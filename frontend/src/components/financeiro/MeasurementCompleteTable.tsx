@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
@@ -50,6 +51,10 @@ export default function MeasurementCompleteTable({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<MeasurementStatus | 'all'>('all');
   const [contractFilter, setContractFilter] = useState<string>('all');
+  
+  // Estados para seleção múltipla
+  const [selectedBulletins, setSelectedBulletins] = useState<Set<string>>(new Set());
+  const [isAllSelected, setIsAllSelected] = useState(false);
 
   // Estados dos modais
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -160,6 +165,71 @@ export default function MeasurementCompleteTable({
   const uniqueContracts = Array.isArray(bulletins) 
     ? Array.from(new Set(bulletins.map(b => b.contractNumber))).filter(Boolean)
     : [];
+
+  // Funções para seleção múltipla
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(filteredBulletins.map(bulletin => bulletin.id));
+      setSelectedBulletins(allIds);
+      setIsAllSelected(true);
+    } else {
+      setSelectedBulletins(new Set());
+      setIsAllSelected(false);
+    }
+  };
+
+  const handleSelectBulletin = (bulletinId: string, checked: boolean) => {
+    const newSelected = new Set(selectedBulletins);
+    if (checked) {
+      newSelected.add(bulletinId);
+    } else {
+      newSelected.delete(bulletinId);
+    }
+    setSelectedBulletins(newSelected);
+    
+    // Verificar se todos estão selecionados
+    setIsAllSelected(newSelected.size === filteredBulletins.length && filteredBulletins.length > 0);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedBulletins.size === 0) return;
+    
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir ${selectedBulletins.size} boletim(ns) selecionado(s)? Esta ação não pode ser desfeita.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const deletePromises = Array.from(selectedBulletins).map(id => 
+        measurementService.deleteBulletin(id)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      toast({
+        title: "Sucesso",
+        description: `${selectedBulletins.size} boletim(ns) excluído(s) com sucesso.`,
+        variant: "default"
+      });
+      
+      // Limpar seleção e recarregar dados
+      setSelectedBulletins(new Set());
+      setIsAllSelected(false);
+      loadBulletins();
+      
+    } catch (error) {
+      console.error('Erro ao excluir boletins:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir alguns boletins. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handlers
   const handleCreate = () => {
@@ -315,6 +385,16 @@ export default function MeasurementCompleteTable({
               <Bug className="h-4 w-4 mr-2" />
               Testar API
             </Button>
+            {selectedBulletins.size > 0 && (
+              <Button
+                onClick={handleBulkDelete}
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Selecionados ({selectedBulletins.size})
+              </Button>
+            )}
           </div>
 
           {/* Estatísticas */}
@@ -359,6 +439,13 @@ export default function MeasurementCompleteTable({
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-600 bg-seguranca-black">
+                    <th className="text-center py-3 px-4 font-medium text-seguranca-lightgray w-12">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={handleSelectAll}
+                        className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                      />
+                    </th>
                     <th className="text-left py-3 px-4 font-medium text-seguranca-lightgray">Contrato</th>
                     <th className="text-left py-3 px-4 font-medium text-seguranca-lightgray">Cliente</th>
                     <th className="text-left py-3 px-4 font-medium text-seguranca-lightgray">Período</th>
@@ -375,6 +462,13 @@ export default function MeasurementCompleteTable({
                     
                     return (
                       <tr key={bulletin.id} className="border-b border-gray-700 hover:bg-seguranca-black/50">
+                        <td className="py-3 px-4 text-center">
+                          <Checkbox
+                            checked={selectedBulletins.has(bulletin.id)}
+                            onCheckedChange={(checked) => handleSelectBulletin(bulletin.id, checked as boolean)}
+                            className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                          />
+                        </td>
                         <td className="py-3 px-4">
                           <div className="text-seguranca-lightgray font-medium">
                             {bulletin.contractNumber}

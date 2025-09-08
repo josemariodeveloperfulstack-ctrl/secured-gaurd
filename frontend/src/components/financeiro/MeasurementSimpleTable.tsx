@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,6 +54,10 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<MeasurementFilters>({});
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Estados para seleção múltipla
+  const [selectedBulletins, setSelectedBulletins] = useState<Set<string>>(new Set());
+  const [isAllSelected, setIsAllSelected] = useState(false);
 
   const statusOptions = [
     { value: 'all', label: 'Todos os Status' },
@@ -160,6 +165,71 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
       ...prev,
       [field]: value === 'all' ? undefined : value
     }));
+  };
+
+  // Funções para seleção múltipla
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(safeBulletins.map(bulletin => bulletin.id));
+      setSelectedBulletins(allIds);
+      setIsAllSelected(true);
+    } else {
+      setSelectedBulletins(new Set());
+      setIsAllSelected(false);
+    }
+  };
+
+  const handleSelectBulletin = (bulletinId: string, checked: boolean) => {
+    const newSelected = new Set(selectedBulletins);
+    if (checked) {
+      newSelected.add(bulletinId);
+    } else {
+      newSelected.delete(bulletinId);
+    }
+    setSelectedBulletins(newSelected);
+    
+    // Verificar se todos estão selecionados
+    setIsAllSelected(newSelected.size === safeBulletins.length && safeBulletins.length > 0);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedBulletins.size === 0) return;
+    
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir ${selectedBulletins.size} boletim(ns) selecionado(s)? Esta ação não pode ser desfeita.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const deletePromises = Array.from(selectedBulletins).map(id => 
+        measurementService.deleteBulletin(id)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      toast({
+        title: "Sucesso",
+        description: `${selectedBulletins.size} boletim(ns) excluído(s) com sucesso.`,
+        variant: "default"
+      });
+      
+      // Limpar seleção e recarregar dados
+      setSelectedBulletins(new Set());
+      setIsAllSelected(false);
+      loadBulletins();
+      
+    } catch (error) {
+      console.error('Erro ao excluir boletins:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir alguns boletins. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -336,6 +406,16 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
             >
               <Bug className="h-4 w-4" />
             </Button>
+            {selectedBulletins.size > 0 && (
+              <Button
+                onClick={handleBulkDelete}
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Selecionados ({selectedBulletins.size})
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -345,6 +425,13 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow className="border-b-gray-700">
+              <TableHead className="text-gray-400 text-center w-12">
+                <Checkbox
+                  checked={isAllSelected}
+                  onCheckedChange={handleSelectAll}
+                  className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                />
+              </TableHead>
               <TableHead className="text-gray-400">Período</TableHead>
               <TableHead className="text-gray-400">Contrato</TableHead>
               <TableHead className="text-gray-400">Valor</TableHead>
@@ -357,6 +444,13 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
               const status = getStatusProps(bulletin.status);
               return (
                 <TableRow key={bulletin.id} className="border-b-gray-700 hover:bg-seguranca-black/50">
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={selectedBulletins.has(bulletin.id)}
+                      onCheckedChange={(checked) => handleSelectBulletin(bulletin.id, checked as boolean)}
+                      className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="text-sm text-seguranca-lightgray">
                       {formatDate(bulletin.periodStart)} - {formatDate(bulletin.periodEnd)}
