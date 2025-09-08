@@ -100,21 +100,19 @@ const ContasAPagar: React.FC = () => {
   };
 
   const handleDeleteConta = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta conta?')) {
-      try {
-        await contasAPagarService.deleteContaAPagar(id);
-        toast({
-          title: "Sucesso",
-          description: "Conta excluída com sucesso!"
-        });
-        loadData();
-      } catch (error) {
-        toast({
-          title: "Erro",
-          description: "Erro ao excluir conta.",
-          variant: "destructive"
-        });
-      }
+    try {
+      await contasAPagarService.deleteContaAPagar(id);
+      toast({
+        title: "Sucesso",
+        description: "Conta excluída com sucesso!"
+      });
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir conta.",
+        variant: "destructive"
+      });
     }
   };
 

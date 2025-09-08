@@ -78,10 +78,10 @@ export const MeasurementValidationModal: React.FC<MeasurementValidationModalProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-600">
+      <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-600 mx-auto my-auto">
         <DialogHeader>
           <DialogTitle className="text-seguranca-lightgray text-xl flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-400" />
+            <CheckCircle className="h-5 w-5 text-seguranca-yellow" />
             Validar Boletim de Medição
           </DialogTitle>
         </DialogHeader>

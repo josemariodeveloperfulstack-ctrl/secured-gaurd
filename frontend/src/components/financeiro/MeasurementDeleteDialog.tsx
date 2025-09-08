@@ -49,10 +49,10 @@ export const MeasurementDeleteDialog: React.FC<MeasurementDeleteDialogProps> = (
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-seguranca-graphite border-gray-600">
+      <AlertDialogContent className="bg-seguranca-graphite border-gray-600 mx-auto my-auto">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-seguranca-lightgray flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <AlertTriangle className="h-5 w-5 text-seguranca-yellow" />
             Confirmar Exclusão
           </AlertDialogTitle>
           <AlertDialogDescription className="text-gray-400">
@@ -76,13 +76,13 @@ export const MeasurementDeleteDialog: React.FC<MeasurementDeleteDialogProps> = (
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black">
+          <AlertDialogCancel className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow">
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
             disabled={deleting}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-seguranca-red hover:bg-seguranca-darkred text-white"
           >
             {deleting ? (
               <>

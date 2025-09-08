@@ -16,6 +16,8 @@ import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 
 export interface ContaAPagar {
   id?: string;
+  numeroFatura?: string;
+  dataEmissao?: Date;
   vencimento: Date;
   fornecedor: string;
   fornecedorId?: string;
@@ -28,8 +30,8 @@ export interface ContaAPagar {
   dataPagamento?: Date;
   observacoes?: string;
   comprovante?: File;
-  categoria?: string;
-  centroCusto?: string;
+  categoria?: string | undefined;
+  centroCusto?: string | undefined;
 }
 
 interface ContasAPagarFormModalProps {
@@ -52,6 +54,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [fornecedores, setFornecedores] = useState<Supplier[]>([]);
   
   const [formData, setFormData] = useState<ContaAPagar>({
+    dataEmissao: new Date(),
     vencimento: new Date(),
     fornecedor: '',
     fornecedorId: '',
@@ -63,13 +66,17 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     baixa: false,
     dataPagamento: undefined,
     observacoes: '',
-    categoria: '',
-    centroCusto: ''
+    categoria: undefined,
+    centroCusto: undefined
   });
 
-  // Carregar fornecedores
+  const [categories, setCategories] = useState<string[]>([]);
+  const [costCenters, setCostCenters] = useState<string[]>([]);
+
+  // Carregar fornecedores, categorias e centros de custo
   useEffect(() => {
     if (open) {
+      // Carregar fornecedores
       contasAPagarService.getFornecedores()
         .then(setFornecedores)
         .catch(error => {
@@ -85,6 +92,20 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             { id: '2', name: 'Fornecedor Exemplo 2', isActive: true }
           ]);
         });
+
+      // Carregar categorias
+      contasAPagarService.getCategories()
+        .then(setCategories)
+        .catch(error => {
+          console.error('Erro ao carregar categorias:', error);
+        });
+
+      // Carregar centros de custo
+      contasAPagarService.getCostCenters()
+        .then(setCostCenters)
+        .catch(error => {
+          console.error('Erro ao carregar centros de custo:', error);
+        });
     }
   }, [open]);
 
@@ -99,6 +120,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       });
     } else if (!open) {
       setFormData({
+        dataEmissao: new Date(),
         vencimento: new Date(),
         fornecedor: '',
         fornecedorId: '',
@@ -175,29 +197,45 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-black border-seguranca-graphite" aria-describedby="conta-pagar-description">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="text-green-600" size={24} />
+          <DialogTitle className="flex items-center gap-2 text-seguranca-lightgray">
+            <DollarSign className="text-seguranca-yellow" size={24} />
             {editMode ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}
           </DialogTitle>
+          <p id="conta-pagar-description" className="text-sm text-seguranca-lightgray">
+            {editMode ? 'Edite os dados da conta a pagar selecionada.' : 'Preencha os dados para criar uma nova conta a pagar.'}
+          </p>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Informações Básicas */}
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* Data de Emissão */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">Data de Emissão *</label>
+            <DatePicker
+              selected={formData.dataEmissao}
+              onChange={(date: Date) => handleInputChange('dataEmissao', date)}
+              {...DEFAULT_DATE_PICKER_PROPS}
+              className="w-full p-2 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+              required
+            />
+          </div>
+
+          {/* Data de Vencimento e Fornecedor */}
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Data de Vencimento *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Data de Vencimento *</label>
               <DatePicker
                 selected={formData.vencimento}
                 onChange={(date: Date) => handleInputChange('vencimento', date)}
                 {...DEFAULT_DATE_PICKER_PROPS}
+                className="w-full p-2 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 required
               />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Fornecedor *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor *</label>
               <Select 
                 value={formData.fornecedorId} 
                 onValueChange={(value) => {
@@ -206,12 +244,12 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   handleInputChange('fornecedor', fornecedor?.name || '');
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue placeholder="Selecione um fornecedor" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
                   {fornecedores.map((fornecedor) => (
-                    <SelectItem key={fornecedor.id} value={fornecedor.id}>
+                    <SelectItem key={fornecedor.id} value={fornecedor.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                       {fornecedor.name}
                     </SelectItem>
                   ))}
@@ -220,22 +258,24 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             </div>
           </div>
 
+
           {/* Descrição e Valor */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Descrição *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Descrição *</label>
               <Input
                 value={formData.descricao}
                 onChange={(e) => handleInputChange('descricao', e.target.value)}
                 placeholder="Descrição da despesa"
+                className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 required
               />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Valor *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Valor *</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">R$</span>
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-seguranca-lightgray">R$</span>
                 <CurrencyInput
                   prefix=""
                   decimalSeparator="," 
@@ -243,7 +283,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   value={formData.valor}
                   onValueChange={(value) => handleInputChange('valor', parseFloat(value || '0'))}
                   placeholder="0,00"
-                  className="w-full p-2 pl-10 border rounded-md"
+                  className="w-full p-2 pl-10 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   required
                 />
               </div>
@@ -251,32 +291,32 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           </div>
 
           {/* Tipo e Status */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Tipo *</label>
               <Select value={formData.tipo} onValueChange={(value: 'FIXA' | 'VARIAVEL') => handleInputChange('tipo', value)}>
-                <SelectTrigger>
+                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FIXA">Despesa Fixa</SelectItem>
-                  <SelectItem value="VARIAVEL">Despesa Variável</SelectItem>
+                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                  <SelectItem value="FIXA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Despesa Fixa</SelectItem>
+                  <SelectItem value="VARIAVEL" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Despesa Variável</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Status</label>
               <Select value={formData.status} onValueChange={(value: any) => handleInputChange('status', value)}>
-                <SelectTrigger>
+                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ABERTA">Aberta</SelectItem>
-                  <SelectItem value="PAGA">Paga</SelectItem>
-                  <SelectItem value="ATRASADA">Atrasada</SelectItem>
-                  <SelectItem value="VENCIDA">Vencida</SelectItem>
-                  <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                  <SelectItem value="ABERTA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Aberta</SelectItem>
+                  <SelectItem value="PAGA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Paga</SelectItem>
+                  <SelectItem value="ATRASADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Atrasada</SelectItem>
+                  <SelectItem value="VENCIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Vencida</SelectItem>
+                  <SelectItem value="CANCELADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -284,54 +324,71 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
           {/* Código de Barras */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Código de Barras</label>
+            <label className="text-sm font-medium text-seguranca-lightgray">Código de Barras</label>
             <Input
               value={formData.codigoBarras}
               onChange={(e) => handleInputChange('codigoBarras', e.target.value)}
               placeholder="Código de barras do boleto"
+              className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
             />
           </div>
 
           {/* Categoria e Centro de Custo */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Categoria</label>
-              <Input
-                value={formData.categoria}
-                onChange={(e) => handleInputChange('categoria', e.target.value)}
-                placeholder="Ex: Manutenção, Material, Serviços"
-              />
+              <label className="text-sm font-medium text-seguranca-lightgray">Categoria</label>
+              <Select value={formData.categoria || undefined} onValueChange={(value) => handleInputChange('categoria', value)}>
+                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Centro de Custo</label>
-              <Input
-                value={formData.centroCusto}
-                onChange={(e) => handleInputChange('centroCusto', e.target.value)}
-                placeholder="Ex: Operacional, Administrativo"
-              />
+              <label className="text-sm font-medium text-seguranca-lightgray">Centro de Custo</label>
+              <Select value={formData.centroCusto || undefined} onValueChange={(value) => handleInputChange('centroCusto', value)}>
+                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectValue placeholder="Selecione um centro de custo" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                  {costCenters.map((costCenter) => (
+                    <SelectItem key={costCenter} value={costCenter} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      {costCenter}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {/* Baixa e Data de Pagamento */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="baixa"
                 checked={formData.baixa}
                 onCheckedChange={(checked) => handleInputChange('baixa', checked)}
+                className="border-seguranca-graphite data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
               />
-              <label htmlFor="baixa" className="text-sm font-medium">
+              <label htmlFor="baixa" className="text-sm font-medium text-seguranca-lightgray">
                 Marcar como baixa no sistema
               </label>
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Data de Pagamento</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Data de Pagamento</label>
               <DatePicker
                 selected={formData.dataPagamento}
                 onChange={(date: Date) => handleInputChange('dataPagamento', date)}
                 {...DEFAULT_DATE_PICKER_PROPS}
+                className="w-full p-2 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 isClearable
               />
             </div>
@@ -339,21 +396,21 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
           {/* Upload de Comprovante */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Comprovante de Pagamento</label>
-            <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">Comprovante de Pagamento</label>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
               <Input
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={handleFileUpload}
-                className="flex-1"
+                className="flex-1 border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray file:bg-seguranca-graphite file:text-seguranca-lightgray file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3"
               />
-              <Button type="button" variant="outline" size="sm">
+              <Button type="button" variant="outline" size="sm" className="border-seguranca-graphite text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-lightgray">
                 <Upload size={16} className="mr-2" />
                 Upload
               </Button>
             </div>
             {formData.comprovante && (
-              <p className="text-sm text-green-600">
+              <p className="text-sm text-seguranca-yellow">
                 Arquivo selecionado: {formData.comprovante.name}
               </p>
             )}
@@ -361,21 +418,31 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
           {/* Observações */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Observações</label>
+            <label className="text-sm font-medium text-seguranca-lightgray">Observações</label>
             <Textarea
               value={formData.observacoes}
               onChange={(e) => handleInputChange('observacoes', e.target.value)}
               placeholder="Observações sobre a conta"
               rows={3}
+              className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
             />
           </div>
 
           {/* Botões */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t border-seguranca-graphite">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="border-seguranca-graphite text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-lightgray"
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {loading ? 'Salvando...' : (editMode ? 'Atualizar' : 'Criar Conta')}
             </Button>
           </div>

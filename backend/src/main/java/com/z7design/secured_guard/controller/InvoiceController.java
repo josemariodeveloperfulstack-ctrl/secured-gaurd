@@ -456,4 +456,81 @@ public class InvoiceController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(selectClients);
     }
+    
+    @GetMapping("/categories")
+    @Operation(summary = "Listar categorias únicas", description = "Retorna uma lista de todas as categorias únicas usadas nas faturas")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de categorias retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<String>> getDistinctCategories() {
+        List<String> categories = invoiceService.getDistinctCategories();
+        return ResponseEntity.ok(categories);
+    }
+    
+    @GetMapping("/cost-centers")
+    @Operation(summary = "Listar centros de custo", description = "Retorna uma lista de todos os centros de custo ativos")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de centros de custo retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<String>> getDistinctCostCenters() {
+        List<String> costCenters = invoiceService.getDistinctCostCenters();
+        return ResponseEntity.ok(costCenters);
+    }
+    
+    @GetMapping("/test-cost-centers")
+    @Operation(summary = "Teste - Listar centros de custo", description = "Endpoint de teste para verificar centros de custo")
+    public ResponseEntity<List<String>> testCostCenters() {
+        try {
+            List<String> costCenters = invoiceService.getDistinctCostCenters();
+            log.info("Centros de custo encontrados: {}", costCenters);
+            return ResponseEntity.ok(costCenters);
+        } catch (Exception e) {
+            log.error("Erro ao buscar centros de custo", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @GetMapping("/public/test-cost-centers")
+    @Operation(summary = "Teste público - Listar centros de custo", description = "Endpoint público de teste para verificar centros de custo")
+    public ResponseEntity<List<String>> testCostCentersPublic() {
+        try {
+            List<String> costCenters = invoiceService.getAllCostCenterNames();
+            log.info("Centros de custo encontrados (público): {}", costCenters);
+            return ResponseEntity.ok(costCenters);
+        } catch (Exception e) {
+            log.error("Erro ao buscar centros de custo (público)", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @GetMapping("/public/debug-cost-centers")
+    @Operation(summary = "Debug - Informações sobre centros de custo", description = "Endpoint público de debug para verificar dados de centros de custo")
+    public ResponseEntity<Map<String, Object>> debugCostCenters() {
+        try {
+            Map<String, Object> debug = new HashMap<>();
+            
+            // Buscar centros de custo da tabela cost_centers (ativos)
+            List<String> costCentersFromTable = invoiceService.getDistinctCostCenters();
+            debug.put("costCentersFromTable", costCentersFromTable);
+            debug.put("costCentersCount", costCentersFromTable.size());
+            
+            // Buscar todos os centros de custo da tabela cost_centers
+            List<String> allCostCentersFromTable = invoiceService.getAllCostCenterNames();
+            debug.put("allCostCentersFromTable", allCostCentersFromTable);
+            debug.put("allCostCentersCount", allCostCentersFromTable.size());
+            
+            // Buscar centros de custo da tabela invoices
+            List<String> costCentersFromInvoices = invoiceService.getDistinctCostCentersFromInvoices();
+            debug.put("costCentersFromInvoices", costCentersFromInvoices);
+            debug.put("costCentersFromInvoicesCount", costCentersFromInvoices.size());
+            
+            log.info("Debug centros de custo: {}", debug);
+            return ResponseEntity.ok(debug);
+        } catch (Exception e) {
+            log.error("Erro ao fazer debug de centros de custo", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 } 

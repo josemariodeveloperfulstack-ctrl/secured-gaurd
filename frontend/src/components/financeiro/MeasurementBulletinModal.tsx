@@ -440,9 +440,10 @@ export const MeasurementBulletinModal: React.FC<MeasurementBulletinModalProps> =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 mx-auto my-auto">
         <DialogHeader>
-          <DialogTitle className="text-seguranca-lightgray text-xl">
+          <DialogTitle className="text-seguranca-lightgray text-xl flex items-center gap-2">
+            <FileText className="h-5 w-5 text-seguranca-yellow" />
             {bulletin ? 'Editar Boletim de Medição' : 'Novo Boletim de Medição'}
           </DialogTitle>
         </DialogHeader>
@@ -527,7 +528,7 @@ export const MeasurementBulletinModal: React.FC<MeasurementBulletinModalProps> =
                           setFormData(prev => ({ ...prev, clientId: '' }));
                           clearRelatedFields();
                         }}
-                        className="px-2 text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
+                        className="px-2 text-red-400 border-gray-600 hover:bg-red-400/10 hover:text-red-300"
                       >
                         ✕
                       </Button>
@@ -563,7 +564,7 @@ export const MeasurementBulletinModal: React.FC<MeasurementBulletinModalProps> =
                             contractEnd: ''
                           }));
                         }}
-                        className="px-2 text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
+                        className="px-2 text-red-400 border-gray-600 hover:bg-red-400/10 hover:text-red-300"
                       >
                         ✕
                       </Button>
@@ -593,7 +594,7 @@ export const MeasurementBulletinModal: React.FC<MeasurementBulletinModalProps> =
                         onClick={() => {
                           setFormData(prev => ({ ...prev, unitId: '' }));
                         }}
-                        className="px-2 text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
+                        className="px-2 text-red-400 border-gray-600 hover:bg-red-400/10 hover:text-red-300"
                       >
                         ✕
                       </Button>
@@ -849,8 +850,9 @@ export const MeasurementBulletinModal: React.FC<MeasurementBulletinModalProps> =
           type="button"
           variant="outline"
           onClick={() => onOpenChange(false)}
-          className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+          className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
         >
+          <X className="h-4 w-4 mr-2" />
           Cancelar
         </Button>
         <Button

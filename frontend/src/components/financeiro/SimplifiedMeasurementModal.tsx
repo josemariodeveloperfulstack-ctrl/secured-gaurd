@@ -209,7 +209,7 @@ export const SimplifiedMeasurementModal: React.FC<SimplifiedMeasurementModalProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-seguranca-graphite border-gray-600">
+      <DialogContent className="sm:max-w-[600px] bg-seguranca-graphite border-gray-600 mx-auto my-auto">
         <DialogHeader>
           <DialogTitle className="text-seguranca-lightgray flex items-center gap-2">
             <Clock className="h-5 w-5 text-seguranca-yellow" />

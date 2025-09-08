@@ -238,4 +238,20 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
     List<Invoice> findByCentroCustoAndPeriod(@Param("centro") String centro,
                                              @Param("start") LocalDate start,
                                              @Param("end") LocalDate end);
+    
+    // Buscar categorias únicas
+    @Query("SELECT DISTINCT i.category FROM Invoice i WHERE i.category IS NOT NULL ORDER BY i.category")
+    List<String> findDistinctCategories();
+    
+    // Buscar centros de custo únicos
+    @Query("SELECT DISTINCT i.centroCusto FROM Invoice i WHERE i.centroCusto IS NOT NULL ORDER BY i.centroCusto")
+    List<String> findDistinctCostCenters();
+    
+    // Buscar centros de custo da tabela cost_centers
+    @Query("SELECT cc.name FROM CostCenter cc WHERE cc.status = 'ACTIVE' ORDER BY cc.name")
+    List<String> findActiveCostCenterNames();
+    
+    // Buscar todos os centros de custo da tabela cost_centers (incluindo inativos)
+    @Query("SELECT cc.name FROM CostCenter cc ORDER BY cc.name")
+    List<String> findAllCostCenterNames();
 } 

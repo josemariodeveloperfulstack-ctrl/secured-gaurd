@@ -50,6 +50,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/files/**").permitAll()
                 .requestMatchers("/api/test/health").permitAll()
                 .requestMatchers("/api/payslips/test-download/**").permitAll()
+                .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
+                .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
+                .requestMatchers("/api/invoices/cost-centers").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // Arquivos públicos (imagens e uploads)
@@ -77,6 +80,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/contracts/**").hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE", "CONTRACTS_CREATE", "CONTRACTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR")
                 // Endpoints financeiros - requerem permissões específicas
                 .requestMatchers("/api/financial/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                // Endpoints de invoices (contas a pagar) - requerem permissões específicas
+                .requestMatchers("/api/invoices/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de holerites - requerem permissões específicas
                 .requestMatchers("/api/payslips/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
                 // Endpoints de recibos - requerem permissões específicas

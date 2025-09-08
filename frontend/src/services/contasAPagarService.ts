@@ -6,17 +6,14 @@ export interface CreateContaAPagarRequest {
   invoiceNumber?: string;
   description: string;
   supplierId: string;
-  clientId?: string;
-  contractId?: string;
   unitId: string;
   amount: number;
   type: 'FIXA' | 'VARIAVEL';
   status: 'ABERTA' | 'PAGA' | 'ATRASADA' | 'CANCELADA' | 'VENCIDA';
   dueDate: string;
-  issueDate?: string;
+  issueDate: string;
   paymentDate?: string;
   barcode?: string;
-  baixa?: boolean;
   category?: string;
   notes?: string;
   centroCusto?: string;
@@ -215,6 +212,8 @@ export const contasAPagarService = {
     
     return invoices.map((invoice: any): ContaAPagar => ({
       id: invoice.id,
+      numeroFatura: invoice.invoiceNumber,
+      dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
       fornecedorId: invoice.supplierId,
@@ -238,9 +237,15 @@ export const contasAPagarService = {
     
     return {
       id: invoice.id,
+      numeroFatura: invoice.invoiceNumber,
+      dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
       fornecedorId: invoice.supplierId,
+      cliente: invoice.clientName,
+      clienteId: invoice.clientId,
+      contrato: invoice.contractNumber,
+      contratoId: invoice.contractId,
       descricao: invoice.description,
       tipo: invoice.type || 'VARIAVEL',
       valor: parseFloat(invoice.amount),
@@ -256,20 +261,38 @@ export const contasAPagarService = {
 
   // Criar nova conta
   async createContaAPagar(conta: Omit<ContaAPagar, 'id'>): Promise<ContaAPagar> {
+    // Buscar uma unidade padrão ou usar UUID padrão
+    let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+    
+    try {
+      const unitsResponse = await api.get('/api/units/all');
+      if (unitsResponse.data && unitsResponse.data.length > 0) {
+        unitId = unitsResponse.data[0].id;
+      }
+    } catch (error) {
+      console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
+    }
+
     const requestData: CreateContaAPagarRequest = {
       description: conta.descricao,
       supplierId: conta.fornecedorId || '',
-      unitId: '1', // TODO: Pegar da unidade selecionada
+      unitId: unitId,
       amount: conta.valor,
       type: conta.tipo,
-      status: conta.status,
+      status: mapFrontendStatusToBackend(conta.status) as any,
       dueDate: formatDateForBackend(conta.vencimento) || '',
+      issueDate: formatDateForBackend(conta.dataEmissao) || '',
       paymentDate: formatDateForBackend(conta.dataPagamento),
       barcode: conta.codigoBarras,
-      baixa: conta.baixa,
-      category: conta.categoria,
-      notes: conta.observacoes
+      category: conta.categoria || undefined,
+      notes: conta.observacoes,
+      centroCusto: conta.centroCusto || undefined
     };
+
+    // Adicionar invoiceNumber apenas se fornecido
+    if (conta.numeroFatura && conta.numeroFatura.trim()) {
+      requestData.invoiceNumber = conta.numeroFatura;
+    }
 
     const response = await api.post('/api/invoices', requestData);
     return this.getContaAPagarById(response.data.id);
@@ -279,17 +302,34 @@ export const contasAPagarService = {
   async updateContaAPagar(id: string, conta: Partial<ContaAPagar>): Promise<ContaAPagar> {
     const requestData: Partial<CreateContaAPagarRequest> = {};
     
+    if (conta.numeroFatura && conta.numeroFatura.trim()) requestData.invoiceNumber = conta.numeroFatura;
     if (conta.descricao) requestData.description = conta.descricao;
     if (conta.fornecedorId) requestData.supplierId = conta.fornecedorId;
     if (conta.valor !== undefined) requestData.amount = conta.valor;
     if (conta.tipo) requestData.type = conta.tipo;
-    if (conta.status) requestData.status = conta.status;
+    if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) as any;
+    if (conta.dataEmissao) requestData.issueDate = formatDateForBackend(conta.dataEmissao);
     if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
     if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
     if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
-    if (conta.baixa !== undefined) requestData.baixa = conta.baixa;
-    if (conta.categoria) requestData.category = conta.categoria;
+    if (conta.categoria !== undefined) requestData.category = conta.categoria;
     if (conta.observacoes) requestData.notes = conta.observacoes;
+    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto;
+    
+    // Se não há unitId, buscar uma unidade padrão
+    if (!requestData.unitId) {
+      try {
+        const unitsResponse = await api.get('/api/units/all');
+        if (unitsResponse.data && unitsResponse.data.length > 0) {
+          requestData.unitId = unitsResponse.data[0].id;
+        } else {
+          requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+        }
+      } catch (error) {
+        console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
+        requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+      }
+    }
 
     const response = await api.put(`/api/invoices/${id}`, requestData);
     return this.getContaAPagarById(response.data.id);
@@ -298,6 +338,16 @@ export const contasAPagarService = {
   // Excluir conta
   async deleteContaAPagar(id: string): Promise<void> {
     await api.delete(`/api/invoices/${id}`);
+  },
+
+  async getCategories(): Promise<string[]> {
+    const response = await api.get('/api/invoices/categories');
+    return response.data;
+  },
+
+  async getCostCenters(): Promise<string[]> {
+    const response = await api.get('/api/invoices/cost-centers');
+    return response.data;
   },
 
   // Marcar conta como paga
@@ -631,6 +681,8 @@ export const contasAPagarService = {
   mapInvoiceToContaAPagar(invoice: any): ContaAPagar {
     return {
       id: invoice.id,
+      numeroFatura: invoice.invoiceNumber,
+      dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
       fornecedorId: invoice.supplierId,
@@ -648,24 +700,38 @@ export const contasAPagarService = {
   }
 };
 
+// Função auxiliar para mapear status do frontend para backend
+function mapFrontendStatusToBackend(frontendStatus: 'ABERTA' | 'PAGA' | 'ATRASADA' | 'CANCELADA' | 'VENCIDA'): string {
+  switch (frontendStatus) {
+    case 'ABERTA':
+      return 'PENDENTE';
+    case 'PAGA':
+      return 'PAGA';
+    case 'CANCELADA':
+      return 'CANCELADA';
+    case 'ATRASADA':
+      return 'ERRO';
+    case 'VENCIDA':
+      return 'ERRO';
+    default:
+      return 'PENDENTE';
+  }
+}
+
 // Função auxiliar para mapear status do backend para frontend
 function mapBackendStatusToFrontend(backendStatus: string): 'ABERTA' | 'PAGA' | 'ATRASADA' | 'CANCELADA' | 'VENCIDA' {
   switch (backendStatus) {
     case 'PENDENTE':
-    case 'PENDING':
+    case 'PENDENTE_ERRO':
+    case 'SOLICITADA':
       return 'ABERTA';
     case 'PAGA':
-    case 'PAID':
+    case 'PAGA_ANTERIORMENTE':
       return 'PAGA';
     case 'CANCELADA':
-    case 'CANCELLED':
       return 'CANCELADA';
-    case 'ATRASADA':
-    case 'OVERDUE':
+    case 'ERRO':
       return 'ATRASADA';
-    case 'VENCIDA':
-    case 'EXPIRED':
-      return 'VENCIDA';
     default:
       return 'ABERTA';
   }

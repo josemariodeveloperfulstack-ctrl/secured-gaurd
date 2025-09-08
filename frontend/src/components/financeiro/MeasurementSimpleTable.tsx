@@ -30,6 +30,7 @@ import {
   MeasurementFilters 
 } from '@/types/measurement';
 import { measurementService } from '@/services/measurementService';
+import { BulkDeleteDialog } from './BulkDeleteDialog';
 
 interface MeasurementSimpleTableProps {
   onView: (bulletin: MeasurementBulletin) => void;
@@ -58,6 +59,7 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   // Estados para seleção múltipla
   const [selectedBulletins, setSelectedBulletins] = useState<Set<string>>(new Set());
   const [isAllSelected, setIsAllSelected] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
   const statusOptions = [
     { value: 'all', label: 'Todos os Status' },
@@ -192,15 +194,12 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     setIsAllSelected(newSelected.size === safeBulletins.length && safeBulletins.length > 0);
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedBulletins.size === 0) return;
-    
-    const confirmed = window.confirm(
-      `Tem certeza que deseja excluir ${selectedBulletins.size} boletim(ns) selecionado(s)? Esta ação não pode ser desfeita.`
-    );
-    
-    if (!confirmed) return;
+    setShowBulkDeleteDialog(true);
+  };
 
+  const confirmBulkDelete = async () => {
     try {
       setLoading(true);
       const deletePromises = Array.from(selectedBulletins).map(id => 
@@ -218,6 +217,7 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
       // Limpar seleção e recarregar dados
       setSelectedBulletins(new Set());
       setIsAllSelected(false);
+      setShowBulkDeleteDialog(false);
       loadBulletins();
       
     } catch (error) {
@@ -526,6 +526,16 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
           </TableBody>
         </Table>
       </div>
+
+      {/* Modal de exclusão em massa */}
+      <BulkDeleteDialog
+        open={showBulkDeleteDialog}
+        onOpenChange={setShowBulkDeleteDialog}
+        onConfirm={confirmBulkDelete}
+        itemCount={selectedBulletins.size}
+        itemType="boletim"
+        loading={loading}
+      />
     </div>
   );
 };

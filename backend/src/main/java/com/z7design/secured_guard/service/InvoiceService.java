@@ -423,4 +423,24 @@ public class InvoiceService {
             .filter(a -> a != null)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+    
+    // Buscar categorias únicas
+    public List<String> getDistinctCategories() {
+        return invoiceRepository.findDistinctCategories();
+    }
+    
+    // Buscar centros de custo únicos
+    public List<String> getDistinctCostCenters() {
+        return invoiceRepository.findAllCostCenterNames();
+    }
+    
+    // Buscar centros de custo únicos da tabela invoices
+    public List<String> getDistinctCostCentersFromInvoices() {
+        return invoiceRepository.findDistinctCostCenters();
+    }
+    
+    // Buscar todos os centros de custo da tabela cost_centers
+    public List<String> getAllCostCenterNames() {
+        return invoiceRepository.findAllCostCenterNames();
+    }
 } 

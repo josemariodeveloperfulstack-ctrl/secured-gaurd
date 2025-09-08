@@ -73,10 +73,10 @@ export const MeasurementViewModal: React.FC<MeasurementViewModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 mx-auto my-auto">
         <DialogHeader>
           <DialogTitle className="text-seguranca-lightgray text-xl flex items-center gap-2">
-            <Eye className="h-5 w-5" />
+            <Eye className="h-5 w-5 text-seguranca-yellow" />
             Visualizar Boletim de Medição
           </DialogTitle>
         </DialogHeader>
