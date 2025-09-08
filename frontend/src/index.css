@@ -1,0 +1,250 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%; /* Preto */
+    --foreground: 0 0% 80%; /* Cinza Claro */
+
+    --card: 0 0% 20%; /* Cinza Grafite */
+    --card-foreground: 0 0% 80%; /* Cinza Claro */
+
+    --popover: 0 0% 20%; /* Cinza Grafite */
+    --popover-foreground: 0 0% 80%; /* Cinza Claro */
+
+    --primary: 0 100% 43%; /* Vermelho Escuro */
+    --primary-foreground: 0 0% 100%; /* Branco */
+
+    --secondary: 0 0% 80%; /* Cinza Claro */
+    --secondary-foreground: 0 0% 20%; /* Cinza Grafite */
+
+    --muted: 0 0% 30%; /* Cinza médio */
+    --muted-foreground: 0 0% 60%; /* Cinza um pouco mais claro */
+
+    --accent: 45 100% 50%; /* Amarelo */
+    --accent-foreground: 0 0% 0%; /* Preto */
+
+    --destructive: 0 100% 43%; /* Vermelho */
+    --destructive-foreground: 0 0% 100%; /* Branco */
+
+    --border: 0 0% 30%; /* Cinza escuro */
+    --input: 0 0% 30%; /* Cinza escuro */
+    --ring: 45 100% 50%; /* Amarelo */
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 20%; /* Cinza Grafite */
+    --sidebar-foreground: 0 0% 80%; /* Cinza Claro */
+    --sidebar-primary: 45 100% 50%; /* Amarelo */
+    --sidebar-primary-foreground: 0 0% 0%; /* Preto */
+    --sidebar-accent: 0 0% 15%; /* Cinza mais escuro */
+    --sidebar-accent-foreground: 0 0% 80%; /* Cinza Claro */
+    --sidebar-border: 0 0% 30%; /* Cinza escuro */
+    --sidebar-ring: 45 100% 50%; /* Amarelo */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html, body {
+    height: 100%;
+    @apply font-roboto bg-seguranca-black text-seguranca-lightgray;
+  }
+  
+  body {
+    @apply bg-seguranca-black text-seguranca-lightgray;
+  }
+  
+  #root {
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    @apply bg-seguranca-black;
+  }
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-seguranca-graphite;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+
+  /* Animações suaves */
+  .transition-all {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Melhorias para mobile */
+  @media (max-width: 768px) {
+    .mobile-sidebar-overlay {
+      backdrop-filter: blur(4px);
+    }
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-seguranca-darkred text-white hover:bg-seguranca-red transition-colors py-2 px-4 rounded-lg;
+  }
+  
+  .btn-secondary {
+    @apply bg-seguranca-graphite text-seguranca-lightgray hover:bg-gray-700 transition-colors py-2 px-4 rounded-lg;
+  }
+  
+  .btn-danger {
+    @apply bg-seguranca-red text-white hover:bg-red-700 transition-colors py-2 px-4 rounded-lg;
+  }
+  
+  .card-dashboard {
+    @apply bg-seguranca-graphite rounded-lg p-6 shadow-md hover:shadow-lg transition-all border border-gray-600;
+  }
+  
+  .form-input {
+    @apply bg-seguranca-graphite border border-gray-600 rounded-lg py-2 px-3 w-full text-seguranca-lightgray focus:ring-2 focus:ring-seguranca-yellow focus:outline-none;
+  }
+  
+  /* DatePicker styles */
+  .react-datepicker-wrapper {
+    @apply w-full;
+  }
+  
+  .react-datepicker__input-container input {
+    @apply bg-seguranca-black border border-gray-600 text-seguranca-lightgray rounded w-full h-10 px-3 focus:ring-2 focus:ring-seguranca-yellow focus:outline-none;
+  }
+  
+  .react-datepicker {
+    @apply bg-seguranca-graphite border border-gray-600 text-seguranca-lightgray;
+  }
+  
+  .react-datepicker__header {
+    @apply bg-seguranca-black border-gray-600;
+  }
+  
+  .react-datepicker__current-month {
+    @apply text-seguranca-lightgray;
+  }
+  
+  .react-datepicker__day-name {
+    @apply text-gray-400;
+  }
+  
+  .react-datepicker__day {
+    @apply text-seguranca-lightgray hover:bg-seguranca-black;
+  }
+  
+  .react-datepicker__day--selected {
+    @apply bg-seguranca-yellow text-black;
+  }
+  
+  .react-datepicker__day--keyboard-selected {
+    @apply bg-seguranca-yellow text-black;
+  }
+  
+  .react-datepicker__day--today {
+    @apply bg-seguranca-red text-white;
+  }
+  
+  .react-datepicker__navigation {
+    @apply text-seguranca-lightgray;
+  }
+  
+  .react-datepicker__month-container {
+    @apply bg-seguranca-graphite;
+  }
+  
+  .alert {
+    @apply bg-seguranca-yellow text-black p-4 rounded-lg border-l-4 border-yellow-500;
+  }
+  
+  .page-container {
+    @apply bg-seguranca-black min-h-screen text-seguranca-lightgray;
+  }
+  
+  .content-area {
+    @apply bg-seguranca-black p-6 rounded-lg;
+  }
+
+  /* Sidebar styles */
+  .sidebar-collapsed {
+    @apply w-16;
+  }
+
+  .sidebar-expanded {
+    @apply w-64;
+  }
+
+  .sidebar-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  /* Layout responsivo */
+  .main-content {
+    @apply transition-all duration-300;
+  }
+
+  .main-content-collapsed {
+    @apply ml-16;
+  }
+
+  .main-content-expanded {
+    @apply ml-64;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .main-content-expanded {
+      @apply ml-0;
+    }
+    
+    .sidebar-mobile {
+      @apply -translate-x-full;
+    }
+    
+    .sidebar-mobile-open {
+      @apply translate-x-0;
+    }
+  }
+
+  /* Tooltip styles for collapsed sidebar */
+  .sidebar-tooltip {
+    @apply bg-seguranca-black text-seguranca-lightgray border border-gray-600;
+  }
+
+  /* Active state improvements */
+  .sidebar-item-active {
+    @apply bg-seguranca-black text-seguranca-yellow shadow-lg;
+  }
+
+  .sidebar-item-hover {
+    @apply hover:bg-seguranca-black hover:text-seguranca-yellow transition-colors;
+  }
+
+  /* Header improvements */
+  .header-sticky {
+    @apply sticky top-0 z-40 backdrop-blur-sm bg-seguranca-black/95;
+  }
+
+  /* Content area improvements */
+  .content-wrapper {
+    @apply bg-seguranca-black rounded-lg border border-gray-700 shadow-lg;
+  }
+}
