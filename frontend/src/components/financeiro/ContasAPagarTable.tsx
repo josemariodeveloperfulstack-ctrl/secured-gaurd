@@ -195,7 +195,7 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
       <Card className="bg-seguranca-graphite border-gray-700">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle className="text-seguranca-lightgray">Contas a Pagar ({contasFiltradas.length})</CardTitle>
+            <CardTitle className="text-seguranca-lightgray">Listagem de Contas a Pagar</CardTitle>
             <Button variant="outline" size="sm" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow">
               <Download size={16} className="mr-2" />
               Exportar
