@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarDays, DollarSign, FileText, Upload, Plus } from 'lucide-react';
-import CurrencyInput from 'react-currency-input-field';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale/pt-BR';
@@ -299,15 +298,29 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               <label className="text-sm font-medium text-seguranca-lightgray">Valor *</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-seguranca-lightgray">R$</span>
-                <CurrencyInput
-                  prefix=""
-                  decimalSeparator="," 
-                  groupSeparator="."
-                  value={formData.valor}
-                  onValueChange={(value) => handleInputChange('valor', parseFloat(value || '0'))}
+                <Input
+                  type="text"
+                  value={formData.valor ? formData.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'}
+                  onChange={(e) => {
+                    // Remove tudo exceto números e vírgula
+                    let value = e.target.value.replace(/[^\d,]/g, '');
+                    
+                    // Garante que há apenas uma vírgula
+                    const parts = value.split(',');
+                    if (parts.length > 2) {
+                      value = parts[0] + ',' + parts.slice(1).join('');
+                    }
+                    
+                    // Limita a 2 casas decimais após a vírgula
+                    if (parts.length === 2 && parts[1].length > 2) {
+                      value = parts[0] + ',' + parts[1].substring(0, 2);
+                    }
+                    
+                    // Converte para número (substitui vírgula por ponto)
+                    const numValue = parseFloat(value.replace(',', '.')) || 0;
+                    handleInputChange('valor', numValue);
+                  }}
                   placeholder="0,00"
-                  decimalsLimit={2}
-                  fixedDecimalLength={2}
                   className="w-full p-2 pl-10 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   required
                 />

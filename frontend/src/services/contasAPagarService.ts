@@ -265,21 +265,12 @@ export const contasAPagarService = {
     let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
     
     try {
-      const unitsResponse = await api.get('/api/units/all');
+      const unitsResponse = await api.get('/api/units');
       if (unitsResponse.data && unitsResponse.data.length > 0) {
         unitId = unitsResponse.data[0].id;
       }
     } catch (error) {
       console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
-      // Tentar buscar unidades de forma alternativa
-      try {
-        const unitsResponse = await api.get('/api/units');
-        if (unitsResponse.data && unitsResponse.data.length > 0) {
-          unitId = unitsResponse.data[0].id;
-        }
-      } catch (secondError) {
-        console.warn('Segunda tentativa de buscar unidades falhou:', secondError);
-      }
     }
 
     const requestData: CreateContaAPagarRequest = {
@@ -337,7 +328,7 @@ export const contasAPagarService = {
     // Se não há unitId, buscar uma unidade padrão
     if (!requestData.unitId) {
       try {
-        const unitsResponse = await api.get('/api/units/all');
+        const unitsResponse = await api.get('/api/units');
         if (unitsResponse.data && unitsResponse.data.length > 0) {
           requestData.unitId = unitsResponse.data[0].id;
         } else {
@@ -349,8 +340,19 @@ export const contasAPagarService = {
       }
     }
 
-    const response = await api.put(`/api/invoices/${id}`, requestData);
-    return this.getContaAPagarById(response.data.id);
+    console.log('Dados da requisição de atualização:', requestData);
+    console.log('ID da conta:', id);
+
+    try {
+      const response = await api.put(`/api/invoices/${id}`, requestData);
+      return this.getContaAPagarById(response.data.id);
+    } catch (error: any) {
+      console.error('Erro detalhado ao atualizar conta a pagar:', error);
+      console.error('Response data:', error.response?.data);
+      console.error('Response status:', error.response?.status);
+      console.error('Request data enviado:', requestData);
+      throw error;
+    }
   },
 
   // Excluir conta

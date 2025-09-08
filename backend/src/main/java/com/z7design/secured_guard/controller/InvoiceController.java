@@ -195,8 +195,45 @@ public class InvoiceController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<InvoiceDTO> update(@PathVariable String id, @Valid @RequestBody InvoiceDTO invoiceDTO) {
-        Invoice updated = invoiceService.update(UUID.fromString(id), invoiceDTO);
-        return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
+        try {
+            log.info("PUT /api/invoices/{} - Atualizando fatura", id);
+            log.info("Dados recebidos: {}", invoiceDTO);
+            
+            // Validações específicas
+            if (invoiceDTO.getDescription() == null || invoiceDTO.getDescription().trim().isEmpty()) {
+                log.error("Descrição é obrigatória");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (invoiceDTO.getAmount() == null || invoiceDTO.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                log.error("Valor é obrigatório e deve ser maior que zero");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (invoiceDTO.getStatus() == null) {
+                log.error("Status é obrigatório");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (invoiceDTO.getIssueDate() == null) {
+                log.error("Data de emissão é obrigatória");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (invoiceDTO.getDueDate() == null) {
+                log.error("Data de vencimento é obrigatória");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            Invoice updated = invoiceService.update(UUID.fromString(id), invoiceDTO);
+            
+            log.info("✅ Fatura atualizada com sucesso - ID: {}", updated.getId());
+            return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao atualizar fatura: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
     }
     
     @DeleteMapping("/{id}")

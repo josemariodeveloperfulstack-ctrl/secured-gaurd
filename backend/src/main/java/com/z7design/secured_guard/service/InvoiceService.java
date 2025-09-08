@@ -14,6 +14,7 @@ import com.z7design.secured_guard.model.Supplier;
 import com.z7design.secured_guard.model.Contract;
 import com.z7design.secured_guard.model.Unit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class InvoiceService {
     
     private final InvoiceRepository invoiceRepository;
@@ -159,12 +161,32 @@ public class InvoiceService {
     }
     
     public Invoice update(UUID id, InvoiceDTO invoiceDTO) {
-        return invoiceRepository.findById(id)
-                .map(invoice -> {
-                    updateInvoiceFromDTO(invoice, invoiceDTO);
-                    return invoiceRepository.save(invoice);
-                })
-                .orElseThrow(() -> new RuntimeException("Fatura não encontrada"));
+        log.info("Atualizando fatura com ID: {}", id);
+        log.info("Dados do DTO: {}", invoiceDTO);
+        
+        try {
+            return invoiceRepository.findById(id)
+                    .map(invoice -> {
+                        log.info("Fatura encontrada, atualizando dados...");
+                        try {
+                            updateInvoiceFromDTO(invoice, invoiceDTO);
+                            log.info("Dados atualizados, salvando fatura...");
+                            Invoice saved = invoiceRepository.save(invoice);
+                            log.info("Fatura salva com sucesso: {}", saved.getId());
+                            return saved;
+                        } catch (Exception e) {
+                            log.error("Erro ao atualizar dados da fatura: {}", e.getMessage(), e);
+                            throw new RuntimeException("Erro ao atualizar fatura: " + e.getMessage(), e);
+                        }
+                    })
+                    .orElseThrow(() -> {
+                        log.error("Fatura não encontrada com ID: {}", id);
+                        return new RuntimeException("Fatura não encontrada com ID: " + id);
+                    });
+        } catch (Exception e) {
+            log.error("Erro geral ao atualizar fatura {}: {}", id, e.getMessage(), e);
+            throw e;
+        }
     }
     
     public void deleteById(UUID id) {
@@ -350,50 +372,76 @@ public class InvoiceService {
     }
 
     public void updateInvoiceFromDTO(Invoice invoice, InvoiceDTO dto) {
-        // Geração automática do número da fatura se não enviado
-        String invoiceNumber = dto.getInvoiceNumber();
-        if (invoiceNumber == null || invoiceNumber.trim().isEmpty()) {
-            // Exemplo: FAT-2025-<UUID curto>
-            String year = String.valueOf(java.time.LocalDate.now().getYear());
-            invoiceNumber = "FAT-" + year + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        }
-        invoice.setInvoiceNumber(invoiceNumber);
-        invoice.setDescription(dto.getDescription());
-        invoice.setAmount(dto.getAmount());
-        invoice.setStatus(dto.getStatus() != null ? dto.getStatus() : ExpenseStatus.PENDENTE);
-        invoice.setType(dto.getType() != null ? dto.getType() : ExpenseType.VARIAVEL);
-        invoice.setIssueDate(dto.getIssueDate() != null ? dto.getIssueDate() : LocalDate.now());
-        invoice.setDueDate(dto.getDueDate());
-        invoice.setPaymentDate(dto.getPaymentDate());
-        invoice.setCategory(dto.getCategory());
-        invoice.setCentroCusto(dto.getCentroCusto());
-        invoice.setComprovanteUrl(dto.getComprovanteUrl());
-        invoice.setBarcode(dto.getBarcode());
-        invoice.setNotes(dto.getNotes());
+        log.info("Iniciando atualização de invoice com DTO: {}", dto);
         
-        // Relacionamentos
-        if (dto.getSupplierId() != null) {
-            Supplier supplier = supplierRepository.findById(dto.getSupplierId())
-                    .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado: " + dto.getSupplierId()));
-            invoice.setSupplier(supplier);
-        }
+        try {
+            // Geração automática do número da fatura se não enviado
+            String invoiceNumber = dto.getInvoiceNumber();
+            if (invoiceNumber == null || invoiceNumber.trim().isEmpty()) {
+                // Exemplo: FAT-2025-<UUID curto>
+                String year = String.valueOf(java.time.LocalDate.now().getYear());
+                invoiceNumber = "FAT-" + year + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            }
+            invoice.setInvoiceNumber(invoiceNumber);
+            log.debug("Número da fatura definido: {}", invoiceNumber);
+            
+            invoice.setDescription(dto.getDescription());
+            invoice.setAmount(dto.getAmount());
+            invoice.setStatus(dto.getStatus() != null ? dto.getStatus() : ExpenseStatus.PENDENTE);
+            invoice.setType(dto.getType() != null ? dto.getType() : ExpenseType.VARIAVEL);
+            invoice.setIssueDate(dto.getIssueDate() != null ? dto.getIssueDate() : LocalDate.now());
+            invoice.setDueDate(dto.getDueDate());
+            invoice.setPaymentDate(dto.getPaymentDate());
+            invoice.setCategory(dto.getCategory());
+            invoice.setCentroCusto(dto.getCentroCusto());
+            invoice.setComprovanteUrl(dto.getComprovanteUrl());
+            invoice.setBarcode(dto.getBarcode());
+            invoice.setNotes(dto.getNotes());
+            
+            log.debug("Campos básicos definidos");
+            
+            // Relacionamentos
+            if (dto.getSupplierId() != null) {
+                log.debug("Processando fornecedor: {}", dto.getSupplierId());
+                Supplier supplier = supplierRepository.findById(dto.getSupplierId())
+                        .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado: " + dto.getSupplierId()));
+                invoice.setSupplier(supplier);
+                log.debug("Fornecedor definido: {}", supplier.getName());
+            }
 
-        if (dto.getClientId() != null) {
-            Client client = clientRepository.findById(dto.getClientId())
-                    .orElseThrow(() -> new RuntimeException("Cliente não encontrado: " + dto.getClientId()));
-            invoice.setClient(client);
-        }
+            if (dto.getClientId() != null) {
+                log.debug("Processando cliente: {}", dto.getClientId());
+                Client client = clientRepository.findById(dto.getClientId())
+                        .orElseThrow(() -> new RuntimeException("Cliente não encontrado: " + dto.getClientId()));
+                invoice.setClient(client);
+                log.debug("Cliente definido: {}", client.getName());
+            }
 
-        if (dto.getContractId() != null) {
-            Contract contract = contractRepository.findById(dto.getContractId())
-                    .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + dto.getContractId()));
-            invoice.setContract(contract);
-        }
+            if (dto.getContractId() != null) {
+                log.debug("Processando contrato: {}", dto.getContractId());
+                Contract contract = contractRepository.findById(dto.getContractId())
+                        .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + dto.getContractId()));
+                invoice.setContract(contract);
+                log.debug("Contrato definido: {}", contract.getContractNumber());
+            }
 
-        if (dto.getUnitId() != null) {
-            Unit unit = unitRepository.findById(dto.getUnitId())
-                    .orElseThrow(() -> new RuntimeException("Unidade não encontrada: " + dto.getUnitId()));
-            invoice.setUnit(unit);
+            if (dto.getUnitId() != null) {
+                log.debug("Processando unidade: {}", dto.getUnitId());
+                try {
+                    Unit unit = unitRepository.findById(dto.getUnitId())
+                            .orElseThrow(() -> new RuntimeException("Unidade não encontrada: " + dto.getUnitId()));
+                    invoice.setUnit(unit);
+                    log.debug("Unidade definida: {}", unit.getName());
+                } catch (Exception e) {
+                    log.error("Erro ao buscar unidade {}: {}", dto.getUnitId(), e.getMessage());
+                    throw new RuntimeException("Erro ao processar unidade: " + e.getMessage(), e);
+                }
+            }
+            
+            log.info("Atualização de invoice concluída com sucesso");
+        } catch (Exception e) {
+            log.error("Erro ao atualizar invoice: {}", e.getMessage(), e);
+            throw e;
         }
     }
     
