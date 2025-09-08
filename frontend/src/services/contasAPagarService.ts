@@ -5,7 +5,7 @@ import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 export interface CreateContaAPagarRequest {
   invoiceNumber?: string;
   description: string;
-  supplierId: string;
+  supplierId: string | null;
   unitId: string;
   amount: number;
   type: 'FIXA' | 'VARIAVEL';
@@ -271,13 +271,22 @@ export const contasAPagarService = {
       }
     } catch (error) {
       console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
+      // Tentar buscar unidades de forma alternativa
+      try {
+        const unitsResponse = await api.get('/api/units');
+        if (unitsResponse.data && unitsResponse.data.length > 0) {
+          unitId = unitsResponse.data[0].id;
+        }
+      } catch (secondError) {
+        console.warn('Segunda tentativa de buscar unidades falhou:', secondError);
+      }
     }
 
     const requestData: CreateContaAPagarRequest = {
       description: conta.descricao,
-      supplierId: conta.fornecedorId || '',
+      supplierId: conta.fornecedorId || null, // Enviar null ao invés de string vazia
       unitId: unitId,
-      amount: conta.valor,
+      amount: Number(conta.valor) || 0, // Garantir que seja um número
       type: conta.tipo,
       status: mapFrontendStatusToBackend(conta.status) as any,
       dueDate: formatDateForBackend(conta.vencimento) || '',
@@ -294,8 +303,17 @@ export const contasAPagarService = {
       requestData.invoiceNumber = conta.numeroFatura;
     }
 
-    const response = await api.post('/api/invoices', requestData);
-    return this.getContaAPagarById(response.data.id);
+    console.log('Dados da requisição:', requestData);
+
+    try {
+      const response = await api.post('/api/invoices', requestData);
+      return this.getContaAPagarById(response.data.id);
+    } catch (error: any) {
+      console.error('Erro detalhado ao criar conta a pagar:', error);
+      console.error('Response data:', error.response?.data);
+      console.error('Response status:', error.response?.status);
+      throw error;
+    }
   },
 
   // Atualizar conta
@@ -341,8 +359,13 @@ export const contasAPagarService = {
   },
 
   async getCategories(): Promise<string[]> {
-    const response = await api.get('/api/invoices/categories');
-    return response.data;
+    try {
+      const response = await api.get('/api/invoices/categories');
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+      return [];
+    }
   },
 
   async getCostCenters(): Promise<string[]> {
@@ -710,9 +733,9 @@ function mapFrontendStatusToBackend(frontendStatus: 'ABERTA' | 'PAGA' | 'ATRASAD
     case 'CANCELADA':
       return 'CANCELADA';
     case 'ATRASADA':
-      return 'ERRO';
+      return 'PENDENTE'; // Mapear para PENDENTE ao invés de ERRO
     case 'VENCIDA':
-      return 'ERRO';
+      return 'PENDENTE'; // Mapear para PENDENTE ao invés de ERRO
     default:
       return 'PENDENTE';
   }

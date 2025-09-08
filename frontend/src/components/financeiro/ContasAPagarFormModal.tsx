@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarDays, DollarSign, FileText, Upload } from 'lucide-react';
+import { CalendarDays, DollarSign, FileText, Upload, Plus } from 'lucide-react';
 import CurrencyInput from 'react-currency-input-field';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -72,6 +72,8 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
   const [categories, setCategories] = useState<string[]>([]);
   const [costCenters, setCostCenters] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState<string>('');
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState<boolean>(false);
 
   // Carregar fornecedores, categorias e centros de custo
   useEffect(() => {
@@ -195,9 +197,30 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     }
   };
 
+  const handleAddNewCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      setCategories(prev => [...prev, newCategory.trim()]);
+      handleInputChange('categoria', newCategory.trim());
+      setNewCategory('');
+      setShowNewCategoryInput(false);
+      toast({
+        title: "Categoria adicionada",
+        description: `Categoria "${newCategory.trim()}" foi adicionada com sucesso`
+      });
+    }
+  };
+
+  const handleCategoryChange = (value: string) => {
+    if (value === 'new') {
+      setShowNewCategoryInput(true);
+    } else {
+      handleInputChange('categoria', value);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-black border-seguranca-graphite" aria-describedby="conta-pagar-description">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-seguranca-lightgray" aria-describedby="conta-pagar-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-seguranca-lightgray">
             <DollarSign className="text-seguranca-yellow" size={24} />
@@ -209,69 +232,69 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Data de Emissão */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-seguranca-lightgray">Data de Emissão *</label>
-            <DatePicker
-              selected={formData.dataEmissao}
-              onChange={(date: Date) => handleInputChange('dataEmissao', date)}
-              {...DEFAULT_DATE_PICKER_PROPS}
-              className="w-full p-2 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-              required
-            />
-          </div>
-
-          {/* Data de Vencimento e Fornecedor */}
+          {/* Data de Emissão e Data de Vencimento */}
           <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Data de Emissão *</label>
+              <DatePicker
+                selected={formData.dataEmissao}
+                onChange={(date: Date) => handleInputChange('dataEmissao', date)}
+                {...DEFAULT_DATE_PICKER_PROPS}
+                className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                required
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data de Vencimento *</label>
               <DatePicker
                 selected={formData.vencimento}
                 onChange={(date: Date) => handleInputChange('vencimento', date)}
                 {...DEFAULT_DATE_PICKER_PROPS}
-                className="w-full p-2 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 required
               />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor *</label>
-              <Select 
-                value={formData.fornecedorId} 
-                onValueChange={(value) => {
-                  const fornecedor = fornecedores.find(f => f.id === value);
-                  handleInputChange('fornecedorId', value);
-                  handleInputChange('fornecedor', fornecedor?.name || '');
-                }}
-              >
-                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                  <SelectValue placeholder="Selecione um fornecedor" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
-                  {fornecedores.map((fornecedor) => (
-                    <SelectItem key={fornecedor.id} value={fornecedor.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      {fornecedor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
+          {/* Descrição */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">Descrição *</label>
+            <Input
+              value={formData.descricao}
+              onChange={(e) => handleInputChange('descricao', e.target.value)}
+              placeholder="Descrição da despesa"
+              className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+              required
+            />
+          </div>
 
-          {/* Descrição e Valor */}
-          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Descrição *</label>
-              <Input
-                value={formData.descricao}
-                onChange={(e) => handleInputChange('descricao', e.target.value)}
-                placeholder="Descrição da despesa"
-                className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                required
-              />
-            </div>
-            
+          {/* Fornecedor */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor *</label>
+            <Select 
+              value={formData.fornecedorId} 
+              onValueChange={(value) => {
+                const fornecedor = fornecedores.find(f => f.id === value);
+                handleInputChange('fornecedorId', value);
+                handleInputChange('fornecedor', fornecedor?.name || '');
+              }}
+            >
+              <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                <SelectValue placeholder="Selecione um fornecedor" />
+              </SelectTrigger>
+              <SelectContent className="bg-seguranca-black border-gray-600">
+                {fornecedores.map((fornecedor) => (
+                  <SelectItem key={fornecedor.id} value={fornecedor.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                    {fornecedor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Valor, Tipo e Status */}
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Valor *</label>
               <div className="relative">
@@ -283,22 +306,21 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   value={formData.valor}
                   onValueChange={(value) => handleInputChange('valor', parseFloat(value || '0'))}
                   placeholder="0,00"
-                  className="w-full p-2 pl-10 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  decimalsLimit={2}
+                  fixedDecimalLength={2}
+                  className="w-full p-2 pl-10 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   required
                 />
               </div>
             </div>
-          </div>
 
-          {/* Tipo e Status */}
-          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Tipo *</label>
               <Select value={formData.tipo} onValueChange={(value: 'FIXA' | 'VARIAVEL') => handleInputChange('tipo', value)}>
-                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                <SelectContent className="bg-seguranca-black border-gray-600">
                   <SelectItem value="FIXA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Despesa Fixa</SelectItem>
                   <SelectItem value="VARIAVEL" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Despesa Variável</SelectItem>
                 </SelectContent>
@@ -308,10 +330,10 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Status</label>
               <Select value={formData.status} onValueChange={(value: any) => handleInputChange('status', value)}>
-                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                <SelectContent className="bg-seguranca-black border-gray-600">
                   <SelectItem value="ABERTA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Aberta</SelectItem>
                   <SelectItem value="PAGA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Paga</SelectItem>
                   <SelectItem value="ATRASADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Atrasada</SelectItem>
@@ -337,27 +359,63 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Categoria</label>
-              <Select value={formData.categoria || undefined} onValueChange={(value) => handleInputChange('categoria', value)}>
-                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!showNewCategoryInput ? (
+                <div className="flex gap-2">
+                  <Select value={formData.categoria || undefined} onValueChange={handleCategoryChange}>
+                    <SelectTrigger className="flex-1 border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          {category}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="new" className="text-seguranca-yellow hover:bg-seguranca-graphite">
+                        + Nova categoria
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Digite o nome da nova categoria"
+                    className="flex-1 border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddNewCategory()}
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleAddNewCategory}
+                    className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500"
+                    disabled={!newCategory.trim()}
+                  >
+                    <Plus size={16} />
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => {
+                      setShowNewCategoryInput(false);
+                      setNewCategory('');
+                    }}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Centro de Custo</label>
               <Select value={formData.centroCusto || undefined} onValueChange={(value) => handleInputChange('centroCusto', value)}>
-                <SelectTrigger className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue placeholder="Selecione um centro de custo" />
                 </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-seguranca-graphite">
+                <SelectContent className="bg-seguranca-black border-gray-600">
                   {costCenters.map((costCenter) => (
                     <SelectItem key={costCenter} value={costCenter} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                       {costCenter}
@@ -375,7 +433,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 id="baixa"
                 checked={formData.baixa}
                 onCheckedChange={(checked) => handleInputChange('baixa', checked)}
-                className="border-seguranca-graphite data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
+                className="border-gray-600 data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
               />
               <label htmlFor="baixa" className="text-sm font-medium text-seguranca-lightgray">
                 Marcar como baixa no sistema
@@ -388,7 +446,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 selected={formData.dataPagamento}
                 onChange={(date: Date) => handleInputChange('dataPagamento', date)}
                 {...DEFAULT_DATE_PICKER_PROPS}
-                className="w-full p-2 border border-seguranca-graphite rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 isClearable
               />
             </div>
@@ -402,9 +460,9 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={handleFileUpload}
-                className="flex-1 border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray file:bg-seguranca-graphite file:text-seguranca-lightgray file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3"
+                className="flex-1 border-gray-600 bg-seguranca-black text-seguranca-lightgray file:bg-seguranca-graphite file:text-seguranca-lightgray file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3"
               />
-              <Button type="button" variant="outline" size="sm" className="border-seguranca-graphite text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-lightgray">
+              <Button type="button" variant="outline" size="sm" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-lightgray">
                 <Upload size={16} className="mr-2" />
                 Upload
               </Button>
@@ -429,12 +487,12 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           </div>
 
           {/* Botões */}
-          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t border-seguranca-graphite">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t border-gray-700">
             <Button 
               type="button" 
               variant="outline" 
               onClick={() => onOpenChange(false)}
-              className="border-seguranca-graphite text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-lightgray"
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-lightgray"
             >
               Cancelar
             </Button>

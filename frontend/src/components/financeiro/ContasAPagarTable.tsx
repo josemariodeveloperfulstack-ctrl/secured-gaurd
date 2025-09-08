@@ -136,51 +136,6 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Estatísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total de Contas</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.abertas}</div>
-            <div className="text-sm text-gray-600">Abertas</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{stats.vencidas}</div>
-            <div className="text-sm text-gray-600">Vencidas</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.pagas}</div>
-            <div className="text-sm text-gray-600">Pagas</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-lg font-bold text-gray-800">{formatCurrency(stats.totalValor)}</div>
-            <div className="text-sm text-gray-600">Valor Total</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-lg font-bold text-orange-600">{stats.vencendoEm7Dias}</div>
-            <div className="text-sm text-gray-600">Vencendo em 7 dias</div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filtros */}
       <Card>
         <CardHeader>
