@@ -1,0 +1,32 @@
+﻿RELATORIO DE UNIFICACAO DE ARQUIVOS PROCESSADOS
+===============================================
+Data: 28/08/2025 15:19:01
+Sistema: Secure Guard
+
+RESUMO:
+-------
+Holerites: 115 arquivos processados
+Recibos: 44 arquivos processados
+Total: 159 arquivos
+
+DETALHES:
+----------
+1. HOLERITES (Periodo: 6-2025)
+   - Origem: C:\dev\secure-guard\backend\holerites
+   - Destino: C:\dev\secure-guard\uploads\unified\holerites\
+   - Arquivos copiados: 115
+
+2. RECIBOS (Periodo: 07_2025)
+   - Origem: C:\dev\secure-guard\uploads\receipts
+   - Destino: C:\dev\secure-guard\uploads\unified\receipts\
+   - Arquivos copiados: 44
+
+ESTRUTURA FINAL:
+----------------
+C:\dev\secure-guard\uploads\unified\
+â”œâ”€â”€ holerites\
+â”‚   â””â”€â”€ [115 arquivos com prefixo HOLERITE_]
+â””â”€â”€ receipts\
+    â””â”€â”€ [44 arquivos com prefixo RECIBO_]
+
+STATUS: Unificacao concluida com sucesso!
