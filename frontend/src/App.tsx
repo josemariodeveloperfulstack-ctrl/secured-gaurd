@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -10,110 +10,119 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
-// Portal Público
+// Portal Público - Carregamento imediato (página inicial)
 import PortalHome from '@/pages/PortalHome';
 import PortalVagas from '@/pages/PortalVagas';
 
-// Sistema Administrativo
-import Login from '@/pages/Login';
-import Index from '@/pages/Index';
-import Dashboard from '@/pages/Dashboard';
-import Funcionarios from '@/pages/Funcionarios';
-import Usuarios from '@/pages/Usuarios';
-import Roles from '@/pages/Roles';
-import Clientes from '@/pages/Clientes';
-import Fornecedores from '@/pages/Fornecedores';
-import Contratos from '@/pages/Contratos';
-import Financeiro from '@/pages/Financeiro';
-import Medicao from '@/pages/Medicao';
-import ContasAPagar from '@/pages/ContasAPagar';
-import ContasAReceber from '@/pages/ContasAReceber';
-import FluxoCaixa from '@/pages/FluxoCaixa';
-import Pagamentos from '@/pages/Pagamentos';
-import RelatoriosFinanceiros from '@/pages/RelatoriosFinanceiros';
-import Frota from '@/pages/Frota';
-import Documentos from '@/pages/Documentos';
-import DocumentosUnificados from '@/pages/DocumentosUnificados';
-import EPIs from '@/pages/EPIs';
-import Certificacoes from '@/pages/Certificacoes';
-import RH from '@/pages/RH';
-import Vagas from '@/pages/Vagas';
-import Relatorios from '@/pages/Relatorios';
-import Grupos from '@/pages/Grupos';
-import Configuracoes from '@/pages/Configuracoes';
-import Profile from '@/pages/Profile';
-import Holerites from '@/pages/Holerites';
-import EnvioHolerites from '@/pages/EnvioHolerites';
-import PayslipView from '@/pages/PayslipView';
-import Mensagens from '@/pages/Mensagens';
-import GestaoMensagens from '@/pages/GestaoMensagens';
-import GestaoAtendimento from '@/pages/GestaoAtendimento';
-import ChatInterno from '@/pages/ChatInterno';
-import NotFound from '@/pages/NotFound';
-import OrdemServico from '@/pages/OrdemServico';
-import FuncionarioNovo from '@/pages/FuncionarioNovo';
-import Ocorrencias from '@/pages/Ocorrencias';
-import CargosPage from '@/pages/Cargos';
-import FuncoesPage from '@/pages/Funcoes';
-import EstoqueSimplificado from '@/pages/EstoqueSimplificado';
-import Estoque from '@/pages/Estoque';
-import Produtos from '@/pages/Produtos';
-import Movimentacoes from '@/pages/Movimentacoes';
-import EstoqueRelatorios from '@/pages/EstoqueRelatorios';
-import Compras from '@/pages/Compras';
-import CotacoesCompras from '@/pages/CotacoesCompras';
-import Suporte from '@/pages/Suporte';
-import Postos from '@/pages/Postos';
-import RemanejamentoPage from '@/pages/Remanejamento';
-import FeriasPage from '@/pages/Ferias';
-import Beneficios from '@/pages/Beneficios';
-import AdmissaoDemissao from '@/pages/AdmissaoDemissao';
-import Empresas from '@/pages/Empresas';
-import CentrosDeCusto from '@/pages/CentrosDeCusto';
+// Sistema Administrativo - Lazy loading para páginas administrativas
+const Login = lazy(() => import('@/pages/Login'));
+const Index = lazy(() => import('@/pages/Index'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Funcionarios = lazy(() => import('@/pages/Funcionarios'));
+const Usuarios = lazy(() => import('@/pages/Usuarios'));
+const Roles = lazy(() => import('@/pages/Roles'));
+const Clientes = lazy(() => import('@/pages/Clientes'));
+const Fornecedores = lazy(() => import('@/pages/Fornecedores'));
+const Contratos = lazy(() => import('@/pages/Contratos'));
+const Financeiro = lazy(() => import('@/pages/Financeiro'));
+const Medicao = lazy(() => import('@/pages/Medicao'));
+const ContasAPagar = lazy(() => import('@/pages/ContasAPagar'));
+const ContasAReceber = lazy(() => import('@/pages/ContasAReceber'));
+const FluxoCaixa = lazy(() => import('@/pages/FluxoCaixa'));
+const Pagamentos = lazy(() => import('@/pages/Pagamentos'));
+const RelatoriosFinanceiros = lazy(() => import('@/pages/RelatoriosFinanceiros'));
+const Frota = lazy(() => import('@/pages/Frota'));
+const Documentos = lazy(() => import('@/pages/Documentos'));
+const DocumentosUnificados = lazy(() => import('@/pages/DocumentosUnificados'));
+const EPIs = lazy(() => import('@/pages/EPIs'));
+const Certificacoes = lazy(() => import('@/pages/Certificacoes'));
+const RH = lazy(() => import('@/pages/RH'));
+const Vagas = lazy(() => import('@/pages/Vagas'));
+const Relatorios = lazy(() => import('@/pages/Relatorios'));
+const Grupos = lazy(() => import('@/pages/Grupos'));
+const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const Holerites = lazy(() => import('@/pages/Holerites'));
+const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
+const PayslipView = lazy(() => import('@/pages/PayslipView'));
+const Mensagens = lazy(() => import('@/pages/Mensagens'));
+const GestaoMensagens = lazy(() => import('@/pages/GestaoMensagens'));
+const GestaoAtendimento = lazy(() => import('@/pages/GestaoAtendimento'));
+const ChatInterno = lazy(() => import('@/pages/ChatInterno'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
+const OrdemServico = lazy(() => import('@/pages/OrdemServico'));
+const FuncionarioNovo = lazy(() => import('@/pages/FuncionarioNovo'));
+const Ocorrencias = lazy(() => import('@/pages/Ocorrencias'));
+const CargosPage = lazy(() => import('@/pages/Cargos'));
+const FuncoesPage = lazy(() => import('@/pages/Funcoes'));
+const EstoqueSimplificado = lazy(() => import('@/pages/EstoqueSimplificado'));
+const Estoque = lazy(() => import('@/pages/Estoque'));
+const Produtos = lazy(() => import('@/pages/Produtos'));
+const Movimentacoes = lazy(() => import('@/pages/Movimentacoes'));
+const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
+const Compras = lazy(() => import('@/pages/Compras'));
+const CotacoesCompras = lazy(() => import('@/pages/CotacoesCompras'));
+const Suporte = lazy(() => import('@/pages/Suporte'));
+const Postos = lazy(() => import('@/pages/Postos'));
+const RemanejamentoPage = lazy(() => import('@/pages/Remanejamento'));
+const FeriasPage = lazy(() => import('@/pages/Ferias'));
+const Beneficios = lazy(() => import('@/pages/Beneficios'));
+const AdmissaoDemissao = lazy(() => import('@/pages/AdmissaoDemissao'));
+const Empresas = lazy(() => import('@/pages/Empresas'));
+const CentrosDeCusto = lazy(() => import('@/pages/CentrosDeCusto'));
 
 // Páginas adicionais
-import Filiais from '@/pages/Filiais';
-import Servicos from '@/pages/Servicos';
-import Operacional from '@/pages/Operacional';
-import ControleRondas from '@/pages/ControleRondas';
+const Filiais = lazy(() => import('@/pages/Filiais'));
+const Servicos = lazy(() => import('@/pages/Servicos'));
+const Operacional = lazy(() => import('@/pages/Operacional'));
+const ControleRondas = lazy(() => import('@/pages/ControleRondas'));
 
 // Módulo Comercial
-import Leads from '@/pages/Leads';
-import Propostas from '@/pages/Propostas';
-import Orcamentos from '@/pages/Orcamentos';
-import CrmKanban from '@/pages/CrmKanban';
-import GestaoFuncionarios from '@/pages/GestaoFuncionarios';
-import AdmissaoFuncionarios from '@/pages/AdmissaoFuncionarios';
+const Leads = lazy(() => import('@/pages/Leads'));
+const Propostas = lazy(() => import('@/pages/Propostas'));
+const Orcamentos = lazy(() => import('@/pages/Orcamentos'));
+const CrmKanban = lazy(() => import('@/pages/CrmKanban'));
+const GestaoFuncionarios = lazy(() => import('@/pages/GestaoFuncionarios'));
+const AdmissaoFuncionarios = lazy(() => import('@/pages/AdmissaoFuncionarios'));
 
-import ControleVisitasAvancado from '@/pages/ControleVisitasAvancado';
-import GuiaTransporte from '@/pages/GuiaTransporte';
-import RotaSemanalSupervisao from '@/pages/RotaSemanalSupervisao';
-import Supervisao from '@/pages/Supervisao';
-import ActivityManagement from '@/pages/ActivityManagement';
-import UserProfile from '@/pages/UserProfile';
+const ControleVisitasAvancado = lazy(() => import('@/pages/ControleVisitasAvancado'));
+const GuiaTransporte = lazy(() => import('@/pages/GuiaTransporte'));
+const RotaSemanalSupervisao = lazy(() => import('@/pages/RotaSemanalSupervisao'));
+const Supervisao = lazy(() => import('@/pages/Supervisao'));
+const ActivityManagement = lazy(() => import('@/pages/ActivityManagement'));
+const UserProfile = lazy(() => import('@/pages/UserProfile'));
 
 const queryClient = new QueryClient();
 
 function App() {
   useEffect(() => {
-    // Inicializar AOS
+    // Inicializar AOS com configurações otimizadas para performance
     AOS.init({
-      duration: 800,
-      easing: 'ease-in-out',
+      duration: 600, // Reduzido de 800 para 600
+      easing: 'ease-out', // Mudado para ease-out (mais performático)
       once: true,
       mirror: false,
-      offset: 50,
-      delay: 100
+      offset: 100, // Aumentado para reduzir animações desnecessárias
+      delay: 50, // Reduzido de 100 para 50
+      disable: 'mobile' // Desabilitar em mobile para melhor performance
     });
 
-    // Re-inicializar AOS quando a rota mudar
+    // Re-inicializar AOS quando a rota mudar (com debounce)
+    let timeoutId: NodeJS.Timeout;
     const handleRouteChange = () => {
-      AOS.refresh();
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        AOS.refresh();
+      }, 100);
     };
 
     window.addEventListener('popstate', handleRouteChange);
-    return () => window.removeEventListener('popstate', handleRouteChange);
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   return (
@@ -137,50 +146,70 @@ function App() {
                     
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
-                    <Route path="/login" element={<Login />} />
+                    <Route path="/login" element={
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <Login />
+                      </Suspense>
+                    } />
                     
                     {/* Rotas Protegidas */}
                     <Route path="/dashboard" element={
                       <ProtectedRoute>
-                        <Index />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Index />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/dashboard-home" element={
                       <ProtectedRoute>
-                        <Dashboard />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Dashboard />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/mensagens" element={
                       <ProtectedRoute>
-                        <Mensagens />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Mensagens />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     {/* Módulo de Gestão de Mensagens com rotas aninhadas */}
                     <Route path="/gestao-mensagens" element={
                       <ProtectedRoute>
-                        <GestaoMensagens />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoMensagens />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/gestao-mensagens/:page" element={
                       <ProtectedRoute>
-                        <GestaoMensagens />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoMensagens />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
 
                     {/* Módulo de Gestão de Atendimento com rotas aninhadas */}
                     <Route path="/gestao-atendimento" element={
                       <ProtectedRoute>
-                        <GestaoAtendimento />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoAtendimento />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/gestao-atendimento/:page" element={
                       <ProtectedRoute>
-                        <GestaoAtendimento />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoAtendimento />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/chat-interno" element={
                       <ProtectedRoute>
-                        <ChatInterno />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ChatInterno />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     

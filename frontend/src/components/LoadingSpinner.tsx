@@ -45,4 +45,7 @@ export const LoadingOverlay: React.FC<{
       </div>
     </div>
   );
-}; 
+};
+
+// Export default para compatibilidade
+export default LoadingSpinner; 

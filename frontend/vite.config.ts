@@ -79,13 +79,79 @@ export default defineConfig(({ mode }) => {
     },
     plugins,
     build: {
-      chunkSizeWarningLimit: 2500, // 2.5MB
+      chunkSizeWarningLimit: 1000, // 1MB - mais restritivo
       rollupOptions: {
         output: {
           manualChunks: {
-            vendor: ['react', 'react-dom'],
-            ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-            lucide: ['lucide-react'],
+            // Core React
+            'react-vendor': ['react', 'react-dom'],
+            
+            // UI Libraries
+            'radix-ui': [
+              '@radix-ui/react-dialog', 
+              '@radix-ui/react-dropdown-menu', 
+              '@radix-ui/react-select',
+              '@radix-ui/react-toast',
+              '@radix-ui/react-tooltip',
+              '@radix-ui/react-accordion',
+              '@radix-ui/react-alert-dialog',
+              '@radix-ui/react-avatar',
+              '@radix-ui/react-checkbox',
+              '@radix-ui/react-collapsible',
+              '@radix-ui/react-context-menu',
+              '@radix-ui/react-hover-card',
+              '@radix-ui/react-label',
+              '@radix-ui/react-menubar',
+              '@radix-ui/react-navigation-menu',
+              '@radix-ui/react-popover',
+              '@radix-ui/react-progress',
+              '@radix-ui/react-radio-group',
+              '@radix-ui/react-scroll-area',
+              '@radix-ui/react-separator',
+              '@radix-ui/react-slider',
+              '@radix-ui/react-slot',
+              '@radix-ui/react-switch',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-toggle',
+              '@radix-ui/react-toggle-group'
+            ],
+            
+            // Icons
+            'lucide': ['lucide-react'],
+            
+            // Charts
+            'charts': ['chart.js', 'react-chartjs-2', 'recharts'],
+            
+            // Forms
+            'forms': ['react-hook-form', '@hookform/resolvers', 'yup', 'zod'],
+            
+            // Data fetching
+            'query': ['@tanstack/react-query', '@tanstack/react-table'],
+            
+            // Utils
+            'utils': ['axios', 'date-fns', 'clsx', 'tailwind-merge', 'class-variance-authority'],
+            
+            // Animations
+            'animations': ['framer-motion', 'aos'],
+            
+            // PDF
+            'pdf': ['html2pdf.js', 'pdf-lib'],
+            
+            // WebSocket
+            'websocket': ['@stomp/stompjs', 'sockjs-client'],
+            
+            // Other UI
+            'ui-other': [
+              'sonner', 
+              'vaul', 
+              'cmdk', 
+              'input-otp', 
+              'react-currency-input-field',
+              'react-datepicker',
+              'react-day-picker',
+              'react-resizable-panels',
+              'embla-carousel-react'
+            ]
           },
         },
       },

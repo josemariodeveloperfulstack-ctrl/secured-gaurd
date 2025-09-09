@@ -1,12 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import AOS from 'aos';
 
 export const useAOS = () => {
   useEffect(() => {
-    AOS.refresh();
+    // Usar requestAnimationFrame para melhor performance
+    const refreshAOS = () => {
+      requestAnimationFrame(() => {
+        AOS.refresh();
+      });
+    };
+    
+    refreshAOS();
   }, []);
 
-  return {
+  // Memoizar os valores para evitar recriação desnecessária
+  return useMemo(() => ({
     fadeUp: 'fade-up',
     fadeDown: 'fade-down',
     fadeLeft: 'fade-left',
@@ -21,7 +29,7 @@ export const useAOS = () => {
     flipRight: 'flip-right',
     flipUp: 'flip-up',
     flipDown: 'flip-down'
-  };
+  }), []);
 };
 
 export const aosConfig = {
