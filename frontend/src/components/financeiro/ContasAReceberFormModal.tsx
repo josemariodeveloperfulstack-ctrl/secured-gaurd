@@ -24,25 +24,12 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
-
-interface Cliente {
-  id: string;
-  nome: string;
-  email: string;
-  telefone: string;
-  documento: string;
-  endereco: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  limitCredito: number;
-  diasVencimento: number;
-  status: 'ativo' | 'inativo' | 'bloqueado';
-}
+import { contasAReceberService, Cliente } from '@/services/contasAReceberService';
 
 interface ContaAReceberFormData {
   clienteId: string;
   numeroFatura: string;
+  numeroMedicao?: string;
   descricao: string;
   valor: number;
   dataEmissao: Date;
@@ -73,10 +60,17 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [invoiceNumbers, setInvoiceNumbers] = useState<string[]>([]);
   const [showInvoiceSuggestions, setShowInvoiceSuggestions] = useState(false);
+  const [measurementNumbers, setMeasurementNumbers] = useState<string[]>([]);
+  const [showMeasurementSuggestions, setShowMeasurementSuggestions] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [showPaymentMethodSuggestions, setShowPaymentMethodSuggestions] = useState(false);
   
   const [formData, setFormData] = useState<ContaAReceberFormData>({
     clienteId: '',
     numeroFatura: '',
+    numeroMedicao: '',
     descricao: '',
     valor: 0,
     dataEmissao: new Date(),
@@ -97,25 +91,27 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
   useEffect(() => {
     if (editMode && contaData) {
       setFormData({
-        clienteId: contaData.cliente?.id || '',
-        numeroFatura: contaData.numeroFatura || '',
-        descricao: contaData.descricao || '',
-        valor: contaData.valor || 0,
-        dataEmissao: contaData.dataEmissao ? new Date(contaData.dataEmissao) : new Date(),
-        dataVencimento: contaData.dataVencimento ? new Date(contaData.dataVencimento) : new Date(),
-        categoria: contaData.categoria || 'fatura',
-        formaPagamento: contaData.formaPagamento || 'pix',
-        observacoes: contaData.observacoes || ''
+        clienteId: contaData.client?.id || '',
+        numeroFatura: contaData.invoiceNumber || '',
+        numeroMedicao: contaData.measurementNumber || '',
+        descricao: contaData.description || '',
+        valor: contaData.amount || 0,
+        dataEmissao: contaData.issueDate ? new Date(contaData.issueDate) : new Date(),
+        dataVencimento: contaData.dueDate ? new Date(contaData.dueDate) : new Date(),
+        categoria: contaData.category || 'fatura',
+        formaPagamento: contaData.paymentMethod || 'pix',
+        observacoes: contaData.notes || ''
       });
       
-      if (contaData.cliente) {
-        setSelectedCliente(contaData.cliente);
+      if (contaData.client) {
+        setSelectedCliente(contaData.client);
       }
     } else {
       // Reset form quando não está em modo de edição
       setFormData({
         clienteId: '',
         numeroFatura: '',
+        numeroMedicao: '',
         descricao: '',
         valor: 0,
         dataEmissao: new Date(),
@@ -130,38 +126,10 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
 
   const loadClientes = async () => {
     try {
-      // Simular carregamento de clientes - substitua pela chamada real da API
-      const mockClientes: Cliente[] = [
-        {
-          id: '1',
-          nome: 'Empresa ABC Ltda',
-          email: 'contato@empresaabc.com',
-          telefone: '(11) 99999-9999',
-          documento: '12.345.678/0001-90',
-          endereco: 'Rua das Empresas, 123',
-          cidade: 'São Paulo',
-          estado: 'SP',
-          cep: '01234-567',
-          limitCredito: 50000,
-          diasVencimento: 30,
-          status: 'ativo'
-        },
-        {
-          id: '2',
-          nome: 'Comércio XYZ S/A',
-          email: 'financeiro@comercioxyz.com',
-          telefone: '(11) 88888-8888',
-          documento: '98.765.432/0001-10',
-          endereco: 'Av. Comercial, 456',
-          cidade: 'São Paulo',
-          estado: 'SP',
-          cep: '04567-890',
-          limitCredito: 30000,
-          diasVencimento: 15,
-          status: 'ativo'
-        }
-      ];
-      setClientes(mockClientes);
+      console.log('Carregando clientes da API...');
+      const clientesData = await contasAReceberService.getClientes();
+      console.log('Clientes carregados:', clientesData);
+      setClientes(clientesData);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       toast({
@@ -187,6 +155,60 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
       console.error('Erro ao buscar números de fatura:', error);
       setInvoiceNumbers([]);
       setShowInvoiceSuggestions(false);
+    }
+  };
+
+  const searchMeasurementNumbers = async (term: string) => {
+    if (term.length < 2) {
+      setMeasurementNumbers([]);
+      setShowMeasurementSuggestions(false);
+      return;
+    }
+
+    try {
+      const numbers = await contasAReceberService.searchMeasurementNumbers(term);
+      setMeasurementNumbers(numbers);
+      setShowMeasurementSuggestions(true);
+    } catch (error) {
+      console.error('Erro ao buscar números de medição:', error);
+      setMeasurementNumbers([]);
+      setShowMeasurementSuggestions(false);
+    }
+  };
+
+  const searchCategories = async (term: string) => {
+    if (term.length < 1) {
+      setCategories([]);
+      setShowCategorySuggestions(false);
+      return;
+    }
+
+    try {
+      const cats = await contasAReceberService.searchCategories(term);
+      setCategories(cats);
+      setShowCategorySuggestions(true);
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+      setCategories([]);
+      setShowCategorySuggestions(false);
+    }
+  };
+
+  const searchPaymentMethods = async (term: string) => {
+    if (term.length < 1) {
+      setPaymentMethods([]);
+      setShowPaymentMethodSuggestions(false);
+      return;
+    }
+
+    try {
+      const methods = await contasAReceberService.searchPaymentMethods(term);
+      setPaymentMethods(methods);
+      setShowPaymentMethodSuggestions(true);
+    } catch (error) {
+      console.error('Erro ao buscar formas de pagamento:', error);
+      setPaymentMethods([]);
+      setShowPaymentMethodSuggestions(false);
     }
   };
 
@@ -256,13 +278,45 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     setLoading(true);
     
     try {
-      // Simular chamada para API - substitua pela integração real
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Sucesso",
-        description: editMode ? "Conta a receber atualizada com sucesso!" : "Conta a receber criada com sucesso!"
-      });
+      if (editMode && contaData?.id) {
+        // Atualizar conta existente
+        await contasAReceberService.updateContaAReceber(contaData.id, {
+          clientId: formData.clienteId,
+          invoiceNumber: formData.numeroFatura,
+          measurementNumber: formData.numeroMedicao,
+          description: formData.descricao,
+          amount: formData.valor,
+          issueDate: formatDateForBackend(formData.dataEmissao),
+          dueDate: formatDateForBackend(formData.dataVencimento),
+          category: formData.categoria.toUpperCase(),
+          paymentMethod: formData.formaPagamento.toUpperCase(),
+          notes: formData.observacoes
+        });
+        
+        toast({
+          title: "Sucesso",
+          description: "Conta a receber atualizada com sucesso!"
+        });
+      } else {
+        // Criar nova conta
+        await contasAReceberService.createContaAReceber({
+          clientId: formData.clienteId,
+          invoiceNumber: formData.numeroFatura,
+          measurementNumber: formData.numeroMedicao,
+          description: formData.descricao,
+          amount: formData.valor,
+          issueDate: formatDateForBackend(formData.dataEmissao),
+          dueDate: formatDateForBackend(formData.dataVencimento),
+          category: formData.categoria.toUpperCase(),
+          paymentMethod: formData.formaPagamento.toUpperCase(),
+          notes: formData.observacoes
+        });
+        
+        toast({
+          title: "Sucesso",
+          description: "Conta a receber criada com sucesso!"
+        });
+      }
       
       onSuccess();
       onOpenChange(false);
@@ -281,12 +335,12 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      'ativo': { color: 'bg-green-500 text-white', label: 'Ativo' },
-      'inativo': { color: 'bg-gray-500 text-white', label: 'Inativo' },
-      'bloqueado': { color: 'bg-red-500 text-white', label: 'Bloqueado' }
+      'ACTIVE': { color: 'bg-green-500 text-white', label: 'Ativo' },
+      'INACTIVE': { color: 'bg-gray-500 text-white', label: 'Inativo' },
+      'BLOCKED': { color: 'bg-red-500 text-white', label: 'Bloqueado' }
     };
     
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['ativo'];
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['ACTIVE'];
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
@@ -358,7 +412,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span>{cliente.nome}</span>
+                          <span>{cliente.name}</span>
                           {getStatusBadge(cliente.status)}
                         </div>
                       </SelectItem>
@@ -378,25 +432,25 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                       </div>
                       <div className="flex items-center gap-2">
                         <Phone className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.telefone}</span>
+                        <span className="text-seguranca-lightgray">{selectedCliente.phone}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Building className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.documento}</span>
+                        <span className="text-seguranca-lightgray">{selectedCliente.cnpj}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.cidade}/{selectedCliente.estado}</span>
+                        <span className="text-seguranca-lightgray">{selectedCliente.city}/{selectedCliente.state}</span>
                       </div>
                     </div>
                     <div className="mt-2 pt-2 border-t border-gray-600">
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Limite de Crédito:</span>
-                        <span className="text-seguranca-yellow">R$ {selectedCliente.limitCredito.toLocaleString('pt-BR')}</span>
+                        <span className="text-gray-400">Contato:</span>
+                        <span className="text-seguranca-yellow">{selectedCliente.contactName}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Dias de Vencimento:</span>
-                        <span className="text-seguranca-lightgray">{selectedCliente.diasVencimento} dias</span>
+                        <span className="text-gray-400">Telefone:</span>
+                        <span className="text-seguranca-lightgray">{selectedCliente.contactPhone}</span>
                       </div>
                     </div>
                   </div>
@@ -412,7 +466,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
               Informações da Conta
             </h3>
             
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Número da Fatura *</label>
                 <div className="relative">
@@ -459,20 +513,92 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Número da Medição</label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={formData.numeroMedicao || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleInputChange('numeroMedicao', value);
+                      searchMeasurementNumbers(value);
+                    }}
+                    onFocus={() => {
+                      if (measurementNumbers.length > 0) {
+                        setShowMeasurementSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay para permitir clique nas sugestões
+                      setTimeout(() => setShowMeasurementSuggestions(false), 200);
+                    }}
+                    placeholder="Ex: MED-2024-001"
+                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  />
+                  
+                  {/* Sugestões de números de medição */}
+                  {showMeasurementSuggestions && measurementNumbers.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {measurementNumbers.map((number, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
+                          onClick={() => {
+                            handleInputChange('numeroMedicao', number);
+                            setShowMeasurementSuggestions(false);
+                          }}
+                        >
+                          {number}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
-                <Select value={formData.categoria} onValueChange={(value: any) => handleInputChange('categoria', value)}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="fatura" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Fatura</SelectItem>
-                    <SelectItem value="nota" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Nota Fiscal</SelectItem>
-                    <SelectItem value="adiantamento" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Adiantamento</SelectItem>
-                    <SelectItem value="servico" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Serviço</SelectItem>
-                    <SelectItem value="produto" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Produto</SelectItem>
-                    <SelectItem value="outros" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={formData.categoria}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleInputChange('categoria', value);
+                      searchCategories(value);
+                    }}
+                    onFocus={() => {
+                      if (categories.length > 0) {
+                        setShowCategorySuggestions(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay para permitir clique nas sugestões
+                      setTimeout(() => setShowCategorySuggestions(false), 200);
+                    }}
+                    placeholder="Digite ou selecione uma categoria"
+                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    required
+                  />
+                  
+                  {/* Sugestões de categorias */}
+                  {showCategorySuggestions && categories.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {categories.map((category, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
+                          onClick={() => {
+                            handleInputChange('categoria', category.toLowerCase());
+                            setShowCategorySuggestions(false);
+                          }}
+                        >
+                          {category}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -537,18 +663,47 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Forma de Pagamento *</label>
-                <Select value={formData.formaPagamento} onValueChange={(value: any) => handleInputChange('formaPagamento', value)}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="pix" className="text-seguranca-lightgray hover:bg-seguranca-graphite">PIX</SelectItem>
-                    <SelectItem value="boleto" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Boleto</SelectItem>
-                    <SelectItem value="transferencia" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Transferência</SelectItem>
-                    <SelectItem value="dinheiro" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Dinheiro</SelectItem>
-                    <SelectItem value="cartao" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cartão</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={formData.formaPagamento}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleInputChange('formaPagamento', value);
+                      searchPaymentMethods(value);
+                    }}
+                    onFocus={() => {
+                      if (paymentMethods.length > 0) {
+                        setShowPaymentMethodSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay para permitir clique nas sugestões
+                      setTimeout(() => setShowPaymentMethodSuggestions(false), 200);
+                    }}
+                    placeholder="Digite ou selecione uma forma de pagamento"
+                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    required
+                  />
+                  
+                  {/* Sugestões de formas de pagamento */}
+                  {showPaymentMethodSuggestions && paymentMethods.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {paymentMethods.map((method, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
+                          onClick={() => {
+                            handleInputChange('formaPagamento', method.toLowerCase());
+                            setShowPaymentMethodSuggestions(false);
+                          }}
+                        >
+                          {method}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

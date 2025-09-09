@@ -2,6 +2,8 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.FuelRecordReportDTO;
 import com.z7design.secured_guard.dto.VehicleReportDTO;
+import com.z7design.secured_guard.dto.BankReconciliationReportDTO;
+import com.z7design.secured_guard.dto.BankFileDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
@@ -167,6 +169,175 @@ public class JasperReportService {
             return "Até " + endDate.format(formatter);
         } else {
             return "Todos os períodos";
+        }
+    }
+    
+    // ===== BANK RECONCILIATION REPORTS =====
+    
+    public byte[] generateBankReconciliationReportPDF(List<BankReconciliationReportDTO> transactions, 
+                                                      BankFileDTO file, 
+                                                      String statusFilter) throws IOException {
+        try {
+            log.info("Gerando relatório PDF de conciliação bancária com JasperReports - {} transações", transactions.size());
+            
+            // Carregar template JRXML
+            ClassPathResource resource = new ClassPathResource("reports/bank-reconciliation-report.jrxml");
+            InputStream templateStream = resource.getInputStream();
+            
+            // Compilar template
+            JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
+            log.debug("Template JRXML de conciliação bancária compilado com sucesso");
+            
+            // Preparar parâmetros
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            parameters.put("TOTAL_TRANSACTIONS", transactions.size());
+            
+            // Informações do arquivo
+            if (file != null) {
+                parameters.put("FILE_NAME", file.getFileName());
+                parameters.put("BANK_NAME", file.getBankName());
+                parameters.put("ACCOUNT_NUMBER", file.getAccountNumber());
+                parameters.put("PERIOD", file.getPeriod());
+            } else {
+                parameters.put("FILE_NAME", "Todos os arquivos");
+                parameters.put("BANK_NAME", "Todos os bancos");
+                parameters.put("ACCOUNT_NUMBER", "Todas as contas");
+                parameters.put("PERIOD", "Todos os períodos");
+            }
+            
+            // Calcular estatísticas
+            long matchedTransactions = transactions.stream()
+                    .filter(t -> "MATCHED".equals(t.getStatus()))
+                    .count();
+            long unmatchedTransactions = transactions.stream()
+                    .filter(t -> "UNMATCHED".equals(t.getStatus()))
+                    .count();
+            long pendingTransactions = transactions.stream()
+                    .filter(t -> "PENDING".equals(t.getStatus()))
+                    .count();
+            
+            parameters.put("MATCHED_TRANSACTIONS", (int) matchedTransactions);
+            parameters.put("UNMATCHED_TRANSACTIONS", (int) unmatchedTransactions);
+            parameters.put("PENDING_TRANSACTIONS", (int) pendingTransactions);
+            
+            // Definir filtro aplicado
+            if (statusFilter != null && !statusFilter.isEmpty() && !statusFilter.equals("ALL")) {
+                switch (statusFilter.toUpperCase()) {
+                    case "MATCHED":
+                        parameters.put("FILTER_STATUS", "Apenas transações conciliadas");
+                        break;
+                    case "UNMATCHED":
+                        parameters.put("FILTER_STATUS", "Apenas transações não conciliadas");
+                        break;
+                    case "PENDING":
+                        parameters.put("FILTER_STATUS", "Apenas transações pendentes");
+                        break;
+                    default:
+                        parameters.put("FILTER_STATUS", "Todas as transações");
+                }
+            } else {
+                parameters.put("FILTER_STATUS", "Todas as transações");
+            }
+            
+            log.debug("Parâmetros preparados: {}", parameters);
+            
+            // Preparar dados
+            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(transactions);
+            
+            // Gerar relatório
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+            log.debug("Relatório de conciliação bancária preenchido com sucesso");
+            
+            // Exportar para PDF
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            
+            byte[] result = outputStream.toByteArray();
+            log.info("Relatório PDF de conciliação bancária gerado com sucesso usando JasperReports. {} transações processadas, {} bytes gerados", 
+                    transactions.size(), result.length);
+            
+            return result;
+            
+        } catch (JRException e) {
+            log.error("Erro ao gerar relatório de conciliação bancária com JasperReports", e);
+            throw new IOException("Erro ao gerar relatório PDF de conciliação bancária: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao gerar relatório de conciliação bancária", e);
+            throw new IOException("Erro inesperado ao gerar relatório PDF de conciliação bancária: " + e.getMessage(), e);
+        }
+    }
+    
+    public byte[] generateBankReconciliationSummaryReportPDF(List<BankReconciliationReportDTO> transactions, 
+                                                             LocalDate startDate, 
+                                                             LocalDate endDate, 
+                                                             String bankName) throws IOException {
+        try {
+            log.info("Gerando relatório PDF de resumo de conciliação bancária com JasperReports - {} transações", transactions.size());
+            
+            // Carregar template JRXML
+            ClassPathResource resource = new ClassPathResource("reports/bank-reconciliation-summary-report.jrxml");
+            InputStream templateStream = resource.getInputStream();
+            
+            // Compilar template
+            JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
+            log.debug("Template JRXML de resumo de conciliação bancária compilado com sucesso");
+            
+            // Preparar parâmetros
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            parameters.put("PERIOD", formatPeriod(startDate, endDate));
+            parameters.put("BANK_FILTER", bankName != null ? bankName : "Todos os bancos");
+            parameters.put("TOTAL_TRANSACTIONS", transactions.size());
+            
+            // Calcular estatísticas por banco
+            Map<String, Long> bankStats = transactions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            BankReconciliationReportDTO::getBankName,
+                            java.util.stream.Collectors.counting()));
+            
+            parameters.put("BANK_STATS", bankStats);
+            
+            // Calcular estatísticas por status
+            long matchedTransactions = transactions.stream()
+                    .filter(t -> "MATCHED".equals(t.getStatus()))
+                    .count();
+            long unmatchedTransactions = transactions.stream()
+                    .filter(t -> "UNMATCHED".equals(t.getStatus()))
+                    .count();
+            long pendingTransactions = transactions.stream()
+                    .filter(t -> "PENDING".equals(t.getStatus()))
+                    .count();
+            
+            parameters.put("MATCHED_TRANSACTIONS", (int) matchedTransactions);
+            parameters.put("UNMATCHED_TRANSACTIONS", (int) unmatchedTransactions);
+            parameters.put("PENDING_TRANSACTIONS", (int) pendingTransactions);
+            
+            log.debug("Parâmetros preparados: {}", parameters);
+            
+            // Preparar dados
+            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(transactions);
+            
+            // Gerar relatório
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+            log.debug("Relatório de resumo de conciliação bancária preenchido com sucesso");
+            
+            // Exportar para PDF
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            
+            byte[] result = outputStream.toByteArray();
+            log.info("Relatório PDF de resumo de conciliação bancária gerado com sucesso usando JasperReports. {} transações processadas, {} bytes gerados", 
+                    transactions.size(), result.length);
+            
+            return result;
+            
+        } catch (JRException e) {
+            log.error("Erro ao gerar relatório de resumo de conciliação bancária com JasperReports", e);
+            throw new IOException("Erro ao gerar relatório PDF de resumo de conciliação bancária: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao gerar relatório de resumo de conciliação bancária", e);
+            throw new IOException("Erro inesperado ao gerar relatório PDF de resumo de conciliação bancária: " + e.getMessage(), e);
         }
     }
 }

@@ -32,6 +32,9 @@ import ContasAReceber from '@/pages/ContasAReceber';
 import FluxoCaixa from '@/pages/FluxoCaixa';
 import Pagamentos from '@/pages/Pagamentos';
 import RelatoriosFinanceiros from '@/pages/RelatoriosFinanceiros';
+import ConciliacaoBancaria from '@/pages/ConciliacaoBancaria';
+import Bancos from '@/pages/Bancos';
+import Agencias from '@/pages/Agencias';
 import Frota from '@/pages/Frota';
 import Documentos from '@/pages/Documentos';
 import DocumentosUnificados from '@/pages/DocumentosUnificados';
@@ -264,6 +267,21 @@ function App() {
                     <Route path="/financeiro/contas-receber" element={
                       <ProtectedRoute>
                         <ContasAReceber />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/conciliacao-bancaria" element={
+                      <ProtectedRoute>
+                        <ConciliacaoBancaria />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/bancos" element={
+                      <ProtectedRoute>
+                        <Bancos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/agencias" element={
+                      <ProtectedRoute>
+                        <Agencias />
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/fluxo-caixa" element={
