@@ -189,7 +189,16 @@ const Frota: React.FC = () => {
     refetch: refetchFines
   } = useQuery({
     queryKey: ['fines'],
-    queryFn: () => fleetService.getFines()
+    queryFn: () => fleetService.getFines(),
+    retry: 2,
+    retryDelay: 1000,
+    onSuccess: (data) => {
+      console.log('✅ React Query: Multas carregadas com sucesso:', data);
+      console.log('📊 React Query: Total de multas:', data?.length || 0);
+    },
+    onError: (error) => {
+      console.error('❌ React Query: Erro ao carregar multas:', error);
+    }
   });
 
   // Buscar lista de motoristas
@@ -246,10 +255,13 @@ const Frota: React.FC = () => {
 
   // Função de mapeamento de multas (dentro do componente para ter acesso aos dados)
   const mapFineToComponent = (fine: Fine): MultaComponent => {
+    console.log('🔍 Mapeando multa:', fine);
+    
     // Encontrar o veículo correspondente
     const vehicle = vehicles?.find(v => v.id === fine.vehicleId);
+    console.log('🚗 Veículo encontrado para multa:', vehicle);
 
-    return {
+    const mappedMulta = {
       id: fine.id.toString(),
       veiculo_id: fine.vehicleId.toString(),
       placa: fine.vehiclePlate,
@@ -266,6 +278,9 @@ const Frota: React.FC = () => {
       created_at: fine.createdAt,
       updated_at: fine.createdAt
     };
+    
+    console.log('✅ Multa mapeada:', mappedMulta);
+    return mappedMulta;
   };
 
   // Mapear dados para componentes
@@ -281,6 +296,12 @@ const Frota: React.FC = () => {
   const veiculosComponent = veiculosFiltrados?.map(mapVehicleToComponent) || [];
   const abastecimentosComponent = fuelRecords?.map(mapFuelRecordToComponent) || [];
   const multasComponent = fines?.map(mapFineToComponent) || [];
+  
+  // Log para debug das multas
+  console.log('🔍 Debug Multas:');
+  console.log('  - fines (dados brutos):', fines);
+  console.log('  - multasComponent (mapeadas):', multasComponent);
+  console.log('  - Quantidade de multas:', multasComponent.length);
 
   // Error handling
   if (vehiclesError) {
@@ -294,6 +315,24 @@ const Frota: React.FC = () => {
   const totalFines = fines?.length || 0;
   const totalFinesAmount = fines?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
   const pendingFines = fines?.filter(f => f.status === 'PENDING').length || 0;
+  
+  // Calcular multas próximas do vencimento (7 dias)
+  const finesNearDue = multasComponent.filter(multa => {
+    if (multa.status === 'paga') return false;
+    const dueDate = new Date(multa.data_vencimento);
+    const today = new Date();
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 7 && diffDays >= 0;
+  });
+  
+  // Calcular multas vencidas
+  const overdueFines = multasComponent.filter(multa => {
+    if (multa.status === 'paga') return false;
+    const dueDate = new Date(multa.data_vencimento);
+    const today = new Date();
+    return dueDate < today;
+  });
 
   const handleVeiculoSuccess = () => {
     refetchVehicles();
@@ -947,29 +986,118 @@ const Frota: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="multas" className="mt-6">
-            <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-seguranca-lightgray">Gestão de Multas</CardTitle>
-                  <Button
-                    onClick={() => setIsMultaModalOpen(true)}
-                    className="bg-seguranca-red hover:bg-seguranca-darkred"
-                  >
-                    <Plus size={16} className="mr-2" />
-                    Nova Multa
-                  </Button>
+            <div className="space-y-6">
+              {/* Alertas de Multas */}
+              {(finesNearDue.length > 0 || overdueFines.length > 0) && (
+                <div className="space-y-4">
+                  {/* Multas Vencidas */}
+                  {overdueFines.length > 0 && (
+                    <Card className="border-red-200 bg-red-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-red-800">
+                          <AlertTriangle className="text-red-600" />
+                          Multas Vencidas ({overdueFines.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {overdueFines.slice(0, 3).map(multa => (
+                            <div key={multa.id} className="flex justify-between items-center p-2 bg-white rounded border">
+                              <div>
+                                <span className="font-medium">{multa.placa}</span>
+                                <span className="text-sm text-gray-600 ml-2">{multa.tipo_infracao}</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-semibold text-red-700">
+                                  R$ {multa.valor.toFixed(2)}
+                                </div>
+                                <div className="text-sm text-red-600">
+                                  Venceu em {new Date(multa.data_vencimento).toLocaleDateString('pt-BR')}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {overdueFines.length > 3 && (
+                            <p className="text-sm text-red-600 text-center">
+                              E mais {overdueFines.length - 3} multa(s) vencida(s)...
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Multas Próximas do Vencimento */}
+                  {finesNearDue.length > 0 && (
+                    <Card className="border-yellow-200 bg-yellow-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-yellow-800">
+                          <AlertTriangle className="text-yellow-600" />
+                          Multas Próximas do Vencimento ({finesNearDue.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {finesNearDue.slice(0, 3).map(multa => {
+                            const dueDate = new Date(multa.data_vencimento);
+                            const today = new Date();
+                            const diffTime = dueDate.getTime() - today.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            return (
+                              <div key={multa.id} className="flex justify-between items-center p-2 bg-white rounded border">
+                                <div>
+                                  <span className="font-medium">{multa.placa}</span>
+                                  <span className="text-sm text-gray-600 ml-2">{multa.tipo_infracao}</span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-semibold text-yellow-700">
+                                    R$ {multa.valor.toFixed(2)}
+                                  </div>
+                                  <div className="text-sm text-yellow-600">
+                                    Vence em {diffDays} dia(s) - {dueDate.toLocaleDateString('pt-BR')}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {finesNearDue.length > 3 && (
+                            <p className="text-sm text-yellow-600 text-center">
+                              E mais {finesNearDue.length - 3} multa(s) vencendo em breve...
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <MultasTable
-                  multas={multasComponent}
-                  onRefresh={refetchFines}
-                  onView={handleViewMulta}
-                  onEdit={handleEditMulta}
-                  onDelete={handleDeleteMulta}
-                />
-              </CardContent>
-            </Card>
+              )}
+
+              {/* Tabela de Multas */}
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-seguranca-lightgray">Gestão de Multas</CardTitle>
+                    <Button
+                      onClick={() => setIsMultaModalOpen(true)}
+                      className="bg-seguranca-red hover:bg-seguranca-darkred"
+                    >
+                      <Plus size={16} className="mr-2" />
+                      Nova Multa
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <MultasTable
+                    multas={multasComponent}
+                    onRefresh={refetchFines}
+                    onView={handleViewMulta}
+                    onEdit={handleEditMulta}
+                    onDelete={handleDeleteMulta}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 

@@ -37,10 +37,8 @@ public class BankReconciliationReportService {
             log.info("Dados obtidos: {} transações", transactions.size());
             
             // Buscar arquivo
-            BankFileDTO file = null;
-            if (fileId != null) {
-                file = BankFileDTO.fromEntity(bankFileRepository.findById(fileId).orElse(null));
-            }
+            final BankFileDTO file = fileId != null ? 
+                BankFileDTO.fromEntity(bankFileRepository.findById(fileId).orElse(null)) : null;
             
             // Converter para DTOs de relatório
             List<BankReconciliationReportDTO> reportDTOs = transactions.stream()
