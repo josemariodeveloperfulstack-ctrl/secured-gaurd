@@ -13,7 +13,7 @@ export interface EmployeeFilters {
 export interface SimpleEmployee {
   id: string;
   name: string;
-  document: string;
+  cpf: string;
   email: string;
   phone: string;
   registrationNumber: string;
@@ -46,9 +46,9 @@ export const employeeService = {
         const allEmployees = await this.getAllEmployees();
         return allEmployees.filter(emp =>
           emp.name.toLowerCase().includes(filters.searchTerm!.toLowerCase()) ||
-          emp.email?.toLowerCase().includes(filters.searchTerm!.toLowerCase()) ||
-          emp.cpf?.includes(filters.searchTerm!) ||
-          emp.registrationNumber?.toLowerCase().includes(filters.searchTerm!.toLowerCase())
+          (emp.email && emp.email.toLowerCase().includes(filters.searchTerm!.toLowerCase())) ||
+          (emp.cpf && emp.cpf.includes(filters.searchTerm!)) ||
+          (emp.registrationNumber && emp.registrationNumber.toLowerCase().includes(filters.searchTerm!.toLowerCase()))
         );
       }
 

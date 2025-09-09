@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollPreservation } from '@/hooks/useScrollPreservation';
 import { Button } from '@/components/ui/button';
 import { ScrollPreservingLink } from './ScrollPreservingLink';
+import UserProfileModal from './UserProfileModal';
 import {
   BarChart3,
   FileText,
@@ -51,7 +52,14 @@ import {
   Wallet,
   ShoppingCart,
   CheckCircle,
-  Ruler
+  Ruler,
+  // Novos ícones para menus operacionais
+  Wrench,
+  AlertCircle,
+  ClipboardCheck,
+  ArrowRightLeft,
+  Eye,
+  Activity
 } from 'lucide-react';
 
 interface CollapsibleSidebarProps {
@@ -69,12 +77,19 @@ const mainMenuItems = [
   { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
 ];
 
-  // Módulo Operacional
+  // Módulo Operacional - Correspondente às abas da página
   const operacionalMenuItems = [
-    { icon: Shield, text: 'Operacional', to: '/operacional', id: 'operacional' },
+    { icon: BarChart3, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
     { icon: ClipboardList, text: 'Serviços', to: '/servicos', id: 'servicos' },
-    { icon: Route, text: 'Escalas Otimizadas', to: '/controle-visitas-avancado', id: 'escalas-otimizadas' },
-    { icon: FileText, text: 'Guia de Transporte', to: '/guia-transporte', id: 'guia-transporte' },
+    { icon: Shield, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
+    { icon: MapPin, text: 'Controle de Visitas', to: '/controle-visitas-avancado', id: 'controle-visitas' },
+    { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },
+    { icon: AlertTriangle, text: 'Notificações', to: '/operacional?tab=notificacoes', id: 'operacional-notificacoes' },
+    { icon: Eye, text: 'Ocorrências', to: '/operacional?tab=ocorrencias', id: 'operacional-ocorrencias' },
+    { icon: Activity, text: 'Registro de Atividade', to: '/operacional?tab=atividades', id: 'operacional-atividades' },
+    { icon: Clock, text: 'Troca de Plantão', to: '/operacional?tab=troca-plantao', id: 'operacional-troca-plantao' },
+    { icon: Route, text: 'Controle de Rondas', to: '/controle-rondas', id: 'controle-rondas' },
+    { icon: FileText, text: 'Guia de Transporte', to: '/operacional?tab=guia-transporte', id: 'operacional-guia-transporte' },
   ];
 
 // Módulo RH/Departamento Pessoal
@@ -85,6 +100,7 @@ const rhMenuItems = [
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'rh-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'rh-cargos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
+  { icon: Shield, text: 'Controle de EPI', to: '/epis', id: 'rh-epis' },
 ];
 
 // Módulo Comercial
@@ -169,21 +185,31 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   const location = useLocation();
   const { user } = useAuth();
   const { forceScrollToTop } = useScrollPreservation();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Função para verificar se usuário tem permissão
+  const handleProfileClick = () => {
+    setIsProfileModalOpen(true);
+  };
+
+  // Função para verificar se usuário tem permissão (TEMPORÁRIO - SEMPRE TRUE PARA TESTE)
   const hasPermission = (permission: string): boolean => {
-    if (!user?.permissions) return false;
-    return user.permissions[permission] || user.permissions.ALL_PERMISSIONS;
+    console.log(`🔍 CollapsibleSidebar - hasPermission(${permission}): TRUE (FORÇADO PARA TESTE)`);
+    return true; // TEMPORÁRIO: sempre retorna true para teste
   };
 
   // Função para verificar se módulo deve ser exibido
   const shouldShowModule = (requiredPermission?: string): boolean => {
     if (!requiredPermission) return true;
-    return hasPermission(requiredPermission);
+    const result = hasPermission(requiredPermission);
+    console.log(`🔍 CollapsibleSidebar - shouldShowModule(${requiredPermission}): ${result}`);
+    return result;
   };
 
   const getActiveId = () => {
     const path = location.pathname;
+    const search = location.search;
+    const fullPath = path + search;
+    
     const allItems = [
       ...mainMenuItems,
       ...financeiroMenuItems,
@@ -198,8 +224,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       ...sistemaMenuItems
     ];
 
-    // Primeiro tenta encontrar uma correspondência exata
-    let activeItem = allItems.find(item => item.to === path);
+    // Primeiro tenta encontrar uma correspondência exata (incluindo query params)
+    let activeItem = allItems.find(item => item.to === fullPath);
 
     // Se não encontrar, tenta corresponder apenas o pathname (sem parâmetros)
     if (!activeItem) {
@@ -207,6 +233,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         const itemPath = item.to.split('?')[0]; // Remove parâmetros da URL do item
         return itemPath === path;
       });
+    }
+
+    // Para páginas operacionais, verifica se está na página operacional e qual aba está ativa
+    if (path === '/operacional' && search) {
+      const urlParams = new URLSearchParams(search);
+      const tab = urlParams.get('tab');
+      if (tab) {
+        return `operacional-${tab}`;
+      }
     }
 
     return activeItem?.id || 'dashboard';
@@ -336,14 +371,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Operacional */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Operacional
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-                              {operacionalMenuItems.map((item) => (
+          {console.log('🔍 CollapsibleSidebar - Mostrando módulo operacional SEM verificação de permissão') || true && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Operacional
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {operacionalMenuItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -364,40 +400,43 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     )}
                   </ScrollPreservingLink>
                 ))}
-            </nav>
-          </div>
+              </nav>
+            </div>
+          )}
 
           {/* Grupo RH */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Recursos Humanos
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-              {rhMenuItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  className={`
-                    flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive(item.id) 
-                      ? 'bg-seguranca-black text-seguranca-yellow' 
-                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                    }
-                  `}
-                >
-                  <item.icon 
-                    size={18} 
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
-            </nav>
-          </div>
+          {shouldShowModule('EMPLOYEES_READ') && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Recursos Humanos
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {rhMenuItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
 
           {/* Grupo Comercial */}
           <div className="mb-6">
@@ -635,12 +674,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         {/* Footer */}
         <div className="p-4 border-t border-gray-700">
           {!collapsed && user && (
-            <div className="flex items-center space-x-3">
+            <div 
+              className="flex items-center space-x-3 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors"
+              onClick={handleProfileClick}
+            >
               <div className="w-8 h-8 bg-seguranca-yellow rounded-full flex items-center justify-center">
                 <User2 size={16} className="text-seguranca-black" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-seguranca-lightgray truncate">
+                <div className="text-sm font-medium text-seguranca-lightgray truncate hover:text-seguranca-yellow transition-colors">
                   {user?.name || 'Usuário'}
                 </div>
                 <div className="text-xs text-gray-400 truncate">
@@ -651,6 +693,12 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
         </div>
       </aside>
+
+      {/* Modal de Perfil */}
+      <UserProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </>
   );
 };

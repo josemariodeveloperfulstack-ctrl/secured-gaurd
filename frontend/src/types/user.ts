@@ -171,11 +171,14 @@ export interface User {
 
 export interface AuthContextType {
   user: User | null;
+  profile?: any;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  signOut: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshAuthToken: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 // Configurações de menu por role

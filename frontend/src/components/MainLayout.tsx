@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import { CollapsibleSidebar } from './CollapsibleSidebar';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Breadcrumb } from './Breadcrumb';
 import { NotificationBell } from './NotificationBell';
+import UserProfileModal from './UserProfileModal';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -30,6 +31,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { collapsed, isMobile, toggleSidebar } = useSidebar();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleProfileClick = () => {
+    setIsProfileModalOpen(true);
+  };
 
   if (!user) {
     return (
@@ -80,9 +86,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
             {/* Lado direito - Informações do usuário */}
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors"
+                onClick={handleProfileClick}
+              >
                 <User className="h-4 w-4 text-seguranca-lightgray" />
-                <span className="text-seguranca-lightgray text-sm hidden sm:block">
+                <span className="text-seguranca-lightgray text-sm hidden sm:block hover:text-seguranca-yellow transition-colors">
                   {user.name}
                 </span>
                 <Badge className={`${getRoleColor(user.role)} text-xs`}>
@@ -134,6 +143,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
         </main>
       </div>
+
+      {/* Modal de Perfil */}
+      <UserProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </div>
   );
 }; 

@@ -173,7 +173,35 @@ const Frota: React.FC = () => {
     refetch: refetchVehicles
   } = useQuery({
     queryKey: ['vehicles'],
-    queryFn: fleetService.getVehicles,
+    queryFn: async () => {
+      try {
+        console.log('🔍 Iniciando busca de veículos...');
+        
+        // Debug authentication
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+        console.log('🔍 Debug Auth - Token exists:', !!token);
+        console.log('🔍 Debug Auth - User exists:', !!user);
+        if (user) {
+          const userData = JSON.parse(user);
+          console.log('🔍 Debug Auth - User role:', userData.role);
+          console.log('🔍 Debug Auth - User permissions:', userData.permissions);
+        }
+        
+        const data = await fleetService.getVehicles();
+        console.log('✅ Veículos carregados:', data);
+        return data;
+      } catch (error) {
+        console.error('❌ Erro ao carregar veículos:', error);
+        console.error('❌ Detalhes do erro:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        });
+        throw error;
+      }
+    },
     retry: 2,
     retryDelay: 1000
   });

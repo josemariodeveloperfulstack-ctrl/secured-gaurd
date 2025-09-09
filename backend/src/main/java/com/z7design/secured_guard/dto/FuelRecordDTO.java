@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import jakarta.persistence.EntityNotFoundException;
 
 @Data
 @NoArgsConstructor
@@ -41,7 +42,19 @@ public class FuelRecordDTO {
             // Verificar se o veículo não é nulo
             if (fuelRecord.getVehicle() != null) {
                 dto.setVehicleId(fuelRecord.getVehicle().getId());
-                dto.setVehiclePlate(fuelRecord.getVehicle().getPlate());
+                // Proteger contra proxies inválidos ou entidades ausentes
+                try {
+                    dto.setVehiclePlate(fuelRecord.getVehicle().getPlate());
+                } catch (EntityNotFoundException e) {
+                    System.err.println("Veículo não encontrado ao acessar plate para FuelRecord " + fuelRecord.getId() + ": " + e.getMessage());
+                    dto.setVehiclePlate(null);
+                } catch (org.hibernate.ObjectNotFoundException e) {
+                    System.err.println("Veículo não encontrado (ObjectNotFoundException) para FuelRecord " + fuelRecord.getId() + ": " + e.getMessage());
+                    dto.setVehiclePlate(null);
+                } catch (org.hibernate.LazyInitializationException e) {
+                    System.err.println("LazyInitialization ao acessar plate do veículo para FuelRecord " + fuelRecord.getId() + ": " + e.getMessage());
+                    dto.setVehiclePlate(null);
+                }
             }
             
             dto.setDate(fuelRecord.getDate());

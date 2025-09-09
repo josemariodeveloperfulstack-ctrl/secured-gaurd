@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import Navbar from '@/components/Navbar';
 import SEO from '@/components/SEO';
 import { Button } from '@/components/ui/button';
@@ -24,14 +24,18 @@ import {
 } from 'lucide-react';
 import { useAOS } from '@/hooks/use-aos';
 import Logo from '@/components/Logo';
-import QuoteModal from '@/components/QuoteModal';
-import WhatsAppChatbot from '@/components/WhatsAppChatbot';
+import LoadingSpinner from '@/components/LoadingSpinner';
+
+// Lazy load dos modais para melhor performance
+const QuoteModal = lazy(() => import('@/components/QuoteModal'));
+const WhatsAppChatbot = lazy(() => import('@/components/WhatsAppChatbot'));
 
 const PortalHome = () => {
   const aos = useAOS();
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
 
-  const services = [
+  // Memoizar dados estáticos para evitar recriação desnecessária
+  const services = useMemo(() => [
     {
       icon: Shield,
       title: "Vigilância Patrimonial",
@@ -62,30 +66,30 @@ const PortalHome = () => {
       description: "Serviço voltado a limpeza e manutenção das áreas administrativas, internas e externas da sua empresa.",
       features: ["Limpeza", "Manutenção", "Áreas administrativas"]
     }
-  ];
+  ], []);
 
-  const sectors = [
+  const sectors = useMemo(() => [
     { icon: Factory, name: "Indústrias" },
     { icon: Home, name: "Condomínios" },
     { icon: Building, name: "Mineradoras" },
     { icon: Heart, name: "Hospitais" },
     { icon: Truck, name: "Transportadoras" },
     { icon: ShoppingBag, name: "Shopping Centers" }
-  ];
+  ], []);
 
-  const benefits = [
+  const benefits = useMemo(() => [
     "Foco no que importa em seu negócio",
     "Continuidade do serviço",
     "Acompanhamento diuturno das operações",
     "Estabilidade Operacional"
-  ];
+  ], []);
 
-  const differentials = [
+  const differentials = useMemo(() => [
     "Autorização da Polícia Federal para execução dos serviços de segurança",
     "Acompanhamento constante das atividades",
     "Treinamento e desenvolvimento contínuo dos colaboradores",
     "Atendimento personalizado"
-  ];
+  ], []);
 
   return (
     <>
@@ -359,13 +363,17 @@ const PortalHome = () => {
       </div>
       
       {/* Quote Modal */}
-      <QuoteModal 
-        isOpen={isQuoteModalOpen} 
-        onClose={() => setIsQuoteModalOpen(false)} 
-      />
+      <Suspense fallback={<LoadingSpinner />}>
+        <QuoteModal 
+          isOpen={isQuoteModalOpen} 
+          onClose={() => setIsQuoteModalOpen(false)} 
+        />
+      </Suspense>
       
       {/* WhatsApp Chatbot */}
-      <WhatsAppChatbot />
+      <Suspense fallback={<LoadingSpinner />}>
+        <WhatsAppChatbot />
+      </Suspense>
     </>
   );
 };

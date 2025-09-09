@@ -4,9 +4,11 @@ import { LogOut, User, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
+import UserProfileModal from './UserProfileModal';
 
 const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
   
@@ -18,32 +20,33 @@ const UserMenu = () => {
 
   const handleProfileClick = () => {
     closeMenu();
-    navigate('/user-profile');
+    setIsProfileModalOpen(true);
   };
 
   return (
-    <div className="relative">
-      <button
-        onClick={toggleMenu}
-        className="flex items-center gap-3 p-2 rounded-lg hover:bg-seguranca-black transition-colors"
+    <div className="relative flex items-center gap-3">
+      {/* Nome do usuário - CLICÁVEL */}
+      <div 
+        className="text-right hidden md:block cursor-pointer hover:text-seguranca-yellow transition-colors p-2 rounded-lg hover:bg-seguranca-black"
+        onClick={handleProfileClick}
       >
-        {/* Nome do usuário - CLICÁVEL */}
-        <div 
-          className="text-right hidden md:block cursor-pointer hover:text-seguranca-yellow transition-colors"
-          onClick={handleProfileClick}
-        >
-          <div className="text-sm font-medium text-seguranca-lightgray">{displayName}</div>
-          <div className="text-xs text-seguranca-yellow font-bold">SUPER_ADMIN</div>
-        </div>
-        
-        {/* Botão Sair */}
-        <button 
-          onClick={() => signOut()}
-          className="px-3 py-1 bg-seguranca-red text-white text-xs rounded hover:bg-red-700 transition-colors"
-        >
-          Sair
-        </button>
+        <div className="text-sm font-medium text-seguranca-lightgray">{displayName}</div>
+        <div className="text-xs text-seguranca-yellow font-bold">SUPER_ADMIN</div>
+      </div>
+      
+      {/* Botão Sair */}
+      <button 
+        onClick={() => signOut()}
+        className="px-3 py-1 bg-seguranca-red text-white text-xs rounded hover:bg-red-700 transition-colors"
+      >
+        Sair
       </button>
+
+      {/* Modal de Perfil */}
+      <UserProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </div>
   );
 };
