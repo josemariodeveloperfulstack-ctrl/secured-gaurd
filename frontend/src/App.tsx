@@ -76,6 +76,7 @@ import CentrosDeCusto from '@/pages/CentrosDeCusto';
 import Filiais from '@/pages/Filiais';
 import Servicos from '@/pages/Servicos';
 import Operacional from '@/pages/Operacional';
+import ControleRondas from '@/pages/ControleRondas';
 
 // Módulo Comercial
 import Leads from '@/pages/Leads';
@@ -197,6 +198,11 @@ function App() {
                     <Route path="/operacional" element={
                       <ProtectedRoute>
                         <Operacional />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/controle-rondas" element={
+                      <ProtectedRoute>
+                        <ControleRondas />
                       </ProtectedRoute>
                     } />
                     {/* Rota para Troca de Plantão removida temporariamente */}

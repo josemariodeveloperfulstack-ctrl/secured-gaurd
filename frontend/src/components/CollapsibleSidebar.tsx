@@ -50,7 +50,14 @@ import {
   Wallet,
   ShoppingCart,
   CheckCircle,
-  Ruler
+  Ruler,
+  // Novos ícones para menus operacionais
+  Wrench,
+  AlertCircle,
+  ClipboardCheck,
+  ArrowRightLeft,
+  Eye,
+  Activity
 } from 'lucide-react';
 
 interface CollapsibleSidebarProps {
@@ -68,12 +75,18 @@ const mainMenuItems = [
   { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
 ];
 
-  // Módulo Operacional
+  // Módulo Operacional - Correspondente às abas da página
   const operacionalMenuItems = [
-    { icon: Shield, text: 'Operacional', to: '/operacional', id: 'operacional' },
+    { icon: BarChart3, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
     { icon: ClipboardList, text: 'Serviços', to: '/servicos', id: 'servicos' },
-    { icon: Route, text: 'Escalas Otimizadas', to: '/controle-visitas-avancado', id: 'escalas-otimizadas' },
-    { icon: FileText, text: 'Guia de Transporte', to: '/guia-transporte', id: 'guia-transporte' },
+    { icon: Shield, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
+    { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },
+    { icon: AlertTriangle, text: 'Notificações', to: '/operacional?tab=notificacoes', id: 'operacional-notificacoes' },
+    { icon: Eye, text: 'Ocorrências', to: '/operacional?tab=ocorrencias', id: 'operacional-ocorrencias' },
+    { icon: Activity, text: 'Registro de Atividade', to: '/operacional?tab=atividades', id: 'operacional-atividades' },
+    { icon: Clock, text: 'Troca de Plantão', to: '/operacional?tab=troca-plantao', id: 'operacional-troca-plantao' },
+    { icon: Route, text: 'Controle de Rondas', to: '/controle-rondas', id: 'controle-rondas' },
+    { icon: FileText, text: 'Guia de Transporte', to: '/operacional?tab=guia-transporte', id: 'operacional-guia-transporte' },
   ];
 
 // Módulo RH/Departamento Pessoal
@@ -84,6 +97,7 @@ const rhMenuItems = [
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'rh-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'rh-cargos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
+  { icon: Shield, text: 'Controle de EPI', to: '/epis', id: 'rh-epis' },
 ];
 
 // Módulo Comercial
@@ -185,6 +199,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
   const getActiveId = () => {
     const path = location.pathname;
+    const search = location.search;
+    const fullPath = path + search;
+    
     const allItems = [
       ...mainMenuItems,
       ...financeiroMenuItems,
@@ -199,8 +216,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       ...sistemaMenuItems
     ];
 
-    // Primeiro tenta encontrar uma correspondência exata
-    let activeItem = allItems.find(item => item.to === path);
+    // Primeiro tenta encontrar uma correspondência exata (incluindo query params)
+    let activeItem = allItems.find(item => item.to === fullPath);
 
     // Se não encontrar, tenta corresponder apenas o pathname (sem parâmetros)
     if (!activeItem) {
@@ -208,6 +225,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         const itemPath = item.to.split('?')[0]; // Remove parâmetros da URL do item
         return itemPath === path;
       });
+    }
+
+    // Para páginas operacionais, verifica se está na página operacional e qual aba está ativa
+    if (path === '/operacional' && search) {
+      const urlParams = new URLSearchParams(search);
+      const tab = urlParams.get('tab');
+      if (tab) {
+        return `operacional-${tab}`;
+      }
     }
 
     return activeItem?.id || 'dashboard';
@@ -337,14 +363,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Operacional */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Operacional
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-                              {operacionalMenuItems.map((item) => (
+          {shouldShowModule('EMPLOYEES_READ') && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Operacional
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {operacionalMenuItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -365,40 +392,43 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     )}
                   </ScrollPreservingLink>
                 ))}
-            </nav>
-          </div>
+              </nav>
+            </div>
+          )}
 
           {/* Grupo RH */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Recursos Humanos
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-              {rhMenuItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  className={`
-                    flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive(item.id) 
-                      ? 'bg-seguranca-black text-seguranca-yellow' 
-                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                    }
-                  `}
-                >
-                  <item.icon 
-                    size={18} 
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
-            </nav>
-          </div>
+          {shouldShowModule('EMPLOYEES_READ') && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Recursos Humanos
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {rhMenuItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
 
           {/* Grupo Comercial */}
           <div className="mb-6">
