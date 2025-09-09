@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, Employee } from '@/services/employeeService';
+import fleetService from '@/services/fleetService';
 
 interface Veiculo {
   id: string;
@@ -40,6 +41,9 @@ interface Multa {
   placa?: string;
   marca?: string;
   modelo?: string;
+  motorista_id?: string;
+  motorista_nome?: string;
+  motorista_cnh?: string;
   data_infracao: string;
   data_vencimento: string;
   valor: number;
@@ -194,31 +198,26 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
 
     setIsLoading(true);
     try {
-      // Se houver arquivo, usar FormData para upload multipart
-      let response;
-      if (file) {
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', file);
-        formDataUpload.append('veiculo_id', formData.veiculo_id);
-        formDataUpload.append('data_infracao', formData.data_infracao);
-        formDataUpload.append('data_vencimento', formData.data_vencimento);
-        formDataUpload.append('valor', String(formData.valor));
-        formDataUpload.append('pontos', String(formData.pontos));
-        formDataUpload.append('tipo_infracao', formData.tipo_infracao);
-        formDataUpload.append('local_infracao', formData.local_infracao);
-        formDataUpload.append('status', formData.status);
-        formDataUpload.append('observacoes', formData.observacoes || '');
-        formDataUpload.append('motorista_id', selectedMotorista);
-        // Exemplo de chamada: await fleetService.createFineWithFile(formDataUpload);
-        // Substitua pelo seu serviço real:
-        // response = await fleetService.createFineWithFile(formDataUpload);
+      // Preparar dados da multa para a API
+      const multaPayload = {
+        vehicleId: formData.veiculo_id,
+        date: formData.data_infracao,
+        dueDate: formData.data_vencimento,
+        amount: formData.valor,
+        description: formData.tipo_infracao,
+        location: formData.local_infracao,
+        status: formData.status === 'paga' ? 'PAID' : formData.status === 'pendente' ? 'PENDING' : 'CANCELLED',
+        paymentDate: formData.status === 'paga' ? formData.data_vencimento : undefined,
+      };
+
+      if (multa) {
+        // Atualizar multa existente
+        await fleetService.updateFine(multa.id, multaPayload);
       } else {
-        const multaPayload = {
-          ...formData,
-          motorista_id: selectedMotorista,
-        };
-        // response = await fleetService.createFine(multaPayload);
+        // Criar nova multa
+        await fleetService.createFine(multaPayload);
       }
+
       toast({
         title: 'Sucesso!',
         description: multa ? 'Multa atualizada com sucesso.' : 'Multa criada com sucesso.',
@@ -226,6 +225,7 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
       onSuccess();
       onClose();
     } catch (error: any) {
+      console.error('Erro ao salvar multa:', error);
       toast({
         title: 'Erro!',
         description: error.response?.data?.message || 'Erro ao salvar multa.',

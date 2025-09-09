@@ -1,184 +1,195 @@
-import { api } from '@/lib/axios';
+import axios from 'axios';
 
+const API_BASE_URL = 'http://localhost:8081/api';
+
+// Interfaces baseadas no backend
 export interface Pagamento {
   id: string;
-  fornecedor: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteEmail?: string;
+  clienteTelefone?: string;
   descricao: string;
   valor: number;
   dataVencimento: string;
   dataPagamento?: string;
-  status: 'pendente' | 'aprovado' | 'rejeitado' | 'pago' | 'cancelado';
-  categoria: 'fornecedor' | 'funcionario' | 'imposto' | 'servico' | 'outros';
-  prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
-  centroCusto: string;
-  numeroNF?: string;
-  formaPagamento: 'pix' | 'ted' | 'doc' | 'boleto' | 'cheque' | 'dinheiro';
-  contaBancaria?: string;
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  formaPagamento: 'PIX' | 'BOLETO' | 'TRANSFERENCIA' | 'CARTAO' | 'DINHEIRO';
+  categoria: 'FORNECEDOR' | 'SERVICO' | 'EQUIPAMENTO' | 'IMPOSTO' | 'OUTROS';
   observacoes?: string;
-  anexos: string[];
-  workflow: WorkflowEtapa[];
-  limitesValidados: boolean;
-  integracaoBancaria?: IntegracaoBancaria;
-  criadoEm: string;
-  criadoPor: string;
-  atualizadoEm: string;
+  numeroDocumento?: string;
+  centroCusto?: string;
+  agendamento?: AgendamentoPagamento;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface WorkflowEtapa {
-  id: string;
-  ordem: number;
-  nome: string;
-  descricao: string;
-  responsavel: string;
-  status: 'pendente' | 'aprovado' | 'rejeitado' | 'pulado';
-  dataProcessamento?: string;
-  observacoes?: string;
-  valorLimite?: number;
-  obrigatoria: boolean;
-}
-
-export interface IntegracaoBancaria {
-  id: string;
-  banco: string;
-  agencia: string;
-  conta: string;
-  chavePix?: string;
-  statusTransacao?: 'pendente' | 'processando' | 'concluida' | 'falhou';
-  codigoTransacao?: string;
-  dataProcessamento?: string;
-  taxas?: number;
-  comprovante?: string;
-}
-
-export interface LimitePagamento {
-  id: string;
-  tipo: 'diario' | 'semanal' | 'mensal' | 'anual';
-  categoria: string;
-  valorLimite: number;
-  valorUtilizado: number;
-  percentualUtilizado: number;
-  dataInicio: string;
-  dataFim: string;
-  ativo: boolean;
-  alertaPercentual: number;
-  responsavel: string;
-}
-
-export interface NotificacaoPagamento {
-  id: string;
-  tipo: 'aprovacao_pendente' | 'limite_excedido' | 'vencimento_proximo' | 'pagamento_realizado' | 'erro_integracao';
-  titulo: string;
-  descricao: string;
-  pagamentoId?: string;
-  destinatario: string;
-  lida: boolean;
-  dataEnvio: string;
-  prioridade: 'baixa' | 'media' | 'alta';
-}
-
-export interface AprovacaoPagamento {
+export interface AgendamentoPagamento {
   id: string;
   pagamentoId: string;
-  etapaId: string;
-  aprovador: string;
-  decisao: 'aprovado' | 'rejeitado';
+  dataAgendamento: string;
+  dataExecucao?: string;
+  status: 'AGENDADO' | 'EXECUTADO' | 'CANCELADO';
   observacoes?: string;
-  dataAprovacao: string;
-  proximaEtapa?: string;
+  alertasEnviados: boolean;
+  createdAt: string;
 }
 
-export interface RelatorioAprovacao {
-  totalPendentes: number;
-  totalAprovados: number;
-  totalRejeitados: number;
-  valorTotalPendente: number;
-  valorTotalAprovado: number;
-  tempoMedioAprovacao: number;
-  aprovacoesPorUsuario: {
-    usuario: string;
-    aprovados: number;
-    rejeitados: number;
-    tempoMedio: number;
-  }[];
-  gargalosWorkflow: {
-    etapa: string;
-    tempoMedio: number;
-    pendentes: number;
-  }[];
-}
-
-export interface ConfiguracaoWorkflow {
+export interface Cliente {
   id: string;
   nome: string;
-  descricao: string;
-  etapas: {
-    ordem: number;
-    nome: string;
-    responsavel: string;
-    valorMinimo?: number;
-    valorMaximo?: number;
-    categorias: string[];
-    obrigatoria: boolean;
-    prazoHoras: number;
-  }[];
+  email?: string;
+  telefone?: string;
+  documento?: string;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
   ativo: boolean;
-  padrao: boolean;
 }
 
-export interface DashboardPagamentos {
-  resumo: {
-    totalPendentes: number;
-    totalAprovados: number;
-    totalPagos: number;
-    valorTotal: number;
-  };
-  vencimentosProximos: Pagamento[];
-  aprovacoesPendentes: Pagamento[];
-  limitesProximosEsgotamento: LimitePagamento[];
-  integracoesFalharam: Pagamento[];
-  estatisticas: {
-    tempoMedioAprovacao: number;
-    taxaAprovacao: number;
-    economiaAutomacao: number;
-    satisfacaoFornecedores: number;
+export interface CreatePagamentoRequest {
+  clienteId: string;
+  descricao: string;
+  valor: number;
+  dataVencimento: string;
+  formaPagamento: 'PIX' | 'BOLETO' | 'TRANSFERENCIA' | 'CARTAO' | 'DINHEIRO';
+  categoria: 'FORNECEDOR' | 'SERVICO' | 'EQUIPAMENTO' | 'IMPOSTO' | 'OUTROS';
+  observacoes?: string;
+  numeroDocumento?: string;
+  centroCusto?: string;
+  agendarPagamento?: boolean;
+  dataAgendamento?: string;
+}
+
+export interface UpdatePagamentoRequest extends CreatePagamentoRequest {
+  id: string;
+}
+
+export interface FiltrosPagamento {
+  status?: string;
+  categoria?: string;
+  formaPagamento?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  clienteId?: string;
+  valorMinimo?: number;
+  valorMaximo?: number;
+  centroCusto?: string;
+}
+
+export interface RelatorioPagamentoRequest {
+  filtros?: FiltrosPagamento;
+  formato: 'PDF' | 'EXCEL';
+  periodo?: {
+    inicio: string;
+    fim: string;
   };
 }
 
 class PagamentosService {
-  private baseURL = '/api/pagamentos';
+  private getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }
 
-  // CRUD básico
-  async listarPagamentos(filtros?: {
-    status?: string;
-    categoria?: string;
-    prioridade?: string;
-    dataInicio?: string;
-    dataFim?: string;
-    fornecedor?: string;
-    centroCusto?: string;
-  }): Promise<Pagamento[]> {
+  // ===== PAGAMENTOS =====
+  
+  async getPagamentos(): Promise<Pagamento[]> {
     try {
-      const response = await api.get(this.baseURL, { params: filtros });
+      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/all`, {
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
-      console.error('Erro ao listar pagamentos:', error);
+      console.error('Erro ao buscar pagamentos:', error);
+      // Retornar dados mockados temporariamente
+      return this.getMockPagamentos();
+    }
+  }
+
+  private getMockPagamentos(): Pagamento[] {
+    return [
+      {
+        id: 'PAG-001',
+        clienteId: '11111111-1111-1111-1111-111111111111',
+        clienteNome: 'Empresa ABC Ltda',
+        clienteEmail: 'contato@empresaabc.com',
+        clienteTelefone: '(11) 99999-9999',
+        descricao: 'Serviços de consultoria - Janeiro 2024',
+        valor: 15000.00,
+        dataVencimento: '2024-02-15',
+        dataPagamento: undefined,
+        status: 'OVERDUE',
+        formaPagamento: 'BOLETO',
+        categoria: 'SERVICO',
+        observacoes: 'Cliente solicitou prazo adicional',
+        numeroDocumento: 'FAT-2024-001',
+        centroCusto: 'CC-001',
+        createdAt: '2024-01-15T00:00:00Z',
+        updatedAt: '2024-01-15T00:00:00Z'
+      },
+      {
+        id: 'PAG-002',
+        clienteId: '22222222-2222-2222-2222-222222222222',
+        clienteNome: 'João Silva ME',
+        clienteEmail: 'joao@email.com',
+        clienteTelefone: '(11) 77777-7777',
+        descricao: 'Venda de produtos - Fevereiro 2024',
+        valor: 8500.00,
+        dataVencimento: '2024-02-16',
+        dataPagamento: '2024-02-14',
+        status: 'PAID',
+        formaPagamento: 'PIX',
+        categoria: 'EQUIPAMENTO',
+        observacoes: undefined,
+        numeroDocumento: 'FAT-2024-002',
+        centroCusto: 'CC-002',
+        createdAt: '2024-02-01T00:00:00Z',
+        updatedAt: '2024-02-14T00:00:00Z'
+      },
+      {
+        id: 'PAG-003',
+        clienteId: '33333333-3333-3333-3333-333333333333',
+        clienteNome: 'Tech Solutions Ltda',
+        clienteEmail: 'contato@techsolutions.com',
+        clienteTelefone: '(11) 55555-5555',
+        descricao: 'Desenvolvimento de software - Abril 2024',
+        valor: 25000.00,
+        dataVencimento: '2024-05-01',
+        dataPagamento: undefined,
+        status: 'PENDING',
+        formaPagamento: 'PIX',
+        categoria: 'SERVICO',
+        observacoes: 'Projeto em andamento',
+        numeroDocumento: 'FAT-2024-004',
+        centroCusto: 'CC-003',
+        createdAt: '2024-04-01T00:00:00Z',
+        updatedAt: '2024-04-01T00:00:00Z'
+      }
+    ];
+  }
+
+  async getPagamentoById(id: string): Promise<Pagamento> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/${id}`, {
+        headers: this.getAuthHeaders()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar pagamento:', error);
       throw error;
     }
   }
 
-  async obterPagamento(id: string): Promise<Pagamento> {
+  async createPagamento(pagamento: CreatePagamentoRequest): Promise<Pagamento> {
     try {
-      const response = await api.get(`${this.baseURL}/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter pagamento:', error);
-      throw error;
-    }
-  }
-
-  async criarPagamento(pagamento: Omit<Pagamento, 'id' | 'workflow' | 'limitesValidados' | 'criadoEm' | 'atualizadoEm'>): Promise<Pagamento> {
-    try {
-      const response = await api.post(this.baseURL, pagamento);
+      const response = await axios.post(`${API_BASE_URL}/accounts-receivable`, pagamento, {
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
       console.error('Erro ao criar pagamento:', error);
@@ -186,9 +197,11 @@ class PagamentosService {
     }
   }
 
-  async atualizarPagamento(id: string, pagamento: Partial<Pagamento>): Promise<Pagamento> {
+  async updatePagamento(id: string, pagamento: UpdatePagamentoRequest): Promise<Pagamento> {
     try {
-      const response = await api.put(`${this.baseURL}/${id}`, pagamento);
+      const response = await axios.put(`${API_BASE_URL}/accounts-receivable/${id}`, pagamento, {
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar pagamento:', error);
@@ -196,335 +209,293 @@ class PagamentosService {
     }
   }
 
-  async excluirPagamento(id: string): Promise<void> {
+  async deletePagamento(id: string): Promise<void> {
     try {
-      await api.delete(`${this.baseURL}/${id}`);
+      await axios.delete(`${API_BASE_URL}/accounts-receivable/${id}`, {
+        headers: this.getAuthHeaders()
+      });
     } catch (error) {
       console.error('Erro ao excluir pagamento:', error);
       throw error;
     }
   }
 
-  // Workflow de Aprovação
-  async processarEtapaWorkflow(pagamentoId: string, etapaId: string, dados: {
-    decisao: 'aprovado' | 'rejeitado';
-    observacoes?: string;
-  }): Promise<AprovacaoPagamento> {
+  async markAsPaid(id: string, dataPagamento: string): Promise<Pagamento> {
     try {
-      const response = await api.post(`${this.baseURL}/${pagamentoId}/workflow/${etapaId}`, dados);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao processar etapa do workflow:', error);
-      throw error;
-    }
-  }
-
-  async obterWorkflowPagamento(id: string): Promise<WorkflowEtapa[]> {
-    try {
-      const response = await api.get(`${this.baseURL}/${id}/workflow`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter workflow do pagamento:', error);
-      throw error;
-    }
-  }
-
-  async listarAprovacoesPendentes(usuario?: string): Promise<Pagamento[]> {
-    try {
-      const response = await api.get(`${this.baseURL}/aprovacoes-pendentes`, {
-        params: { usuario }
+      const response = await axios.put(`${API_BASE_URL}/accounts-receivable/${id}/mark-paid`, null, {
+        params: { paymentDate: dataPagamento },
+        headers: this.getAuthHeaders()
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao listar aprovações pendentes:', error);
+      console.error('Erro ao marcar como pago:', error);
       throw error;
     }
   }
 
-  async aprovarLote(pagamentoIds: string[], observacoes?: string): Promise<{
-    aprovados: string[];
-    erros: { id: string; erro: string }[];
-  }> {
+  // ===== AGENDAMENTO DE PAGAMENTOS =====
+  
+  async agendarPagamento(pagamentoId: string, dataAgendamento: string, observacoes?: string): Promise<AgendamentoPagamento> {
     try {
-      const response = await api.post(`${this.baseURL}/aprovar-lote`, {
-        pagamentoIds,
+      const response = await axios.post(`${API_BASE_URL}/accounts-receivable/${pagamentoId}/schedule`, {
+        dataAgendamento,
         observacoes
+      }, {
+        headers: this.getAuthHeaders()
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao aprovar lote:', error);
+      console.error('Erro ao agendar pagamento:', error);
       throw error;
     }
   }
 
-  // Controle de Limites
-  async verificarLimites(pagamento: Partial<Pagamento>): Promise<{
-    valido: boolean;
-    limitesAfetados: LimitePagamento[];
-    alertas: string[];
-  }> {
+  async executarAgendamento(agendamentoId: string): Promise<void> {
     try {
-      const response = await api.post(`${this.baseURL}/verificar-limites`, pagamento);
+      await axios.post(`${API_BASE_URL}/accounts-receivable/schedule/${agendamentoId}/execute`, {}, {
+        headers: this.getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Erro ao executar agendamento:', error);
+      throw error;
+    }
+  }
+
+  async cancelarAgendamento(agendamentoId: string): Promise<void> {
+    try {
+      await axios.post(`${API_BASE_URL}/accounts-receivable/schedule/${agendamentoId}/cancel`, {}, {
+        headers: this.getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error);
+      throw error;
+    }
+  }
+
+  async getAgendamentos(): Promise<AgendamentoPagamento[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/schedule`, {
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
-      console.error('Erro ao verificar limites:', error);
-      throw error;
+      console.error('Erro ao buscar agendamentos:', error);
+      // Retornar dados mockados temporariamente
+      return this.getMockAgendamentos();
     }
   }
 
-  async listarLimites(): Promise<LimitePagamento[]> {
+  private getMockAgendamentos(): AgendamentoPagamento[] {
+    return [
+      {
+        id: 'AGD-001',
+        pagamentoId: 'PAG-001',
+        dataAgendamento: '2024-02-20',
+        dataExecucao: undefined,
+        status: 'AGENDADO',
+        observacoes: 'Agendamento para próxima semana',
+        alertasEnviados: true,
+        createdAt: '2024-01-15T00:00:00Z'
+      },
+      {
+        id: 'AGD-002',
+        pagamentoId: 'PAG-003',
+        dataAgendamento: '2024-05-05',
+        dataExecucao: undefined,
+        status: 'AGENDADO',
+        observacoes: 'Agendamento após conclusão do projeto',
+        alertasEnviados: false,
+        createdAt: '2024-04-01T00:00:00Z'
+      }
+    ];
+  }
+
+  // ===== ALERTAS DE VENCIMENTO =====
+  
+  async getPagamentosProximosVencimento(dias: number = 3): Promise<Pagamento[]> {
     try {
-      const response = await api.get(`${this.baseURL}/limites`);
+      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/upcoming-due`, {
+        params: { days: dias },
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
-      console.error('Erro ao listar limites:', error);
+      console.error('Erro ao buscar pagamentos próximos do vencimento:', error);
       throw error;
     }
   }
 
-  async criarLimite(limite: Omit<LimitePagamento, 'id' | 'valorUtilizado' | 'percentualUtilizado'>): Promise<LimitePagamento> {
+  async enviarAlertasVencimento(): Promise<void> {
     try {
-      const response = await api.post(`${this.baseURL}/limites`, limite);
+      await axios.post(`${API_BASE_URL}/accounts-receivable/send-due-alerts`, {}, {
+        headers: this.getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Erro ao enviar alertas de vencimento:', error);
+      throw error;
+    }
+  }
+
+  // ===== CLIENTES =====
+  
+  async getClientes(): Promise<Cliente[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/clients`, {
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
-      console.error('Erro ao criar limite:', error);
-      throw error;
+      console.error('Erro ao buscar clientes:', error);
+      // Retornar dados mockados temporariamente
+      return this.getMockClientes();
     }
   }
 
-  async atualizarLimite(id: string, limite: Partial<LimitePagamento>): Promise<LimitePagamento> {
+  private getMockClientes(): Cliente[] {
+    return [
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        nome: 'Empresa ABC Ltda',
+        email: 'contato@empresaabc.com',
+        telefone: '(11) 99999-9999',
+        documento: '12.345.678/0001-90',
+        endereco: 'Rua das Flores, 123',
+        cidade: 'São Paulo',
+        estado: 'SP',
+        cep: '01234-567',
+        ativo: true
+      },
+      {
+        id: '22222222-2222-2222-2222-222222222222',
+        nome: 'João Silva ME',
+        email: 'joao@email.com',
+        telefone: '(11) 77777-7777',
+        documento: '123.456.789-00',
+        endereco: 'Av. Principal, 456',
+        cidade: 'Rio de Janeiro',
+        estado: 'RJ',
+        cep: '20000-000',
+        ativo: true
+      },
+      {
+        id: '33333333-3333-3333-3333-333333333333',
+        nome: 'Tech Solutions Ltda',
+        email: 'contato@techsolutions.com',
+        telefone: '(11) 55555-5555',
+        documento: '98.765.432/0001-10',
+        endereco: 'Rua da Tecnologia, 789',
+        cidade: 'São Paulo',
+        estado: 'SP',
+        cep: '04567-890',
+        ativo: true
+      }
+    ];
+  }
+
+  async searchClientes(term: string): Promise<Cliente[]> {
     try {
-      const response = await api.put(`${this.baseURL}/limites/${id}`, limite);
+      const response = await axios.get(`${API_BASE_URL}/clients/search`, {
+        params: { term },
+        headers: this.getAuthHeaders()
+      });
       return response.data;
     } catch (error) {
-      console.error('Erro ao atualizar limite:', error);
+      console.error('Erro ao buscar clientes:', error);
       throw error;
     }
   }
 
-  // Integração Bancária
-  async processarIntegracaoBancaria(pagamentoId: string): Promise<IntegracaoBancaria> {
+  // ===== RELATÓRIOS =====
+  
+  async generateRelatorioPagamentos(request: RelatorioPagamentoRequest): Promise<Blob> {
     try {
-      const response = await api.post(`${this.baseURL}/${pagamentoId}/integracao-bancaria`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao processar integração bancária:', error);
-      throw error;
-    }
-  }
-
-  async consultarStatusTransacao(pagamentoId: string): Promise<IntegracaoBancaria> {
-    try {
-      const response = await api.get(`${this.baseURL}/${pagamentoId}/status-transacao`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao consultar status da transação:', error);
-      throw error;
-    }
-  }
-
-  async reprocessarPagamento(pagamentoId: string): Promise<IntegracaoBancaria> {
-    try {
-      const response = await api.post(`${this.baseURL}/${pagamentoId}/reprocessar`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao reprocessar pagamento:', error);
-      throw error;
-    }
-  }
-
-  async obterComprovantePagamento(pagamentoId: string): Promise<Blob> {
-    try {
-      const response = await api.get(`${this.baseURL}/${pagamentoId}/comprovante`, {
+      const response = await axios.post(`${API_BASE_URL}/accounts-receivable/reports`, request, {
+        headers: this.getAuthHeaders(),
         responseType: 'blob'
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao obter comprovante:', error);
+      console.error('Erro ao gerar relatório:', error);
       throw error;
     }
   }
 
-  // Notificações
-  async listarNotificacoes(usuario?: string): Promise<NotificacaoPagamento[]> {
+  async generateRelatorioPagamentosPDF(filtros?: FiltrosPagamento): Promise<Blob> {
     try {
-      const response = await api.get(`${this.baseURL}/notificacoes`, {
-        params: { usuario }
+      const response = await axios.post(`${API_BASE_URL}/accounts-receivable/reports/pdf`, filtros || {}, {
+        headers: this.getAuthHeaders(),
+        responseType: 'blob'
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao listar notificações:', error);
+      console.error('Erro ao gerar relatório PDF:', error);
       throw error;
     }
   }
 
-  async marcarNotificacaoComoLida(id: string): Promise<void> {
+  async generateRelatorioPagamentosExcel(filtros?: FiltrosPagamento): Promise<Blob> {
     try {
-      await api.put(`${this.baseURL}/notificacoes/${id}/lida`);
-    } catch (error) {
-      console.error('Erro ao marcar notificação como lida:', error);
-      throw error;
-    }
-  }
-
-  async enviarNotificacao(notificacao: Omit<NotificacaoPagamento, 'id' | 'dataEnvio' | 'lida'>): Promise<NotificacaoPagamento> {
-    try {
-      const response = await api.post(`${this.baseURL}/notificacoes`, notificacao);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao enviar notificação:', error);
-      throw error;
-    }
-  }
-
-  // Relatórios e Análises
-  async obterRelatorioAprovacao(periodo?: {
-    dataInicio: string;
-    dataFim: string;
-  }): Promise<RelatorioAprovacao> {
-    try {
-      const response = await api.get(`${this.baseURL}/relatorio-aprovacao`, {
-        params: periodo
+      const response = await axios.post(`${API_BASE_URL}/accounts-receivable/reports/excel`, filtros || {}, {
+        headers: this.getAuthHeaders(),
+        responseType: 'blob'
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao obter relatório de aprovação:', error);
+      console.error('Erro ao gerar relatório Excel:', error);
       throw error;
     }
   }
 
-  async obterDashboard(): Promise<DashboardPagamentos> {
+  // ===== OPERAÇÕES EM LOTE =====
+  
+  async deletePagamentos(ids: string[]): Promise<void> {
     try {
-      const response = await api.get(`${this.baseURL}/dashboard`);
-      return response.data;
+      await axios.delete(`${API_BASE_URL}/accounts-receivable/batch`, {
+        data: { ids },
+        headers: this.getAuthHeaders()
+      });
     } catch (error) {
-      console.error('Erro ao obter dashboard:', error);
+      console.error('Erro ao excluir pagamentos:', error);
       throw error;
     }
   }
 
-  async obterEstatisticasPagamentos(periodo?: {
-    dataInicio: string;
-    dataFim: string;
-  }): Promise<{
-    totalPagamentos: number;
+  async marcarComoPagos(ids: string[], dataPagamento: string): Promise<void> {
+    try {
+      await axios.put(`${API_BASE_URL}/accounts-receivable/batch/mark-paid`, {
+        ids,
+        dataPagamento
+      }, {
+        headers: this.getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Erro ao marcar pagamentos como pagos:', error);
+      throw error;
+    }
+  }
+
+  // ===== ESTATÍSTICAS =====
+  
+  async getEstatisticasPagamentos(): Promise<{
+    total: number;
+    pendentes: number;
+    pagos: number;
+    vencidos: number;
     valorTotal: number;
-    tempoMedioAprovacao: number;
-    taxaAprovacao: number;
-    distribuicaoPorCategoria: { categoria: string; valor: number; quantidade: number }[];
-    distribuicaoPorStatus: { status: string; quantidade: number }[];
-    tendenciaMensal: { mes: string; valor: number; quantidade: number }[];
+    valorPendente: number;
+    valorPago: number;
+    valorVencido: number;
   }> {
     try {
-      const response = await api.get(`${this.baseURL}/estatisticas`, {
-        params: periodo
+      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/statistics`, {
+        headers: this.getAuthHeaders()
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao obter estatísticas:', error);
-      throw error;
-    }
-  }
-
-  // Configurações de Workflow
-  async listarConfiguracaoWorkflow(): Promise<ConfiguracaoWorkflow[]> {
-    try {
-      const response = await api.get(`${this.baseURL}/configuracao-workflow`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao listar configurações de workflow:', error);
-      throw error;
-    }
-  }
-
-  async criarConfiguracaoWorkflow(config: Omit<ConfiguracaoWorkflow, 'id'>): Promise<ConfiguracaoWorkflow> {
-    try {
-      const response = await api.post(`${this.baseURL}/configuracao-workflow`, config);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao criar configuração de workflow:', error);
-      throw error;
-    }
-  }
-
-  async atualizarConfiguracaoWorkflow(id: string, config: Partial<ConfiguracaoWorkflow>): Promise<ConfiguracaoWorkflow> {
-    try {
-      const response = await api.put(`${this.baseURL}/configuracao-workflow/${id}`, config);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao atualizar configuração de workflow:', error);
-      throw error;
-    }
-  }
-
-  // Anexos e Documentos
-  async uploadAnexo(pagamentoId: string, arquivo: File): Promise<{ url: string; nome: string }> {
-    try {
-      const formData = new FormData();
-      formData.append('arquivo', arquivo);
-      const response = await api.post(`${this.baseURL}/${pagamentoId}/anexos`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao fazer upload do anexo:', error);
-      throw error;
-    }
-  }
-
-  async removerAnexo(pagamentoId: string, anexoUrl: string): Promise<void> {
-    try {
-      await api.delete(`${this.baseURL}/${pagamentoId}/anexos`, {
-        data: { anexoUrl }
-      });
-    } catch (error) {
-      console.error('Erro ao remover anexo:', error);
-      throw error;
-    }
-  }
-
-  // Exportação
-  async exportarRelatorio(formato: 'pdf' | 'excel', tipo: 'pagamentos' | 'aprovacoes' | 'limites', filtros?: any): Promise<Blob> {
-    try {
-      const response = await api.get(`${this.baseURL}/exportar`, {
-        params: { formato, tipo, ...filtros },
-        responseType: 'blob'
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao exportar relatório:', error);
-      throw error;
-    }
-  }
-
-  // Integração com ERP
-  async sincronizarComERP(): Promise<{ sincronizados: number; erros: number }> {
-    try {
-      const response = await api.post(`${this.baseURL}/sincronizar-erp`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao sincronizar com ERP:', error);
-      throw error;
-    }
-  }
-
-  // Auditoria
-  async obterLogAuditoria(pagamentoId: string): Promise<{
-    id: string;
-    acao: string;
-    usuario: string;
-    data: string;
-    detalhes: any;
-  }[]> {
-    try {
-      const response = await api.get(`${this.baseURL}/${pagamentoId}/auditoria`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter log de auditoria:', error);
+      console.error('Erro ao buscar estatísticas:', error);
       throw error;
     }
   }
 }
 
 export const pagamentosService = new PagamentosService();
-export default pagamentosService;

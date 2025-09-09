@@ -39,6 +39,9 @@ interface FineAPI {
   id: string;
   vehicleId: string;
   vehiclePlate: string;
+  driverId?: string;
+  driverName?: string;
+  driverLicenseNumber?: string;
   date: string;
   description: string;
   amount: number;
@@ -311,6 +314,66 @@ class FleetService {
 
   async getDrivers(): Promise<string[]> {
     const response = await api.get('/api/fuel-records/stats/drivers');
+    return response.data;
+  }
+
+  // ===== FINE REPORTS =====
+  
+  async generateFineReportPDF(params: {
+    startDate?: string;
+    endDate?: string;
+    vehicleFilter?: string;
+    driverFilter?: string;
+    statusFilter?: string;
+    amountMin?: number;
+    amountMax?: number;
+    selectedIds?: string[];
+  }): Promise<any[]> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    if (params.vehicleFilter) queryParams.append('vehicleFilter', params.vehicleFilter);
+    if (params.driverFilter) queryParams.append('driverFilter', params.driverFilter);
+    if (params.statusFilter) queryParams.append('statusFilter', params.statusFilter);
+    if (params.amountMin) queryParams.append('amountMin', params.amountMin.toString());
+    if (params.amountMax) queryParams.append('amountMax', params.amountMax.toString());
+    if (params.selectedIds && params.selectedIds.length > 0) {
+      params.selectedIds.forEach(id => queryParams.append('selectedIds', id));
+    }
+    
+    const response = await api.get(`/api/fines/reports/pdf?${queryParams.toString()}`);
+    
+    return response.data;
+  }
+  
+  async generateFineReportExcel(params: {
+    startDate?: string;
+    endDate?: string;
+    vehicleFilter?: string;
+    driverFilter?: string;
+    statusFilter?: string;
+    amountMin?: number;
+    amountMax?: number;
+    selectedIds?: string[];
+  }): Promise<Blob> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    if (params.vehicleFilter) queryParams.append('vehicleFilter', params.vehicleFilter);
+    if (params.driverFilter) queryParams.append('driverFilter', params.driverFilter);
+    if (params.statusFilter) queryParams.append('statusFilter', params.statusFilter);
+    if (params.amountMin) queryParams.append('amountMin', params.amountMin.toString());
+    if (params.amountMax) queryParams.append('amountMax', params.amountMax.toString());
+    if (params.selectedIds && params.selectedIds.length > 0) {
+      params.selectedIds.forEach(id => queryParams.append('selectedIds', id));
+    }
+    
+    const response = await api.get(`/api/fines/reports/excel?${queryParams.toString()}`, {
+      responseType: 'blob'
+    });
+    
     return response.data;
   }
 }

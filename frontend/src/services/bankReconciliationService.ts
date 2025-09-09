@@ -1,228 +1,207 @@
 import api from '@/lib/axios';
-import {
-  BankAccount,
-  BankStatement,
-  BankReconciliation,
-  ReconciliationItem,
-  ReconciliationSummary,
-  CreateBankAccountRequest,
-  CreateReconciliationRequest,
-  ImportStatementRequest,
-  ReconciliationFilters,
-  StatementFilters
-} from '@/types/bankReconciliation';
 
-export const bankReconciliationService = {
-  // ===== CONTAS BANCÁRIAS =====
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountType: string;
+  balance: number;
+  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankFile {
+  id: string;
+  fileName: string;
+  fileType: 'PDF' | 'CSV' | 'EXCEL';
+  bankName: string;
+  accountNumber: string;
+  period: string;
+  status: 'UPLOADED' | 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  totalRecords: number;
+  matchedRecords: number;
+  unmatchedRecords: number;
+  fileSize: string;
+  description: string;
+  errorMessage: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankTransaction {
+  id: string;
+  bankFileId: string;
+  transactionDate: string;
+  description: string;
+  amount: number;
+  balance: number;
+  status: 'PENDING' | 'MATCHED' | 'UNMATCHED' | 'MANUAL_REVIEW';
+  referenceNumber: string;
+  category: string;
+  notes: string;
+  systemTransactionId: string;
+  systemTransactionType: string;
+  reconciliationDate: string;
+  reconciliationUser: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankFileStatistics {
+  totalFiles: number;
+  completedFiles: number;
+  processingFiles: number;
+  errorFiles: number;
+}
+
+export interface BankTransactionStatistics {
+  totalTransactions: number;
+  matchedTransactions: number;
+  unmatchedTransactions: number;
+}
+
+export interface CreateBankAccountRequest {
+  bankName: string;
+  accountNumber: string;
+  accountType?: string;
+  balance?: number;
+  status?: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  description?: string;
+}
+
+export interface UploadBankFileRequest {
+  file: File;
+  bankName: string;
+  accountNumber: string;
+  period: string;
+  description?: string;
+}
+
+class BankReconciliationService {
+  // ===== BANK ACCOUNTS =====
   
-  // Buscar todas as contas bancárias
   async getBankAccounts(): Promise<BankAccount[]> {
-    const response = await api.get('/api/financial/bank-accounts');
+    const response = await api.get('/api/bank-reconciliation/accounts');
     return response.data;
-  },
-
-  // Buscar conta bancária por ID
-  async getBankAccount(id: string): Promise<BankAccount> {
-    const response = await api.get(`/api/financial/bank-accounts/${id}`);
+  }
+  
+  async getBankAccountById(id: string): Promise<BankAccount> {
+    const response = await api.get(`/api/bank-reconciliation/accounts/${id}`);
     return response.data;
-  },
-
-  // Criar nova conta bancária
+  }
+  
   async createBankAccount(data: CreateBankAccountRequest): Promise<BankAccount> {
-    const response = await api.post('/api/financial/bank-accounts', data);
+    const response = await api.post('/api/bank-reconciliation/accounts', data);
     return response.data;
-  },
-
-  // Atualizar conta bancária
-  async updateBankAccount(id: string, data: Partial<CreateBankAccountRequest>): Promise<BankAccount> {
-    const response = await api.put(`/api/financial/bank-accounts/${id}`, data);
-    return response.data;
-  },
-
-  // Excluir conta bancária
-  async deleteBankAccount(id: string): Promise<void> {
-    await api.delete(`/api/financial/bank-accounts/${id}`);
-  },
-
-  // Ativar/Desativar conta bancária
-  async toggleBankAccountStatus(id: string): Promise<BankAccount> {
-    const response = await api.patch(`/api/financial/bank-accounts/${id}/toggle-status`);
-    return response.data;
-  },
-
-  // ===== EXTRATOS BANCÁRIOS =====
-
-  // Buscar extratos bancários
-  async getBankStatements(filters: StatementFilters = {}): Promise<BankStatement[]> {
+  }
+  
+  // ===== BANK FILES =====
+  
+  async getBankFiles(page?: number, size?: number): Promise<{ content: BankFile[], totalElements: number, totalPages: number }> {
     const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', page.toString());
+    if (size !== undefined) params.append('size', size.toString());
     
-    if (filters.accountId) params.append('accountId', filters.accountId);
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    if (filters.isReconciled !== undefined) params.append('isReconciled', filters.isReconciled.toString());
-    if (filters.type) params.append('type', filters.type);
-    if (filters.page !== undefined) params.append('page', filters.page.toString());
-    if (filters.size !== undefined) params.append('size', filters.size.toString());
-    if (filters.sortBy) params.append('sortBy', filters.sortBy);
-    if (filters.sortDir) params.append('sortDir', filters.sortDir);
-
-    const response = await api.get(`/api/financial/bank-statements?${params.toString()}`);
+    const response = await api.get(`/api/bank-reconciliation/files?${params.toString()}`);
     return response.data;
-  },
-
-  // Importar extrato bancário
-  async importBankStatement(data: ImportStatementRequest): Promise<{ imported: number; errors: string[] }> {
+  }
+  
+  async getAllBankFiles(): Promise<BankFile[]> {
+    const response = await api.get('/api/bank-reconciliation/files/all');
+    return response.data;
+  }
+  
+  async getBankFileById(id: string): Promise<BankFile> {
+    const response = await api.get(`/api/bank-reconciliation/files/${id}`);
+    return response.data;
+  }
+  
+  async uploadBankFile(data: UploadBankFileRequest): Promise<BankFile> {
     const formData = new FormData();
     formData.append('file', data.file);
-    formData.append('accountId', data.accountId);
-    formData.append('format', data.format);
+    formData.append('bankName', data.bankName);
+    formData.append('accountNumber', data.accountNumber);
+    formData.append('period', data.period);
+    if (data.description) {
+      formData.append('description', data.description);
+    }
     
-    if (data.dateColumn) formData.append('dateColumn', data.dateColumn);
-    if (data.descriptionColumn) formData.append('descriptionColumn', data.descriptionColumn);
-    if (data.amountColumn) formData.append('amountColumn', data.amountColumn);
-    if (data.typeColumn) formData.append('typeColumn', data.typeColumn);
-
-    const response = await api.post('/api/financial/bank-statements/import', formData, {
+    const response = await api.post('/api/bank-reconciliation/files/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
     return response.data;
-  },
-
-  // Criar lançamento manual no extrato
-  async createBankStatement(data: {
-    accountId: string;
-    date: string;
-    description: string;
-    amount: number;
-    type: 'DEBIT' | 'CREDIT';
-    reference?: string;
-    category?: string;
-  }): Promise<BankStatement> {
-    const response = await api.post('/api/financial/bank-statements', data);
-    return response.data;
-  },
-
-  // Atualizar lançamento do extrato
-  async updateBankStatement(id: string, data: Partial<BankStatement>): Promise<BankStatement> {
-    const response = await api.put(`/api/financial/bank-statements/${id}`, data);
-    return response.data;
-  },
-
-  // Excluir lançamento do extrato
-  async deleteBankStatement(id: string): Promise<void> {
-    await api.delete(`/api/financial/bank-statements/${id}`);
-  },
-
-  // ===== CONCILIAÇÕES BANCÁRIAS =====
-
-  // Buscar conciliações bancárias
-  async getReconciliations(filters: ReconciliationFilters = {}): Promise<BankReconciliation[]> {
-    const params = new URLSearchParams();
-    
-    if (filters.accountId) params.append('accountId', filters.accountId);
-    if (filters.status) params.append('status', filters.status);
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    if (filters.page !== undefined) params.append('page', filters.page.toString());
-    if (filters.size !== undefined) params.append('size', filters.size.toString());
-    if (filters.sortBy) params.append('sortBy', filters.sortBy);
-    if (filters.sortDir) params.append('sortDir', filters.sortDir);
-
-    const response = await api.get(`/api/financial/reconciliations?${params.toString()}`);
-    return response.data;
-  },
-
-  // Buscar conciliação por ID
-  async getReconciliation(id: string): Promise<BankReconciliation> {
-    const response = await api.get(`/api/financial/reconciliations/${id}`);
-    return response.data;
-  },
-
-  // Criar nova conciliação
-  async createReconciliation(data: CreateReconciliationRequest): Promise<BankReconciliation> {
-    const response = await api.post('/api/financial/reconciliations', data);
-    return response.data;
-  },
-
-  // Iniciar processo de conciliação automática
-  async startAutoReconciliation(reconciliationId: string): Promise<BankReconciliation> {
-    const response = await api.post(`/api/financial/reconciliations/${reconciliationId}/auto-reconcile`);
-    return response.data;
-  },
-
-  // Confirmar item de conciliação
-  async confirmReconciliationItem(reconciliationId: string, itemId: string): Promise<ReconciliationItem> {
-    const response = await api.patch(`/api/financial/reconciliations/${reconciliationId}/items/${itemId}/confirm`);
-    return response.data;
-  },
-
-  // Rejeitar item de conciliação
-  async rejectReconciliationItem(reconciliationId: string, itemId: string, notes?: string): Promise<ReconciliationItem> {
-    const response = await api.patch(`/api/financial/reconciliations/${reconciliationId}/items/${itemId}/reject`, { notes });
-    return response.data;
-  },
-
-  // Criar ajuste manual
-  async createManualAdjustment(reconciliationId: string, data: {
-    description: string;
-    amount: number;
-    type: 'DEBIT' | 'CREDIT';
-    notes?: string;
-  }): Promise<ReconciliationItem> {
-    const response = await api.post(`/api/financial/reconciliations/${reconciliationId}/adjustments`, data);
-    return response.data;
-  },
-
-  // Finalizar conciliação
-  async completeReconciliation(reconciliationId: string, notes?: string): Promise<BankReconciliation> {
-    const response = await api.patch(`/api/financial/reconciliations/${reconciliationId}/complete`, { notes });
-    return response.data;
-  },
-
-  // Cancelar conciliação
-  async cancelReconciliation(reconciliationId: string, reason?: string): Promise<BankReconciliation> {
-    const response = await api.patch(`/api/financial/reconciliations/${reconciliationId}/cancel`, { reason });
-    return response.data;
-  },
-
-  // ===== RELATÓRIOS E ESTATÍSTICAS =====
-
-  // Buscar resumo das conciliações
-  async getReconciliationSummary(accountId?: string, startDate?: string, endDate?: string): Promise<ReconciliationSummary> {
-    const params = new URLSearchParams();
-    if (accountId) params.append('accountId', accountId);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-
-    const response = await api.get(`/api/financial/reconciliations/summary?${params.toString()}`);
-    return response.data;
-  },
-
-  // Exportar relatório de conciliação
-  async exportReconciliationReport(reconciliationId: string, format: 'PDF' | 'EXCEL'): Promise<Blob> {
-    const response = await api.get(`/api/financial/reconciliations/${reconciliationId}/export`, {
-      params: { format },
-      responseType: 'blob'
-    });
-    return response.data;
-  },
-
-  // Buscar diferenças não conciliadas
-  async getUnreconciledDifferences(accountId: string, startDate?: string, endDate?: string): Promise<{
-    bankOnly: BankStatement[];
-    systemOnly: any[];
-    totalDifference: number;
-  }> {
-    const params = new URLSearchParams();
-    params.append('accountId', accountId);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-
-    const response = await api.get(`/api/financial/reconciliations/unreconciled-differences?${params.toString()}`);
+  }
+  
+  async deleteBankFile(id: string): Promise<void> {
+    await api.delete(`/api/bank-reconciliation/files/${id}`);
+  }
+  
+  // ===== BANK TRANSACTIONS =====
+  
+  async getTransactionsByFileId(fileId: string): Promise<BankTransaction[]> {
+    const response = await api.get(`/api/bank-reconciliation/files/${fileId}/transactions`);
     return response.data;
   }
-};
+  
+  async getTransactionsByStatus(status: string): Promise<BankTransaction[]> {
+    const response = await api.get(`/api/bank-reconciliation/transactions/status/${status}`);
+    return response.data;
+  }
+  
+  // ===== STATISTICS =====
+  
+  async getFileStatistics(): Promise<BankFileStatistics> {
+    const response = await api.get('/api/bank-reconciliation/statistics/files');
+    return response.data;
+  }
+  
+  async getTransactionStatistics(): Promise<BankTransactionStatistics> {
+    const response = await api.get('/api/bank-reconciliation/statistics/transactions');
+    return response.data;
+  }
+  
+  // ===== REPORTS =====
+  
+  async generateFileReport(fileId: string, statusFilter?: string): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (statusFilter && statusFilter !== 'ALL') {
+      params.append('status', statusFilter);
+    }
+    
+    const response = await api.get(`/api/bank-reconciliation/reports/file/${fileId}?${params.toString()}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+  
+  async generateSummaryReport(startDate?: string, endDate?: string, bankName?: string): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (bankName) params.append('bankName', bankName);
+    
+    const response = await api.get(`/api/bank-reconciliation/reports/summary?${params.toString()}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+  
+  // ===== UTILITY METHODS =====
+  
+  downloadReport(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+}
 
-export default bankReconciliationService;
+export const bankReconciliationService = new BankReconciliationService();
