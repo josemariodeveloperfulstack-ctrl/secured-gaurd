@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Car, Fuel, Search, AlertTriangle, Loader2, Wrench, Filter, Calendar, DollarSign, Settings, FileText } from 'lucide-react';
+import { Plus, Car, Fuel, Search, AlertTriangle, Loader2, Wrench, Filter, Calendar, DollarSign, Settings, FileText, Download } from 'lucide-react';
 import VeiculosTable from '@/components/frota/VeiculosTable';
 import AbastecimentosTable from '@/components/frota/AbastecimentosTable';
 import MultasTable from '@/components/frota/MultasTable';
@@ -14,6 +14,7 @@ import AbastecimentoFormModal from '@/components/frota/AbastecimentoFormModal';
 import MultaFormModal from '@/components/frota/MultaFormModal';
 import MultaViewModal from '@/components/frota/MultaViewModal';
 import MultaDeleteDialog from '@/components/frota/MultaDeleteDialog';
+import ReportFiltersModal, { ReportFilters } from '@/components/frota/ReportFiltersModal';
 import { FuelConsumptionStats } from '@/components/frota/FuelConsumptionStats';
 import { FuelConsumptionOverview } from '@/components/frota/FuelConsumptionOverview';
 import { DriverFuelConsumptionStats } from '@/components/frota/DriverFuelConsumptionStats';
@@ -159,6 +160,10 @@ const Frota: React.FC = () => {
   const [selectedManutencao, setSelectedManutencao] = useState<VehicleMaintenance | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [selectedKmControl, setSelectedKmControl] = useState<KmControl | null>(null);
+  
+  // Estados para relatórios
+  const [isReportFiltersModalOpen, setIsReportFiltersModalOpen] = useState(false);
+  const [showMultaSelection, setShowMultaSelection] = useState(false);
 
   // Buscar veículos
   const {
@@ -601,6 +606,139 @@ const Frota: React.FC = () => {
     );
   }
 
+  // Função para gerar relatórios de multas
+  const handleGenerateFineReport = async (format: 'pdf' | 'excel') => {
+    try {
+      console.log(`🔍 Gerando relatório ${format.toUpperCase()} de multas...`);
+      
+      const params = {
+        // Adicionar filtros se necessário
+        startDate: undefined,
+        endDate: undefined,
+        vehicleFilter: undefined,
+        driverFilter: undefined,
+        statusFilter: undefined
+      };
+      
+      let blob: Blob;
+      let filename: string;
+      
+      if (format === 'pdf') {
+        blob = await fleetService.generateFineReportPDF(params);
+        filename = `relatorio_multas_${new Date().toISOString().split('T')[0]}.pdf`;
+      } else {
+        blob = await fleetService.generateFineReportExcel(params);
+        filename = `relatorio_multas_${new Date().toISOString().split('T')[0]}.xlsx`;
+      }
+      
+      // Criar URL do blob e fazer download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log(`✅ Relatório ${format.toUpperCase()} gerado com sucesso:`, filename);
+    } catch (error) {
+      console.error(`❌ Erro ao gerar relatório ${format.toUpperCase()}:`, error);
+      // Aqui você pode adicionar uma notificação de erro
+    }
+  };
+
+  // Nova função para geração de relatórios com filtros
+  const handleGenerateReportWithFilters = async (filters: ReportFilters, format: 'pdf' | 'excel') => {
+    try {
+      console.log('Gerando relatório com filtros:', filters);
+      
+      const params = {
+        startDate: filters.startDate?.toISOString().split('T')[0],
+        endDate: filters.endDate?.toISOString().split('T')[0],
+        vehicleFilter: filters.vehicleFilter,
+        driverFilter: filters.driverFilter,
+        statusFilter: filters.statusFilter,
+        amountMin: filters.amountMin,
+        amountMax: filters.amountMax
+      };
+
+      const response = format === 'pdf' 
+        ? await fleetService.generateFineReportPDF(params)
+        : await fleetService.generateFineReportExcel(params);
+      
+      // Criar blob e fazer download
+      const blob = new Blob([response], { type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_multas_filtrado_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Sucesso!',
+        description: `Relatório ${format.toUpperCase()} gerado com sucesso.`,
+      });
+    } catch (error) {
+      console.error(`Erro ao gerar relatório ${format}:`, error);
+      toast({
+        title: 'Erro!',
+        description: `Erro ao gerar relatório ${format.toUpperCase()}.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Função para geração de relatórios com seleção individual
+  const handleGenerateReportWithSelection = async (selectedIds: string[], format: 'pdf' | 'excel') => {
+    try {
+      console.log(`Gerando relatório ${format} para multas selecionadas:`, selectedIds);
+      
+      // Filtrar multas selecionadas
+      const selectedFines = fines?.filter(fine => selectedIds.includes(fine.id)) || [];
+      
+      if (selectedFines.length === 0) {
+        toast({
+          title: 'Atenção!',
+          description: 'Nenhuma multa selecionada.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Gerar relatório com as multas selecionadas
+      const response = format === 'pdf' 
+        ? await fleetService.generateFineReportPDF({ selectedIds })
+        : await fleetService.generateFineReportExcel({ selectedIds });
+      
+      // Criar blob e fazer download
+      const blob = new Blob([response], { type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_multas_selecionadas_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Sucesso!',
+        description: `Relatório ${format.toUpperCase()} gerado com ${selectedFines.length} multa(s) selecionada(s).`,
+      });
+    } catch (error) {
+      console.error(`Erro ao gerar relatório ${format}:`, error);
+      toast({
+        title: 'Erro!',
+        description: `Erro ao gerar relatório ${format.toUpperCase()}.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <StandardLayout>
       <div className="space-y-6">
@@ -1004,6 +1142,61 @@ const Frota: React.FC = () => {
 
           <TabsContent value="multas" className="mt-6">
             <div className="space-y-6">
+              {/* Botões de Relatórios */}
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Relatórios de Multas
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Gere relatórios em PDF e Excel com filtros personalizados ou seleção individual
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Botões de modo de seleção */}
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        onClick={() => setShowMultaSelection(!showMultaSelection)}
+                        variant={showMultaSelection ? "default" : "outline"}
+                        className={showMultaSelection ? "bg-blue-600 hover:bg-blue-700" : "border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"}
+                      >
+                        <Filter className="h-4 w-4 mr-2" />
+                        {showMultaSelection ? 'Desativar Seleção' : 'Seleção Individual'}
+                      </Button>
+                      
+                      <Button
+                        onClick={() => setIsReportFiltersModalOpen(true)}
+                        variant="outline"
+                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                      >
+                        <Filter className="h-4 w-4 mr-2" />
+                        Filtros Avançados
+                      </Button>
+                    </div>
+
+                    {/* Botões de relatório simples */}
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        onClick={() => handleGenerateFineReport('pdf')}
+                        className="bg-seguranca-red hover:bg-red-700 text-white"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Relatório PDF (Todos)
+                      </Button>
+                      <Button
+                        onClick={() => handleGenerateFineReport('excel')}
+                        variant="outline"
+                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Relatório Excel (Todos)
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
               {/* Alertas de Multas */}
               {(finesNearDue.length > 0 || overdueFines.length > 0) && (
                 <div className="space-y-4">
@@ -1111,6 +1304,8 @@ const Frota: React.FC = () => {
                     onView={handleViewMulta}
                     onEdit={handleEditMulta}
                     onDelete={handleDeleteMulta}
+                    onGenerateReport={handleGenerateReportWithSelection}
+                    showSelection={showMultaSelection}
                   />
                 </CardContent>
               </Card>
@@ -1278,6 +1473,13 @@ const Frota: React.FC = () => {
         <VehicleReportModal
           isOpen={isVehicleReportModalOpen}
           onClose={() => setIsVehicleReportModalOpen(false)}
+        />
+
+        {/* Modal de Filtros de Relatório */}
+        <ReportFiltersModal
+          isOpen={isReportFiltersModalOpen}
+          onOpenChange={setIsReportFiltersModalOpen}
+          onGenerateReport={handleGenerateReportWithFilters}
         />
       </div>
     </StandardLayout>
