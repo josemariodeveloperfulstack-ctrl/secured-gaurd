@@ -3,7 +3,6 @@ package com.z7design.secured_guard.service;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,7 @@ import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.model.Role;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.model.Permission;
+import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
 
@@ -128,7 +128,7 @@ public class UserService {
     }
 
     public void delete(UUID id) {
-        User user = userRepository.findById(id)
+        userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         userRepository.deleteById(id);
     }
@@ -173,5 +173,56 @@ public class UserService {
         user.getPermissions().removeAll(permissionsToRemove);
         userRepository.save(user);
         return user.getPermissions();
+    }
+
+    /**
+     * Atualiza o perfil do próprio usuário logado
+     */
+    public User updateProfile(UUID userId, ProfileUpdateRequest request) {
+        User existingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        // Validar se o email não está sendo usado por outro usuário
+        if (!existingUser.getEmail().equals(request.getEmail())) {
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new IllegalArgumentException("Email já está em uso por outro usuário");
+            }
+        }
+
+        // Validar formato do email
+        if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new IllegalArgumentException("Formato de email inválido");
+        }
+
+        // Atualizar dados básicos
+        existingUser.setName(request.getName().trim());
+        existingUser.setEmail(request.getEmail().trim());
+        existingUser.setWhatsapp(request.getWhatsapp() != null ? request.getWhatsapp().trim() : null);
+
+        // Se está alterando a senha, validar e atualizar
+        if (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) {
+            if (request.getCurrentPassword() == null || request.getCurrentPassword().isEmpty()) {
+                throw new IllegalArgumentException("Senha atual é obrigatória para alterar a senha");
+            }
+
+            // Verificar se a senha atual está correta
+            if (!passwordEncoder.matches(request.getCurrentPassword(), existingUser.getPassword())) {
+                throw new IllegalArgumentException("Senha atual incorreta");
+            }
+
+            // Validar força da nova senha
+            if (request.getNewPassword().length() < 6) {
+                throw new IllegalArgumentException("Nova senha deve ter pelo menos 6 caracteres");
+            }
+
+            if (!request.getNewPassword().matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+                throw new IllegalArgumentException("Nova senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial");
+            }
+
+            // Criptografar e definir nova senha
+            existingUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        }
+
+        return userRepository.save(existingUser);
     }
 } 

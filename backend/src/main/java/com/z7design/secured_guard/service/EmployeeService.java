@@ -405,7 +405,7 @@ public class EmployeeService {
             dto.setRegistrationNumber(e.getRegistrationNumber());
             dto.setHireDate(e.getHireDate());
             dto.setTerminationDate(e.getTerminationDate());
-            dto.setStatus(e.getStatus().name());
+            dto.setStatus(e.getStatus() != null ? e.getStatus().name() : null);
             // dto.setPossuiWhatsapp(e.getPossuiWhatsapp());
             // dto.setCaminhoPdf(e.getCaminhoPdf());
             // dto.setMesReferencia(e.getMesReferencia());

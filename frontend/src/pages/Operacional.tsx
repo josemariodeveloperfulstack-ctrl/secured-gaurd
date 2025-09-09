@@ -4,12 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Shield, 
-  Users, 
-  MapPin, 
-  Clock, 
-  AlertTriangle, 
+import {
+  Shield,
+  Users,
+  MapPin,
+  Clock,
+  AlertTriangle,
   BarChart3,
   FileText,
   Settings,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { StandardLayout } from '@/components/StandardLayout';
 import Equipamentos from './Equipamentos';
+
 import EscalaTrabalhoTable from '@/components/operacional/EscalaTrabalhoTable';
 import NotificacoesList from '@/components/operacional/NotificacoesList';
 import OcorrenciasTable from '@/components/operacional/OcorrenciasTable';
@@ -26,6 +27,7 @@ import OcorrenciaFormModal from '@/components/operacional/OcorrenciaFormModal';
 import EscalaFormModal from '@/components/EscalaFormModal';
 import TransportGuideTab from '@/components/operacional/TransportGuideTab';
 import VisitWidget from '@/components/operacional/VisitWidget';
+
 import { scheduleService, Schedule, CreateScheduleDTO, UpdateScheduleDTO } from '@/services/scheduleService';
 
 // Interface para o formulário de escala
@@ -65,6 +67,7 @@ const Operacional: React.FC = () => {
   const [selectedOcorrencia, setSelectedOcorrencia] = useState<Occurrence | null>(null);
   const [showEscalaModal, setShowEscalaModal] = useState(false);
   const [selectedEscala, setSelectedEscala] = useState<Schedule | null>(null);
+
   const { toast } = useToast();
 
 
@@ -242,7 +245,7 @@ const Operacional: React.FC = () => {
     try {
       const reason = prompt('Motivo da rejeição:');
       if (!reason) return;
-      
+
       const updatedReport = await activityReportService.rejectReport(report.id, reason);
       setActivityReports(prev => prev.map(r => r.id === report.id ? updatedReport : r));
       toast({
@@ -299,7 +302,7 @@ const Operacional: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       toast({
         title: 'Sucesso',
         description: 'Relatório PDF gerado com sucesso.',
@@ -341,8 +344,8 @@ const Operacional: React.FC = () => {
   };
 
   const handleMarkNotificationAsRead = (id: string) => {
-    setNotificacoes(prev => 
-      prev.map(notif => 
+    setNotificacoes(prev =>
+      prev.map(notif =>
         notif.id === id ? { ...notif, lida: true } : notif
       )
     );
@@ -353,7 +356,7 @@ const Operacional: React.FC = () => {
   };
 
   const handleMarkAllNotificationsAsRead = () => {
-    setNotificacoes(prev => 
+    setNotificacoes(prev =>
       prev.map(notif => ({ ...notif, lida: true }))
     );
     toast({
@@ -485,33 +488,33 @@ const Operacional: React.FC = () => {
       </Card>
 
       <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Funcionários em Serviço</CardTitle>
           <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+        </CardHeader>
+        <CardContent>
           <div className="text-2xl font-bold">18</div>
           <p className="text-xs text-muted-foreground">
             +1 desde ontem
-              </p>
-            </CardContent>
-          </Card>
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Postos Ativos</CardTitle>
           <MapPin className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+        </CardHeader>
+        <CardContent>
           <div className="text-2xl font-bold">12</div>
           <p className="text-xs text-muted-foreground">
             Todos operacionais
-              </p>
-            </CardContent>
-          </Card>
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Alertas Pendentes</CardTitle>
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -586,12 +589,12 @@ const Operacional: React.FC = () => {
 
           <TabsContent value="dashboard" className="mt-6">
             {renderDashboard()}
-            
+
             {/* Widget de Controle de Visitas */}
             <div className="mb-6">
               <VisitWidget />
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -608,12 +611,12 @@ const Operacional: React.FC = () => {
                       <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
                       <span className="text-sm">Alerta: Arma AR-002 vencendo em 15 dias</span>
                       <span className="text-xs text-muted-foreground ml-auto">4h atrás</span>
-                        </div>
+                    </div>
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                       <span className="text-sm">Nova escala criada para Portaria Principal</span>
                       <span className="text-xs text-muted-foreground ml-auto">6h atrás</span>
-                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -635,9 +638,9 @@ const Operacional: React.FC = () => {
                       <div>
                         <p className="font-medium">Manutenção EQ-005</p>
                         <p className="text-sm text-muted-foreground">Agendada para amanhã</p>
-                        </div>
+                      </div>
                       <Button size="sm">Ver Detalhes</Button>
-                        </div>
+                    </div>
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div>
                         <p className="font-medium">Relatório mensal</p>
@@ -655,6 +658,8 @@ const Operacional: React.FC = () => {
             {renderEquipamentosTab()}
           </TabsContent>
 
+
+
           <TabsContent value="escalas" className="mt-6">
             <EscalaTrabalhoTable
               escalas={escalas}
@@ -668,28 +673,28 @@ const Operacional: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="notificacoes" className="mt-6">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h2 className="text-2xl font-bold">Notificações</h2>
-                    <p className="text-muted-foreground">
-                      Sistema de notificações e alertas operacionais
-                    </p>
-                  </div>
-                  <Button variant="outline">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Configurações
-                  </Button>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">Notificações</h2>
+                  <p className="text-muted-foreground">
+                    Sistema de notificações e alertas operacionais
+                  </p>
                 </div>
-                
-                <NotificacoesList
-                  notificacoes={notificacoes}
-                  onRefresh={handleRefreshNotificacoes}
-                  onMarkAsRead={handleMarkNotificationAsRead}
-                  onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-                  onDelete={handleDeleteNotification}
-                />
+                <Button variant="outline">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurações
+                </Button>
               </div>
+
+              <NotificacoesList
+                notificacoes={notificacoes}
+                onRefresh={handleRefreshNotificacoes}
+                onMarkAsRead={handleMarkNotificationAsRead}
+                onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+                onDelete={handleDeleteNotification}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="ocorrencias" className="mt-6">
@@ -719,7 +724,7 @@ const Operacional: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="troca-plantao" className="mt-6">
-            <ShiftChangeTable onRefresh={() => {}} />
+            <ShiftChangeTable onRefresh={() => { }} />
           </TabsContent>
 
           <TabsContent value="guia-transporte" className="mt-6">

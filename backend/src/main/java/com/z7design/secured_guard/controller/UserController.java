@@ -1,18 +1,19 @@
 package com.z7design.secured_guard.controller;
 
-import com.z7design.secured_guard.dto.UserDTO;
 import com.z7design.secured_guard.dto.UserListResponseDTO;
+import com.z7design.secured_guard.dto.ProfileUpdateRequest;
+import com.z7design.secured_guard.dto.ProfileResponse;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.UserService;
-import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -155,5 +156,77 @@ public class UserController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         userService.delete(UUID.fromString(id));
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/profile")
+    @Operation(summary = "Buscar próprio perfil", description = "Retorna as informações do perfil do usuário logado")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Perfil encontrado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+    })
+    public ResponseEntity<ProfileResponse> getProfile() {
+        // Obter o usuário atual do contexto de segurança
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String username = authentication.getName();
+        User currentUser = userService.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        // Construir resposta
+        ProfileResponse response = ProfileResponse.builder()
+                .id(currentUser.getId())
+                .username(currentUser.getUsername())
+                .name(currentUser.getName())
+                .email(currentUser.getEmail())
+                .whatsapp(currentUser.getWhatsapp())
+                .active(currentUser.isActive())
+                .roles(currentUser.getRoles().stream()
+                        .map(role -> role.getName())
+                        .collect(java.util.stream.Collectors.toList()))
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "Atualizar próprio perfil", description = "Permite ao usuário atualizar suas próprias informações")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Perfil atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<ProfileResponse> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
+        // Obter o usuário atual do contexto de segurança
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String username = authentication.getName();
+        User currentUser = userService.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        // Atualizar o perfil
+        User updatedUser = userService.updateProfile(currentUser.getId(), request);
+
+        // Construir resposta
+        ProfileResponse response = ProfileResponse.builder()
+                .id(updatedUser.getId())
+                .username(updatedUser.getUsername())
+                .name(updatedUser.getName())
+                .email(updatedUser.getEmail())
+                .whatsapp(updatedUser.getWhatsapp())
+                .active(updatedUser.isActive())
+                .roles(updatedUser.getRoles().stream()
+                        .map(role -> role.getName())
+                        .collect(java.util.stream.Collectors.toList()))
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 } 

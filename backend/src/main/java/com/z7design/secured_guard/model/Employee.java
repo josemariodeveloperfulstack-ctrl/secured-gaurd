@@ -11,11 +11,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -34,13 +35,15 @@ public class Employee {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     
-    @OneToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;
     
-    @ManyToOne
-    @JoinColumn(name = "position_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "position_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Position position;
     
@@ -81,7 +84,8 @@ public class Employee {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
     
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "unit_id")
     @JsonIgnoreProperties("employees")
     private Unit unit;

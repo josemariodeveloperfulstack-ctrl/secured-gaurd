@@ -73,10 +73,11 @@ public class FuelRecordController {
                         try {
                             return FuelRecordDTO.fromEntity(fuelRecord);
                         } catch (Exception e) {
-                            log.error("Erro ao converter registro {}: {}", fuelRecord.getId(), e.getMessage(), e);
-                            throw new RuntimeException("Erro ao converter registro: " + fuelRecord.getId(), e);
+                            log.warn("Ignorando registro {} devido a erro de conversão: {}", fuelRecord.getId(), e.getMessage());
+                            return null; // pular registro problemático
                         }
                     })
+                    .filter(dto -> dto != null)
                     .collect(Collectors.toList());
             
             log.info("DTOs convertidos com sucesso: {}", fuelRecordDTOs.size());
@@ -562,10 +563,11 @@ public class FuelRecordController {
                         try {
                             return FuelRecordDTO.fromEntity(fuelRecord);
                         } catch (Exception e) {
-                            log.error("Erro ao converter registro {}: {}", fuelRecord.getId(), e.getMessage(), e);
-                            throw new RuntimeException("Erro ao converter registro: " + fuelRecord.getId(), e);
+                            log.warn("Ignorando registro {} devido a erro de conversão: {}", fuelRecord.getId(), e.getMessage());
+                            return null;
                         }
                     })
+                    .filter(dto -> dto != null)
                     .collect(Collectors.toList());
             
             log.info("Relatório gerado com {} registros", fuelRecordDTOs.size());

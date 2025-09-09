@@ -22,6 +22,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -208,35 +209,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    setProfile(null);
     setRefreshToken(null);
     // Navegar apenas durante logout
     navigate('/login');
   };
 
+  const signOut = logout; // Alias para compatibilidade
+
+  const refreshUser = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      // Buscar dados atualizados do usuário
+      const response = await api.get('/api/users/profile');
+      if (response.data) {
+        const updatedUser = {
+          ...user,
+          name: response.data.name,
+          email: response.data.email,
+          whatsapp: response.data.whatsapp
+        };
+        setUser(updatedUser);
+        setProfile(response.data);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar dados do usuário:', error);
+    }
+  };
+
   const value: AuthContextType = {
     user,
+    profile,
     login,
     logout,
+    signOut,
     isLoading,
     isAuthenticated: !!user,
     refreshAuthToken: async () => {
-    try {
-      const response = await api.post('/api/auth/refresh-token', {
-        refreshToken
-      });
+      try {
+        const response = await api.post('/api/auth/refresh-token', {
+          refreshToken
+        });
 
-      const { token: newToken, refreshToken: newRefreshToken } = response.data;
+        const { token: newToken, refreshToken: newRefreshToken } = response.data;
 
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('refreshToken', newRefreshToken);
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
 
-      setRefreshToken(newRefreshToken);
-    } catch (error) {
-      console.error('Error refreshing token:', error);
+        setRefreshToken(newRefreshToken);
+      } catch (error) {
+        console.error('Error refreshing token:', error);
         logout();
-      throw error;
-    }
+        throw error;
+      }
     },
+    refreshUser,
   };
 
   return (

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollPreservation } from '@/hooks/useScrollPreservation';
 import { Button } from '@/components/ui/button';
 import { ScrollPreservingLink } from './ScrollPreservingLink';
+import UserProfileModal from './UserProfileModal';
 import {
   BarChart3,
   FileText,
@@ -164,6 +165,11 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   const location = useLocation();
   const { user } = useAuth();
   const { forceScrollToTop } = useScrollPreservation();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleProfileClick = () => {
+    setIsProfileModalOpen(true);
+  };
 
   // Função para verificar se usuário tem permissão
   const hasPermission = (permission: string): boolean => {
@@ -630,12 +636,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         {/* Footer */}
         <div className="p-4 border-t border-gray-700">
           {!collapsed && user && (
-            <div className="flex items-center space-x-3">
+            <div 
+              className="flex items-center space-x-3 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors"
+              onClick={handleProfileClick}
+            >
               <div className="w-8 h-8 bg-seguranca-yellow rounded-full flex items-center justify-center">
                 <User2 size={16} className="text-seguranca-black" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-seguranca-lightgray truncate">
+                <div className="text-sm font-medium text-seguranca-lightgray truncate hover:text-seguranca-yellow transition-colors">
                   {user?.name || 'Usuário'}
                 </div>
                 <div className="text-xs text-gray-400 truncate">
@@ -646,6 +655,12 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
         </div>
       </aside>
+
+      {/* Modal de Perfil */}
+      <UserProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </>
   );
 };
