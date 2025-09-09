@@ -77,7 +77,7 @@ public class FineController {
     // ===== RELATÓRIOS =====
     
     @GetMapping("/reports/pdf")
-    public ResponseEntity<byte[]> generateFineReportPDF(
+    public ResponseEntity<List<Object>> generateFineReportPDF(
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate,
             @RequestParam(required = false) String vehicleFilter,
@@ -87,16 +87,8 @@ public class FineController {
             @RequestParam(required = false) BigDecimal amountMax,
             @RequestParam(required = false) List<String> selectedIds) {
         try {
-            byte[] reportBytes = fineService.generateFineReportPDF(startDate, endDate, vehicleFilter, driverFilter, statusFilter, amountMin, amountMax, selectedIds);
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", "relatorio_multas.pdf");
-            headers.setContentLength(reportBytes.length);
-            
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(reportBytes);
+            List<Object> fines = fineService.getFinesForReportSimple(startDate, endDate, vehicleFilter, driverFilter, statusFilter, amountMin, amountMax, selectedIds);
+            return ResponseEntity.ok(fines);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

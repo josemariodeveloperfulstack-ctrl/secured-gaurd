@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.z7design.secured_guard.model.Fine.FineStatus;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -91,11 +93,11 @@ public class FineReportDTO {
         dto.setDueDate(fine.getDueDate());
         dto.setPaymentDate(fine.getPaymentDate());
         dto.setCreatedAt(fine.getCreatedAt().toLocalDate());
-        dto.setOverdue(fine.getDueDate() != null && fine.getDueDate().isBefore(LocalDate.now()) && fine.getStatus() != com.z7design.secured_guard.model.FineStatus.PAID);
+        dto.setOverdue(fine.getDueDate() != null && fine.getDueDate().isBefore(LocalDate.now()) && fine.getStatus() != FineStatus.PAID);
         return dto;
     }
     
-    private static String translateStatus(com.z7design.secured_guard.model.FineStatus status) {
+    private static String translateStatus(FineStatus status) {
         switch (status) {
             case PENDING:
                 return "Pendente";

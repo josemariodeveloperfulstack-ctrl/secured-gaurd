@@ -45,6 +45,7 @@ interface MultasTableProps {
   onRefresh: () => void;
   onEdit: (multa: Multa) => void;
   onDelete: (multa: Multa) => void;
+  onDeleteMultiple?: (selectedIds: string[]) => void;
   onView: (multa: Multa) => void;
   onGenerateReport?: (selectedIds: string[], format: 'pdf' | 'excel') => void;
   showSelection?: boolean;
@@ -55,6 +56,7 @@ const MultasTable: React.FC<MultasTableProps> = ({
   onRefresh,
   onEdit,
   onDelete,
+  onDeleteMultiple,
   onView,
   onGenerateReport,
   showSelection = false
@@ -139,6 +141,21 @@ const MultasTable: React.FC<MultasTableProps> = ({
     }
   };
 
+  const handleDeleteMultiple = () => {
+    if (selectedMultas.length === 0) {
+      toast({
+        title: 'Atenção!',
+        description: 'Selecione pelo menos uma multa para excluir.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (onDeleteMultiple) {
+      onDeleteMultiple(selectedMultas);
+    }
+  };
+
   // Atualizar estado de "selecionar todos" quando multas mudarem
   useEffect(() => {
     if (selectedMultas.length === multas.length && multas.length > 0) {
@@ -209,25 +226,40 @@ const MultasTable: React.FC<MultasTableProps> = ({
           </Button>
         </div>
         
-        {showSelection && selectedMultas.length > 0 && onGenerateReport && (
+        {showSelection && selectedMultas.length > 0 && (
           <div className="flex items-center space-x-2">
-            <Button
-              onClick={() => handleGenerateReport('pdf')}
-              size="sm"
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              PDF
-            </Button>
-            <Button
-              onClick={() => handleGenerateReport('excel')}
-              size="sm"
-              variant="outline"
-              className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
+            {onDeleteMultiple && (
+              <Button
+                onClick={handleDeleteMultiple}
+                size="sm"
+                variant="outline"
+                className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir ({selectedMultas.length})
+              </Button>
+            )}
+            {onGenerateReport && (
+              <>
+                <Button
+                  onClick={() => handleGenerateReport('pdf')}
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button
+                  onClick={() => handleGenerateReport('excel')}
+                  size="sm"
+                  variant="outline"
+                  className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>

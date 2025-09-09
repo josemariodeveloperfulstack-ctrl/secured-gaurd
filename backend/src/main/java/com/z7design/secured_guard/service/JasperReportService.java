@@ -350,20 +350,23 @@ public class JasperReportService {
                                        String vehicleFilter, 
                                        String driverFilter,
                                        String statusFilter) throws IOException {
+        return generateFineReportPDFSimple(fines);
+    }
+    
+    private byte[] generateFineReportPDFSimple(List<FineReportDTO> fines) throws IOException {
         try {
-            log.info("Gerando relatório PDF de multas com JasperReports - {} multas", fines.size());
+            log.info("Gerando relatório PDF simplificado de multas - {} multas", fines.size());
             
-            // Carregar template JRXML
-            ClassPathResource resource = new ClassPathResource("reports/fine-report.jrxml");
+            // Carregar template JRXML simplificado
+            ClassPathResource resource = new ClassPathResource("reports/fine-report-simple.jrxml");
             InputStream templateStream = resource.getInputStream();
             
             // Compilar template
             JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
-            log.debug("Template JRXML de multas compilado com sucesso");
+            log.debug("Template JRXML simplificado compilado com sucesso");
             
-            // Preparar parâmetros
+            // Preparar parâmetros mínimos
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("PERIOD", formatPeriod(startDate, endDate));
             parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
             parameters.put("TOTAL_FINES", fines.size());
             

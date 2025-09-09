@@ -328,7 +328,7 @@ class FleetService {
     amountMin?: number;
     amountMax?: number;
     selectedIds?: string[];
-  }): Promise<Blob> {
+  }): Promise<any[]> {
     const queryParams = new URLSearchParams();
     
     if (params.startDate) queryParams.append('startDate', params.startDate);
@@ -342,9 +342,7 @@ class FleetService {
       params.selectedIds.forEach(id => queryParams.append('selectedIds', id));
     }
     
-    const response = await api.get(`/api/fines/reports/pdf?${queryParams.toString()}`, {
-      responseType: 'blob'
-    });
+    const response = await api.get(`/api/fines/reports/pdf?${queryParams.toString()}`);
     
     return response.data;
   }

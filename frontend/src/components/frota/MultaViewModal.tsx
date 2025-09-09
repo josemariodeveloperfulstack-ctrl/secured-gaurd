@@ -21,7 +21,8 @@ import {
   CheckCircle,
   XCircle,
   User,
-  CreditCard
+  CreditCard,
+  Download
 } from 'lucide-react';
 
 interface Multa {
@@ -49,12 +50,14 @@ interface MultaViewModalProps {
   multa: Multa | null;
   isOpen: boolean;
   onClose: () => void;
+  onGenerateReport?: (multaId: string, format: 'pdf' | 'excel') => void;
 }
 
 const MultaViewModal: React.FC<MultaViewModalProps> = ({
   multa,
   isOpen,
   onClose,
+  onGenerateReport,
 }) => {
   if (!multa) return null;
 
@@ -328,7 +331,29 @@ const MultaViewModal: React.FC<MultaViewModalProps> = ({
           </Card>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          {/* Botões de Relatórios */}
+          {onGenerateReport && (
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={() => onGenerateReport(multa.id, 'pdf')}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Relatório PDF
+              </Button>
+              <Button
+                onClick={() => onGenerateReport(multa.id, 'excel')}
+                variant="outline"
+                className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Relatório Excel
+              </Button>
+            </div>
+          )}
+          
+          {/* Botão Fechar */}
           <Button
             variant="outline"
             onClick={onClose}
