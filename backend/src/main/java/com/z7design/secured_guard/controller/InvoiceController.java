@@ -10,8 +10,6 @@ import com.z7design.secured_guard.model.enums.ClientStatus;
 import com.z7design.secured_guard.service.InvoiceService;
 import com.z7design.secured_guard.service.ClientService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
-import com.z7design.secured_guard.repository.UnitRepository;
-import com.z7design.secured_guard.model.Unit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,7 +21,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -44,7 +41,6 @@ public class InvoiceController {
     
     private final InvoiceService invoiceService;
     private final ClientService clientService;
-    private final UnitRepository unitRepository;
     
     @GetMapping
     @Operation(summary = "Listar todas as faturas", description = "Retorna uma lista paginada de todas as faturas")
@@ -112,6 +108,17 @@ public class InvoiceController {
         List<Invoice> invoices = invoiceService.findByCategory(category);
         List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
+    }
+    
+    @GetMapping("/search/invoice-number")
+    @Operation(summary = "Buscar números de fatura", description = "Retorna números de fatura que contenham o termo pesquisado")
+    public ResponseEntity<List<String>> searchInvoiceNumbers(@RequestParam String term) {
+        List<Invoice> invoices = invoiceService.findByInvoiceNumber(term);
+        List<String> invoiceNumbers = invoices.stream()
+            .map(Invoice::getInvoiceNumber)
+            .distinct()
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(invoiceNumbers);
     }
     
     @GetMapping("/overdue")

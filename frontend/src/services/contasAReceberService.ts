@@ -1,306 +1,253 @@
-import { api } from '@/lib/axios';
+import { api } from './api';
 
-export interface ContaAReceber {
-  id: string;
-  cliente: string;
-  descricao: string;
-  valor: number;
-  dataVencimento: string;
-  dataPagamento?: string;
-  status: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  categoria: 'servico' | 'produto' | 'consultoria' | 'outros';
-  formaPagamento?: 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro';
-  numeroNF?: string;
-  observacoes?: string;
-  comprovante?: string;
-  juros?: number;
-  multa?: number;
-  desconto?: number;
-  valorOriginal: number;
-  diasAtraso?: number;
-  tentativasCobranca: number;
-  proximaCobranca?: string;
-  responsavelCobranca?: string;
-  historicoCobranca: HistoricoCobranca[];
-  cliente_id?: string;
-  contrato_id?: string;
-}
-
-export interface HistoricoCobranca {
-  id: string;
-  data: string;
-  tipo: 'email' | 'telefone' | 'whatsapp' | 'carta' | 'visita';
-  responsavel: string;
-  observacoes: string;
-  sucesso: boolean;
-}
-
-export interface ClienteCobranca {
+export interface Cliente {
   id: string;
   nome: string;
   email: string;
   telefone: string;
-  whatsapp?: string;
+  documento: string;
   endereco: string;
-  cpfCnpj: string;
-  contasEmAberto: number;
-  valorTotalDevido: number;
-  diasMedioAtraso: number;
-  ultimoPagamento?: string;
-  scoreCredito: 'baixo' | 'medio' | 'alto';
-  bloqueado: boolean;
+  cidade: string;
+  estado: string;
+  cep: string;
+  limitCredito: number;
+  diasVencimento: number;
+  status: 'ativo' | 'inativo' | 'bloqueado';
 }
 
-export interface RelatorioInadimplencia {
-  totalContas: number;
-  valorTotal: number;
-  contasVencidas: number;
-  valorVencido: number;
-  contasPendentes: number;
-  valorPendente: number;
-  ticketMedio: number;
-  diasMedioRecebimento: number;
-  taxaInadimplencia: number;
-  projecaoRecebimento: ProjecaoRecebimento[];
-  topDevedores: ClienteCobranca[];
-}
-
-export interface ProjecaoRecebimento {
-  mes: string;
-  valorPrevisto: number;
-  valorRealizado: number;
-  percentualRealizacao: number;
-}
-
-export interface ConfiguracaoCobranca {
+export interface ContaAReceber {
   id: string;
-  diasAvisoVencimento: number;
-  diasPrimeiraCobranca: number;
-  intervaloDiasCobranca: number;
-  maxTentativasCobranca: number;
-  jurosMensal: number;
+  cliente: Cliente;
+  numeroFatura: string;
+  descricao: string;
+  valor: number;
+  valorPago: number;
+  valorPendente: number;
+  dataEmissao: string;
+  dataVencimento: string;
+  dataPagamento?: string;
+  status: 'pendente' | 'vencido' | 'pago' | 'cancelado' | 'parcial';
+  categoria: 'fatura' | 'nota' | 'adiantamento' | 'servico' | 'produto' | 'outros';
+  formaPagamento: 'pix' | 'boleto' | 'transferencia' | 'dinheiro' | 'cartao';
+  diasAtraso: number;
+  jurosAtraso: number;
   multaAtraso: number;
-  emailTemplate: string;
-  whatsappTemplate: string;
-  ativo: boolean;
+  observacoes?: string;
+}
+
+export interface CreateContaAReceberRequest {
+  clienteId: string;
+  numeroFatura: string;
+  descricao: string;
+  valor: number;
+  dataEmissao: string;
+  dataVencimento: string;
+  categoria: string;
+  formaPagamento: string;
+  observacoes?: string;
+}
+
+export interface UpdateContaAReceberRequest extends CreateContaAReceberRequest {
+  id: string;
 }
 
 class ContasAReceberService {
-  private baseURL = '/api/contas-receber';
-
-  // CRUD básico
-  async listarContas(filtros?: {
-    status?: string;
-    cliente?: string;
-    dataInicio?: string;
-    dataFim?: string;
-    categoria?: string;
-  }): Promise<ContaAReceber[]> {
+  // Buscar todas as contas a receber
+  async getContasAReceber(): Promise<ContaAReceber[]> {
     try {
-      const response = await api.get(this.baseURL, { params: filtros });
+      const response = await api.get('/api/receivables');
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar contas a receber:', error);
+      return [];
+    }
+  }
+
+  // Buscar conta por ID
+  async getContaAReceberById(id: string): Promise<ContaAReceber | null> {
+    try {
+      const response = await api.get(`/api/receivables/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Erro ao listar contas a receber:', error);
+      console.error('Erro ao buscar conta a receber:', error);
+      return null;
+    }
+  }
+
+  // Criar nova conta a receber
+  async createContaAReceber(conta: CreateContaAReceberRequest): Promise<ContaAReceber> {
+    try {
+      console.log('Criando conta a receber:', conta);
+      
+      const requestData = {
+        clienteId: conta.clienteId,
+        numeroFatura: conta.numeroFatura,
+        descricao: conta.descricao,
+        valor: Number(conta.valor) || 0,
+        dataEmissao: this.formatDateForBackend(conta.dataEmissao),
+        dataVencimento: this.formatDateForBackend(conta.dataVencimento),
+        categoria: conta.categoria,
+        formaPagamento: conta.formaPagamento,
+        observacoes: conta.observacoes || undefined
+      };
+
+      console.log('Dados da requisição:', requestData);
+
+      const response = await api.post('/api/receivables', requestData);
+      return this.getContaAReceberById(response.data.id);
+    } catch (error: any) {
+      console.error('Erro detalhado ao criar conta a receber:', error);
+      console.error('Response data:', error.response?.data);
+      console.error('Response status:', error.response?.status);
       throw error;
     }
   }
 
-  async obterConta(id: string): Promise<ContaAReceber> {
+  // Atualizar conta a receber
+  async updateContaAReceber(id: string, conta: UpdateContaAReceberRequest): Promise<ContaAReceber> {
     try {
-      const response = await api.get(`${this.baseURL}/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter conta a receber:', error);
+      console.log('Atualizando conta a receber:', id, conta);
+      
+      const requestData = {
+        clienteId: conta.clienteId,
+        numeroFatura: conta.numeroFatura,
+        descricao: conta.descricao,
+        valor: Number(conta.valor) || 0,
+        dataEmissao: this.formatDateForBackend(conta.dataEmissao),
+        dataVencimento: this.formatDateForBackend(conta.dataVencimento),
+        categoria: conta.categoria,
+        formaPagamento: conta.formaPagamento,
+        observacoes: conta.observacoes || undefined
+      };
+
+      console.log('Dados da requisição de atualização:', requestData);
+      console.log('ID da conta:', id);
+
+      const response = await api.put(`/api/receivables/${id}`, requestData);
+      return this.getContaAReceberById(response.data.id);
+    } catch (error: any) {
+      console.error('Erro detalhado ao atualizar conta a receber:', error);
+      console.error('Response data:', error.response?.data);
+      console.error('Response status:', error.response?.status);
+      console.error('Request data enviado:', requestData);
       throw error;
     }
   }
 
-  async criarConta(conta: Omit<ContaAReceber, 'id' | 'historicoCobranca' | 'tentativasCobranca'>): Promise<ContaAReceber> {
+  // Excluir conta a receber
+  async deleteContaAReceber(id: string): Promise<void> {
     try {
-      const response = await api.post(this.baseURL, conta);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao criar conta a receber:', error);
-      throw error;
-    }
-  }
-
-  async atualizarConta(id: string, conta: Partial<ContaAReceber>): Promise<ContaAReceber> {
-    try {
-      const response = await api.put(`${this.baseURL}/${id}`, conta);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao atualizar conta a receber:', error);
-      throw error;
-    }
-  }
-
-  async excluirConta(id: string): Promise<void> {
-    try {
-      await api.delete(`${this.baseURL}/${id}`);
+      await api.delete(`/api/receivables/${id}`);
     } catch (error) {
       console.error('Erro ao excluir conta a receber:', error);
       throw error;
     }
   }
 
-  // Funcionalidades específicas
-  async registrarPagamento(id: string, dados: {
-    dataPagamento: string;
-    valorPago: number;
-    formaPagamento: string;
-    comprovante?: string;
-    observacoes?: string;
-  }): Promise<ContaAReceber> {
+  // Marcar como paga
+  async markAsPaid(id: string, dataPagamento: string): Promise<ContaAReceber> {
     try {
-      const response = await api.post(`${this.baseURL}/${id}/pagamento`, dados);
+      const response = await api.patch(`/api/receivables/${id}/mark-paid`, {
+        dataPagamento: this.formatDateForBackend(dataPagamento)
+      });
       return response.data;
     } catch (error) {
-      console.error('Erro ao registrar pagamento:', error);
+      console.error('Erro ao marcar como paga:', error);
       throw error;
     }
   }
 
-  async registrarCobranca(id: string, cobranca: Omit<HistoricoCobranca, 'id'>): Promise<HistoricoCobranca> {
+  // Buscar clientes
+  async getClientes(): Promise<Cliente[]> {
     try {
-      const response = await api.post(`${this.baseURL}/${id}/cobranca`, cobranca);
-      return response.data;
+      const response = await api.get('/api/clients');
+      return response.data || [];
     } catch (error) {
-      console.error('Erro ao registrar cobrança:', error);
-      throw error;
+      console.error('Erro ao carregar clientes:', error);
+      return [];
     }
   }
 
-  async enviarCobrancaAutomatica(ids: string[]): Promise<{ sucesso: number; erro: number; detalhes: any[] }> {
+  // Buscar cliente por ID
+  async getClienteById(id: string): Promise<Cliente | null> {
     try {
-      const response = await api.post(`${this.baseURL}/cobranca-automatica`, { ids });
+      const response = await api.get(`/api/clients/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Erro ao enviar cobrança automática:', error);
-      throw error;
+      console.error('Erro ao buscar cliente:', error);
+      return null;
     }
   }
 
-  async calcularJurosMulta(id: string): Promise<{ juros: number; multa: number; valorTotal: number }> {
+  // Gerar relatório de inadimplência
+  async generateDefaultReport(): Promise<Blob> {
     try {
-      const response = await api.get(`${this.baseURL}/${id}/juros-multa`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao calcular juros e multa:', error);
-      throw error;
-    }
-  }
-
-  // Relatórios e análises
-  async obterRelatorioInadimplencia(periodo?: {
-    dataInicio: string;
-    dataFim: string;
-  }): Promise<RelatorioInadimplencia> {
-    try {
-      const response = await api.get(`${this.baseURL}/relatorio-inadimplencia`, { params: periodo });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter relatório de inadimplência:', error);
-      throw error;
-    }
-  }
-
-  async obterProjecaoRecebimento(meses: number = 12): Promise<ProjecaoRecebimento[]> {
-    try {
-      const response = await api.get(`${this.baseURL}/projecao-recebimento`, { params: { meses } });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter projeção de recebimento:', error);
-      throw error;
-    }
-  }
-
-  async obterClientesInadimplentes(): Promise<ClienteCobranca[]> {
-    try {
-      const response = await api.get(`${this.baseURL}/clientes-inadimplentes`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter clientes inadimplentes:', error);
-      throw error;
-    }
-  }
-
-  async obterEstatisticas(periodo?: {
-    dataInicio: string;
-    dataFim: string;
-  }): Promise<{
-    totalRecebido: number;
-    totalPendente: number;
-    totalVencido: number;
-    ticketMedio: number;
-    taxaRecebimento: number;
-    crescimentoMensal: number;
-  }> {
-    try {
-      const response = await api.get(`${this.baseURL}/estatisticas`, { params: periodo });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter estatísticas:', error);
-      throw error;
-    }
-  }
-
-  // Configurações de cobrança
-  async obterConfiguracaoCobranca(): Promise<ConfiguracaoCobranca> {
-    try {
-      const response = await api.get(`${this.baseURL}/configuracao-cobranca`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter configuração de cobrança:', error);
-      throw error;
-    }
-  }
-
-  async atualizarConfiguracaoCobranca(config: Partial<ConfiguracaoCobranca>): Promise<ConfiguracaoCobranca> {
-    try {
-      const response = await api.put(`${this.baseURL}/configuracao-cobranca`, config);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao atualizar configuração de cobrança:', error);
-      throw error;
-    }
-  }
-
-  // Exportação de dados
-  async exportarRelatorio(formato: 'pdf' | 'excel', filtros?: any): Promise<Blob> {
-    try {
-      const response = await api.get(`${this.baseURL}/exportar`, {
-        params: { formato, ...filtros },
+      const response = await api.get('/api/receivables/reports/default', {
         responseType: 'blob'
       });
       return response.data;
     } catch (error) {
-      console.error('Erro ao exportar relatório:', error);
+      console.error('Erro ao gerar relatório:', error);
       throw error;
     }
   }
 
-  // Integração com sistemas externos
-  async sincronizarComERP(): Promise<{ sincronizadas: number; erros: number }> {
-    try {
-      const response = await api.post(`${this.baseURL}/sincronizar-erp`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao sincronizar com ERP:', error);
-      throw error;
+  // Formatar data para o backend (YYYY-MM-DD)
+  private formatDateForBackend(date: string | Date): string {
+    if (!date) return '';
+    
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toISOString().split('T')[0];
+  }
+
+  // Formatar data para exibição (DD/MM/YYYY)
+  formatDateForDisplay(date: string | Date): string {
+    if (!date) return '';
+    
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('pt-BR');
+  }
+
+  // Calcular dias de atraso
+  calculateDaysOverdue(dataVencimento: string | Date): number {
+    const vencimento = typeof dataVencimento === 'string' ? new Date(dataVencimento) : dataVencimento;
+    const hoje = new Date();
+    const diffTime = hoje.getTime() - vencimento.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  }
+
+  // Calcular valor pendente
+  calculatePendingValue(valor: number, valorPago: number): number {
+    return Math.max(0, valor - valorPago);
+  }
+
+  // Determinar status da conta
+  determineStatus(dataVencimento: string | Date, valorPago: number, valor: number): string {
+    const hoje = new Date();
+    const vencimento = typeof dataVencimento === 'string' ? new Date(dataVencimento) : dataVencimento;
+    
+    if (valorPago >= valor) {
+      return 'pago';
+    } else if (valorPago > 0) {
+      return 'parcial';
+    } else if (vencimento < hoje) {
+      return 'vencido';
+    } else {
+      return 'pendente';
     }
   }
 
-  async gerarBoletos(ids: string[]): Promise<{ boletos: string[]; erros: string[] }> {
+  // Buscar números de fatura
+  async searchInvoiceNumbers(term: string): Promise<string[]> {
     try {
-      const response = await api.post(`${this.baseURL}/gerar-boletos`, { ids });
+      const response = await api.get(`/api/invoices/search/invoice-number?term=${encodeURIComponent(term)}`);
       return response.data;
     } catch (error) {
-      console.error('Erro ao gerar boletos:', error);
+      console.error('Erro ao buscar números de fatura:', error);
       throw error;
     }
   }
 }
 
 export const contasAReceberService = new ContasAReceberService();
-export default contasAReceberService;
