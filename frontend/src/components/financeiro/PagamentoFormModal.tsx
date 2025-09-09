@@ -283,11 +283,15 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
                 <SelectValue placeholder="Selecione um cliente" />
               </SelectTrigger>
               <SelectContent>
-                {(clientes || []).map((cliente) => (
+                {Array.isArray(clientes) ? clientes.map((cliente) => (
                   <SelectItem key={cliente.id} value={cliente.id}>
                     {cliente.nome}
                   </SelectItem>
-                ))}
+                )) : (
+                  <SelectItem value="no-clients" disabled>
+                    Nenhum cliente disponível
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
