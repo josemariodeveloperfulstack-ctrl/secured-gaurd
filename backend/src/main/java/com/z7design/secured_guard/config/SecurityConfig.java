@@ -66,6 +66,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/groups/**").hasAnyAuthority("GROUPS_READ", "GROUPS_WRITE", "GROUPS_CREATE", "GROUPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de equipamentos - requerem permissões específicas
                 .requestMatchers("/api/equipments/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                // Endpoints de EPIs - requerem permissões específicas
+                .requestMatchers("/api/epis/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                // Endpoints de controle de EPI - requerem permissões específicas
+                .requestMatchers("/api/epi-control/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Endpoints da frota - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/frota/**").authenticated()
                 // Endpoints de fuel-records - requerem apenas autenticação (temporário para desenvolvimento)

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Shield, 
   Plus, 
@@ -24,12 +25,14 @@ import {
   Hand,
   Eye,
   Shirt,
-  Zap
+  Zap,
+  FileText
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import epiService from '@/services/epiService';
 import { EPI, EPIType, EPIStatus } from '@/types/epi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import EPIControl from './EPIControl';
 
 const EPIs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,13 +177,33 @@ const EPIs: React.FC = () => {
             <h1 className="text-2xl font-bold text-seguranca-lightgray">Gestão de EPIs</h1>
             <p className="text-gray-400 mt-1">Controle de Equipamentos de Proteção Individual</p>
           </div>
-          <Button 
-            className="bg-seguranca-red hover:bg-seguranca-darkred"
-          >
-            <Plus size={16} className="mr-2" />
-            Novo EPI
-          </Button>
         </div>
+
+        <Tabs defaultValue="inventory" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="inventory" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Estoque de EPIs
+            </TabsTrigger>
+            <TabsTrigger value="control" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Controle de EPI
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="inventory" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-seguranca-lightgray">Estoque de EPIs</h2>
+                <p className="text-gray-400 mt-1">Gestão do inventário de equipamentos</p>
+              </div>
+              <Button 
+                className="bg-seguranca-red hover:bg-seguranca-darkred"
+              >
+                <Plus size={16} className="mr-2" />
+                Novo EPI
+              </Button>
+            </div>
 
         {/* Cards de Estatísticas */}
         {stats && (
@@ -380,6 +403,12 @@ const EPIs: React.FC = () => {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="control" className="space-y-6">
+            <EPIControl />
+          </TabsContent>
+        </Tabs>
       </div>
     </StandardLayout>
   );

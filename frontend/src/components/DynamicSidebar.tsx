@@ -92,9 +92,9 @@ export function DynamicSidebar() {
       requiredPermission: 'EMPLOYEES_READ'
     },
     {
-      icon: BarChart3,
+      icon: MapPin,
       text: 'Controle de Visitas',
-      to: '/operacional',
+      to: '/controle-visitas-avancado',
       id: 'controle-visitas',
       requiredPermission: 'EMPLOYEES_READ'
     },
@@ -521,8 +521,13 @@ export function DynamicSidebar() {
     // Debug específico para SUPER_ADMIN
     if (user?.role === 'SUPER_ADMIN') {
       console.log('🔍 SUPER_ADMIN - getMenuGroups - Total filtrados:', filteredItems.length);
+      console.log('🔍 SUPER_ADMIN - getMenuGroups - Itens principais:', groups.principal.map(item => item.text));
       console.log('🔍 SUPER_ADMIN - getMenuGroups - Itens de sistema:', groups.sistema.map(item => item.text));
       console.log('🔍 SUPER_ADMIN - getMenuGroups - Todos os grupos:', Object.keys(groups).map(key => `${key}: ${groups[key as keyof typeof groups].length}`));
+
+      // Debug específico para Controle de Visitas
+      const controleVisitasInFiltered = filteredItems.find(item => item.id === 'controle-visitas');
+      console.log('🔍 SUPER_ADMIN - Controle de Visitas nos itens filtrados:', controleVisitasInFiltered);
     }
 
     return groups;
@@ -545,6 +550,10 @@ export function DynamicSidebar() {
       console.log('🔍 ALL_PERMISSIONS:', user.permissions.ALL_PERMISSIONS);
       console.log('🔍 Total de itens no allMenuItems:', allMenuItems.length);
       console.log('🔍 Primeiros 5 itens:', allMenuItems.slice(0, 5).map(item => item.text));
+
+      // Debug específico para Controle de Visitas
+      const controleVisitasItem = allMenuItems.find(item => item.id === 'controle-visitas');
+      console.log('🔍 Item Controle de Visitas encontrado:', controleVisitasItem);
 
       // Debug específico para Usuários e Grupos
       const usuariosItem = allMenuItems.find(item => item.id === 'usuarios');

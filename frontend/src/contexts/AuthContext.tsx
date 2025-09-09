@@ -120,13 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('🔍 Tentando fazer login com:', email);
       
-      // Teste simples de comunicação com o backend
-      try {
-        const testResponse = await api.get('/api/test/health');
-        console.log('🔍 Teste de comunicação com backend:', testResponse.status);
-      } catch (testError) {
-        console.error('🔍 Erro no teste de comunicação:', testError);
-      }
+      // Removido teste de comunicação para evitar erros desnecessários
       
       // Enviar username em vez de email para corresponder ao backend
       const response = await api.post('/api/auth/login', { username: email, password });

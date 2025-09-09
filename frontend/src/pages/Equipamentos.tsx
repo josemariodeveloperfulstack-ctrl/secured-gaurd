@@ -42,6 +42,7 @@ import equipmentReportService from '@/services/equipmentReportService';
 import EquipmentHistoryModal from '@/components/equipamentos/EquipmentHistoryModal';
 import EquipmentFormModal from '@/components/equipamentos/EquipmentFormModal';
 import EquipmentReportModal from '@/components/equipamentos/EquipmentReportModal';
+import EquipamentosTableHybrid from '@/components/operacional/EquipamentosTableHybrid';
 import EquipmentFiltersComponent from '@/components/equipamentos/EquipmentFilters';
 
 interface DashboardCard {
@@ -270,153 +271,34 @@ const Equipamentos: React.FC = () => {
   );
 
   const renderEquipmentsTable = () => (
-    <div className="space-y-4">
-      {/* Barra de busca e filtros */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 flex gap-2">
-          <Input
-            placeholder="Buscar por número de série, modelo, lote..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          />
-          <Button onClick={handleSearch} variant="outline">
-            <Search className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setSelectedTab('dashboard')} variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
-          <Button 
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={handleCreateEquipment}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Equipamento
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabela de equipamentos */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b">
-                <tr className="text-left">
-                  <th className="p-4 font-medium">Nº Série</th>
-                  <th className="p-4 font-medium">Modelo</th>
-                  <th className="p-4 font-medium">Status</th>
-                  <th className="p-4 font-medium">Usuário Atual</th>
-                  <th className="p-4 font-medium">Validade</th>
-                  <th className="p-4 font-medium">Nível</th>
-                  <th className="p-4 font-medium">Perigoso</th>
-                  <th className="p-4 font-medium">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {equipments.map((equipment) => (
-                  <tr key={equipment.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4 font-mono text-sm">{equipment.serialNumber}</td>
-                    <td className="p-4">{equipment.model || '-'}</td>
-                    <td className="p-4">
-                      <Badge className={getStatusBadgeColor(equipment.status)}>
-                        {EQUIPMENT_STATUS_LABELS[equipment.status]}
-                      </Badge>
-                    </td>
-                    <td className="p-4">{equipment.currentUserName || '-'}</td>
-                    <td className="p-4">
-                      <span className={getDaysToExpiryColor(equipment.daysToExpiry)}>
-                        {equipment.validityDate 
-                          ? equipmentService.formatDate(equipment.validityDate)
-                          : '-'
-                        }
-                        {equipment.daysToExpiry !== undefined && equipment.daysToExpiry !== null && (
-                          <span className="block text-xs">
-                            {equipment.daysToExpiry < 0 
-                              ? `Vencido há ${Math.abs(equipment.daysToExpiry)} dias`
-                              : `${equipment.daysToExpiry} dias`
-                            }
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {equipment.protectionLevel 
-                        ? PROTECTION_LEVEL_LABELS[equipment.protectionLevel]
-                        : '-'
-                      }
-                    </td>
-                    <td className="p-4">
-                      {equipment.isDangerous ? (
-                        <Badge variant="destructive">Sim</Badge>
-                      ) : (
-                        <Badge variant="secondary">Não</Badge>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleViewHistory(equipment)}
-                          title="Ver histórico"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" title="Editar">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {equipment.currentUserId ? (
-                          <Button variant="ghost" size="sm" title="Remover usuário">
-                            <UserX className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm" title="Atribuir usuário">
-                            <UserPlus className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" title="QR Code">
-                          <QrCode className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" title="Excluir">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Paginação */}
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-center space-x-2">
-          <Button 
-            variant="outline" 
-            disabled={pagination.page === 0}
-            onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-          >
-            Anterior
-          </Button>
-          <span className="px-4 py-2 text-sm">
-            Página {pagination.page + 1} de {pagination.totalPages}
-          </span>
-          <Button 
-            variant="outline" 
-            disabled={pagination.page >= pagination.totalPages - 1}
-            onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-          >
-            Próxima
-          </Button>
-        </div>
-      )}
-    </div>
+    <EquipamentosTableHybrid
+      equipments={equipments}
+      loading={loading}
+      onSearch={handleSearch}
+      onView={handleViewHistory}
+      onEdit={(equipment) => {
+        setSelectedEquipment(equipment);
+        setFormModalOpen(true);
+      }}
+      onAssignUser={(equipment) => {
+        // TODO: Implementar atribuição de usuário
+        console.log('Atribuir usuário para:', equipment);
+      }}
+      onRemoveUser={(equipment) => {
+        // TODO: Implementar remoção de usuário
+        console.log('Remover usuário de:', equipment);
+      }}
+      onQRCode={(equipment) => {
+        // TODO: Implementar geração de QR Code
+        console.log('Gerar QR Code para:', equipment);
+      }}
+      onDelete={(equipment) => {
+        // TODO: Implementar exclusão
+        console.log('Excluir equipamento:', equipment);
+      }}
+      onCreate={handleCreateEquipment}
+      onReport={() => setReportModalOpen(true)}
+    />
   );
 
   if (loading) {
