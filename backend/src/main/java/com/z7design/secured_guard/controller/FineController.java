@@ -3,8 +3,10 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.FineDTO;
 import com.z7design.secured_guard.model.Fine;
 import com.z7design.secured_guard.model.Vehicle;
+import com.z7design.secured_guard.model.Driver;
 import com.z7design.secured_guard.repository.FineRepository;
 import com.z7design.secured_guard.repository.VehicleRepository;
+import com.z7design.secured_guard.repository.DriverRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ public class FineController {
     
     private final FineRepository fineRepository;
     private final VehicleRepository vehicleRepository;
+    private final DriverRepository driverRepository;
     
     @GetMapping
     public ResponseEntity<List<FineDTO>> getAllFines() {
@@ -71,27 +74,60 @@ public class FineController {
     }
     
     @PostMapping
-    public ResponseEntity<FineDTO> createFine(@Valid @RequestBody Fine fine) {
-        Vehicle vehicle = vehicleRepository.findById(fine.getVehicle().getId())
+    public ResponseEntity<FineDTO> createFine(@Valid @RequestBody FineDTO fineDTO) {
+        Vehicle vehicle = vehicleRepository.findById(fineDTO.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Veículo não encontrado"));
+        
+        Fine fine = new Fine();
         fine.setVehicle(vehicle);
+        
+        // Definir motorista se fornecido
+        if (fineDTO.getDriverId() != null) {
+            Driver driver = driverRepository.findById(fineDTO.getDriverId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Motorista não encontrado"));
+            fine.setDriver(driver);
+        }
+        
+        fine.setDate(fineDTO.getDate());
+        fine.setDescription(fineDTO.getDescription());
+        fine.setAmount(fineDTO.getAmount());
+        fine.setLocation(fineDTO.getLocation());
+        fine.setStatus(fineDTO.getStatus());
+        fine.setDueDate(fineDTO.getDueDate());
+        fine.setPaymentDate(fineDTO.getPaymentDate());
         
         Fine savedFine = fineRepository.save(fine);
         return ResponseEntity.ok(FineDTO.fromEntity(savedFine));
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<FineDTO> updateFine(@PathVariable UUID id, @Valid @RequestBody Fine fineDetails) {
+    public ResponseEntity<FineDTO> updateFine(@PathVariable UUID id, @Valid @RequestBody FineDTO fineDTO) {
         Fine fine = fineRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Multa não encontrada com ID: " + id));
         
-        fine.setDate(fineDetails.getDate());
-        fine.setDescription(fineDetails.getDescription());
-        fine.setAmount(fineDetails.getAmount());
-        fine.setLocation(fineDetails.getLocation());
-        fine.setStatus(fineDetails.getStatus());
-        fine.setDueDate(fineDetails.getDueDate());
-        fine.setPaymentDate(fineDetails.getPaymentDate());
+        // Atualizar veículo se necessário
+        if (fineDTO.getVehicleId() != null && !fineDTO.getVehicleId().equals(fine.getVehicle().getId())) {
+            Vehicle vehicle = vehicleRepository.findById(fineDTO.getVehicleId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Veículo não encontrado"));
+            fine.setVehicle(vehicle);
+        }
+        
+        // Atualizar motorista se fornecido
+        if (fineDTO.getDriverId() != null) {
+            Driver driver = driverRepository.findById(fineDTO.getDriverId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Motorista não encontrado"));
+            fine.setDriver(driver);
+        } else {
+            fine.setDriver(null); // Remover motorista se não fornecido
+        }
+        
+        fine.setDate(fineDTO.getDate());
+        fine.setDescription(fineDTO.getDescription());
+        fine.setAmount(fineDTO.getAmount());
+        fine.setLocation(fineDTO.getLocation());
+        fine.setStatus(fineDTO.getStatus());
+        fine.setDueDate(fineDTO.getDueDate());
+        fine.setPaymentDate(fineDTO.getPaymentDate());
         
         Fine updatedFine = fineRepository.save(fine);
         return ResponseEntity.ok(FineDTO.fromEntity(updatedFine));
@@ -104,5 +140,11 @@ public class FineController {
         }
         fineRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+    
+    @GetMapping("/drivers")
+    public ResponseEntity<List<Driver>> getDrivers() {
+        List<Driver> drivers = driverRepository.findAll();
+        return ResponseEntity.ok(drivers);
     }
 } 

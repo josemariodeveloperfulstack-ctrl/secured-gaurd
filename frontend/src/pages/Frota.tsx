@@ -82,6 +82,9 @@ interface MultaComponent {
   placa: string;
   marca: string;
   modelo: string;
+  motorista_id?: string;
+  motorista_nome?: string;
+  motorista_cnh?: string;
   data_infracao: string;
   data_vencimento: string;
   valor: number;
@@ -256,6 +259,11 @@ const Frota: React.FC = () => {
   // Função de mapeamento de multas (dentro do componente para ter acesso aos dados)
   const mapFineToComponent = (fine: Fine): MultaComponent => {
     console.log('🔍 Mapeando multa:', fine);
+    console.log('🔍 Dados do motorista na multa:', {
+      driverId: fine.driverId,
+      driverName: fine.driverName,
+      driverLicenseNumber: fine.driverLicenseNumber
+    });
     
     // Encontrar o veículo correspondente
     const vehicle = vehicles?.find(v => v.id === fine.vehicleId);
@@ -267,6 +275,10 @@ const Frota: React.FC = () => {
       placa: fine.vehiclePlate,
       marca: vehicle?.brand || '',
       modelo: vehicle?.model || '',
+      // TESTE: Adicionar dados de motorista para teste
+      motorista_id: fine.driverId || 'TESTE-001',
+      motorista_nome: fine.driverName || 'João Silva (Teste)',
+      motorista_cnh: fine.driverLicenseNumber || '12345678901',
       data_infracao: fine.date,
       data_vencimento: fine.dueDate || fine.date,
       valor: fine.amount,
@@ -280,6 +292,11 @@ const Frota: React.FC = () => {
     };
     
     console.log('✅ Multa mapeada:', mappedMulta);
+    console.log('✅ Dados do motorista mapeados:', {
+      motorista_id: mappedMulta.motorista_id,
+      motorista_nome: mappedMulta.motorista_nome,
+      motorista_cnh: mappedMulta.motorista_cnh
+    });
     return mappedMulta;
   };
 

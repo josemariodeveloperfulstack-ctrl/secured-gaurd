@@ -19,7 +19,9 @@ import {
   FileText,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  User,
+  CreditCard
 } from 'lucide-react';
 
 interface Multa {
@@ -28,6 +30,9 @@ interface Multa {
   placa: string;
   marca: string;
   modelo: string;
+  motorista_id?: string;
+  motorista_nome?: string;
+  motorista_cnh?: string;
   data_infracao: string;
   data_vencimento: string;
   valor: number;
@@ -52,6 +57,12 @@ const MultaViewModal: React.FC<MultaViewModalProps> = ({
   onClose,
 }) => {
   if (!multa) return null;
+
+  // Debug: Log dos dados da multa para verificar se o motorista está presente
+  console.log('🔍 MultaViewModal - Dados da multa:', multa);
+  console.log('🔍 MultaViewModal - Motorista nome:', multa.motorista_nome);
+  console.log('🔍 MultaViewModal - Motorista ID:', multa.motorista_id);
+  console.log('🔍 MultaViewModal - Motorista CNH:', multa.motorista_cnh);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -172,6 +183,43 @@ const MultaViewModal: React.FC<MultaViewModalProps> = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Informações do Motorista - TESTE: Sempre mostrar */}
+          {true && (
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardHeader>
+                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Motorista
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-400">Nome</label>
+                    <p className="text-seguranca-lightgray font-semibold">
+                      {multa.motorista_nome || 'Nome não disponível'}
+                    </p>
+                  </div>
+                  {multa.motorista_cnh && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-400 flex items-center gap-1">
+                        <CreditCard className="h-4 w-4" />
+                        CNH
+                      </label>
+                      <p className="text-seguranca-lightgray">{multa.motorista_cnh}</p>
+                    </div>
+                  )}
+                  {multa.motorista_id && !multa.motorista_nome && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-400">ID do Motorista</label>
+                      <p className="text-seguranca-lightgray text-sm">{multa.motorista_id}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Detalhes da Infração */}
           <Card className="bg-seguranca-graphite border-gray-600">

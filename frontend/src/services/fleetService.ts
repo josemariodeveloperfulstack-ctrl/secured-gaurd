@@ -39,6 +39,9 @@ interface FineAPI {
   id: string;
   vehicleId: string;
   vehiclePlate: string;
+  driverId?: string;
+  driverName?: string;
+  driverLicenseNumber?: string;
   date: string;
   description: string;
   amount: number;
