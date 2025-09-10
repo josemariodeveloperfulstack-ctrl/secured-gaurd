@@ -355,7 +355,7 @@ public class JasperReportService {
         return generateFineReportPDF(fines, startDate, endDate, vehicleFilter, driverFilter, statusFilter);
     }
     
-    /*private byte[] generateFineReportPDFSimple(List<FineReportDTO> fines) throws IOException {
+    private byte[] generateFineReportPDFSimple(List<FineReportDTO> fines, String vehicleFilter, String driverFilter, String statusFilter) throws IOException {
         try {
             log.info("Gerando relatório PDF simplificado de multas - {} multas", fines.size());
             
@@ -696,5 +696,4 @@ public class JasperReportService {
             throw new IOException("Erro ao gerar relatório de pagamentos agendados: " + e.getMessage(), e);
         }
     }
-    */
 }
