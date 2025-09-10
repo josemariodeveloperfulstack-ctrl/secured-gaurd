@@ -264,7 +264,15 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => onView(conta)} className="text-seguranca-lightgray hover:text-seguranca-yellow">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => {
+                            console.log('Botão de visualização clicado para conta:', conta);
+                            onView(conta);
+                          }} 
+                          className="text-seguranca-lightgray hover:text-seguranca-yellow"
+                        >
                           <Eye size={16} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => onEdit(conta)} className="text-seguranca-lightgray hover:text-seguranca-yellow">
