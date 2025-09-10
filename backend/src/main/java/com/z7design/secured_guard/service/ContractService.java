@@ -182,7 +182,7 @@ public class ContractService {
         BeanUtils.copyProperties(contract, dto);
         
         if (contract.getClient() != null) {
-            dto.setClientId(contract.getClient() != null ? contract.getClient().getId() : null);
+            dto.setClientId(contract.getClient().getId());
             dto.setClientName(contract.getClient().getName());
             dto.setClientCnpj(contract.getClient().getCnpj());
         }

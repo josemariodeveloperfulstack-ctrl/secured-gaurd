@@ -32,6 +32,7 @@ const ContasAPagar = lazy(() => import('@/pages/ContasAPagar'));
 const ContasAReceber = lazy(() => import('@/pages/ContasAReceber'));
 const FluxoCaixa = lazy(() => import('@/pages/FluxoCaixa'));
 const Pagamentos = lazy(() => import('@/pages/Pagamentos'));
+const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
 const RelatoriosFinanceiros = lazy(() => import('@/pages/RelatoriosFinanceiros'));
 const Frota = lazy(() => import('@/pages/Frota'));
 const Documentos = lazy(() => import('@/pages/Documentos'));
@@ -318,6 +319,11 @@ function App() {
                     <Route path="/financeiro/pagamentos" element={
                       <ProtectedRoute>
                         <Pagamentos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/conciliacao-bancaria" element={
+                      <ProtectedRoute>
+                        <ConciliacaoBancaria />
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/relatorios" element={

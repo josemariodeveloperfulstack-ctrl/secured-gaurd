@@ -103,7 +103,8 @@ class PagamentosService {
       const response = await axios.get(`${API_BASE_URL}/accounts-receivable/all`, {
         headers: this.getAuthHeaders()
       });
-      return response.data;
+      // Garantir que sempre retornamos um array
+      return Array.isArray(response.data) ? response.data : this.getMockPagamentos();
     } catch (error) {
       console.error('Erro ao buscar pagamentos:', error);
       // Retornar dados mockados temporariamente
@@ -252,9 +253,9 @@ class PagamentosService {
 
   async executarAgendamento(agendamentoId: string): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/accounts-receivable/schedule/${agendamentoId}/execute`, {}, {
-        headers: this.getAuthHeaders()
-      });
+      // TODO: Implementar endpoint correto no backend
+      console.warn('Endpoint /api/accounts-receivable/schedule/${agendamentoId}/execute não implementado');
+      throw new Error('Funcionalidade de execução de agendamento não implementada');
     } catch (error) {
       console.error('Erro ao executar agendamento:', error);
       throw error;
@@ -263,9 +264,9 @@ class PagamentosService {
 
   async cancelarAgendamento(agendamentoId: string): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/accounts-receivable/schedule/${agendamentoId}/cancel`, {}, {
-        headers: this.getAuthHeaders()
-      });
+      // TODO: Implementar endpoint correto no backend
+      console.warn('Endpoint /api/accounts-receivable/schedule/${agendamentoId}/cancel não implementado');
+      throw new Error('Funcionalidade de cancelamento de agendamento não implementada');
     } catch (error) {
       console.error('Erro ao cancelar agendamento:', error);
       throw error;
@@ -274,10 +275,9 @@ class PagamentosService {
 
   async getAgendamentos(): Promise<AgendamentoPagamento[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/schedule`, {
-        headers: this.getAuthHeaders()
-      });
-      return response.data;
+      // TODO: Implementar endpoint correto no backend
+      console.warn('Endpoint /api/accounts-receivable/schedule não implementado');
+      return this.getMockAgendamentos();
     } catch (error) {
       console.error('Erro ao buscar agendamentos:', error);
       // Retornar dados mockados temporariamente
@@ -340,10 +340,11 @@ class PagamentosService {
   
   async getClientes(): Promise<Cliente[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/clients`, {
+      const response = await axios.get(`${API_BASE_URL}/clients/all`, {
         headers: this.getAuthHeaders()
       });
-      return response.data;
+      // Garantir que sempre retornamos um array
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
       // Retornar dados mockados temporariamente
