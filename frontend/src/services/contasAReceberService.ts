@@ -1,50 +1,55 @@
-import { api } from './api';
+import api from '@/lib/axios';
 
 export interface Cliente {
   id: string;
-  nome: string;
+  name: string;
   email: string;
-  telefone: string;
-  documento: string;
-  endereco: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  limitCredito: number;
-  diasVencimento: number;
-  status: 'ativo' | 'inativo' | 'bloqueado';
+  phone: string;
+  mobile: string;
+  cnpj: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  notes?: string;
 }
 
 export interface ContaAReceber {
   id: string;
-  cliente: Cliente;
-  numeroFatura: string;
-  descricao: string;
-  valor: number;
-  valorPago: number;
-  valorPendente: number;
-  dataEmissao: string;
-  dataVencimento: string;
-  dataPagamento?: string;
-  status: 'pendente' | 'vencido' | 'pago' | 'cancelado' | 'parcial';
-  categoria: 'fatura' | 'nota' | 'adiantamento' | 'servico' | 'produto' | 'outros';
-  formaPagamento: 'pix' | 'boleto' | 'transferencia' | 'dinheiro' | 'cartao';
-  diasAtraso: number;
-  jurosAtraso: number;
-  multaAtraso: number;
-  observacoes?: string;
+  client: Cliente;
+  invoiceNumber: string;
+  measurementNumber?: string;
+  description: string;
+  amount: number;
+  amountPaid: number;
+  pendingAmount: number;
+  issueDate: string;
+  dueDate: string;
+  paymentDate?: string;
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'PARTIAL';
+  category: 'INVOICE' | 'NOTE' | 'ADVANCE' | 'SERVICE' | 'PRODUCT' | 'OTHER';
+  paymentMethod: 'PIX' | 'BOLETO' | 'TRANSFER' | 'CASH' | 'CARD';
+  overdueDays: number;
+  lateFee: number;
+  latePenalty: number;
+  notes?: string;
 }
 
 export interface CreateContaAReceberRequest {
-  clienteId: string;
-  numeroFatura: string;
-  descricao: string;
-  valor: number;
-  dataEmissao: string;
-  dataVencimento: string;
-  categoria: string;
-  formaPagamento: string;
-  observacoes?: string;
+  clientId: string;
+  invoiceNumber: string;
+  measurementNumber?: string;
+  description: string;
+  amount: number;
+  issueDate: string;
+  dueDate: string;
+  category: string;
+  paymentMethod: string;
+  notes?: string;
 }
 
 export interface UpdateContaAReceberRequest extends CreateContaAReceberRequest {
@@ -55,7 +60,9 @@ class ContasAReceberService {
   // Buscar todas as contas a receber
   async getContasAReceber(): Promise<ContaAReceber[]> {
     try {
-      const response = await api.get('/api/receivables');
+      console.log('Buscando contas a receber da API...');
+      const response = await api.get('/api/accounts-receivable/all');
+      console.log('Contas a receber recebidas:', response.data);
       return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar contas a receber:', error);
@@ -66,7 +73,8 @@ class ContasAReceberService {
   // Buscar conta por ID
   async getContaAReceberById(id: string): Promise<ContaAReceber | null> {
     try {
-      const response = await api.get(`/api/receivables/${id}`);
+      console.log('Buscando conta a receber por ID:', id);
+      const response = await api.get(`/api/accounts-receivable/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar conta a receber:', error);
@@ -80,21 +88,23 @@ class ContasAReceberService {
       console.log('Criando conta a receber:', conta);
       
       const requestData = {
-        clienteId: conta.clienteId,
-        numeroFatura: conta.numeroFatura,
-        descricao: conta.descricao,
-        valor: Number(conta.valor) || 0,
-        dataEmissao: this.formatDateForBackend(conta.dataEmissao),
-        dataVencimento: this.formatDateForBackend(conta.dataVencimento),
-        categoria: conta.categoria,
-        formaPagamento: conta.formaPagamento,
-        observacoes: conta.observacoes || undefined
+        clientId: conta.clientId,
+        invoiceNumber: conta.invoiceNumber,
+        measurementNumber: conta.measurementNumber,
+        description: conta.description,
+        amount: Number(conta.amount) || 0,
+        issueDate: this.formatDateForBackend(conta.issueDate),
+        dueDate: this.formatDateForBackend(conta.dueDate),
+        category: conta.category,
+        paymentMethod: conta.paymentMethod,
+        notes: conta.notes || undefined
       };
 
       console.log('Dados da requisição:', requestData);
 
-      const response = await api.post('/api/receivables', requestData);
-      return this.getContaAReceberById(response.data.id);
+      const response = await api.post('/api/accounts-receivable', requestData);
+      console.log('Conta a receber criada:', response.data);
+      return response.data;
     } catch (error: any) {
       console.error('Erro detalhado ao criar conta a receber:', error);
       console.error('Response data:', error.response?.data);
@@ -109,27 +119,28 @@ class ContasAReceberService {
       console.log('Atualizando conta a receber:', id, conta);
       
       const requestData = {
-        clienteId: conta.clienteId,
-        numeroFatura: conta.numeroFatura,
-        descricao: conta.descricao,
-        valor: Number(conta.valor) || 0,
-        dataEmissao: this.formatDateForBackend(conta.dataEmissao),
-        dataVencimento: this.formatDateForBackend(conta.dataVencimento),
-        categoria: conta.categoria,
-        formaPagamento: conta.formaPagamento,
-        observacoes: conta.observacoes || undefined
+        clientId: conta.clientId,
+        invoiceNumber: conta.invoiceNumber,
+        measurementNumber: conta.measurementNumber,
+        description: conta.description,
+        amount: Number(conta.amount) || 0,
+        issueDate: this.formatDateForBackend(conta.issueDate),
+        dueDate: this.formatDateForBackend(conta.dueDate),
+        category: conta.category,
+        paymentMethod: conta.paymentMethod,
+        notes: conta.notes || undefined
       };
 
       console.log('Dados da requisição de atualização:', requestData);
       console.log('ID da conta:', id);
 
-      const response = await api.put(`/api/receivables/${id}`, requestData);
-      return this.getContaAReceberById(response.data.id);
+      const response = await api.put(`/api/accounts-receivable/${id}`, requestData);
+      console.log('Conta a receber atualizada:', response.data);
+      return response.data;
     } catch (error: any) {
       console.error('Erro detalhado ao atualizar conta a receber:', error);
       console.error('Response data:', error.response?.data);
       console.error('Response status:', error.response?.status);
-      console.error('Request data enviado:', requestData);
       throw error;
     }
   }
@@ -137,7 +148,9 @@ class ContasAReceberService {
   // Excluir conta a receber
   async deleteContaAReceber(id: string): Promise<void> {
     try {
-      await api.delete(`/api/receivables/${id}`);
+      console.log('Excluindo conta a receber:', id);
+      await api.delete(`/api/accounts-receivable/${id}`);
+      console.log('Conta a receber excluída com sucesso');
     } catch (error) {
       console.error('Erro ao excluir conta a receber:', error);
       throw error;
@@ -147,9 +160,9 @@ class ContasAReceberService {
   // Marcar como paga
   async markAsPaid(id: string, dataPagamento: string): Promise<ContaAReceber> {
     try {
-      const response = await api.patch(`/api/receivables/${id}/mark-paid`, {
-        dataPagamento: this.formatDateForBackend(dataPagamento)
-      });
+      console.log('Marcando conta como paga:', id, dataPagamento);
+      const response = await api.put(`/api/accounts-receivable/${id}/mark-paid?paymentDate=${this.formatDateForBackend(dataPagamento)}`);
+      console.log('Conta marcada como paga:', response.data);
       return response.data;
     } catch (error) {
       console.error('Erro ao marcar como paga:', error);
@@ -160,7 +173,9 @@ class ContasAReceberService {
   // Buscar clientes
   async getClientes(): Promise<Cliente[]> {
     try {
-      const response = await api.get('/api/clients');
+      console.log('Buscando clientes da API...');
+      const response = await api.get('/api/clients/all');
+      console.log('Clientes recebidos:', response.data);
       return response.data || [];
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -241,11 +256,52 @@ class ContasAReceberService {
   // Buscar números de fatura
   async searchInvoiceNumbers(term: string): Promise<string[]> {
     try {
-      const response = await api.get(`/api/invoices/search/invoice-number?term=${encodeURIComponent(term)}`);
-      return response.data;
+      console.log('Buscando números de fatura para termo:', term);
+      const response = await api.get(`/api/accounts-receivable/search/invoice-number?term=${encodeURIComponent(term)}`);
+      console.log('Números de fatura encontrados:', response.data);
+      return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar números de fatura:', error);
-      throw error;
+      return [];
+    }
+  }
+
+  // Buscar números de medição
+  async searchMeasurementNumbers(term: string): Promise<string[]> {
+    try {
+      console.log('Buscando números de medição para termo:', term);
+      const response = await api.get(`/api/accounts-receivable/search/measurement-number?term=${encodeURIComponent(term)}`);
+      console.log('Números de medição encontrados:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar números de medição:', error);
+      return [];
+    }
+  }
+
+  // Buscar categorias
+  async searchCategories(term: string): Promise<string[]> {
+    try {
+      console.log('Buscando categorias para termo:', term);
+      const response = await api.get(`/api/accounts-receivable/search/categories?term=${encodeURIComponent(term)}`);
+      console.log('Categorias encontradas:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+      return [];
+    }
+  }
+
+  // Buscar formas de pagamento
+  async searchPaymentMethods(term: string): Promise<string[]> {
+    try {
+      console.log('Buscando formas de pagamento para termo:', term);
+      const response = await api.get(`/api/accounts-receivable/search/payment-methods?term=${encodeURIComponent(term)}`);
+      console.log('Formas de pagamento encontradas:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar formas de pagamento:', error);
+      return [];
     }
   }
 }

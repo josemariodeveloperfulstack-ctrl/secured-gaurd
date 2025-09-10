@@ -203,4 +203,27 @@ public class ClientDTO {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+    
+    // Static factory method
+    public static ClientDTO fromEntity(com.z7design.secured_guard.model.Client entity) {
+        ClientDTO dto = new ClientDTO();
+        dto.setId(entity.getId());
+        dto.setName(entity.getName());
+        dto.setCnpj(entity.getCnpj());
+        dto.setEmail(entity.getEmail());
+        dto.setPhone(entity.getPhone());
+        dto.setMobile(entity.getMobile());
+        dto.setAddress(entity.getAddress());
+        dto.setCity(entity.getCity());
+        dto.setState(entity.getState());
+        dto.setZipCode(entity.getZipCode());
+        dto.setContactName(entity.getContactName());
+        dto.setContactEmail(entity.getContactEmail());
+        dto.setContactPhone(entity.getContactPhone());
+        dto.setStatus(entity.getStatus());
+        dto.setNotes(entity.getNotes());
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
+        return dto;
+    }
 } 
