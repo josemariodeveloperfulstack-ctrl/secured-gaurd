@@ -204,22 +204,22 @@ const EquipmentHistoryModal: React.FC<EquipmentHistoryModalProps> = ({
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <div className="font-medium text-gray-700">Número de Série:</div>
+                  <div className="font-medium text-muted-foreground">Número de Série:</div>
                   <div className="font-mono">{equipment.serialNumber}</div>
                 </div>
                 <div>
-                  <div className="font-medium text-gray-700">Modelo:</div>
+                  <div className="font-medium text-muted-foreground">Modelo:</div>
                   <div>{equipment.model || '-'}</div>
                 </div>
                 <div>
-                  <div className="font-medium text-gray-700">Status Atual:</div>
+                  <div className="font-medium text-muted-foreground">Status Atual:</div>
                   <Badge className={equipmentService.getStatusColor(equipment.status)}>
                     {EQUIPMENT_STATUS_LABELS[equipment.status]}
                   </Badge>
                 </div>
                 {equipment.currentUserName && (
                   <div className="md:col-span-3">
-                    <div className="font-medium text-gray-700">Usuário Atual:</div>
+                    <div className="font-medium text-muted-foreground">Usuário Atual:</div>
                     <div>{equipment.currentUserName}</div>
                   </div>
                 )}

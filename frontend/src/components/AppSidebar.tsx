@@ -36,12 +36,104 @@ import {
   Mail,
   ShoppingCart,
   CheckCircle,
+  CheckSquare,
   UserPlus,
   Headphones,
   Camera,
   Phone,
   Clock,
-  UserCog
+  UserCog,
+  GraduationCap,
+  FileSignature,
+  CreditCard,
+  Heart,
+  Home,
+  Car,
+  BookOpen,
+  TrendingUp,
+  UserX,
+  UserMinus,
+  FileBarChart,
+  CalendarDays,
+  Clock3,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  PlusCircle,
+  Edit3,
+  Trash2,
+  Eye,
+  Download,
+  Upload,
+  Search,
+  Filter,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronRight,
+  Star,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
+  Share2,
+  Copy,
+  ExternalLink,
+  Lock,
+  Unlock,
+  RefreshCw,
+  Save,
+  Printer,
+  Archive,
+  Folder,
+  FolderOpen,
+  File,
+  Image,
+  Video,
+  Music,
+  FileImage,
+  FileVideo,
+  FileAudio,
+  FilePdf,
+  FileWord,
+  FileExcel,
+  FilePowerpoint,
+  FileArchive,
+  FileCode,
+  FileJson,
+  FileXml,
+  FileCsv,
+  FileDatabase,
+  FileLock,
+  FileMinus,
+  FilePlus,
+  FileSearch,
+  FileSlash,
+  FileText2,
+  FileType,
+  FileUp,
+  FileX,
+  FileZip,
+  FolderPlus,
+  FolderMinus,
+  FolderX,
+  FolderCheck,
+  FolderClock,
+  FolderEdit,
+  FolderHeart,
+  FolderKey,
+  FolderLock,
+  FolderOpen2,
+  FolderPause,
+  FolderPlay,
+  FolderQuestion,
+  FolderSearch,
+  FolderSettings,
+  FolderStar,
+  FolderSync,
+  FolderTree,
+  FolderUp,
+  FolderUser,
+  FolderWarning,
+  FolderX2
 } from 'lucide-react';
 import {
   Sidebar,
@@ -100,45 +192,54 @@ const gestaoMensagensInternasMenuItems = [
   { icon: Users, text: 'Grupos de Mensagens', to: '/gestao-mensagens-internas/grupos', id: 'gestao-mensagens-internas-grupos' },
 ];
 
-// Debug: verificar se o suporteMenuItems está sendo definido
-console.log('🎧 suporteMenuItems:', suporteMenuItems);
 
 // Módulo RH/Departamento Pessoal
 const rhMenuItems = [
   { icon: Users, text: 'RH Principal', to: '/rh', id: 'rh' },
   { icon: User2, text: 'Funcionários', to: '/rh/funcionarios', id: 'rh-funcionarios' },
+  { icon: UserPlus, text: 'Admissão de Funcionários', to: '/rh/admissao-funcionarios', id: 'rh-admissao-funcionarios' },
+  { icon: UserX, text: 'Demissão de Funcionários', to: '/rh/demissao-funcionarios', id: 'rh-demissao-funcionarios' },
+  { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'rh-admissao-demissao' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'rh-remanejamentos' },
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'rh-ferias' },
+  { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'rh-ponto-eletronico' },
+  { icon: Clock3, text: 'Horas Extras', to: '/rh/horas-extras', id: 'rh-horas-extras' },
   { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'rh-ocorrencias' },
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
+  { icon: CreditCard, text: 'Vale Transporte', to: '/rh/vale-transporte', id: 'rh-vale-transporte' },
+  { icon: Home, text: 'Vale Refeição', to: '/rh/vale-refeicao', id: 'rh-vale-refeicao' },
+  { icon: Car, text: 'Vale Combustível', to: '/rh/vale-combustivel', id: 'rh-vale-combustivel' },
+  { icon: Heart, text: 'Plano de Saúde', to: '/rh/plano-saude', id: 'rh-plano-saude' },
+  { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
+  { icon: BookOpen, text: 'Cursos', to: '/rh/cursos', id: 'rh-cursos' },
+  { icon: FileSignature, text: 'Contratos', to: '/rh/contratos', id: 'rh-contratos' },
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'rh-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'rh-cargos' },
   { icon: MapPin, text: 'Postos', to: '/postos', id: 'postos' },
   { icon: Shield, text: 'EPIs', to: '/epis', id: 'rh-epis' },
   { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico?emitir=1', id: 'rh-ordens-servico' },
-  { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'rh-admissao-demissao' },
-  { icon: UserPlus, text: 'Admissão de Funcionários', to: '/rh/admissao-funcionarios', id: 'rh-admissao-funcionarios' },
   { icon: UserCheck, text: 'LGPD', to: '/rh/lgpd', id: 'rh-lgpd' },
+  { icon: FileBarChart, text: 'Avaliação de Desempenho', to: '/rh/avaliacao-desempenho', id: 'rh-avaliacao-desempenho' },
+  { icon: TrendingUp, text: 'Plano de Carreira', to: '/rh/plano-carreira', id: 'rh-plano-carreira' },
   { icon: BarChart3Icon, text: 'Relatórios', to: '/rh/relatorios', id: 'rh-relatorios' },
   { icon: Send, text: 'Envio de Holerites', to: '/envio-holerites', id: 'envio-holerites' },
 ];
 
 // Módulo Operacional
 const operacionalMenuItems = [
+  { icon: BarChart3, text: 'Dashboard Operacional', to: '/operacional-dashboard', id: 'operacional-dashboard' },
+  { icon: Building2, text: 'Gestão de Postos', to: '/operacional/postos', id: 'operacional-postos' },
+  { icon: Clock, text: 'Gestão de Escalas', to: '/operacional/escalas', id: 'operacional-escalas' },
+  { icon: Calendar, text: 'Gestão de Férias', to: '/operacional/ferias', id: 'operacional-ferias' },
+  { icon: CheckSquare, text: 'Gestão de Tarefas', to: '/operacional/tarefas', id: 'operacional-tarefas' },
+  { icon: FileText, text: 'Relatórios Operacionais', to: '/operacional/relatorios', id: 'operacional-relatorios' },
+  { icon: CheckSquare, text: 'Controle de Visitas de Supervisor', to: '/gestao-visitas-supervisor', id: 'gestao-visitas-supervisor' },
   { icon: ClipboardList, text: 'Serviços', to: '/servicos', id: 'servicos' },
   { icon: BarChart3, text: 'Controle de Visitas', to: '/controle-visitas-avancado', id: 'controle-visitas-avancado' },
   { icon: Route, text: 'Supervisão de Postos', to: '/rota-semanal-supervisao', id: 'rota-semanal-supervisao' },
   { icon: Shield, text: 'Equipamentos', to: '/operacional', id: 'equipamentos' },
   { icon: ArrowUpDown, text: 'Troca de Plantão', to: '/operacional/troca-plantao', id: 'troca-plantao' },
-  
-  // ===== NOVO MÓDULO DE SUPERVISÃO DENTRO DO OPERACIONAL =====
-  { icon: Shield, text: 'Supervisão Principal', to: '/supervisao', id: 'supervisao' },
-  { icon: Camera, text: 'Login Facial', to: '/facial-login', id: 'facial-login' },
-  { icon: MapPin, text: 'Visitas Supervisionadas', to: '/supervisao/visitas', id: 'supervisao-visitas' },
-  { icon: Route, text: 'Rotas Otimizadas', to: '/supervisao/rotas', id: 'supervisao-rotas' },
-  { icon: BarChart3, text: 'Relatórios de Supervisão', to: '/supervisao/relatorios', id: 'supervisao-relatorios' },
-  { icon: Settings, text: 'Configurações de Biometria', to: '/supervisao/biometria', id: 'supervisao-biometria' },
 ];
 
 // Grupo Empresas
@@ -191,19 +292,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { user } = useAuth();
   
-  // Debug: verificar se o array está sendo definido
-  console.log('🚨 empresasMenuItems:', empresasMenuItems);
   
-  console.log('🚨 AppSidebar está sendo renderizado! 🚨');
-  console.log('🚨 Localização atual:', location.pathname);
-  console.log('🚨 Usuário:', user);
-  console.log('🚨 operacionalMenuItems:', operacionalMenuItems);
-  console.log('🚨 operacionalMenuItems.length:', operacionalMenuItems.length);
-  
-  // TESTE ESPECÍFICO: Verificar cada item do array
-  operacionalMenuItems.forEach((item, index) => {
-    console.log(`🚨 Item ${index}:`, item.text, item.id, item.icon);
-  });
 
   // Menu principal - incluir Roles apenas para SUPER_ADMIN
   const getMainMenuItems = () => {
@@ -429,33 +518,21 @@ export function AppSidebar() {
           <Shield size={16} className="mr-2 text-seguranca-yellow" />
           Operacional
         </div>
-        
-        {/* TESTE: Renderização forçada para debug */}
-        <div className="mb-2 ml-4 p-2 bg-red-500 text-white text-xs">
-          DEBUG: operacionalMenuItems.length = {operacionalMenuItems.length}
-        </div>
-        
-        {/* TESTE: Renderização forçada de cada item */}
-        {operacionalMenuItems.map((item, index) => {
-          console.log(`🚨 Renderizando item ${index}:`, item.text, item.id);
-          return (
-            <div className="mb-2 ml-4" key={item.id}>
-              <a 
-                href={item.to} 
-                className={`flex items-center p-3 rounded-lg transition-colors ${
-                  isActive(item.id) 
-                    ? 'bg-seguranca-black text-seguranca-yellow' 
-                    : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                }`}
-              >
-                <item.icon size={18} className="text-seguranca-yellow mr-3" />
-                <span>{item.text}</span>
-                {/* TESTE: Mostrar índice do item */}
-                <span className="ml-2 text-xs text-gray-400">({index})</span>
-              </a>
-            </div>
-          );
-        })}
+        {operacionalMenuItems.map(item => (
+          <div className="mb-2 ml-4" key={item.id}>
+            <a 
+              href={item.to} 
+              className={`flex items-center p-3 rounded-lg transition-colors ${
+                isActive(item.id) 
+                  ? 'bg-seguranca-black text-seguranca-yellow' 
+                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+              }`}
+            >
+              <item.icon size={18} className="text-seguranca-yellow mr-3" />
+              <span>{item.text}</span>
+            </a>
+          </div>
+        ))}
 
         {/* Grupo de Mensagens */}
         <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">

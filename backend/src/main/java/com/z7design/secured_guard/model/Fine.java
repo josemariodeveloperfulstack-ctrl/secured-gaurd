@@ -24,6 +24,10 @@ public class Fine {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_id")
+    private Driver driver;
+    
     @Column(nullable = false)
     private LocalDate date;
     

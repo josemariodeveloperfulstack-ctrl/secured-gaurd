@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Eye, 
   Edit, 
@@ -11,7 +12,10 @@ import {
   Calendar, 
   DollarSign,
   Car,
-  RefreshCw
+  RefreshCw,
+  User,
+  FileText,
+  Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,6 +25,9 @@ interface Multa {
   placa: string;
   marca: string;
   modelo: string;
+  motorista_id?: string;
+  motorista_nome?: string;
+  motorista_cnh?: string;
   data_infracao: string;
   data_vencimento: string;
   valor: number;
@@ -38,7 +45,10 @@ interface MultasTableProps {
   onRefresh: () => void;
   onEdit: (multa: Multa) => void;
   onDelete: (multa: Multa) => void;
+  onDeleteMultiple?: (selectedIds: string[]) => void;
   onView: (multa: Multa) => void;
+  onGenerateReport?: (selectedIds: string[], format: 'pdf' | 'excel') => void;
+  showSelection?: boolean;
 }
 
 const MultasTable: React.FC<MultasTableProps> = ({
@@ -46,10 +56,15 @@ const MultasTable: React.FC<MultasTableProps> = ({
   onRefresh,
   onEdit,
   onDelete,
-  onView
+  onDeleteMultiple,
+  onView,
+  onGenerateReport,
+  showSelection = false
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedMultas, setSelectedMultas] = useState<string[]>([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -91,6 +106,64 @@ const MultasTable: React.FC<MultasTableProps> = ({
   const isVencida = (dataVencimento: string) => {
     return new Date(dataVencimento) < new Date();
   };
+
+  // Funções de seleção
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedMultas(multas.map(multa => multa.id));
+      setIsAllSelected(true);
+    } else {
+      setSelectedMultas([]);
+      setIsAllSelected(false);
+    }
+  };
+
+  const handleSelectMulta = (multaId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedMultas(prev => [...prev, multaId]);
+    } else {
+      setSelectedMultas(prev => prev.filter(id => id !== multaId));
+    }
+  };
+
+  const handleGenerateReport = (format: 'pdf' | 'excel') => {
+    if (selectedMultas.length === 0) {
+      toast({
+        title: 'Atenção!',
+        description: 'Selecione pelo menos uma multa para gerar o relatório.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (onGenerateReport) {
+      onGenerateReport(selectedMultas, format);
+    }
+  };
+
+  const handleDeleteMultiple = () => {
+    if (selectedMultas.length === 0) {
+      toast({
+        title: 'Atenção!',
+        description: 'Selecione pelo menos uma multa para excluir.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (onDeleteMultiple) {
+      onDeleteMultiple(selectedMultas);
+    }
+  };
+
+  // Atualizar estado de "selecionar todos" quando multas mudarem
+  useEffect(() => {
+    if (selectedMultas.length === multas.length && multas.length > 0) {
+      setIsAllSelected(true);
+    } else {
+      setIsAllSelected(false);
+    }
+  }, [selectedMultas, multas.length]);
 
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -136,6 +209,11 @@ const MultasTable: React.FC<MultasTableProps> = ({
           <h3 className="text-lg font-medium text-seguranca-lightgray">
             Multas ({multas.length})
           </h3>
+          {showSelection && selectedMultas.length > 0 && (
+            <Badge variant="outline" className="border-blue-600 text-blue-400">
+              {selectedMultas.length} selecionada{selectedMultas.length > 1 ? 's' : ''}
+            </Badge>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -147,13 +225,60 @@ const MultasTable: React.FC<MultasTableProps> = ({
             Atualizar
           </Button>
         </div>
+        
+        {showSelection && selectedMultas.length > 0 && (
+          <div className="flex items-center space-x-2">
+            {onDeleteMultiple && (
+              <Button
+                onClick={handleDeleteMultiple}
+                size="sm"
+                variant="outline"
+                className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir ({selectedMultas.length})
+              </Button>
+            )}
+            {onGenerateReport && (
+              <>
+                <Button
+                  onClick={() => handleGenerateReport('pdf')}
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button
+                  onClick={() => handleGenerateReport('excel')}
+                  size="sm"
+                  variant="outline"
+                  className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border border-gray-600">
         <Table>
           <TableHeader>
             <TableRow className="border-gray-600">
+              {showSelection && (
+                <TableHead className="text-seguranca-lightgray w-12">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAll}
+                    className="border-gray-400"
+                  />
+                </TableHead>
+              )}
               <TableHead className="text-seguranca-lightgray">Veículo</TableHead>
+              <TableHead className="text-seguranca-lightgray">Motorista</TableHead>
               <TableHead className="text-seguranca-lightgray">Infração</TableHead>
               <TableHead className="text-seguranca-lightgray">Data Infração</TableHead>
               <TableHead className="text-seguranca-lightgray">Vencimento</TableHead>
@@ -166,6 +291,15 @@ const MultasTable: React.FC<MultasTableProps> = ({
           <TableBody>
             {multas.map((multa) => (
               <TableRow key={multa.id} className="border-gray-600 hover:bg-seguranca-black">
+                {showSelection && (
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedMultas.includes(multa.id)}
+                      onCheckedChange={(checked) => handleSelectMulta(multa.id, checked as boolean)}
+                      className="border-gray-400"
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-seguranca-red rounded-full flex items-center justify-center">
@@ -174,6 +308,21 @@ const MultasTable: React.FC<MultasTableProps> = ({
                     <div>
                       <div className="font-medium text-seguranca-lightgray">{multa.placa}</div>
                       <div className="text-sm text-gray-400">{multa.marca} {multa.modelo}</div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                      <User className="text-white" size={12} />
+                    </div>
+                    <div>
+                      <div className="font-medium text-seguranca-lightgray">
+                        {multa.motorista_nome || 'Não informado'}
+                      </div>
+                      {multa.motorista_cnh && (
+                        <div className="text-sm text-gray-400">CNH: {multa.motorista_cnh}</div>
+                      )}
                     </div>
                   </div>
                 </TableCell>

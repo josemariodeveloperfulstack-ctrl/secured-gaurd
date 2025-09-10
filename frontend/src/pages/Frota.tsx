@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Car, Fuel, Search, AlertTriangle, Loader2, Wrench, Filter, Calendar, DollarSign, Settings, FileText } from 'lucide-react';
+import { Plus, Car, Fuel, Search, AlertTriangle, Loader2, Wrench, Calendar, DollarSign, Settings, FileText, Filter } from 'lucide-react';
 import VeiculosTable from '@/components/frota/VeiculosTable';
 import AbastecimentosTable from '@/components/frota/AbastecimentosTable';
 import MultasTable from '@/components/frota/MultasTable';
@@ -32,6 +32,8 @@ import VehicleReportModal from '@/components/frota/VehicleReportModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import fleetService from '@/services/fleetService';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import driverService from '@/services/driverService';
 import maintenanceService from '@/services/maintenanceService';
 import kmControlService from '@/services/kmControlService';
@@ -82,6 +84,9 @@ interface MultaComponent {
   placa: string;
   marca: string;
   modelo: string;
+  motorista_id?: string;
+  motorista_nome?: string;
+  motorista_cnh?: string;
   data_infracao: string;
   data_vencimento: string;
   valor: number;
@@ -156,6 +161,9 @@ const Frota: React.FC = () => {
   const [selectedManutencao, setSelectedManutencao] = useState<VehicleMaintenance | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [selectedKmControl, setSelectedKmControl] = useState<KmControl | null>(null);
+  
+  // Estados para relatórios
+  const [showMultaSelection, setShowMultaSelection] = useState(false);
 
   // Buscar veículos
   const {
@@ -284,6 +292,11 @@ const Frota: React.FC = () => {
   // Função de mapeamento de multas (dentro do componente para ter acesso aos dados)
   const mapFineToComponent = (fine: Fine): MultaComponent => {
     console.log('🔍 Mapeando multa:', fine);
+    console.log('🔍 Dados do motorista na multa:', {
+      driverId: fine.driverId,
+      driverName: fine.driverName,
+      driverLicenseNumber: fine.driverLicenseNumber
+    });
     
     // Encontrar o veículo correspondente
     const vehicle = vehicles?.find(v => v.id === fine.vehicleId);
@@ -295,6 +308,10 @@ const Frota: React.FC = () => {
       placa: fine.vehiclePlate,
       marca: vehicle?.brand || '',
       modelo: vehicle?.model || '',
+      // TESTE: Adicionar dados de motorista para teste
+      motorista_id: fine.driverId || 'TESTE-001',
+      motorista_nome: fine.driverName || 'João Silva (Teste)',
+      motorista_cnh: fine.driverLicenseNumber || '12345678901',
       data_infracao: fine.date,
       data_vencimento: fine.dueDate || fine.date,
       valor: fine.amount,
@@ -308,6 +325,11 @@ const Frota: React.FC = () => {
     };
     
     console.log('✅ Multa mapeada:', mappedMulta);
+    console.log('✅ Dados do motorista mapeados:', {
+      motorista_id: mappedMulta.motorista_id,
+      motorista_nome: mappedMulta.motorista_nome,
+      motorista_cnh: mappedMulta.motorista_cnh
+    });
     return mappedMulta;
   };
 
@@ -411,6 +433,224 @@ const Frota: React.FC = () => {
   const handleDeleteMulta = (multa: MultaComponent) => {
     setSelectedMulta(multa);
     setIsMultaDeleteDialogOpen(true);
+  };
+
+  const handleDeleteMultipleMultas = async (selectedIds: string[]) => {
+    try {
+      console.log('🗑️ Excluindo multas:', selectedIds);
+      
+      // Confirmar exclusão
+      const confirmed = window.confirm(
+        `Tem certeza que deseja excluir ${selectedIds.length} multa(s) selecionada(s)?\n\nEsta ação não pode ser desfeita.`
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+
+      // Excluir cada multa
+      for (const id of selectedIds) {
+        await fleetService.deleteFine(id);
+      }
+
+      // Atualizar lista
+      await refetchFines();
+      
+      toast({
+        title: 'Sucesso!',
+        description: `${selectedIds.length} multa(s) excluída(s) com sucesso.`,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao excluir multas:', error);
+      toast({
+        title: 'Erro!',
+        description: 'Erro ao excluir multas. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const generatePDFReport = async (multa: any) => {
+    try {
+      // Criar elemento temporário para renderizar o relatório
+      const reportElement = document.createElement('div');
+      reportElement.style.position = 'absolute';
+      reportElement.style.left = '-9999px';
+      reportElement.style.top = '-9999px';
+      reportElement.style.width = '800px';
+      reportElement.style.backgroundColor = 'white';
+      reportElement.style.padding = '20px';
+      reportElement.style.fontFamily = 'Arial, sans-serif';
+      
+      const currentDate = new Date().toLocaleDateString('pt-BR');
+      
+      reportElement.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #333; margin-bottom: 10px;">RELATÓRIO DE MULTA</h1>
+          <h2 style="color: #666; font-size: 18px; margin: 0;">PROMOVER - Vigilância Patrimonial LTDA</h2>
+          <p style="color: #888; margin: 5px 0;">Data de Geração: ${currentDate}</p>
+        </div>
+        
+        <div style="border: 2px solid #333; padding: 20px; margin-bottom: 20px;">
+          <h3 style="color: #333; margin-top: 0; border-bottom: 1px solid #ccc; padding-bottom: 10px;">INFORMAÇÕES DA MULTA</h3>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Placa do Veículo:</strong><br>
+              <span style="font-size: 18px; color: #d32f2f; font-weight: bold;">${multa.placa}</span>
+            </div>
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Status:</strong><br>
+              <span style="color: ${multa.status === 'paga' ? '#2e7d32' : multa.status === 'pendente' ? '#f57c00' : '#d32f2f'}; font-weight: bold;">
+                ${multa.status === 'paga' ? 'PAGA' : multa.status === 'pendente' ? 'PENDENTE' : 'VENCIDA'}
+              </span>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Marca/Modelo:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${multa.marca} ${multa.modelo}</span>
+            </div>
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Motorista:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${multa.motorista_nome || 'Não informado'}</span>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Data da Infração:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${new Date(multa.data_infracao).toLocaleDateString('pt-BR')}</span>
+            </div>
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Data de Vencimento:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${new Date(multa.data_vencimento).toLocaleDateString('pt-BR')}</span>
+            </div>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <strong style="color: #000000; font-weight: bold;">Tipo de Infração:</strong><br>
+            <span style="color: #000000; font-weight: 500;">${multa.tipo_infracao}</span>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <strong style="color: #000000; font-weight: bold;">Local da Infração:</strong><br>
+            <span style="color: #000000; font-weight: 500;">${multa.local_infracao}</span>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Valor da Multa:</strong><br>
+              <span style="font-size: 20px; color: #d32f2f; font-weight: bold;">
+                R$ ${multa.valor.toFixed(2).replace('.', ',')}
+              </span>
+            </div>
+            <div>
+              <strong style="color: #000000; font-weight: bold;">Pontos na CNH:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${multa.pontos || 0} pontos</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; color: #666; font-size: 12px;">
+          <p>Relatório gerado automaticamente pelo Sistema Secured Guard</p>
+          <p>Data: ${currentDate} | Hora: ${new Date().toLocaleTimeString('pt-BR')}</p>
+        </div>
+      `;
+      
+      document.body.appendChild(reportElement);
+      
+      // Capturar como imagem
+      const canvas = await html2canvas(reportElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      // Remover elemento temporário
+      document.body.removeChild(reportElement);
+      
+      // Criar PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Salvar PDF
+      const filename = `relatorio_multa_${multa.placa}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF:', error);
+      throw error;
+    }
+  };
+
+  const handleGenerateSingleFineReport = async (multaId: string, format: 'pdf' | 'excel') => {
+    try {
+      console.log(`📄 Gerando relatório ${format.toUpperCase()} para multa:`, multaId);
+      
+      // Encontrar a multa específica nos dados mapeados
+      const multa = multasComponent?.find(m => m.id === multaId);
+      if (!multa) {
+        toast({
+          title: 'Erro!',
+          description: 'Multa não encontrada.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (format === 'pdf') {
+        await generatePDFReport(multa);
+      } else {
+        // Para Excel, usar o serviço original
+        const response = await fleetService.generateFineReportExcel({ selectedIds: [multaId] });
+        
+        // Criar blob e fazer download
+        const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const filename = `relatorio_multa_${multa.placa}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Criar URL do blob e fazer download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+      
+      toast({
+        title: 'Sucesso!',
+        description: `Relatório ${format.toUpperCase()} da multa gerado com sucesso.`,
+      });
+    } catch (error) {
+      console.error(`❌ Erro ao gerar relatório ${format.toUpperCase()}:`, error);
+      toast({
+        title: 'Erro!',
+        description: `Erro ao gerar relatório ${format.toUpperCase()}.`,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleOpenDriverModal = (driver: Driver | null = null) => {
@@ -611,6 +851,427 @@ const Frota: React.FC = () => {
       </StandardLayout>
     );
   }
+
+  // Função para gerar HTML do relatório
+  const generateHTMLReport = (finesData: any[]) => {
+    const currentDate = new Date().toLocaleDateString('pt-BR');
+    
+    let html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Multas</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 30px;
+            border-bottom: 3px solid #dc2626;
+            padding-bottom: 10px;
+        }
+        .info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #dc2626; 
+            color: white;
+            font-weight: bold; 
+        }
+        tr:nth-child(even) { 
+            background-color: #f9f9f9; 
+        }
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+        .status-paga { 
+            color: #16a34a; 
+            font-weight: bold; 
+        }
+        .status-pendente { 
+            color: #ea580c; 
+            font-weight: bold; 
+        }
+        .status-cancelada { 
+            color: #dc2626; 
+            font-weight: bold; 
+        }
+        .valor {
+            text-align: right;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RELATÓRIO DE MULTAS</h1>
+        
+        <div class="info">
+            <p><strong>Data de Geração:</strong> ${currentDate}</p>
+            <p><strong>Total de Multas:</strong> ${finesData.length}</p>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Veículo</th>
+                    <th>Motorista</th>
+                    <th>Data Infração</th>
+                    <th>Descrição</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                    <th>Vencimento</th>
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    finesData.forEach(fine => {
+        const statusClass = fine.status === 'Paga' ? 'status-paga' : 
+                          fine.status === 'Pendente' ? 'status-pendente' : 'status-cancelada';
+        
+        html += `
+                <tr>
+                    <td>${fine.vehiclePlate}</td>
+                    <td>${fine.driverName || 'Não informado'}</td>
+                    <td>${fine.infractionDate}</td>
+                    <td>${fine.description}</td>
+                    <td class="valor">R$ ${fine.amount}</td>
+                    <td class="${statusClass}">${fine.status}</td>
+                    <td>${fine.dueDate}</td>
+                </tr>`;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p>Relatório gerado automaticamente pelo sistema Secure Guard</p>
+        </div>
+    </div>
+</body>
+</html>`;
+    
+    return html;
+  };
+
+  // Função para gerar relatórios de multas
+  const handleGenerateFineReport = async (format: 'pdf' | 'excel') => {
+    try {
+      console.log(`🔍 Gerando relatório ${format.toUpperCase()} de multas...`);
+      
+      const params = {
+        // Adicionar filtros se necessário
+        startDate: undefined,
+        endDate: undefined,
+        vehicleFilter: undefined,
+        driverFilter: undefined,
+        statusFilter: undefined
+      };
+      
+      let blob: Blob;
+      let filename: string;
+      
+      if (format === 'pdf') {
+        // Usar dados das multas já carregadas
+        const finesData = fines?.map(fine => ({
+          id: fine.id,
+          vehiclePlate: fine.placa,
+          vehicleBrand: fine.marca,
+          vehicleModel: fine.modelo,
+          driverName: fine.motorista_nome || 'Não informado',
+          driverLicenseNumber: fine.motorista_cnh || '',
+          infractionDate: fine.data_infracao,
+          description: fine.tipo_infracao,
+          amount: fine.valor.toString(),
+          location: fine.local_infracao,
+          status: fine.status === 'paga' ? 'Paga' : fine.status === 'pendente' ? 'Pendente' : 'Cancelada',
+          dueDate: fine.data_vencimento,
+          paymentDate: null,
+          createdAt: fine.created_at,
+          overdue: false
+        })) || [];
+        
+        // Gerar HTML do relatório
+        const htmlContent = generateHTMLReport(finesData);
+        
+        // Criar blob com HTML
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        filename = `relatorio_multas_${new Date().toISOString().split('T')[0]}.html`;
+        
+        // Criar URL do blob e fazer download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        blob = await fleetService.generateFineReportExcel(params);
+        filename = `relatorio_multas_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Criar URL do blob e fazer download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+      
+      console.log(`✅ Relatório ${format.toUpperCase()} gerado com sucesso:`, filename);
+    } catch (error) {
+      console.error(`❌ Erro ao gerar relatório ${format.toUpperCase()}:`, error);
+      // Aqui você pode adicionar uma notificação de erro
+    }
+  };
+
+
+  const generateMultiplePDFReport = async (multas: any[]) => {
+    try {
+      // Criar elemento temporário para renderizar o relatório
+      const reportElement = document.createElement('div');
+      reportElement.style.position = 'absolute';
+      reportElement.style.left = '-9999px';
+      reportElement.style.top = '-9999px';
+      reportElement.style.width = '800px';
+      reportElement.style.backgroundColor = 'white';
+      reportElement.style.padding = '20px';
+      reportElement.style.fontFamily = 'Arial, sans-serif';
+      
+      const currentDate = new Date().toLocaleDateString('pt-BR');
+      
+      // Gerar HTML para múltiplas multas
+      let multasHTML = '';
+      multas.forEach((multa, index) => {
+        multasHTML += `
+          <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; page-break-inside: avoid;">
+            <h4 style="color: #333; margin-top: 0; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+              MULTA ${index + 1} - ${multa.plate}
+            </h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Placa do Veículo:</strong><br>
+                <span style="font-size: 16px; color: #d32f2f; font-weight: bold;">${multa.plate}</span>
+              </div>
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Status:</strong><br>
+                <span style="color: ${multa.status === 'PAID' ? '#2e7d32' : multa.status === 'PENDING' ? '#f57c00' : '#d32f2f'}; font-weight: bold;">
+                  ${multa.status === 'PAID' ? 'PAGA' : multa.status === 'PENDING' ? 'PENDENTE' : 'CANCELADA'}
+                </span>
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Marca/Modelo:</strong><br>
+                <span style="color: #000000; font-weight: 500;">${multa.brand} ${multa.model}</span>
+              </div>
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Motorista:</strong><br>
+                <span style="color: #000000; font-weight: 500;">${multa.driverName || 'Não informado'}</span>
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Data da Infração:</strong><br>
+                <span style="color: #000000; font-weight: 500;">${new Date(multa.date).toLocaleDateString('pt-BR')}</span>
+              </div>
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Data de Vencimento:</strong><br>
+                <span style="color: #000000; font-weight: 500;">${new Date(multa.dueDate).toLocaleDateString('pt-BR')}</span>
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <strong style="color: #000000; font-weight: bold;">Tipo de Infração:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${multa.description}</span>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <strong style="color: #000000; font-weight: bold;">Local da Infração:</strong><br>
+              <span style="color: #000000; font-weight: 500;">${multa.location}</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Valor da Multa:</strong><br>
+                <span style="font-size: 18px; color: #d32f2f; font-weight: bold;">
+                  R$ ${multa.amount.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+              <div>
+                <strong style="color: #000000; font-weight: bold;">Pontos na CNH:</strong><br>
+                <span style="color: #000000; font-weight: 500;">${multa.points || 0} pontos</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      reportElement.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #333; margin-bottom: 10px;">RELATÓRIO DE MULTAS</h1>
+          <h2 style="color: #666; font-size: 18px; margin: 0;">PROMOVER - Vigilância Patrimonial LTDA</h2>
+          <p style="color: #888; margin: 5px 0;">Data de Geração: ${currentDate}</p>
+          <p style="color: #888; margin: 5px 0;">Total de Multas: ${multas.length}</p>
+        </div>
+        
+        ${multasHTML}
+        
+        <div style="text-align: center; margin-top: 30px; color: #666; font-size: 12px;">
+          <p>Relatório gerado automaticamente pelo Sistema Secured Guard</p>
+          <p>Data: ${currentDate} | Hora: ${new Date().toLocaleTimeString('pt-BR')}</p>
+        </div>
+      `;
+      
+      document.body.appendChild(reportElement);
+      
+      // Capturar como imagem
+      const canvas = await html2canvas(reportElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      // Remover elemento temporário
+      document.body.removeChild(reportElement);
+      
+      // Criar PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Salvar PDF
+      const filename = `relatorio_multas_selecionadas_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF múltiplo:', error);
+      throw error;
+    }
+  };
+
+  // Função para geração de relatórios com seleção individual
+  const handleGenerateReportWithSelection = async (selectedIds: string[], format: 'pdf' | 'excel') => {
+    try {
+      console.log(`Gerando relatório ${format} para multas selecionadas:`, selectedIds);
+      
+      // Filtrar multas selecionadas
+      const selectedFines = fines?.filter(fine => selectedIds.includes(fine.id)) || [];
+      
+      if (selectedFines.length === 0) {
+        toast({
+          title: 'Atenção!',
+          description: 'Nenhuma multa selecionada.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (format === 'pdf') {
+        // Converter dados das multas selecionadas para o formato esperado
+        const multasData = selectedFines.map(fine => ({
+          id: fine.id,
+          plate: fine.placa,
+          brand: fine.marca,
+          model: fine.modelo,
+          driverName: fine.motorista_nome || 'Não informado',
+          driverLicenseNumber: fine.motorista_cnh || '',
+          date: fine.data_infracao,
+          description: fine.tipo_infracao,
+          amount: parseFloat(fine.valor) || 0,
+          location: fine.local_infracao,
+          status: fine.status === 'paga' ? 'PAID' : fine.status === 'pendente' ? 'PENDING' : 'CANCELLED',
+          dueDate: fine.data_vencimento,
+          points: fine.pontos || 0,
+          createdAt: fine.created_at
+        }));
+        
+        await generateMultiplePDFReport(multasData);
+      } else {
+        // Gerar relatório Excel
+        const response = await fleetService.generateFineReportExcel({ selectedIds });
+        
+        // Criar blob e fazer download
+        const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `relatorio_multas_selecionadas_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+      
+      toast({
+        title: 'Sucesso!',
+        description: `Relatório ${format.toUpperCase()} gerado com ${selectedFines.length} multa(s) selecionada(s).`,
+      });
+    } catch (error) {
+      console.error(`Erro ao gerar relatório ${format}:`, error);
+      toast({
+        title: 'Erro!',
+        description: `Erro ao gerar relatório ${format.toUpperCase()}.`,
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
     <StandardLayout>
@@ -1105,7 +1766,17 @@ const Frota: React.FC = () => {
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-seguranca-lightgray">Gestão de Multas</CardTitle>
+                    <div className="flex items-center space-x-3">
+                      <CardTitle className="text-seguranca-lightgray">Gestão de Multas</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMultaSelection(!showMultaSelection)}
+                        className={showMultaSelection ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"}
+                      >
+                        {showMultaSelection ? 'Desativar Seleção' : 'Ativar Seleção'}
+                      </Button>
+                    </div>
                     <Button
                       onClick={() => setIsMultaModalOpen(true)}
                       className="bg-seguranca-red hover:bg-seguranca-darkred"
@@ -1122,6 +1793,9 @@ const Frota: React.FC = () => {
                     onView={handleViewMulta}
                     onEdit={handleEditMulta}
                     onDelete={handleDeleteMulta}
+                    onDeleteMultiple={handleDeleteMultipleMultas}
+                    onGenerateReport={handleGenerateReportWithSelection}
+                    showSelection={showMultaSelection}
                   />
                 </CardContent>
               </Card>
@@ -1229,6 +1903,7 @@ const Frota: React.FC = () => {
             setIsMultaViewModalOpen(false);
             setSelectedMulta(null);
           }}
+          onGenerateReport={handleGenerateSingleFineReport}
         />
 
         <MultaDeleteDialog
@@ -1290,6 +1965,7 @@ const Frota: React.FC = () => {
           isOpen={isVehicleReportModalOpen}
           onClose={() => setIsVehicleReportModalOpen(false)}
         />
+
       </div>
     </StandardLayout>
   );

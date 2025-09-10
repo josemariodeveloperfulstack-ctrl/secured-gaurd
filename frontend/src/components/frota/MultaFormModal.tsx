@@ -41,6 +41,9 @@ interface Multa {
   placa?: string;
   marca?: string;
   modelo?: string;
+  motorista_id?: string;
+  motorista_nome?: string;
+  motorista_cnh?: string;
   data_infracao: string;
   data_vencimento: string;
   valor: number;

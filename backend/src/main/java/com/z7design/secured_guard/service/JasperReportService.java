@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.FuelRecordReportDTO;
 import com.z7design.secured_guard.dto.VehicleReportDTO;
 import com.z7design.secured_guard.dto.BankReconciliationReportDTO;
 import com.z7design.secured_guard.dto.BankFileDTO;
+import com.z7design.secured_guard.dto.FineReportDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
@@ -338,6 +339,199 @@ public class JasperReportService {
         } catch (Exception e) {
             log.error("Erro inesperado ao gerar relatório de resumo de conciliação bancária", e);
             throw new IOException("Erro inesperado ao gerar relatório PDF de resumo de conciliação bancária: " + e.getMessage(), e);
+        }
+    }
+    
+    // ===== FINE REPORTS =====
+    
+    public byte[] generateFineReportPDF(List<FineReportDTO> fines, 
+                                       LocalDate startDate, 
+                                       LocalDate endDate, 
+                                       String vehicleFilter, 
+                                       String driverFilter,
+                                       String statusFilter) throws IOException {
+        return generateFineReportPDFSimple(fines);
+    }
+    
+    private byte[] generateFineReportPDFSimple(List<FineReportDTO> fines) throws IOException {
+        try {
+            log.info("Gerando relatório PDF simplificado de multas - {} multas", fines.size());
+            
+            // Carregar template JRXML simplificado
+            ClassPathResource resource = new ClassPathResource("reports/fine-report-simple.jrxml");
+            InputStream templateStream = resource.getInputStream();
+            
+            // Compilar template
+            JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
+            log.debug("Template JRXML simplificado compilado com sucesso");
+            
+            // Preparar parâmetros mínimos
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            parameters.put("TOTAL_FINES", fines.size());
+            
+            // Calcular valor total
+            BigDecimal totalAmount = fines.stream()
+                    .map(FineReportDTO::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            parameters.put("TOTAL_AMOUNT", totalAmount);
+            
+            // Calcular estatísticas por status
+            long pendingFines = fines.stream()
+                    .filter(f -> "PENDING".equals(f.getStatus()))
+                    .count();
+            long paidFines = fines.stream()
+                    .filter(f -> "PAID".equals(f.getStatus()))
+                    .count();
+            long overdueFines = fines.stream()
+                    .filter(f -> f.isOverdue())
+                    .count();
+            
+            parameters.put("PENDING_FINES", (int) pendingFines);
+            parameters.put("PAID_FINES", (int) paidFines);
+            parameters.put("OVERDUE_FINES", (int) overdueFines);
+            
+            // Definir filtros aplicados
+            parameters.put("VEHICLE_FILTER", vehicleFilter != null ? vehicleFilter : "Todos os veículos");
+            parameters.put("DRIVER_FILTER", driverFilter != null ? driverFilter : "Todos os motoristas");
+            
+            if (statusFilter != null && !statusFilter.isEmpty() && !statusFilter.equals("ALL")) {
+                switch (statusFilter.toUpperCase()) {
+                    case "PENDING":
+                        parameters.put("STATUS_FILTER", "Apenas multas pendentes");
+                        break;
+                    case "PAID":
+                        parameters.put("STATUS_FILTER", "Apenas multas pagas");
+                        break;
+                    case "CANCELLED":
+                        parameters.put("STATUS_FILTER", "Apenas multas canceladas");
+                        break;
+                    default:
+                        parameters.put("STATUS_FILTER", "Todos os status");
+                }
+            } else {
+                parameters.put("STATUS_FILTER", "Todos os status");
+            }
+            
+            log.debug("Parâmetros preparados: {}", parameters);
+            
+            // Preparar dados
+            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(fines);
+            
+            // Gerar relatório
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+            log.debug("Relatório de multas preenchido com sucesso");
+            
+            // Exportar para PDF
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            
+            byte[] result = outputStream.toByteArray();
+            log.info("Relatório PDF de multas gerado com sucesso usando JasperReports. {} multas processadas, {} bytes gerados", 
+                    fines.size(), result.length);
+            
+            return result;
+            
+        } catch (JRException e) {
+            log.error("Erro ao gerar relatório de multas com JasperReports", e);
+            throw new IOException("Erro ao gerar relatório PDF de multas: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao gerar relatório de multas", e);
+            throw new IOException("Erro inesperado ao gerar relatório PDF de multas: " + e.getMessage(), e);
+        }
+    }
+    
+    public byte[] generateFineReportExcel(List<FineReportDTO> fines, 
+                                         LocalDate startDate, 
+                                         LocalDate endDate, 
+                                         String vehicleFilter, 
+                                         String driverFilter,
+                                         String statusFilter) throws IOException {
+        try {
+            log.info("Gerando relatório Excel de multas com JasperReports - {} multas", fines.size());
+            
+            // Carregar template JRXML
+            ClassPathResource resource = new ClassPathResource("reports/fine-report.jrxml");
+            InputStream templateStream = resource.getInputStream();
+            
+            // Compilar template
+            JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
+            log.debug("Template JRXML de multas compilado com sucesso");
+            
+            // Preparar parâmetros
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("PERIOD", formatPeriod(startDate, endDate));
+            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            parameters.put("TOTAL_FINES", fines.size());
+            
+            // Calcular valor total
+            BigDecimal totalAmount = fines.stream()
+                    .map(FineReportDTO::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            parameters.put("TOTAL_AMOUNT", totalAmount);
+            
+            // Calcular estatísticas por status
+            long pendingFines = fines.stream()
+                    .filter(f -> "PENDING".equals(f.getStatus()))
+                    .count();
+            long paidFines = fines.stream()
+                    .filter(f -> "PAID".equals(f.getStatus()))
+                    .count();
+            long overdueFines = fines.stream()
+                    .filter(f -> f.isOverdue())
+                    .count();
+            
+            parameters.put("PENDING_FINES", (int) pendingFines);
+            parameters.put("PAID_FINES", (int) paidFines);
+            parameters.put("OVERDUE_FINES", (int) overdueFines);
+            
+            // Definir filtros aplicados
+            parameters.put("VEHICLE_FILTER", vehicleFilter != null ? vehicleFilter : "Todos os veículos");
+            parameters.put("DRIVER_FILTER", driverFilter != null ? driverFilter : "Todos os motoristas");
+            
+            if (statusFilter != null && !statusFilter.isEmpty() && !statusFilter.equals("ALL")) {
+                switch (statusFilter.toUpperCase()) {
+                    case "PENDING":
+                        parameters.put("STATUS_FILTER", "Apenas multas pendentes");
+                        break;
+                    case "PAID":
+                        parameters.put("STATUS_FILTER", "Apenas multas pagas");
+                        break;
+                    case "CANCELLED":
+                        parameters.put("STATUS_FILTER", "Apenas multas canceladas");
+                        break;
+                    default:
+                        parameters.put("STATUS_FILTER", "Todos os status");
+                }
+            } else {
+                parameters.put("STATUS_FILTER", "Todos os status");
+            }
+            
+            log.debug("Parâmetros preparados: {}", parameters);
+            
+            // Preparar dados
+            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(fines);
+            
+            // Gerar relatório
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+            log.debug("Relatório de multas preenchido com sucesso");
+            
+            // Exportar para Excel
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToXlsxStream(jasperPrint, outputStream);
+            
+            byte[] result = outputStream.toByteArray();
+            log.info("Relatório Excel de multas gerado com sucesso usando JasperReports. {} multas processadas, {} bytes gerados", 
+                    fines.size(), result.length);
+            
+            return result;
+            
+        } catch (JRException e) {
+            log.error("Erro ao gerar relatório Excel de multas com JasperReports", e);
+            throw new IOException("Erro ao gerar relatório Excel de multas: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao gerar relatório Excel de multas", e);
+            throw new IOException("Erro inesperado ao gerar relatório Excel de multas: " + e.getMessage(), e);
         }
     }
 }

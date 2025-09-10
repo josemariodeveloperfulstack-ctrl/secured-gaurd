@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, User, Clock, Building2, Calendar as CalendarIconLucide } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { User, Clock, Building2 } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { formatDateForBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
 import { ShiftChangeFormDTO } from '@/services/shiftChangeService';
+import { employeeService, Employee } from '@/services/employeeService';
+import { workPostService, WorkPost } from '@/services/workPostService';
+import ShiftChangePDFGenerator from './ShiftChangePDFGenerator';
 
 interface ShiftChangeFormModalProps {
   open: boolean;
@@ -40,6 +40,10 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
 
   const shiftTimeOptions = [
     { value: 'SHIFT_6H_18H', label: '6h às 18h' },
@@ -48,9 +52,68 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     { value: 'SHIFT_19H_7H', label: '19h às 7h' },
   ];
 
-  // Carregar dados quando o modal abrir para edição
+  // Carregar funcionários
+  const loadEmployees = async () => {
+    setLoadingEmployees(true);
+    try {
+      const employeesData = await employeeService.getAllEmployees();
+      setEmployees(employeesData);
+    } catch (error) {
+      console.error('Erro ao carregar funcionários:', error);
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
+
+  // Carregar postos de trabalho
+  const loadWorkPosts = async () => {
+    setLoadingWorkPosts(true);
+    try {
+      const workPostsData = await workPostService.getWorkPosts();
+      setWorkPosts(workPostsData);
+    } catch (error) {
+      console.error('Erro ao carregar postos de trabalho:', error);
+      // Fallback para dados de exemplo em caso de erro
+      const fallbackData = [
+        { id: '1', name: 'Posto Central', postCode: 'PC001', status: 'ATIVO' },
+        { id: '2', name: 'Posto Norte', postCode: 'PN002', status: 'ATIVO' },
+        { id: '3', name: 'Posto Sul', postCode: 'PS003', status: 'ATIVO' }
+      ];
+      setWorkPosts(fallbackData);
+    } finally {
+      setLoadingWorkPosts(false);
+    }
+  };
+
+  // Carregar dados quando o modal abrir
   useEffect(() => {
-    if (shiftChange && open) {
+    if (open) {
+      // Carregar funcionários e postos de trabalho
+      loadEmployees();
+      loadWorkPosts();
+
+      if (!shiftChange) {
+        // Reset form for new entry
+        setFormData({
+          dateOfRequest: new Date(),
+          requesterFullName: '',
+          requesterSector: '',
+          requesterDayOffDate: null,
+          requesterShiftDate: null,
+          replacingFullName: '',
+          replacingSector: '',
+          replacingShiftDate: null,
+          replacingDayOffDate: null,
+          shiftTime: '',
+        });
+      }
+      setErrors({});
+    }
+  }, [shiftChange, open]);
+
+  // Preencher formulário quando os dados estiverem carregados
+  useEffect(() => {
+    if (shiftChange && employees.length > 0 && workPosts.length > 0) {
       setFormData({
         dateOfRequest: shiftChange.dateOfRequest ? new Date(shiftChange.dateOfRequest) : new Date(),
         requesterFullName: shiftChange.requesterFullName || '',
@@ -63,23 +126,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
         replacingDayOffDate: shiftChange.replacingDayOffDate ? new Date(shiftChange.replacingDayOffDate) : null,
         shiftTime: shiftChange.shiftTime || '',
       });
-    } else if (!shiftChange && open) {
-      // Reset form for new entry
-      setFormData({
-        dateOfRequest: new Date(),
-        requesterFullName: '',
-        requesterSector: '',
-        requesterDayOffDate: null,
-        requesterShiftDate: null,
-        replacingFullName: '',
-        replacingSector: '',
-        replacingShiftDate: null,
-        replacingDayOffDate: null,
-        shiftTime: '',
-      });
     }
-    setErrors({});
-  }, [shiftChange, open]);
+  }, [shiftChange, employees, workPosts]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -112,11 +160,11 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     try {
       const submitData = {
         ...formData,
-        dateOfRequest: format(formData.dateOfRequest, 'yyyy-MM-dd'),
-        requesterDayOffDate: formData.requesterDayOffDate ? format(formData.requesterDayOffDate, 'yyyy-MM-dd') : null,
-        requesterShiftDate: formData.requesterShiftDate ? format(formData.requesterShiftDate, 'yyyy-MM-dd') : null,
-        replacingShiftDate: formData.replacingShiftDate ? format(formData.replacingShiftDate, 'yyyy-MM-dd') : null,
-        replacingDayOffDate: formData.replacingDayOffDate ? format(formData.replacingDayOffDate, 'yyyy-MM-dd') : null,
+        dateOfRequest: formatDateForBackend(formData.dateOfRequest),
+        requesterDayOffDate: formData.requesterDayOffDate ? formatDateForBackend(formData.requesterDayOffDate) : null,
+        requesterShiftDate: formData.requesterShiftDate ? formatDateForBackend(formData.requesterShiftDate) : null,
+        replacingShiftDate: formData.replacingShiftDate ? formatDateForBackend(formData.replacingShiftDate) : null,
+        replacingDayOffDate: formData.replacingDayOffDate ? formatDateForBackend(formData.replacingDayOffDate) : null,
       };
 
       await onSave(submitData);
@@ -149,33 +197,15 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Data da Solicitação */}
-          <div className="grid gap-3">
-            <Label htmlFor="dateOfRequest" className="text-seguranca-lightgray font-medium">
-              Data da Solicitação <CalendarIconLucide className="inline h-4 w-4 mr-1 text-seguranca-yellow" />
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11",
-                    !formData.dateOfRequest && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow" />
-                  {formData.dateOfRequest ? format(formData.dateOfRequest, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-600">
-                <Calendar
-                  mode="single"
-                  selected={formData.dateOfRequest}
-                  onSelect={(date) => handleInputChange('dateOfRequest', date)}
-                  initialFocus
-                  className="bg-seguranca-black text-seguranca-lightgray"
-                />
-              </PopoverContent>
-            </Popover>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">Data da Solicitação *</label>
+            <DatePicker
+              selected={formData.dateOfRequest}
+              onChange={(date: Date) => handleInputChange('dateOfRequest', date)}
+              {...DEFAULT_DATE_PICKER_PROPS}
+              className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+              required
+            />
             {errors.dateOfRequest && (
               <span className="text-red-400 text-sm">{errors.dateOfRequest}</span>
             )}
@@ -189,33 +219,53 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-3">
-                <Label htmlFor="requesterFullName" className="text-seguranca-lightgray font-medium">
-                  Nome Completo <User className="inline h-4 w-4 mr-1 text-seguranca-yellow" />
-                </Label>
-                <Input
-                  id="requesterFullName"
-                  value={formData.requesterFullName}
-                  onChange={(e) => handleInputChange('requesterFullName', e.target.value)}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11"
-                  placeholder="Nome do solicitante"
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Nome Completo *</label>
+                <Select 
+                  value={formData.requesterFullName} 
+                  onValueChange={(value) => handleInputChange('requesterFullName', value)}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
+                    <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o funcionário"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {employees.map((employee) => (
+                      <SelectItem 
+                        key={employee.id} 
+                        value={employee.name} 
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.requesterFullName && (
                   <span className="text-red-400 text-sm">{errors.requesterFullName}</span>
                 )}
               </div>
 
-              <div className="grid gap-3">
-                <Label htmlFor="requesterSector" className="text-seguranca-lightgray font-medium">
-                  Setor <Building2 className="inline h-4 w-4 mr-1 text-seguranca-yellow" />
-                </Label>
-                <Input
-                  id="requesterSector"
-                  value={formData.requesterSector}
-                  onChange={(e) => handleInputChange('requesterSector', e.target.value)}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11"
-                  placeholder="Setor do solicitante"
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Setor *</label>
+                <Select 
+                  value={formData.requesterSector} 
+                  onValueChange={(value) => handleInputChange('requesterSector', value)}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
+                    <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de trabalho"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {workPosts.map((workPost) => (
+                      <SelectItem 
+                        key={workPost.id} 
+                        value={workPost.name} 
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {workPost.name} {workPost.postCode && `(${workPost.postCode})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.requesterSector && (
                   <span className="text-red-400 text-sm">{errors.requesterSector}</span>
                 )}
@@ -223,65 +273,29 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-3">
-                <Label htmlFor="requesterShiftDate" className="text-seguranca-lightgray font-medium">
-                  Data do Plantão <CalendarIconLucide className="inline h-4 w-4 mr-1 text-seguranca-yellow" />
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11",
-                        !formData.requesterShiftDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow" />
-                      {formData.requesterShiftDate ? format(formData.requesterShiftDate, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-600">
-                    <Calendar
-                      mode="single"
-                      selected={formData.requesterShiftDate}
-                      onSelect={(date) => handleInputChange('requesterShiftDate', date)}
-                      initialFocus
-                      className="bg-seguranca-black text-seguranca-lightgray"
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Data do Plantão *</label>
+                <DatePicker
+                  selected={formData.requesterShiftDate}
+                  onChange={(date: Date) => handleInputChange('requesterShiftDate', date)}
+                  {...DEFAULT_DATE_PICKER_PROPS}
+                  className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  required
+                />
                 {errors.requesterShiftDate && (
                   <span className="text-red-400 text-sm">{errors.requesterShiftDate}</span>
                 )}
               </div>
 
-              <div className="grid gap-3">
-                <Label htmlFor="requesterDayOffDate" className="text-seguranca-lightgray font-medium">
-                  Data da Folga (Opcional) <CalendarIconLucide className="inline h-4 w-4 mr-1 text-gray-400" />
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11",
-                        !formData.requesterDayOffDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow" />
-                      {formData.requesterDayOffDate ? format(formData.requesterDayOffDate, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-600">
-                    <Calendar
-                      mode="single"
-                      selected={formData.requesterDayOffDate}
-                      onSelect={(date) => handleInputChange('requesterDayOffDate', date)}
-                      initialFocus
-                      className="bg-seguranca-black text-seguranca-lightgray"
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Data da Folga (Opcional)</label>
+                <DatePicker
+                  selected={formData.requesterDayOffDate}
+                  onChange={(date: Date) => handleInputChange('requesterDayOffDate', date)}
+                  {...DEFAULT_DATE_PICKER_PROPS}
+                  className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  isClearable
+                />
               </div>
             </div>
           </div>
@@ -294,33 +308,53 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-3">
-                <Label htmlFor="replacingFullName" className="text-seguranca-lightgray font-medium">
-                  Nome Completo <User className="inline h-4 w-4 mr-1 text-blue-400" />
-                </Label>
-                <Input
-                  id="replacingFullName"
-                  value={formData.replacingFullName}
-                  onChange={(e) => handleInputChange('replacingFullName', e.target.value)}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11"
-                  placeholder="Nome do colega"
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Nome Completo *</label>
+                <Select 
+                  value={formData.replacingFullName} 
+                  onValueChange={(value) => handleInputChange('replacingFullName', value)}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
+                    <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o funcionário"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {employees.map((employee) => (
+                      <SelectItem 
+                        key={employee.id} 
+                        value={employee.name} 
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.replacingFullName && (
                   <span className="text-red-400 text-sm">{errors.replacingFullName}</span>
                 )}
               </div>
 
-              <div className="grid gap-3">
-                <Label htmlFor="replacingSector" className="text-seguranca-lightgray font-medium">
-                  Setor <Building2 className="inline h-4 w-4 mr-1 text-blue-400" />
-                </Label>
-                <Input
-                  id="replacingSector"
-                  value={formData.replacingSector}
-                  onChange={(e) => handleInputChange('replacingSector', e.target.value)}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11"
-                  placeholder="Setor do colega"
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Setor *</label>
+                <Select 
+                  value={formData.replacingSector} 
+                  onValueChange={(value) => handleInputChange('replacingSector', value)}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
+                    <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de trabalho"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {workPosts.map((workPost) => (
+                      <SelectItem 
+                        key={workPost.id} 
+                        value={workPost.name} 
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {workPost.name} {workPost.postCode && `(${workPost.postCode})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.replacingSector && (
                   <span className="text-red-400 text-sm">{errors.replacingSector}</span>
                 )}
@@ -328,74 +362,38 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-3">
-                <Label htmlFor="replacingShiftDate" className="text-seguranca-lightgray font-medium">
-                  Data do Plantão <CalendarIconLucide className="inline h-4 w-4 mr-1 text-blue-400" />
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11",
-                        !formData.replacingShiftDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow" />
-                      {formData.replacingShiftDate ? format(formData.replacingShiftDate, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-600">
-                    <Calendar
-                      mode="single"
-                      selected={formData.replacingShiftDate}
-                      onSelect={(date) => handleInputChange('replacingShiftDate', date)}
-                      initialFocus
-                      className="bg-seguranca-black text-seguranca-lightgray"
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Data do Plantão *</label>
+                <DatePicker
+                  selected={formData.replacingShiftDate}
+                  onChange={(date: Date) => handleInputChange('replacingShiftDate', date)}
+                  {...DEFAULT_DATE_PICKER_PROPS}
+                  className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  required
+                />
                 {errors.replacingShiftDate && (
                   <span className="text-red-400 text-sm">{errors.replacingShiftDate}</span>
                 )}
               </div>
 
-              <div className="grid gap-3">
-                <Label htmlFor="replacingDayOffDate" className="text-seguranca-lightgray font-medium">
-                  Data da Folga (Opcional) <CalendarIconLucide className="inline h-4 w-4 mr-1 text-gray-400" />
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11",
-                        !formData.replacingDayOffDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow" />
-                      {formData.replacingDayOffDate ? format(formData.replacingDayOffDate, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-600">
-                    <Calendar
-                      mode="single"
-                      selected={formData.replacingDayOffDate}
-                      onSelect={(date) => handleInputChange('replacingDayOffDate', date)}
-                      initialFocus
-                      className="bg-seguranca-black text-seguranca-lightgray"
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Data da Folga (Opcional)</label>
+                <DatePicker
+                  selected={formData.replacingDayOffDate}
+                  onChange={(date: Date) => handleInputChange('replacingDayOffDate', date)}
+                  {...DEFAULT_DATE_PICKER_PROPS}
+                  className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  isClearable
+                />
               </div>
             </div>
           </div>
 
           {/* Horário do Plantão */}
-          <div className="grid gap-3">
-            <Label htmlFor="shiftTime" className="text-seguranca-lightgray font-medium">
-              Horário do Plantão <Clock className="inline h-4 w-4 mr-1 text-seguranca-yellow" />
-            </Label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">
+              Horário do Plantão *
+            </label>
             <Select value={formData.shiftTime} onValueChange={(value) => handleInputChange('shiftTime', value)}>
               <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
                 <SelectValue placeholder="Selecione o horário do plantão" />
@@ -414,23 +412,44 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
           </div>
 
           {/* Botões */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-600">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              className="border-gray-600 text-gray-400 hover:bg-gray-700"
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="bg-seguranca-yellow hover:bg-seguranca-darkyellow text-seguranca-black"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Salvando...' : (shiftChange ? 'Atualizar' : 'Criar Solicitação')}
-            </Button>
+          <div className="flex justify-between items-center pt-4 border-t border-gray-600">
+            <div>
+              <ShiftChangePDFGenerator
+                data={{
+                  dateOfRequest: formatDateForBackend(formData.dateOfRequest),
+                  requesterFullName: formData.requesterFullName,
+                  requesterSector: formData.requesterSector,
+                  requesterDayOffDate: formData.requesterDayOffDate ? formatDateForBackend(formData.requesterDayOffDate) : undefined,
+                  requesterShiftDate: formData.requesterShiftDate ? formatDateForBackend(formData.requesterShiftDate) : '',
+                  replacingFullName: formData.replacingFullName,
+                  replacingSector: formData.replacingSector,
+                  replacingShiftDate: formData.replacingShiftDate ? formatDateForBackend(formData.replacingShiftDate) : '',
+                  replacingDayOffDate: formData.replacingDayOffDate ? formatDateForBackend(formData.replacingDayOffDate) : undefined,
+                  shiftTime: formData.shiftTime,
+                }}
+                onGenerate={() => {
+                  console.log('PDF gerado com sucesso!');
+                }}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="border-gray-600 text-gray-400 hover:bg-gray-700"
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-seguranca-yellow hover:bg-seguranca-darkyellow text-seguranca-black"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Salvando...' : (shiftChange ? 'Atualizar' : 'Criar Solicitação')}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

@@ -91,11 +91,20 @@ const GestaoFuncionarios = lazy(() => import('@/pages/GestaoFuncionarios'));
 const AdmissaoFuncionarios = lazy(() => import('@/pages/AdmissaoFuncionarios'));
 
 const ControleVisitasAvancado = lazy(() => import('@/pages/ControleVisitasAvancado'));
+const GestaoVisitasSupervisor = lazy(() => import('@/pages/GestaoVisitasSupervisor'));
 const GuiaTransporte = lazy(() => import('@/pages/GuiaTransporte'));
 const RotaSemanalSupervisao = lazy(() => import('@/pages/RotaSemanalSupervisao'));
 const Supervisao = lazy(() => import('@/pages/Supervisao'));
 const ActivityManagement = lazy(() => import('@/pages/ActivityManagement'));
 const UserProfile = lazy(() => import('@/pages/UserProfile'));
+
+// Módulo Operacional
+const OperacionalDashboard = lazy(() => import('@/pages/OperacionalDashboard'));
+const GestaoPostos = lazy(() => import('@/pages/GestaoPostos'));
+const GestaoEscalas = lazy(() => import('@/pages/GestaoEscalas'));
+const GestaoFerias = lazy(() => import('@/pages/GestaoFerias'));
+const GestaoTarefas = lazy(() => import('@/pages/GestaoTarefas'));
+const RelatoriosOperacionais = lazy(() => import('@/pages/RelatoriosOperacionais'));
 
 const queryClient = new QueryClient();
 
@@ -679,6 +688,13 @@ function App() {
                       </ProtectedRoute>
                     } />
                     
+                    {/* Gestão de Visitas de Supervisor */}
+                    <Route path="/gestao-visitas-supervisor" element={
+                      <ProtectedRoute>
+                        <GestaoVisitasSupervisor />
+                      </ProtectedRoute>
+                    } />
+                    
                     {/* Rota Semanal de Supervisão */}
                     <Route path="/rota-semanal-supervisao" element={
                       <ProtectedRoute>
@@ -758,6 +774,50 @@ function App() {
                     <Route path="/movimentacoes" element={
                       <ProtectedRoute>
                         <Movimentacoes />
+                      </ProtectedRoute>
+                    } />
+                    
+                    {/* Módulo Operacional */}
+                    <Route path="/operacional-dashboard" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <OperacionalDashboard />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/postos" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoPostos />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/escalas" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoEscalas />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/ferias" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoFerias />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/tarefas" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoTarefas />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/relatorios" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <RelatoriosOperacionais />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     

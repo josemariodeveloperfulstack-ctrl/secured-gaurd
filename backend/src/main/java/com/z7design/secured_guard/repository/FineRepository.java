@@ -26,4 +26,7 @@ public interface FineRepository extends JpaRepository<Fine, UUID> {
     Double getTotalPendingAmountByVehicleId(@Param("vehicleId") UUID vehicleId);
     
     List<Fine> findByDueDateBeforeAndStatus(LocalDate date, Fine.FineStatus status);
+    
+    @Query("SELECT f FROM Fine f LEFT JOIN FETCH f.vehicle LEFT JOIN FETCH f.driver")
+    List<Fine> findAllWithRelations();
 } 

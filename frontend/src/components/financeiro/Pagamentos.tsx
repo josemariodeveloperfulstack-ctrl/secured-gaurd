@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { pagamentosService, Pagamento, Cliente, AgendamentoPagamento } from '@/services/pagamentosService';
 import { 
   CreditCard, 
   Plus, 
@@ -49,31 +50,12 @@ import {
   Loader2
 } from 'lucide-react';
 import { PagamentosGuard } from './FinanceiroPermissionGuard';
+import { PagamentoFormModal } from './PagamentoFormModal';
+import { PagamentoViewModal } from './PagamentoViewModal';
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface Pagamento {
-  id: string;
-  fornecedor: string;
-  descricao: string;
-  valor: number;
-  dataSolicitacao: string;
-  dataAprovacao?: string;
-  dataExecucao?: string;
-  status: 'pendente' | 'aprovado' | 'executado' | 'rejeitado' | 'cancelado';
-  categoria: 'fornecedor' | 'servico' | 'equipamento' | 'imposto' | 'outros';
-  formaPagamento: 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro';
-  aprovador?: string;
-  observacoes?: string;
-  comprovante?: string;
-  prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
-  centroCusto?: string;
-  numeroNF?: string;
-  dataVencimento?: string;
-  workflow: WorkflowEtapa[];
-  limitesValidados: boolean;
-  integracaoBancaria?: IntegracaoBancaria;
-}
+// Interfaces movidas para o serviço
 
 interface WorkflowEtapa {
   id: string;
@@ -123,278 +105,311 @@ interface NotificacaoPagamento {
 export const Pagamentos: React.FC = () => {
   const { toast } = useToast();
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-  const [limites, setLimites] = useState<LimitePagamento[]>([]);
-  const [notificacoes, setNotificacoes] = useState<NotificacaoPagamento[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [agendamentos, setAgendamentos] = useState<AgendamentoPagamento[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
-  const [filterPrioridade, setFilterPrioridade] = useState('all');
+  const [filterFormaPagamento, setFilterFormaPagamento] = useState('all');
   const [showForm, setShowForm] = useState(false);
-  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
-  const [showLimitesModal, setShowLimitesModal] = useState(false);
-  const [showIntegracaoModal, setShowIntegracaoModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedPagamento, setSelectedPagamento] = useState<Pagamento | null>(null);
-  const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [integracaoLoading, setIntegracaoLoading] = useState(false);
+  const [selectedPagamentos, setSelectedPagamentos] = useState<string[]>([]);
+  const [showSelection, setShowSelection] = useState(false);
 
-  // Dados mockados para demonstração
+  // Carregar dados do backend
   useEffect(() => {
-    const mockPagamentos: Pagamento[] = [
-      {
-        id: 'PAG-001',
-        fornecedor: 'Fornecedor ABC Ltda',
-        descricao: 'Equipamentos de Segurança',
-        valor: 2500.00,
-        dataSolicitacao: '2024-01-15',
-        dataAprovacao: '2024-01-16',
-        status: 'aprovado',
-        categoria: 'equipamento',
-        formaPagamento: 'transferencia',
-        aprovador: 'João Silva',
-        prioridade: 'media',
-        centroCusto: 'CC-001',
-        numeroNF: 'NF-12345',
-        dataVencimento: '2024-01-25',
-        limitesValidados: true,
-        workflow: [
-          {
-            id: 'wf-001-1',
-            etapa: 'solicitacao',
-            responsavel: 'Solicitante',
-            dataInicio: '2024-01-15',
-            dataConclusao: '2024-01-15',
-            status: 'concluido'
-          },
-          {
-            id: 'wf-001-2',
-            etapa: 'aprovacao_gestor',
-            responsavel: 'João Silva',
-            dataInicio: '2024-01-15',
-            dataConclusao: '2024-01-16',
-            status: 'concluido',
-            valorLimite: 5000
-          },
-          {
-            id: 'wf-001-3',
-            etapa: 'execucao',
-            responsavel: 'Financeiro',
-            dataInicio: '2024-01-16',
-            status: 'pendente'
-          }
-        ],
-        integracaoBancaria: {
-          banco: 'Banco do Brasil',
-          agencia: '1234-5',
-          conta: '12345-6',
-          statusIntegracao: 'pendente'
-        }
-      },
-      {
-        id: 'PAG-002',
-        fornecedor: 'Empresa de Limpeza XYZ',
-        descricao: 'Serviços de Limpeza - Janeiro 2024',
-        valor: 1800.00,
-        dataSolicitacao: '2024-01-10',
-        status: 'pendente',
-        categoria: 'servico',
-        formaPagamento: 'boleto',
-        prioridade: 'baixa',
-        centroCusto: 'CC-002',
-        dataVencimento: '2024-01-30',
-        limitesValidados: true,
-        workflow: [
-          {
-            id: 'wf-002-1',
-            etapa: 'solicitacao',
-            responsavel: 'Solicitante',
-            dataInicio: '2024-01-10',
-            dataConclusao: '2024-01-10',
-            status: 'concluido'
-          },
-          {
-            id: 'wf-002-2',
-            etapa: 'aprovacao_gestor',
-            responsavel: 'João Silva',
-            dataInicio: '2024-01-10',
-            status: 'pendente',
-            valorLimite: 5000
-          }
-        ]
-      },
-      {
-        id: 'PAG-003',
-        fornecedor: 'Receita Federal',
-        descricao: 'Impostos - DAS',
-        valor: 3200.00,
-        dataSolicitacao: '2024-01-05',
-        dataAprovacao: '2024-01-06',
-        dataExecucao: '2024-01-07',
-        status: 'executado',
-        categoria: 'imposto',
-        formaPagamento: 'pix',
-        aprovador: 'Maria Santos',
-        comprovante: 'comprovante_pagamento.pdf',
-        prioridade: 'urgente',
-        centroCusto: 'CC-003',
-        dataVencimento: '2024-01-08',
-        limitesValidados: true,
-        workflow: [
-          {
-            id: 'wf-003-1',
-            etapa: 'solicitacao',
-            responsavel: 'Solicitante',
-            dataInicio: '2024-01-05',
-            dataConclusao: '2024-01-05',
-            status: 'concluido'
-          },
-          {
-            id: 'wf-003-2',
-            etapa: 'aprovacao_financeiro',
-            responsavel: 'Maria Santos',
-            dataInicio: '2024-01-05',
-            dataConclusao: '2024-01-06',
-            status: 'concluido',
-            valorLimite: 10000
-          },
-          {
-            id: 'wf-003-3',
-            etapa: 'execucao',
-            responsavel: 'Financeiro',
-            dataInicio: '2024-01-06',
-            dataConclusao: '2024-01-07',
-            status: 'concluido'
-          }
-        ],
-        integracaoBancaria: {
-          banco: 'Banco do Brasil',
-          agencia: '1234-5',
-          conta: '12345-6',
-          chavePix: 'empresa@email.com',
-          statusIntegracao: 'concluido',
-          idTransacao: 'TXN-789456',
-          comprovanteBancario: 'comprovante_banco.pdf',
-          dataProcessamento: '2024-01-07'
-        }
-      }
-    ];
-
-    const mockLimites: LimitePagamento[] = [
-      {
-        id: 'LIM-001',
-        tipo: 'diario',
-        valor: 10000,
-        valorUtilizado: 3200,
-        periodo: '2024-01-20',
-        ativo: true
-      },
-      {
-        id: 'LIM-002',
-        tipo: 'mensal',
-        valor: 50000,
-        valorUtilizado: 7500,
-        periodo: '2024-01',
-        ativo: true
-      },
-      {
-        id: 'LIM-003',
-        tipo: 'categoria',
-        valor: 15000,
-        valorUtilizado: 2500,
-        periodo: '2024-01',
-        categoria: 'equipamento',
-        ativo: true
-      }
-    ];
-
-    const mockNotificacoes: NotificacaoPagamento[] = [
-      {
-        id: 'NOT-001',
-        tipo: 'aprovacao_pendente',
-        titulo: 'Aprovação Pendente',
-        descricao: 'Pagamento PAG-002 aguarda aprovação do gestor',
-        pagamentoId: 'PAG-002',
-        destinatario: 'joao.silva@empresa.com',
-        dataEnvio: '2024-01-10',
-        lida: false
-      },
-      {
-        id: 'NOT-002',
-        tipo: 'vencimento_proximo',
-        titulo: 'Vencimento Próximo',
-        descricao: 'Pagamento PAG-001 vence em 3 dias',
-        pagamentoId: 'PAG-001',
-        destinatario: 'financeiro@empresa.com',
-        dataEnvio: '2024-01-22',
-        lida: true
-      }
-    ];
-
-    setPagamentos(mockPagamentos);
-    setLimites(mockLimites);
-    setNotificacoes(mockNotificacoes);
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [pagamentosData, clientesData, agendamentosData] = await Promise.all([
+        pagamentosService.getPagamentos(),
+        pagamentosService.getClientes(),
+        pagamentosService.getAgendamentos()
+      ]);
+      
+      setPagamentos(pagamentosData || []);
+      setClientes(clientesData || []);
+      setAgendamentos(agendamentosData || []);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao carregar dados dos pagamentos.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filtrar pagamentos
   const filteredPagamentos = pagamentos.filter(pagamento => {
-    const matchesSearch = pagamento.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = pagamento.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          pagamento.descricao.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || pagamento.status === filterStatus;
     const matchesCategoria = filterCategoria === 'all' || pagamento.categoria === filterCategoria;
-    const matchesPrioridade = filterPrioridade === 'all' || pagamento.prioridade === filterPrioridade;
+    const matchesFormaPagamento = filterFormaPagamento === 'all' || pagamento.formaPagamento === filterFormaPagamento;
 
-    return matchesSearch && matchesStatus && matchesCategoria && matchesPrioridade;
+    return matchesSearch && matchesStatus && matchesCategoria && matchesFormaPagamento;
   });
 
   // Estatísticas
   const stats = {
     total: pagamentos.length,
-    pendente: pagamentos.filter(p => p.status === 'pendente').length,
-    aprovado: pagamentos.filter(p => p.status === 'aprovado').length,
-    executado: pagamentos.filter(p => p.status === 'executado').length,
-    valorTotal: pagamentos.reduce((sum, p) => sum + p.valor, 0),
-    valorPendente: pagamentos.filter(p => p.status === 'pendente').reduce((sum, p) => sum + p.valor, 0),
-    valorAprovado: pagamentos.filter(p => p.status === 'aprovado').reduce((sum, p) => sum + p.valor, 0),
-    valorExecutado: pagamentos.filter(p => p.status === 'executado').reduce((sum, p) => sum + p.valor, 0)
+    pendente: pagamentos.filter(p => p.status === 'PENDING').length,
+    pago: pagamentos.filter(p => p.status === 'PAID').length,
+    vencido: pagamentos.filter(p => p.status === 'OVERDUE').length,
+    cancelado: pagamentos.filter(p => p.status === 'CANCELLED').length,
+    valorTotal: pagamentos.reduce((sum, p) => sum + (p.valor || 0), 0),
+    valorPendente: pagamentos.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + (p.valor || 0), 0),
+    valorPago: pagamentos.filter(p => p.status === 'PAID').reduce((sum, p) => sum + (p.valor || 0), 0),
+    valorVencido: pagamentos.filter(p => p.status === 'OVERDUE').reduce((sum, p) => sum + (p.valor || 0), 0)
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pendente': return 'bg-yellow-100 text-yellow-800';
-      case 'aprovado': return 'bg-blue-100 text-blue-800';
-      case 'executado': return 'bg-green-100 text-green-800';
-      case 'rejeitado': return 'bg-red-100 text-red-800';
-      case 'cancelado': return 'bg-gray-100 text-gray-800';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'PAID': return 'bg-green-100 text-green-800';
+      case 'OVERDUE': return 'bg-red-100 text-red-800';
+      case 'CANCELLED': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pendente': return <Clock className="w-4 h-4" />;
-      case 'aprovado': return <Shield className="w-4 h-4" />;
-      case 'executado': return <CheckCircle className="w-4 h-4" />;
-      case 'rejeitado': return <XCircle className="w-4 h-4" />;
-      case 'cancelado': return <XCircle className="w-4 h-4" />;
+      case 'PENDING': return <Clock className="w-4 h-4" />;
+      case 'PAID': return <CheckCircle className="w-4 h-4" />;
+      case 'OVERDUE': return <AlertCircle className="w-4 h-4" />;
+      case 'CANCELLED': return <XCircle className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
   };
 
-  const handleAprovarPagamento = (id: string) => {
-    setPagamentos(prev => prev.map(p => 
-      p.id === id 
-        ? { ...p, status: 'aprovado', dataAprovacao: new Date().toISOString(), aprovador: 'Usuário Atual' }
-        : p
-    ));
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'Pendente';
+      case 'PAID': return 'Pago';
+      case 'OVERDUE': return 'Vencido';
+      case 'CANCELLED': return 'Cancelado';
+      default: return status;
+    }
   };
 
-  const handleExecutarPagamento = (id: string) => {
-    setPagamentos(prev => prev.map(p => 
-      p.id === id 
-        ? { ...p, status: 'executado', dataExecucao: new Date().toISOString() }
-        : p
-    ));
+  const handleMarcarComoPago = async (id: string) => {
+    try {
+      const dataPagamento = new Date().toISOString().split('T')[0];
+      const pagamentoAtualizado = await pagamentosService.markAsPaid(id, dataPagamento);
+      
+      setPagamentos(prev => prev.map(p => 
+        p.id === id ? pagamentoAtualizado : p
+      ));
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Pagamento marcado como pago.',
+      });
+    } catch (error) {
+      console.error('Erro ao marcar como pago:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao marcar pagamento como pago.',
+        variant: 'destructive',
+      });
+    }
   };
+
+  const handleAgendarPagamento = async (id: string, dataAgendamento: string, observacoes?: string) => {
+    try {
+      await pagamentosService.agendarPagamento(id, dataAgendamento, observacoes);
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Pagamento agendado com sucesso.',
+      });
+      
+      // Recarregar dados para atualizar agendamentos
+      loadData();
+    } catch (error) {
+      console.error('Erro ao agendar pagamento:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao agendar pagamento.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeletePagamento = async (id: string) => {
+    try {
+      await pagamentosService.deletePagamento(id);
+      
+      setPagamentos(prev => prev.filter(p => p.id !== id));
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Pagamento excluído com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao excluir pagamento:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao excluir pagamento.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteMultiplePagamentos = async (ids: string[]) => {
+    try {
+      await pagamentosService.deletePagamentos(ids);
+      
+      setPagamentos(prev => prev.filter(p => !ids.includes(p.id)));
+      setSelectedPagamentos([]);
+      
+      toast({
+        title: 'Sucesso',
+        description: `${ids.length} pagamento(s) excluído(s) com sucesso.`,
+      });
+    } catch (error) {
+      console.error('Erro ao excluir pagamentos:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao excluir pagamentos.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleGenerateReport = async (pagamentoId: string, format: 'pdf' | 'excel') => {
+    try {
+      let blob: Blob;
+      
+      if (format === 'pdf') {
+        blob = await pagamentosService.generateRelatorioPagamentosPDF({ 
+          clienteId: pagamentoId 
+        });
+      } else {
+        blob = await pagamentosService.generateRelatorioPagamentosExcel({ 
+          clienteId: pagamentoId 
+        });
+      }
+      
+      // Criar URL do blob e fazer download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_pagamento_${pagamentoId}_${new Date().toISOString().split('T')[0]}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Sucesso',
+        description: `Relatório ${format.toUpperCase()} gerado com sucesso.`,
+      });
+    } catch (error) {
+      console.error(`Erro ao gerar relatório ${format}:`, error);
+      toast({
+        title: 'Erro',
+        description: `Erro ao gerar relatório ${format.toUpperCase()}.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleGenerateBulkReport = async (format: 'pdf' | 'excel') => {
+    if (selectedPagamentos.length === 0) {
+      toast({
+        title: 'Atenção',
+        description: 'Selecione pelo menos um pagamento para gerar o relatório.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      let blob: Blob;
+      
+      if (format === 'pdf') {
+        blob = await pagamentosService.generateRelatorioPagamentosPDF({});
+      } else {
+        blob = await pagamentosService.generateRelatorioPagamentosExcel({});
+      }
+      
+      // Criar URL do blob e fazer download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_pagamentos_${new Date().toISOString().split('T')[0]}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Sucesso',
+        description: `Relatório ${format.toUpperCase()} gerado com sucesso.`,
+      });
+    } catch (error) {
+      console.error(`Erro ao gerar relatório ${format}:`, error);
+      toast({
+        title: 'Erro',
+        description: `Erro ao gerar relatório ${format.toUpperCase()}.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleOpenFormModal = (pagamento?: Pagamento) => {
+    setSelectedPagamento(pagamento || null);
+    setShowForm(true);
+  };
+
+  const handleOpenViewModal = (pagamento: Pagamento) => {
+    setSelectedPagamento(pagamento);
+    setShowViewModal(true);
+  };
+
+  const handleOpenEditModal = (pagamento: Pagamento) => {
+    setSelectedPagamento(pagamento);
+    setShowEditModal(true);
+  };
+
+  const handleFormSuccess = () => {
+    loadData();
+    setShowForm(false);
+    setShowEditModal(false);
+    setSelectedPagamento(null);
+  };
+
+  const handleSelectPagamento = (id: string) => {
+    setSelectedPagamentos(prev => 
+      prev.includes(id) 
+        ? prev.filter(p => p !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedPagamentos.length === filteredPagamentos.length) {
+      setSelectedPagamentos([]);
+    } else {
+      setSelectedPagamentos(filteredPagamentos.map(p => p.id));
+    }
+  };
+
+  const isAllSelected = selectedPagamentos.length === filteredPagamentos.length && filteredPagamentos.length > 0;
 
   // Função para obter cor da prioridade
   const getPrioridadeColor = (prioridade: string) => {
@@ -515,6 +530,19 @@ export const Pagamentos: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <PagamentosGuard>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Carregando pagamentos...</p>
+          </div>
+        </div>
+      </PagamentosGuard>
+    );
+  }
+
   return (
     <PagamentosGuard>
       <div className="space-y-6">
@@ -523,15 +551,24 @@ export const Pagamentos: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold">Pagamentos</h1>
             <p className="text-muted-foreground">
-              Gerencie pagamentos, aprovações e execução de despesas
+              Gerencie pagamentos com agendamento e alertas de vencimento
             </p>
           </div>
-          <PagamentosGuard action="manage">
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Pagamento
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowSelection(!showSelection)}
+              className={showSelection ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+            >
+              {showSelection ? 'Desativar Seleção' : 'Ativar Seleção'}
             </Button>
-          </PagamentosGuard>
+            <PagamentosGuard action="manage">
+              <Button onClick={() => handleOpenFormModal()}>
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Pagamento
+              </Button>
+            </PagamentosGuard>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -565,7 +602,7 @@ export const Pagamentos: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <TrendingUp className="w-5 h-5 text-green-600" />
                     <div>
-                      <p className="text-2xl font-bold">R$ {stats.valorTotal.toLocaleString('pt-BR')}</p>
+                      <p className="text-2xl font-bold">R$ {(stats.valorTotal || 0).toLocaleString('pt-BR')}</p>
                       <p className="text-sm text-muted-foreground">Valor Total</p>
                     </div>
                   </div>
@@ -577,7 +614,7 @@ export const Pagamentos: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Clock className="w-5 h-5 text-yellow-600" />
                     <div>
-                      <p className="text-2xl font-bold">R$ {stats.valorPendente.toLocaleString('pt-BR')}</p>
+                      <p className="text-2xl font-bold">R$ {(stats.valorPendente || 0).toLocaleString('pt-BR')}</p>
                       <p className="text-sm text-muted-foreground">Pendente</p>
                     </div>
                   </div>
@@ -589,8 +626,8 @@ export const Pagamentos: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-600" />
                     <div>
-                      <p className="text-2xl font-bold">R$ {stats.valorExecutado.toLocaleString('pt-BR')}</p>
-                      <p className="text-sm text-muted-foreground">Executado</p>
+                      <p className="text-2xl font-bold">R$ {(stats.valorPago || 0).toLocaleString('pt-BR')}</p>
+                      <p className="text-sm text-muted-foreground">Pago</p>
                     </div>
                   </div>
                 </CardContent>
@@ -661,24 +698,24 @@ export const Pagamentos: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os Status</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="aprovado">Aprovado</SelectItem>
-                      <SelectItem value="executado">Executado</SelectItem>
-                      <SelectItem value="rejeitado">Rejeitado</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                      <SelectItem value="PENDING">Pendente</SelectItem>
+                      <SelectItem value="PAID">Pago</SelectItem>
+                      <SelectItem value="OVERDUE">Vencido</SelectItem>
+                      <SelectItem value="CANCELLED">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
 
-                  <Select value={filterPrioridade} onValueChange={setFilterPrioridade}>
+                  <Select value={filterFormaPagamento} onValueChange={setFilterFormaPagamento}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Prioridade" />
+                      <SelectValue placeholder="Forma de Pagamento" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas as Prioridades</SelectItem>
-                      <SelectItem value="urgente">Urgente</SelectItem>
-                      <SelectItem value="alta">Alta</SelectItem>
-                      <SelectItem value="media">Média</SelectItem>
-                      <SelectItem value="baixa">Baixa</SelectItem>
+                      <SelectItem value="all">Todas as Formas</SelectItem>
+                      <SelectItem value="PIX">PIX</SelectItem>
+                      <SelectItem value="BOLETO">Boleto</SelectItem>
+                      <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
+                      <SelectItem value="CARTAO">Cartão</SelectItem>
+                      <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -688,16 +725,61 @@ export const Pagamentos: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas as Categorias</SelectItem>
-                      <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                      <SelectItem value="servico">Serviço</SelectItem>
-                      <SelectItem value="equipamento">Equipamento</SelectItem>
-                      <SelectItem value="imposto">Imposto</SelectItem>
-                      <SelectItem value="outros">Outros</SelectItem>
+                      <SelectItem value="FORNECEDOR">Fornecedor</SelectItem>
+                      <SelectItem value="SERVICO">Serviço</SelectItem>
+                      <SelectItem value="EQUIPAMENTO">Equipamento</SelectItem>
+                      <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                      <SelectItem value="OUTROS">Outros</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Botões de Ação em Lote */}
+            {showSelection && selectedPagamentos.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-medium">
+                        {selectedPagamentos.length} pagamento(s) selecionado(s)
+                      </span>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleGenerateBulkReport('pdf')}
+                        className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Relatório PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleGenerateBulkReport('excel')}
+                        className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Relatório Excel
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (window.confirm(`Tem certeza que deseja excluir ${selectedPagamentos.length} pagamento(s)?`)) {
+                            handleDeleteMultiplePagamentos(selectedPagamentos);
+                          }
+                        }}
+                        className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir ({selectedPagamentos.length})
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Tabela de Pagamentos */}
             <Card>
@@ -706,25 +788,56 @@ export const Pagamentos: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Fornecedor</th>
+                        {showSelection && (
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            <Checkbox
+                              checked={isAllSelected}
+                              onCheckedChange={handleSelectAll}
+                            />
+                          </th>
+                        )}
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Cliente</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Descrição</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Valor</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Prioridade</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Vencimento</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Centro de Custo</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Forma Pagamento</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Categoria</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {filteredPagamentos.map((pagamento) => {
-                        const PrioridadeIcon = getPrioridadeIcon(pagamento.prioridade || 'media');
+                        const isVencimentoProximo = () => {
+                          if (!pagamento.dataVencimento) return false;
+                          const hoje = new Date();
+                          const vencimento = new Date(pagamento.dataVencimento);
+                          const diffTime = vencimento.getTime() - hoje.getTime();
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                          return diffDays <= 3 && diffDays >= 0;
+                        };
+
+                        const isVencido = () => {
+                          if (!pagamento.dataVencimento) return false;
+                          const hoje = new Date();
+                          const vencimento = new Date(pagamento.dataVencimento);
+                          return vencimento < hoje && pagamento.status === 'PENDING';
+                        };
+
                         return (
                           <tr key={pagamento.id} className="hover:bg-gray-50">
+                            {showSelection && (
+                              <td className="px-4 py-3">
+                                <Checkbox
+                                  checked={selectedPagamentos.includes(pagamento.id)}
+                                  onCheckedChange={() => handleSelectPagamento(pagamento.id)}
+                                />
+                              </td>
+                            )}
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-2">
-                                <Building className="w-4 h-4 text-gray-400" />
-                                <span className="font-medium">{pagamento.fornecedor}</span>
+                                <User className="w-4 h-4 text-gray-400" />
+                                <span className="font-medium">{pagamento.clienteNome}</span>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
@@ -732,39 +845,38 @@ export const Pagamentos: React.FC = () => {
                             </td>
                             <td className="px-4 py-3">
                               <span className="font-medium text-red-600">
-                                R$ {pagamento.valor.toLocaleString('pt-BR')}
+                                R$ {(pagamento.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium ${
-                                getPrioridadeColor(pagamento.prioridade || 'media')
-                              }`}>
-                                <PrioridadeIcon className="h-3 w-3" />
-                                {(pagamento.prioridade || 'media').charAt(0).toUpperCase() + (pagamento.prioridade || 'media').slice(1)}
-                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <Badge className={getStatusColor(pagamento.status)}>
                                 {getStatusIcon(pagamento.status)}
-                                <span className="ml-1 capitalize">{pagamento.status}</span>
+                                <span className="ml-1">{getStatusLabel(pagamento.status)}</span>
                               </Badge>
                             </td>
                             <td className="px-4 py-3">
-                              {pagamento.dataVencimento ? (
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-4 h-4 text-gray-400" />
                                 <span className={`${
-                                  new Date(pagamento.dataVencimento) < new Date() ? 'text-red-600 font-medium' :
-                                  new Date(pagamento.dataVencimento) <= addDays(new Date(), 3) ? 'text-yellow-600 font-medium' :
+                                  isVencido() ? 'text-red-600 font-medium' :
+                                  isVencimentoProximo() ? 'text-yellow-600 font-medium' :
                                   'text-muted-foreground'
                                 }`}>
                                   {format(new Date(pagamento.dataVencimento), 'dd/MM/yyyy', { locale: ptBR })}
                                 </span>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
+                                {(isVencido() || isVencimentoProximo()) && (
+                                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <span className="text-sm text-muted-foreground">
-                                {pagamento.centroCusto || '-'}
+                                {pagamento.formaPagamento}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-muted-foreground">
+                                {pagamento.categoria}
                               </span>
                             </td>
                             <td className="px-4 py-3">
@@ -772,33 +884,43 @@ export const Pagamentos: React.FC = () => {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  onClick={() => {
-                                    setSelectedPagamento(pagamento);
-                                    setShowWorkflowModal(true);
-                                  }}
+                                  onClick={() => handleOpenViewModal(pagamento)}
                                 >
-                                  <History className="w-4 h-4" />
+                                  <Eye className="w-4 h-4" />
                                 </Button>
-                                {pagamento.integracaoBancaria && (
+                                <PagamentosGuard action="manage">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleOpenEditModal(pagamento)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </PagamentosGuard>
+                                {pagamento.status === 'PENDING' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleMarcarComoPago(pagamento.id)}
+                                    className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                <PagamentosGuard action="manage">
                                   <Button 
                                     variant="outline" 
                                     size="sm"
                                     onClick={() => {
-                                      setSelectedPagamento(pagamento);
-                                      setShowIntegracaoModal(true);
+                                      if (window.confirm('Tem certeza que deseja excluir este pagamento?')) {
+                                        handleDeletePagamento(pagamento.id);
+                                      }
                                     }}
+                                    className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
                                   >
-                                    <CreditCard className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                <PagamentosGuard action="manage">
-                                  <Button variant="outline" size="sm">
-                                    <Edit className="w-4 h-4" />
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </PagamentosGuard>
-                                <Button variant="outline" size="sm">
-                                  <Eye className="w-4 h-4" />
-                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -1005,118 +1127,70 @@ export const Pagamentos: React.FC = () => {
               </div>
             </TabsContent>
 
-            {/* Aba Limites */}
+            {/* Aba Limites - Temporariamente desabilitada */}
             <TabsContent value="limites" className="space-y-4">
-              <div className="grid gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Controle de Limites
+                  </CardTitle>
+                  <CardDescription>
+                    Funcionalidade em desenvolvimento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
                       Controle de Limites
-                    </CardTitle>
-                    <CardDescription>
-                      Gerencie os limites de pagamento e monitore o uso
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {limites.map((limite) => {
-                        const percentualUso = (limite.valorUtilizado / limite.valor) * 100;
-                        const corStatus = percentualUso >= 90 ? 'text-red-600' :
-                                         percentualUso >= 70 ? 'text-yellow-600' : 'text-green-600';
-                        
-                        return (
-                          <Card key={limite.id} className="relative">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-medium capitalize">
-                                  {limite.tipo} {limite.categoria && `- ${limite.categoria}`}
-                                </h4>
-                                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  limite.ativo ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-600'
-                                }`}>
-                                  {limite.ativo ? 'Ativo' : 'Inativo'}
-                                </div>
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                  <span>Utilizado:</span>
-                                  <span className={corStatus}>
-                                    R$ {limite.valorUtilizado.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span>Limite:</span>
-                                  <span>R$ {limite.valor.toFixed(2)}</span>
-                                </div>
-                                <Progress value={percentualUso} className="h-2" />
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                  <span>{percentualUso.toFixed(1)}% utilizado</span>
-                                  <span>Período: {limite.periodo}</span>
-                                </div>
-                              </div>
-                              
-                              {percentualUso >= 90 && (
-                                <Alert className="mt-3">
-                                  <AlertTriangle className="h-4 w-4" />
-                                  <AlertDescription>
-                                    Limite quase esgotado! Restam apenas R$ {(limite.valor - limite.valorUtilizado).toFixed(2)}
-                                  </AlertDescription>
-                                </Alert>
-                              )}
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                    
-                    <div className="mt-6">
-                      <Button onClick={() => setShowLimitesModal(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Novo Limite
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Bell className="h-5 w-5" />
-                      Notificações
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {notificacoes.map((notificacao) => (
-                        <div key={notificacao.id} className={`p-3 rounded-lg border ${
-                          notificacao.lida ? 'bg-gray-50' : 'bg-blue-50 border-blue-200'
-                        }`}>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="font-medium">{notificacao.titulo}</h4>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {notificacao.descricao}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {format(new Date(notificacao.dataEnvio), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                              </p>
-                            </div>
-                            {!notificacao.lida && (
-                              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      Esta funcionalidade será implementada em uma versão futura.
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Aqui você poderá gerenciar limites de pagamento por categoria, período e valor.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
           </Tabs>
         </div>
+
+        {/* Modais */}
+        <PagamentoFormModal
+          isOpen={showForm}
+          onClose={() => {
+            setShowForm(false);
+            setSelectedPagamento(null);
+          }}
+          onSuccess={handleFormSuccess}
+          clientes={clientes}
+        />
+
+        <PagamentoFormModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedPagamento(null);
+          }}
+          onSuccess={handleFormSuccess}
+          pagamento={selectedPagamento}
+          clientes={clientes}
+        />
+
+        <PagamentoViewModal
+          isOpen={showViewModal}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedPagamento(null);
+          }}
+          pagamento={selectedPagamento}
+          onEdit={handleOpenEditModal}
+          onGenerateReport={handleGenerateReport}
+        />
       </PagamentosGuard>
     );
   };

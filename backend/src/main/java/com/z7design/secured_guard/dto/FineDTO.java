@@ -18,6 +18,9 @@ public class FineDTO {
     private UUID id;
     private UUID vehicleId;
     private String vehiclePlate;
+    private UUID driverId;
+    private String driverName;
+    private String driverLicenseNumber;
     private LocalDate date;
     private String description;
     private BigDecimal amount;
@@ -32,6 +35,14 @@ public class FineDTO {
         dto.setId(fine.getId());
         dto.setVehicleId(fine.getVehicle().getId());
         dto.setVehiclePlate(fine.getVehicle().getPlate());
+        
+        // Informações do motorista
+        if (fine.getDriver() != null) {
+            dto.setDriverId(fine.getDriver().getId());
+            dto.setDriverName(fine.getDriver().getName());
+            dto.setDriverLicenseNumber(fine.getDriver().getLicenseNumber());
+        }
+        
         dto.setDate(fine.getDate());
         dto.setDescription(fine.getDescription());
         dto.setAmount(fine.getAmount());
