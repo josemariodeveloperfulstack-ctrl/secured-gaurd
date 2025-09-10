@@ -310,4 +310,70 @@ public class AccountsReceivableService {
         accountsReceivableRepository.saveAll(overdueAccounts);
         log.info("Status de {} contas vencidas atualizado", overdueAccounts.size());
     }
+    
+    /**
+     * Buscar contas a receber vencendo em 3 dias
+     */
+    @Transactional(readOnly = true)
+    public List<AccountsReceivableDTO> getAccountsReceivableDueInThreeDays() {
+        log.info("Buscando contas a receber vencendo em 3 dias");
+        LocalDate threeDaysFromNow = LocalDate.now().plusDays(3);
+        List<AccountsReceivable> accounts = accountsReceivableRepository.findByDueDateBetween(
+                threeDaysFromNow, threeDaysFromNow);
+        return accounts.stream()
+                .filter(account -> account.getStatus() == ReceivableStatus.PENDING)
+                .map(AccountsReceivableDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Buscar contas a receber vencendo em X dias
+     */
+    @Transactional(readOnly = true)
+    public List<AccountsReceivableDTO> getAccountsReceivableDueInDays(int days) {
+        log.info("Buscando contas a receber vencendo em {} dias", days);
+        LocalDate targetDate = LocalDate.now().plusDays(days);
+        List<AccountsReceivable> accounts = accountsReceivableRepository.findByDueDateBetween(
+                targetDate, targetDate);
+        return accounts.stream()
+                .filter(account -> account.getStatus() == ReceivableStatus.PENDING)
+                .map(AccountsReceivableDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Enviar alertas para contas a receber vencendo em 3 dias
+     */
+    @Transactional
+    public void sendAlertsForAccountsDueInThreeDays() {
+        log.info("Enviando alertas para contas a receber vencendo em 3 dias");
+        
+        List<AccountsReceivableDTO> accountsDueInThreeDays = getAccountsReceivableDueInThreeDays();
+        
+        for (AccountsReceivableDTO account : accountsDueInThreeDays) {
+            try {
+                // Enviar notificação
+                sendAccountDueAlert(account);
+                log.info("Alerta enviado para conta a receber: {} - Cliente: {} - Valor: {}", 
+                        account.getId(), account.getClient().getName(), account.getAmount());
+            } catch (Exception e) {
+                log.error("Erro ao enviar alerta para conta a receber {}: {}", account.getId(), e.getMessage());
+            }
+        }
+        
+        log.info("Alertas enviados para {} contas a receber", accountsDueInThreeDays.size());
+    }
+    
+    /**
+     * Enviar alerta individual para conta a receber
+     */
+    private void sendAccountDueAlert(AccountsReceivableDTO account) {
+        // Aqui você pode implementar a lógica de envio de notificação
+        // Por exemplo, criar uma notificação no sistema ou enviar email
+        log.info("Enviando alerta para conta a receber vencendo em 3 dias: {} - Cliente: {} - Valor: {}", 
+                account.getId(), account.getClient().getName(), account.getAmount());
+        
+        // TODO: Implementar envio de notificação via NotificationService
+        // notificationService.createNotification(...);
+    }
 }

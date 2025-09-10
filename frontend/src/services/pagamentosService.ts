@@ -237,9 +237,10 @@ class PagamentosService {
   
   async agendarPagamento(pagamentoId: string, dataAgendamento: string, observacoes?: string): Promise<AgendamentoPagamento> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/accounts-receivable/${pagamentoId}/schedule`, {
-        dataAgendamento,
-        observacoes
+      const response = await axios.post(`${API_BASE_URL}/scheduled-payments`, {
+        paymentId: pagamentoId,
+        scheduledDate: dataAgendamento,
+        notes: observacoes
       }, {
         headers: this.getAuthHeaders()
       });
@@ -252,7 +253,8 @@ class PagamentosService {
 
   async executarAgendamento(agendamentoId: string): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/accounts-receivable/schedule/${agendamentoId}/execute`, {}, {
+      await axios.put(`${API_BASE_URL}/scheduled-payments/${agendamentoId}/mark-executed`, null, {
+        params: { executionDate: new Date().toISOString().split('T')[0] },
         headers: this.getAuthHeaders()
       });
     } catch (error) {
@@ -263,7 +265,7 @@ class PagamentosService {
 
   async cancelarAgendamento(agendamentoId: string): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/accounts-receivable/schedule/${agendamentoId}/cancel`, {}, {
+      await axios.put(`${API_BASE_URL}/scheduled-payments/${agendamentoId}/cancel`, {}, {
         headers: this.getAuthHeaders()
       });
     } catch (error) {
@@ -274,7 +276,7 @@ class PagamentosService {
 
   async getAgendamentos(): Promise<AgendamentoPagamento[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/schedule`, {
+      const response = await axios.get(`${API_BASE_URL}/scheduled-payments/all`, {
         headers: this.getAuthHeaders()
       });
       return response.data;

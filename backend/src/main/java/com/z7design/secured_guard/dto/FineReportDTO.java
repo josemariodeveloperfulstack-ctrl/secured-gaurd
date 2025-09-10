@@ -34,6 +34,7 @@ public class FineReportDTO {
     private String notes;
     private LocalDate createdAt;
     private LocalDate updatedAt;
+    private boolean overdue;
     
     // Métodos auxiliares para formatação
     public String getFormattedAmount() {
