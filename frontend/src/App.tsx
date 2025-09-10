@@ -34,7 +34,6 @@ const FluxoCaixa = lazy(() => import('@/pages/FluxoCaixa'));
 const Pagamentos = lazy(() => import('@/pages/Pagamentos'));
 const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
 const RelatoriosFinanceiros = lazy(() => import('@/pages/RelatoriosFinanceiros'));
-const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
 const Bancos = lazy(() => import('@/pages/Bancos'));
 const Agencias = lazy(() => import('@/pages/Agencias'));
 const Frota = lazy(() => import('@/pages/Frota'));
