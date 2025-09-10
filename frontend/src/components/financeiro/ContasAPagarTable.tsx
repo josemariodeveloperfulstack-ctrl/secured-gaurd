@@ -27,7 +27,7 @@ interface ContasAPagarTableProps {
   onEdit: (conta: ContaAPagar) => void;
   onDelete: (id: string) => void;
   onView: (conta: ContaAPagar) => void;
-  onMarkAsPaid: (id: string, dataPagamento: Date) => void;
+  onRefresh: () => void;
   loading?: boolean;
 }
 
@@ -36,7 +36,7 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
   onEdit,
   onDelete,
   onView,
-  onMarkAsPaid,
+  onRefresh,
   loading = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -270,16 +270,6 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                         <Button variant="ghost" size="sm" onClick={() => onEdit(conta)} className="text-seguranca-lightgray hover:text-seguranca-yellow">
                           <Edit size={16} />
                         </Button>
-                        {conta.status === 'ABERTA' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => onMarkAsPaid(conta.id!, new Date())}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <CheckCircle size={16} />
-                          </Button>
-                        )}
                         <Button 
                           variant="ghost" 
                           size="sm" 
