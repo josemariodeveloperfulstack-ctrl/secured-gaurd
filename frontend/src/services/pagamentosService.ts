@@ -103,7 +103,8 @@ class PagamentosService {
       const response = await axios.get(`${API_BASE_URL}/accounts-receivable/all`, {
         headers: this.getAuthHeaders()
       });
-      return response.data;
+      // Garantir que sempre retornamos um array
+      return Array.isArray(response.data) ? response.data : this.getMockPagamentos();
     } catch (error) {
       console.error('Erro ao buscar pagamentos:', error);
       // Retornar dados mockados temporariamente
@@ -342,10 +343,11 @@ class PagamentosService {
   
   async getClientes(): Promise<Cliente[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/clients`, {
+      const response = await axios.get(`${API_BASE_URL}/clients/all`, {
         headers: this.getAuthHeaders()
       });
-      return response.data;
+      // Garantir que sempre retornamos um array
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
       // Retornar dados mockados temporariamente

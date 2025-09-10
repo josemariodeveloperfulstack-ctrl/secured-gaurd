@@ -32,7 +32,11 @@ const ContasAPagar = lazy(() => import('@/pages/ContasAPagar'));
 const ContasAReceber = lazy(() => import('@/pages/ContasAReceber'));
 const FluxoCaixa = lazy(() => import('@/pages/FluxoCaixa'));
 const Pagamentos = lazy(() => import('@/pages/Pagamentos'));
+const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
 const RelatoriosFinanceiros = lazy(() => import('@/pages/RelatoriosFinanceiros'));
+const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
+const Bancos = lazy(() => import('@/pages/Bancos'));
+const Agencias = lazy(() => import('@/pages/Agencias'));
 const Frota = lazy(() => import('@/pages/Frota'));
 const Documentos = lazy(() => import('@/pages/Documentos'));
 const DocumentosUnificados = lazy(() => import('@/pages/DocumentosUnificados'));
@@ -310,6 +314,27 @@ function App() {
                         <ContasAReceber />
                       </ProtectedRoute>
                     } />
+                    <Route path="/financeiro/conciliacao-bancaria" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ConciliacaoBancaria />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/bancos" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Bancos />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/agencias" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Agencias />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
                     <Route path="/financeiro/fluxo-caixa" element={
                       <ProtectedRoute>
                         <FluxoCaixa />
@@ -318,6 +343,11 @@ function App() {
                     <Route path="/financeiro/pagamentos" element={
                       <ProtectedRoute>
                         <Pagamentos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/financeiro/conciliacao-bancaria" element={
+                      <ProtectedRoute>
+                        <ConciliacaoBancaria />
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/relatorios" element={
@@ -798,7 +828,11 @@ function App() {
                     } />
                     
                     {/* Rota 404 */}
-                    <Route path="*" element={<NotFound />} />
+                    <Route path="*" element={
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <NotFound />
+                      </Suspense>
+                    } />
                   </Routes>
                   <Toaster />
                 </AuthProvider>
