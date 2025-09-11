@@ -10,6 +10,7 @@ import { Plus, Search, Filter, Download, Eye, Edit, Trash2, AlertTriangle, Calen
 import { ContasAPagarTable } from './ContasAPagarTable';
 import { ContasAPagarDashboard } from './ContasAPagarDashboard';
 import { ContasAPagarFormModal } from './ContasAPagarFormModal';
+import { ContasAPagarViewModal } from './ContasAPagarViewModal';
 import { ContaAPagar } from './ContasAPagarFormModal';
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +22,9 @@ export const ContasAPagar: React.FC = () => {
   const [contas, setContas] = useState<ContaAPagar[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
+  const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [tipoFilter, setTipoFilter] = useState<string>('all');
@@ -60,6 +63,16 @@ export const ContasAPagar: React.FC = () => {
   const handleEdit = (conta: ContaAPagar) => {
     setEditingConta(conta);
     setShowFormModal(true);
+  };
+
+  const handleView = (conta: ContaAPagar) => {
+    setViewingConta(conta);
+    setShowViewModal(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setViewingConta(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -336,6 +349,7 @@ export const ContasAPagar: React.FC = () => {
             contas={filteredContas}
             loading={loading}
             onEdit={handleEdit}
+            onView={handleView}
             onDelete={handleDelete}
             onRefresh={loadContas}
           />
@@ -348,6 +362,14 @@ export const ContasAPagar: React.FC = () => {
         onOpenChange={setShowFormModal}
         onSuccess={handleFormSuccess}
         initialData={editingConta}
+      />
+
+      {/* Modal de Visualização */}
+      <ContasAPagarViewModal
+        isOpen={showViewModal}
+        onClose={handleCloseViewModal}
+        conta={viewingConta}
+        onEdit={handleEdit}
       />
     </div>
   );

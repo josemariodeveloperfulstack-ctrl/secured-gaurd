@@ -1,10 +1,12 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.AccountsReceivableReportDTO;
 import com.z7design.secured_guard.dto.FuelRecordReportDTO;
 import com.z7design.secured_guard.dto.VehicleReportDTO;
 import com.z7design.secured_guard.dto.BankReconciliationReportDTO;
 import com.z7design.secured_guard.dto.BankFileDTO;
 import com.z7design.secured_guard.dto.FineReportDTO;
+import com.z7design.secured_guard.dto.ScheduledPaymentReportDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
@@ -350,7 +352,7 @@ public class JasperReportService {
                                        String vehicleFilter, 
                                        String driverFilter,
                                        String statusFilter) throws IOException {
-        return generateFineReportPDFSimple(fines, vehicleFilter, driverFilter, statusFilter);
+        return generateFineReportPDF(fines, startDate, endDate, vehicleFilter, driverFilter, statusFilter);
     }
     
     private byte[] generateFineReportPDFSimple(List<FineReportDTO> fines, String vehicleFilter, String driverFilter, String statusFilter) throws IOException {
@@ -524,7 +526,7 @@ public class JasperReportService {
             
             // Exportar para Excel
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            JasperExportManager.exportReportToXlsxStream(jasperPrint, outputStream);
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
             
             byte[] result = outputStream.toByteArray();
             log.info("Relatório Excel de multas gerado com sucesso usando JasperReports. {} multas processadas, {} bytes gerados", 
@@ -539,6 +541,159 @@ public class JasperReportService {
             log.error("Erro inesperado ao gerar relatório Excel de multas", e);
             throw new IOException("Erro inesperado ao gerar relatório Excel de multas: " + e.getMessage(), e);
         }
+    }*/
+    
+    // ===== ACCOUNTS RECEIVABLE REPORTS =====
+    
+    public byte[] generateAccountsReceivableReportPDF(List<AccountsReceivableReportDTO> accounts, 
+                                                    LocalDate startDate, 
+                                                    LocalDate endDate, 
+                                                    String clientFilter, 
+                                                    String statusFilter,
+                                                    String categoryFilter,
+                                                    String paymentMethodFilter,
+                                                    BigDecimal amountMin,
+                                                    BigDecimal amountMax) throws IOException {
+        try {
+            log.info("Gerando relatório PDF de contas a receber com JasperReports - {} contas", accounts.size());
+            
+            // Carregar template JRXML
+            ClassPathResource resource = new ClassPathResource("reports/accounts-receivable-report.jrxml");
+            InputStream templateStream = resource.getInputStream();
+            
+            // Compilar template
+            JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
+            log.debug("Template JRXML de contas a receber compilado com sucesso");
+            
+            // Preparar parâmetros
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            parameters.put("PERIOD", formatPeriod(startDate, endDate));
+            parameters.put("TOTAL_ACCOUNTS", accounts.size());
+            
+            // Calcular valor total
+            BigDecimal totalAmount = accounts.stream()
+                    .map(AccountsReceivableReportDTO::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            parameters.put("TOTAL_AMOUNT", totalAmount);
+            
+            // Calcular valor pendente
+            BigDecimal totalPending = accounts.stream()
+                    .map(AccountsReceivableReportDTO::getPendingAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            parameters.put("TOTAL_PENDING", totalPending);
+            
+            // Definir filtros aplicados
+            parameters.put("CLIENT_FILTER", clientFilter != null ? clientFilter : "Todos os clientes");
+            parameters.put("STATUS_FILTER", statusFilter != null && !statusFilter.equals("ALL") ? statusFilter : "Todos os status");
+            parameters.put("CATEGORY_FILTER", categoryFilter != null && !categoryFilter.equals("ALL") ? categoryFilter : "Todas as categorias");
+            parameters.put("PAYMENT_METHOD_FILTER", paymentMethodFilter != null && !paymentMethodFilter.equals("ALL") ? paymentMethodFilter : "Todos os métodos");
+            
+            if (amountMin != null || amountMax != null) {
+                String amountRange = "";
+                if (amountMin != null) amountRange += "A partir de R$ " + amountMin;
+                if (amountMin != null && amountMax != null) amountRange += " até ";
+                if (amountMax != null) amountRange += "Até R$ " + amountMax;
+                parameters.put("AMOUNT_FILTER", amountRange);
+            } else {
+                parameters.put("AMOUNT_FILTER", "Todos os valores");
+            }
+            
+            log.debug("Parâmetros preparados: {}", parameters);
+            
+            // Preparar dados
+            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(accounts);
+            
+            // Gerar relatório
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+            log.debug("Relatório de contas a receber preenchido com sucesso");
+            
+            // Exportar para PDF
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            
+            byte[] result = outputStream.toByteArray();
+            log.info("Relatório PDF de contas a receber gerado com sucesso usando JasperReports. {} contas processadas, {} bytes gerados", 
+                    accounts.size(), result.length);
+            
+            return result;
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF de contas a receber: " + e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório de contas a receber: " + e.getMessage(), e);
+        }
     }
-    */
+    
+    // ===== SCHEDULED PAYMENT REPORTS =====
+    
+    public byte[] generateScheduledPaymentReportPDF(List<ScheduledPaymentReportDTO> payments, 
+                                                  LocalDate startDate, 
+                                                  LocalDate endDate, 
+                                                  String clientFilter, 
+                                                  String statusFilter,
+                                                  String paymentMethodFilter,
+                                                  BigDecimal amountMin,
+                                                  BigDecimal amountMax) throws IOException {
+        try {
+            log.info("Gerando relatório PDF de pagamentos agendados com JasperReports - {} pagamentos", payments.size());
+            
+            // Carregar template JRXML
+            ClassPathResource resource = new ClassPathResource("reports/scheduled-payment-report.jrxml");
+            InputStream templateStream = resource.getInputStream();
+            
+            // Compilar template
+            JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
+            log.debug("Template JRXML de pagamentos agendados compilado com sucesso");
+            
+            // Preparar parâmetros
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            parameters.put("PERIOD", formatPeriod(startDate, endDate));
+            parameters.put("TOTAL_PAYMENTS", payments.size());
+            
+            // Calcular valor total
+            BigDecimal totalAmount = payments.stream()
+                    .map(ScheduledPaymentReportDTO::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            parameters.put("TOTAL_AMOUNT", totalAmount);
+            
+            // Definir filtros aplicados
+            parameters.put("CLIENT_FILTER", clientFilter != null ? clientFilter : "Todos os clientes");
+            parameters.put("STATUS_FILTER", statusFilter != null && !statusFilter.equals("ALL") ? statusFilter : "Todos os status");
+            parameters.put("PAYMENT_METHOD_FILTER", paymentMethodFilter != null && !paymentMethodFilter.equals("ALL") ? paymentMethodFilter : "Todos os métodos");
+            
+            if (amountMin != null || amountMax != null) {
+                String amountRange = "";
+                if (amountMin != null) amountRange += "A partir de R$ " + amountMin;
+                if (amountMin != null && amountMax != null) amountRange += " até ";
+                if (amountMax != null) amountRange += "Até R$ " + amountMax;
+                parameters.put("AMOUNT_FILTER", amountRange);
+            } else {
+                parameters.put("AMOUNT_FILTER", "Todos os valores");
+            }
+            
+            log.debug("Parâmetros preparados: {}", parameters);
+            
+            // Preparar dados
+            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(payments);
+            
+            // Gerar relatório
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+            log.debug("Relatório de pagamentos agendados preenchido com sucesso");
+            
+            // Exportar para PDF
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            
+            byte[] result = outputStream.toByteArray();
+            log.info("Relatório PDF de pagamentos agendados gerado com sucesso usando JasperReports. {} pagamentos processados, {} bytes gerados", 
+                    payments.size(), result.length);
+            
+            return result;
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF de pagamentos agendados: " + e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório de pagamentos agendados: " + e.getMessage(), e);
+        }
+    }
 }

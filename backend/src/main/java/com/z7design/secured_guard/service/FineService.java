@@ -207,7 +207,7 @@ public class FineService {
         log.info("Gerando relatório Excel de multas");
         
         List<FineReportDTO> fines = getFinesForReport(startDate, endDate, vehicleFilter, driverFilter, statusFilter, amountMin, amountMax, selectedIds);
-        return jasperReportService.generateFineReportExcel(fines, startDate, endDate, vehicleFilter, driverFilter, statusFilter);
+        return jasperReportService.generateFineReportPDF(fines, startDate, endDate, vehicleFilter, driverFilter, statusFilter);
     }
     
     private FineReportDTO convertToReportDTO(Fine fine) {

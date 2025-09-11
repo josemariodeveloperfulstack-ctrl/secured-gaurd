@@ -136,9 +136,9 @@ export const Pagamentos: React.FC = () => {
         pagamentosService.getAgendamentos()
       ]);
       
-      setPagamentos(pagamentosData || []);
-      setClientes(clientesData || []);
-      setAgendamentos(agendamentosData || []);
+      setPagamentos(Array.isArray(pagamentosData) ? pagamentosData : []);
+      setClientes(Array.isArray(clientesData) ? clientesData : []);
+      setAgendamentos(Array.isArray(agendamentosData) ? agendamentosData : []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({

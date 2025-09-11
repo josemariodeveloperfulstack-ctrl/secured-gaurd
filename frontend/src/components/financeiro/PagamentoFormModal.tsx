@@ -288,7 +288,7 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
                     {cliente.nome}
                   </SelectItem>
                 )) : (
-                  <SelectItem value="" disabled>
+                  <SelectItem value="no-clients" disabled>
                     Nenhum cliente disponível
                   </SelectItem>
                 )}

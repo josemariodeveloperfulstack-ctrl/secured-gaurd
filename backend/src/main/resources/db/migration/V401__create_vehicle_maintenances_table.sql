@@ -1,5 +1,5 @@
 -- Criação da tabela de manutenções de veículos
-CREATE TABLE vehicle_maintenances (
+CREATE TABLE IF NOT EXISTS vehicle_maintenances (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vehicle_id UUID NOT NULL,
     date DATE NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE vehicle_maintenances (
 );
 
 -- Índices para melhorar performance
-CREATE INDEX idx_vehicle_maintenances_vehicle_id ON vehicle_maintenances(vehicle_id);
-CREATE INDEX idx_vehicle_maintenances_date ON vehicle_maintenances(date);
-CREATE INDEX idx_vehicle_maintenances_status ON vehicle_maintenances(status);
-CREATE INDEX idx_vehicle_maintenances_priority ON vehicle_maintenances(priority);
+CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_vehicle_id ON vehicle_maintenances(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_date ON vehicle_maintenances(date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_status ON vehicle_maintenances(status);
+CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_priority ON vehicle_maintenances(priority);

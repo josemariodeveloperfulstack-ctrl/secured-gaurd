@@ -18,6 +18,7 @@ import {
 import { ContasAPagarFormModal, ContaAPagar } from '@/components/financeiro/ContasAPagarFormModal';
 import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
+import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { format, addDays, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
@@ -29,7 +30,9 @@ const ContasAPagar: React.FC = () => {
   const [contas, setContas] = useState<ContaAPagar[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
+  const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [alertasVencimento, setAlertasVencimento] = useState<ContaAPagar[]>([]);
   const [showDashboard, setShowDashboard] = useState(false);
   
@@ -117,8 +120,15 @@ const ContasAPagar: React.FC = () => {
   };
 
   const handleViewConta = (conta: ContaAPagar) => {
-    // TODO: Implementar modal de visualização
-    console.log('Visualizando conta:', conta);
+    console.log('handleViewConta chamado com:', conta);
+    setViewingConta(conta);
+    setShowViewModal(true);
+    console.log('showViewModal definido como true');
+  };
+
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setViewingConta(null);
   };
 
   const handleMarkAsPaid = async (id: string, dataPagamento: Date) => {
@@ -336,7 +346,7 @@ const ContasAPagar: React.FC = () => {
           onEdit={handleEditConta}
           onDelete={handleDeleteConta}
           onView={handleViewConta}
-          onMarkAsPaid={handleMarkAsPaid}
+          onRefresh={loadData}
           loading={loading}
         />
 
@@ -347,6 +357,14 @@ const ContasAPagar: React.FC = () => {
           onSuccess={handleFormSuccess}
           editMode={!!editingConta}
           initialData={editingConta}
+        />
+
+        {/* Modal de Visualização */}
+        <ContasAPagarViewModal
+          isOpen={showViewModal}
+          onClose={handleCloseViewModal}
+          conta={viewingConta}
+          onEdit={handleEditConta}
         />
       </div>
     </StandardLayout>

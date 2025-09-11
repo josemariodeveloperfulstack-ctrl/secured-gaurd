@@ -53,6 +53,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
                 .requestMatchers("/api/invoices/cost-centers").permitAll()
+                .requestMatchers("/api/accounts-receivable/public/test").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // Arquivos públicos (imagens e uploads)
@@ -88,6 +89,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/invoices/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de accounts-receivable (contas a receber) - requerem permissões específicas
                 .requestMatchers("/api/accounts-receivable/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                // Endpoints de scheduled-payments (pagamentos agendados) - requerem permissões específicas
+                .requestMatchers("/api/scheduled-payments/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de bank-reconciliation (conciliação bancária) - requerem permissões específicas
                 .requestMatchers("/api/bank-reconciliation/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de bancos e agências - requerem permissões específicas
@@ -111,6 +114,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/fines/**").authenticated()
                 // Endpoints de medições - requerem permissões específicas
                 .requestMatchers("/api/measurements/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                // Endpoints de estoque - requerem permissões específicas
+                .requestMatchers("/api/stock/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Todo o resto requer autenticação
                 .anyRequest().authenticated()
             )

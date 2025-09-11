@@ -3,6 +3,7 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.AccountsReceivableDTO;
 import com.z7design.secured_guard.model.enums.ReceivableStatus;
 import com.z7design.secured_guard.service.AccountsReceivableService;
+import com.z7design.secured_guard.service.PaymentReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,12 +14,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -29,6 +36,7 @@ import java.util.UUID;
 public class AccountsReceivableController {
     
     private final AccountsReceivableService accountsReceivableService;
+    private final PaymentReportService paymentReportService;
     
     @GetMapping
     @Operation(summary = "Listar todas as contas a receber", description = "Retorna uma lista paginada de todas as contas a receber")
@@ -191,5 +199,105 @@ public class AccountsReceivableController {
         log.info("PUT /api/accounts-receivable/update-overdue-status - Atualizando status de contas vencidas");
         accountsReceivableService.updateOverdueStatus();
         return ResponseEntity.ok().build();
+    }
+    
+    @GetMapping("/due-in-3-days")
+    @Operation(summary = "Buscar contas a receber vencendo em 3 dias", description = "Retorna todas as contas a receber que vencem em 3 dias")
+    public ResponseEntity<List<AccountsReceivableDTO>> getDueInThreeDays() {
+        log.info("GET /api/accounts-receivable/due-in-3-days - Buscando contas a receber vencendo em 3 dias");
+        return ResponseEntity.ok(accountsReceivableService.getAccountsReceivableDueInThreeDays());
+    }
+    
+    @GetMapping("/due-in-days/{days}")
+    @Operation(summary = "Buscar contas a receber vencendo em X dias", description = "Retorna todas as contas a receber que vencem em X dias")
+    public ResponseEntity<List<AccountsReceivableDTO>> getDueInDays(@PathVariable int days) {
+        log.info("GET /api/accounts-receivable/due-in-days/{} - Buscando contas a receber vencendo em {} dias", days, days);
+        return ResponseEntity.ok(accountsReceivableService.getAccountsReceivableDueInDays(days));
+    }
+    
+    @PostMapping("/send-alerts-3-days")
+    @Operation(summary = "Enviar alertas para contas vencendo em 3 dias", description = "Envia alertas para todas as contas a receber que vencem em 3 dias")
+    public ResponseEntity<Void> sendAlertsForThreeDays() {
+        log.info("POST /api/accounts-receivable/send-alerts-3-days - Enviando alertas para contas vencendo em 3 dias");
+        accountsReceivableService.sendAlertsForAccountsDueInThreeDays();
+        return ResponseEntity.ok().build();
+    }
+    
+    @GetMapping("/reports/pdf")
+    @Operation(summary = "Gerar relatório PDF de contas a receber", description = "Gera relatório PDF com filtros dinâmicos")
+    public ResponseEntity<byte[]> generateReportPDF(
+            @RequestParam(value = "startDate", required = false) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) LocalDate endDate,
+            @RequestParam(value = "clientFilter", required = false) String clientFilter,
+            @RequestParam(value = "statusFilter", required = false) String statusFilter,
+            @RequestParam(value = "categoryFilter", required = false) String categoryFilter,
+            @RequestParam(value = "paymentMethodFilter", required = false) String paymentMethodFilter,
+            @RequestParam(value = "amountMin", required = false) BigDecimal amountMin,
+            @RequestParam(value = "amountMax", required = false) BigDecimal amountMax,
+            @RequestParam(value = "selectedIds", required = false) List<String> selectedIds) {
+        log.info("GET /api/accounts-receivable/reports/pdf - Gerando relatório PDF com filtros");
+        
+        try {
+            byte[] reportBytes = paymentReportService.generateAccountsReceivableReportPDF(
+                    startDate, endDate, clientFilter, statusFilter, categoryFilter, 
+                    paymentMethodFilter, amountMin, amountMax, selectedIds);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "relatorio-contas-receber.pdf");
+            headers.setContentLength(reportBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(reportBytes);
+                    
+        } catch (IOException e) {
+            log.error("Erro ao gerar relatório PDF de contas a receber", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @DeleteMapping("/bulk-delete")
+    @Operation(summary = "Excluir múltiplas contas a receber", description = "Exclui várias contas a receber selecionadas")
+    public ResponseEntity<Void> bulkDelete(@RequestBody List<String> ids) {
+        log.info("DELETE /api/accounts-receivable/bulk-delete - Excluindo {} contas a receber", ids.size());
+        paymentReportService.deleteMultipleAccountsReceivable(ids);
+        return ResponseEntity.noContent().build();
+    }
+    
+    @GetMapping("/schedule")
+    @Operation(summary = "Buscar agendamentos de pagamento", description = "Retorna todos os agendamentos de pagamento relacionados às contas a receber")
+    public ResponseEntity<List<Object>> getSchedule() {
+        log.info("GET /api/accounts-receivable/schedule - Buscando agendamentos de pagamento");
+        // Por enquanto, retornar lista vazia até implementar a lógica completa
+        return ResponseEntity.ok(List.of());
+    }
+    
+    @GetMapping("/public/test")
+    @Operation(summary = "Teste de conectividade público", description = "Endpoint público de teste para verificar se o serviço está funcionando")
+    public ResponseEntity<Map<String, Object>> publicTest() {
+        log.info("GET /api/accounts-receivable/public/test - Testando conectividade");
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "testing");
+        result.put("message", "Testando serviço...");
+        
+        try {
+            // Teste simples: apenas chamar o serviço
+            log.info("Chamando accountsReceivableService.getAccountsReceivable()...");
+            var accounts = accountsReceivableService.getAccountsReceivable();
+            
+            result.put("status", "ok");
+            result.put("message", "Serviço funcionando");
+            result.put("totalAccounts", accounts.size());
+            
+        } catch (Exception e) {
+            log.error("Erro no teste: ", e);
+            result.put("status", "error");
+            result.put("message", e.getMessage());
+            result.put("error", e.getClass().getSimpleName());
+        }
+        
+        return ResponseEntity.ok(result);
     }
 }
