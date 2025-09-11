@@ -56,6 +56,10 @@ public class TrainingService {
         return trainingRepository.findByProviderContainingIgnoreCase(provider);
     }
     
+    public List<Training> findAll() {
+        return trainingRepository.findAll();
+    }
+    
     private void validateTraining(Training training) {
         if (training.getName() == null || training.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Nome do treinamento é obrigatório");

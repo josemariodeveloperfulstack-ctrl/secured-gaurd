@@ -91,6 +91,23 @@ public class DocumentService {
         return documentRepository.findByExpirationDateBefore(threeMonthsFromNow);
     }
     
+    // Métodos de contagem para estatísticas
+    public long countAll() {
+        return documentRepository.count();
+    }
+    
+    public long countSigned() {
+        return documentRepository.countBySignedTrue();
+    }
+    
+    public long countPending() {
+        return documentRepository.countBySignedFalse();
+    }
+    
+    public long countExpired() {
+        return documentRepository.countByExpirationDateBefore(LocalDateTime.now());
+    }
+    
     @Transactional
     public Document uploadFile(UUID documentId, MultipartFile file) {
         Document document = findById(documentId);

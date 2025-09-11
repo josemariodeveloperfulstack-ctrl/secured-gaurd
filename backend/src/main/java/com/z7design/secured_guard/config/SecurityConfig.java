@@ -76,8 +76,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/fuel-records/**").authenticated()
                 // Endpoints de veículos - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/vehicles/**").authenticated()
-                // Endpoints de work-posts - requerem permissões específicas
-                .requestMatchers("/api/work-posts/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                // Endpoints de work-posts - requerem apenas autenticação (temporário para debug)
+                .requestMatchers("/api/work-posts/**").authenticated()
                 // Endpoints de clientes - requerem permissões específicas
                 .requestMatchers("/api/clients/**").hasAnyAuthority("CLIENTS_READ", "CLIENTS_WRITE", "CLIENTS_CREATE", "CLIENTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de contratos - requerem permissões específicas
@@ -105,6 +105,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/messages/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
                 // Endpoints de funcionários - requerem permissões específicas
                 .requestMatchers("/api/employees/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
+                // Endpoints de cargos/posições - requerem permissões específicas
+                .requestMatchers("/api/positions/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
                 // Endpoints de multas - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/fines/**").authenticated()
                 // Endpoints de medições - requerem permissões específicas

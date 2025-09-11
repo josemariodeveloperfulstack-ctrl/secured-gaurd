@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -38,97 +38,22 @@ import {
   Star,
   TrendingUp
 } from 'lucide-react';
+import { documentService, Document as ApiDocument } from '@/services/documentService';
+import { useToast } from '@/hooks/use-toast';
 
-const mockDocuments = [
-  {
-    id: 1,
-    type: 'Termo LGPD',
-    status: 'PENDENTE',
-    generatedAt: '2024-07-18 10:00',
-    signedAt: null,
-    signedBy: null,
-    hash: null,
-    url: '/mock/termo-lgpd.pdf',
-    category: 'Compliance',
-    priority: 'Alta',
-    employee: {
-      name: 'João da Silva',
-      cpf: '123.456.789-00',
-      rg: 'MG-12.345.678',
-      address: 'Rua das Flores, 123, Centro, Contagem/MG',
-      company: 'PROMOVER TERCEIRIZACAO & SERVIÇOS LTDA',
-      unit: 'Unidade Centro',
-      cnpj: '12.345.678/0001-99',
-      companyAddress: 'Av. das Empresas, 456, Centro, Contagem/MG'
-    }
-  },
-  {
-    id: 2,
-    type: 'Contrato de Trabalho',
-    status: 'ASSINADO',
-    generatedAt: '2024-07-10 09:00',
-    signedAt: '2024-07-10 09:30',
-    signedBy: 'João da Silva',
-    hash: 'abc123hash',
-    url: '/mock/contrato-trabalho.pdf',
-    category: 'Trabalho',
-    priority: 'Alta',
-    employee: {
-      name: 'João da Silva',
-      cpf: '123.456.789-00',
-      rg: 'MG-12.345.678',
-      address: 'Rua das Flores, 123, Centro, Contagem/MG',
-      company: 'PROMOVER TERCEIRIZACAO & SERVIÇOS LTDA',
-      unit: 'Unidade Centro',
-      cnpj: '12.345.678/0001-99',
-      companyAddress: 'Av. das Empresas, 456, Centro, Contagem/MG'
-    }
-  },
-  {
-    id: 3,
-    type: 'Termo de Responsabilidade',
-    status: 'VENCIDO',
-    generatedAt: '2024-06-15 14:00',
-    signedAt: '2024-06-15 14:30',
-    signedBy: 'João da Silva',
-    hash: 'def456hash',
-    url: '/mock/termo-responsabilidade.pdf',
-    category: 'Responsabilidade',
-    priority: 'Média',
-    employee: {
-      name: 'João da Silva',
-      cpf: '123.456.789-00',
-      rg: 'MG-12.345.678',
-      address: 'Rua das Flores, 123, Centro, Contagem/MG',
-      company: 'PROMOVER TERCEIRIZACAO & SERVIÇOS LTDA',
-      unit: 'Unidade Centro',
-      cnpj: '12.345.678/0001-99',
-      companyAddress: 'Av. das Empresas, 456, Centro, Contagem/MG'
-    }
-  },
-  {
-    id: 4,
-    type: 'Ficha de Registro',
-    status: 'ASSINADO',
-    generatedAt: '2024-07-20 11:00',
-    signedAt: '2024-07-20 11:15',
-    signedBy: 'João da Silva',
-    hash: 'ghi789hash',
-    url: '/mock/ficha-registro.pdf',
-    category: 'Registro',
-    priority: 'Baixa',
-    employee: {
-      name: 'João da Silva',
-      cpf: '123.456.789-00',
-      rg: 'MG-12.345.678',
-      address: 'Rua das Flores, 123, Centro, Contagem/MG',
-      company: 'PROMOVER TERCEIRIZACAO & SERVIÇOS LTDA',
-      unit: 'Unidade Centro',
-      cnpj: '12.345.678/0001-99',
-      companyAddress: 'Av. das Empresas, 456, Centro, Contagem/MG'
-    }
-  }
-];
+// Tipagem local que a UI deste painel utiliza
+type PanelDocument = {
+  id: string;
+  type: string;
+  status: 'ASSINADO' | 'PENDENTE' | 'VENCIDO';
+  generatedAt?: string;
+  signedAt?: string | null;
+  signedBy?: string | null;
+  url?: string | null;
+  category: string; // derivada
+  priority: 'Alta' | 'Média' | 'Baixa'; // derivada
+  employee?: { name?: string } | null;
+};
 
 const documentCategories = [
   'Compliance',
@@ -149,11 +74,72 @@ const priorityLevels = [
 const EmployeeDocumentsPanel = () => {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [open, setOpen] = useState(false);
-  const [docs, setDocs] = useState(mockDocuments);
+  const [docs, setDocs] = useState<PanelDocument[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      setLoading(true);
+      try {
+        const apiDocs = await documentService.getAllDocuments();
+        const mapped: PanelDocument[] = apiDocs.map((d: ApiDocument & { signed?: boolean; signatureDate?: string; signedBy?: string; }) => {
+          const now = new Date();
+          const exp = d.expirationDate ? new Date(d.expirationDate) : null;
+          const isExpired = !!(exp && exp.getTime() <= now.getTime());
+          const status: 'ASSINADO' | 'PENDENTE' | 'VENCIDO' = d['signed'] ? 'ASSINADO' : (isExpired ? 'VENCIDO' : 'PENDENTE');
+
+          // prioridade baseada em vencimento
+          let priority: 'Alta' | 'Média' | 'Baixa' = 'Baixa';
+          if (isExpired) {
+            priority = 'Alta';
+          } else if (exp && (exp.getTime() - now.getTime()) <= 30 * 24 * 60 * 60 * 1000) {
+            priority = 'Média';
+          }
+
+          // categoria simples derivada do tipo
+          const category = mapTypeToCategory(String(d.type));
+
+          return {
+            id: d.id,
+            type: String(d.type),
+            status,
+            generatedAt: d.issueDate || d.createdAt,
+            signedAt: (d as any).signatureDate || null,
+            signedBy: (d as any).signedBy || null,
+            url: d.fileUrl || null,
+            category,
+            priority,
+            employee: null
+          };
+        });
+        setDocs(mapped);
+      } catch (error) {
+        toast({ title: 'Erro', description: 'Falha ao carregar documentos.', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocs();
+  }, []);
+
+  const mapTypeToCategory = (type: string): string => {
+    switch (type) {
+      case 'CONTRATO_TRABALHO':
+      case 'CARTEIRA_TRABALHO':
+        return 'Trabalho';
+      case 'CPF':
+      case 'RG':
+      case 'COMPROVANTE_RESIDENCIA':
+        return 'Registro';
+      default:
+        return 'Outros';
+    }
+  };
 
   // Calcular estatísticas
   const stats = useMemo(() => {
@@ -168,16 +154,14 @@ const EmployeeDocumentsPanel = () => {
   // Filtrar documentos
   const filteredDocs = useMemo(() => {
     return docs.filter(doc => {
+      const term = searchTerm.toLowerCase();
       const matchesSearch = (
-        doc.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.employee.name.toLowerCase().includes(searchTerm.toLowerCase())
+        doc.type.toLowerCase().includes(term) ||
+        doc.category.toLowerCase().includes(term)
       );
-      
       const matchesStatus = statusFilter === 'ALL' || doc.status === statusFilter;
       const matchesCategory = categoryFilter === 'ALL' || doc.category === categoryFilter;
       const matchesPriority = priorityFilter === 'ALL' || doc.priority === priorityFilter;
-      
       return matchesSearch && matchesStatus && matchesCategory && matchesPriority;
     });
   }, [docs, searchTerm, statusFilter, categoryFilter, priorityFilter]);
@@ -388,7 +372,11 @@ const EmployeeDocumentsPanel = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredDocs.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Carregando documentos...</p>
+            </div>
+          ) : filteredDocs.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <h3 className="text-lg font-medium mb-2">

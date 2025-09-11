@@ -295,6 +295,22 @@ public class DocumentController {
         }
     }
 
+    @Operation(summary = "Estatísticas de documentos", description = "Retorna contadores de documentos por status")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Estatísticas retornadas com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    @GetMapping("/stats")
+    public ResponseEntity<DocumentStats> getDocumentStats() {
+        long total = documentService.countAll();
+        long signed = documentService.countSigned();
+        long pending = documentService.countPending();
+        long expired = documentService.countExpired();
+        
+        DocumentStats stats = new DocumentStats(total, signed, pending, expired);
+        return ResponseEntity.ok(stats);
+    }
+
     @GetMapping(value = "/test-pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> testPdf() {
         try {
@@ -321,6 +337,27 @@ public class DocumentController {
             log.error("Erro ao gerar PDF de teste: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    // Classe interna para estatísticas
+    public static class DocumentStats {
+        private final long total;
+        private final long signed;
+        private final long pending;
+        private final long expired;
+        
+        public DocumentStats(long total, long signed, long pending, long expired) {
+            this.total = total;
+            this.signed = signed;
+            this.pending = pending;
+            this.expired = expired;
+        }
+        
+        // Getters
+        public long getTotal() { return total; }
+        public long getSigned() { return signed; }
+        public long getPending() { return pending; }
+        public long getExpired() { return expired; }
     }
 
 } 

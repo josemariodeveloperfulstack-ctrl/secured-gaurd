@@ -26,9 +26,26 @@ import {
   Users,
   Shield
 } from 'lucide-react';
+import { trainingService, EmployeeCertification } from '@/services/trainingService';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock de dados de treinamentos
-const mockTrainings = [
+// Estrutura local da linha para a UI
+type TrainingRow = {
+  id: string;
+  employee: string;
+  cpf?: string;
+  position?: string;
+  sector?: string;
+  workSchedule?: string;
+  validUntil: string;
+  status: 'valid' | 'expiring' | 'expired';
+  lastUpdate?: string;
+  trainingType: string;
+  instructor?: string;
+  hours?: number;
+};
+
+const mockTrainings: TrainingRow[] = [
   {
     id: 1,
     employee: 'João Silva',
@@ -117,11 +134,41 @@ const trainingTypes = [
 const EmployeeTrainingTab = () => {
   const [open, setOpen] = useState(false);
   const [editData, setEditData] = useState(null);
-  const [trainings, setTrainings] = useState(mockTrainings);
+  const [trainings, setTrainings] = useState<TrainingRow[]>(mockTrainings);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [positionFilter, setPositionFilter] = useState('all');
   const [trainingTypeFilter, setTrainingTypeFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        // Buscar certificações de funcionários (histórico de treinamentos concluídos)
+        const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
+        const rows: TrainingRow[] = certs.map(c => {
+          const validUntil = c.expirationDate || '';
+          const status = getTrainingStatus(validUntil);
+          return {
+            id: c.id,
+            employee: (c as any).employee?.name || (c as any).employee?.id || 'Funcionário',
+            validUntil,
+            status,
+            trainingType: c.training?.name || 'Treinamento',
+            hours: c.training?.duration,
+          };
+        });
+        setTrainings(rows);
+      } catch (e) {
+        toast({ title: 'Erro', description: 'Falha ao carregar treinamentos.', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   // Calcular estatísticas
   const getStats = () => {
@@ -215,49 +262,49 @@ const EmployeeTrainingTab = () => {
     <div className="space-y-6">
       {/* Dashboard de Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-blue-600" />
+              <Users className="h-5 w-5 text-blue-500" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Total</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-sm font-medium text-seguranca-lightgray">Total</p>
+                <p className="text-2xl font-bold text-seguranca-lightgray">{stats.total}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <CheckCircle className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Válidos</p>
-                <p className="text-2xl font-bold text-green-600">{stats.valid}</p>
+                <p className="text-sm font-medium text-seguranca-lightgray">Válidos</p>
+                <p className="text-2xl font-bold text-green-500">{stats.valid}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-yellow-600" />
+              <Clock className="h-5 w-5 text-yellow-500" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Expirando</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.expiring}</p>
+                <p className="text-sm font-medium text-seguranca-lightgray">Expirando</p>
+                <p className="text-2xl font-bold text-yellow-500">{stats.expiring}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <AlertTriangle className="h-5 w-5 text-red-500" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Expirados</p>
-                <p className="text-2xl font-bold text-red-600">{stats.expired}</p>
+                <p className="text-sm font-medium text-seguranca-lightgray">Expirados</p>
+                <p className="text-2xl font-bold text-red-500">{stats.expired}</p>
               </div>
             </div>
           </CardContent>
@@ -265,10 +312,10 @@ const EmployeeTrainingTab = () => {
       </div>
 
       {/* Filtros e Busca */}
-      <Card>
+      <Card className="bg-seguranca-graphite border-gray-600">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
+            <div className="flex items-center gap-2 ">
               <Filter className="h-5 w-5" />
               Filtros e Busca
             </div>
@@ -281,7 +328,7 @@ const EmployeeTrainingTab = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>Buscar</Label>
+              <Label className="text-seguranca-lightgray">Buscar</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <Input
@@ -294,7 +341,7 @@ const EmployeeTrainingTab = () => {
             </div>
             
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label className="text-seguranca-lightgray">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os status" />
@@ -309,7 +356,7 @@ const EmployeeTrainingTab = () => {
             </div>
             
             <div className="space-y-2">
-              <Label>Cargo</Label>
+              <Label className="text-seguranca-lightgray">Cargo</Label>
               <Select value={positionFilter} onValueChange={setPositionFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os cargos" />
@@ -324,7 +371,7 @@ const EmployeeTrainingTab = () => {
             </div>
             
             <div className="space-y-2">
-              <Label>Tipo de Treinamento</Label>
+              <Label className="text-seguranca-lightgray">Tipo de Treinamento</Label>
               <Select value={trainingTypeFilter} onValueChange={setTrainingTypeFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os tipos" />
@@ -342,19 +389,22 @@ const EmployeeTrainingTab = () => {
       </Card>
 
       {/* Lista de Treinamentos */}
-      <Card>
+      <Card className="bg-seguranca-graphite border-gray-600">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-seguranca-lightgray">
             <FileText className="h-5 w-5" />
             Treinamentos ({filteredTrainings.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {loading && (
+            <div className="text-center py-6 text-seguranca-lightgray">Carregando...</div>
+          )}
           <div className="overflow-x-auto">
             {/* Tabela Desktop */}
             <table className="min-w-full border text-sm hidden md:table">
               <thead>
-                <tr className="bg-muted">
+                <tr className="bg-seguranca-black text-seguranca-lightgray">
                   <th className="px-3 py-2 border text-left">Funcionário</th>
                   <th className="px-3 py-2 border text-left">Cargo</th>
                   <th className="px-3 py-2 border text-left">Setor</th>
@@ -368,7 +418,7 @@ const EmployeeTrainingTab = () => {
               <tbody>
                 {filteredTrainings.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={8} className="text-center py-8 text-seguranca-lightgray">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-8 w-8 text-gray-400" />
                         <p>Nenhum treinamento encontrado</p>
@@ -378,25 +428,25 @@ const EmployeeTrainingTab = () => {
                   </tr>
                 ) : (
                   filteredTrainings.map(t => (
-                    <tr key={t.id} className="border-b hover:bg-gray-50">
+                    <tr key={t.id} className="border-b hover:bg-seguranca-black/40">
                       <td className="px-3 py-3 border">
                         <div>
-                          <div className="font-medium">{t.employee}</div>
-                          <div className="text-xs text-gray-500">{t.cpf}</div>
+                          <div className="font-medium text-seguranca-lightgray">{t.employee}</div>
+                          <div className="text-xs text-seguranca-lightgray/70">{t.cpf}</div>
                         </div>
                       </td>
                       <td className="px-3 py-3 border">{t.position}</td>
                       <td className="px-3 py-3 border">{t.sector}</td>
                       <td className="px-3 py-3 border">
                         <div>
-                          <div className="font-medium">{t.trainingType}</div>
-                          <div className="text-xs text-gray-500">{t.hours}h</div>
+                          <div className="font-medium text-seguranca-lightgray">{t.trainingType}</div>
+                          <div className="text-xs text-seguranca-lightgray/70">{t.hours}h</div>
                         </div>
                       </td>
                       <td className="px-3 py-3 border">
                         <div>
-                          <div>{new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-seguranca-lightgray">{new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
+                          <div className="text-xs text-seguranca-lightgray/70">
                             {Math.ceil((new Date(t.validUntil).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} dias
                           </div>
                         </div>
@@ -427,18 +477,18 @@ const EmployeeTrainingTab = () => {
             {/* Cards Mobile */}
             <div className="flex flex-col gap-4 md:hidden">
               {filteredTrainings.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-seguranca-lightgray">
                   <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
                   <p>Nenhum treinamento encontrado</p>
                   <p className="text-sm">Tente ajustar os filtros de busca</p>
                 </div>
               ) : (
                 filteredTrainings.map(t => (
-                  <Card key={t.id} className="p-4">
+                  <Card key={t.id} className="p-4 bg-seguranca-graphite border-gray-600">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="font-medium">{t.employee}</h3>
-                        <p className="text-sm text-gray-500">{t.cpf}</p>
+                        <h3 className="font-medium text-seguranca-lightgray">{t.employee}</h3>
+                        <p className="text-sm text-seguranca-lightgray/70">{t.cpf}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {getStatusIcon(t.status)}
@@ -447,12 +497,12 @@ const EmployeeTrainingTab = () => {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                      <div><span className="font-medium">Cargo:</span> {t.position}</div>
-                      <div><span className="font-medium">Setor:</span> {t.sector}</div>
-                      <div><span className="font-medium">Treinamento:</span> {t.trainingType}</div>
-                      <div><span className="font-medium">Instrutor:</span> {t.instructor}</div>
-                      <div><span className="font-medium">Validade:</span> {new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
-                      <div><span className="font-medium">Carga Horária:</span> {t.hours}h</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Cargo:</span> {t.position}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Setor:</span> {t.sector}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Treinamento:</span> {t.trainingType}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Instrutor:</span> {t.instructor}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Validade:</span> {new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Carga Horária:</span> {t.hours}h</div>
                     </div>
                     
                     <div className="flex gap-2">

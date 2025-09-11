@@ -55,7 +55,7 @@ public class WorkPost {
     
     // Cliente
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "client_id", nullable = false)
+    @JoinColumn(name = "client_id", nullable = true)
     private Client client;
     
     // Contrato
@@ -162,4 +162,4 @@ public class WorkPost {
     public void setWorkSchedules(List<WorkSchedule> workSchedules) {
         this.workSchedules = workSchedules;
     }
-} 
+}

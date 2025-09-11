@@ -1,404 +1,157 @@
-# Design Document
+# 🎨 Sistema de Arquivos e Pastas - Design
 
-## Overview
+## 1. Arquitetura do Sistema
 
-O Sistema de Arquivos e Pastas (Explorer) é um explorador de arquivos web integrado ao SecuredGuard que permite aos usuários navegar, criar, mover, editar e gerenciar arquivos e diretórios com controle de permissões e segurança. O sistema utiliza uma arquitetura baseada em Spring Boot no backend e React.js no frontend, seguindo os padrões já estabelecidos no projeto.
-
-**Observação Importante:** O sistema já possui uma implementação básica do backend com algumas funcionalidades implementadas. Este design irá expandir e completar as funcionalidades existentes, especialmente no frontend e nas funcionalidades avançadas do backend.
-
-## Architecture
-
-### Backend Architecture (Spring Boot)
-
-O backend segue a arquitetura em camadas já estabelecida no projeto:
-
+### 1.1 Backend (Spring Boot)
 ```
-Controller Layer (FileSystemController) 
-    ↓
-Service Layer (FileSystemService)
-    ↓
-Repository Layer (FileSystemRepository)
-    ↓
-Database Layer (PostgreSQL)
-    ↓
-File System Layer (Local Storage)
+FileExplorerController
+├── FileExplorerService
+├── FileSystemService (operações de arquivo)
+└── PermissionService (controle de acesso)
 ```
 
-### Frontend Architecture (React.js)
-
-O frontend seguirá a arquitetura de componentes React já estabelecida:
-
+### 1.2 Frontend (React)
 ```
-Pages/
-├── FileExplorer/
-│   ├── FileExplorerPage.tsx (Main container)
-│   └── components/
-│       ├── FileTree.tsx (Left panel - folder tree)
-│       ├── FileGrid.tsx (Right panel - file/folder grid)
-│       ├── FileToolbar.tsx (Top toolbar with actions)
-│       ├── FileUpload.tsx (Upload component with drag & drop)
-│       ├── FileContextMenu.tsx (Right-click context menu)
-│       ├── CreateFolderModal.tsx (Modal for creating folders)
-│       ├── RenameModal.tsx (Modal for renaming items)
-│       └── FilePreview.tsx (File preview component)
+FileExplorer/
+├── components/
+│   ├── FileTree.tsx          # Árvore de pastas (sidebar)
+│   ├── FileGrid.tsx          # Grid de arquivos (main)
+│   ├── FileUpload.tsx        # Upload de arquivos
+│   ├── FileActions.tsx       # Botões de ação
+│   └── FilePreview.tsx       # Preview de arquivos
+├── hooks/
+│   ├── useFileSystem.ts      # Hook para operações
+│   └── useFileUpload.ts      # Hook para upload
+└── types/
+    └── FileSystem.ts         # Tipos TypeScript
 ```
 
-### Data Flow
+## 2. Modelos de Dados
 
-```mermaid
-graph TD
-    A[User Action] --> B[React Component]
-    B --> C[API Service]
-    C --> D[Spring Controller]
-    D --> E[Service Layer]
-    E --> F[Repository Layer]
-    F --> G[Database]
-    E --> H[File System]
-    H --> I[Local Storage]
-    G --> J[Response]
-    I --> J
-    J --> K[Frontend Update]
-```
-
-## Components and Interfaces
-
-### Backend Components
-
-#### 1. FileSystemController (Existing - Needs Enhancement)
-**Status:** Parcialmente implementado
-**Enhancements Needed:**
-- Implementar funcionalidade de mover arquivos/pastas
-- Implementar busca de arquivos
-- Implementar obtenção de informações detalhadas de itens
-- Adicionar validação de permissões mais robusta
-
-#### 2. FileSystemService (Existing - Needs Enhancement)
-**Status:** Implementado com funcionalidades básicas
-**Enhancements Needed:**
-- Implementar moveItem() method
-- Implementar searchFiles() method
-- Implementar getItemInfo() method
-- Adicionar suporte a operações em lote
-- Melhorar tratamento de erros
-
-#### 3. FileSystemRepository (Existing)
-**Status:** Implementado
-**Additional Methods Needed:**
-```java
-List<FileSystemItem> findByOwnerAndNameContainingIgnoreCase(User owner, String name);
-List<FileSystemItem> findByParentAndNotDeleted(FileSystemItem parent);
-Optional<FileSystemItem> findByOwnerAndFullPath(User owner, String fullPath);
-```
-
-### Frontend Components
-
-#### 1. FileExplorerPage (New)
-**Purpose:** Main container component that manages the overall state and layout
-**Props:** None (route-based)
-**State:**
-- currentPath: string
-- selectedItems: FileSystemItem[]
-- isLoading: boolean
-- files: FileSystemItem[]
-- folders: FileSystemItem[]
-
-#### 2. FileTree (New)
-**Purpose:** Left panel showing folder hierarchy
-**Props:**
-- folders: FileSystemItem[]
-- currentPath: string
-- onFolderSelect: (path: string) => void
-- onFolderExpand: (folderId: string) => void
-
-#### 3. FileGrid (New)
-**Purpose:** Right panel showing files and folders in grid/list view
-**Props:**
-- items: FileSystemItem[]
-- selectedItems: FileSystemItem[]
-- onItemSelect: (item: FileSystemItem) => void
-- onItemDoubleClick: (item: FileSystemItem) => void
-- viewMode: 'grid' | 'list'
-
-#### 4. FileToolbar (New)
-**Purpose:** Top toolbar with action buttons
-**Props:**
-- selectedItems: FileSystemItem[]
-- onUpload: () => void
-- onCreateFolder: () => void
-- onDelete: () => void
-- onRename: () => void
-- onDownload: () => void
-
-#### 5. FileUpload (New)
-**Purpose:** Drag & drop upload component
-**Props:**
-- currentPath: string
-- onUploadComplete: (files: FileSystemItem[]) => void
-- maxFileSize: number
-- acceptedTypes: string[]
-
-## Data Models
-
-### Existing Models (Already Implemented)
-
-#### FileSystemItem Entity
-```java
-@Entity
-@Table(name = "file_system_items")
-public class FileSystemItem {
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
-    
-    @Column(nullable = false)
-    private String name;
-    
-    @Column(nullable = false)
-    private String path;
-    
-    @Enumerated(EnumType.STRING)
-    private ItemType type; // FILE, FOLDER
-    
-    private Long size;
-    private String mimeType;
-    private String fileExtension;
-    
-    @ManyToOne
-    private FileSystemItem parent;
-    
-    @ManyToOne(nullable = false)
-    private User owner;
-    
-    @Builder.Default
-    private Boolean isDeleted = false;
-    
-    private LocalDateTime createdAt;
-    private LocalDateTime modifiedAt;
-    private String physicalPath;
-}
-```
-
-### Frontend Models
-
-#### FileSystemItem Interface
+### 2.1 FileItem (TypeScript)
 ```typescript
-interface FileSystemItem {
+interface FileItem {
   id: string;
   name: string;
   path: string;
-  type: 'FILE' | 'FOLDER';
+  type: 'file' | 'folder';
   size?: number;
   mimeType?: string;
-  fileExtension?: string;
-  parentId?: string;
-  ownerId: string;
-  isDeleted: boolean;
-  createdAt: string;
-  modifiedAt: string;
-  displaySize: string;
-  fullPath: string;
+  createdAt: Date;
+  updatedAt: Date;
+  permissions: FilePermissions;
+}
+
+interface FilePermissions {
+  canRead: boolean;
+  canWrite: boolean;
+  canDelete: boolean;
+  canShare: boolean;
 }
 ```
 
-#### FileSystemResponse Interface
-```typescript
-interface FileSystemResponse {
-  success: boolean;
-  message: string;
-  data?: FileSystemItem | FileSystemItem[];
-  error?: string;
-}
-```
-
-### API Request/Response Models
-
-#### CreateFolderRequest (Existing)
+### 2.2 FileSystemNode (Java)
 ```java
-public class CreateFolderRequest {
-    @NotBlank
+@Entity
+@Table(name = "file_system_nodes")
+public class FileSystemNode {
+    @Id
+    private UUID id;
     private String name;
-    
-    @NotNull
+    private String path;
     private String parentPath;
+    private FileType type;
+    private Long size;
+    private String mimeType;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private UUID createdBy;
 }
 ```
 
-#### UploadFileRequest (New)
-```java
-public class UploadFileRequest {
-    @NotNull
-    private MultipartFile file;
-    
-    @NotNull
-    private String parentPath;
-    
-    private String description;
-}
+## 3. APIs REST
+
+### 3.1 Endpoints Principais
+```
+GET    /api/files                    # Listar arquivos/pastas
+POST   /api/files/folders            # Criar pasta
+POST   /api/files/upload             # Upload arquivo
+GET    /api/files/{id}/download      # Download arquivo
+PUT    /api/files/{id}               # Renomear/mover
+DELETE /api/files/{id}               # Excluir
+GET    /api/files/{id}/preview       # Preview arquivo
 ```
 
-#### MoveItemRequest (Existing - Needs Implementation)
-```java
-public class MoveItemRequest {
-    @NotBlank
-    private String targetPath;
-}
+### 3.2 Parâmetros de Query
+```
+?path=/documents/reports             # Filtrar por caminho
+?type=file|folder                    # Filtrar por tipo
+?search=nome                         # Buscar por nome
+?sort=name|size|date                 # Ordenação
+?order=asc|desc                      # Direção da ordenação
 ```
 
-## Error Handling
+## 4. Interface do Usuário
 
-### Backend Error Handling
-- **FileNotFoundException:** Quando arquivo/pasta não é encontrado
-- **AccessDeniedException:** Quando usuário não tem permissão
-- **DuplicateNameException:** Quando nome já existe no diretório
-- **StorageException:** Quando há problemas no sistema de arquivos
-- **FileSizeException:** Quando arquivo excede limite de tamanho
+### 4.1 Layout Principal
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🗂️ File Explorer                                        │
+├─────────────┬───────────────────────────────────────────┤
+│ 📁 Folders  │ 📄 Files                                  │
+│             │                                           │
+│ 📂 documents│ ┌─────┐ ┌─────┐ ┌─────┐                   │
+│   📂 reports│ │📄   │ │📄   │ │📄   │                   │
+│   📂 images │ │file1│ │file2│ │file3│                   │
+│ 📂 unified  │ └─────┘ └─────┘ └─────┘                   │
+│             │                                           │
+│             │ [Upload] [New Folder] [Delete] [Rename]   │
+└─────────────┴───────────────────────────────────────────┘
+```
 
-### Frontend Error Handling
-- Toast notifications para erros de operação
-- Loading states durante operações
-- Retry mechanisms para falhas de rede
-- Validation feedback em formulários
+### 4.2 Componentes UI
+- **FileTree**: Árvore expansível de pastas
+- **FileGrid**: Grid responsivo de arquivos
+- **FileUpload**: Drag & drop + botão upload
+- **FileActions**: Toolbar com ações
+- **FilePreview**: Modal para preview
 
-## Testing Strategy
+## 5. Funcionalidades
 
-### Backend Testing
+### 5.1 Navegação
+- Clique em pasta → navegar
+- Breadcrumb para caminho atual
+- Botão "voltar" para pasta pai
 
-#### Unit Tests
-- **FileSystemServiceTest:** Testar todas as operações CRUD
-- **FileSystemControllerTest:** Testar endpoints e validações
-- **FileSystemRepositoryTest:** Testar queries customizadas
+### 5.2 Upload
+- Drag & drop de arquivos
+- Upload múltiplo
+- Barra de progresso
+- Validação de tipo/tamanho
 
-#### Integration Tests
-- **FileSystemIntegrationTest:** Testar fluxo completo de operações
-- **FileUploadIntegrationTest:** Testar upload de arquivos grandes
-- **PermissionIntegrationTest:** Testar controle de acesso
+### 5.3 Ações
+- Criar pasta (modal com nome)
+- Renomear (inline editing)
+- Excluir (confirmação)
+- Download (link direto)
+- Mover (drag & drop)
 
-### Frontend Testing
+## 6. Integração com Sistema Existente
 
-#### Component Tests
-- **FileTree.test.tsx:** Testar navegação e expansão de pastas
-- **FileGrid.test.tsx:** Testar seleção e visualização de itens
-- **FileUpload.test.tsx:** Testar drag & drop e upload
+### 6.1 Aproveitamento
+- Usar `UnifiedDocumentController` como referência
+- Estender sistema de permissões atual
+- Integrar com estrutura de uploads existente
+- Manter padrão de resposta da API
 
-#### E2E Tests
-- **file-explorer.e2e.ts:** Testar fluxo completo do usuário
-- **file-operations.e2e.ts:** Testar operações de arquivo
-- **permissions.e2e.ts:** Testar controle de permissões
+### 6.2 Roteamento
+- Nova rota: `/file-explorer`
+- Integrar com sidebar existente
+- Adicionar ao menu "OPERACIONAL"
 
-### Performance Testing
-- **Load Testing:** Testar com até 10.000 arquivos por diretório
-- **Upload Testing:** Testar upload de arquivos até 100MB
-- **Concurrent Access:** Testar múltiplos usuários simultâneos
-
-## Security Considerations
-
-### Authentication & Authorization
-- JWT token validation em todas as operações
-- Verificação de ownership de arquivos/pastas
-- Role-based permissions (Admin, Editor, Viewer)
-- Path traversal protection
-
-### File Security
-- Validação de tipos de arquivo permitidos
-- Scan de malware em uploads (futuro)
+## 7. Segurança
+- Validação de permissões por pasta
 - Sanitização de nomes de arquivo
-- Limite de tamanho por arquivo e por usuário
-
-### API Security
-- Rate limiting em endpoints de upload
-- CSRF protection
-- Input validation e sanitização
-- Audit logging de todas as operações
-
-## Performance Optimizations
-
-### Backend Optimizations
-- Lazy loading de relacionamentos JPA
-- Paginação para listagem de arquivos
-- Cache de metadados de arquivos
-- Async processing para uploads grandes
-
-### Frontend Optimizations
-- Virtual scrolling para listas grandes
-- Lazy loading de thumbnails
-- Debounced search
-- Progressive loading de diretórios
-
-### Storage Optimizations
-- Estrutura de diretórios otimizada por usuário
-- Cleanup de arquivos deletados (soft delete)
-- Compressão de arquivos (futuro)
-- CDN para arquivos estáticos (futuro)
-
-## Implementation Phases
-
-### Phase 1: Complete Backend Implementation
-- Implementar funcionalidades faltantes no FileSystemService
-- Adicionar validações robustas
-- Implementar testes unitários
-- Melhorar tratamento de erros
-
-### Phase 2: Frontend Basic Implementation
-- Criar componentes básicos do explorador
-- Implementar navegação de pastas
-- Implementar upload básico
-- Integrar com APIs do backend
-
-### Phase 3: Advanced Features
-- Implementar drag & drop
-- Adicionar context menus
-- Implementar busca de arquivos
-- Adicionar preview de arquivos
-
-### Phase 4: Polish & Optimization
-- Melhorar UX/UI
-- Otimizar performance
-- Adicionar testes E2E
-- Implementar features avançadas
-
-## Technical Decisions
-
-### Storage Strategy
-**Decision:** Local file system storage
-**Rationale:** Simplicidade inicial, controle total, sem custos de cloud
-**Future:** Migração para S3/Cloud Storage quando necessário
-
-### Database Strategy
-**Decision:** PostgreSQL com soft delete
-**Rationale:** Consistência com o resto do sistema, auditoria, recuperação
-
-### Frontend State Management
-**Decision:** React hooks com Context API
-**Rationale:** Simplicidade, sem overhead de Redux para este escopo
-
-### File Upload Strategy
-**Decision:** Multipart upload com progress tracking
-**Rationale:** Melhor UX, suporte a arquivos grandes, feedback visual
-
-## Monitoring and Logging
-
-### Backend Monitoring
-- Log de todas as operações de arquivo
-- Métricas de uso de storage por usuário
-- Performance metrics de operações
-- Error tracking e alertas
-
-### Frontend Monitoring
-- User interaction tracking
-- Performance metrics (load times)
-- Error boundary logging
-- Usage analytics
-
-## Future Enhancements
-
-### Version 2.0 Features
-- Compartilhamento de arquivos/pastas
-- Controle de versão de arquivos
-- Colaboração em tempo real
-- Preview avançado (PDF, Office docs)
-
-### Version 3.0 Features
-- Integração com cloud storage
-- Sync offline/online
-- Mobile app
-- Advanced search com indexação de conteúdo
+- Validação de tipos MIME
+- Limite de tamanho por arquivo
+- Prevenção de path traversal

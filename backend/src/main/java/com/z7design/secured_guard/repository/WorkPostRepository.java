@@ -19,7 +19,11 @@ import java.util.UUID;
 public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UUID> {
     
     // Buscar todos os postos com relacionamentos carregados
-    @Query("SELECT wp FROM WorkPost wp LEFT JOIN FETCH wp.client LEFT JOIN FETCH wp.contract LEFT JOIN FETCH wp.responsible ORDER BY wp.name")
+    @Query("SELECT DISTINCT wp FROM WorkPost wp " +
+           "LEFT JOIN FETCH wp.client c " +
+           "LEFT JOIN FETCH wp.contract ct " +
+           "LEFT JOIN FETCH wp.responsible r " +
+           "ORDER BY wp.name")
     List<WorkPost> findAllWithRelations();
     
     // Buscar por código do posto
@@ -99,4 +103,4 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     
     // Verificar se código do posto já existe
     boolean existsByPostCode(String postCode);
-} 
+}

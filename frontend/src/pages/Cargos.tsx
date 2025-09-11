@@ -47,11 +47,13 @@ const CargosPage: React.FC = () => {
 
   const fetchUnits = useCallback(async () => {
     try {
-      const data = await unitService.getAllUnits();
-      setUnits(data);
+      const units = await unitService.getAllUnits();
+      setUnits(units);
+      console.log('Unidades carregadas:', units);
     } catch (error) {
+      console.error('Erro ao carregar unidades:', error);
       toast({
-        title: 'Erro ao buscar unidades',
+        title: 'Erro ao carregar unidades',
         description: 'Não foi possível carregar a lista de unidades. Tente novamente.',
         variant: 'destructive',
       });

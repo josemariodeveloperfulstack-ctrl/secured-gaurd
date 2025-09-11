@@ -20,4 +20,9 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     List<Document> findByExpirationDateBefore(LocalDateTime date);
     
     List<Document> findByEmployeeIdAndType(UUID employeeId, DocumentType type);
-} 
+    
+    // Métodos de contagem para estatísticas
+    long countBySignedTrue();
+    long countBySignedFalse();
+    long countByExpirationDateBefore(LocalDateTime date);
+}

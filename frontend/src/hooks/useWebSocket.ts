@@ -36,6 +36,13 @@ export const useWebSocket = (config: WebSocketConfig) => {
       return;
     }
 
+    // Evitar múltiplas conexões simultâneas
+    if (clientRef.current) {
+      console.log('[WebSocket] Limpando conexão anterior...');
+      clientRef.current.deactivate();
+      clientRef.current = null;
+    }
+
     console.log('[WebSocket] Iniciando conexão...');
     
     try {
@@ -47,7 +54,10 @@ export const useWebSocket = (config: WebSocketConfig) => {
           'X-Username': config.username
         },
         debug: (str) => {
-          console.log('[WebSocket Debug]', str);
+          // Reduzir logs de debug para evitar spam
+          if (str.includes('ERROR') || str.includes('CONNECTED') || str.includes('DISCONNECTED')) {
+            console.log('[WebSocket Debug]', str);
+          }
         },
         reconnectDelay: reconnectDelay,
         heartbeatIncoming: 4000,
@@ -167,19 +177,33 @@ export const useWebSocket = (config: WebSocketConfig) => {
   const disconnect = useCallback(() => {
     console.log('[WebSocket] Desconectando...');
     
+    // Limpar timeout de reconexão
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
 
+    // Desconectar cliente WebSocket
     if (clientRef.current) {
-      clientRef.current.deactivate();
-      clientRef.current = null;
+      try {
+        // Desativar todas as subscrições primeiro
+        if (clientRef.current.subscriptions) {
+          Object.values(clientRef.current.subscriptions).forEach(subscription => {
+            subscription.unsubscribe();
+          });
+        }
+        clientRef.current.deactivate();
+      } catch (error) {
+        console.warn('[WebSocket] Erro ao desconectar:', error);
+      } finally {
+        clientRef.current = null;
+      }
     }
 
     setIsConnected(false);
     setWsConnection(null);
-  }, [setIsConnected, setWsConnection]);
+    config.onDisconnect?.();
+  }, [setIsConnected, setWsConnection, config]);
 
   const sendMessage = useCallback((destination: string, body: any) => {
     if (!clientRef.current?.connected) {
@@ -225,8 +249,11 @@ export const useWebSocket = (config: WebSocketConfig) => {
 
   // Conectar automaticamente quando o hook é montado
   useEffect(() => {
-    if (config.token && config.username) {
+    // Só conectar se temos token e username válidos
+    if (config.token && config.username && config.token !== 'null' && config.token !== 'undefined') {
       connect();
+    } else {
+      console.log('[WebSocket] Não conectando - token ou username inválidos');
     }
 
     return () => {

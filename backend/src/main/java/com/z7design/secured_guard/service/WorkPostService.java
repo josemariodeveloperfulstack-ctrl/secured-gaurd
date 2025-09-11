@@ -254,19 +254,37 @@ public class WorkPostService {
         BeanUtils.copyProperties(workPost, dto);
         
         // Tratar relacionamentos de forma segura
-        if (workPost.getClient() != null) {
-            dto.setClientId(workPost.getClient().getId());
-            dto.setClientName(workPost.getClient().getName());
-            dto.setClientCnpj(workPost.getClient().getCnpj());
+        try {
+            if (workPost.getClient() != null) {
+                dto.setClientId(workPost.getClient().getId());
+                dto.setClientName(workPost.getClient().getName());
+                dto.setClientCnpj(workPost.getClient().getCnpj());
+            } else {
+                // Cliente não encontrado - definir valores padrão
+                dto.setClientName("Cliente não encontrado");
+                dto.setClientCnpj("N/A");
+            }
+        } catch (Exception e) {
+            // Em caso de erro ao acessar o cliente, definir valores padrão
+            dto.setClientName("Cliente não encontrado");
+            dto.setClientCnpj("N/A");
         }
         
-        if (workPost.getContract() != null) {
-            dto.setContractId(workPost.getContract().getId());
+        try {
+            if (workPost.getContract() != null) {
+                dto.setContractId(workPost.getContract().getId());
+            }
+        } catch (Exception e) {
+            // Contrato não encontrado - não definir contractId
         }
         
-        if (workPost.getResponsible() != null) {
-            dto.setResponsibleId(workPost.getResponsible().getId());
-            dto.setResponsibleName(workPost.getResponsible().getName());
+        try {
+            if (workPost.getResponsible() != null) {
+                dto.setResponsibleId(workPost.getResponsible().getId());
+                dto.setResponsibleName(workPost.getResponsible().getName());
+            }
+        } catch (Exception e) {
+            // Responsável não encontrado - não definir responsibleId
         }
         
         return dto;

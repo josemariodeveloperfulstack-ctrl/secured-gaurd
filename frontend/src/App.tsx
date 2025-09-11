@@ -34,7 +34,6 @@ const FluxoCaixa = lazy(() => import('@/pages/FluxoCaixa'));
 const Pagamentos = lazy(() => import('@/pages/Pagamentos'));
 const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
 const RelatoriosFinanceiros = lazy(() => import('@/pages/RelatoriosFinanceiros'));
-const ConciliacaoBancaria = lazy(() => import('@/pages/ConciliacaoBancaria'));
 const Bancos = lazy(() => import('@/pages/Bancos'));
 const Agencias = lazy(() => import('@/pages/Agencias'));
 const Frota = lazy(() => import('@/pages/Frota'));
@@ -111,6 +110,27 @@ const queryClient = new QueryClient();
 
 function App() {
   useEffect(() => {
+    // Tratamento global para erros de message channel (extensões do browser)
+    const handleMessageChannelError = (event: ErrorEvent) => {
+      if (event.message && event.message.includes('message channel closed')) {
+        console.warn('[App] Erro de message channel ignorado (provavelmente extensão do browser):', event.message);
+        event.preventDefault();
+        return false;
+      }
+    };
+
+    // Tratamento global para promises rejeitadas
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason && event.reason.message && event.reason.message.includes('message channel closed')) {
+        console.warn('[App] Promise rejeitada por message channel ignorada:', event.reason.message);
+        event.preventDefault();
+        return false;
+      }
+    };
+
+    window.addEventListener('error', handleMessageChannelError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     // Inicializar AOS com configurações otimizadas para performance
     AOS.init({
       duration: 600, // Reduzido de 800 para 600
@@ -134,6 +154,8 @@ function App() {
     window.addEventListener('popstate', handleRouteChange);
     return () => {
       window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('error', handleMessageChannelError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       clearTimeout(timeoutId);
     };
   }, []);
