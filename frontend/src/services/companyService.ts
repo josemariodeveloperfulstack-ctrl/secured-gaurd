@@ -4,78 +4,78 @@ import { Company, CompanyFilters, CompanyStats, CompanyStatus } from '@/types/co
 export const companyService = {
   // Buscar todas as empresas
   async getAllCompanies(): Promise<Company[]> {
-    const response = await api.get('/api/companies');
+    const response = await api.get('/companies');
     return response.data;
   },
 
   // Buscar empresa por ID
   async getCompanyById(id: string): Promise<Company> {
-    const response = await api.get(`/api/companies/${id}`);
+    const response = await api.get(`/companies/${id}`);
     return response.data;
   },
 
   // Buscar empresa por CNPJ
   async getCompanyByCnpj(cnpj: string): Promise<Company> {
-    const response = await api.get(`/api/companies/cnpj/${cnpj}`);
+    const response = await api.get(`/companies/cnpj/${cnpj}`);
     return response.data;
   },
 
   // Criar nova empresa
   async createCompany(company: Omit<Company, 'id' | 'createdAt' | 'updatedAt'>): Promise<Company> {
-    const response = await api.post('/api/companies', company);
+    const response = await api.post('/companies', company);
     return response.data;
   },
 
   // Atualizar empresa
   async updateCompany(id: string, company: Partial<Company>): Promise<Company> {
-    const response = await api.put(`/api/companies/${id}`, company);
+    const response = await api.put(`/companies/${id}`, company);
     return response.data;
   },
 
   // Deletar empresa
   async deleteCompany(id: string): Promise<void> {
-    await api.delete(`/api/companies/${id}`);
+    await api.delete(`/companies/${id}`);
   },
 
   // Buscar empresas por status
   async getCompaniesByStatus(status: CompanyStatus): Promise<Company[]> {
-    const response = await api.get(`/api/companies/status/${status}`);
+    const response = await api.get(`/companies/status/${status}`);
     return response.data;
   },
 
   // Buscar empresas por cidade
   async getCompaniesByCity(city: string): Promise<Company[]> {
-    const response = await api.get(`/api/companies/city/${city}`);
+    const response = await api.get(`/companies/city/${city}`);
     return response.data;
   },
 
   // Buscar empresas por estado
   async getCompaniesByState(state: string): Promise<Company[]> {
-    const response = await api.get(`/api/companies/state/${state}`);
+    const response = await api.get(`/companies/state/${state}`);
     return response.data;
   },
 
   // Buscar empresas por setor
   async getCompaniesBySector(sector: string): Promise<Company[]> {
-    const response = await api.get(`/api/companies/sector/${sector}`);
+    const response = await api.get(`/companies/sector/${sector}`);
     return response.data;
   },
 
   // Buscar empresas por tipo
   async getCompaniesByType(type: string): Promise<Company[]> {
-    const response = await api.get(`/api/companies/type/${type}`);
+    const response = await api.get(`/companies/type/${type}`);
     return response.data;
   },
 
   // Buscar empresas por tamanho
   async getCompaniesBySize(size: string): Promise<Company[]> {
-    const response = await api.get(`/api/companies/size/${size}`);
+    const response = await api.get(`/companies/size/${size}`);
     return response.data;
   },
 
   // Buscar empresas por termo
   async searchCompanies(searchTerm: string): Promise<Company[]> {
-    const response = await api.get(`/api/companies/search?searchTerm=${searchTerm}`);
+    const response = await api.get(`/companies/search?searchTerm=${searchTerm}`);
     return response.data;
   },
 
@@ -100,38 +100,38 @@ export const companyService = {
     params.append('page', page.toString());
     params.append('size', size.toString());
 
-    const response = await api.get(`/api/companies/advanced-filters?${params.toString()}`);
+    const response = await api.get(`/companies/advanced-filters?${params.toString()}`);
     return response.data;
   },
 
   // Estatísticas
   async getActiveCompaniesCount(): Promise<number> {
-    const response = await api.get('/api/companies/stats/active-count');
+    const response = await api.get('/companies/stats/active-count');
     return response.data;
   },
 
   async getCompaniesCountByStatus(status: CompanyStatus): Promise<number> {
-    const response = await api.get(`/api/companies/stats/status-count/${status}`);
+    const response = await api.get(`/companies/stats/status-count/${status}`);
     return response.data;
   },
 
   async getCompaniesCountByState(state: string): Promise<number> {
-    const response = await api.get(`/api/companies/stats/state-count/${state}`);
+    const response = await api.get(`/companies/stats/state-count/${state}`);
     return response.data;
   },
 
   async getCompaniesCountBySector(sector: string): Promise<number> {
-    const response = await api.get(`/api/companies/stats/sector-count/${sector}`);
+    const response = await api.get(`/companies/stats/sector-count/${sector}`);
     return response.data;
   },
 
   async getCompaniesCountByType(type: string): Promise<number> {
-    const response = await api.get(`/api/companies/stats/type-count/${type}`);
+    const response = await api.get(`/companies/stats/type-count/${type}`);
     return response.data;
   },
 
   async getCompaniesCountBySize(size: string): Promise<number> {
-    const response = await api.get(`/api/companies/stats/size-count/${size}`);
+    const response = await api.get(`/companies/stats/size-count/${size}`);
     return response.data;
   },
 

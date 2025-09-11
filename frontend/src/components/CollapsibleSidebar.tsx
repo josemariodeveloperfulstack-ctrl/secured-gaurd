@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollPreservation } from '@/hooks/useScrollPreservation';
@@ -101,6 +101,7 @@ const rhMenuItems = [
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'rh-cargos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
   { icon: Shield, text: 'Controle de EPI', to: '/epis', id: 'rh-epis' },
+  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'rh-gestao-documentos' },
 ];
 
 // Módulo Comercial
@@ -192,18 +193,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   };
 
   // Função para verificar se usuário tem permissão (TEMPORÁRIO - SEMPRE TRUE PARA TESTE)
-  const hasPermission = (permission: string): boolean => {
-    console.log(`🔍 CollapsibleSidebar - hasPermission(${permission}): TRUE (FORÇADO PARA TESTE)`);
+  const hasPermission = useCallback((permission: string): boolean => {
     return true; // TEMPORÁRIO: sempre retorna true para teste
-  };
+  }, []);
 
   // Função para verificar se módulo deve ser exibido
-  const shouldShowModule = (requiredPermission?: string): boolean => {
+  const shouldShowModule = useCallback((requiredPermission?: string): boolean => {
     if (!requiredPermission) return true;
-    const result = hasPermission(requiredPermission);
-    console.log(`🔍 CollapsibleSidebar - shouldShowModule(${requiredPermission}): ${result}`);
-    return result;
-  };
+    return hasPermission(requiredPermission);
+  }, [hasPermission]);
 
   const getActiveId = () => {
     const path = location.pathname;
@@ -371,7 +369,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Operacional */}
-          {console.log('🔍 CollapsibleSidebar - Mostrando módulo operacional SEM verificação de permissão') || true && (
+          {shouldShowModule() && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">

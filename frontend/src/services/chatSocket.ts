@@ -3,7 +3,7 @@ import SockJS from 'sockjs-client';
 
 export function connectChatSocket(token: string, userId: string, onMessage: (msg: any) => void, onTyping?: (typing: any) => void) {
   const client = new Client({
-    webSocketFactory: () => new SockJS('http://localhost:8081/ws'),
+    webSocketFactory: () => new SockJS('/ws'),
     connectHeaders: { Authorization: `Bearer ${token}` },
     onConnect: () => {
       client.subscribe(`/user/${userId}/chat`, (message) => {

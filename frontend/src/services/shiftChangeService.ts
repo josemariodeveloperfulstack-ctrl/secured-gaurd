@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { toast } from '@/components/ui/use-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface ShiftChangeFormDTO {
     id?: number;

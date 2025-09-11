@@ -131,7 +131,7 @@ export const workPostService = {
     const hasPagination = filters.page !== undefined && filters.size !== undefined;
     if (!hasPagination && Object.keys(filters).length === 0) {
       // Busca todos sem paginação
-      const response = await api.get('/api/work-posts/all');
+      const response = await api.get('/work-posts/all');
       return response.data;
     }
     
@@ -151,19 +151,19 @@ export const workPostService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
-    const response = await api.get(`/api/work-posts?${params.toString()}`);
+    const response = await api.get(`/work-posts?${params.toString()}`);
     return response.data;
   },
 
   // Buscar posto por ID
   async getWorkPostById(id: string): Promise<WorkPost> {
-    const response = await api.get(`/api/work-posts/${id}`);
+    const response = await api.get(`/work-posts/${id}`);
     return response.data;
   },
 
   // Buscar posto por código
   async getWorkPostByCode(postCode: string): Promise<WorkPost> {
-    const response = await api.get(`/api/work-posts/code/${postCode}`);
+    const response = await api.get(`/work-posts/code/${postCode}`);
     return response.data;
   },
 
@@ -200,61 +200,61 @@ export const workPostService = {
     
     console.log('Dados enviados para o backend:', backendData);
     
-    const response = await api.post('/api/work-posts', backendData);
+    const response = await api.post('/work-posts', backendData);
     return response.data;
   },
 
   // Atualizar posto
   async updateWorkPost(id: string, workPostData: UpdateWorkPostRequest): Promise<WorkPost> {
-    const response = await api.put(`/api/work-posts/${id}`, workPostData);
+    const response = await api.put(`/work-posts/${id}`, workPostData);
     return response.data;
   },
 
   // Excluir posto
   async deleteWorkPost(id: string): Promise<void> {
-    await api.delete(`/api/work-posts/${id}`);
+    await api.delete(`/work-posts/${id}`);
   },
 
   // Atualizar status do posto
   async updateWorkPostStatus(id: string, status: string): Promise<WorkPost> {
-    const response = await api.patch(`/api/work-posts/${id}/status?status=${status}`);
+    const response = await api.patch(`/work-posts/${id}/status?status=${status}`);
     return response.data;
   },
 
   // Buscar postos por status
   async getWorkPostsByStatus(status: string): Promise<WorkPost[]> {
-    const response = await api.get(`/api/work-posts/status/${status}`);
+    const response = await api.get(`/work-posts/status/${status}`);
     return response.data;
   },
 
   // Buscar postos por tipo
   async getWorkPostsByType(type: string): Promise<WorkPost[]> {
-    const response = await api.get(`/api/work-posts/type/${type}`);
+    const response = await api.get(`/work-posts/type/${type}`);
     return response.data;
   },
 
   // Buscar postos por cliente
   async getWorkPostsByClient(clientId: string): Promise<WorkPost[]> {
-    const response = await api.get(`/api/work-posts/client/${clientId}`);
+    const response = await api.get(`/work-posts/client/${clientId}`);
     return response.data;
   },
 
   // Buscar postos por contrato
   async getWorkPostsByContract(contractId: string): Promise<WorkPost[]> {
-    const response = await api.get(`/api/work-posts/contract/${contractId}`);
+    const response = await api.get(`/work-posts/contract/${contractId}`);
     return response.data;
   },
 
   // Buscar postos para implantação em período
   async getWorkPostsToBeImplemented(startDate: string, endDate: string): Promise<WorkPost[]> {
-    const response = await api.get(`/api/work-posts/implementation/period?startDate=${startDate}&endDate=${endDate}`);
+    const response = await api.get(`/work-posts/implementation/period?startDate=${startDate}&endDate=${endDate}`);
     return response.data;
   },
 
   // Verificar se código do posto já existe
   async checkPostCodeExists(postCode: string): Promise<boolean> {
     try {
-      await api.get(`/api/work-posts/code/${postCode}`);
+      await api.get(`/work-posts/code/${postCode}`);
       return true;
     } catch (error) {
       return false;
@@ -263,7 +263,7 @@ export const workPostService = {
 
   // Buscar postos com filtros avançados
   async searchWorkPosts(query: string): Promise<WorkPost[]> {
-    const response = await api.get(`/api/work-posts/search?q=${encodeURIComponent(query)}`);
+    const response = await api.get(`/work-posts/search?q=${encodeURIComponent(query)}`);
     return response.data;
   },
 
@@ -335,7 +335,7 @@ export const workPostService = {
 
   // Obter estatísticas de postos
   async getWorkPostStats(): Promise<any> {
-    const response = await api.get('/api/work-posts/stats/count');
+    const response = await api.get('/work-posts/stats/count');
     return response.data;
   }
 }; 

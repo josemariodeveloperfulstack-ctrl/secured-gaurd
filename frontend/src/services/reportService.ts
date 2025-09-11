@@ -10,7 +10,7 @@ export interface ReportFilters {
 // Remover ReportData e outros tipos não usados
 
 class ReportService {
-  private API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
+  private API_URL = import.meta.env.VITE_API_URL || '/api';
 
   /**
    * Gera relatório no backend (PDF ou Excel)

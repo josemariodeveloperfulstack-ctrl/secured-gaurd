@@ -84,7 +84,7 @@ class BankReconciliationService {
   
   async getBankAccounts(): Promise<BankAccount[]> {
     try {
-      const response = await api.get('/api/bank-reconciliation/accounts');
+      const response = await api.get('/bank-reconciliation/accounts');
       return Array.isArray(response.data) ? response.data : this.getMockBankAccounts();
     } catch (error) {
       console.error('Erro ao buscar contas bancárias:', error);
@@ -93,12 +93,12 @@ class BankReconciliationService {
   }
   
   async getBankAccountById(id: string): Promise<BankAccount> {
-    const response = await api.get(`/api/bank-reconciliation/accounts/${id}`);
+    const response = await api.get(`/bank-reconciliation/accounts/${id}`);
     return response.data;
   }
   
   async createBankAccount(data: CreateBankAccountRequest): Promise<BankAccount> {
-    const response = await api.post('/api/bank-reconciliation/accounts', data);
+    const response = await api.post('/bank-reconciliation/accounts', data);
     return response.data;
   }
   
@@ -109,13 +109,13 @@ class BankReconciliationService {
     if (page !== undefined) params.append('page', page.toString());
     if (size !== undefined) params.append('size', size.toString());
     
-    const response = await api.get(`/api/bank-reconciliation/files?${params.toString()}`);
+    const response = await api.get(`/bank-reconciliation/files?${params.toString()}`);
     return response.data;
   }
   
   async getAllBankFiles(): Promise<BankFile[]> {
     try {
-      const response = await api.get('/api/bank-reconciliation/files/all');
+      const response = await api.get('/bank-reconciliation/files/all');
       return Array.isArray(response.data) ? response.data : this.getMockBankFiles();
     } catch (error) {
       console.error('Erro ao buscar arquivos bancários:', error);
@@ -124,7 +124,7 @@ class BankReconciliationService {
   }
   
   async getBankFileById(id: string): Promise<BankFile> {
-    const response = await api.get(`/api/bank-reconciliation/files/${id}`);
+    const response = await api.get(`/bank-reconciliation/files/${id}`);
     return response.data;
   }
   
@@ -138,7 +138,7 @@ class BankReconciliationService {
       formData.append('description', data.description);
     }
     
-    const response = await api.post('/api/bank-reconciliation/files/upload', formData, {
+    const response = await api.post('/bank-reconciliation/files/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -147,30 +147,30 @@ class BankReconciliationService {
   }
   
   async deleteBankFile(id: string): Promise<void> {
-    await api.delete(`/api/bank-reconciliation/files/${id}`);
+    await api.delete(`/bank-reconciliation/files/${id}`);
   }
   
   // ===== BANK TRANSACTIONS =====
   
   async getTransactionsByFileId(fileId: string): Promise<BankTransaction[]> {
-    const response = await api.get(`/api/bank-reconciliation/files/${fileId}/transactions`);
+    const response = await api.get(`/bank-reconciliation/files/${fileId}/transactions`);
     return response.data;
   }
   
   async getTransactionsByStatus(status: string): Promise<BankTransaction[]> {
-    const response = await api.get(`/api/bank-reconciliation/transactions/status/${status}`);
+    const response = await api.get(`/bank-reconciliation/transactions/status/${status}`);
     return response.data;
   }
   
   // ===== STATISTICS =====
   
   async getFileStatistics(): Promise<BankFileStatistics> {
-    const response = await api.get('/api/bank-reconciliation/statistics/files');
+    const response = await api.get('/bank-reconciliation/statistics/files');
     return response.data;
   }
   
   async getTransactionStatistics(): Promise<BankTransactionStatistics> {
-    const response = await api.get('/api/bank-reconciliation/statistics/transactions');
+    const response = await api.get('/bank-reconciliation/statistics/transactions');
     return response.data;
   }
   
@@ -182,7 +182,7 @@ class BankReconciliationService {
       params.append('status', statusFilter);
     }
     
-    const response = await api.get(`/api/bank-reconciliation/reports/file/${fileId}?${params.toString()}`, {
+    const response = await api.get(`/bank-reconciliation/reports/file/${fileId}?${params.toString()}`, {
       responseType: 'blob',
     });
     return response.data;
@@ -194,7 +194,7 @@ class BankReconciliationService {
     if (endDate) params.append('endDate', endDate);
     if (bankName) params.append('bankName', bankName);
     
-    const response = await api.get(`/api/bank-reconciliation/reports/summary?${params.toString()}`, {
+    const response = await api.get(`/bank-reconciliation/reports/summary?${params.toString()}`, {
       responseType: 'blob',
     });
     return response.data;

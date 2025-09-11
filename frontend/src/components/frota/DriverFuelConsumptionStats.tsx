@@ -93,7 +93,7 @@ export const DriverFuelConsumptionStats: React.FC<DriverFuelConsumptionStatsProp
       
       // Carregar postos de combustível únicos
       try {
-        const stationsResponse = await api.get('/api/fuel-stations');
+        const stationsResponse = await api.get('/fuel-stations');
         console.log('⛽ Resposta do endpoint fuel-stations:', stationsResponse);
         
         if (stationsResponse.data && Array.isArray(stationsResponse.data)) {
@@ -104,7 +104,7 @@ export const DriverFuelConsumptionStats: React.FC<DriverFuelConsumptionStatsProp
         } else {
           console.log('⚠️ Endpoint fuel-stations não retornou array válido, tentando fallback...');
           // Fallback: extrair postos dos registros de combustível
-          const fuelRecordsResponse = await api.get('/api/fuel-records');
+          const fuelRecordsResponse = await api.get('/fuel-records');
           console.log('📊 Registros de combustível para fallback:', fuelRecordsResponse.data);
           
           if (fuelRecordsResponse.data && Array.isArray(fuelRecordsResponse.data)) {
@@ -116,7 +116,7 @@ export const DriverFuelConsumptionStats: React.FC<DriverFuelConsumptionStatsProp
       } catch (stationsError) {
         console.error('❌ Erro ao carregar postos via endpoint fuel-stations, tentando fallback:', stationsError);
         // Fallback: extrair postos dos registros de combustível
-        const fuelRecordsResponse = await api.get('/api/fuel-records');
+        const fuelRecordsResponse = await api.get('/fuel-records');
         if (fuelRecordsResponse.data && Array.isArray(fuelRecordsResponse.data)) {
           const uniqueStations = [...new Set(fuelRecordsResponse.data.map((record: any) => record.station))];
           setFuelStations(uniqueStations.filter(station => station));
@@ -152,11 +152,11 @@ export const DriverFuelConsumptionStats: React.FC<DriverFuelConsumptionStatsProp
       
       if (startDate && endDate) {
         response = await api.get(
-          `/api/fuel-records/stats/driver/${selectedDriverId}/period?` +
+          `/fuel-records/stats/driver/${selectedDriverId}/period?` +
           `startDate=${startDate}&endDate=${endDate}`
         );
       } else {
-        response = await api.get(`/api/fuel-records/stats/driver/${selectedDriverId}`);
+        response = await api.get(`/fuel-records/stats/driver/${selectedDriverId}`);
       }
 
       setStats(response.data);
@@ -289,7 +289,7 @@ export const DriverFuelConsumptionStats: React.FC<DriverFuelConsumptionStatsProp
       
       console.log(`📊 Gerando relatório ${format.toUpperCase()} com parâmetros:`, params.toString());
       
-      const response = await api.get(`/api/fuel-records/report/${format}?${params.toString()}`, {
+      const response = await api.get(`/fuel-records/report/${format}?${params.toString()}`, {
         responseType: 'blob'
       });
       

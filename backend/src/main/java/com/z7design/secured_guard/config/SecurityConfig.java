@@ -116,6 +116,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/measurements/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de estoque - requerem permissões específicas
                 .requestMatchers("/api/stock/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                // Endpoints de modelos de documentos - temporariamente público para teste
+                .requestMatchers("/api/modelos-documentos/**").permitAll()
+                // Endpoints de documentos gerados - temporariamente público para teste
+                .requestMatchers("/api/documentos-gerados/**").permitAll()
+                // Endpoints de assinaturas de documentos - temporariamente público para teste
+                .requestMatchers("/api/assinaturas-documentos/**").permitAll()
                 // Todo o resto requer autenticação
                 .anyRequest().authenticated()
             )

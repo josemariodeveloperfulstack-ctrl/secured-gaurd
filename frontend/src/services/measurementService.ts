@@ -21,7 +21,7 @@ export const measurementService = {
     try {
       if (filters?.searchTerm) {
         // Busca por texto
-        const response = await api.get(`/api/measurements/search-text?searchTerm=${encodeURIComponent(filters.searchTerm)}`);
+        const response = await api.get(`/measurements/search-text?searchTerm=${encodeURIComponent(filters.searchTerm)}`);
         return response.data || [];
       } else if (filters && Object.keys(filters).some(key => filters[key as keyof MeasurementFilters])) {
         // Busca com filtros
@@ -31,12 +31,12 @@ export const measurementService = {
             params.append(key, value.toString());
           }
         });
-        const response = await api.get(`/api/measurements/search?${params.toString()}`);
+        const response = await api.get(`/measurements/search?${params.toString()}`);
         // O endpoint retorna uma página, então precisamos extrair o conteúdo
         return response.data?.content || response.data || [];
       } else {
         // Buscar todos os boletins (usar endpoint sem paginação)
-        const response = await api.get('/api/measurements/all');
+        const response = await api.get('/measurements/all');
         return response.data || [];
       }
     } catch (error) {
@@ -53,7 +53,7 @@ export const measurementService = {
    */
   async getBulletinById(id: string): Promise<MeasurementBulletin> {
     try {
-      const response = await api.get(`/api/measurements/${id}`);
+      const response = await api.get(`/measurements/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar boletim por ID:', error);
@@ -66,7 +66,7 @@ export const measurementService = {
    */
   async createBulletin(data: CreateMeasurementBulletinDTO): Promise<MeasurementBulletin> {
     try {
-      const response = await api.post('/api/measurements', data);
+      const response = await api.post('/measurements', data);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar boletim de medição:', error);
@@ -79,7 +79,7 @@ export const measurementService = {
    */
   async updateBulletin(id: string, data: UpdateMeasurementBulletinDTO): Promise<MeasurementBulletin> {
     try {
-      const response = await api.put(`/api/measurements/${id}`, data);
+      const response = await api.put(`/measurements/${id}`, data);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar boletim de medição:', error);
@@ -96,7 +96,7 @@ export const measurementService = {
       params.append('validatedBy', validationData.validatedBy);
       params.append('checkedBy', validationData.checkedBy);
       
-      const response = await api.patch(`/api/measurements/${id}/validate?${params.toString()}`);
+      const response = await api.patch(`/measurements/${id}/validate?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao validar boletim de medição:', error);
@@ -109,7 +109,7 @@ export const measurementService = {
    */
   async deleteBulletin(id: string): Promise<void> {
     try {
-      await api.delete(`/api/measurements/${id}`);
+      await api.delete(`/measurements/${id}`);
     } catch (error) {
       console.error('Erro ao excluir boletim de medição:', error);
       throw new Error('Falha ao excluir boletim de medição');
@@ -121,7 +121,7 @@ export const measurementService = {
    */
   async saveCalculationMemory(bulletinId: string, memory: Partial<CalculationMemory>): Promise<CalculationMemory> {
     try {
-      const response = await api.post(`/api/measurements/${bulletinId}/calculation-memory`, memory);
+      const response = await api.post(`/measurements/${bulletinId}/calculation-memory`, memory);
       return response.data;
     } catch (error) {
       console.error('Erro ao salvar memória de cálculo:', error);
@@ -134,7 +134,7 @@ export const measurementService = {
    */
   async getReport(): Promise<MeasurementReport> {
     try {
-      const response = await api.get('/api/measurements/report');
+      const response = await api.get('/measurements/report');
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar relatório de medições:', error);

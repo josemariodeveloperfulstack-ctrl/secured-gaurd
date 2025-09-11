@@ -100,58 +100,58 @@ class BankAgencyService {
     if (page !== undefined) params.append('page', page.toString());
     if (size !== undefined) params.append('size', size.toString());
     
-    const response = await api.get(`/api/banks?${params.toString()}`);
+    const response = await api.get(`/banks?${params.toString()}`);
     return response.data;
   }
   
   async getAllBanks(): Promise<Bank[]> {
-    const response = await api.get('/api/banks/all');
+    const response = await api.get('/banks/all');
     return response.data;
   }
   
   async getBankById(id: string): Promise<Bank> {
-    const response = await api.get(`/api/banks/${id}`);
+    const response = await api.get(`/banks/${id}`);
     return response.data;
   }
   
   async getBankByCode(code: string): Promise<Bank> {
-    const response = await api.get(`/api/banks/code/${code}`);
+    const response = await api.get(`/banks/code/${code}`);
     return response.data;
   }
   
   async createBank(data: CreateBankRequest): Promise<Bank> {
-    const response = await api.post('/api/banks', data);
+    const response = await api.post('/banks', data);
     return response.data;
   }
   
   async updateBank(id: string, data: CreateBankRequest): Promise<Bank> {
-    const response = await api.put(`/api/banks/${id}`, data);
+    const response = await api.put(`/banks/${id}`, data);
     return response.data;
   }
   
   async deleteBank(id: string): Promise<void> {
-    await api.delete(`/api/banks/${id}`);
+    await api.delete(`/banks/${id}`);
   }
   
   // ===== BANK SEARCH =====
   
   async searchBanksByName(name: string): Promise<Bank[]> {
-    const response = await api.get(`/api/banks/search/name?name=${encodeURIComponent(name)}`);
+    const response = await api.get(`/banks/search/name?name=${encodeURIComponent(name)}`);
     return response.data;
   }
   
   async searchBanksByCode(code: string): Promise<Bank[]> {
-    const response = await api.get(`/api/banks/search/code?code=${encodeURIComponent(code)}`);
+    const response = await api.get(`/banks/search/code?code=${encodeURIComponent(code)}`);
     return response.data;
   }
   
   async getBanksByStatus(status: string): Promise<Bank[]> {
-    const response = await api.get(`/api/banks/status/${status}`);
+    const response = await api.get(`/banks/status/${status}`);
     return response.data;
   }
   
   async getBanksByState(state: string): Promise<Bank[]> {
-    const response = await api.get(`/api/banks/state/${state}`);
+    const response = await api.get(`/banks/state/${state}`);
     return response.data;
   }
   
@@ -162,80 +162,80 @@ class BankAgencyService {
     if (page !== undefined) params.append('page', page.toString());
     if (size !== undefined) params.append('size', size.toString());
     
-    const response = await api.get(`/api/agencies?${params.toString()}`);
+    const response = await api.get(`/agencies?${params.toString()}`);
     return response.data;
   }
   
   async getAllAgencies(): Promise<Agency[]> {
-    const response = await api.get('/api/agencies/all');
+    const response = await api.get('/agencies/all');
     return response.data;
   }
   
   async getAgencyById(id: string): Promise<Agency> {
-    const response = await api.get(`/api/agencies/${id}`);
+    const response = await api.get(`/agencies/${id}`);
     return response.data;
   }
   
   async getAgenciesByBankId(bankId: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/bank/${bankId}`);
+    const response = await api.get(`/agencies/bank/${bankId}`);
     return response.data;
   }
   
   async createAgency(data: CreateAgencyRequest): Promise<Agency> {
-    const response = await api.post('/api/agencies', data);
+    const response = await api.post('/agencies', data);
     return response.data;
   }
   
   async updateAgency(id: string, data: CreateAgencyRequest): Promise<Agency> {
-    const response = await api.put(`/api/agencies/${id}`, data);
+    const response = await api.put(`/agencies/${id}`, data);
     return response.data;
   }
   
   async deleteAgency(id: string): Promise<void> {
-    await api.delete(`/api/agencies/${id}`);
+    await api.delete(`/agencies/${id}`);
   }
   
   // ===== AGENCY SEARCH =====
   
   async searchAgenciesByName(name: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/search/name?name=${encodeURIComponent(name)}`);
+    const response = await api.get(`/agencies/search/name?name=${encodeURIComponent(name)}`);
     return response.data;
   }
   
   async searchAgenciesByCode(code: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/search/code?code=${encodeURIComponent(code)}`);
+    const response = await api.get(`/agencies/search/code?code=${encodeURIComponent(code)}`);
     return response.data;
   }
   
   async searchAgenciesByBankName(bankName: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/search/bank?bankName=${encodeURIComponent(bankName)}`);
+    const response = await api.get(`/agencies/search/bank?bankName=${encodeURIComponent(bankName)}`);
     return response.data;
   }
   
   async searchAgenciesByCity(city: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/search/city?city=${encodeURIComponent(city)}`);
+    const response = await api.get(`/agencies/search/city?city=${encodeURIComponent(city)}`);
     return response.data;
   }
   
   async getAgenciesByStatus(status: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/status/${status}`);
+    const response = await api.get(`/agencies/status/${status}`);
     return response.data;
   }
   
   async getAgenciesByState(state: string): Promise<Agency[]> {
-    const response = await api.get(`/api/agencies/state/${state}`);
+    const response = await api.get(`/agencies/state/${state}`);
     return response.data;
   }
   
   // ===== STATISTICS =====
   
   async getBankStatistics(): Promise<BankStatistics> {
-    const response = await api.get('/api/banks/statistics');
+    const response = await api.get('/banks/statistics');
     return response.data;
   }
   
   async getAgencyStatistics(): Promise<AgencyStatistics> {
-    const response = await api.get('/api/agencies/statistics');
+    const response = await api.get('/agencies/statistics');
     return response.data;
   }
 }

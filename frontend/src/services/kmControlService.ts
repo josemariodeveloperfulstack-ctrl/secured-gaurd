@@ -21,7 +21,7 @@ class KmControlService {
   async getKmControls(): Promise<KmControl[]> {
     try {
       console.log('🔍 KmControlService: Buscando registros de controle de KM...');
-      const response = await axios.get('/api/frota/km-controls');
+      const response = await axios.get('/frota/km-controls');
       console.log('✅ KmControlService: Resposta recebida:', response.data);
       console.log('📊 KmControlService: Total de registros:', response.data?.length || 0);
       
@@ -69,7 +69,7 @@ class KmControlService {
   async getKmControlById(id: string): Promise<KmControl> {
     try {
       console.log('🔍 KmControlService: Buscando registro por ID:', id);
-      const response = await axios.get(`/api/frota/km-controls/${id}`);
+      const response = await axios.get(`/frota/km-controls/${id}`);
       console.log('✅ KmControlService: Dados do registro:', response.data);
       console.log('🔍 KmControlService: Campos do registro:', Object.keys(response.data));
       console.log('🔍 KmControlService: initialKm:', response.data.initialKm, 'tipo:', typeof response.data.initialKm);
@@ -110,7 +110,7 @@ class KmControlService {
       if (filters.supervisor && filters.supervisor !== 'all') params.append('supervisor', filters.supervisor);
       if (filters.vehiclePlate && filters.vehiclePlate !== 'all') params.append('vehiclePlate', filters.vehiclePlate);
       
-      const response = await axios.get(`/api/frota/km-controls/filter?${params.toString()}`);
+      const response = await axios.get(`/frota/km-controls/filter?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar registros com filtros:', error);
@@ -123,7 +123,7 @@ class KmControlService {
    */
   async createKmControl(kmControl: Omit<KmControl, 'id' | 'createdAt' | 'updatedAt'>): Promise<KmControl> {
     try {
-      const response = await axios.post('/api/frota/km-controls', kmControl, {
+      const response = await axios.post('/frota/km-controls', kmControl, {
         headers: { 'Content-Type': 'application/json' }
       });
       return response.data;
@@ -139,7 +139,7 @@ class KmControlService {
    */
   async updateKmControl(id: string, kmControl: Partial<KmControl>): Promise<KmControl> {
     try {
-      const response = await axios.put(`/api/frota/km-controls/${id}`, kmControl);
+      const response = await axios.put(`/frota/km-controls/${id}`, kmControl);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao atualizar registro de controle de KM:', error);
@@ -152,7 +152,7 @@ class KmControlService {
    */
   async deleteKmControl(id: string): Promise<void> {
     try {
-      await axios.delete(`/api/frota/km-controls/${id}`);
+      await axios.delete(`/frota/km-controls/${id}`);
     } catch (error) {
       console.error('❌ Erro ao deletar registro de controle de KM:', error);
       throw error;
@@ -168,7 +168,7 @@ class KmControlService {
       formData.append('photo', file);
       formData.append('description', description);
 
-      const response = await axios.post(`/api/frota/km-controls/${kmControlId}/dashboard-photo`, formData, {
+      const response = await axios.post(`/frota/km-controls/${kmControlId}/dashboard-photo`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -185,7 +185,7 @@ class KmControlService {
    */
   async getStatistics(startDate: string, endDate: string): Promise<KmControlStatistics> {
     try {
-      const response = await axios.get(`/api/frota/km-controls/statistics?startDate=${startDate}&endDate=${endDate}`);
+      const response = await axios.get(`/frota/km-controls/statistics?startDate=${startDate}&endDate=${endDate}`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar estatísticas:', error);
@@ -198,7 +198,7 @@ class KmControlService {
    */
   async getKmControlsWithObservations(): Promise<KmControl[]> {
     try {
-      const response = await axios.get('/api/frota/km-controls/with-observations');
+      const response = await axios.get('/frota/km-controls/with-observations');
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar registros com observações:', error);
@@ -211,7 +211,7 @@ class KmControlService {
    */
   async getSupervisors(): Promise<string[]> {
     try {
-      const response = await axios.get('/api/frota/km-controls/supervisors');
+      const response = await axios.get('/frota/km-controls/supervisors');
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar supervisores:', error);
@@ -224,7 +224,7 @@ class KmControlService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await axios.get('/api/frota/km-controls/test');
+      const response = await axios.get('/frota/km-controls/test');
       console.log('✅ Teste de conexão KmControl:', response.data);
       return true;
     } catch (error) {
@@ -239,7 +239,7 @@ class KmControlService {
   async createTestData(): Promise<KmControl[]> {
     try {
       console.log('🔧 KmControlService: Criando dados de teste...');
-      const response = await axios.post('/api/frota/km-controls/create-test-data');
+      const response = await axios.post('/frota/km-controls/create-test-data');
       console.log('✅ KmControlService: Dados de teste criados:', response.data);
       return response.data.data || response.data;
     } catch (error) {

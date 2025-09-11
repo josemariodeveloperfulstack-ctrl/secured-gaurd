@@ -223,6 +223,7 @@ const rhMenuItems = [
   { icon: FileBarChart, text: 'Avaliação de Desempenho', to: '/rh/avaliacao-desempenho', id: 'rh-avaliacao-desempenho' },
   { icon: TrendingUp, text: 'Plano de Carreira', to: '/rh/plano-carreira', id: 'rh-plano-carreira' },
   { icon: BarChart3Icon, text: 'Relatórios', to: '/rh/relatorios', id: 'rh-relatorios' },
+  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'rh-gestao-documentos' },
   { icon: Send, text: 'Envio de Holerites', to: '/envio-holerites', id: 'envio-holerites' },
 ];
 

@@ -149,6 +149,13 @@ export function DynamicSidebar() {
       requiredPermission: 'EMPLOYEES_READ'
     },
     {
+      icon: FileText,
+      text: 'Gestão de Documentos',
+      to: '/rh/gestao-documentos',
+      id: 'rh-gestao-documentos',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
       icon: ClipboardList,
       text: 'Serviços',
       to: '/servicos',
@@ -478,7 +485,7 @@ export function DynamicSidebar() {
         ['dashboard', 'operacional', 'controle-visitas', 'guia-transporte'].includes(item.id)
       ),
       rh: filteredItems.filter(item =>
-        ['rh', 'rh-funcionarios', 'rh-vagas', 'rh-remanejamentos', 'rh-ferias', 'rh-ocorrencias', 'rh-beneficios', 'rh-funcoes', 'rh-cargos', 'postos', 'rh-epis', 'rh-ordens-servico', 'rh-admissao-demissao', 'rh-admissao-funcionarios', 'rh-lgpd', 'rh-relatorios', 'envio-holerites'].includes(item.id)
+        ['rh', 'rh-funcionarios', 'rh-vagas', 'rh-remanejamentos', 'rh-ferias', 'rh-ocorrencias', 'rh-beneficios', 'rh-funcoes', 'rh-cargos', 'postos', 'rh-epis', 'rh-ordens-servico', 'rh-admissao-demissao', 'rh-admissao-funcionarios', 'rh-lgpd', 'rh-relatorios', 'rh-gestao-documentos', 'envio-holerites'].includes(item.id)
       ),
       financeiro: filteredItems.filter(item =>
         ['modulo-financeiro', 'gestao-financeira-dashboard', 'gestao-financeira-contas-pagar', 'gestao-financeira-contas-receber', 'gestao-financeira-fluxo-caixa', 'gestao-financeira-movimentacoes', 'gestao-financeira-conciliacao', 'gestao-financeira-relatorios', 'gestao-financeira-orcamento', 'gestao-financeira-centros-custo'].includes(item.id)

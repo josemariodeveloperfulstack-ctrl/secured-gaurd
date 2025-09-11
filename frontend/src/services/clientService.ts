@@ -1,7 +1,7 @@
 import axios from '@/lib/axios';
 import { Client, ClientPage, ClientSearchParams } from '@/types/client';
 
-const BASE_URL = '/api/clients';
+const BASE_URL = '/clients';
 
 export const clientService = {
   /**

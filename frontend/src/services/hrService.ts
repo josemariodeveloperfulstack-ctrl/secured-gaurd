@@ -338,7 +338,7 @@ class HRService {
       if (filters?.position) params.append('position', filters.position);
       if (filters?.location) params.append('location', filters.location);
 
-      const url = `/api/hr/vacancies${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/hr/vacancies${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get(url);
       return response.data.map((vacancy: JobVacancyAPI) => ({
         id: vacancy.id,
@@ -365,7 +365,7 @@ class HRService {
   // Criar vaga
   async createJobVacancy(vacancy: Omit<JobVacancy, 'id' | 'createdAt' | 'updatedAt'>): Promise<JobVacancy> {
     try {
-      const response = await api.post('/api/hr/vacancies', vacancy);
+      const response = await api.post('/hr/vacancies', vacancy);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar vaga:', error);
@@ -376,7 +376,7 @@ class HRService {
   // Atualizar vaga
   async updateJobVacancy(id: number, vacancy: Partial<JobVacancy>): Promise<JobVacancy> {
     try {
-      const response = await api.put(`/api/hr/vacancies/${id}`, vacancy);
+      const response = await api.put(`/hr/vacancies/${id}`, vacancy);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar vaga:', error);
@@ -387,7 +387,7 @@ class HRService {
   // Excluir vaga
   async deleteJobVacancy(id: number): Promise<void> {
     try {
-      await api.delete(`/api/hr/vacancies/${id}`);
+      await api.delete(`/hr/vacancies/${id}`);
     } catch (error) {
       console.error('Erro ao excluir vaga:', error);
       throw new Error('Erro ao excluir vaga');
@@ -398,7 +398,7 @@ class HRService {
   async getPublicJobVacancies(): Promise<JobVacancy[]> {
     try {
       console.log('🔍 Fazendo requisição GET para /api/public/vacancies');
-      const response = await api.get('/api/public/vacancies');
+      const response = await api.get('/public/vacancies');
       console.log('✅ Resposta recebida:', response.data);
       console.log('📊 Tipo da resposta:', typeof response.data);
       console.log('📊 É array?', Array.isArray(response.data));

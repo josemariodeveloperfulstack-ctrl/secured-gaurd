@@ -73,7 +73,7 @@ class FleetService {
   async getVehicles(): Promise<Vehicle[]> {
     console.log('🔍 FleetService - Buscando veículos...');
     try {
-      const response = await api.get('/api/frota/vehicles');
+      const response = await api.get('/frota/vehicles');
       console.log('✅ FleetService - Veículos encontrados:', response.data);
       console.log('🔍 FleetService - Tipo de resposta:', typeof response.data);
       console.log('🔍 FleetService - É array?', Array.isArray(response.data));
@@ -100,29 +100,29 @@ class FleetService {
   }
 
   async getVehicle(id: string): Promise<Vehicle | null> {
-    const response = await api.get(`/api/frota/vehicles/${id}`);
+    const response = await api.get(`/frota/vehicles/${id}`);
     return response.data;
   }
 
   async createVehicle(vehicle: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vehicle> {
-    const response = await api.post('/api/frota/vehicles', vehicle);
+    const response = await api.post('/frota/vehicles', vehicle);
     return response.data;
   }
 
   async updateVehicle(id: string, vehicle: Partial<Vehicle>): Promise<Vehicle> {
-    const response = await api.put(`/api/frota/vehicles/${id}`, vehicle);
+    const response = await api.put(`/frota/vehicles/${id}`, vehicle);
     return response.data;
   }
 
   async deleteVehicle(id: string): Promise<void> {
-    await api.delete(`/api/frota/vehicles/${id}`);
+    await api.delete(`/frota/vehicles/${id}`);
   }
 
   // Buscar data da última manutenção de um veículo
   async getLastMaintenanceDate(vehicleId: string): Promise<string | null> {
     try {
       console.log('🔍 FleetService - Buscando data da última manutenção para veículo:', vehicleId);
-      const response = await api.get(`/api/maintenances/vehicle/${vehicleId}/last-date`);
+      const response = await api.get(`/maintenances/vehicle/${vehicleId}/last-date`);
       const lastMaintenanceDate = response.data;
       console.log('✅ FleetService - Data da última manutenção:', lastMaintenanceDate);
       return lastMaintenanceDate;
@@ -135,7 +135,7 @@ class FleetService {
   // Registros de Abastecimento
   async getFuelRecords(vehicleId?: string): Promise<FuelRecord[]> {
     try {
-      const url = vehicleId ? `/api/fuel-records?vehicleId=${vehicleId}` : '/api/fuel-records';
+      const url = vehicleId ? `/fuel-records?vehicleId=${vehicleId}` : '/fuel-records';
       console.log('🔍 FleetService - Buscando registros de abastecimento:', url);
       
       const response = await api.get(url);
@@ -161,7 +161,7 @@ class FleetService {
   }
 
   async createFuelRecord(data: FormData): Promise<FuelRecord> {
-    const response = await api.post('/api/fuel-records', data, {
+    const response = await api.post('/fuel-records', data, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -170,59 +170,59 @@ class FleetService {
   }
 
   async updateFuelRecord(id: string, record: Partial<FuelRecord>): Promise<FuelRecord> {
-    const response = await api.put(`/api/fuel-records/${id}`, record);
+    const response = await api.put(`/fuel-records/${id}`, record);
     return response.data;
   }
 
   async deleteFuelRecord(id: string): Promise<void> {
-    await api.delete(`/api/fuel-records/${id}`);
+    await api.delete(`/fuel-records/${id}`);
   }
 
   // Multas
   async getFines(vehicleId?: string): Promise<Fine[]> {
-    const url = vehicleId ? `/api/fines?vehicleId=${vehicleId}` : '/api/fines';
+    const url = vehicleId ? `/fines?vehicleId=${vehicleId}` : '/fines';
     const response = await api.get(url);
     return response.data;
   }
 
   async createFine(fine: Omit<Fine, 'id' | 'createdAt'>): Promise<Fine> {
-    const response = await api.post('/api/fines', fine);
+    const response = await api.post('/fines', fine);
     return response.data;
   }
 
   async updateFine(id: string, fine: Partial<Fine>): Promise<Fine> {
-    const response = await api.put(`/api/fines/${id}`, fine);
+    const response = await api.put(`/fines/${id}`, fine);
     return response.data;
   }
 
   async deleteFine(id: string): Promise<void> {
-    await api.delete(`/api/fines/${id}`);
+    await api.delete(`/fines/${id}`);
   }
 
   // Manutenções
   async getMaintenances(vehicleId?: string): Promise<Maintenance[]> {
-    const url = vehicleId ? `/api/maintenances?vehicleId=${vehicleId}` : '/api/maintenances';
+    const url = vehicleId ? `/maintenances?vehicleId=${vehicleId}` : '/maintenances';
     const response = await api.get(url);
     return response.data;
   }
 
   async createMaintenance(maintenance: Omit<Maintenance, 'id' | 'createdAt'>): Promise<Maintenance> {
-    const response = await api.post('/api/maintenances', maintenance);
+    const response = await api.post('/maintenances', maintenance);
     return response.data;
   }
 
   async updateMaintenance(id: string, maintenance: Partial<Maintenance>): Promise<Maintenance> {
-    const response = await api.put(`/api/maintenances/${id}`, maintenance);
+    const response = await api.put(`/maintenances/${id}`, maintenance);
     return response.data;
   }
 
   async deleteMaintenance(id: string): Promise<void> {
-    await api.delete(`/api/maintenances/${id}`);
+    await api.delete(`/maintenances/${id}`);
   }
 
   async getLastFuelRecord(vehicleId: string): Promise<FuelRecord | null> {
     try {
-      const response = await api.get(`/api/fuel-records/last/${vehicleId}`);
+      const response = await api.get(`/fuel-records/last/${vehicleId}`);
       return response.data;
     } catch (error) {
       console.warn(`Não foi possível buscar o último abastecimento para o veículo ${vehicleId}:`, error);
@@ -246,7 +246,7 @@ class FleetService {
     if (filters.minCost) params.append('minCost', String(filters.minCost));
     if (filters.maxCost) params.append('maxCost', String(filters.maxCost));
 
-    const response = await api.get(`/api/fuel-records/filter?${params.toString()}`);
+    const response = await api.get(`/fuel-records/filter?${params.toString()}`);
     return response.data;
   }
 
@@ -262,7 +262,7 @@ class FleetService {
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
 
-    const response = await api.get(`/api/fuel-records/report/filtered?${params.toString()}`);
+    const response = await api.get(`/fuel-records/report/filtered?${params.toString()}`);
     return response.data;
   }
 
@@ -278,7 +278,7 @@ class FleetService {
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
 
-    const response = await api.get(`/api/fuel-records/report/pdf?${params.toString()}`, {
+    const response = await api.get(`/fuel-records/report/pdf?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -296,7 +296,7 @@ class FleetService {
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
 
-    const response = await api.get(`/api/fuel-records/report/excel?${params.toString()}`, {
+    const response = await api.get(`/fuel-records/report/excel?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -306,14 +306,14 @@ class FleetService {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
 
-    const response = await api.get(`/api/vehicles/report/pdf?${params.toString()}`, {
+    const response = await api.get(`/vehicles/report/pdf?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
   }
 
   async getDrivers(): Promise<string[]> {
-    const response = await api.get('/api/fuel-records/stats/drivers');
+    const response = await api.get('/fuel-records/stats/drivers');
     return response.data;
   }
 
@@ -342,7 +342,7 @@ class FleetService {
       params.selectedIds.forEach(id => queryParams.append('selectedIds', id));
     }
     
-    const response = await api.get(`/api/fines/reports/pdf?${queryParams.toString()}`);
+    const response = await api.get(`/fines/reports/pdf?${queryParams.toString()}`);
     
     return response.data;
   }
@@ -370,7 +370,7 @@ class FleetService {
       params.selectedIds.forEach(id => queryParams.append('selectedIds', id));
     }
     
-    const response = await api.get(`/api/fines/reports/excel?${queryParams.toString()}`, {
+    const response = await api.get(`/fines/reports/excel?${queryParams.toString()}`, {
       responseType: 'blob'
     });
     

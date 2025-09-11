@@ -5,7 +5,7 @@ export const unitService = {
   // Buscar todas as unidades
   async getAllUnits(): Promise<Unit[]> {
     try {
-      const response = await api.get('/api/units');
+      const response = await api.get('/units');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar unidades:', error);
@@ -16,7 +16,7 @@ export const unitService = {
   // Buscar unidade por ID
   async getUnitById(id: string): Promise<Unit> {
     try {
-      const response = await api.get(`/api/units/${id}`);
+      const response = await api.get(`/units/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar unidade:', error);
@@ -27,7 +27,7 @@ export const unitService = {
   // Buscar unidades por cliente
   async getUnitsByClient(clientId: string): Promise<Unit[]> {
     try {
-      const response = await api.get(`/api/units/client/${clientId}`);
+      const response = await api.get(`/units/client/${clientId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar unidades do cliente:', error);
@@ -38,7 +38,7 @@ export const unitService = {
   // Criar nova unidade
   async createUnit(unitData: Partial<Unit>): Promise<Unit> {
     try {
-      const response = await api.post('/api/units', unitData);
+      const response = await api.post('/units', unitData);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao criar unidade:', error);
@@ -52,7 +52,7 @@ export const unitService = {
   // Atualizar unidade
   async updateUnit(id: string, unitData: Partial<Unit>): Promise<Unit> {
     try {
-      const response = await api.put(`/api/units/${id}`, unitData);
+      const response = await api.put(`/units/${id}`, unitData);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao atualizar unidade:', error);
@@ -66,7 +66,7 @@ export const unitService = {
   // Excluir unidade
   async deleteUnit(id: string): Promise<void> {
     try {
-      await api.delete(`/api/units/${id}`);
+      await api.delete(`/units/${id}`);
     } catch (error) {
       console.error('Erro ao excluir unidade:', error);
       throw new Error('Falha ao excluir unidade');
@@ -76,7 +76,7 @@ export const unitService = {
   // Buscar unidades próximas (para otimização de rotas)
   async getNearbyUnits(latitude: number, longitude: number, radiusKm: number = 10): Promise<Unit[]> {
     try {
-      const response = await api.get('/api/units/nearby', {
+      const response = await api.get('/units/nearby', {
         params: { latitude, longitude, radius: radiusKm }
       });
       return response.data;
@@ -95,7 +95,7 @@ export const unitService = {
     averageVisitsPerUnit: number;
   }> {
     try {
-      const response = await api.get('/api/units/statistics');
+      const response = await api.get('/units/statistics');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas de unidades:', error);

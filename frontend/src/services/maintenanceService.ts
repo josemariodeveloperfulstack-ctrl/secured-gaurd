@@ -6,7 +6,7 @@ class MaintenanceService {
   async getAllMaintenances(): Promise<VehicleMaintenance[]> {
     try {
       console.log('🔗 MaintenanceService: Buscando manutenções...');
-      const response = await api.get('/api/maintenances');
+      const response = await api.get('/maintenances');
       console.log('✅ MaintenanceService: Manutenções carregadas:', response.data?.length || 0);
       return response.data || [];
     } catch (error) {
@@ -55,7 +55,7 @@ class MaintenanceService {
   // Buscar manutenção por ID
   async getMaintenanceById(id: string): Promise<VehicleMaintenance | null> {
     try {
-      const response = await api.get(`/api/maintenances/${id}`);
+      const response = await api.get(`/maintenances/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenção:', error);
@@ -66,7 +66,7 @@ class MaintenanceService {
   // Buscar manutenções por veículo
   async getMaintenancesByVehicle(vehicleId: string): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get(`/api/maintenances/vehicle/${vehicleId}`);
+      const response = await api.get(`/maintenances/vehicle/${vehicleId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções do veículo:', error);
@@ -97,7 +97,7 @@ class MaintenanceService {
           formData.append('files', file);
         });
         
-        const response = await api.post('/api/maintenances/upload', formData, {
+        const response = await api.post('/maintenances/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -105,7 +105,7 @@ class MaintenanceService {
         return response.data;
       } else {
         // Usar endpoint padrão sem arquivos
-        const response = await api.post('/api/maintenances', data);
+        const response = await api.post('/maintenances', data);
         return response.data;
       }
     } catch (error) {
@@ -149,7 +149,7 @@ class MaintenanceService {
           formData.append('files', file);
         });
         
-        const response = await api.put(`/api/maintenances/${id}/upload`, formData, {
+        const response = await api.put(`/maintenances/${id}/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -157,7 +157,7 @@ class MaintenanceService {
         return response.data;
       } else {
         // Usar endpoint padrão sem arquivos
-        const response = await api.put(`/api/maintenances/${id}`, data);
+        const response = await api.put(`/maintenances/${id}`, data);
         return response.data;
       }
     } catch (error) {
@@ -169,7 +169,7 @@ class MaintenanceService {
   // Deletar manutenção
   async deleteMaintenance(id: string): Promise<void> {
     try {
-      await api.delete(`/api/maintenances/${id}`);
+      await api.delete(`/maintenances/${id}`);
     } catch (error) {
       console.error('Erro ao deletar manutenção:', error);
       throw new Error('Falha ao deletar manutenção');
@@ -179,7 +179,7 @@ class MaintenanceService {
   // Buscar manutenções por status
   async getMaintenancesByStatus(status: string): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get(`/api/maintenances/status/${status}`);
+      const response = await api.get(`/maintenances/status/${status}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções por status:', error);
@@ -190,7 +190,7 @@ class MaintenanceService {
   // Buscar manutenções por prioridade
   async getMaintenancesByPriority(priority: string): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get(`/api/maintenances/priority/${priority}`);
+      const response = await api.get(`/maintenances/priority/${priority}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções por prioridade:', error);
@@ -213,7 +213,7 @@ class MaintenanceService {
   // Buscar manutenções por período
   async getMaintenancesByPeriod(startDate: string, endDate: string): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/api/maintenances/period', {
+      const response = await api.get('/maintenances/period', {
         params: { startDate, endDate }
       });
       return response.data;
@@ -226,7 +226,7 @@ class MaintenanceService {
   // Buscar manutenções agendadas para hoje
   async getScheduledForToday(): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/api/maintenances/scheduled/today');
+      const response = await api.get('/maintenances/scheduled/today');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções agendadas para hoje:', error);
@@ -237,7 +237,7 @@ class MaintenanceService {
   // Buscar manutenções urgentes
   async getUrgentMaintenances(): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/api/maintenances/urgent');
+      const response = await api.get('/maintenances/urgent');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções urgentes:', error);
@@ -248,7 +248,7 @@ class MaintenanceService {
   // Buscar manutenções vencidas
   async getOverdueMaintenances(): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/api/maintenances/overdue');
+      const response = await api.get('/maintenances/overdue');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções vencidas:', error);
@@ -269,7 +269,7 @@ class MaintenanceService {
     averageCost: number;
   }> {
     try {
-      const response = await api.get('/api/maintenances/stats');
+      const response = await api.get('/maintenances/stats');
       const stats = response.data;
       
       // Calcular custo total e médio (se não estiver disponível no backend)
@@ -307,7 +307,7 @@ class MaintenanceService {
   // Atualizar apenas o status
   async updateMaintenanceStatus(id: string, status: string): Promise<VehicleMaintenance> {
     try {
-      const response = await api.patch(`/api/maintenances/${id}/status?status=${status}`);
+      const response = await api.patch(`/maintenances/${id}/status?status=${status}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar status da manutenção:', error);
@@ -318,7 +318,7 @@ class MaintenanceService {
   // Atualizar apenas a prioridade
   async updateMaintenancePriority(id: string, priority: string): Promise<VehicleMaintenance> {
     try {
-      const response = await api.patch(`/api/maintenances/${id}/priority?priority=${priority}`);
+      const response = await api.patch(`/maintenances/${id}/priority?priority=${priority}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar prioridade da manutenção:', error);

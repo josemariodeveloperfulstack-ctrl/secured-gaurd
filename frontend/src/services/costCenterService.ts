@@ -16,28 +16,28 @@ export const costCenterService = {
     if (params.status) qs.append('status', params.status);
     if (params.page !== undefined) qs.append('page', String(params.page));
     if (params.size !== undefined) qs.append('size', String(params.size));
-    const { data } = await api.get(`/api/cost-centers?${qs.toString()}`);
+    const { data } = await api.get(`/cost-centers?${qs.toString()}`);
     return data;
   },
   
   async listActive() {
-    const { data } = await api.get('/api/cost-centers/active');
+    const { data } = await api.get('/cost-centers/active');
     return data;
   },
   
   async create(dto: CostCenterDTO) {
-    const { data } = await api.post('/api/cost-centers', dto);
+    const { data } = await api.post('/cost-centers', dto);
     return data;
   },
   async update(id: string, dto: CostCenterDTO) {
-    const { data } = await api.put(`/api/cost-centers/${id}`, dto);
+    const { data } = await api.put(`/cost-centers/${id}`, dto);
     return data;
   },
   async remove(id: string) {
-    await api.delete(`/api/cost-centers/${id}`);
+    await api.delete(`/cost-centers/${id}`);
   },
   async toggleStatus(id: string) {
-    const { data } = await api.patch(`/api/cost-centers/${id}/toggle-status`);
+    const { data } = await api.patch(`/cost-centers/${id}/toggle-status`);
     return data as CostCenterDTO;
   },
 };

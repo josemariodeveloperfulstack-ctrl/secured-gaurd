@@ -664,7 +664,7 @@ Confirma a exclusão?`)) {
                   data-aos-delay={index * 100}
                 >
                   <CardContent className="p-4">
-                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 overflow-hidden">
                        {/* Seção Esquerda: Avatar, Nome e Cargo */}
                        <div className="flex items-center space-x-4 flex-shrink-0">
                          <div className="w-12 h-12 bg-seguranca-red rounded-full flex items-center justify-center">
@@ -677,7 +677,7 @@ Confirma a exclusão?`)) {
                        </div>
 
                        {/* Seção Central: Informações de Contato e Localização - ALINHADAS À ESQUERDA */}
-                       <div className="flex flex-col space-y-2 flex-1 lg:ml-8">
+                       <div className="flex flex-col space-y-2 flex-1 lg:ml-8 min-w-0">
                          <div className="flex items-center space-x-2 text-sm text-seguranca-lightgray">
                            <Mail size={16} className="w-5 flex-shrink-0" />
                            <span className="truncate">{employee.email || 'Email não informado'}</span>
@@ -701,11 +701,11 @@ Confirma a exclusão?`)) {
                        </div>
 
                        {/* Seção Direita: Status e Botões de Ação */}
-                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-shrink-0">
+                       <div className="flex flex-col items-start gap-3 flex-shrink-0 min-w-0">
                          <Badge className={getStatusColor(employee.status)}>
                            {getStatusText(employee.status)}
                          </Badge>
-                         <div className="flex flex-wrap gap-2">
+                         <div className="flex flex-wrap gap-2 w-full">
                            <Button 
                              variant="outline" 
                              size="sm" 

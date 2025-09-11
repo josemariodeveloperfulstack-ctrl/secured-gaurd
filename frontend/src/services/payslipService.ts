@@ -48,7 +48,7 @@ export const payslipService = {
     if (filters.month) params.append('month', filters.month);
     if (filters.year) params.append('year', filters.year);
     
-    const response = await api.get(`/api/payslips${params.toString() ? `?${params.toString()}` : ''}`);
+    const response = await api.get(`/payslips${params.toString() ? `?${params.toString()}` : ''}`);
     return response.data;
   },
 
@@ -57,7 +57,7 @@ export const payslipService = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post('/api/payslips/upload', formData, {
+    const response = await api.post('/payslips/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -89,7 +89,7 @@ export const payslipService = {
       options.funcionarioIds.forEach(id => formData.append('funcionarioIds', id.toString()));
     }
 
-    const response = await api.post('/api/payslips/upload-and-send', formData, {
+    const response = await api.post('/payslips/upload-and-send', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -119,7 +119,7 @@ export const payslipService = {
       options.funcionarioIds.forEach(id => formData.append('funcionarioIds', id.toString()));
     }
 
-    const response = await api.post('/api/payslips/upload-and-send-async', formData, {
+    const response = await api.post('/payslips/upload-and-send-async', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -129,7 +129,7 @@ export const payslipService = {
 
   // Verificar status do processamento assíncrono
   async getProcessingStatus(sessionId: string): Promise<ProcessingStatus> {
-    const response = await api.get(`/api/payslips/status/${sessionId}`);
+    const response = await api.get(`/payslips/status/${sessionId}`);
     return response.data;
   },
 
@@ -140,7 +140,7 @@ export const payslipService = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post('/api/payslips/debug', formData, {
+    const response = await api.post('/payslips/debug', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -153,7 +153,7 @@ export const payslipService = {
     console.log('🔍 PayslipService - Tentando baixar:', fileName);
     
     // Temporariamente usar o endpoint de teste
-    const response = await api.get(`/api/payslips/test-download/${encodeURIComponent(fileName)}`, {
+    const response = await api.get(`/payslips/test-download/${encodeURIComponent(fileName)}`, {
       responseType: 'blob',
     });
     
@@ -165,24 +165,24 @@ export const payslipService = {
 
   // Excluir holerite individual
   async deletePayslip(id: number): Promise<void> {
-    await api.delete(`/api/payslips/${id}`);
+    await api.delete(`/payslips/${id}`);
   },
 
   // Excluir múltiplos holerites
   async deleteMultiple(ids: number[]): Promise<{ deleted: number; failed: number; errors: string[] }> {
-    const response = await api.post('/api/payslips/delete-multiple', { ids });
+    const response = await api.post('/payslips/delete-multiple', { ids });
     return response.data;
   },
 
   // Buscar holerite por ID
   async getPayslipById(id: number): Promise<Payslip> {
-    const response = await api.get(`/api/payslips/${id}`);
+    const response = await api.get(`/payslips/${id}`);
     return response.data;
   },
 
   // Atualizar holerite
   async updatePayslip(id: number, data: Partial<Payslip>): Promise<Payslip> {
-    const response = await api.put(`/api/payslips/${id}`, data);
+    const response = await api.put(`/payslips/${id}`, data);
     return response.data;
   },
 
@@ -193,7 +193,7 @@ export const payslipService = {
     byYear: Record<string, number>;
     recentUploads: number;
   }> {
-    const response = await api.get('/api/payslips/stats');
+    const response = await api.get('/payslips/stats');
     return response.data;
   }
 }; 

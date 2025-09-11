@@ -49,7 +49,7 @@ export const FuelConsumptionOverview: React.FC<FuelConsumptionOverviewProps> = (
 
     try {
       console.log('🔍 Carregando estatísticas de todos os veículos...');
-      const response = await api.get('/api/fuel-records/stats/all-vehicles');
+      const response = await api.get('/fuel-records/stats/all-vehicles');
       console.log('✅ Resposta da API:', response.data);
       
       if (response.data && Array.isArray(response.data)) {

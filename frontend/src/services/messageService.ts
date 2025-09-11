@@ -55,7 +55,7 @@ export const messageService = {
 
   async getSystemMessages(page = 0, size = 10): Promise<{ messages: SystemMessage[]; totalPages: number; hasNext: boolean }> {
     try {
-      const response = await api.get('/api/v1/messages/received', {
+      const response = await api.get('/v1/messages/received', {
         headers: getAuthHeaders(),
         params: { page, size, sort: 'createdAt,desc' }
       });
@@ -140,7 +140,7 @@ export const messageService = {
 
       console.log('[MessageService] Enviando dados para o backend:', requestData);
 
-      const response = await api.post('/api/v1/messages', requestData, {
+      const response = await api.post('/v1/messages', requestData, {
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }
       });
 
@@ -154,7 +154,7 @@ export const messageService = {
 
   async markSystemMessageAsRead(messageId: string): Promise<void> {
     try {
-      await api.put(`/api/v1/messages/${messageId}/read`, {}, {
+      await api.put(`/v1/messages/${messageId}/read`, {}, {
         headers: getAuthHeaders()
       });
     } catch (error) {
@@ -164,7 +164,7 @@ export const messageService = {
 
   async getUnreadSystemCount(): Promise<number> {
     try {
-      const response = await api.get('/api/v1/messages/unread/count', {
+      const response = await api.get('/v1/messages/unread/count', {
         headers: getAuthHeaders()
       });
       return response.data || 0;
@@ -179,7 +179,7 @@ export const messageService = {
   async getAvailableUsers(): Promise<User[]> {
     try {
       // Primeiro tenta a API principal de usuários
-      const response = await api.get('/api/users', {
+      const response = await api.get('/users', {
         headers: getAuthHeaders()
       });
 
@@ -199,7 +199,7 @@ export const messageService = {
 
       try {
         // Fallback para API de teste
-        const response = await api.get('/api/test/users', {
+        const response = await api.get('/test/users', {
           headers: getAuthHeaders()
         });
 
@@ -223,7 +223,7 @@ export const messageService = {
 
   async getRecentConversations(): Promise<Conversation[]> {
     try {
-      const response = await api.get('/api/v1/chat/recent', {
+      const response = await api.get('/v1/chat/recent', {
         headers: getAuthHeaders()
       });
       return response.data || [];
@@ -235,7 +235,7 @@ export const messageService = {
 
   async getConversationMessages(conversationId: string): Promise<ChatMessage[]> {
     try {
-      const response = await api.get(`/api/v1/chat/conversation/${conversationId}`, {
+      const response = await api.get(`/v1/chat/conversation/${conversationId}`, {
         headers: getAuthHeaders()
       });
 
@@ -289,7 +289,7 @@ export const messageService = {
     replyToId?: string;
   }): Promise<ChatMessage> {
     try {
-      const response = await api.post('/api/v1/chat/send', messageData, {
+      const response = await api.post('/v1/chat/send', messageData, {
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }
       });
 
@@ -314,7 +314,7 @@ export const messageService = {
 
   async editChatMessage(messageId: string, content: string): Promise<ChatMessage> {
     try {
-      const response = await api.put(`/api/v1/chat/${messageId}/edit`, null, {
+      const response = await api.put(`/v1/chat/${messageId}/edit`, null, {
         headers: getAuthHeaders(),
         params: { content }
       });
@@ -327,7 +327,7 @@ export const messageService = {
 
   async markChatMessageAsRead(messageId: string): Promise<void> {
     try {
-      await api.put(`/api/v1/chat/${messageId}/read`, {}, {
+      await api.put(`/v1/chat/${messageId}/read`, {}, {
         headers: getAuthHeaders()
       });
     } catch (error) {
@@ -337,7 +337,7 @@ export const messageService = {
 
   async getUnreadChatCount(): Promise<number> {
     try {
-      const response = await api.get('/api/v1/chat/unread/count', {
+      const response = await api.get('/v1/chat/unread/count', {
         headers: getAuthHeaders()
       });
       return response.data || 0;
@@ -351,7 +351,7 @@ export const messageService = {
 
   async searchMessages(query: string, type: 'system' | 'chat' = 'system'): Promise<SystemMessage[] | ChatMessage[]> {
     try {
-      const endpoint = type === 'system' ? '/api/v1/messages/search' : '/api/v1/chat/search';
+      const endpoint = type === 'system' ? '/v1/messages/search' : '/v1/chat/search';
       const response = await api.get(endpoint, {
         headers: getAuthHeaders(),
         params: { q: query }

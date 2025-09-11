@@ -35,7 +35,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { payslipService, Payslip, PayslipFilters } from '@/services/payslipService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AuthDebug } from '@/components/AuthDebug';
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
 import api from '@/lib/axios';
 
@@ -244,7 +243,7 @@ const Holerites: React.FC = () => {
       setLoadingUnified(true);
       setError(null);
       
-      const response = await api.get('/api/unified-documents/list');
+      const response = await api.get('/unified-documents/list');
       
       if (response.data.sucesso) {
         setUnifiedDocuments(response.data.documents || []);
@@ -353,7 +352,7 @@ const Holerites: React.FC = () => {
       }
       
       // Chamar API para excluir documento
-      const response = await api.delete(`/api/unified-documents/delete/${encodeURIComponent(fileName)}`);
+      const response = await api.delete(`/unified-documents/delete/${encodeURIComponent(fileName)}`);
       
       if (response.data.sucesso) {
         console.log('✅ Documento excluído com sucesso:', fileName);
@@ -1073,7 +1072,7 @@ const Holerites: React.FC = () => {
   const handleSendWhatsApp = async () => {
     setSendingWhatsApp(true);
     try {
-      const response = await api.post('/api/envio/massa', {
+      const response = await api.post('/envio/massa', {
         tipo: 'whatsapp',
         funcionarioIds: selectedPayslips,
         mensagem: whatsAppMessage
@@ -1097,7 +1096,7 @@ const Holerites: React.FC = () => {
   // Envio individual via WhatsApp
   const handleSendWhatsAppIndividual = async (payslip: Payslip) => {
     try {
-      const response = await api.post('/api/envio/individual', {
+      const response = await api.post('/envio/individual', {
         tipo: 'whatsapp',
         funcionarioId: payslip.id,
         mensagem: 'Olá! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.'
@@ -1122,7 +1121,7 @@ const Holerites: React.FC = () => {
       console.log('🔍 Permissões do usuário:', user?.permissions);
       console.log('🔍 Token no localStorage:', localStorage.getItem('token'));
       
-      const response = await api.get('/api/receipts');
+      const response = await api.get('/receipts');
       console.log('🔍 Resposta da API de recibos:', response);
       
       let receipts = [];
@@ -1205,7 +1204,7 @@ const Holerites: React.FC = () => {
 
       console.log('📤 Enviando requisição para /api/receipts/upload...');
 
-      const response = await api.post('/api/receipts/upload', formData, {
+      const response = await api.post('/receipts/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -1283,7 +1282,7 @@ const Holerites: React.FC = () => {
     try {
       setProcessingUnified(true);
       
-      const response = await api.post('/api/unified-documents/create-expanded-holerites');
+      const response = await api.post('/unified-documents/create-expanded-holerites');
 
       if (response.status === 200) {
         toast({
@@ -1314,7 +1313,7 @@ const Holerites: React.FC = () => {
     try {
       setDeletingReceipts(true);
       
-      const response = await api.delete(`/api/receipts/${receiptId}`);
+      const response = await api.delete(`/receipts/${receiptId}`);
       
       if (response.status === 200) {
         toast({
@@ -1357,7 +1356,7 @@ const Holerites: React.FC = () => {
     try {
       setDeletingReceipts(true);
       
-      const response = await api.delete('/api/receipts/batch', {
+      const response = await api.delete('/receipts/batch', {
         data: selectedReceipts
       });
       
@@ -1464,7 +1463,7 @@ const Holerites: React.FC = () => {
     
     try {
       console.log('🔍 Fazendo requisição para baixar recibo:', receiptId);
-      const response = await api.get(`/api/receipts/${receiptId}/download`, {
+      const response = await api.get(`/receipts/${receiptId}/download`, {
         responseType: 'blob'
       });
       
@@ -1544,7 +1543,7 @@ const Holerites: React.FC = () => {
           // Se não houver dados nas outras abas, tentar carregar via API
           if (payslips.length === 0) {
               try {
-                  const holeritesResponse = await api.get('/api/holerites/processed-files');
+                  const holeritesResponse = await api.get('/holerites/processed-files');
                   if (holeritesResponse.data.success) {
                       setProcessedHolerites(holeritesResponse.data.files || []);
                       console.log('✅ Holerites carregados via API:', holeritesResponse.data.files?.length || 0);
@@ -1556,7 +1555,7 @@ const Holerites: React.FC = () => {
 
           if (!Array.isArray(receipts) || receipts.length === 0) {
               try {
-                  const recibosResponse = await api.get('/api/receipts/processed-files');
+                  const recibosResponse = await api.get('/receipts/processed-files');
                   if (recibosResponse.data.success) {
                       setProcessedRecibos(recibosResponse.data.files || []);
                       console.log('✅ Recibos carregados via API:', recibosResponse.data.files?.length || 0);
@@ -3603,8 +3602,6 @@ const Holerites: React.FC = () => {
            receiptData={selectedReceiptForTemplate}
          />
 
-         {/* Debug de Autenticação */}
-         <AuthDebug />
      </StandardLayout>
    );
  };

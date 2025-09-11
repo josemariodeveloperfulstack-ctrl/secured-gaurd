@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 // Request interceptor
@@ -36,7 +36,7 @@ api.interceptors.response.use(
         }
 
         // Tenta renovar o token
-        const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8081'}/auth/refresh-token`, {
+        const response = await axios.post(`${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`, {
           refreshToken
         });
 

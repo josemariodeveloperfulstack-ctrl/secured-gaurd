@@ -44,6 +44,7 @@ const Certificacoes = lazy(() => import('@/pages/Certificacoes'));
 const RH = lazy(() => import('@/pages/RH'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
+const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
 const Grupos = lazy(() => import('@/pages/Grupos'));
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const Profile = lazy(() => import('@/pages/Profile'));
@@ -594,6 +595,11 @@ function App() {
                     <Route path="/rh/relatorios" element={
                       <ProtectedRoute>
                         <Relatorios />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/gestao-documentos" element={
+                      <ProtectedRoute>
+                        <GestaoDocumentos />
                       </ProtectedRoute>
                     } />
                     
