@@ -180,7 +180,7 @@ export const occurrenceService = {
   async createOccurrence(data: CreateOccurrenceRequest): Promise<Occurrence> {
     try {
       console.log('🔗 Tentando criar ocorrência no backend:', data);
-      const response = await api.post('/api/occurrences', data);
+      const response = await api.post('/occurrences', data);
       console.log('✅ Ocorrência criada no backend');
       return response.data;
     } catch (error) {

@@ -58,7 +58,7 @@ export interface LeadSourceStats {
 
 class LeadService {
   async getAllLeads(): Promise<Lead[]> {
-    const response = await api.get('/api/leads/all');
+    const response = await api.get('/leads/all');
     return response.data;
   }
 
@@ -73,7 +73,7 @@ class LeadService {
   }
 
   async createLead(leadData: CreateLeadRequest): Promise<Lead> {
-    const response = await api.post('/api/leads', leadData);
+    const response = await api.post('/leads', leadData);
     return response.data;
   }
 
@@ -122,12 +122,12 @@ class LeadService {
   }
 
   async getStatsByStatus(): Promise<LeadStats> {
-    const response = await api.get('/api/leads/stats/count-by-status');
+    const response = await api.get('/leads/stats/count-by-status');
     return response.data;
   }
 
   async getStatsBySource(): Promise<LeadSourceStats> {
-    const response = await api.get('/api/leads/stats/count-by-source');
+    const response = await api.get('/leads/stats/count-by-source');
     return response.data;
   }
 }

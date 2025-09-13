@@ -602,6 +602,11 @@ function App() {
                         <GestaoDocumentos />
                       </ProtectedRoute>
                     } />
+                    <Route path="/rh/epis" element={
+                      <ProtectedRoute>
+                        <EPIs />
+                      </ProtectedRoute>
+                    } />
                     
                     {/* Relatórios */}
                     <Route path="/reports" element={

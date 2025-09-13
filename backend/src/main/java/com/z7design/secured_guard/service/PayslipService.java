@@ -264,20 +264,36 @@ public class PayslipService {
             }
         }
 
-        // 3. EXTRAÇÃO DO PERÍODO - múltiplos padrões
-        // Padrão 1: "DD/MM/AAAA a DD/MM/AAAA" 
+        // 3. EXTRAÇÃO DO PERÍODO DE REFERÊNCIA - múltiplos padrões
+        log.info("🔍 Procurando período de referência no holerite...");
+        
+        // Padrão 1: "DD/MM/AAAA a DD/MM/AAAA" (período completo)
         Pattern periodoPattern1 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+a\\s+(\\d{2})/(\\d{2})/(\\d{4})");
         for (String linha : linhas) {
             Matcher periodoMatcher = periodoPattern1.matcher(linha);
             if (periodoMatcher.find()) {
-                mes = periodoMatcher.group(5); // mês da data final
-                ano = periodoMatcher.group(6); // ano da data final
-                log.info("✅ Período encontrado (padrão 1): {}/{}", mes, ano);
+                mes = periodoMatcher.group(5); // mês da data final (período de referência)
+                ano = periodoMatcher.group(6); // ano da data final (período de referência)
+                log.info("✅ Período de referência encontrado (padrão 1): {}/{} - Linha: {}", mes, ano, linha.trim());
                 break;
             }
         }
 
-        // Padrão 2: "MM/AAAA" direto
+        // Padrão 2: "DD/MM/AAAA a DD/MM/AAAA" com espaços diferentes
+        if (mes == null || ano == null) {
+            Pattern periodoPattern1b = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+à\\s+(\\d{2})/(\\d{2})/(\\d{4})");
+            for (String linha : linhas) {
+                Matcher periodoMatcher = periodoPattern1b.matcher(linha);
+                if (periodoMatcher.find()) {
+                    mes = periodoMatcher.group(5);
+                    ano = periodoMatcher.group(6);
+                    log.info("✅ Período de referência encontrado (padrão 1b): {}/{} - Linha: {}", mes, ano, linha.trim());
+                    break;
+                }
+            }
+        }
+
+        // Padrão 3: "MM/AAAA" direto
         if (mes == null || ano == null) {
             Pattern periodoPattern2 = Pattern.compile("(\\d{2})/(\\d{4})");
             for (String linha : linhas) {
@@ -285,25 +301,61 @@ public class PayslipService {
                 if (periodoMatcher.find()) {
                     mes = periodoMatcher.group(1);
                     ano = periodoMatcher.group(2);
-                    log.info("✅ Período encontrado (padrão 2): {}/{}", mes, ano);
+                    log.info("✅ Período de referência encontrado (padrão 2): {}/{} - Linha: {}", mes, ano, linha.trim());
                     break;
                 }
             }
         }
 
-        // Padrão 3: "JUNHO/2025" ou "06/2025" no texto OCR
+        // Padrão 4: "DD/MM/AAAA" (data única - usar o mês/ano dessa data)
+        if (mes == null || ano == null) {
+            Pattern periodoPattern3 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})");
+            for (String linha : linhas) {
+                Matcher periodoMatcher = periodoPattern3.matcher(linha);
+                if (periodoMatcher.find()) {
+                    mes = periodoMatcher.group(2);
+                    ano = periodoMatcher.group(3);
+                    log.info("✅ Período de referência encontrado (padrão 3): {}/{} - Linha: {}", mes, ano, linha.trim());
+                    break;
+                }
+            }
+        }
+
+        // Padrão 5: Nomes de meses em português via OCR
         if ((mes == null || ano == null) && ocrText != null) {
+            log.info("🔍 Tentando extrair período via OCR...");
             String[] meses = {"JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", 
                              "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"};
             for (int i = 0; i < meses.length; i++) {
                 if (ocrText.toUpperCase().contains(meses[i])) {
                     mes = String.format("%02d", i + 1);
-                    // Procurar ano próximo
-                    Pattern anoPattern = Pattern.compile("(20[0-9]{2})");
+                    // Procurar ano próximo (2020-2030)
+                    Pattern anoPattern = Pattern.compile("(20[2-3][0-9])");
                     Matcher anoMatcher = anoPattern.matcher(ocrText);
                     if (anoMatcher.find()) {
                         ano = anoMatcher.group(1);
-                        log.info("✅ Período encontrado via OCR: {}/{} ({})", mes, ano, meses[i]);
+                        log.info("✅ Período de referência encontrado via OCR: {}/{} ({})", mes, ano, meses[i]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Padrão 6: Buscar por "PERÍODO" ou "REFERÊNCIA" no texto
+        if ((mes == null || ano == null)) {
+            log.info("🔍 Procurando por palavras-chave de período...");
+            for (String linha : linhas) {
+                String linhaUpper = linha.toUpperCase();
+                if (linhaUpper.contains("PERÍODO") || linhaUpper.contains("REFERÊNCIA") || 
+                    linhaUpper.contains("COMPETÊNCIA") || linhaUpper.contains("MÊS")) {
+                    
+                    // Tentar extrair data dessa linha
+                    Pattern dataPattern = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})");
+                    Matcher dataMatcher = dataPattern.matcher(linha);
+                    if (dataMatcher.find()) {
+                        mes = dataMatcher.group(2);
+                        ano = dataMatcher.group(3);
+                        log.info("✅ Período de referência encontrado por palavra-chave: {}/{} - Linha: {}", mes, ano, linha.trim());
                         break;
                     }
                 }
@@ -322,19 +374,39 @@ public class PayslipService {
         }
         
         if (mes == null || ano == null) {
-            log.warn("❌ Mês/ano não encontrados - Página: {}", pageNumber);
+            log.warn("❌ Mês/ano de referência não encontrados - Página: {}", pageNumber);
             return null;
         }
 
-        log.info("✅ Dados extraídos com sucesso - Página: {}, Código: {}, Nome: {}, CPF: {}, Período: {}/{}", 
-                pageNumber, codigo, nome, cpf, mes, ano);
+        // Validar se o mês está entre 1 e 12
+        try {
+            int mesInt = Integer.parseInt(mes);
+            int anoInt = Integer.parseInt(ano);
+            
+            if (mesInt < 1 || mesInt > 12) {
+                log.warn("❌ Mês inválido: {} - Página: {}", mes, pageNumber);
+                return null;
+            }
+            
+            if (anoInt < 2020 || anoInt > 2030) {
+                log.warn("❌ Ano inválido: {} - Página: {}", ano, pageNumber);
+                return null;
+            }
+            
+            log.info("✅ Dados extraídos com sucesso - Página: {}, Código: {}, Nome: {}, CPF: {}, Período de Referência: {}/{}", 
+                    pageNumber, codigo, nome, cpf, mes, ano);
 
-        return Payslip.builder()
-                .employeeName(nome)
-                .cpf(cpf)
-                .month(mes != null ? Integer.parseInt(mes) : null)
-                .year(ano != null ? Integer.parseInt(ano) : null)
-                .build();
+            return Payslip.builder()
+                    .employeeName(nome)
+                    .cpf(cpf)
+                    .month(mesInt)
+                    .year(anoInt)
+                    .build();
+                    
+        } catch (NumberFormatException e) {
+            log.warn("❌ Erro ao converter mês/ano para número - Mês: {}, Ano: {}, Página: {}", mes, ano, pageNumber);
+            return null;
+        }
     }
 
     private boolean isValidEmployeeName(String name) {
@@ -691,7 +763,15 @@ public class PayslipService {
     }
 
     public List<Payslip> getAllPayslips() {
-        return payslipRepository.findAll();
+        log.info("🔍 Buscando todos os payslips no repositório...");
+        List<Payslip> payslips = payslipRepository.findAll();
+        log.info("✅ Repositório retornou {} payslips", payslips.size());
+        if (payslips.size() > 0) {
+            log.info("📋 Primeiro registro: ID={}, Nome={}, CPF={}, Mês={}, Ano={}", 
+                payslips.get(0).getId(), payslips.get(0).getEmployeeName(), 
+                payslips.get(0).getCpf(), payslips.get(0).getMonth(), payslips.get(0).getYear());
+        }
+        return payslips;
     }
 
     public List<Payslip> getPayslipsByCpf(String cpf) {

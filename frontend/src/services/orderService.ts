@@ -32,13 +32,13 @@ export interface CreateOrderRequest {
 export const orderService = {
   // Criar nova ordem de serviço
   async createOrder(orderData: CreateOrderRequest): Promise<Order> {
-    const response = await api.post('/api/orders', orderData);
+    const response = await api.post('/orders', orderData);
     return response.data;
   },
 
   // Buscar ordens de serviço
   async getOrders(): Promise<Order[]> {
-    const response = await api.get('/api/orders');
+    const response = await api.get('/orders');
     return response.data;
   },
 

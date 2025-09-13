@@ -38,7 +38,7 @@ export const activityReportService = {
   // Criar novo relatório
   async createActivityReport(reportData: CreateActivityReportDTO): Promise<ActivityReport> {
     try {
-      const response = await api.post('/api/activity-reports', reportData);
+      const response = await api.post('/activity-reports', reportData);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar relatório de atividade:', error);

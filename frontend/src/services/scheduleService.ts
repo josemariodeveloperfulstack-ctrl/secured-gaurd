@@ -53,7 +53,7 @@ export const scheduleService = {
    * Busca todas as escalas de trabalho.
    */
   async findAll(): Promise<Schedule[]> {
-    const response = await api.get('/api/schedules');
+    const response = await api.get('/schedules');
     return response.data;
   },
 
@@ -80,7 +80,7 @@ export const scheduleService = {
    * @param date - A data no formato 'YYYY-MM-DD'.
    */
   async findByDate(date: string): Promise<Schedule[]> {
-    const response = await api.get('/api/schedules/date', { params: { date } });
+    const response = await api.get('/schedules/date', { params: { date } });
     return response.data;
   },
 
@@ -89,7 +89,7 @@ export const scheduleService = {
    * @param data - Os dados da nova escala.
    */
   async create(data: CreateScheduleDTO): Promise<Schedule> {
-    const response = await api.post('/api/schedules', data);
+    const response = await api.post('/schedules', data);
     return response.data;
   },
 
@@ -115,7 +115,7 @@ export const scheduleService = {
    * Busca todas as escalas de trabalho.
    */
   async getSchedules(): Promise<Schedule[]> {
-    const response = await api.get('/api/schedules');
+    const response = await api.get('/schedules');
     return response.data;
   },
 
@@ -124,7 +124,7 @@ export const scheduleService = {
    * @param date - A data no formato 'YYYY-MM-DD'.
    */
   async getSchedulesByDate(date: string): Promise<Schedule[]> {
-    const response = await api.get('/api/schedules/date', { params: { date } });
+    const response = await api.get('/schedules/date', { params: { date } });
     return response.data;
   },
 }; 

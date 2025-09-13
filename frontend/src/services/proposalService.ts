@@ -78,7 +78,7 @@ export interface ProposalValueStats {
 
 export const proposalService = {
   async getAllProposals(): Promise<Proposal[]> {
-    const response = await api.get('/api/proposals/all');
+    const response = await api.get('/proposals/all');
     return response.data;
   },
 
@@ -93,7 +93,7 @@ export const proposalService = {
   },
 
   async createProposal(proposalData: CreateProposalRequest): Promise<Proposal> {
-    const response = await api.post('/api/proposals', proposalData);
+    const response = await api.post('/proposals', proposalData);
     return response.data;
   },
 
@@ -137,7 +137,7 @@ export const proposalService = {
   },
 
   async getExpiredProposals(): Promise<Proposal[]> {
-    const response = await api.get('/api/proposals/expired');
+    const response = await api.get('/proposals/expired');
     return response.data;
   },
 
@@ -152,12 +152,12 @@ export const proposalService = {
   },
 
   async getStatsByStatus(): Promise<ProposalStats> {
-    const response = await api.get('/api/proposals/stats/count-by-status');
+    const response = await api.get('/proposals/stats/count-by-status');
     return response.data;
   },
 
   async getTotalValueByStatus(): Promise<ProposalStats> {
-    const response = await api.get('/api/proposals/stats/total-value-by-status');
+    const response = await api.get('/proposals/stats/total-value-by-status');
     return response.data;
   }
 };

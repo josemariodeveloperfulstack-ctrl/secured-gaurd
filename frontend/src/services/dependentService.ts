@@ -49,7 +49,7 @@ export const dependentService = {
   // Criar novo dependente
   async createDependent(dependentData: CreateDependentDTO): Promise<Dependent> {
     try {
-      const response = await api.post('/api/dependents', dependentData);
+      const response = await api.post('/dependents', dependentData);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao criar dependente:', error);

@@ -196,6 +196,9 @@ export const workPostService = {
       nrs: Array.isArray(workPostData.nrs) ? workPostData.nrs : [],
       epis: Array.isArray(workPostData.epis) ? workPostData.epis : [],
       trainings: Array.isArray(workPostData.trainings) ? workPostData.trainings : [],
+      // Converter horários para formato ISO (HH:mm:ss) que o backend espera
+      shiftStart: workPostData.shiftStart ? this.formatTimeForBackend(workPostData.shiftStart) : '08:00:00',
+      shiftEnd: workPostData.shiftEnd ? this.formatTimeForBackend(workPostData.shiftEnd) : '16:00:00',
     };
     
     console.log('Dados enviados para o backend:', backendData);
@@ -206,7 +209,15 @@ export const workPostService = {
 
   // Atualizar posto
   async updateWorkPost(id: string, workPostData: UpdateWorkPostRequest): Promise<WorkPost> {
-    const response = await api.put(`/work-posts/${id}`, workPostData);
+    // Preparar dados para o backend com formatação de horários
+    const backendData = {
+      ...workPostData,
+      // Converter horários se fornecidos
+      shiftStart: workPostData.shiftStart ? this.formatTimeForBackend(workPostData.shiftStart) : undefined,
+      shiftEnd: workPostData.shiftEnd ? this.formatTimeForBackend(workPostData.shiftEnd) : undefined,
+    };
+    
+    const response = await api.put(`/work-posts/${id}`, backendData);
     return response.data;
   },
 
@@ -337,5 +348,24 @@ export const workPostService = {
   async getWorkPostStats(): Promise<any> {
     const response = await api.get('/work-posts/stats/count');
     return response.data;
+  },
+
+  // Método auxiliar para formatar horário para o backend
+  formatTimeForBackend(timeString: string): string {
+    // Se já está no formato HH:mm:ss, retorna como está
+    if (timeString.includes(':')) {
+      const parts = timeString.split(':');
+      if (parts.length === 2) {
+        // Formato HH:mm -> converte para HH:mm:ss
+        return `${timeString}:00`;
+      } else if (parts.length === 3) {
+        // Formato HH:mm:ss -> retorna como está
+        return timeString;
+      }
+    }
+    
+    // Se não conseguir parsear, retorna horário padrão
+    console.warn(`Formato de horário inválido: ${timeString}, usando 08:00:00`);
+    return '08:00:00';
   }
 }; 

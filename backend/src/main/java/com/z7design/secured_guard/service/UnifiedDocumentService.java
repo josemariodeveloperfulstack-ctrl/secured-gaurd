@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.PaymentReceipt;
+import com.z7design.secured_guard.model.PaymentReceiptStatus;
 import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import lombok.RequiredArgsConstructor;
@@ -414,15 +415,15 @@ public class UnifiedDocumentService {
         try {
             log.info("🏗️ Criando PaymentReceipt mock para: {} - {}/{}", employeeName, month, year);
             
-            // Usar o builder do PaymentReceipt para criar um mock
-            return PaymentReceipt.builder()
-                .employeeName(employeeName)
-                .month(month)
-                .year(year)
-                .fileName("recibo_" + employeeName.toLowerCase().replaceAll("\\s+", "_") + "_" + month + "_" + year + ".pdf")
-                .netSalary(new java.math.BigDecimal("911.00"))
-                .status(PaymentReceipt.ReceiptStatus.PROCESSED)
-                .build();
+            // Criar um PaymentReceipt mock usando construtor
+            PaymentReceipt receipt = new PaymentReceipt();
+            receipt.setEmployeeName(employeeName);
+            receipt.setMonth(month);
+            receipt.setYear(year);
+            receipt.setFileName("recibo_" + employeeName.toLowerCase().replaceAll("\\s+", "_") + "_" + month + "_" + year + ".pdf");
+            receipt.setNetSalary(new java.math.BigDecimal("911.00"));
+            receipt.setStatus(PaymentReceiptStatus.PROCESSED);
+            return receipt;
                 
         } catch (Exception e) {
             log.error("💥 Erro ao criar PaymentReceipt mock: {}", e.getMessage(), e);
@@ -842,7 +843,7 @@ public class UnifiedDocumentService {
                 try {
                     // Buscar recibos por nome do funcionário (busca mais flexível)
                     log.info("🔍 Buscando recibos para funcionário: '{}'", employeeName);
-                    List<PaymentReceipt> allReceipts = receiptRepository.findByEmployeeNameContaining(employeeName);
+                    List<PaymentReceipt> allReceipts = receiptRepository.findByEmployeeNameContainingIgnoreCase(employeeName);
                     log.info("📄 Total de recibos encontrados para '{}': {}", employeeName, allReceipts.size());
                     
                     // Mostrar detalhes dos recibos encontrados

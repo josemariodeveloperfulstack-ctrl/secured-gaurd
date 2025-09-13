@@ -26,7 +26,7 @@ export const vehicleFuelEfficiencyService = {
    */
   async getMostEfficientVehicle(): Promise<VehicleFuelEfficiency> {
     try {
-      const response = await api.get('/api/frota/efficiency/best');
+      const response = await api.get('/frota/efficiency/best');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar veículo mais eficiente:', error);
@@ -42,7 +42,7 @@ export const vehicleFuelEfficiencyService = {
    */
   async getAllVehiclesEfficiency(): Promise<VehicleFuelEfficiency[]> {
     try {
-      const response = await api.get('/api/frota/efficiency/all');
+      const response = await api.get('/frota/efficiency/all');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar eficiência de todos os veículos:', error);

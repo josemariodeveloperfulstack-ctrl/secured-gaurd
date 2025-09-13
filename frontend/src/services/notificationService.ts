@@ -385,7 +385,7 @@ class NotificationService {
   // Buscar notificações do painel
   async getPanelNotifications(): Promise<NotificationData[]> {
     try {
-      const response = await api.get('/api/notifications/panel');
+      const response = await api.get('/notifications/panel');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar notificações:', error);
@@ -406,7 +406,7 @@ class NotificationService {
   // Marcar todas as notificações como lidas
   async markAllAsRead(): Promise<void> {
     try {
-      await api.patch('/api/notifications/panel/read-all');
+      await api.patch('/notifications/panel/read-all');
     } catch (error) {
       console.error('Erro ao marcar todas as notificações como lidas:', error);
       throw error;
@@ -425,7 +425,7 @@ class NotificationService {
 
   // Criar nova notificação
     async createNotification(notificationData: CreateNotificationRequest): Promise<NotificationData> {
-    const response = await api.post('/api/notifications', notificationData);
+    const response = await api.post('/notifications', notificationData);
     return response.data;
   }
 }

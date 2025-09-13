@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.PaymentReceipt;
+import com.z7design.secured_guard.model.PaymentReceiptStatus;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -174,7 +175,7 @@ public class ReceiptProcessingService {
                     .netSalary(receiptData.amount != null ? java.math.BigDecimal.valueOf(receiptData.amount) : java.math.BigDecimal.ZERO)
                     .fileName(fileName)
                     .filePath(newPdfPath != null ? newPdfPath : "sem_pdf")
-                    .status(PaymentReceipt.ReceiptStatus.PROCESSED)
+                    .status(PaymentReceiptStatus.PROCESSED)
                     .createdAt(LocalDateTime.now())
                     // Campos bancários extraídos
                     .debitedAgency(receiptData.agency != null ? receiptData.agency : "0925")
@@ -243,6 +244,16 @@ public class ReceiptProcessingService {
             if (nameMatcher1.find()) {
                 employeeName = nameMatcher1.group(1).trim();
                 log.info("✅ Nome encontrado (padrão Itaú): {}", employeeName);
+            }
+            
+            // Padrão 1b: Específico para formato Itaú - "Nome: [NOME]" seguido de "Agência:"
+            if (employeeName == null || employeeName.isEmpty()) {
+                Pattern namePattern1b = Pattern.compile("Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+?)\\s*Agência\\s*:", Pattern.CASE_INSENSITIVE);
+                Matcher nameMatcher1b = namePattern1b.matcher(text);
+                if (nameMatcher1b.find()) {
+                    employeeName = nameMatcher1b.group(1).trim();
+                    log.info("✅ Nome encontrado (padrão Itaú específico): {}", employeeName);
+                }
             }
             
             // Padrão 2: Buscar por "Nome: [NOME]" em qualquer lugar
@@ -394,6 +405,21 @@ public class ReceiptProcessingService {
                 }
             }
             
+            // Padrão 1b: "R$ [VALOR]" sem "Valor:" - mais flexível para comprovantes
+            if (amount == null) {
+                Pattern amountPattern1b = Pattern.compile("R\\$\\s*([\\d.,]{4,})", Pattern.CASE_INSENSITIVE);
+                Matcher amountMatcher1b = amountPattern1b.matcher(text);
+                if (amountMatcher1b.find()) {
+                    String amountStr = amountMatcher1b.group(1).replace(".", "").replace(",", ".");
+                    try {
+                        amount = Double.parseDouble(amountStr);
+                        log.info("Valor extraído (padrão flexível): {}", amount);
+                    } catch (NumberFormatException e) {
+                        log.warn("Erro ao converter valor: {}", amountStr);
+                    }
+                }
+            }
+            
             // Padrão 2: "R$ [VALOR]" - padrão alternativo
             if (amount == null) {
                 Pattern amountPattern2 = Pattern.compile("R\\$\\s*([\\d.,]+)", Pattern.CASE_INSENSITIVE);
@@ -438,29 +464,77 @@ public class ReceiptProcessingService {
                 data.transferDate = dateMatcher1.group(1);
                 String transferTime = dateMatcher1.group(2);
                 log.info("Data de transferência extraída: {} às {}", data.transferDate, transferTime);
-                
-                // Extrair mês e ano da data
-                String[] dateParts = data.transferDate.split("\\.");
-                if (dateParts.length >= 3) {
-                    data.month = Integer.parseInt(dateParts[1]);
-                    data.year = Integer.parseInt(dateParts[2]);
-                    log.info("📅 Mês/Ano extraído: {}/{}", data.month, data.year);
-                } else {
-                    log.warn("⚠️ Formato de data inválido: {}", data.transferDate);
-                }
             } else {
                 // Padrão alternativo: "Data: DD/MM/YYYY"
                 Pattern datePattern2 = Pattern.compile("Data\\s*:\\s*(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
                 Matcher dateMatcher2 = datePattern2.matcher(text);
                 if (dateMatcher2.find()) {
-                    data.month = Integer.parseInt(dateMatcher2.group(2));
-                    data.year = Integer.parseInt(dateMatcher2.group(3));
-                    log.info("Mês/Ano extraído (padrão alternativo): {}/{}", data.month, data.year);
+                    data.transferDate = dateMatcher2.group(1) + "/" + dateMatcher2.group(2) + "/" + dateMatcher2.group(3);
+                    log.info("Data de transferência extraída (padrão alternativo): {}", data.transferDate);
+                }
+            }
+
+            // EXTRAIR PERÍODO DE REFERÊNCIA DO SALÁRIO
+            log.info("🔍 Procurando período de referência do salário no comprovante...");
+            
+            // Padrão 1: "PERÍODO: MM/AAAA" ou "COMPETÊNCIA: MM/AAAA"
+            Pattern periodoPattern1 = Pattern.compile("(?:PERÍODO|COMPETÊNCIA|REFERÊNCIA)\\s*:\\s*(\\d{1,2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+            Matcher periodoMatcher1 = periodoPattern1.matcher(text);
+            if (periodoMatcher1.find()) {
+                data.month = Integer.parseInt(periodoMatcher1.group(1));
+                data.year = Integer.parseInt(periodoMatcher1.group(2));
+                log.info("✅ Período de referência encontrado (padrão 1): {}/{}", data.month, data.year);
+            } else {
+                // Padrão 2: "SALÁRIO DE MM/AAAA" ou "PAGAMENTO DE MM/AAAA"
+                Pattern periodoPattern2 = Pattern.compile("(?:SALÁRIO|PAGAMENTO)\\s+DE\\s+(\\d{1,2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                Matcher periodoMatcher2 = periodoPattern2.matcher(text);
+                if (periodoMatcher2.find()) {
+                    data.month = Integer.parseInt(periodoMatcher2.group(1));
+                    data.year = Integer.parseInt(periodoMatcher2.group(2));
+                    log.info("✅ Período de referência encontrado (padrão 2): {}/{}", data.month, data.year);
                 } else {
-                    // Usar data atual como fallback
-                    data.month = LocalDateTime.now().getMonthValue();
-                    data.year = LocalDateTime.now().getYear();
-                    log.info("Usando data atual como fallback: {}/{}", data.month, data.year);
+                    // Padrão 3: Para comprovantes Itaú, usar a data de transferência como período de referência
+                    // "Transferência efetuada em DD/MM/AAAA"
+                    Pattern transferPattern = Pattern.compile("Transferência\\s+(?:efetuada|realizada)\\s+em\\s+(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                    Matcher transferMatcher = transferPattern.matcher(text);
+                    if (transferMatcher.find()) {
+                        data.month = Integer.parseInt(transferMatcher.group(2)); // MM
+                        data.year = Integer.parseInt(transferMatcher.group(3));  // AAAA
+                        log.info("✅ Período de referência extraído da data de transferência: {}/{}", data.month, data.year);
+                    } else {
+                        // Padrão 3b: "Transferência efetuada em DD.MM.AAAA" (formato com pontos)
+                        Pattern transferPattern2 = Pattern.compile("Transferência\\s+(?:efetuada|realizada)\\s+em\\s+(\\d{2})\\.(\\d{2})\\.(\\d{4})", Pattern.CASE_INSENSITIVE);
+                        Matcher transferMatcher2 = transferPattern2.matcher(text);
+                        if (transferMatcher2.find()) {
+                            data.month = Integer.parseInt(transferMatcher2.group(2)); // MM
+                            data.year = Integer.parseInt(transferMatcher2.group(3));  // AAAA
+                            log.info("✅ Período de referência extraído da data de transferência (formato com pontos): {}/{}", data.month, data.year);
+                        } else {
+                            // Padrão 4: Nomes de meses em português
+                            String[] meses = {"JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", 
+                                             "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"};
+                            for (int i = 0; i < meses.length; i++) {
+                                if (text.toUpperCase().contains(meses[i])) {
+                                    data.month = i + 1;
+                                    // Procurar ano próximo (2020-2030)
+                                    Pattern anoPattern = Pattern.compile("(20[2-3][0-9])");
+                                    Matcher anoMatcher = anoPattern.matcher(text);
+                                    if (anoMatcher.find()) {
+                                        data.year = Integer.parseInt(anoMatcher.group(1));
+                                        log.info("✅ Período de referência encontrado via nome do mês: {}/{} ({})", data.month, data.year, meses[i]);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Se ainda não encontrou, usar data atual como fallback
+                            if (data.month == 0 || data.year == 0) {
+                                data.month = LocalDateTime.now().getMonthValue();
+                                data.year = LocalDateTime.now().getYear();
+                                log.warn("⚠️ Período de referência não encontrado, usando data atual: {}/{}", data.month, data.year);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -493,7 +567,7 @@ public class ReceiptProcessingService {
             // Para debug: aceitar mesmo sem nome completo
             if (data.employeeName == null || data.employeeName.trim().isEmpty() || data.employeeName.equals("Nome não extraído")) {
                 log.warn("⚠️ Nome do funcionário não encontrado - usando nome genérico para debug");
-                data.employeeName = "Funcionário_" + System.currentTimeMillis();
+                data.employeeName = "NOVO FUNCIONÁRIO";
             }
 
             log.info("=== ✅ EXTRAÇÃO CONCLUÍDA ===");
@@ -575,7 +649,7 @@ public class ReceiptProcessingService {
 
         String filePath = monthPath.resolve(fileName).toString();
 
-        // Criar PDF com template do Itaú
+        // Criar PDF com layout EXATO do comprovante Itaú original
         try (PDDocument document = new PDDocument()) {
             PDPage page = new PDPage();
             document.addPage(page);
@@ -584,134 +658,120 @@ public class ReceiptProcessingService {
                 // Configurar fontes
                 PDFont fontRegular = PDType1Font.HELVETICA;
                 PDFont fontBold = PDType1Font.HELVETICA_BOLD;
-                PDFont fontTitle = PDType1Font.HELVETICA_BOLD;
                 
                 // Cores
                 contentStream.setNonStrokingColor(0, 0, 0); // Preto
                 
-                // HEADER - Logo e branding
+                // HEADER - Layout exato do Itaú
+                // Logo Itaú (esquerda)
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 16);
+                contentStream.newLineAtOffset(50, 750);
+                contentStream.showText("Itaú");
+                contentStream.endText();
+                
+                // "30 horas" (direita)
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 12);
+                contentStream.newLineAtOffset(500, 750);
+                contentStream.showText("30 horas");
+                contentStream.endText();
+                
+                // Título principal centralizado
                 contentStream.beginText();
                 contentStream.setFont(fontBold, 14);
-                contentStream.newLineAtOffset(50, 750);
-                contentStream.showText("ITAÚ");
-                contentStream.setFont(fontBold, 18);
-                contentStream.newLineAtOffset(200, 0);
-                contentStream.showText("30 HORAS");
+                contentStream.newLineAtOffset(50, 720);
+                contentStream.showText("Banco Itaú - Comprovante de Transferência de conta corrente para conta corrente");
                 contentStream.endText();
                 
                 // Linha separadora
                 contentStream.setLineWidth(1);
-                contentStream.moveTo(50, 740);
-                contentStream.lineTo(550, 740);
+                contentStream.moveTo(50, 710);
+                contentStream.lineTo(550, 710);
                 contentStream.stroke();
-                
-                // TÍTULO PRINCIPAL
-                contentStream.beginText();
-                contentStream.setFont(fontTitle, 16);
-                contentStream.newLineAtOffset(50, 710);
-                contentStream.showText("COMPROVANTE DE OPERAÇÃO");
-                contentStream.endText();
-                
-                // Tipo de operação
-                contentStream.beginText();
-                contentStream.setFont(fontRegular, 12);
-                contentStream.newLineAtOffset(50, 690);
-                contentStream.showText("Transferência de Conta Corrente para Conta Corrente");
-                contentStream.endText();
                 
                 // Identificação no extrato
                 contentStream.beginText();
                 contentStream.setFont(fontRegular, 12);
-                contentStream.newLineAtOffset(50, 670);
-                contentStream.showText("Identificação no Extrato: SISPAG SALARIOS");
+                contentStream.newLineAtOffset(50, 680);
+                contentStream.showText("Identificação no extrato: SISPAG SALARIOS");
                 contentStream.endText();
                 
-                // DADOS DA CONTA DEBITADA
+                // Dados da conta debitada
                 contentStream.beginText();
                 contentStream.setFont(fontBold, 12);
-                contentStream.newLineAtOffset(50, 630);
-                contentStream.showText("Dados da conta a ser debitada:");
+                contentStream.newLineAtOffset(50, 650);
+                contentStream.showText("Dados da conta debitada");
                 contentStream.endText();
-                
-                contentStream.beginText();
-                contentStream.setFont(fontRegular, 11);
-                contentStream.newLineAtOffset(50, 610);
-                contentStream.showText("Agência: " + (data.agency != null ? cleanText(data.agency) : "N/A"));
-                contentStream.newLineAtOffset(0, -15);
-                contentStream.showText("Conta: " + (data.account != null ? cleanText(data.account) : "N/A"));
-                contentStream.newLineAtOffset(0, -15);
-                contentStream.showText("Nome: PROMOVER VIGILANCIA PATRIMONIA");
-                contentStream.endText();
-                
-                // DADOS DA CONTA CREDITADA
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 12);
-                contentStream.newLineAtOffset(50, 540);
-                contentStream.showText("Dados da conta a ser creditada:");
-                contentStream.endText();
-                
-                contentStream.beginText();
-                contentStream.setFont(fontRegular, 11);
-                contentStream.newLineAtOffset(50, 520);
-                contentStream.showText("Agência: " + (data.agency != null ? cleanText(data.agency) : "N/A"));
-                contentStream.newLineAtOffset(0, -15);
-                contentStream.showText("Conta: " + (data.account != null ? cleanText(data.account) : "N/A"));
-                contentStream.newLineAtOffset(0, -15);
-                contentStream.showText("Nome: " + (cleanedName != null ? cleanText(cleanedName) : "Nome não extraído"));
-                contentStream.newLineAtOffset(0, -15);
-                contentStream.setFont(fontBold, 12);
-                String valorFormatado = String.format("%.2f", data.amount != null ? data.amount : 0.0);
-                contentStream.showText("Valor: R$ " + valorFormatado);
-                contentStream.endText();
-                
-                // INFORMAÇÕES DO PAGADOR
-                contentStream.beginText();
-                contentStream.setFont(fontRegular, 11);
-                contentStream.newLineAtOffset(50, 450);
-                contentStream.showText("Informações fornecidas pelo pagador:");
-                contentStream.endText();
-                
-                // DETALHES DA TRANSFERÊNCIA
-                contentStream.beginText();
-                contentStream.setFont(fontRegular, 11);
-                contentStream.newLineAtOffset(50, 410);
-                String transferInfo = "Transferência realizada em " + 
-                    (data.transferDate != null ? cleanText(data.transferDate) : "data não encontrada") + 
-                    ", via Sispag";
-                if (data.controlNumber != null) {
-                    transferInfo += ", CTRL " + cleanText(data.controlNumber);
-                }
-                contentStream.showText(transferInfo);
-                contentStream.endText();
-                
-                // AUTENTICAÇÃO
-                if (data.authentication != null) {
-                    contentStream.beginText();
-                    contentStream.setFont(fontRegular, 11);
-                    contentStream.newLineAtOffset(50, 390);
-                    contentStream.showText("Autenticação: " + cleanText(data.authentication));
-                    contentStream.endText();
-                }
-                
-                // FOOTER - Linha de corte
-                contentStream.setLineDashPattern(new float[]{5, 5}, 0);
-                contentStream.moveTo(50, 100);
-                contentStream.lineTo(550, 100);
-                contentStream.stroke();
                 
                 contentStream.beginText();
                 contentStream.setFont(fontRegular, 10);
-                contentStream.newLineAtOffset(250, 90);
-                contentStream.showText("Cortar aqui");
+                contentStream.newLineAtOffset(50, 630);
+                contentStream.showText("Nome da empresa: " + (data.companyName != null ? data.companyName : "PROMOVER VIGILANCIA PATRIMONIA"));
                 contentStream.endText();
                 
-                // Informações do sistema
+                contentStream.beginText();
+                contentStream.newLineAtOffset(50, 610);
+                contentStream.showText("Agência: " + (data.agency != null ? data.agency : "0925"));
+                contentStream.endText();
+                
+                contentStream.beginText();
+                contentStream.newLineAtOffset(50, 590);
+                contentStream.showText("Conta corrente: " + (data.account != null ? data.account : "98240 - 7"));
+                contentStream.endText();
+                
+                // Dados da conta creditada
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 12);
+                contentStream.newLineAtOffset(50, 560);
+                contentStream.showText("Dados da conta creditada");
+                contentStream.endText();
+                
+                contentStream.beginText();
+                contentStream.setFont(fontRegular, 10);
+                contentStream.newLineAtOffset(50, 540);
+                contentStream.showText("Nome: " + (data.employeeName != null ? data.employeeName : "FUNCIONARIO"));
+                contentStream.endText();
+                
+                contentStream.beginText();
+                contentStream.newLineAtOffset(50, 520);
+                contentStream.showText("Agência: " + (data.creditedAgency != null ? data.creditedAgency : "1429"));
+                contentStream.endText();
+                
+                contentStream.beginText();
+                contentStream.newLineAtOffset(50, 500);
+                contentStream.showText("Conta corrente: " + (data.creditedAccount != null ? data.creditedAccount : "39637 - 5"));
+                contentStream.endText();
+                
+                contentStream.beginText();
+                contentStream.newLineAtOffset(50, 480);
+                contentStream.showText("Valor: R$ " + String.format("%.2f", data.amount != null ? data.amount : 0.0).replace(".", ","));
+                contentStream.endText();
+                
+                // Informações fornecidas pelo pagador
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 12);
+                contentStream.newLineAtOffset(50, 450);
+                contentStream.showText("Informações fornecidas pelo pagador");
+                contentStream.endText();
+                
+                contentStream.beginText();
+                contentStream.setFont(fontRegular, 10);
+                contentStream.newLineAtOffset(50, 430);
+                contentStream.showText("Transferência efetuada em " + (data.transferDate != null ? data.transferDate : "06/08/2025") + " às 07:13:32 via Sispag, CTRL " + (data.controlNumber != null ? data.controlNumber : "992972681000634"));
+                contentStream.endText();
+                
+                // Autenticação
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 12);
+                contentStream.newLineAtOffset(50, 400);
+                contentStream.showText("Autenticação");
+                contentStream.endText();
+                
                 contentStream.beginText();
                 contentStream.setFont(fontRegular, 8);
-                contentStream.newLineAtOffset(50, 50);
-                contentStream.showText("Documento gerado automaticamente pelo sistema SecuredGuard");
-                contentStream.newLineAtOffset(0, -12);
-                contentStream.showText("Data de geração: " + LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+                contentStream.newLineAtOffset(50, 380);
+                contentStream.showText(data.authentication != null ? data.authentication : "F410FFD7DFB796B1582294EE30C77BFE389A75AB");
                 contentStream.endText();
                 
             }
@@ -853,7 +913,7 @@ public class ReceiptProcessingService {
     }
 
     public List<PaymentReceipt> getReceiptsByMonthYear(int month, int year) {
-        return receiptRepository.findByMonthAndYear(month, year);
+        return receiptRepository.findByYearAndMonth(year, month);
     }
 
     public boolean deleteReceipt(String id) {

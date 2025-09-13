@@ -40,7 +40,7 @@ export interface UpdateQuoteRequest extends Partial<CreateQuoteRequest> {
 export const quoteService = {
   // Buscar todos os orçamentos
   async getAllQuotes(): Promise<Quote[]> {
-    const response = await api.get('/api/quotes');
+    const response = await api.get('/quotes');
     return response.data;
   },
 
@@ -99,7 +99,7 @@ export const quoteService = {
 
   // Buscar orçamentos expirados
   async getExpiredQuotes(): Promise<Quote[]> {
-    const response = await api.get('/api/quotes/expired');
+    const response = await api.get('/quotes/expired');
     return response.data;
   },
 

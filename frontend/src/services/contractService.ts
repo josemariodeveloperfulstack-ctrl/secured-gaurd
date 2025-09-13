@@ -64,7 +64,7 @@ export const contractService = {
     if (!hasPagination && Object.keys(filters).length === 0) {
       // Busca todos sem paginação
       try {
-        const response = await api.get('/api/contracts/all');
+        const response = await api.get('/contracts/all');
         return Array.isArray(response.data) ? response.data : this.getMockContracts();
       } catch (error) {
         console.error('Erro ao buscar contratos:', error);
@@ -123,7 +123,7 @@ export const contractService = {
 
   // Criar novo contrato
   async createContract(contractData: CreateContractRequest): Promise<Contract> {
-    const response = await api.post('/api/contracts', contractData);
+    const response = await api.post('/contracts', contractData);
     return response.data;
   },
 

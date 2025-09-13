@@ -247,4 +247,88 @@
   .content-wrapper {
     @apply bg-seguranca-black rounded-lg border border-gray-700 shadow-lg;
   }
+
+  /* Tab animations and improvements */
+  .tab-container {
+    @apply relative overflow-hidden;
+  }
+
+  .tab-trigger {
+    @apply relative overflow-hidden;
+  }
+
+  .tab-trigger::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-seguranca-yellow/10 to-yellow-500/10 opacity-0 transition-opacity duration-300;
+  }
+
+  .tab-trigger:hover::before {
+    @apply opacity-100;
+  }
+
+  .tab-trigger[data-state="active"]::before {
+    @apply opacity-100;
+  }
+
+  .tab-indicator {
+    @apply absolute bottom-0 left-0 h-1 bg-gradient-to-r from-seguranca-yellow to-yellow-500 rounded-full transition-all duration-500 ease-out;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 640px) {
+    .tab-trigger {
+      @apply min-h-[60px] py-2;
+    }
+    
+    .tab-trigger .tab-content {
+      @apply flex-col gap-1;
+    }
+  }
+
+  /* Smooth transitions for all tab elements */
+  .tab-transition {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* Hover effects */
+  .tab-hover-effect {
+    @apply transform transition-transform duration-200 ease-out hover:scale-105;
+  }
+
+  /* Active state glow */
+  .tab-active-glow {
+    @apply shadow-lg shadow-seguranca-yellow/25;
+  }
+
+  /* Classes personalizadas para responsividade melhorada */
+  .responsive-button {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  
+  .responsive-button:hover {
+    @apply transform scale-105 shadow-lg;
+  }
+  
+  .responsive-button:active {
+    @apply transform scale-95;
+  }
+  
+  /* Breakpoint personalizado para telas muito pequenas - removido pois não é necessário */
+  
+  /* Melhorias para touch em dispositivos móveis */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Animações suaves para elementos responsivos */
+  .responsive-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  
+  /* Melhor contraste para botões em mobile */
+  @media (max-width: 768px) {
+    .mobile-button {
+      @apply border-2 font-semibold;
+    }
+  }
 }

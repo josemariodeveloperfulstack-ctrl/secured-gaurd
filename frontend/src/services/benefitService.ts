@@ -27,7 +27,7 @@ export interface UpdateBenefitRequest extends Partial<CreateBenefitRequest> {
 export const benefitService = {
   // Buscar todos os benefícios
   async getBenefits(): Promise<Benefit[]> {
-    const response = await api.get('/api/benefits');
+    const response = await api.get('/benefits');
     return response.data;
   },
 
@@ -39,7 +39,7 @@ export const benefitService = {
 
   // Criar novo benefício
   async createBenefit(benefitData: Partial<Benefit>): Promise<Benefit> {
-    const response = await api.post('/api/benefits', benefitData);
+    const response = await api.post('/benefits', benefitData);
     return response.data;
   },
 
@@ -68,7 +68,7 @@ export const benefitService = {
 
   // Buscar benefícios ativos
   async getActiveBenefits(): Promise<Benefit[]> {
-    const response = await api.get('/api/benefits/active');
+    const response = await api.get('/benefits/active');
     return response.data;
   }
 }; 

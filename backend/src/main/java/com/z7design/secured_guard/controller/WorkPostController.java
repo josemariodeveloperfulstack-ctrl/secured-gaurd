@@ -1,9 +1,11 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.WorkPostDTO;
+import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
+import com.z7design.secured_guard.service.ClientService;
 import com.z7design.secured_guard.service.WorkPostService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -25,6 +28,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import com.z7design.secured_guard.repository.WorkPostRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @RestController
 @RequestMapping("/api/work-posts")
@@ -34,6 +40,7 @@ import com.z7design.secured_guard.repository.WorkPostRepository;
 public class WorkPostController {
     
     private final WorkPostService workPostService;
+    private final ClientService clientService;
     private final WorkPostRepository workPostRepository;
     
     @GetMapping
@@ -273,6 +280,50 @@ public class WorkPostController {
             return ResponseEntity.ok("OK - Endpoint funcionando");
         } catch (Exception e) {
             log.error("❌ TESTE - Erro: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body("Erro: " + e.getMessage());
+        }
+    }
+    
+    @PostMapping("/test-create")
+    @Operation(summary = "Teste criação sem autenticação", description = "Endpoint de teste para criação de posto")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<String> testCreate(@RequestBody String rawData) {
+        log.info("🔍 TESTE CREATE - Dados recebidos (raw): {}", rawData);
+        try {
+            // Tentar deserializar manualmente
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            
+            WorkPostDTO workPostDTO = mapper.readValue(rawData, WorkPostDTO.class);
+            log.info("✅ TESTE CREATE - Deserialização bem-sucedida: {}", workPostDTO.getPostCode());
+            log.info("🔍 TESTE CREATE - shiftStart: {} (tipo: {})", workPostDTO.getShiftStart(), workPostDTO.getShiftStart() != null ? workPostDTO.getShiftStart().getClass().getSimpleName() : "null");
+            log.info("🔍 TESTE CREATE - shiftEnd: {} (tipo: {})", workPostDTO.getShiftEnd(), workPostDTO.getShiftEnd() != null ? workPostDTO.getShiftEnd().getClass().getSimpleName() : "null");
+            
+            // Tentar criar o posto
+            WorkPost workPost = workPostService.createWorkPost(workPostDTO);
+            log.info("✅ TESTE CREATE - Posto criado com sucesso: {}", workPost.getId());
+            return ResponseEntity.ok("Posto criado com sucesso: " + workPost.getId());
+        } catch (Exception e) {
+            log.error("❌ TESTE CREATE - Erro: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body("Erro: " + e.getMessage() + " - " + e.getClass().getSimpleName());
+        }
+    }
+    
+    @GetMapping("/test-clients")
+    @Operation(summary = "Listar clientes para teste", description = "Endpoint para listar clientes disponíveis")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<String> testClients() {
+        try {
+            var pageable = Pageable.unpaged();
+            var clientsPage = clientService.getAllClients(pageable);
+            StringBuilder result = new StringBuilder("Clientes disponíveis:\n");
+            for (var client : clientsPage.getContent()) {
+                result.append("- ID: ").append(client.getId()).append(", Nome: ").append(client.getName()).append("\n");
+            }
+            return ResponseEntity.ok(result.toString());
+        } catch (Exception e) {
+            log.error("❌ TESTE CLIENTS - Erro: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body("Erro: " + e.getMessage());
         }
     }

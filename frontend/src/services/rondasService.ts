@@ -16,7 +16,7 @@ export const rondasService = {
 
   async getAllRondas(): Promise<Ronda[]> {
     try {
-      const response = await api.get('/api/rondas');
+      const response = await api.get('/rondas');
       return response.data;
     } catch (error) {
       console.warn('API de rondas não disponível, usando dados mock:', error);
@@ -61,7 +61,7 @@ export const rondasService = {
 
   async createRonda(ronda: CreateRondaDTO): Promise<Ronda> {
     try {
-      const response = await api.post('/api/rondas', ronda);
+      const response = await api.post('/rondas', ronda);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar ronda:', error);
@@ -136,7 +136,7 @@ export const rondasService = {
 
   async getRondaStats(): Promise<RondaStats> {
     try {
-      const response = await api.get('/api/rondas/stats');
+      const response = await api.get('/rondas/stats');
       return response.data;
     } catch (error) {
       console.warn('API de estatísticas não disponível, usando dados mock:', error);
@@ -167,7 +167,7 @@ export const rondasService = {
 
   async getStatusOptions(): Promise<RondaStatus[]> {
     try {
-      const response = await api.get('/api/rondas/enums/status');
+      const response = await api.get('/rondas/enums/status');
       return response.data;
     } catch (error) {
       console.warn('API de status não disponível, usando valores padrão:', error);
@@ -177,7 +177,7 @@ export const rondasService = {
 
   async getTipoOptions(): Promise<RondaTipo[]> {
     try {
-      const response = await api.get('/api/rondas/enums/tipos');
+      const response = await api.get('/rondas/enums/tipos');
       return response.data;
     } catch (error) {
       console.warn('API de tipos não disponível, usando valores padrão:', error);
@@ -187,7 +187,7 @@ export const rondasService = {
 
   async getPrioridadeOptions(): Promise<RondaPrioridade[]> {
     try {
-      const response = await api.get('/api/rondas/enums/prioridades');
+      const response = await api.get('/rondas/enums/prioridades');
       return response.data;
     } catch (error) {
       console.warn('API de prioridades não disponível, usando valores padrão:', error);

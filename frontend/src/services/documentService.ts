@@ -45,34 +45,34 @@ export interface CreateDocumentRequest {
 
 class DocumentService {
   async getDocumentsByEmployee(employeeId: string): Promise<Document[]> {
-    const response = await api.get(`/api/documents/employee/${employeeId}`);
+    const response = await api.get(`/documents/employee/${employeeId}`);
     return response.data;
   }
 
   async getDocumentTypes(): Promise<DocumentType[]> {
-    const response = await api.get('/api/documents/types');
+    const response = await api.get('/documents/types');
     return response.data;
   }
 
   async createDocument(document: CreateDocumentRequest): Promise<Document> {
-    const response = await api.post('/api/documents', document);
+    const response = await api.post('/documents', document);
     return response.data;
   }
 
   async updateDocument(id: string, document: Partial<Document>): Promise<Document> {
-    const response = await api.put(`/api/documents/${id}`, document);
+    const response = await api.put(`/documents/${id}`, document);
     return response.data;
   }
 
   async deleteDocument(id: string): Promise<void> {
-    await api.delete(`/api/documents/${id}`);
+    await api.delete(`/documents/${id}`);
   }
 
   async uploadFile(documentId: string, file: File): Promise<Document> {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await api.post(`/api/documents/${documentId}/upload`, formData, {
+    const response = await api.post(`/documents/${documentId}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -81,41 +81,41 @@ class DocumentService {
   }
 
   async downloadFile(documentId: string): Promise<Blob> {
-    const response = await api.get(`/api/documents/${documentId}/download`, {
+    const response = await api.get(`/documents/${documentId}/download`, {
       responseType: 'blob',
     });
     return response.data;
   }
 
   async viewFile(documentId: string): Promise<Blob> {
-    const response = await api.get(`/api/documents/${documentId}/view`, {
+    const response = await api.get(`/documents/${documentId}/view`, {
       responseType: 'blob',
     });
     return response.data;
   }
 
   async getDocument(id: string): Promise<Document> {
-    const response = await api.get(`/api/documents/${id}`);
+    const response = await api.get(`/documents/${id}`);
     return response.data;
   }
 
   async getAllDocuments(): Promise<Document[]> {
-    const response = await api.get('/api/documents');
+    const response = await api.get('/documents');
     return response.data;
   }
 
   async getDocumentsByType(type: DocumentType): Promise<Document[]> {
-    const response = await api.get(`/api/documents/type/${type}`);
+    const response = await api.get(`/documents/type/${type}`);
     return response.data;
   }
 
   async getExpiringDocuments(): Promise<Document[]> {
-    const response = await api.get('/api/documents/expiring');
+    const response = await api.get('/documents/expiring');
     return response.data;
   }
 
   async getDocuments(): Promise<Document[]> {
-    const response = await api.get('/api/documents');
+    const response = await api.get('/documents');
     return response.data;
   }
 }

@@ -32,7 +32,7 @@ export const feriasService = {
   },
 
   async createFerias(data: CreateFeriasRequest): Promise<FeriasPeriodo> {
-    const response = await api.post('/api/ferias', data);
+    const response = await api.post('/ferias', data);
     return response.data;
   },
 
@@ -76,7 +76,7 @@ export const feriasService = {
   },
 
   async createAfastamento(data: CreateAfastamentoRequest): Promise<Afastamento> {
-    const response = await api.post('/api/afastamentos', data);
+    const response = await api.post('/afastamentos', data);
     return response.data;
   },
 
@@ -107,7 +107,7 @@ export const feriasService = {
     concluidas: number;
     canceladas: number;
   }> {
-    const response = await api.get('/api/ferias/stats');
+    const response = await api.get('/ferias/stats');
     return response.data;
   },
 
@@ -117,7 +117,7 @@ export const feriasService = {
     aprovados: number;
     concluidos: number;
   }> {
-    const response = await api.get('/api/afastamentos/stats');
+    const response = await api.get('/afastamentos/stats');
     return response.data;
   },
 

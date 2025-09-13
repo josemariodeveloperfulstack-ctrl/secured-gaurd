@@ -6,7 +6,7 @@ export const orderOfServiceSSTService = {
    * Busca todas as ordens de serviço SST
    */
   async findAll(): Promise<OrderOfServiceSST[]> {
-    const response = await api.get('/api/orders-of-service-sst');
+    const response = await api.get('/orders-of-service-sst');
     return response.data;
   },
 
@@ -22,7 +22,7 @@ export const orderOfServiceSSTService = {
    * Cria uma nova ordem de serviço SST
    */
   async create(data: CreateOrderOfServiceSSTDTO): Promise<OrderOfServiceSST> {
-    const response = await api.post('/api/orders-of-service-sst', data);
+    const response = await api.post('/orders-of-service-sst', data);
     return response.data;
   },
 

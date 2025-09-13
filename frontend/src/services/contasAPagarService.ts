@@ -205,7 +205,7 @@ export const contasAPagarService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
-    const response = await api.get(`/api/invoices?${params.toString()}`);
+    const response = await api.get(`/invoices?${params.toString()}`);
     
     // Transformar dados do backend para o formato do frontend
     const invoices = Array.isArray(response.data) ? response.data : response.data.content || [];
@@ -232,7 +232,7 @@ export const contasAPagarService = {
 
   // Buscar conta por ID
   async getContaAPagarById(id: string): Promise<ContaAPagar> {
-    const response = await api.get(`/api/invoices/${id}`);
+    const response = await api.get(`/invoices/${id}`);
     const invoice = response.data;
     
     return {
@@ -265,7 +265,7 @@ export const contasAPagarService = {
     let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
     
     try {
-      const unitsResponse = await api.get('/api/units');
+      const unitsResponse = await api.get('/units');
       if (unitsResponse.data && unitsResponse.data.length > 0) {
         unitId = unitsResponse.data[0].id;
       }
@@ -297,7 +297,7 @@ export const contasAPagarService = {
     console.log('Dados da requisição:', requestData);
 
     try {
-      const response = await api.post('/api/invoices', requestData);
+      const response = await api.post('/invoices', requestData);
       return this.getContaAPagarById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao criar conta a pagar:', error);
@@ -328,7 +328,7 @@ export const contasAPagarService = {
     // Se não há unitId, buscar uma unidade padrão
     if (!requestData.unitId) {
       try {
-        const unitsResponse = await api.get('/api/units');
+        const unitsResponse = await api.get('/units');
         if (unitsResponse.data && unitsResponse.data.length > 0) {
           requestData.unitId = unitsResponse.data[0].id;
         } else {
@@ -344,7 +344,7 @@ export const contasAPagarService = {
     console.log('ID da conta:', id);
 
     try {
-      const response = await api.put(`/api/invoices/${id}`, requestData);
+      const response = await api.put(`/invoices/${id}`, requestData);
       return this.getContaAPagarById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao atualizar conta a pagar:', error);
@@ -357,12 +357,12 @@ export const contasAPagarService = {
 
   // Excluir conta
   async deleteContaAPagar(id: string): Promise<void> {
-    await api.delete(`/api/invoices/${id}`);
+    await api.delete(`/invoices/${id}`);
   },
 
   async getCategories(): Promise<string[]> {
     try {
-      const response = await api.get('/api/invoices/categories');
+      const response = await api.get('/invoices/categories');
       return response.data || [];
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
@@ -371,13 +371,13 @@ export const contasAPagarService = {
   },
 
   async getCostCenters(): Promise<string[]> {
-    const response = await api.get('/api/invoices/cost-centers');
+    const response = await api.get('/invoices/cost-centers');
     return response.data;
   },
 
   // Marcar conta como paga
   async marcarComoPaga(id: string, dataPagamento: Date): Promise<ContaAPagar> {
-    const response = await api.patch(`/api/invoices/${id}/mark-as-paid`, {
+    const response = await api.patch(`/invoices/${id}/mark-as-paid`, {
       paymentDate: formatDateForBackend(dataPagamento)
     });
     return this.getContaAPagarById(response.data.id);
@@ -385,13 +385,13 @@ export const contasAPagarService = {
 
   // Buscar contas vencidas
   async getContasVencidas(): Promise<ContaAPagar[]> {
-    const response = await api.get('/api/invoices/overdue');
+    const response = await api.get('/invoices/overdue');
     return response.data.map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
   // Buscar contas vencendo em breve
   async getContasVencendoEmBreve(dias: number = 7): Promise<ContaAPagar[]> {
-    const response = await api.get(`/api/invoices/due-soon/${dias}`);
+    const response = await api.get(`/invoices/due-soon/${dias}`);
     return response.data.map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
@@ -399,43 +399,43 @@ export const contasAPagarService = {
   
   // Buscar todos os fornecedores
   async getFornecedores(): Promise<Supplier[]> {
-    const response = await api.get('/api/suppliers/all');
+    const response = await api.get('/suppliers/all');
     return response.data;
   },
 
   // Criar fornecedor
   async createFornecedor(data: CreateSupplierRequest): Promise<Supplier> {
-    const response = await api.post('/api/suppliers', data);
+    const response = await api.post('/suppliers', data);
     return response.data;
   },
 
   // Atualizar fornecedor
   async updateFornecedor(id: string, data: UpdateSupplierRequest): Promise<Supplier> {
-    const response = await api.put(`/api/suppliers/${id}`, data);
+    const response = await api.put(`/suppliers/${id}`, data);
     return response.data;
   },
 
   // Excluir fornecedor
   async deleteFornecedor(id: string): Promise<void> {
-    await api.delete(`/api/suppliers/${id}`);
+    await api.delete(`/suppliers/${id}`);
   },
 
   // Alternar status (ativo/inativo)
   async toggleFornecedorStatus(id: string): Promise<Supplier> {
-    const response = await api.patch(`/api/suppliers/${id}/toggle-status`);
+    const response = await api.patch(`/suppliers/${id}/toggle-status`);
     return response.data;
   },
 
   // Listar fornecedores ativos
   async getFornecedoresAtivos(): Promise<Supplier[]> {
-    const response = await api.get('/api/suppliers/active');
+    const response = await api.get('/suppliers/active');
     return response.data;
   },
 
   // Buscar por CNPJ
   async getFornecedorByCnpj(cnpj: string): Promise<Supplier | null> {
     try {
-      const response = await api.get(`/api/suppliers/cnpj/${encodeURIComponent(cnpj)}`);
+      const response = await api.get(`/suppliers/cnpj/${encodeURIComponent(cnpj)}`);
       return response.data;
     } catch {
       return null;
@@ -444,7 +444,7 @@ export const contasAPagarService = {
 
   // Buscar fornecedor por ID
   async getFornecedorById(id: string): Promise<Supplier> {
-    const response = await api.get(`/api/suppliers/${id}`);
+    const response = await api.get(`/suppliers/${id}`);
     return response.data;
   },
 
@@ -456,7 +456,7 @@ export const contasAPagarService = {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     
-    const response = await api.get(`/api/invoices/reports/summary?${params.toString()}`);
+    const response = await api.get(`/invoices/reports/summary?${params.toString()}`);
     return response.data;
   },
 
@@ -483,7 +483,7 @@ export const contasAPagarService = {
     dataFim: string;
   }): Promise<RelatorioDetalhado> {
     try {
-      const response = await api.get('/api/contas-pagar/relatorio-detalhado', {
+      const response = await api.get('/contas-pagar/relatorio-detalhado', {
         params: periodo
       });
       return response.data;
@@ -495,7 +495,7 @@ export const contasAPagarService = {
 
   async getDashboard(): Promise<DashboardContasAPagar> {
     try {
-      const response = await api.get('/api/contas-pagar/dashboard');
+      const response = await api.get('/contas-pagar/dashboard');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar dashboard:', error);
@@ -505,7 +505,7 @@ export const contasAPagarService = {
 
   async getAnaliseFluxoPagamento(dias: number = 90): Promise<AnaliseFluxoPagamento> {
     try {
-      const response = await api.get('/api/contas-pagar/analise-fluxo', {
+      const response = await api.get('/contas-pagar/analise-fluxo', {
         params: { dias }
       });
       return response.data;
@@ -520,7 +520,7 @@ export const contasAPagarService = {
     dataFim: string;
   }): Promise<PrevisaoPagamento[]> {
     try {
-      const response = await api.get('/api/contas-pagar/previsao-pagamentos', {
+      const response = await api.get('/contas-pagar/previsao-pagamentos', {
         params: periodo
       });
       return response.data;
@@ -543,7 +543,7 @@ export const contasAPagarService = {
     contasRecentes: ContaAPagar[];
   }> {
     try {
-      const response = await api.get(`/api/contas-pagar/analise-fornecedor/${fornecedorId}`);
+      const response = await api.get(`/contas-pagar/analise-fornecedor/${fornecedorId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar análise por fornecedor:', error);
@@ -560,7 +560,7 @@ export const contasAPagarService = {
     variacao: number;
   }[]> {
     try {
-      const response = await api.get('/api/contas-pagar/comparativo-mensal', {
+      const response = await api.get('/contas-pagar/comparativo-mensal', {
         params: { meses }
       });
       return response.data;
@@ -576,7 +576,7 @@ export const contasAPagarService = {
     erros: { id: string; erro: string }[];
   }> {
     try {
-      const response = await api.post('/api/contas-pagar/pagamento-lote', {
+      const response = await api.post('/contas-pagar/pagamento-lote', {
         contaIds,
         dataPagamento: formatDateForBackend(new Date(dataPagamento))
       });
@@ -589,7 +589,7 @@ export const contasAPagarService = {
 
   async agendarPagamento(contaId: string, dataAgendamento: string): Promise<ContaAPagar> {
     try {
-      const response = await api.post(`/api/contas-pagar/${contaId}/agendar`, {
+      const response = await api.post(`/contas-pagar/${contaId}/agendar`, {
         dataAgendamento: formatDateForBackend(new Date(dataAgendamento))
       });
       return this.mapInvoiceToContaAPagar(response.data);
@@ -605,7 +605,7 @@ export const contasAPagarService = {
     motivo: string;
   }): Promise<ContaAPagar> {
     try {
-      const response = await api.post(`/api/contas-pagar/${contaId}/desconto`, desconto);
+      const response = await api.post(`/contas-pagar/${contaId}/desconto`, desconto);
       return this.mapInvoiceToContaAPagar(response.data);
     } catch (error) {
       console.error('Erro ao aplicar desconto:', error);
@@ -615,7 +615,7 @@ export const contasAPagarService = {
 
   async duplicarConta(contaId: string, novaDataVencimento: string): Promise<ContaAPagar> {
     try {
-      const response = await api.post(`/api/contas-pagar/${contaId}/duplicar`, {
+      const response = await api.post(`/contas-pagar/${contaId}/duplicar`, {
         novaDataVencimento: formatDateForBackend(new Date(novaDataVencimento))
       });
       return this.mapInvoiceToContaAPagar(response.data);
@@ -632,7 +632,7 @@ export const contasAPagarService = {
     formato: 'pdf' | 'excel' | 'csv';
   }): Promise<Blob> {
     try {
-      const response = await api.post('/api/contas-pagar/relatorio-personalizado', configuracao, {
+      const response = await api.post('/contas-pagar/relatorio-personalizado', configuracao, {
         responseType: 'blob'
       });
       return response.data;
@@ -644,7 +644,7 @@ export const contasAPagarService = {
 
   async exportarDados(formato: 'excel' | 'csv' | 'pdf', filtros?: ContasAPagarFilters): Promise<Blob> {
     try {
-      const response = await api.get('/api/contas-pagar/exportar', {
+      const response = await api.get('/contas-pagar/exportar', {
         params: { formato, ...filtros },
         responseType: 'blob'
       });
@@ -662,7 +662,7 @@ export const contasAPagarService = {
     try {
       const formData = new FormData();
       formData.append('arquivo', arquivo);
-      const response = await api.post('/api/contas-pagar/importar', formData, {
+      const response = await api.post('/contas-pagar/importar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data;
@@ -678,7 +678,7 @@ export const contasAPagarService = {
     detalhes: any[];
   }> {
     try {
-      const response = await api.post('/api/contas-pagar/sincronizar-erp');
+      const response = await api.post('/contas-pagar/sincronizar-erp');
       return response.data;
     } catch (error) {
       console.error('Erro ao sincronizar com ERP:', error);
@@ -694,7 +694,7 @@ export const contasAPagarService = {
     detalhes: any;
   }[]> {
     try {
-      const response = await api.get(`/api/contas-pagar/${contaId}/auditoria`);
+      const response = await api.get(`/contas-pagar/${contaId}/auditoria`);
       return response.data;
     } catch (error) {
       console.error('Erro ao obter auditoria:', error);

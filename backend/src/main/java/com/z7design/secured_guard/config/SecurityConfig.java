@@ -78,6 +78,8 @@ public class SecurityConfig {
                 // Endpoints de veículos - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/vehicles/**").authenticated()
                 // Endpoints de work-posts - requerem apenas autenticação (temporário para debug)
+                .requestMatchers("/api/work-posts/test-create").permitAll()
+                .requestMatchers("/api/work-posts/test-clients").permitAll()
                 .requestMatchers("/api/work-posts/**").authenticated()
                 // Endpoints de clientes - requerem permissões específicas
                 .requestMatchers("/api/clients/**").hasAnyAuthority("CLIENTS_READ", "CLIENTS_WRITE", "CLIENTS_CREATE", "CLIENTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")

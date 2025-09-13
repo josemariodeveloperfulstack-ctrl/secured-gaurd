@@ -4,7 +4,7 @@ import { UserGroupData } from '@/types/user';
 export const groupService = {
   // Buscar todos os grupos
   async getGroups(): Promise<UserGroupData[]> {
-    const response = await api.get('/api/groups');
+    const response = await api.get('/groups');
     return response.data;
   },
 
@@ -34,7 +34,7 @@ export const groupService = {
 
   // Criar novo grupo
   async createGroup(groupData: Partial<UserGroupData>): Promise<UserGroupData> {
-    const response = await api.post('/api/groups', groupData);
+    const response = await api.post('/groups', groupData);
     return response.data;
   },
 

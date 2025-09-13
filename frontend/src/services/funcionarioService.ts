@@ -45,19 +45,19 @@ export const funcionarioService = {
 
   // Buscar funcionários com email
   async getFuncionariosComEmail(): Promise<Funcionario[]> {
-    const response = await api.get('/api/employees/email');
+    const response = await api.get('/employees/email');
     return response.data;
   },
 
   // Buscar funcionários com WhatsApp
   async getFuncionariosComWhatsapp(): Promise<Funcionario[]> {
-    const response = await api.get('/api/employees/whatsapp');
+    const response = await api.get('/employees/whatsapp');
     return response.data;
   },
 
   // Criar funcionário
   async createFuncionario(funcionario: Omit<Funcionario, 'id' | 'createdAt' | 'updatedAt'>): Promise<Funcionario> {
-    const response = await api.post('/api/employees', funcionario);
+    const response = await api.post('/employees', funcionario);
     return response.data;
   },
 
@@ -74,7 +74,7 @@ export const funcionarioService = {
 
   // Buscar períodos disponíveis
   async getPeriodos(): Promise<Periodo[]> {
-    const response = await api.get('/api/employees/periodos');
+    const response = await api.get('/employees/periodos');
     return response.data.map((item: any) => ({
       mesReferencia: item[0],
       anoReferencia: item[1]

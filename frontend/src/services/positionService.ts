@@ -20,7 +20,7 @@ export interface PositionDTO {
 export const positionService = {
   // Buscar todas as posições
   async getPositions(): Promise<Position[]> {
-    const response = await api.get('/api/positions');
+    const response = await api.get('/positions');
     return response.data;
   },
 
@@ -32,7 +32,7 @@ export const positionService = {
 
   // Criar nova posição
   async createPosition(positionData: PositionDTO): Promise<Position> {
-    const response = await api.post('/api/positions', positionData);
+    const response = await api.post('/positions', positionData);
     return response.data;
   },
 

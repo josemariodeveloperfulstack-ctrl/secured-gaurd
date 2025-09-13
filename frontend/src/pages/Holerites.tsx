@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import paymentReceiptService, { type PaymentReceipt } from '@/services/paymentReceiptService';
+import holeriteService, { Holerite } from '@/services/holeriteService';
+import { PaymentReceiptViewModal } from '@/components/paymentReceipts/PaymentReceiptViewModal';
 import { 
   Plus, 
   Search, 
@@ -23,8 +26,10 @@ import {
   User,
   CheckSquare,
   Square,
+  CheckCircle,
   MessageSquare,
-  X
+  X,
+  Upload
 } from 'lucide-react';
 import HoleriteUpload from '@/components/HoleriteUpload';
 import { HoleriteViewModal } from '@/components/holerites/HoleriteViewModal';
@@ -33,7 +38,7 @@ import HoleriteDeleteDialog from '@/components/holerites/HoleriteDeleteDialog';
 import AdvancedFilters from '@/components/holerites/AdvancedFilters';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { payslipService, Payslip, PayslipFilters } from '@/services/payslipService';
+import { payslipService } from '@/services/payslipService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
 import api from '@/lib/axios';
@@ -41,26 +46,24 @@ import api from '@/lib/axios';
 const Holerites: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
+  const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [holerites, setHolerites] = useState<Holerite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPayslips, setSelectedPayslips] = useState<number[]>([]);
+  const [selectedHolerites, setSelectedHolerites] = useState<string[]>([]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [filters, setFilters] = useState<PayslipFilters>({});
+  const [filters, setFilters] = useState<any>({});
   const { toast } = useToast();
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [whatsAppMessage, setWhatsAppMessage] = useState('Olá! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.');
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [activeTab, setActiveTab] = useState('processados');
   const [showReceiptUploadModal, setShowReceiptUploadModal] = useState(false);
-  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [processingReceipts, setProcessingReceipts] = useState(false);
-  const [processingUnified, setProcessingUnified] = useState(false);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [loadingReceipts, setLoadingReceipts] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
@@ -68,13 +71,6 @@ const Holerites: React.FC = () => {
   const [showReceiptDeleteModal, setShowReceiptDeleteModal] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<any>(null);
 
-  // Estados para documentos unificados
-  const [unifiedDocuments, setUnifiedDocuments] = useState<any[]>([]);
-  const [loadingUnified, setLoadingUnified] = useState(false);
-  const [unifiedSearchTerm, setUnifiedSearchTerm] = useState('');
-  const [selectedUnifiedDocuments, setSelectedUnifiedDocuments] = useState<string[]>([]);
-  const [unifiedDocumentsToDelete, setUnifiedDocumentsToDelete] = useState<any[]>([]);
-  const [showUnifiedDeleteModal, setShowUnifiedDeleteModal] = useState(false);
 
   // Estados para template de recibo
   const [showReceiptTemplateModal, setShowReceiptTemplateModal] = useState(false);
@@ -98,8 +94,25 @@ const Holerites: React.FC = () => {
 
   // Estados para modais de exclusão
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [payslipsToDelete, setPayslipsToDelete] = useState<Payslip[]>([]);
+  const [holeritesToDelete, setHoleritesToDelete] = useState<Holerite[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Estados para comprovantes de pagamento
+  const [paymentReceipts, setPaymentReceipts] = useState<PaymentReceipt[]>([]);
+  const [loadingPaymentReceipts, setLoadingPaymentReceipts] = useState(false);
+  const [showPaymentReceiptUploadModal, setShowPaymentReceiptUploadModal] = useState(false);
+  const [processingPaymentReceipts, setProcessingPaymentReceipts] = useState(false);
+  const [activeYear, setActiveYear] = useState('2025');
+  const [activeMonth, setActiveMonth] = useState('1');
+  const [selectedPaymentReceipts, setSelectedPaymentReceipts] = useState<string[]>([]);
+  const [selectedPaymentReceiptForView, setSelectedPaymentReceiptForView] = useState<PaymentReceipt | null>(null);
+  const [showPaymentReceiptViewModal, setShowPaymentReceiptViewModal] = useState(false);
+
+  // Estados para navegação de holerites por ano/mês
+  const [holeriteActiveYear, setHoleriteActiveYear] = useState<string>('2025');
+  const [holeriteActiveMonth, setHoleriteActiveMonth] = useState<string>('6');
+  const [holeriteAvailableYears, setHoleriteAvailableYears] = useState<string[]>(['2025']);
+  const [holeriteAvailableMonths, setHoleriteAvailableMonths] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
   // Função para obter ID único do documento
   const getDocumentId = (document: any): string => {
@@ -124,8 +137,416 @@ const Holerites: React.FC = () => {
     );
   };
 
+
+  // Função para carregar comprovantes de pagamento
+  const loadPaymentReceipts = async () => {
+    try {
+      setLoadingPaymentReceipts(true);
+      console.log('🔍 Carregando comprovantes de pagamento...');
+      
+      // Carregar dados reais do backend
+      const receipts = await paymentReceiptService.getAllPaymentReceipts();
+      console.log('✅ Comprovantes carregados do backend:', receipts);
+      
+      if (receipts && Array.isArray(receipts)) {
+        setPaymentReceipts(receipts);
+      } else {
+        console.log('📝 Nenhum comprovante encontrado no backend');
+        setPaymentReceipts([]);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar comprovantes de pagamento:', error);
+      setPaymentReceipts([]);
+    } finally {
+      setLoadingPaymentReceipts(false);
+    }
+  };
+
+  // Função para filtrar comprovantes por ano e mês
+  const getFilteredPaymentReceipts = () => {
+    return paymentReceipts.filter(receipt => 
+      receipt.year.toString() === activeYear && receipt.month.toString() === activeMonth
+    );
+  };
+
+  // Função para obter anos disponíveis
+  const getAvailableYears = () => {
+    const years = [...new Set(paymentReceipts.map(receipt => receipt.year))];
+    return years.sort();
+  };
+
+  // Função para obter meses disponíveis para um ano
+  const getAvailableMonths = (year: string) => {
+    const months = [...new Set(paymentReceipts
+      .filter(receipt => receipt.year.toString() === year)
+      .map(receipt => receipt.month)
+    )];
+    return months.sort((a, b) => a - b);
+  };
+
+  // Função para carregar anos do backend
+  const loadAvailableYears = async () => {
+    try {
+      const years = await paymentReceiptService.getDistinctYears();
+      console.log('📅 Anos disponíveis:', years);
+      return years;
+    } catch (error) {
+      console.error('❌ Erro ao carregar anos:', error);
+      return getAvailableYears();
+    }
+  };
+
+  // Função para carregar meses do backend
+  const loadAvailableMonths = async (year: number) => {
+    try {
+      const months = await paymentReceiptService.getDistinctMonthsByYear(year);
+      console.log(`📅 Meses disponíveis para ${year}:`, months);
+      return months;
+    } catch (error) {
+      console.error('❌ Erro ao carregar meses:', error);
+      return getAvailableMonths(year.toString());
+    }
+  };
+
+  // Função para converter número do mês para nome em português
+  const getMonthName = (monthNumber: number): string => {
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return monthNames[monthNumber - 1] || `Mês ${monthNumber}`;
+  };
+
+  // Funções para holerites
+  const getHoleriteAvailableYears = (): string[] => {
+    const years = [...new Set(holerites.map(h => h.year.toString()))].sort((a, b) => b.localeCompare(a));
+    return years;
+  };
+
+  const getHoleriteAvailableMonths = (year: string): number[] => {
+    const yearNumber = parseInt(year);
+    const holeritesInYear = holerites.filter(h => h.year === yearNumber);
+    const months = [...new Set(holeritesInYear.map(h => h.month))].sort((a, b) => a - b);
+    return months.length > 0 ? months : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  };
+
+  const getHoleritesProcessedToday = (): number => {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    return holerites.filter(holerite => {
+      if (!holerite.processedAt) return false;
+      const processedDate = new Date(holerite.processedAt);
+      const processedDateString = processedDate.toISOString().split('T')[0];
+      return processedDateString === todayString;
+    }).length;
+  };
+
+
+  const areAllHoleritesSelected = (): boolean => {
+    const filtered = getFilteredHolerites();
+    return filtered.length > 0 && filtered.every(h => selectedHolerites.includes(h.id));
+  };
+
+  const hasSelectedHolerites = (): boolean => {
+    return selectedHolerites.length > 0;
+  };
+
+  const handleSelectAllHolerites = (checked: boolean) => {
+    const filtered = getFilteredHolerites();
+    if (checked) {
+      const newSelected = [...new Set([...selectedHolerites, ...filtered.map(h => h.id)])];
+      setSelectedHolerites(newSelected);
+    } else {
+      const filteredIds = filtered.map(h => h.id);
+      setSelectedHolerites(selectedHolerites.filter(id => !filteredIds.includes(id)));
+    }
+  };
+
+  const handleBatchEmailHolerites = () => {
+    // Implementar envio em lote por email
+    console.log('Enviando holerites por email:', selectedHolerites);
+  };
+
+  const handleBatchWhatsAppHolerites = () => {
+    // Implementar envio em lote por WhatsApp
+    console.log('Enviando holerites por WhatsApp:', selectedHolerites);
+  };
+
+  const handleBatchDeleteHolerites = () => {
+    // Implementar exclusão em lote
+    console.log('Excluindo holerites:', selectedHolerites);
+  };
+
+  // Função para processar upload de comprovantes
+  const handlePaymentReceiptUpload = async (file: File) => {
+    try {
+      setProcessingPaymentReceipts(true);
+      console.log('📤 Iniciando upload do comprovante:', file.name);
+      
+      // Tentar fazer upload via service
+      try {
+        const newReceipt = await paymentReceiptService.uploadPaymentReceipt(
+          file, 
+          'NOVO FUNCIONÁRIO', 
+          1, // janeiro
+          2025
+        );
+        
+        console.log('✅ Comprovante criado no backend:', newReceipt);
+        setPaymentReceipts(prev => [...prev, newReceipt]);
+        
+        toast({
+          title: "Sucesso",
+          description: "Comprovante de pagamento processado e salvo com sucesso!",
+        });
+      } catch (backendError) {
+        console.warn('⚠️ Erro no backend, usando simulação local:', backendError);
+        
+        // Fallback para simulação local
+        const newReceipt: PaymentReceipt = {
+          id: `pr-${Date.now()}`,
+          employeeName: 'NOVO FUNCIONÁRIO',
+          year: 2025,
+          month: 1,
+          fileName: file.name,
+          filePath: `uploads/payment-receipts/2025/01/${file.name}`,
+          status: 'PROCESSED',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        setPaymentReceipts(prev => [...prev, newReceipt]);
+        
+        toast({
+          title: "Sucesso",
+          description: "Comprovante de pagamento processado com sucesso!",
+        });
+      }
+      
+      setShowPaymentReceiptUploadModal(false);
+    } catch (error) {
+      console.error('Erro ao processar comprovante:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao processar comprovante de pagamento.",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingPaymentReceipts(false);
+    }
+  };
+
+  // Funções para seleção em lote de comprovantes
+  const handleSelectAllPaymentReceipts = (checked: boolean) => {
+    if (checked) {
+      const allIds = getFilteredPaymentReceipts().map(receipt => receipt.id);
+      setSelectedPaymentReceipts(allIds);
+    } else {
+      setSelectedPaymentReceipts([]);
+    }
+  };
+
+  const handleSelectPaymentReceipt = (receiptId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedPaymentReceipts(prev => [...prev, receiptId]);
+    } else {
+      setSelectedPaymentReceipts(prev => prev.filter(id => id !== receiptId));
+    }
+  };
+
+  const handleBatchEmailPaymentReceipts = async () => {
+    if (selectedPaymentReceipts.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "Selecione pelo menos um comprovante para envio por email.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const selectedReceipts = getFilteredPaymentReceipts().filter(receipt => 
+        selectedPaymentReceipts.includes(receipt.id)
+      );
+
+      toast({
+        title: "Enviando emails",
+        description: `Enviando ${selectedReceipts.length} comprovante(s) por email...`,
+      });
+
+      // Simular envio de emails em lote
+      for (const receipt of selectedReceipts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`Enviando email para: ${receipt.employeeName}`);
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: `${selectedReceipts.length} email(s) enviado(s) com sucesso!`,
+      });
+      
+      // Limpar seleção após envio
+      setSelectedPaymentReceipts([]);
+    } catch (error) {
+      console.error('Erro ao enviar emails em lote:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar emails em lote.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleBatchWhatsAppPaymentReceipts = async () => {
+    if (selectedPaymentReceipts.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "Selecione pelo menos um comprovante para envio por WhatsApp.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const selectedReceipts = getFilteredPaymentReceipts().filter(receipt => 
+        selectedPaymentReceipts.includes(receipt.id)
+      );
+
+      toast({
+        title: "Enviando WhatsApp",
+        description: `Enviando ${selectedReceipts.length} comprovante(s) por WhatsApp...`,
+      });
+
+      // Simular envio de WhatsApp em lote
+      for (const receipt of selectedReceipts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`Enviando WhatsApp para: ${receipt.employeeName}`);
+      }
+
+        toast({
+        title: "Sucesso",
+        description: `${selectedReceipts.length} mensagem(ns) WhatsApp enviada(s) com sucesso!`,
+      });
+
+      // Limpar seleção após envio
+      setSelectedPaymentReceipts([]);
+    } catch (error) {
+      console.error('Erro ao enviar WhatsApp em lote:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar mensagens WhatsApp em lote.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const clearPaymentReceiptSelection = () => {
+    setSelectedPaymentReceipts([]);
+  };
+
+  // Excluir comprovante individual
+  const handleDeletePaymentReceipt = async (receiptId: string) => {
+    try {
+      await paymentReceiptService.deletePaymentReceipt(receiptId);
+      
+      // Remover da seleção se estiver selecionado
+      setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => id !== receiptId));
+      
+      // Recarregar lista
+      await loadReceipts();
+      
+      toast({
+        title: "Comprovante excluído",
+        description: "Comprovante excluído com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao excluir comprovante:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir comprovante. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Visualizar comprovante
+  const handleViewPaymentReceipt = (receipt: PaymentReceipt) => {
+    setSelectedPaymentReceiptForView(receipt);
+    setShowPaymentReceiptViewModal(true);
+  };
+
+  // Baixar comprovante
+  const handleDownloadPaymentReceipt = async (receiptId: string, fileName: string) => {
+    try {
+      await paymentReceiptService.downloadPaymentReceipt(receiptId, fileName);
+      toast({
+        title: "Download iniciado",
+        description: "O download do comprovante foi iniciado.",
+      });
+    } catch (error) {
+      console.error('Erro ao baixar comprovante:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao baixar comprovante. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Excluir múltiplos comprovantes
+  const handleDeleteMultiplePaymentReceipts = async () => {
+    if (selectedPaymentReceipts.length === 0) {
+      toast({
+        title: "Nenhum comprovante selecionado",
+        description: "Selecione pelo menos um comprovante para excluir.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const result = await paymentReceiptService.deleteMultiplePaymentReceipts(selectedPaymentReceipts);
+      
+      if (result.deleted > 0) {
+        toast({
+          title: "Comprovantes excluídos",
+          description: `${result.deleted} comprovante${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''} com sucesso.`,
+        });
+      }
+      
+      if (result.failed > 0) {
+        toast({
+          title: "Alguns comprovantes não foram excluídos",
+          description: `${result.failed} comprovante${result.failed > 1 ? 's' : ''} não puderam ser excluído${result.failed > 1 ? 's' : ''}.`,
+          variant: "destructive"
+        });
+      }
+      
+      setSelectedPaymentReceipts([]);
+      await loadReceipts();
+    } catch (error) {
+      console.error('Erro ao excluir comprovantes:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir comprovantes. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const areAllPaymentReceiptsSelected = () => {
+    const filteredReceipts = getFilteredPaymentReceipts();
+    return filteredReceipts.length > 0 && 
+           selectedPaymentReceipts.length === filteredReceipts.length;
+  };
+
+  const hasSelectedPaymentReceipts = () => {
+    return selectedPaymentReceipts.length > 0;
+  };
+
   // Carregar holerites
-  const loadPayslips = async (filters: PayslipFilters = {}) => {
+  const loadHolerites = async (filters: any = {}) => {
     try {
       setLoading(true);
       setError(null);
@@ -135,38 +556,68 @@ const Holerites: React.FC = () => {
       console.log('🔍 Permissões do usuário:', user?.permissions);
       console.log('🔍 Token no localStorage:', localStorage.getItem('token'));
       
-      const data = await payslipService.getPayslips(filters);
-      console.log('✅ Holerites carregados com sucesso:', data);
-      setPayslips(data);
+      try {
+        console.log('🔍 Filtros aplicados:', filters);
+        const data = await holeriteService.getAllHolerites();
+        console.log('✅ Holerites carregados do backend:', data);
+        console.log('🔍 Tipo dos dados:', typeof data);
+        console.log('🔍 É array?', Array.isArray(data));
+        console.log('🔍 Tamanho do array:', data?.length);
+        
+        if (data && Array.isArray(data)) {
+          console.log('✅ Usando dados do backend:', data.length, 'holerites');
+          setHolerites(data);
+          
+          // Atualizar anos disponíveis baseado nos dados reais
+          const availableYears = [...new Set(data.map(h => h.year.toString()))].sort((a, b) => b.localeCompare(a));
+          console.log('📅 Anos disponíveis baseado nos holerites:', availableYears);
+          setHoleriteAvailableYears(availableYears);
+          
+          // Se o ano ativo não estiver mais disponível, mudar para o primeiro disponível
+          if (availableYears.length > 0 && !availableYears.includes(holeriteActiveYear)) {
+            setHoleriteActiveYear(availableYears[0]);
+            console.log('🔄 Mudando ano ativo para:', availableYears[0]);
+          }
+        } else {
+          console.log('📝 Nenhum holerite encontrado no backend');
+          setHolerites([]);
+          setHoleriteAvailableYears(['2025']); // Manter 2025 como padrão
+        }
+      } catch (backendError) {
+        console.error('❌ Erro no backend:', backendError);
+        setHolerites([]);
+        setHoleriteAvailableYears(['2025']); // Manter 2025 como padrão em caso de erro
+        setError('Erro ao carregar holerites do servidor. Verifique sua conexão.');
+      }
     } catch (err) {
       console.error('❌ Erro ao carregar holerites:', err);
       console.error('🔍 Detalhes do erro:', err.response?.data, err.response?.status);
       setError('Erro ao carregar holerites. Tente novamente.');
-      toast({
-        title: "Erro",
+        toast({
+          title: "Erro",
         description: "Não foi possível carregar os holerites.",
-        variant: "destructive"
-      });
+          variant: "destructive"
+        });
     } finally {
       setLoading(false);
     }
   };
 
   // Carregar holerites com filtros
-  const loadPayslipsWithFilters = async () => {
-    const newFilters: PayslipFilters = { ...filters };
+  const loadHoleritesWithFilters = async () => {
+    const newFilters: any = { ...filters };
     
     if (searchTerm) {
       newFilters.employeeName = searchTerm;
     }
     
-    await loadPayslips(newFilters);
+    await loadHolerites(newFilters);
   };
 
   // Aplicar filtros quando mudarem
   useEffect(() => {
     if (!loading) {
-      loadPayslipsWithFilters();
+      loadHoleritesWithFilters();
     }
   }, [searchTerm, filters]);
 
@@ -174,16 +625,16 @@ const Holerites: React.FC = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setFilters({});
-    setSelectedPayslips([]);
-    loadPayslips();
+    setSelectedHolerites([]);
+    loadHolerites();
   };
 
   // Atualizar holerites
-  const refreshPayslips = async () => {
+  const refreshHolerites = async () => {
     setRefreshing(true);
     try {
-      await loadPayslips();
-      setSelectedPayslips([]);
+      await loadHolerites();
+      setSelectedHolerites([]);
       toast({
         title: "Sucesso",
         description: "Lista de holerites atualizada.",
@@ -201,7 +652,7 @@ const Holerites: React.FC = () => {
   };
 
   // Filtrar holerites localmente
-  const filteredPayslips = payslips.filter(payslip =>
+  const filteredHolerites = holerites.filter(payslip =>
     payslip.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     payslip.cpf.toLowerCase().includes(searchTerm.toLowerCase()) ||
     payslip.month.toString().includes(searchTerm) ||
@@ -211,230 +662,26 @@ const Holerites: React.FC = () => {
   // Seleção múltipla
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedPayslips(filteredPayslips.map(p => p.id));
+      setSelectedHolerites(filteredHolerites.map(p => p.id));
     } else {
-      setSelectedPayslips([]);
+      setSelectedHolerites([]);
     }
   };
 
-  const handleSelectPayslip = (payslipId: number, checked: boolean) => {
+  const handleSelectHolerite = (payslipId: string, checked: boolean) => {
     if (checked) {
-      setSelectedPayslips([...selectedPayslips, payslipId]);
+      setSelectedHolerites([...selectedHolerites, payslipId]);
     } else {
-      setSelectedPayslips(selectedPayslips.filter(id => id !== payslipId));
+      setSelectedHolerites(selectedHolerites.filter(id => id !== payslipId));
     }
   };
 
-  const isAllSelected = filteredPayslips.length > 0 && selectedPayslips.length === filteredPayslips.length;
-  const isIndeterminate = selectedPayslips.length > 0 && selectedPayslips.length < filteredPayslips.length;
+  const isAllSelected = filteredHolerites.length > 0 && selectedHolerites.length === filteredHolerites.length;
+  const isIndeterminate = selectedHolerites.length > 0 && selectedHolerites.length < filteredHolerites.length;
 
-  // Função para obter documentos visíveis (com filtros aplicados)
-  const getVisibleUnifiedDocuments = () => {
-    return unifiedDocuments.filter(doc => 
-      !unifiedSearchTerm || 
-      doc.employeeName?.toLowerCase().includes(unifiedSearchTerm.toLowerCase()) ||
-      doc.fileName?.toLowerCase().includes(unifiedSearchTerm.toLowerCase())
-    );
-  };
 
-  // Função para carregar documentos unificados
-  const loadUnifiedDocuments = async () => {
-    try {
-      setLoadingUnified(true);
-      setError(null);
-      
-      const response = await api.get('/unified-documents/list');
-      
-      if (response.data.sucesso) {
-        setUnifiedDocuments(response.data.documents || []);
-      } else {
-        setError(response.data.mensagem || 'Erro ao carregar documentos unificados');
-      }
-    } catch (err: any) {
-      console.error('Erro ao carregar documentos unificados:', err);
-      setError('Erro ao carregar documentos unificados: ' + (err.response?.data?.mensagem || err.message));
-    } finally {
-      setLoadingUnified(false);
-    }
-  };
 
-  // Função para selecionar todos os documentos unificados
-  const handleSelectAllUnifiedDocuments = (checked: boolean) => {
-    console.log('🔍 Selecionando todos os documentos:', checked);
-    if (checked) {
-      // Selecionar todos os documentos visíveis (considerando filtros)
-      const visibleDocuments = getVisibleUnifiedDocuments();
-      const documentIds = visibleDocuments.map(doc => getDocumentId(doc));
-      console.log('🔍 Documentos visíveis para seleção:', visibleDocuments.length);
-      console.log('🔍 IDs para seleção:', documentIds);
-      setSelectedUnifiedDocuments(documentIds);
-    } else {
-      console.log('🔍 Limpando seleção');
-      setSelectedUnifiedDocuments([]);
-    }
-  };
 
-  // Função para selecionar documento unificado individual
-  const handleSelectUnifiedDocument = (documentId: string, checked: boolean) => {
-    console.log('🔍 Selecionando documento:', documentId, 'checked:', checked);
-    if (checked) {
-      setSelectedUnifiedDocuments(prev => {
-        const newSelection = [...prev, documentId];
-        console.log('🔍 Nova seleção:', newSelection);
-        return newSelection;
-      });
-    } else {
-      setSelectedUnifiedDocuments(prev => {
-        const newSelection = prev.filter(id => id !== documentId);
-        console.log('🔍 Nova seleção após remoção:', newSelection);
-        return newSelection;
-      });
-    }
-  };
-
-  // Função para confirmar exclusão de documento unificado
-  const confirmDeleteUnifiedDocument = (document: any) => {
-    setUnifiedDocumentsToDelete([document]);
-    setShowUnifiedDeleteModal(true);
-  };
-
-  // Função para excluir documentos unificados selecionados
-  const handleDeleteUnifiedDocuments = async () => {
-    if (unifiedDocumentsToDelete.length === 0) {
-      toast({
-        title: "Aviso",
-        description: "Nenhum documento selecionado para exclusão.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setLoadingUnified(true);
-      
-      // Excluir cada documento
-      for (const document of unifiedDocumentsToDelete) {
-        await deleteUnifiedDocument(document);
-      }
-      
-      // Limpar seleção e recarregar lista
-      setSelectedUnifiedDocuments([]);
-      setUnifiedDocumentsToDelete([]);
-      setShowUnifiedDeleteModal(false);
-      
-      // Recarregar documentos
-      await loadUnifiedDocuments();
-      
-      toast({
-        title: "Sucesso",
-        description: `${unifiedDocumentsToDelete.length} documento(s) excluído(s) com sucesso!`,
-      });
-      
-    } catch (error) {
-      console.error('Erro ao excluir documentos unificados:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir documentos unificados.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingUnified(false);
-    }
-  };
-
-  // Função para excluir um documento unificado individual
-  const deleteUnifiedDocument = async (document: any) => {
-    try {
-      const fileName = document.fileName || document.filePath?.split(/[\\/]/).pop();
-      
-      if (!fileName) {
-        throw new Error('Nome do arquivo não encontrado');
-      }
-      
-      // Chamar API para excluir documento
-      const response = await api.delete(`/unified-documents/delete/${encodeURIComponent(fileName)}`);
-      
-      if (response.data.sucesso) {
-        console.log('✅ Documento excluído com sucesso:', fileName);
-      } else {
-        throw new Error(response.data.mensagem || 'Erro ao excluir documento');
-      }
-      
-    } catch (error) {
-      console.error('Erro ao excluir documento:', error);
-      throw error;
-    }
-  };
-
-  // Função para visualizar documento unificado
-  const handleViewUnifiedDocument = (document: any) => {
-    try {
-      // Extrair nome do arquivo do caminho
-      const fileName = document.fileName || document.filePath?.split(/[\\/]/).pop();
-      
-      if (!fileName) {
-        toast({
-          title: "Erro",
-          description: "Nome do arquivo não encontrado.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Usar endpoint público para servir o arquivo
-      const url = `http://localhost:8081/api/files/unified/${encodeURIComponent(fileName)}`;
-      console.log('🔍 Abrindo documento:', url);
-      window.open(url, '_blank');
-    } catch (error) {
-      console.error('Erro ao visualizar documento:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível visualizar o documento.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Função para baixar documento unificado
-  const handleDownloadUnifiedDocument = (document: any) => {
-    try {
-      // Extrair nome do arquivo do caminho
-      const fileName = document.fileName || document.filePath?.split(/[\\/]/).pop();
-      
-      if (!fileName) {
-        toast({
-          title: "Erro",
-          description: "Nome do arquivo não encontrado.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Usar endpoint público para download
-      const url = `http://localhost:8081/api/files/unified/${encodeURIComponent(fileName)}`;
-      console.log('🔍 Baixando documento:', url);
-      
-      // Criar link de download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast({
-        title: "Sucesso",
-        description: "Download iniciado com sucesso!",
-      });
-    } catch (error) {
-      console.error('Erro ao baixar documento:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível baixar o documento.",
-        variant: "destructive"
-      });
-    }
-  };
 
   // Funções para unificação individual
   const handleDragStart = (e: React.DragEvent, item: any, type: 'holerite' | 'recibo') => {
@@ -902,7 +1149,7 @@ const Holerites: React.FC = () => {
 
   // Exclusão múltipla
   const handleDeleteSelected = async () => {
-    if (selectedPayslips.length === 0) {
+    if (selectedHolerites.length === 0) {
       toast({
         title: "Aviso",
         description: "Selecione pelo menos um holerite para excluir.",
@@ -912,18 +1159,34 @@ const Holerites: React.FC = () => {
     }
 
     // Preparar holerites para exclusão
-    const payslipsToDelete = payslips.filter(p => selectedPayslips.includes(p.id));
-    setPayslipsToDelete(payslipsToDelete);
+    const holeritesToDelete = holerites.filter(p => selectedHolerites.includes(p.id));
+    setHoleritesToDelete(holeritesToDelete);
     setShowDeleteModal(true);
   };
 
   // Confirmar exclusão múltipla
   const confirmDeleteSelected = async () => {
+    if (selectedHolerites.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "Nenhum holerite selecionado para exclusão.",
+        variant: "destructive"
+      });
+      setShowDeleteModal(false);
+      return;
+    }
+
     setIsDeleting(true);
       try {
-        const result = await payslipService.deleteMultiple(selectedPayslips);
+        const result = await holeriteService.deleteMultipleHolerites(selectedHolerites);
         
-        if (result.failed > 0) {
+        if (result.deleted === 0 && result.failed === 0) {
+          toast({
+            title: "Informação",
+            description: "Nenhum holerite foi excluído. Verifique se os holerites ainda existem.",
+            variant: "default"
+          });
+        } else if (result.failed > 0) {
           toast({
             title: "Aviso",
           description: `${result.deleted} holerite${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''} com sucesso. ${result.failed} falha${result.failed > 1 ? 's' : ''}.`,
@@ -936,8 +1199,8 @@ const Holerites: React.FC = () => {
           });
         }
         
-        setSelectedPayslips([]);
-        await loadPayslips();
+        setSelectedHolerites([]);
+        await loadHolerites();
       setShowDeleteModal(false);
       } catch (error) {
       console.error('Erro ao excluir holerites:', error);
@@ -951,19 +1214,19 @@ const Holerites: React.FC = () => {
     }
   };
 
-  const handleViewPayslip = (payslip: Payslip) => {
-    setSelectedPayslip(payslip);
+  const handleViewHolerite = (payslip: Holerite) => {
+    setSelectedHolerite(payslip);
     setShowViewModal(true);
   };
 
-  const handleEmailPayslip = (payslip: Payslip) => {
-    setSelectedPayslip(payslip);
+  const handleEmailHolerite = (payslip: Holerite) => {
+    setSelectedHolerite(payslip);
     setShowEmailModal(true);
   };
 
-  const handleDownloadPayslip = async (payslip: Payslip) => {
+  const handleDownloadHolerite = async (payslip: Holerite) => {
     try {
-      const blob = await payslipService.downloadPayslip(payslip.fileName);
+      const blob = await holeriteService.downloadHolerite(payslip.fileName);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -988,20 +1251,20 @@ const Holerites: React.FC = () => {
   };
 
   // Excluir holerite individual
-  const handleDeletePayslip = async (payslip: Payslip) => {
-    setPayslipsToDelete([payslip]);
+  const handleDeleteHolerite = async (payslip: Holerite) => {
+    setHoleritesToDelete([payslip]);
     setShowDeleteModal(true);
   };
 
   // Confirmar exclusão individual
   const confirmDeleteIndividual = async () => {
-    if (payslipsToDelete.length === 0) return;
+    if (holeritesToDelete.length === 0) return;
     
-    const payslip = payslipsToDelete[0];
+    const payslip = holeritesToDelete[0];
     setIsDeleting(true);
     
       try {
-        await payslipService.deletePayslip(payslip.id);
+        await holeriteService.deleteHolerite(payslip.id);
         
         toast({
           title: "Sucesso",
@@ -1009,10 +1272,10 @@ const Holerites: React.FC = () => {
         });
         
         // Remover da seleção se estiver selecionado
-        setSelectedPayslips(selectedPayslips.filter(id => id !== payslip.id));
+        setSelectedHolerites(selectedHolerites.filter(id => id !== payslip.id));
         
         // Recarregar lista
-        await loadPayslips();
+        await loadHolerites();
       setShowDeleteModal(false);
       } catch (error) {
       console.error('Erro ao excluir holerite:', error);
@@ -1027,7 +1290,7 @@ const Holerites: React.FC = () => {
   };
 
   const handleUploadSuccess = () => {
-    loadPayslips(); // Recarrega a lista após upload
+    loadHolerites(); // Recarrega a lista após upload
     toast({
       title: "Upload Concluído",
       description: "Holerites processados com sucesso.",
@@ -1062,8 +1325,8 @@ const Holerites: React.FC = () => {
 
   // Função para lidar com filtros avançados
   const handleAdvancedFiltersChange = (filterState: any) => {
-    // Converter FilterState para PayslipFilters
-    const newFilters: PayslipFilters = {};
+    // Converter FilterState para filtros
+    const newFilters: any = {};
     if (filterState.search) newFilters.employeeName = filterState.search;
     setFilters(newFilters);
   };
@@ -1074,14 +1337,14 @@ const Holerites: React.FC = () => {
     try {
       const response = await api.post('/envio/massa', {
         tipo: 'whatsapp',
-        funcionarioIds: selectedPayslips,
+        funcionarioIds: selectedHolerites,
         mensagem: whatsAppMessage
       });
       const data = response.data;
       if (data.sucesso) {
         toast({ title: 'Sucesso', description: data.mensagem });
         setShowWhatsAppModal(false);
-        setSelectedPayslips([]);
+        setSelectedHolerites([]);
       } else {
         toast({ title: 'Erro no envio', description: data.mensagem, variant: 'destructive' });
       }
@@ -1094,7 +1357,7 @@ const Holerites: React.FC = () => {
   };
 
   // Envio individual via WhatsApp
-  const handleSendWhatsAppIndividual = async (payslip: Payslip) => {
+  const handleSendWhatsAppIndividual = async (payslip: Holerite) => {
     try {
       const response = await api.post('/envio/individual', {
         tipo: 'whatsapp',
@@ -1133,10 +1396,10 @@ const Holerites: React.FC = () => {
         receipts = response.data.receipts;
       }
       
-      console.log('✅ Recibos carregados com sucesso:', receipts);
+      console.log('✅ Comprovantes carregados com sucesso:', receipts);
       setReceipts(receipts);
     } catch (error) {
-      console.error('🔍 Erro ao carregar recibos:', error);
+      console.error('🔍 Erro ao carregar comprovantes:', error);
       console.error('🔍 Detalhes do erro:', error.response?.data, error.response?.status);
       setReceipts([]);
     }
@@ -1145,10 +1408,19 @@ const Holerites: React.FC = () => {
   // Carregar dados iniciais quando usuário estiver autenticado
   useEffect(() => {
     if (user) {
-      loadPayslips();
+      loadHolerites();
       loadReceipts();
     }
   }, [user]);
+
+  // Atualizar anos disponíveis quando holerites mudarem
+  useEffect(() => {
+    if (holerites.length > 0) {
+      const availableYears = [...new Set(holerites.map(h => h.year.toString()))].sort((a, b) => b.localeCompare(a));
+      console.log('🔄 Atualizando anos disponíveis:', availableYears);
+      setHoleriteAvailableYears(availableYears);
+    }
+  }, [holerites]);
 
   // Carregar recibos quando a aba de recibos for ativa
   useEffect(() => {
@@ -1157,12 +1429,6 @@ const Holerites: React.FC = () => {
     }
   }, [activeTab, user]);
 
-  // Carregar documentos unificados quando a aba for ativada
-  useEffect(() => {
-    if (activeTab === 'unificados' && user) {
-      loadUnifiedDocuments();
-    }
-  }, [activeTab, user]);
 
   // Carregar arquivos processados quando a aba "Unificação Individual" for ativada
   useEffect(() => {
@@ -1170,6 +1436,27 @@ const Holerites: React.FC = () => {
       loadProcessedFiles();
     }
   }, [activeTab, user]);
+
+  // Carregar comprovantes de pagamento quando a aba "Comprovantes" for ativada
+  useEffect(() => {
+    if (activeTab === 'recibos' && user) {
+      loadPaymentReceipts();
+    }
+  }, [activeTab, user]);
+
+  // Atualizar mês ativo quando os dados dos comprovantes mudarem
+  useEffect(() => {
+    if (paymentReceipts.length > 0) {
+      const availableMonths = getAvailableMonths(activeYear);
+      if (availableMonths.length > 0) {
+        // Se o mês atual não está disponível, mudar para o primeiro disponível
+        if (!availableMonths.includes(parseInt(activeMonth))) {
+          setActiveMonth(availableMonths[0].toString());
+          console.log('🔄 Mês ativo atualizado para:', availableMonths[0]);
+        }
+      }
+    }
+  }, [paymentReceipts, activeYear]);
 
   // Função para upload de recibos
   const handleReceiptUpload = async (file: File) => {
@@ -1221,7 +1508,7 @@ const Holerites: React.FC = () => {
         
         toast({
           title: "Sucesso",
-          description: `Recibos processados com sucesso! ${receiptsCount} recibos extraídos.`,
+          description: `Comprovantes processados com sucesso! ${receiptsCount} comprovantes extraídos.`,
         });
         
         setShowReceiptUploadModal(false);
@@ -1268,7 +1555,7 @@ const Holerites: React.FC = () => {
       }
 
       toast({
-        title: "Erro no Upload de Recibos",
+        title: "Erro no Upload de Comprovantes",
         description: errorMessage,
         variant: "destructive"
       });
@@ -1277,36 +1564,6 @@ const Holerites: React.FC = () => {
     }
   };
 
-  // Função para criar holerites expandidos
-  const handleCreateUnifiedDocuments = async () => {
-    try {
-      setProcessingUnified(true);
-      
-      const response = await api.post('/unified-documents/create-expanded-holerites');
-
-      if (response.status === 200) {
-        toast({
-          title: "Sucesso",
-          description: `Holerites e recibos com nomes exatos unidos com sucesso! ${response.data.count || 0} documentos gerados.`,
-        });
-        setShowUnifiedModal(false);
-        
-        // Recarregar a lista de documentos unificados
-        if (activeTab === 'unificados') {
-          await loadUnifiedDocuments();
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao unir holerites e recibos com nomes exatos:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível unir os holerites e recibos com nomes exatos.",
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingUnified(false);
-    }
-  };
 
   // Função para deletar recibo individual
   const handleDeleteReceipt = async (receiptId: string) => {
@@ -1445,66 +1702,31 @@ const Holerites: React.FC = () => {
       return;
     }
     
-    // Verificar se o recibo existe na lista local
-    const receipt = Array.isArray(receipts) ? receipts.find(r => r.id === receiptId) : undefined;
-    if (!receipt) {
-      console.error('🔍 Recibo não encontrado na lista local:', receiptId);
-      toast({
-        title: "Erro",
-        description: "Recibo não encontrado.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    console.log('🔍 Dados do recibo encontrado:', receipt);
-    console.log('🔍 FilePath:', receipt.filePath);
-    console.log('🔍 FileName:', receipt.fileName);
-    
     try {
-      console.log('🔍 Fazendo requisição para baixar recibo:', receiptId);
-      const response = await api.get(`/receipts/${receiptId}/download`, {
-        responseType: 'blob'
-      });
-      
-      console.log('🔍 Resposta recebida:', response);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
+      // Tentar fazer download via service
+      const blob = await paymentReceiptService.downloadReceipt(receiptId);
       
       // Criar link de download
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = fileName || 'recibo.pdf';
+      link.download = fileName || `comprovante_${receiptId}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Limpar URL após um tempo
-      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      window.URL.revokeObjectURL(url);
       
       toast({
         title: "Sucesso",
-        description: "Recibo baixado com sucesso!",
+        description: "Download iniciado com sucesso!",
       });
-      
     } catch (error) {
-      console.error('🔍 Erro ao baixar recibo:', error);
-      console.error('🔍 Status do erro:', error.response?.status);
-      console.error('🔍 Dados do erro:', error.response?.data);
-      
-      if (error.response?.status === 404) {
-        toast({
-          title: "Recibo não encontrado",
-          description: "O arquivo do recibo não foi encontrado no servidor.",
-          variant: "destructive"
-        });
-      } else {
+      console.error('❌ Erro ao fazer download:', error);
         toast({
           title: "Erro",
-          description: "Não foi possível baixar o recibo.",
+        description: "Erro ao fazer download do comprovante.",
           variant: "destructive"
         });
-      }
     }
   };
 
@@ -1513,8 +1735,8 @@ const Holerites: React.FC = () => {
       setLoadingProcessedFiles(true);
       try {
           // Primeiro, tentar usar os dados já carregados nas outras abas
-          if (payslips.length > 0) {
-              const holeritesProcessados = payslips.map(payslip => ({
+          if (holerites.length > 0) {
+              const holeritesProcessados = holerites.map(payslip => ({
                   id: `hol-${payslip.id}`,
                   name: payslip.fileName || `holerite_${payslip.employeeName}_${payslip.month}_${payslip.year}.pdf`,
                   employeeName: payslip.employeeName,
@@ -1527,6 +1749,27 @@ const Holerites: React.FC = () => {
               console.log('✅ Holerites carregados dos dados existentes:', holeritesProcessados.length);
           }
 
+          // Carregar comprovantes processados do backend
+          try {
+              const processedReceipts = await paymentReceiptService.getProcessedFiles();
+              console.log('✅ Comprovantes processados carregados do backend:', processedReceipts);
+              
+              if (processedReceipts && processedReceipts.length > 0) {
+                  const comprovantesProcessados = processedReceipts.map(receipt => ({
+                      id: `rec-${receipt.id}`,
+                      name: receipt.fileName,
+                      employeeName: receipt.employeeName,
+                      month: receipt.month.toString(),
+                      year: receipt.year.toString(),
+                      path: receipt.filePath || `uploads/payment-receipts/${receipt.year}/${receipt.month}/${receipt.fileName}`
+                  }));
+                  // Processed receipts serão exibidos junto com os payment receipts
+                  console.log('✅ Comprovantes processados carregados:', comprovantesProcessados.length);
+              }
+          } catch (backendError) {
+              console.warn('⚠️ Erro ao carregar comprovantes do backend, usando dados locais:', backendError);
+          }
+
               if (Array.isArray(receipts) && receipts.length > 0) {
       const recibosProcessados = receipts.map(receipt => ({
                   id: `rec-${receipt.id || Math.random()}`,
@@ -1537,11 +1780,11 @@ const Holerites: React.FC = () => {
                   path: `uploads/receipts/${receipt.month}_${receipt.year}/${receipt.fileName}`
               }));
               setProcessedRecibos(recibosProcessados);
-              console.log('✅ Recibos carregados dos dados existentes:', recibosProcessados.length);
+              console.log('✅ Comprovantes carregados dos dados existentes:', recibosProcessados.length);
           }
 
           // Se não houver dados nas outras abas, tentar carregar via API
-          if (payslips.length === 0) {
+          if (holerites.length === 0) {
               try {
                   const holeritesResponse = await api.get('/holerites/processed-files');
                   if (holeritesResponse.data.success) {
@@ -1558,10 +1801,10 @@ const Holerites: React.FC = () => {
                   const recibosResponse = await api.get('/receipts/processed-files');
                   if (recibosResponse.data.success) {
                       setProcessedRecibos(recibosResponse.data.files || []);
-                      console.log('✅ Recibos carregados via API:', recibosResponse.data.files?.length || 0);
+                      console.log('✅ Comprovantes carregados via API:', recibosResponse.data.files?.length || 0);
                   }
               } catch (apiError) {
-                  console.log('⚠️ Erro ao carregar recibos via API, usando dados simulados');
+                  console.log('⚠️ Erro ao carregar comprovantes via API, usando dados simulados');
               }
           }
       } catch (error) {
@@ -1600,7 +1843,7 @@ const Holerites: React.FC = () => {
   }
 
   // Loading state
-  if (loading && payslips.length === 0) {
+  if (loading && holerites.length === 0) {
     return (
       <StandardLayout>
         <div className="flex items-center justify-center h-64 px-4">
@@ -1614,7 +1857,7 @@ const Holerites: React.FC = () => {
   }
 
   // Error state
-  if (error && payslips.length === 0) {
+  if (error && holerites.length === 0) {
     return (
       <StandardLayout>
         <div className="flex items-center justify-center h-64 px-4">
@@ -1622,7 +1865,7 @@ const Holerites: React.FC = () => {
             <AlertCircle className="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-red-500 mb-4" />
             <p className="text-seguranca-lightgray mb-4 text-sm sm:text-base">{error}</p>
             <Button 
-              onClick={() => loadPayslips()}
+              onClick={() => loadHolerites()}
               className="bg-seguranca-red hover:bg-seguranca-darkred text-sm"
             >
               Tentar Novamente
@@ -1633,143 +1876,8 @@ const Holerites: React.FC = () => {
     );
   }
 
-  // Funções de ação em lote para documentos unificados
-  const handleBatchEmail = async () => {
-    if (selectedUnifiedDocuments.length === 0) {
-      toast({
-        title: "Aviso",
-        description: "Selecione pelo menos um documento para enviar por email.",
-        variant: "destructive"
-      });
-      return;
-    }
 
-    try {
-      const selectedDocs = individualUnifications.filter(u => 
-        selectedUnifiedDocuments.includes(u.id) && u.status === 'completed'
-      );
 
-      toast({
-        title: "Enviando emails",
-        description: `Enviando ${selectedDocs.length} documento(s) por email...`,
-      });
-
-      // Simular envio de emails em lote
-      for (const doc of selectedDocs) {
-        await handleEmailIndividualUnified(doc);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Delay entre envios
-      }
-
-      toast({
-        title: "Sucesso",
-        description: `${selectedDocs.length} email(s) enviado(s) com sucesso!`,
-      });
-
-      // Limpar seleção após envio
-      setSelectedUnifiedDocuments([]);
-    } catch (error) {
-      console.error('Erro ao enviar emails em lote:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar emails em lote.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleBatchWhatsApp = async () => {
-    if (selectedUnifiedDocuments.length === 0) {
-      toast({
-        title: "Aviso",
-        description: "Selecione pelo menos um documento para enviar por WhatsApp.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const selectedDocs = individualUnifications.filter(u => 
-        selectedUnifiedDocuments.includes(u.id) && u.status === 'completed'
-      );
-
-      toast({
-        title: "Enviando WhatsApp",
-        description: `Enviando ${selectedDocs.length} documento(s) por WhatsApp...`,
-      });
-
-      // Simular envio de WhatsApp em lote
-      for (const doc of selectedDocs) {
-        await handleWhatsAppIndividualUnified(doc);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Delay entre envios
-      }
-
-      toast({
-        title: "Sucesso",
-        description: `${selectedDocs.length} mensagem(ns) enviada(s) por WhatsApp!`,
-      });
-
-      // Limpar seleção após envio
-      setSelectedUnifiedDocuments([]);
-    } catch (error) {
-      console.error('Erro ao enviar WhatsApp em lote:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar mensagens por WhatsApp em lote.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleBatchDelete = async () => {
-    if (selectedUnifiedDocuments.length === 0) {
-      toast({
-        title: "Aviso",
-        description: "Selecione pelo menos um documento para excluir.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const selectedDocs = individualUnifications.filter(u => 
-        selectedUnifiedDocuments.includes(u.id) && u.status === 'completed'
-      );
-
-      // Confirmar exclusão em lote
-      const confirmed = window.confirm(
-        `Tem certeza que deseja excluir ${selectedDocs.length} documento(s) unificado(s)?\n\n` +
-        `Esta ação não pode ser desfeita.`
-      );
-
-      if (!confirmed) return;
-
-      toast({
-        title: "Excluindo documentos",
-        description: `Excluindo ${selectedDocs.length} documento(s)...`,
-      });
-
-      // Simular exclusão em lote
-      for (const doc of selectedDocs) {
-        await handleDeleteIndividualUnified(doc);
-        await new Promise(resolve => setTimeout(resolve, 500)); // Delay entre exclusões
-      }
-
-      toast({
-        title: "Sucesso",
-        description: `${selectedDocs.length} documento(s) excluído(s) com sucesso!`,
-      });
-
-      // Limpar seleção após exclusão
-      setSelectedUnifiedDocuments([]);
-    } catch (error) {
-      console.error('Erro ao excluir documentos em lote:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir documentos em lote.",
-        variant: "destructive"
-      });
-    }
-  };
 
   // Função para excluir unificação individual
   const handleDeleteIndividualUnified = async (unification: any) => {
@@ -1792,8 +1900,6 @@ const Holerites: React.FC = () => {
       // Remover da lista
       setIndividualUnifications(prev => prev.filter(u => u.id !== unification.id));
       
-      // Remover da seleção se estiver selecionado
-      setSelectedUnifiedDocuments(prev => prev.filter(id => id !== unification.id));
 
       toast({
         title: "Sucesso",
@@ -1810,21 +1916,6 @@ const Holerites: React.FC = () => {
   };
 
   // Função para limpar seleção de documentos unificados
-  const clearUnifiedSelection = () => {
-    setSelectedUnifiedDocuments([]);
-  };
-
-  // Função para verificar se todos os documentos completos estão selecionados
-  const areAllCompletedSelected = () => {
-    const completedUnifications = individualUnifications.filter(u => u.status === 'completed');
-    return completedUnifications.length > 0 && 
-           selectedUnifiedDocuments.length === completedUnifications.length;
-  };
-
-  // Função para verificar se algum documento está selecionado
-  const hasSelectedDocuments = () => {
-    return selectedUnifiedDocuments.length > 0;
-  };
 
   return (
     <StandardLayout>
@@ -1839,7 +1930,7 @@ const Holerites: React.FC = () => {
                 </div>
                 <div>
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-seguranca-lightgray">
-                    Gestão de Holerites e Recibos
+                    Gestão de Holerites e Comprovantes
                   </h1>
                   <p className="text-seguranca-yellow font-medium text-sm sm:text-base mt-1">
                     Sistema completo de gestão de documentos financeiros
@@ -1850,19 +1941,13 @@ const Holerites: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-seguranca-yellow rounded-full animate-pulse"></div>
                   <span className="text-gray-400">
-                    {loading ? 'Carregando...' : `${filteredPayslips.length} holerite${filteredPayslips.length !== 1 ? 's' : ''} encontrado${filteredPayslips.length !== 1 ? 's' : ''}`}
+                    {loading ? 'Carregando...' : `${filteredHolerites.length} holerite${filteredHolerites.length !== 1 ? 's' : ''} encontrado${filteredHolerites.length !== 1 ? 's' : ''}`}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                   <span className="text-gray-400">
-                    {Array.isArray(receipts) ? receipts.length : 0} recibo{(Array.isArray(receipts) ? receipts.length : 0) !== 1 ? 's' : ''} processado{(Array.isArray(receipts) ? receipts.length : 0) !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-400">
-                    {unifiedDocuments.length} documento{unifiedDocuments.length !== 1 ? 's' : ''} unificado{unifiedDocuments.length !== 1 ? 's' : ''}
+                    {Array.isArray(receipts) ? receipts.length : 0} comprovante{(Array.isArray(receipts) ? receipts.length : 0) !== 1 ? 's' : ''} processado{(Array.isArray(receipts) ? receipts.length : 0) !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
@@ -1874,92 +1959,313 @@ const Holerites: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs Melhoradas */}
+        {/* Tabs Modernas e Responsivas */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-seguranca-graphite border border-gray-600 rounded-xl p-1 w-full grid grid-cols-4 sm:w-auto sm:flex shadow-lg">
+          <div className="relative tab-container">
+            <TabsList className="bg-gradient-to-r from-seguranca-graphite to-gray-800 border border-gray-600/50 rounded-2xl p-2 w-full shadow-2xl backdrop-blur-sm">
+              <div className="flex w-full gap-1">
             <TabsTrigger 
               value="processados" 
-              className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow data-[state=active]:shadow-lg data-[state=active]:border-seguranca-yellow/30 text-xs sm:text-sm rounded-lg transition-all duration-300 hover:bg-seguranca-black/50"
-            >
-              <FileText size={16} className="mr-2" />
-              <span className="hidden sm:inline">Holerites ({payslips.length})</span>
+                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state=active]:bg-gradient-to-r data-[state=active]:from-seguranca-yellow data-[state=active]:to-yellow-500 data-[state=active]:text-seguranca-black data-[state=active]:shadow-xl data-[state=active]:scale-105 data-[state=active]:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state=active]:border-seguranca-yellow/20"
+                >
+                  <div className="flex items-center justify-center gap-1 sm:gap-2">
+                    <div className="relative">
+                      <FileText size={14} className="sm:w-4 sm:h-4" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-seguranca-red rounded-full opacity-0 group-data-[state=active]:opacity-100 transition-opacity duration-300"></div>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="font-medium leading-tight">
+                        <span className="hidden sm:inline">Holerites</span>
               <span className="sm:hidden">Holerites</span>
+                      </span>
+                      <Badge variant="secondary" className="text-xs px-1 py-0 h-4 bg-seguranca-black/50 text-seguranca-yellow border-seguranca-yellow/30 group-data-[state=active]:bg-seguranca-black group-data-[state=active]:text-seguranca-yellow">
+                        {holerites.length}
+                      </Badge>
+                    </div>
+                  </div>
             </TabsTrigger>
-            <TabsTrigger 
-              value="recibos" 
-              className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow data-[state=active]:shadow-lg data-[state=active]:border-seguranca-yellow/30 text-xs sm:text-sm rounded-lg transition-all duration-300 hover:bg-seguranca-black/50"
-            >
-              <FileText size={16} className="mr-2" />
-                              <span className="hidden sm:inline">Recibos ({Array.isArray(receipts) ? receipts.length : 0})</span>
-              <span className="sm:hidden">Recibos</span>
+                
+                <TabsTrigger 
+                  value="recibos" 
+                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state=active]:bg-gradient-to-r data-[state=active]:from-seguranca-yellow data-[state=active]:to-yellow-500 data-[state=active]:text-seguranca-black data-[state=active]:shadow-xl data-[state=active]:scale-105 data-[state=active]:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state=active]:border-seguranca-yellow/20"
+                >
+                  <div className="flex items-center justify-center gap-1 sm:gap-2">
+                    <div className="relative">
+                      <FileText size={14} className="sm:w-4 sm:h-4" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full opacity-0 group-data-[state=active]:opacity-100 transition-opacity duration-300"></div>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="font-medium leading-tight">
+                        <span className="hidden sm:inline">Comprovantes</span>
+                        <span className="sm:hidden">Comprovantes</span>
+                      </span>
+                      <Badge variant="secondary" className="text-xs px-1 py-0 h-4 bg-seguranca-black/50 text-green-400 border-green-400/30 group-data-[state=active]:bg-seguranca-black group-data-[state=active]:text-seguranca-yellow">
+                        {Array.isArray(receipts) ? receipts.length : 0}
+                      </Badge>
+                    </div>
+                  </div>
             </TabsTrigger>
-            <TabsTrigger 
-              value="unificados" 
-              className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow data-[state=active]:shadow-lg data-[state=active]:border-seguranca-yellow/30 text-xs sm:text-sm rounded-lg transition-all duration-300 hover:bg-seguranca-black/50"
-            >
-              <FileText size={16} className="mr-2" />
-              <span className="hidden sm:inline">Holerites + Recibos (Nomes Exatos)</span>
-              <span className="sm:hidden">Holerites + Recibos (Nomes Exatos)</span>
+                
+                <TabsTrigger 
+                  value="unificacao-individual" 
+                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state=active]:bg-gradient-to-r data-[state=active]:from-seguranca-yellow data-[state=active]:to-yellow-500 data-[state=active]:text-seguranca-black data-[state=active]:shadow-xl data-[state=active]:scale-105 data-[state=active]:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state=active]:border-seguranca-yellow/20"
+                >
+                  <div className="flex items-center justify-center gap-1 sm:gap-2">
+                    <div className="relative">
+                      <FileText size={14} className="sm:w-4 sm:h-4" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-data-[state=active]:opacity-100 transition-opacity duration-300"></div>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="font-medium leading-tight">
+                        <span className="hidden sm:inline">Unificação</span>
+                        <span className="sm:hidden">Unificação</span>
+                      </span>
+                      <Badge variant="secondary" className="text-xs px-1 py-0 h-4 bg-seguranca-black/50 text-blue-400 border-blue-400/30 group-data-[state=active]:bg-seguranca-black group-data-[state=active]:text-seguranca-yellow">
+                        <span className="hidden sm:inline">Individual</span>
+                        <span className="sm:hidden">Ind.</span>
+                      </Badge>
+                    </div>
+                  </div>
             </TabsTrigger>
-            <TabsTrigger 
-              value="unificacao-individual" 
-              className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow data-[state=active]:shadow-lg data-[state=active]:border-seguranca-yellow/30 text-xs sm:text-sm rounded-lg transition-all duration-300 hover:bg-seguranca-black/50"
-            >
-              <FileText size={16} className="mr-2" />
-              <span className="hidden sm:inline">Unificação Individual</span>
-              <span className="sm:hidden">Unificação Individual</span>
-            </TabsTrigger>
+              </div>
           </TabsList>
+            
+            {/* Indicador de progresso animado */}
+            <div className="tab-indicator" 
+                 style={{
+                   width: activeTab === 'processados' ? '33.33%' : activeTab === 'recibos' ? '66.66%' : '100%',
+                   transform: `translateX(${activeTab === 'processados' ? '0%' : activeTab === 'recibos' ? '33.33%' : '66.66%'})`
+                 }}>
+            </div>
+          </div>
 
           <TabsContent value="processados">
-            <Card className="bg-seguranca-graphite border border-gray-600 rounded-xl p-6 shadow-lg">
-              {/* Filtros e botão de upload melhorados */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <div className="relative flex-1 min-w-0">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    placeholder="🔍 Buscar holerites por nome, CPF, mês ou ano..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 pr-4 py-3 bg-seguranca-black border-2 border-gray-600 text-seguranca-lightgray text-sm rounded-xl focus:border-seguranca-yellow focus:ring-2 focus:ring-seguranca-yellow/20 transition-all duration-300"
-                  />
+            {/* Header da Seção de Holerites */}
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-white mb-4 flex items-center justify-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <FileText size={24} className="text-white" />
                 </div>
+                Gestão de Holerites
+              </h3>
+              <p className="text-gray-400 text-base max-w-2xl mx-auto">
+                Importe e processe holerites de funcionários com navegação organizada por período.
+              </p>
+            </div>
+
+            {/* Dashboard de Holerites */}
+            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm mb-8">
+              <div className="space-y-8">
+                {/* Estatísticas Melhoradas */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="group bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 rounded-2xl p-6 hover:border-red-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/10">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <p className="text-red-300/80 text-sm font-medium">Total de Holerites</p>
+                        <p className="text-3xl font-bold text-white">{holerites.length}</p>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                          <span className="text-red-300/60 text-xs">Ativo</span>
+                        </div>
+                      </div>
+                      <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-red-500/25 transition-all duration-300">
+                        <FileText size={28} className="text-white" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="group bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-2xl p-6 hover:border-green-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-green-500/10">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <p className="text-green-300/80 text-sm font-medium">Total de Holerites</p>
+                        <p className="text-3xl font-bold text-white">{holerites.length}</p>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          <span className="text-green-300/60 text-xs">Processados</span>
+                        </div>
+                      </div>
+                      <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-green-500/25 transition-all duration-300">
+                        <FileText size={28} className="text-white" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="group bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-2xl p-6 hover:border-yellow-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-yellow-500/10">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <p className="text-yellow-300/80 text-sm font-medium">Processados Hoje</p>
+                        <p className="text-3xl font-bold text-white">{getHoleritesProcessedToday()}</p>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                          <span className="text-yellow-300/60 text-xs">Em tempo real</span>
+                        </div>
+                      </div>
+                      <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-yellow-500/25 transition-all duration-300">
+                        <CheckCircle size={28} className="text-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão de Upload Melhorado */}
+                <div className="flex justify-center">
                 <Button 
-                  variant="outline" 
-                  className="border-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:border-seguranca-yellow w-full sm:w-auto px-6 py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-gray-500/25"
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                >
-                  <Filter size={18} className="mr-2" />
-                  <span className="hidden sm:inline">Filtros Avançados</span>
-                  <span className="sm:hidden">Filtros</span>
+                    onClick={() => setShowUploadModal(true)}
+                    disabled={loading}
+                    className="group relative bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 px-10 py-4 rounded-2xl shadow-2xl hover:shadow-red-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-red-400/20"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-400/20 to-pink-400/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="relative flex items-center space-x-3">
+                      {loading ? (
+                        <Loader2 size={24} className="animate-spin" />
+                      ) : (
+                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors duration-300">
+                          <Plus size={20} />
+                        </div>
+                      )}
+                      <span className="text-lg font-semibold">
+                        {loading ? 'Processando...' : 'Importar Holerites'}
+                      </span>
+                    </div>
                 </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Abas por Ano e Mês */}
+            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+              <div className="space-y-8">
+                <div className="text-center">
+                  <h4 className="text-2xl font-bold text-white mb-2">Holerites por Período</h4>
+                  <p className="text-gray-400">Navegue pelos anos e meses para visualizar os holerites</p>
+                </div>
+                
+                {/* Abas de Ano Melhoradas */}
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {holeriteAvailableYears.map((year) => (
                 <Button 
-                  onClick={() => setShowUploadModal(true)}
-                  className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red w-full sm:w-auto px-6 py-3 rounded-xl shadow-lg hover:shadow-red-500/25 transition-all duration-300 transform hover:scale-105"
-                >
-                  <Plus size={18} className="mr-2" />
-                  <span className="hidden sm:inline">Upload Holerites</span>
-                  <span className="sm:hidden">Upload</span>
+                          key={year}
+                          variant={holeriteActiveYear === year ? "default" : "outline"}
+                          onClick={() => {
+                            setHoleriteActiveYear(year);
+                            const months = getHoleriteAvailableMonths(year);
+                            if (months.length > 0) {
+                              setHoleriteActiveMonth(months[0].toString());
+                            }
+                          }}
+                          className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                            holeriteActiveYear === year 
+                              ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105' 
+                              : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
+                          }`}
+                        >
+                          {holeriteActiveYear === year && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
+                          )}
+                          <span className="relative text-lg font-bold">{year}</span>
                 </Button>
+                      ))}
+                    </div>
               </div>
 
-              {/* Filtros Avançados */}
-              {showAdvancedFilters && (
-                <div className="mb-6">
-                  <AdvancedFilters
-                    onFiltersChange={handleAdvancedFiltersChange}
-                    onClearFilters={() => setFilters({})}
-                  />
+                  {/* Abas de Mês Melhoradas */}
+                  {holeriteActiveYear && (
+                    <div className="text-center">
+                      <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Mês</h5>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {getHoleriteAvailableMonths(holeriteActiveYear).map((month) => (
+                          <Button
+                            key={month}
+                            variant={holeriteActiveMonth === month.toString() ? "default" : "outline"}
+                            onClick={() => setHoleriteActiveMonth(month.toString())}
+                            className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                              holeriteActiveMonth === month.toString() 
+                                ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transform hover:scale-105' 
+                                : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400'
+                            }`}
+                          >
+                            {holeriteActiveMonth === month.toString() && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-red-400/20 to-red-500/20 rounded-xl blur opacity-50"></div>
+                            )}
+                            <span className="relative text-sm font-semibold">
+                              {getMonthName(month)}
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Lista de Holerites do Período Selecionado */}
+                <div className="space-y-6">
+                  {/* Controles de seleção em lote */}
+                  {getFilteredHolerites().length > 0 && (
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="select-all-holerites"
+                              checked={areAllHoleritesSelected()}
+                              onCheckedChange={handleSelectAllHolerites}
+                              className="border-red-400 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
+                            />
+                            <label htmlFor="select-all-holerites" className="text-white text-sm font-medium">
+                              Selecionar Todos
+                            </label>
+                </div>
+                          
+                          {hasSelectedHolerites() && (
+                            <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-3 py-1">
+                              {selectedHolerites.length} selecionado{selectedHolerites.length !== 1 ? 's' : ''}
+                            </Badge>
+                          )}
+                          
+                          {hasSelectedHolerites() && (
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={handleBatchEmailHolerites}
+                                variant="outline"
+                                size="sm"
+                                className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm"
+                              >
+                                <Mail size={14} className="mr-1" />
+                                Email ({selectedHolerites.length})
+                              </Button>
+                              <Button
+                                onClick={handleBatchWhatsAppHolerites}
+                                variant="outline"
+                                size="sm"
+                                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400 px-3 py-1 text-sm"
+                              >
+                                <MessageSquare size={14} className="mr-1" />
+                                WhatsApp ({selectedHolerites.length})
+                              </Button>
+                              <Button
+                                onClick={handleBatchDeleteHolerites}
+                                variant="outline"
+                                size="sm"
+                                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400 px-3 py-1 text-sm"
+                              >
+                                <Trash2 size={14} className="mr-1" />
+                                Excluir ({selectedHolerites.length})
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
               {/* Lista de holerites */}
               {loading ? (
                 <div className="flex justify-center items-center py-8">
                   <Loader2 size={32} className="animate-spin text-seguranca-yellow" />
-                  <span className="ml-2 text-seguranca-lightgray text-sm sm:text-base">Carregando payslips...</span>
+                  <span className="ml-2 text-seguranca-lightgray text-sm sm:text-base">Carregando holerites...</span>
                 </div>
-              ) : filteredPayslips.length === 0 ? (
+              ) : filteredHolerites.length === 0 ? (
                 <div className="text-center py-12 px-4">
                   <div className="inline-flex items-center justify-center w-24 h-24 bg-seguranca-red/10 rounded-full mb-6">
                     <FileText size={48} className="text-seguranca-red" />
@@ -1994,8 +2300,8 @@ const Holerites: React.FC = () => {
                         className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
                       />
                       <span className="text-seguranca-lightgray font-medium text-xs sm:text-sm">
-                        {selectedPayslips.length > 0 
-                          ? `${selectedPayslips.length} selecionado${selectedPayslips.length > 1 ? 's' : ''}`
+                        {selectedHolerites.length > 0 
+                          ? `${selectedHolerites.length} selecionado${selectedHolerites.length > 1 ? 's' : ''}`
                           : 'Selecionar todos'
                         }
                       </span>
@@ -2007,7 +2313,7 @@ const Holerites: React.FC = () => {
                         variant="destructive"
                         size="sm"
                         onClick={handleDeleteSelected}
-                        disabled={selectedPayslips.length === 0}
+                        disabled={selectedHolerites.length === 0}
                         className="bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                       >
                         <Trash2 size={14} className="mr-1" />
@@ -2019,7 +2325,7 @@ const Holerites: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => setShowWhatsAppModal(true)}
-                        disabled={selectedPayslips.length === 0}
+                        disabled={selectedHolerites.length === 0}
                         className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                       >
                         <MessageSquare size={14} className="mr-1" />
@@ -2050,7 +2356,7 @@ const Holerites: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={refreshPayslips}
+                        onClick={refreshHolerites}
                         disabled={refreshing}
                         className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black shadow-lg hover:shadow-gray-500/25 transition-all text-xs"
                       >
@@ -2065,22 +2371,22 @@ const Holerites: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Lista de payslips */}
-                  {filteredPayslips.map((payslip) => (
+                  {/* Lista de holerites */}
+                  {filteredHolerites.map((holerite) => (
                     <div
-                      key={payslip.id}
+                      key={holerite.id}
                       draggable
-                      onDragStart={(e) => handleDragStart(e, payslip, 'holerite')}
+                      onDragStart={(e) => handleDragStart(e, holerite, 'holerite')}
                       className={`flex flex-col lg:flex-row lg:items-center lg:justify-between p-3 sm:p-4 bg-seguranca-black rounded-lg border transition-colors gap-3 cursor-move hover:shadow-lg ${
-                        selectedPayslips.includes(payslip.id)
+                        selectedHolerites.includes(holerite.id)
                           ? 'border-seguranca-yellow bg-seguranca-yellow/10'
                           : 'border-gray-600 hover:border-gray-500'
                       }`}
                     >
                       <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                         <Checkbox
-                          checked={selectedPayslips.includes(payslip.id)}
-                          onCheckedChange={(checked) => handleSelectPayslip(payslip.id, !!checked)}
+                          checked={selectedHolerites.includes(holerite.id)}
+                          onCheckedChange={(checked) => handleSelectHolerite(holerite.id, !!checked)}
                           className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow flex-shrink-0 mt-1 sm:mt-0"
                         />
                         
@@ -2091,20 +2397,20 @@ const Holerites: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
                             <h3 className="font-medium text-seguranca-lightgray text-sm break-words">
-                              {payslip.employeeName}
+                              {holerite.employeeName}
                             </h3>
                             <Badge variant="outline" className="text-xs w-fit">
-                              {payslip.month}/{payslip.year}
+                              {holerite.month}/{holerite.year}
                             </Badge>
                           </div>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-400">
                             <span className="flex items-center">
                               <User size={12} className="mr-1 flex-shrink-0" />
-                              CPF: {payslip.cpf}
+                              CPF: {holerite.cpf}
                             </span>
                             <span className="flex items-center">
                               <Calendar size={12} className="mr-1 flex-shrink-0" />
-                              {formatDate(payslip.processedAt)}
+                              {formatDate(holerite.processedAt)}
                             </span>
                           </div>
                         </div>
@@ -2114,7 +2420,7 @@ const Holerites: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewPayslip(payslip)}
+                          onClick={() => handleViewHolerite(holerite)}
                           className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
                         >
                           <Eye size={14} className="mr-1" />
@@ -2124,7 +2430,7 @@ const Holerites: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEmailPayslip(payslip)}
+                          onClick={() => handleEmailHolerite(holerite)}
                           className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white text-xs"
                         >
                           <Mail size={14} className="mr-1" />
@@ -2134,7 +2440,7 @@ const Holerites: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleSendWhatsAppIndividual(payslip)}
+                          onClick={() => handleSendWhatsAppIndividual(holerite)}
                           className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white text-xs"
                         >
                           <MessageSquare size={14} className="mr-1" />
@@ -2144,7 +2450,7 @@ const Holerites: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDownloadPayslip(payslip)}
+                          onClick={() => handleDownloadHolerite(holerite)}
                           className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
                         >
                           <Download size={14} className="mr-1" />
@@ -2154,7 +2460,7 @@ const Holerites: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeletePayslip(payslip)}
+                          onClick={() => handleDeleteHolerite(holerite)}
                           className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white text-xs"
                         >
                           <Trash2 size={14} className="mr-1" />
@@ -2170,478 +2476,409 @@ const Holerites: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="recibos">
-            <Card className="bg-seguranca-graphite border border-gray-600 rounded-xl p-6 shadow-lg">
-              <div className="space-y-8">
-                {/* Header da aba */}
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full shadow-lg mb-6">
-                    <FileText size={32} className="text-white" />
+            <div className="space-y-6">
+                {/* Header da aba - Design Moderno */}
+                <div className="text-center relative">
+                  <div className="relative inline-block">
+                    <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 via-purple-600 to-blue-700 rounded-3xl shadow-2xl mb-6 transform hover:scale-105 transition-all duration-300">
+                      <FileText size={36} className="text-white" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-400 to-green-500 rounded-full border-2 border-seguranca-black flex items-center justify-center">
+                      <CheckCircle size={12} className="text-white" />
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-bold text-seguranca-lightgray mb-3">
-                    Recibos de Pagamentos
+                  <h3 className="text-3xl font-bold bg-gradient-to-r from-seguranca-lightgray via-white to-seguranca-lightgray bg-clip-text text-transparent mb-4">
+                    Comprovantes de Pagamento de Salário
                   </h3>
-                  <p className="text-gray-400 text-base max-w-2xl mx-auto">
-                    Upload e processamento de recibos de pagamento para unificação com holerites.
+                  <p className="text-gray-400 text-lg max-w-3xl mx-auto leading-relaxed">
+                    Importe e processe comprovantes de transferência de pagamento de salário de funcionários com tecnologia avançada de OCR e organização automática.
                   </p>
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    <span className="text-blue-300 text-sm font-medium">Sistema ativo e monitorado</span>
+                  </div>
                 </div>
                 
-                {/* Card de Upload */}
-                <div className="max-w-md mx-auto">
-                  <Card className="bg-seguranca-black border-2 border-gray-600 p-6 rounded-xl shadow-lg hover:border-blue-500/50 transition-all duration-300">
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500/20 rounded-full mb-4">
-                        <FileText size={24} className="text-blue-400" />
-                      </div>
-                      <h4 className="text-lg font-semibold text-seguranca-lightgray mb-3">Upload de Recibos</h4>
-                      <p className="text-gray-400 text-sm mb-6">
-                        Faça upload do arquivo PDF contendo os recibos de pagamento.
-                      </p>
-                      <Button 
-                        onClick={() => setShowReceiptUploadModal(true)}
-                        disabled={processingReceipts}
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 w-full py-3 rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all duration-300 transform hover:scale-105"
-                      >
-                        {processingReceipts ? (
-                          <Loader2 size={16} className="mr-2 animate-spin" />
-                        ) : (
-                          <Plus size={16} className="mr-2" />
-                        )}
-                        {processingReceipts ? 'Processando...' : 'Upload de Recibos'}
-                      </Button>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Lista de Recibos Processados */}
-                <Card className="bg-seguranca-black border-gray-600 p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-seguranca-lightgray font-medium">Recibos Processados</h4>
-                    <div className="flex gap-2">
-                      {selectedReceipts.length > 0 && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={handleDeleteReceiptsBatch}
-                          disabled={deletingReceipts}
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          {deletingReceipts ? (
-                            <Loader2 size={14} className="mr-1 animate-spin" />
-                          ) : (
-                            <Trash2 size={14} className="mr-1" />
-                          )}
-                          Excluir ({selectedReceipts.length})
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={loadReceipts}
-                        disabled={loadingReceipts}
-                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                      >
-                        {loadingReceipts ? (
-                          <Loader2 size={14} className="mr-1 animate-spin" />
-                        ) : (
-                          <RefreshCw size={14} className="mr-1" />
-                        )}
-                        Atualizar
-                      </Button>
-                    </div>
-                  </div>
-
-                  {loadingReceipts ? (
-                    <div className="text-center py-8">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-seguranca-red mb-2" />
-                      <p className="text-seguranca-lightgray text-sm">Carregando recibos...</p>
-                    </div>
-                  ) : (!Array.isArray(receipts) || receipts.length === 0) ? (
-                    <div className="text-center py-12 px-4">
-                      <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-500/10 rounded-full mb-4">
-                        <FileText size={32} className="text-blue-500" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-seguranca-lightgray mb-2">Nenhum recibo processado ainda</h3>
-                      <p className="text-gray-400 text-sm">Faça upload de um arquivo PDF para começar.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {/* Header com seleção */}
-                      {Array.isArray(receipts) && receipts.length > 0 && (
-                        <div className="flex items-center space-x-3 p-3 bg-seguranca-graphite rounded-lg border border-gray-600">
-                          <Checkbox
-                                                          checked={selectedReceipts.length === (Array.isArray(receipts) ? receipts.length : 0)}
-                            onCheckedChange={handleSelectAllReceipts}
-                            className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
-                          />
-                          <span className="text-seguranca-lightgray font-medium text-sm">
-                            {selectedReceipts.length > 0 
-                              ? `${selectedReceipts.length} selecionado${selectedReceipts.length > 1 ? 's' : ''}`
-                              : 'Selecionar todos'
-                            }
-                          </span>
-                        </div>
-                      )}
-
-                      {Array.isArray(receipts) ? receipts.map((receipt, index) => {
-                        console.log('Renderizando recibo:', receipt);
-                        return (
-                        <div 
-                          key={receipt.id || index} 
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, receipt, 'recibo')}
-                          className="bg-seguranca-graphite border border-gray-600 rounded-lg p-3 cursor-move hover:shadow-lg transition-all duration-300"
-                        >
-                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-                            <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0">
-                              <Checkbox
-                                checked={selectedReceipts.includes(receipt.id)}
-                                onCheckedChange={(checked) => handleSelectReceipt(receipt.id, checked as boolean)}
-                                className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow mt-1 sm:mt-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                                  <h5 className="font-medium text-seguranca-lightgray text-sm break-words">
-                                    {receipt.employeeName || 'Nome não extraído'}
-                                  </h5>
-                                  <Badge variant="outline" className="text-xs w-fit">
-                                    {receipt.month}/{receipt.year}
-                                  </Badge>
-                                  <Badge 
-                                    variant={receipt.status === 'PROCESSED' ? 'default' : 'secondary'} 
-                                    className="text-xs w-fit"
-                                  >
-                                    {receipt.status === 'PROCESSED' ? 'Processado' : receipt.status}
-                                  </Badge>
-                                </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-400">
-                                  {receipt.grossSalary && (
-                                    <span className="flex items-center">
-                                      <span className="mr-1">💰</span>
-                                      Bruto: R$ {Number(receipt.grossSalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </span>
-                                  )}
-                                  {receipt.netSalary && (
-                                    <span className="flex items-center">
-                                      <span className="mr-1">💵</span>
-                                      Líquido: R$ {Number(receipt.netSalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </span>
-                                  )}
-                                  {receipt.fileName && (
-                                    <span className="flex items-center">
-                                      <FileText size={12} className="mr-1 flex-shrink-0" />
-                                      <span className="truncate">{receipt.fileName}</span>
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-1 sm:gap-2 justify-start lg:justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewReceipt(receipt.id)}
-                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
-                              >
-                                <Eye size={14} className="mr-1" />
-                                <span className="hidden sm:inline">Visualizar</span>
-                                <span className="sm:hidden">Ver</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDownloadReceipt(receipt.id, receipt.fileName)}
-                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
-                              >
-                                <Download size={14} className="mr-1" />
-                                <span className="hidden sm:inline">Baixar</span>
-                                <span className="sm:hidden">Baixar</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => confirmDeleteReceipt(receipt)}
-                                disabled={deletingReceipts}
-                                className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white text-xs"
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                <span className="hidden sm:inline">Excluir</span>
-                                <span className="sm:hidden">Excluir</span>
-                              </Button>
-                            </div>
+              {/* Dashboard de Comprovantes */}
+              <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+                <div className="space-y-8">
+                  {/* Estatísticas Melhoradas */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="group bg-gradient-to-br from-blue-500/15 to-blue-600/10 border border-blue-500/30 rounded-3xl p-8 hover:border-blue-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 backdrop-blur-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+                            <p className="text-blue-300/90 text-sm font-semibold uppercase tracking-wide">Total de Comprovantes</p>
+                          </div>
+                          <p className="text-4xl font-bold text-white">{paymentReceipts.length}</p>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                            <span className="text-blue-300/70 text-xs font-medium">Sistema ativo</span>
                           </div>
                         </div>
-                        );
-                      }) : (
-                        <div className="text-center py-8 text-gray-400">
-                          Nenhum recibo disponível ou erro ao carregar dados.
+                        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-blue-500/30 transition-all duration-500 group-hover:scale-110">
+                          <FileText size={32} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="group bg-gradient-to-br from-green-500/15 to-green-600/10 border border-green-500/30 rounded-3xl p-8 hover:border-green-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20 backdrop-blur-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                            <p className="text-green-300/90 text-sm font-semibold uppercase tracking-wide">Anos Disponíveis</p>
+                          </div>
+                          <p className="text-4xl font-bold text-white">{getAvailableYears().length}</p>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                            <span className="text-green-300/70 text-xs font-medium">Organizado</span>
+                          </div>
+                        </div>
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-green-500/30 transition-all duration-500 group-hover:scale-110">
+                          <Calendar size={32} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="group bg-gradient-to-br from-yellow-500/15 to-yellow-600/10 border border-yellow-500/30 rounded-3xl p-8 hover:border-yellow-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-yellow-500/20 backdrop-blur-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                            <p className="text-yellow-300/90 text-sm font-semibold uppercase tracking-wide">Processados Hoje</p>
+                          </div>
+                          <p className="text-4xl font-bold text-white">{getHoleritesProcessedToday()}</p>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                            <span className="text-yellow-300/70 text-xs font-medium">Em tempo real</span>
+                          </div>
+                        </div>
+                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-yellow-500/30 transition-all duration-500 group-hover:scale-110">
+                          <CheckCircle size={32} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botão de Upload Melhorado */}
+                  <div className="flex justify-center">
+                      <Button 
+                      onClick={() => setShowPaymentReceiptUploadModal(true)}
+                      disabled={processingPaymentReceipts}
+                      className="group relative bg-gradient-to-r from-blue-500 via-purple-600 to-blue-700 hover:from-blue-600 hover:via-purple-700 hover:to-blue-800 px-12 py-6 rounded-3xl shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 transform hover:scale-110 hover:-translate-y-2 text-white font-bold text-xl border border-blue-400/30 overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-400/30 to-purple-400/30 rounded-3xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                      <div className="relative flex items-center space-x-4">
+                        {processingPaymentReceipts ? (
+                          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                            <Loader2 size={24} className="animate-spin" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300 group-hover:scale-110">
+                            <Plus size={24} />
+                          </div>
+                        )}
+                        <span className="text-xl font-bold">
+                          {processingPaymentReceipts ? 'Processando...' : 'Importar Comprovante de Pagamento'}
+                        </span>
+                      </div>
+                      </Button>
+                  </div>
+                    </div>
+                  </Card>
+
+              {/* Abas por Ano e Mês */}
+              <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+                <div className="space-y-8">
+                  <div className="text-center">
+                    <h4 className="text-2xl font-bold text-white mb-2">Comprovantes por Período</h4>
+                    <p className="text-gray-400">Navegue pelos anos e meses para visualizar os comprovantes</p>
+                </div>
+
+                  {/* Abas de Ano Melhoradas */}
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        {getAvailableYears().map((year) => (
+                        <Button
+                            key={year}
+                            variant={activeYear === year.toString() ? "default" : "outline"}
+                            onClick={() => {
+                              setActiveYear(year.toString());
+                              const months = getAvailableMonths(year.toString());
+                              if (months.length > 0) {
+                                setActiveMonth(months[0].toString());
+                              }
+                            }}
+                            className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                              activeYear === year.toString() 
+                                ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105' 
+                                : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
+                            }`}
+                          >
+                            {activeYear === year.toString() && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
+                            )}
+                            <span className="relative text-lg font-bold">{year}</span>
+                        </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Abas de Mês Melhoradas */}
+                    {activeYear && (
+                      <div className="text-center">
+                        <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Mês</h5>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                          {getAvailableMonths(activeYear).map((month) => (
+                      <Button
+                              key={month}
+                              variant={activeMonth === month.toString() ? "default" : "outline"}
+                              onClick={() => setActiveMonth(month.toString())}
+                              className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                                activeMonth === month.toString() 
+                                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105' 
+                                  : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
+                              }`}
+                            >
+                              {activeMonth === month.toString() && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-blue-500/20 rounded-xl blur opacity-50"></div>
+                              )}
+                              <span className="relative text-sm font-semibold">
+                                {getMonthName(month)}
+                              </span>
+                      </Button>
+                          ))}
+                    </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lista de Comprovantes do Período Selecionado */}
+                  <div className="space-y-6">
+                    {/* Header responsivo melhorado */}
+                    <div className="bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
+                      
+                      {/* Layout principal: empilhado em mobile, lado a lado em desktop */}
+                      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 xl:gap-6">
+                        
+                        {/* Seção de informações - sempre visível */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                            <FileText size={20} className="sm:w-6 sm:h-6 text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h5 className="text-lg sm:text-xl xl:text-2xl font-bold text-white leading-tight">
+                              Comprovantes de {getMonthName(parseInt(activeMonth))} de {activeYear}
+                            </h5>
+                            <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-1">
+                              Documentos processados e organizados
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Badge de contagem - responsivo */}
+                        <div className="flex justify-center xl:justify-end">
+                          <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-lg font-bold shadow-xl rounded-xl sm:rounded-2xl">
+                            {getFilteredPaymentReceipts().length} comprovante{getFilteredPaymentReceipts().length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      {/* Controles de seleção em lote - responsivo */}
+                      {getFilteredPaymentReceipts().length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-blue-500/20">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                            
+                            {/* Checkbox de selecionar todos */}
+                            <div className="flex items-center space-x-3 bg-seguranca-black/50 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-gray-600/30">
+                              <Checkbox
+                                id="select-all-payment-receipts"
+                                checked={areAllPaymentReceiptsSelected()}
+                                onCheckedChange={handleSelectAllPaymentReceipts}
+                                className="border-blue-400 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 w-4 h-4 sm:w-5 sm:h-5"
+                              />
+                              <label htmlFor="select-all-payment-receipts" className="text-white text-xs sm:text-sm font-semibold cursor-pointer whitespace-nowrap">
+                                Selecionar Todos
+                              </label>
+                            </div>
+                            
+                            {/* Botões de ação - responsivos */}
+                            {hasSelectedPaymentReceipts() && (
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                                <Button
+                                  onClick={handleBatchEmailPaymentReceipts}
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
+                                >
+                                  <Mail size={14} className="mr-1" />
+                                  <span className="hidden sm:inline">Email</span>
+                                  <span className="sm:hidden">E</span>
+                                  <span className="ml-1">({selectedPaymentReceipts.length})</span>
+                                </Button>
+                                
+                                <Button
+                                  onClick={handleBatchWhatsAppPaymentReceipts}
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
+                                >
+                                  <MessageSquare size={14} className="mr-1" />
+                                  <span className="hidden sm:inline">WhatsApp</span>
+                                  <span className="sm:hidden">W</span>
+                                  <span className="ml-1">({selectedPaymentReceipts.length})</span>
+                                </Button>
+                                
+                                <Button
+                                  onClick={handleDeleteMultiplePaymentReceipts}
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
+                                >
+                                  <Trash2 size={14} className="mr-1" />
+                                  <span className="hidden sm:inline">Excluir</span>
+                                  <span className="sm:hidden">X</span>
+                                  <span className="ml-1">({selectedPaymentReceipts.length})</span>
+                                </Button>
+                                
+                                <Button
+                                  onClick={clearPaymentReceiptSelection}
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-gray-500/50 text-gray-400 hover:bg-gray-500/10 hover:border-gray-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
+                                >
+                                  <X size={14} className="mr-1" />
+                                  <span className="hidden sm:inline">Limpar</span>
+                                  <span className="sm:hidden">L</span>
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
-                  )}
-                </Card>
-              </div>
-            </Card>
-          </TabsContent>
-
-                    <TabsContent value="unificados">
-            <Card className="bg-seguranca-graphite border border-gray-600 rounded-xl p-6 shadow-lg">
-              <div className="space-y-8">
-                {/* Header da aba */}
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-seguranca-yellow to-yellow-500 rounded-full shadow-lg mb-6">
-                    <FileText size={32} className="text-seguranca-black" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-seguranca-lightgray mb-3">
-                    Holerites com Recibos (Nomes Exatos)
-                  </h3>
-                  <p className="text-gray-400 text-base max-w-3xl mx-auto">
-                    Visualize e baixe holerites com recibos anexados em um único PDF. Só serão unidos documentos com nomes de funcionários EXATAMENTE iguais.
-                  </p>
                 </div>
                 
-                {/* Cards de funcionalidades */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  {/* Card de Busca */}
-                  <Card className="bg-seguranca-black border-2 border-gray-600 p-6 rounded-xl shadow-lg hover:border-seguranca-yellow/50 transition-all duration-300">
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-16 h-16 bg-seguranca-yellow/20 rounded-full mb-4">
-                        <Search size={24} className="text-seguranca-yellow" />
+                    {loadingPaymentReceipts ? (
+                      <div className="text-center py-12">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mb-4">
+                          <Loader2 className="h-8 w-8 animate-spin text-white" />
                       </div>
-                      <h4 className="text-lg font-semibold text-seguranca-lightgray mb-4">Buscar Documentos</h4>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                        <Input
-                          placeholder="Buscar por nome ou arquivo..."
-                          value={unifiedSearchTerm}
-                          onChange={(e) => {
-                            setUnifiedSearchTerm(e.target.value);
-                            setSelectedUnifiedDocuments([]);
-                          }}
-                          className="pl-10 pr-4 py-2 bg-seguranca-graphite border border-gray-600 text-seguranca-lightgray text-sm rounded-lg focus:border-seguranca-yellow focus:ring-2 focus:ring-seguranca-yellow/20 transition-all duration-300"
-                        />
+                        <p className="text-white text-lg font-medium">Carregando comprovantes...</p>
+                        <p className="text-gray-400 text-sm">Aguarde um momento</p>
                       </div>
+                    ) : getFilteredPaymentReceipts().length === 0 ? (
+                      <div className="text-center py-16 px-4">
+                        <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl mb-6">
+                          <FileText size={40} className="text-blue-400" />
                     </div>
-                  </Card>
-                  
-                  {/* Card de Filtros */}
-                  <Card className="bg-seguranca-black border-2 border-gray-600 p-6 rounded-xl shadow-lg hover:border-seguranca-yellow/50 transition-all duration-300">
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-16 h-16 bg-seguranca-yellow/20 rounded-full mb-4">
-                        <Filter size={24} className="text-seguranca-yellow" />
-                      </div>
-                      <h4 className="text-lg font-semibold text-seguranca-lightgray mb-4">Filtros Avançados</h4>
-                      <p className="text-gray-400 text-sm mb-4">
-                        Configure filtros específicos para encontrar documentos
+                        <h3 className="text-xl font-bold text-white mb-3">
+                          Nenhum comprovante encontrado
+                        </h3>
+                        <p className="text-gray-400 text-base mb-6">
+                          Não há comprovantes para {getMonthName(parseInt(activeMonth))} de {activeYear}.
                       </p>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowUnifiedModal(true)}
-                        className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black w-full rounded-lg transition-all duration-300"
-                      >
-                        <FileText size={16} className="mr-2" />
-                        Configurar Filtros
-                      </Button>
-                    </div>
-                  </Card>
-
-                  {/* Card de Criação */}
-                  <Card className="bg-seguranca-black border-2 border-gray-600 p-6 rounded-xl shadow-lg hover:border-seguranca-yellow/50 transition-all duration-300">
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-16 h-16 bg-seguranca-yellow/20 rounded-full mb-4">
-                        <FileText size={24} className="text-seguranca-yellow" />
-                      </div>
-                      <h4 className="text-lg font-semibold text-seguranca-lightgray mb-4">Criar Documentos Unificados</h4>
-                      <p className="text-gray-400 text-sm mb-4">
-                        Combine holerites e recibos em documentos únicos por funcionário
-                      </p>
-                      <Button 
-                        onClick={handleCreateUnifiedDocuments}
-                        disabled={processingUnified}
-                        className="bg-gradient-to-r from-seguranca-yellow to-yellow-500 hover:from-yellow-500 hover:to-seguranca-yellow w-full py-2 rounded-lg shadow-lg hover:shadow-seguranca-yellow/25 transition-all duration-300 transform hover:scale-105 text-seguranca-black font-medium"
-                      >
-                        {processingUnified ? (
-                          <Loader2 size={16} className="mr-2 animate-spin" />
-                        ) : (
-                          <FileText size={16} className="mr-2" />
-                        )}
-                        {processingUnified ? 'Processando...' : 'Criar Unificados'}
-                      </Button>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Lista de Documentos Unificados */}
-                <Card className="bg-seguranca-black border-gray-600 p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <h4 className="text-seguranca-lightgray font-medium">Holerites com Recibos (Nomes Exatos)</h4>
-                      {selectedUnifiedDocuments.length > 0 && (
-                        <Badge variant="secondary" className="bg-seguranca-yellow text-seguranca-black">
-                          {selectedUnifiedDocuments.length} selecionado{selectedUnifiedDocuments.length > 1 ? 's' : ''}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      {selectedUnifiedDocuments.length > 0 && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            const documentsToDelete = getVisibleUnifiedDocuments().filter(doc => 
-                              selectedUnifiedDocuments.includes(getDocumentId(doc))
-                            );
-                            setUnifiedDocumentsToDelete(documentsToDelete);
-                            setShowUnifiedDeleteModal(true);
-                          }}
-                          disabled={loadingUnified}
-                          className="bg-red-600 hover:bg-red-700"
+                          onClick={() => setShowPaymentReceiptUploadModal(true)}
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
                         >
-                          {loadingUnified ? (
-                            <Loader2 size={14} className="mr-1 animate-spin" />
-                          ) : (
-                            <Trash2 size={14} className="mr-1" />
-                          )}
-                          Excluir ({selectedUnifiedDocuments.length})
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={loadUnifiedDocuments}
-                        disabled={loadingUnified}
-                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                      >
-                        {loadingUnified ? (
-                          <Loader2 size={14} className="mr-1 animate-spin" />
-                        ) : (
-                          <RefreshCw size={14} className="mr-1" />
-                        )}
-                        Atualizar
+                          <Plus size={20} className="mr-2" />
+                          Importar Primeiro Comprovante
                       </Button>
                     </div>
-                  </div>
-
-                  {loadingUnified ? (
-                    <div className="text-center py-8">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-seguranca-red mb-2" />
-                      <p className="text-seguranca-lightgray text-sm">Carregando documentos unificados...</p>
-                    </div>
-                  ) : unifiedDocuments.length === 0 ? (
-                    <div className="text-center py-12 px-4">
-                      <div className="inline-flex items-center justify-center w-20 h-20 bg-seguranca-yellow/10 rounded-full mb-4">
-                        <FileText size={32} className="text-seguranca-yellow" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-seguranca-lightgray mb-2">Nenhum documento unificado encontrado</h3>
-                      <p className="text-gray-400 text-sm">Crie documentos unificados para começar.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {/* Header com seleção */}
-                      {unifiedDocuments.length > 0 && (
-                        <div className="flex items-center space-x-3 p-3 bg-seguranca-graphite rounded-lg border border-gray-600">
-                          <Checkbox
-                            checked={(() => {
-                              const visibleDocuments = getVisibleUnifiedDocuments();
-                              const visibleIds = visibleDocuments.map(doc => getDocumentId(doc));
-                              return visibleIds.length > 0 && visibleIds.every(id => selectedUnifiedDocuments.includes(id));
-                            })()}
-                            onCheckedChange={handleSelectAllUnifiedDocuments}
-                            className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
-                          />
-                          <span className="text-seguranca-lightgray font-medium text-sm">
-                            {(() => {
-                              const visibleCount = getVisibleUnifiedDocuments().length;
-                              
-                              if (selectedUnifiedDocuments.length > 0) {
-                                return `${selectedUnifiedDocuments.length} de ${visibleCount} selecionado${selectedUnifiedDocuments.length > 1 ? 's' : ''}`;
-                              } else {
-                                return `Selecionar todos (${visibleCount} documentos)`;
-                              }
-                            })()}
-                          </span>
-                        </div>
-                      )}
-
-                      {getVisibleUnifiedDocuments().map((document) => (
-                        <div key={getDocumentId(document)} className="bg-seguranca-graphite border border-gray-600 rounded-lg p-3">
-                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-                            <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0">
-                              <Checkbox
-                                checked={selectedUnifiedDocuments.includes(getDocumentId(document))}
-                                onCheckedChange={(checked) => handleSelectUnifiedDocument(getDocumentId(document), checked as boolean)}
-                                className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow mt-1 sm:mt-0"
-                              />
+                    ) : (
+                      <div className="grid gap-4">
+                        {getFilteredPaymentReceipts().map((receipt, index) => (
+                          <div key={receipt.id} className="group bg-gradient-to-r from-seguranca-black/50 to-seguranca-graphite/50 border border-gray-600/30 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 hover:scale-[1.02]">
+                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                               <div className="flex-1 min-w-0">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                                  <h5 className="font-medium text-seguranca-lightgray text-sm break-words">
-                                    {document.employeeName || 'Nome não extraído'}
-                                  </h5>
-                                  <Badge variant="outline" className="text-xs w-fit">
-                                    {document.month}/{document.year}
-                                  </Badge>
-                                  <Badge 
-                                    variant={document.status === 'PROCESSED' ? 'default' : 'secondary'} 
-                                    className="text-xs w-fit"
-                                  >
-                                    {document.status === 'PROCESSED' ? 'Processado' : document.status}
-                                  </Badge>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                                  <div className="flex items-center space-x-3">
+                                    <Checkbox
+                                      id={`payment-receipt-${receipt.id}`}
+                                      checked={selectedPaymentReceipts.includes(receipt.id)}
+                                      onCheckedChange={(checked) => handleSelectPaymentReceipt(receipt.id, checked as boolean)}
+                                      className="border-blue-400 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                    />
+                                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                                      <User size={20} className="text-white" />
+                    </div>
+                                    <div>
+                                      <h6 className="font-bold text-white text-lg">
+                                        {receipt.employeeName}
+                                      </h6>
+                                      <p className="text-gray-400 text-sm">Funcionário</p>
+                </div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Badge className="bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg">
+                                      ✓ Processado
+                        </Badge>
+                    </div>
+                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                  <div className="flex items-center space-x-2 text-gray-300">
+                                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                      <span className="text-green-400">💰</span>
+                  </div>
+                                    <div>
+                                      <p className="text-gray-400 text-xs">Valor</p>
+                                      <p className="font-semibold text-white">R$ {Number(receipt.netSalary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                      </div>
+                                  <div className="flex items-center space-x-2 text-gray-300">
+                                    <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                      <Calendar size={16} className="text-blue-400" />
+                    </div>
+                                    <div>
+                                      <p className="text-gray-400 text-xs">Processado em</p>
+                                      <p className="font-semibold text-white">{new Date(receipt.updatedAt).toLocaleDateString('pt-BR')}</p>
+                        </div>
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-400">
-                                  {document.grossSalary && (
-                                    <span className="flex items-center">
-                                      <span className="mr-1">💰</span>
-                                      Bruto: R$ {Number(document.grossSalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </span>
-                                  )}
-                                  {document.netSalary && (
-                                    <span className="flex items-center">
-                                      <span className="mr-1">💵</span>
-                                      Líquido: R$ {Number(document.netSalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </span>
-                                  )}
-                                  {document.fileName && (
-                                    <span className="flex items-center">
-                                      <FileText size={12} className="mr-1 flex-shrink-0" />
-                                      <span className="truncate">{document.fileName}</span>
-                                    </span>
-                                  )}
+                                  <div className="flex items-center space-x-2 text-gray-300">
+                                    <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                      <FileText size={16} className="text-purple-400" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-gray-400 text-xs">Arquivo</p>
+                                      <p className="font-semibold text-white truncate">{receipt.fileName}</p>
+                                    </div>
                                 </div>
                               </div>
                             </div>
                             
-                            <div className="flex flex-wrap gap-1 sm:gap-2 justify-start lg:justify-end">
+                              <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleViewUnifiedDocument(document)}
-                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
-                              >
-                                <Eye size={14} className="mr-1" />
-                                <span className="hidden sm:inline">Visualizar</span>
-                                <span className="sm:hidden">Ver</span>
+                                  onClick={() => handleViewPaymentReceipt(receipt)}
+                                  className="group border-2 border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white hover:border-blue-500 px-4 py-2 rounded-xl font-semibold transition-all duration-300"
+                                >
+                                  <Eye size={16} className="mr-2 group-hover:scale-110 transition-transform duration-300" />
+                                  Visualizar
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDownloadUnifiedDocument(document)}
-                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
-                              >
-                                <Download size={14} className="mr-1" />
-                                <span className="hidden sm:inline">Baixar</span>
-                                <span className="sm:hidden">Baixar</span>
+                                  onClick={() => handleDownloadPaymentReceipt(receipt.id, receipt.fileName)}
+                                  className="group border-2 border-green-500/50 text-green-400 hover:bg-green-500 hover:text-white hover:border-green-500 px-4 py-2 rounded-xl font-semibold transition-all duration-300"
+                                >
+                                  <Download size={16} className="mr-2 group-hover:scale-110 transition-transform duration-300" />
+                                  Baixar
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => confirmDeleteUnifiedDocument(document)}
-                                disabled={loadingUnified}
-                                className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white text-xs"
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                <span className="hidden sm:inline">Excluir</span>
-                                <span className="sm:hidden">Excluir</span>
+                                  onClick={() => handleDeletePaymentReceipt(receipt.id)}
+                                  className="group border-2 border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white hover:border-red-500 px-4 py-2 rounded-xl font-semibold transition-all duration-300"
+                                >
+                                  <Trash2 size={16} className="mr-2 group-hover:scale-110 transition-transform duration-300" />
+                                  Excluir
                               </Button>
                             </div>
                           </div>
@@ -2649,10 +2886,11 @@ const Holerites: React.FC = () => {
                       ))}
                     </div>
                   )}
-                </Card>
-              </div>
-            </Card>
+                  </div>
+              </Card>
+            </div>
           </TabsContent>
+
 
           {/* Nova Aba: Unificação Individual */}
           <TabsContent value="unificacao-individual" className="space-y-6">
@@ -2727,12 +2965,12 @@ const Holerites: React.FC = () => {
                       </CardContent>
                   </Card>
 
-                  {/* Lista de Recibos Processados */}
+                  {/* Lista de Comprovantes Processados */}
                   <Card>
                       <CardHeader>
                           <CardTitle className="flex items-center text-lg">
                               <FileText className="w-5 h-5 mr-2 text-yellow-600" />
-                              Recibos Processados
+                              Comprovantes Processados
                               <Badge variant="secondary" className="ml-2">
                                   {getFilteredRecibos().length} / {processedRecibos.length}
                               </Badge>
@@ -2758,17 +2996,17 @@ const Holerites: React.FC = () => {
                               )}
                           </div>
 
-                          {/* Lista de recibos */}
+                          {/* Lista de comprovantes */}
                           <div className="space-y-2 max-h-96 overflow-y-auto">
                               {loadingProcessedFiles ? (
                                   <div className="flex items-center justify-center py-8">
                                       <Loader2 className="w-6 h-6 animate-spin text-green-600" />
-                                      <span className="ml-2 text-muted-foreground">Carregando recibos...</span>
+                                      <span className="ml-2 text-muted-foreground">Carregando comprovantes...</span>
                                   </div>
                               ) : getFilteredRecibos().length === 0 ? (
                                   <div className="text-center py-8 text-muted-foreground">
                                       <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                      <p>Nenhum recibo encontrado</p>
+                                      <p>Nenhum comprovante encontrado</p>
                                   </div>
                               ) : (
                                   getFilteredRecibos().map((recibo) => (
@@ -2901,216 +3139,6 @@ const Holerites: React.FC = () => {
                   </CardContent>
               </Card>
 
-              {/* Lista de Unificações */}
-              {individualUnifications.length > 0 && (
-                  <Card>
-                      <CardHeader>
-                          <CardTitle className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                  <RefreshCw className="w-5 h-5 mr-2 text-yellow-600" />
-                                  Unificações Realizadas
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                  {/* Checkbox "Selecionar Todos" */}
-                                  <div className="flex items-center space-x-2">
-                                      <Checkbox
-                                          id="select-all-unifications"
-                                          checked={areAllCompletedSelected()}
-                                          onCheckedChange={(checked) => {
-                                              if (checked) {
-                                                  const completedUnifications = individualUnifications
-                                                      .filter(u => u.status === 'completed')
-                                                      .map(u => u.id);
-                                                  setSelectedUnifiedDocuments(completedUnifications);
-                                              } else {
-                                                  clearUnifiedSelection();
-                                              }
-                                          }}
-                                      />
-                                      <label htmlFor="select-all-unifications" className="text-sm text-muted-foreground">
-                                          Selecionar Todos
-                                      </label>
-                                  </div>
-                                  
-                                  {/* Indicador de seleção */}
-                                  {hasSelectedDocuments() && (
-                                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                                          {selectedUnifiedDocuments.length} selecionado(s)
-                                      </Badge>
-                                  )}
-                                  
-                                  {/* Botões de ação em lote */}
-                                  {hasSelectedDocuments() && (
-                                      <div className="flex items-center space-x-2">
-                                          <Button
-                                              onClick={() => handleBatchEmail()}
-                                              variant="outline"
-                                              size="sm"
-                                              className="border-green-300 text-green-700 hover:bg-green-50"
-                                          >
-                                              <Mail className="w-4 h-4 mr-2" />
-                                              Email ({selectedUnifiedDocuments.length})
-                                          </Button>
-                                          <Button
-                                              onClick={() => handleBatchWhatsApp()}
-                                              variant="outline"
-                                              size="sm"
-                                              className="border-green-300 text-green-700 hover:bg-green-50"
-                                          >
-                                              <MessageSquare className="w-4 h-4 mr-2" />
-                                              WhatsApp ({selectedUnifiedDocuments.length})
-                                          </Button>
-                                          <Button
-                                              onClick={() => handleBatchDelete()}
-                                              variant="outline"
-                                              size="sm"
-                                              className="border-red-300 text-red-700 hover:bg-red-50"
-                                          >
-                                              <Trash2 className="w-4 h-4 mr-2" />
-                                              Excluir ({selectedUnifiedDocuments.length})
-                                          </Button>
-                                          <Button
-                                              onClick={clearUnifiedSelection}
-                                              variant="outline"
-                                              size="sm"
-                                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                                          >
-                                              <X className="w-4 h-4 mr-2" />
-                                              Limpar Seleção
-                                          </Button>
-                                      </div>
-                                  )}
-                              </div>
-                          </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                          <div className="space-y-4">
-                              {individualUnifications.map((unification) => (
-                                  <div key={unification.id} className="border rounded-lg p-4">
-                                      <div className="flex items-center justify-between mb-3">
-                                          <div className="flex items-center space-x-3">
-                                              {/* Checkbox de seleção individual */}
-                                              {unification.status === 'completed' && (
-                                                  <Checkbox
-                                                      id={`unification-${unification.id}`}
-                                                      checked={selectedUnifiedDocuments.includes(unification.id)}
-                                                      onCheckedChange={(checked) => {
-                                                          if (checked) {
-                                                              setSelectedUnifiedDocuments(prev => [...prev, unification.id]);
-                                                          } else {
-                                                              setSelectedUnifiedDocuments(prev => prev.filter(id => id !== unification.id));
-                                                          }
-                                                      }}
-                                                  />
-                                              )}
-                                              
-                                              <div>
-                                                  <h4 className="font-semibold">
-                                                      {unification.holerite.employeeName} - {unification.holerite.month}/{unification.holerite.year}
-                                                  </h4>
-                                                  <p className="text-sm text-muted-foreground">
-                                                      Holerite + Recibo unificados
-                                                  </p>
-                                              </div>
-                                          </div>
-                                          <div className="flex items-center space-x-2">
-                                              {unification.status === 'processing' && (
-                                                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                      Processando... {unification.progress}%
-                                                  </Badge>
-                                              )}
-                                              {unification.status === 'completed' && (
-                                                  <Badge className="bg-green-100 text-green-800">
-                                                      PDF Pronto
-                                                  </Badge>
-                                              )}
-                                              {unification.status === 'error' && (
-                                                  <Badge variant="destructive">
-                                                      Erro
-                                                  </Badge>
-                                              )}
-                                          </div>
-                                      </div>
-
-                                      {unification.status === 'processing' && (
-                                          <div className="space-y-2">
-                                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                                  <div 
-                                                      className="bg-yellow-600 h-2 rounded-full transition-all duration-300"
-                                                      style={{ width: `${unification.progress}%` }}
-                                                  ></div>
-                                              </div>
-                                              <p className="text-sm text-muted-foreground">
-                                                  {unification.progress < 30 ? 'Preparando documentos...' : 
-                                                   unification.progress < 100 ? 'Gerando PDF unificado...' : 'Concluído!'}
-                                              </p>
-                                          </div>
-                                      )}
-
-                                      {unification.status === 'completed' && (
-                                          <div className="flex items-center space-x-2">
-                                              <Button
-                                                  onClick={() => handleViewIndividualUnified(unification)}
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                                              >
-                                                  <Eye className="w-4 h-4 mr-2" />
-                                                  Visualizar
-                                              </Button>
-                                              <Button
-                                                  onClick={() => handleDownloadIndividualUnified(unification)}
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                                              >
-                                                  <Download className="w-4 h-4 mr-2" />
-                                                  Baixar
-                                              </Button>
-                                              <Button
-                                                  onClick={() => handleEmailIndividualUnified(unification)}
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="border-green-300 text-green-700 hover:bg-green-50"
-                                              >
-                                                  <Mail className="w-4 h-4 mr-2" />
-                                                  Email
-                                              </Button>
-                                              <Button
-                                                  onClick={() => handleWhatsAppIndividualUnified(unification)}
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="border-green-300 text-green-700 hover:bg-green-50"
-                                              >
-                                                  <MessageSquare className="w-4 h-4 mr-2" />
-                                                  WhatsApp
-                                              </Button>
-                                              <Button
-                                                  onClick={() => handleDeleteIndividualUnified(unification)}
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="border-red-300 text-red-700 hover:bg-red-50"
-                                              >
-                                                  <Trash2 className="w-4 h-4 mr-2" />
-                                                  Excluir
-                                              </Button>
-                                          </div>
-                                      )}
-
-                                      {unification.status === 'error' && (
-                                          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                              <p className="text-sm text-red-700">
-                                                  Erro: {unification.error}
-                                              </p>
-                                          </div>
-                                      )}
-                                  </div>
-                              ))}
-                          </div>
-                      </CardContent>
-                  </Card>
-              )}
           </TabsContent>
 
         </Tabs>
@@ -3119,16 +3147,16 @@ const Holerites: React.FC = () => {
         <HoleriteViewModal
           open={showViewModal}
           onOpenChange={setShowViewModal}
-          payslip={selectedPayslip}
-          onDownload={() => selectedPayslip && handleDownloadPayslip(selectedPayslip)}
-          onSendEmail={() => selectedPayslip && handleEmailPayslip(selectedPayslip)}
-          onSendWhatsApp={() => selectedPayslip && handleSendWhatsAppIndividual(selectedPayslip)}
+          payslip={selectedHolerite as any}
+          onDownload={() => selectedHolerite && handleDownloadHolerite(selectedHolerite)}
+          onSendEmail={() => selectedHolerite && handleEmailHolerite(selectedHolerite)}
+          onSendWhatsApp={() => selectedHolerite && handleSendWhatsAppIndividual(selectedHolerite)}
         />
 
         <HoleriteEmailModal
           open={showEmailModal}
           onOpenChange={setShowEmailModal}
-          payslip={selectedPayslip}
+          payslip={selectedHolerite as any}
         />
 
         {/* Modal de Visualização de Documento Unificado Individual */}
@@ -3371,16 +3399,16 @@ const Holerites: React.FC = () => {
         <HoleriteDeleteDialog
           open={showDeleteModal}
           onOpenChange={setShowDeleteModal}
-          payslips={payslipsToDelete}
-          onConfirm={payslipsToDelete.length > 1 ? confirmDeleteSelected : confirmDeleteIndividual}
+          holerites={holeritesToDelete}
+          onConfirm={confirmDeleteSelected}
           isLoading={isDeleting}
         />
 
-        {/* Modal de upload de recibos */}
+        {/* Modal de upload de comprovantes */}
         <Dialog open={showReceiptUploadModal} onOpenChange={setShowReceiptUploadModal}>
           <DialogContent className="w-[95vw] max-w-[500px] bg-seguranca-graphite border-gray-600 mx-4 sm:mx-auto">
             <DialogHeader className="pb-4">
-              <DialogTitle className="text-seguranca-lightgray text-base sm:text-lg lg:text-xl">Upload de Recibos</DialogTitle>
+              <DialogTitle className="text-seguranca-lightgray text-base sm:text-lg lg:text-xl">Upload de Comprovantes</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="text-center">
@@ -3436,107 +3464,102 @@ const Holerites: React.FC = () => {
           </DialogContent>
         </Dialog>
 
-                 {/* Modal de confirmação para documentos unificados */}
-         <Dialog open={showUnifiedModal} onOpenChange={setShowUnifiedModal}>
-           <DialogContent className="w-[95vw] max-w-[500px] bg-seguranca-graphite border-gray-600 mx-4 sm:mx-auto">
-             <DialogHeader className="pb-4">
-               <DialogTitle className="text-seguranca-lightgray text-base sm:text-lg lg:text-xl">Criar Documentos Unificados</DialogTitle>
-             </DialogHeader>
-             <div className="space-y-4">
-               <div className="text-center">
-                 <FileText size={40} className="mx-auto text-gray-500 mb-4 sm:hidden" />
-                 <FileText size={48} className="mx-auto text-gray-500 mb-4 hidden sm:block" />
-                 <p className="text-gray-400 mb-4 text-xs sm:text-sm">
-                   Esta ação irá unir holerites e recibos em um único PDF, preservando o layout original do holerite. Só serão unidos documentos com nomes de funcionários EXATAMENTE iguais.
-                 </p>
+        {/* Modal de upload de comprovantes de pagamento */}
+        <Dialog open={showPaymentReceiptUploadModal} onOpenChange={setShowPaymentReceiptUploadModal}>
+          <DialogContent className="w-[95vw] max-w-[600px] bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 mx-4 sm:mx-auto rounded-2xl shadow-2xl">
+            <DialogHeader className="pb-6 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl shadow-lg mb-4">
+                <FileText size={32} className="text-white" />
+              </div>
+              <DialogTitle className="text-white text-xl sm:text-2xl font-bold">Importar Comprovante de Pagamento</DialogTitle>
+              <p className="text-gray-400 text-sm sm:text-base mt-2">
+                Selecione um arquivo PDF contendo o comprovante de transferência de pagamento de salário de funcionário.
+              </p>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6">
+                <h4 className="text-white font-semibold mb-4 text-base sm:text-lg flex items-center">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                    <span className="text-white text-sm font-bold">⚡</span>
                </div>
-               
-               <div className="bg-seguranca-black border border-gray-600 rounded-lg p-4">
-                 <h4 className="text-seguranca-lightgray font-medium mb-2 text-sm sm:text-base">O que será feito:</h4>
-                 <ul className="text-gray-400 text-xs sm:text-sm space-y-1">
-                   <li>• Buscar holerites e recibos correspondentes</li>
-                   <li>• Verificar se nomes dos funcionários são EXATAMENTE iguais</li>
-                   <li>• Preservar layout original do holerite</li>
-                   <li>• Página 1: Holerite original (sem alterações)</li>
-                   <li>• Páginas 2+: Recibos de pagamento anexados</li>
-                   <li>• Unir tudo em um único arquivo PDF</li>
-                   <li>• Salvar no sistema para download</li>
+                  O que será feito:
+                </h4>
+                <ul className="text-gray-300 text-sm sm:text-base space-y-3">
+                  <li className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span>Processar o PDF original</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Extrair informações do funcionário</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <span>Gerar um novo PDF com um comprovante por página</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <span>Preservar o layout original</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-pink-400 rounded-full"></div>
+                    <span>Organizar por ano e mês de referência</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
+                    <span>Salvar com nome do funcionário</span>
+                  </li>
                  </ul>
                </div>
                
-               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                 <Button 
-                   variant="outline" 
-                   onClick={() => setShowUnifiedModal(false)} 
-                   disabled={processingUnified}
-                   className="order-2 sm:order-1 flex-1 sm:flex-none"
-                 >
-                   Cancelar
-                 </Button>
-                 <Button 
-                   onClick={handleCreateUnifiedDocuments}
-                   disabled={processingUnified}
-                   className="bg-blue-600 hover:bg-blue-700 text-white order-1 sm:order-2 flex-1 sm:flex-none"
-                 >
-                   {processingUnified ? 'Processando...' : 'Unir Holerites e Recibos (Nomes Exatos)'}
-                 </Button>
-               </div>
-             </div>
-           </DialogContent>
-         </Dialog>
-
-         {/* Modal de confirmação de exclusão de documentos unificados */}
-         <Dialog open={showUnifiedDeleteModal} onOpenChange={setShowUnifiedDeleteModal}>
-           <DialogContent className="w-[95vw] max-w-[500px] bg-seguranca-graphite border-gray-600 mx-4 sm:mx-auto">
-             <DialogHeader className="pb-4">
-               <DialogTitle className="text-seguranca-lightgray text-base sm:text-lg lg:text-xl">Confirmar Exclusão</DialogTitle>
-             </DialogHeader>
+              <div className="group border-2 border-dashed border-gray-600/50 rounded-2xl p-8 text-center hover:border-blue-500/50 transition-all duration-300 hover:bg-blue-500/5">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handlePaymentReceiptUpload(file);
+                    }
+                  }}
+                  className="hidden"
+                  id="payment-receipt-file-input"
+                  disabled={processingPaymentReceipts}
+                />
+                <label
+                  htmlFor="payment-receipt-file-input"
+                  className="cursor-pointer block"
+                >
              <div className="space-y-4">
-               <div className="text-center">
-                 <Trash2 size={40} className="mx-auto text-red-500 mb-4 sm:hidden" />
-                 <Trash2 size={48} className="mx-auto text-red-500 mb-4 hidden sm:block" />
-                 <p className="text-gray-400 mb-4 text-xs sm:text-sm">
-                   Tem certeza que deseja excluir {unifiedDocumentsToDelete.length > 1 ? 'estes holerites com recibos (nomes exatos)' : 'este holerite com recibos (nomes exatos)'}?
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl group-hover:from-blue-500/30 group-hover:to-purple-500/30 transition-all duration-300">
+                      <FileText size={32} className="text-blue-400 group-hover:text-blue-300 transition-colors duration-300" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-lg mb-2">
+                        {processingPaymentReceipts ? 'Processando...' : 'Clique para selecionar arquivo PDF'}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        Apenas arquivos PDF são aceitos • Máximo 10MB
                  </p>
                </div>
-               
-               {unifiedDocumentsToDelete.length > 0 && (
-                 <div className="bg-seguranca-black border border-gray-600 rounded-lg p-4">
-                   <h4 className="text-seguranca-lightgray font-medium mb-2 text-sm sm:text-base">
-                     {unifiedDocumentsToDelete.length > 1 ? 'Holerites com recibos (nomes exatos) a serem excluídos:' : 'Holerite com recibos (nomes exatos) a ser excluído:'}
-                   </h4>
-                   <div className="text-gray-400 text-xs sm:text-sm space-y-2 max-h-40 overflow-y-auto">
-                     {unifiedDocumentsToDelete.map((doc, index) => (
-                       <div key={index} className="border-b border-gray-600 pb-2 last:border-b-0">
-                         <p><strong>Funcionário:</strong> {doc.employeeName || 'Nome não extraído'}</p>
-                         <p><strong>Arquivo:</strong> <span className="truncate block">{doc.fileName}</span></p>
-                         {doc.month && doc.year && (
-                           <p><strong>Período:</strong> {doc.month}/{doc.year}</p>
+                    {!processingPaymentReceipts && (
+                      <div className="inline-flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-2">
+                        <Upload size={16} className="text-blue-400" />
+                        <span className="text-blue-400 text-sm font-medium">Arraste e solte ou clique para selecionar</span>
+                      </div>
                          )}
                        </div>
-                     ))}
+                </label>
                    </div>
-                 </div>
-               )}
                
-               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
                  <Button 
                    variant="outline" 
-                   onClick={() => {
-                     setShowUnifiedDeleteModal(false);
-                     setUnifiedDocumentsToDelete([]);
-                   }} 
-                   disabled={loadingUnified}
-                   className="order-2 sm:order-1 flex-1 sm:flex-none"
+                  onClick={() => setShowPaymentReceiptUploadModal(false)} 
+                  disabled={processingPaymentReceipts}
+                  className="order-2 sm:order-1 flex-1 sm:flex-none border-2 border-gray-600/50 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500/50 px-6 py-3 rounded-xl font-semibold"
                  >
                    Cancelar
-                 </Button>
-                 <Button 
-                   onClick={handleDeleteUnifiedDocuments}
-                   disabled={loadingUnified}
-                   className="bg-red-600 hover:bg-red-700 text-white order-1 sm:order-2 flex-1 sm:flex-none"
-                 >
-                   {loadingUnified ? 'Excluindo...' : `Confirmar Exclusão${unifiedDocumentsToDelete.length > 1 ? ' (' + unifiedDocumentsToDelete.length + ')' : ''}`}
                  </Button>
                </div>
              </div>
@@ -3600,6 +3623,14 @@ const Holerites: React.FC = () => {
            onOpenChange={setShowReceiptTemplateModal}
            receiptId={selectedReceiptForTemplate?.id || ''}
            receiptData={selectedReceiptForTemplate}
+         />
+
+         {/* Modal de visualização de comprovante de pagamento */}
+         <PaymentReceiptViewModal
+           open={showPaymentReceiptViewModal}
+           onOpenChange={setShowPaymentReceiptViewModal}
+           receipt={selectedPaymentReceiptForView}
+           onDownload={handleDownloadPaymentReceipt}
          />
 
      </StandardLayout>

@@ -10,12 +10,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Payslip } from '@/types/payslip';
+import { Holerite } from '@/services/holeriteService';
 
 interface HoleriteDeleteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  payslips: Payslip[];
+  holerites: Holerite[];
   onConfirm: () => void;
   isLoading?: boolean;
 }
@@ -23,14 +23,14 @@ interface HoleriteDeleteDialogProps {
 const HoleriteDeleteDialog: React.FC<HoleriteDeleteDialogProps> = ({
   open,
   onOpenChange,
-  payslips,
+  holerites,
   onConfirm,
   isLoading = false
 }) => {
-  if (!payslips || payslips.length === 0) return null;
+  if (!holerites || holerites.length === 0) return null;
 
-  const isMultiple = payslips.length > 1;
-  const payslip = payslips[0]; // Para caso individual
+  const isMultiple = holerites.length > 1;
+  const holerite = holerites[0]; // Para caso individual
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -43,13 +43,13 @@ const HoleriteDeleteDialog: React.FC<HoleriteDeleteDialogProps> = ({
           <AlertDialogDescription className="text-seguranca-lightgray">
             {isMultiple ? (
               <>
-                Tem certeza que deseja excluir <strong>{payslips.length} holerite{payslips.length > 1 ? 's' : ''}</strong>?
+                Tem certeza que deseja excluir <strong>{holerites.length} holerite{holerites.length > 1 ? 's' : ''}</strong>?
                 <br /><br />
                 Esta ação não pode ser desfeita e todos os holerites selecionados serão permanentemente removidos.
               </>
             ) : (
               <>
-                Tem certeza que deseja excluir o holerite de <strong>{payslip.employeeName}</strong> ({payslip.month}/{payslip.year})?
+                Tem certeza que deseja excluir o holerite de <strong>{holerite.employeeName}</strong> ({holerite.month}/{holerite.year})?
                 <br /><br />
                 Esta ação não pode ser desfeita e o holerite será permanentemente removido.
               </>

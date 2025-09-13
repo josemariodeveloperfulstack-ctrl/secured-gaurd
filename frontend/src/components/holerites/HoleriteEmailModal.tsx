@@ -7,11 +7,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, Send } from 'lucide-react';
 
 interface Payslip {
-  id: number;
+  id: string;
   employeeName: string;
   cpf: string;
-  month: string;
-  year: string;
+  month: number;
+  year: number;
   fileName: string;
   processedAt: string;
 }

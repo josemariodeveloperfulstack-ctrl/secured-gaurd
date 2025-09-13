@@ -8,7 +8,7 @@ export const orderOfServiceService = {
   },
   
   async listAll(): Promise<OrderOfService[]> {
-    const { data } = await api.get('/api/orders-of-service');
+    const { data } = await api.get('/orders-of-service');
     return data;
   },
   
@@ -18,7 +18,7 @@ export const orderOfServiceService = {
   },
   
   async create(dto: CreateOrderOfServiceDTO): Promise<OrderOfService> {
-    const { data } = await api.post('/api/orders-of-service', dto);
+    const { data } = await api.post('/orders-of-service', dto);
     return data;
   },
   
@@ -49,7 +49,7 @@ export const orderOfServiceService = {
   },
   
   async getOrdersOfService(): Promise<OrderOfService[]> {
-    const { data } = await api.get('/api/orders-of-service');
+    const { data } = await api.get('/orders-of-service');
     return data;
   }
 }; 

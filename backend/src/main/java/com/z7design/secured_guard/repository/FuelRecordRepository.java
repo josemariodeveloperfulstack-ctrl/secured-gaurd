@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -136,27 +135,29 @@ public interface FuelRecordRepository extends JpaRepository<FuelRecord, UUID> {
            "GROUP BY fr.driver, v.id, v.plate, v.model")
     List<Object[]> getFuelStatsByDriverAndVehicle();
     
-    // Top motoristas por consumo de combustível
+    // Top motoristas por consumo de combustível (retorna apenas o nome do motorista para evitar serialização de entidade)
     @Query("SELECT " +
-           "fr.driver, " +
+           "d.name, " +
            "SUM(fr.quantity) as totalFuel, " +
            "SUM(fr.cost) as totalCost, " +
            "COUNT(fr) as totalRecords " +
            "FROM FuelRecord fr " +
-           "WHERE fr.driver IS NOT NULL " +
-           "GROUP BY fr.driver " +
+           "JOIN fr.driver d " +
+           "WHERE d IS NOT NULL " +
+           "GROUP BY d.name " +
            "ORDER BY SUM(fr.quantity) DESC")
     List<Object[]> getTopDriversByFuelConsumption();
     
-    // Top motoristas por custo
+    // Top motoristas por custo (retorna apenas o nome do motorista para evitar serialização de entidade)
     @Query("SELECT " +
-           "fr.driver, " +
+           "d.name, " +
            "SUM(fr.cost) as totalCost, " +
            "SUM(fr.quantity) as totalFuel, " +
            "COUNT(fr) as totalRecords " +
            "FROM FuelRecord fr " +
-           "WHERE fr.driver IS NOT NULL " +
-           "GROUP BY fr.driver " +
+           "JOIN fr.driver d " +
+           "WHERE d IS NOT NULL " +
+           "GROUP BY d.name " +
            "ORDER BY SUM(fr.cost) DESC")
     List<Object[]> getTopDriversByCost();
     

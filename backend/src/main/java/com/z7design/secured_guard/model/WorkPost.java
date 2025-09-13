@@ -42,7 +42,7 @@ public class WorkPost {
     private WorkPostType type; // Tipo: 24H, SDF, 12H_NOTURNO
     
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = true)
     private WorkPostStatus status; // Status: ATIVO, INATIVO, EM_IMPLANTACAO, SUSPENSO
     
     // Localização

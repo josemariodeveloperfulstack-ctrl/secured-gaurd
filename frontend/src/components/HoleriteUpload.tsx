@@ -62,7 +62,7 @@ const HoleriteUpload: React.FC<HoleriteUploadProps> = ({ isOpen, onClose, onUplo
       const sanitizedFile = new File([file], file.name.replace(/[\r\n]+/g, ''), { type: file.type });
       formData.append('file', sanitizedFile);
 
-      const response = await api.post('/api/payslips/upload', formData, {
+      const response = await api.post('/payslips/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

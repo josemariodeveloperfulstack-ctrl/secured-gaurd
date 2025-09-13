@@ -44,8 +44,8 @@ export const DriverRankingStats: React.FC<DriverRankingStatsProps> = ({ drivers 
 
     try {
       const endpoint = rankingType === 'consumption' 
-        ? '/api/fuel-records/stats/drivers/top-consumption'
-        : '/api/fuel-records/stats/drivers/top-cost';
+        ? '/fuel-records/stats/drivers/top-consumption'
+        : '/fuel-records/stats/drivers/top-cost';
       
       const response = await api.get(endpoint);
       

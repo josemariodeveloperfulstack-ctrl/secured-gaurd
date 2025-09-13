@@ -18,7 +18,7 @@ export const visitService = {
   // Criar nova visita
   async createVisit(visitData: CreateVisitDTO): Promise<Visit> {
     try {
-      const response = await api.post('/api/visits', visitData);
+      const response = await api.post('/visits', visitData);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao criar visita:', error);
@@ -64,7 +64,7 @@ export const visitService = {
   // Buscar estatísticas
   async getVisitStatistics(supervisorId: string, year: number, month: number): Promise<VisitStatistics> {
     try {
-      const response = await api.get('/api/visits/statistics', {
+      const response = await api.get('/visits/statistics', {
         params: { supervisorId, year, month }
       });
       return response.data;
@@ -88,7 +88,7 @@ export const visitService = {
   // Gerar template mensal
   async generateMonthlyTemplate(supervisorId: string, year: number, month: number): Promise<Visit[]> {
     try {
-      const response = await api.post('/api/visits/generate-template', null, {
+      const response = await api.post('/visits/generate-template', null, {
         params: { supervisorId, year, month }
       });
       return response.data;

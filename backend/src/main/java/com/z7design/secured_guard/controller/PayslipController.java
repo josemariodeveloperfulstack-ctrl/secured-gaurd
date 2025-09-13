@@ -19,6 +19,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
@@ -154,14 +159,23 @@ public class PayslipController {
 
     @GetMapping
     public ResponseEntity<List<Payslip>> getAllPayslips() {
+        log.info("🔍 Iniciando busca de todos os payslips...");
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
         List<Payslip> payslips;
         if (isColaborador) {
             String cpf = auth.getName(); // username é o CPF
+            log.info("👤 Usuário colaborador, buscando payslips por CPF: {}", cpf);
             payslips = payslipService.getPayslipsByCpf(cpf);
         } else {
+            log.info("👑 Usuário admin, buscando todos os payslips");
             payslips = payslipService.getAllPayslips();
+        }
+        log.info("✅ Payslips encontrados: {} registros", payslips.size());
+        if (payslips.size() > 0) {
+            log.info("📋 Primeiro payslip: ID={}, Nome={}, CPF={}, Mês={}, Ano={}", 
+                payslips.get(0).getId(), payslips.get(0).getEmployeeName(), 
+                payslips.get(0).getCpf(), payslips.get(0).getMonth(), payslips.get(0).getYear());
         }
         return ResponseEntity.ok(payslips);
     }
@@ -294,10 +308,38 @@ public class PayslipController {
 
     // Exclusão em massa de payslips
     @PostMapping("/delete-multiple")
-    public ResponseEntity<Map<String, Object>> deleteMultiplePayslips(@RequestBody Map<String, List<UUID>> body) {
-        List<UUID> ids = body.get("ids");
-        Map<String, Object> result = payslipService.deleteMultiplePayslips(ids);
-        return ResponseEntity.ok(result);
+    public ResponseEntity<Map<String, Object>> deleteMultiplePayslips(@RequestBody Map<String, List<String>> body) {
+        try {
+            List<String> idStrings = body.get("ids");
+            if (idStrings == null || idStrings.isEmpty()) {
+                Map<String, Object> result = new HashMap<>();
+                result.put("deleted", 0);
+                result.put("failed", 0);
+                result.put("errors", List.of());
+                return ResponseEntity.ok(result);
+            }
+            
+            List<UUID> ids = idStrings.stream()
+                .map(UUID::fromString)
+                .collect(java.util.stream.Collectors.toList());
+            
+            Map<String, Object> result = payslipService.deleteMultiplePayslips(ids);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            log.error("Erro ao converter IDs para UUID: {}", e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("deleted", 0);
+            errorResult.put("failed", 0);
+            errorResult.put("errors", List.of("IDs inválidos: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(errorResult);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao excluir múltiplos payslips: {}", e.getMessage(), e);
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("deleted", 0);
+            errorResult.put("failed", 0);
+            errorResult.put("errors", List.of("Erro interno: " + e.getMessage()));
+            return ResponseEntity.internalServerError().body(errorResult);
+        }
     }
 
     // ==================== ENDPOINTS DE VERIFICAÇÃO ====================

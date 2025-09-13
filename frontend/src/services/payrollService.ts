@@ -238,7 +238,7 @@ export const payrollService = {
 
   // Verificar status do processamento
   async getProcessingStatus(): Promise<any> {
-    const response = await api.get('/api/holerites/status');
+    const response = await api.get('/holerites/status');
     return response.data;
   }
 }; 

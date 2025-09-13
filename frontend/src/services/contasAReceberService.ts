@@ -66,7 +66,7 @@ class ContasAReceberService {
     /* Código original comentado temporariamente
     try {
       console.log('Buscando contas a receber da API...');
-      const response = await api.get('/api/accounts-receivable/all');
+      const response = await api.get('/accounts-receivable/all');
       console.log('Contas a receber recebidas:', response.data);
       // Garantir que sempre retornamos um array
       return Array.isArray(response.data) ? response.data : this.getMockContasAReceber();
@@ -110,7 +110,7 @@ class ContasAReceberService {
 
       console.log('Dados da requisição:', requestData);
 
-      const response = await api.post('/api/accounts-receivable', requestData);
+      const response = await api.post('/accounts-receivable', requestData);
       console.log('Conta a receber criada:', response.data);
       return response.data;
     } catch (error: any) {
@@ -182,7 +182,7 @@ class ContasAReceberService {
   async getClientes(): Promise<Cliente[]> {
     try {
       console.log('Buscando clientes da API...');
-      const response = await api.get('/api/clients/all');
+      const response = await api.get('/clients/all');
       console.log('Clientes recebidos:', response.data);
       // Garantir que sempre retornamos um array
       return Array.isArray(response.data) ? response.data : this.getMockClientes();
@@ -206,7 +206,7 @@ class ContasAReceberService {
   // Gerar relatório de inadimplência
   async generateDefaultReport(): Promise<Blob> {
     try {
-      const response = await api.get('/api/receivables/reports/default', {
+      const response = await api.get('/receivables/reports/default', {
         responseType: 'blob'
       });
       return response.data;

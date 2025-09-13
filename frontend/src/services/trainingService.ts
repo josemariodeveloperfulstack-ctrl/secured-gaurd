@@ -40,27 +40,27 @@ export interface EmployeeCertification {
 
 class TrainingService {
   async getTrainings(params?: { name?: string; provider?: string }): Promise<Training[]> {
-    const response = await api.get('/api/trainings', { params });
+    const response = await api.get('/trainings', { params });
     return response.data;
   }
 
   async getPositions(): Promise<Position[]> {
-    const response = await api.get('/api/positions');
+    const response = await api.get('/positions');
     return response.data;
   }
 
   async getUnits(): Promise<Unit[]> {
-    const response = await api.get('/api/units/active');
+    const response = await api.get('/units/active');
     return response.data;
   }
 
   async getEmployeeCertifications(params?: { employeeId?: string; trainingId?: string; status?: string; expiringBefore?: string; }): Promise<EmployeeCertification[]> {
-    const response = await api.get('/api/employee-certifications', { params });
+    const response = await api.get('/employee-certifications', { params });
     return response.data;
   }
 
   async createTraining(training: Omit<Training, 'id'>): Promise<Training> {
-    const response = await api.post('/api/trainings', training);
+    const response = await api.post('/trainings', training);
     return response.data;
   }
 
@@ -72,7 +72,7 @@ class TrainingService {
     expirationDate?: string; // ISO date
     documentUrl?: string;
   }): Promise<EmployeeCertification> {
-    const response = await api.post('/api/employee-certifications', {
+    const response = await api.post('/employee-certifications', {
       employee: { id: payload.employeeId },
       training: { id: payload.trainingId },
       certificationNumber: payload.certificationNumber,
