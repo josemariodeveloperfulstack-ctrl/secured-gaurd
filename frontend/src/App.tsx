@@ -48,7 +48,7 @@ const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
 const Grupos = lazy(() => import('@/pages/Grupos'));
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const Profile = lazy(() => import('@/pages/Profile'));
-const Holerites = lazy(() => import('@/pages/Holerites'));
+import Holerites from '@/pages/Holerites';
 const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
 const PayslipView = lazy(() => import('@/pages/PayslipView'));
 const Mensagens = lazy(() => import('@/pages/Mensagens'));

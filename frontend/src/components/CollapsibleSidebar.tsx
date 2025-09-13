@@ -62,15 +62,13 @@ import {
   Activity,
   UserPlus,
   UserX,
-  Handshake,
   CalendarDays,
   Clock3,
   FileBarChart,
-  TrendingUp,
   FileSignature,
-  UserCheck,
   Heart,
-  GraduationCap
+  GraduationCap,
+  Car
 } from 'lucide-react';
 
 interface CollapsibleSidebarProps {

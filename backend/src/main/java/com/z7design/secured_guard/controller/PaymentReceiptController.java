@@ -3,6 +3,9 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.CreatePaymentReceiptDTO;
 import com.z7design.secured_guard.dto.PaymentReceiptDTO;
 import com.z7design.secured_guard.service.PaymentReceiptService;
+import com.z7design.secured_guard.service.ReceiptProcessingService;
+import com.z7design.secured_guard.model.PaymentReceipt;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +24,9 @@ public class PaymentReceiptController {
     
     @Autowired
     private PaymentReceiptService paymentReceiptService;
+    
+    @Autowired
+    private ReceiptProcessingService receiptProcessingService;
     
     // Criar novo comprovante
     @PostMapping
@@ -144,6 +150,47 @@ public class PaymentReceiptController {
             return ResponseEntity.status(HttpStatus.CREATED).body(receipt);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+    }
+    
+    // Processamento automático de comprovantes (NOVO ENDPOINT)
+    @PostMapping("/process-automatic")
+    public ResponseEntity<List<PaymentReceiptDTO>> processReceiptsAutomatic(@RequestParam("file") MultipartFile file) {
+        try {
+            // Validar arquivo
+            if (file.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            }
+            
+            if (!file.getContentType().equals("application/pdf")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            }
+            
+            // Processar arquivo automaticamente
+            List<PaymentReceipt> processedReceipts = receiptProcessingService.processReceiptFile(file);
+            
+            // Converter para DTOs
+            List<PaymentReceiptDTO> receiptDTOs = processedReceipts.stream()
+                .map(receipt -> {
+                    PaymentReceiptDTO dto = new PaymentReceiptDTO();
+                    dto.setId(receipt.getId());
+                    dto.setEmployeeName(receipt.getEmployeeName());
+                    dto.setMonth(receipt.getMonth());
+                    dto.setYear(receipt.getYear());
+                    dto.setGrossSalary(receipt.getGrossSalary());
+                    dto.setNetSalary(receipt.getNetSalary());
+                    dto.setFileName(receipt.getFileName());
+                    dto.setFilePath(receipt.getFilePath());
+                    dto.setStatus(receipt.getStatus());
+                    dto.setCreatedAt(receipt.getCreatedAt());
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            return ResponseEntity.ok(receiptDTOs);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
     

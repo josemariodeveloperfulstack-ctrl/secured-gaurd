@@ -57,7 +57,10 @@ public class ReceiptProcessingService {
 
         List<PaymentReceipt> extractedReceipts = new ArrayList<>();
         
-        try (PDDocument document = PDDocument.load(file.getInputStream())) {
+        // Ler o arquivo em bytes para poder reutilizar
+        byte[] fileBytes = file.getBytes();
+        
+        try (PDDocument document = PDDocument.load(new java.io.ByteArrayInputStream(fileBytes))) {
             int pageCount = document.getNumberOfPages();
             log.info("📄 Arquivo contém {} páginas", pageCount);
 
@@ -81,7 +84,7 @@ public class ReceiptProcessingService {
                 }
                 
                 // Extrair informações do recibo
-                PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1);
+                PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1, new java.io.ByteArrayInputStream(fileBytes));
                 if (receipt != null) {
                     log.info("✅ Recibo extraído da página {}: {}", pageNum + 1, receipt.getEmployeeName());
                     extractedReceipts.add(receipt);
@@ -111,7 +114,7 @@ public class ReceiptProcessingService {
         return savedReceipts;
     }
 
-    private PaymentReceipt extractReceiptInfo(String pageText, int pageNumber) {
+    private PaymentReceipt extractReceiptInfo(String pageText, int pageNumber, java.io.InputStream originalInputStream) {
         try {
             log.info("Extraindo informações do recibo da página {}", pageNumber);
             
@@ -144,7 +147,7 @@ public class ReceiptProcessingService {
             // Criar novo PDF com os dados extraídos
             String newPdfPath = null;
             try {
-                newPdfPath = createReceiptPdf(receiptData, pageNumber);
+                newPdfPath = extractReceiptPageFromOriginal(originalInputStream, pageNumber, receiptData);
                 log.info("PDF criado com sucesso: {}", newPdfPath);
                 
                 // Verificar se o arquivo foi realmente criado
@@ -238,8 +241,8 @@ public class ReceiptProcessingService {
             // Extrair nome do funcionário (conta creditada) - padrão específico do Itaú
             String employeeName = null;
             
-            // Padrão 1: "Dados da conta a ser creditada" seguido de "Nome: [NOME COMPLETO]"
-            Pattern namePattern1 = Pattern.compile("Dados da conta a ser creditada[\\s\\S]*?Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+)", Pattern.CASE_INSENSITIVE);
+            // Padrão 1: "Dados da conta a ser creditada" seguido de "Nome: [NOME COMPLETO]" até "Agência:"
+            Pattern namePattern1 = Pattern.compile("Dados da conta a ser creditada[\\s\\S]*?Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+?)\\s*Agência\\s*:", Pattern.CASE_INSENSITIVE);
             Matcher nameMatcher1 = namePattern1.matcher(text);
             if (nameMatcher1.find()) {
                 employeeName = nameMatcher1.group(1).trim();
@@ -458,12 +461,15 @@ public class ReceiptProcessingService {
             }
 
             // Extrair data da transferência - padrão específico do Itaú
-            Pattern datePattern1 = Pattern.compile("Transferência realizada em\\s*(\\d{2}\\.\\d{2}\\.\\d{4})\\s*às\\s*(\\d{2}:\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
+            Pattern datePattern1 = Pattern.compile("Transferência realizada em\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})\\s*às\\s*(\\d{2}:\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
             Matcher dateMatcher1 = datePattern1.matcher(text);
             if (dateMatcher1.find()) {
-                data.transferDate = dateMatcher1.group(1);
-                String transferTime = dateMatcher1.group(2);
-                log.info("Data de transferência extraída: {} às {}", data.transferDate, transferTime);
+                String day = dateMatcher1.group(1);
+                String month = dateMatcher1.group(2);
+                String year = dateMatcher1.group(3);
+                String time = dateMatcher1.group(4);
+                data.transferDate = day + "." + month + "." + year;
+                log.info("✅ Data de transferência extraída: {} às {}", data.transferDate, time);
             } else {
                 // Padrão alternativo: "Data: DD/MM/YYYY"
                 Pattern datePattern2 = Pattern.compile("Data\\s*:\\s*(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
@@ -494,8 +500,8 @@ public class ReceiptProcessingService {
                     log.info("✅ Período de referência encontrado (padrão 2): {}/{}", data.month, data.year);
                 } else {
                     // Padrão 3: Para comprovantes Itaú, usar a data de transferência como período de referência
-                    // "Transferência efetuada em DD/MM/AAAA"
-                    Pattern transferPattern = Pattern.compile("Transferência\\s+(?:efetuada|realizada)\\s+em\\s+(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                    // "Transferência realizada em DD.MM.AAAA às HH:MM:SS"
+                    Pattern transferPattern = Pattern.compile("Transferência\\s+realizada\\s+em\\s+(\\d{2})\\.(\\d{2})\\.(\\d{4})\\s*às", Pattern.CASE_INSENSITIVE);
                     Matcher transferMatcher = transferPattern.matcher(text);
                     if (transferMatcher.find()) {
                         data.month = Integer.parseInt(transferMatcher.group(2)); // MM
@@ -611,7 +617,10 @@ public class ReceiptProcessingService {
         }
     }
 
-    private String createReceiptPdf(ReceiptData data, int pageNumber) throws IOException {
+    /**
+     * Extrai uma página específica do PDF original preservando o layout exato
+     */
+    private String extractReceiptPageFromOriginal(java.io.InputStream originalInputStream, int pageNumber, ReceiptData data) throws IOException {
         // Criar diretório por mês com caminho absoluto
         String monthFolder = String.format("%02d_%04d", data.month, data.year);
         Path monthPath = Paths.get(UPLOAD_DIR, monthFolder).toAbsolutePath();
@@ -625,8 +634,7 @@ public class ReceiptProcessingService {
             log.info("Diretório já existe: {}", monthPath);
         }
 
-        // Nome do arquivo com nome do funcionário (usando o mesmo padrão do generateReceiptFileName)
-        // Limpar o nome para remover palavras comuns que podem estar sendo incluídas incorretamente
+        // Nome do arquivo com nome do funcionário
         String cleanedName = data.employeeName != null ? data.employeeName.trim()
             .replaceAll("(?i)\\bvalor\\b", "") // Remove "valor" (case insensitive)
             .replaceAll("(?i)\\bfuncionario\\b", "") // Remove "funcionario" (case insensitive)
@@ -649,7 +657,74 @@ public class ReceiptProcessingService {
 
         String filePath = monthPath.resolve(fileName).toString();
 
-        // Criar PDF com layout EXATO do comprovante Itaú original
+        // PRESERVAR LAYOUT ORIGINAL: Extrair apenas a página específica do PDF original
+        try (PDDocument originalDocument = PDDocument.load(originalInputStream);
+             PDDocument newDocument = new PDDocument()) {
+            
+            log.info("📄 Extraindo página {} do PDF original (preservando layout)", pageNumber);
+            
+            // Verificar se a página existe
+            if (pageNumber > originalDocument.getNumberOfPages()) {
+                throw new IOException("Página " + pageNumber + " não existe no PDF original");
+            }
+            
+            // Copiar a página específica (índice baseado em 0)
+            PDPage originalPage = originalDocument.getPage(pageNumber - 1);
+            newDocument.addPage(originalPage);
+            
+            // Salvar o novo PDF com apenas a página extraída
+            newDocument.save(filePath);
+            
+            log.info("✅ Página {} extraída com sucesso preservando layout original: {}", pageNumber, filePath);
+            
+            return filePath;
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao extrair página do PDF original: {}", e.getMessage(), e);
+            throw new IOException("Erro ao extrair página do PDF original: " + e.getMessage(), e);
+        }
+    }
+
+    private String createReceiptPdf(ReceiptData data, int pageNumber) throws IOException {
+        // Criar diretório por mês com caminho absoluto
+        String monthFolder = String.format("%02d_%04d", data.month, data.year);
+        Path monthPath = Paths.get(UPLOAD_DIR, monthFolder).toAbsolutePath();
+        
+        log.info("Criando diretório: {}", monthPath);
+        
+        if (!Files.exists(monthPath)) {
+            Files.createDirectories(monthPath);
+            log.info("Diretório criado: {}", monthPath);
+        } else {
+            log.info("Diretório já existe: {}", monthPath);
+        }
+
+        // Nome do arquivo com nome do funcionário
+        String cleanedName = data.employeeName != null ? data.employeeName.trim()
+            .replaceAll("(?i)\\bvalor\\b", "") // Remove "valor" (case insensitive)
+            .replaceAll("(?i)\\bfuncionario\\b", "") // Remove "funcionario" (case insensitive)
+            .replaceAll("(?i)\\bempregado\\b", "") // Remove "empregado" (case insensitive)
+            .replaceAll("(?i)\\bcolaborador\\b", "") // Remove "colaborador" (case insensitive)
+            .replaceAll("\\s+", " ") // Múltiplos espaços para um só
+            .trim() : "";
+        
+        // Se após a limpeza o nome ficou vazio, usar o nome original
+        if (cleanedName.isEmpty() && data.employeeName != null) {
+            cleanedName = data.employeeName.trim();
+        }
+        
+        String fileName = String.format("recibo_%s_%02d_%d_pagina_%d.pdf", 
+            cleanedName.replaceAll("[^a-zA-ZÀ-ÿ\\s]", "").trim().replaceAll("\\s+", "_").toLowerCase(),
+            data.month, 
+            data.year, 
+            pageNumber
+        );
+
+        String filePath = monthPath.resolve(fileName).toString();
+
+        // IMPORTANTE: Este método deve preservar o layout original do comprovante
+        // Por enquanto, vamos criar um PDF com layout similar ao original
+        // TODO: Implementar preservação do layout original do PDF
         try (PDDocument document = new PDDocument()) {
             PDPage page = new PDPage();
             document.addPage(page);
