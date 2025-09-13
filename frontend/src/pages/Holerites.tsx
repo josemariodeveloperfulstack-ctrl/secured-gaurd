@@ -3464,55 +3464,63 @@ const Holerites: React.FC = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Modal de upload de comprovantes de pagamento */}
+        {/* Modal de upload de comprovantes de pagamento - RESPONSIVO */}
         <Dialog open={showPaymentReceiptUploadModal} onOpenChange={setShowPaymentReceiptUploadModal}>
-          <DialogContent className="w-[95vw] max-w-[600px] bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 mx-4 sm:mx-auto rounded-2xl shadow-2xl">
-            <DialogHeader className="pb-6 text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl shadow-lg mb-4">
-                <FileText size={32} className="text-white" />
+          <DialogContent className="w-[98vw] sm:w-[95vw] max-w-[600px] h-[90vh] sm:h-auto max-h-[90vh] overflow-y-auto bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 mx-2 sm:mx-4 rounded-xl sm:rounded-2xl shadow-2xl">
+            <DialogHeader className="pb-4 sm:pb-6 text-center px-2 sm:px-0">
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl shadow-lg mb-3 sm:mb-4">
+                <FileText size={24} className="sm:hidden text-white" />
+                <FileText size={32} className="hidden sm:block text-white" />
               </div>
-              <DialogTitle className="text-white text-xl sm:text-2xl font-bold">Importar Comprovante de Pagamento</DialogTitle>
-              <p className="text-gray-400 text-sm sm:text-base mt-2">
+              <DialogTitle className="text-white text-lg sm:text-xl md:text-2xl font-bold px-2 sm:px-0">
+                Importar Comprovante de Pagamento
+              </DialogTitle>
+              <p className="text-gray-400 text-xs sm:text-sm md:text-base mt-2 px-2 sm:px-0 leading-relaxed">
                 Selecione um arquivo PDF contendo o comprovante de transferência de pagamento de salário de funcionário.
               </p>
             </DialogHeader>
-            <div className="space-y-6">
-              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6">
-                <h4 className="text-white font-semibold mb-4 text-base sm:text-lg flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-                    <span className="text-white text-sm font-bold">⚡</span>
-               </div>
-                  O que será feito:
+            
+            <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+              {/* Seção "O que será feito" - Otimizada para mobile */}
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                <h4 className="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base md:text-lg flex items-center">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                    <span className="text-white text-xs sm:text-sm font-bold">⚡</span>
+                  </div>
+                  <span className="leading-tight">O que será feito:</span>
                 </h4>
-                <ul className="text-gray-300 text-sm sm:text-base space-y-3">
-                  <li className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                    <span>Processar o PDF original</span>
+                
+                {/* Lista otimizada para mobile */}
+                <ul className="text-gray-300 text-xs sm:text-sm md:text-base space-y-2 sm:space-y-3">
+                  <li className="flex items-start sm:items-center space-x-2 sm:space-x-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full flex-shrink-0 mt-1.5 sm:mt-0"></div>
+                    <span className="leading-relaxed">Processar o PDF original</span>
                   </li>
-                  <li className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span>Extrair informações do funcionário</span>
+                  <li className="flex items-start sm:items-center space-x-2 sm:space-x-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full flex-shrink-0 mt-1.5 sm:mt-0"></div>
+                    <span className="leading-relaxed">Extrair informações do funcionário</span>
                   </li>
-                  <li className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                    <span>Gerar um novo PDF com um comprovante por página</span>
+                  <li className="flex items-start sm:items-center space-x-2 sm:space-x-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-400 rounded-full flex-shrink-0 mt-1.5 sm:mt-0"></div>
+                    <span className="leading-relaxed">Gerar um novo PDF com um comprovante por página</span>
                   </li>
-                  <li className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    <span>Preservar o layout original</span>
+                  <li className="flex items-start sm:items-center space-x-2 sm:space-x-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full flex-shrink-0 mt-1.5 sm:mt-0"></div>
+                    <span className="leading-relaxed">Preservar o layout original</span>
                   </li>
-                  <li className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-pink-400 rounded-full"></div>
-                    <span>Organizar por ano e mês de referência</span>
+                  <li className="flex items-start sm:items-center space-x-2 sm:space-x-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-pink-400 rounded-full flex-shrink-0 mt-1.5 sm:mt-0"></div>
+                    <span className="leading-relaxed">Organizar por ano e mês de referência</span>
                   </li>
-                  <li className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
-                    <span>Salvar com nome do funcionário</span>
+                  <li className="flex items-start sm:items-center space-x-2 sm:space-x-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-indigo-400 rounded-full flex-shrink-0 mt-1.5 sm:mt-0"></div>
+                    <span className="leading-relaxed">Salvar com nome do funcionário</span>
                   </li>
-                 </ul>
-               </div>
-               
-              <div className="group border-2 border-dashed border-gray-600/50 rounded-2xl p-8 text-center hover:border-blue-500/50 transition-all duration-300 hover:bg-blue-500/5">
+                </ul>
+              </div>
+              
+              {/* Área de upload - Otimizada para touch */}
+              <div className="group border-2 border-dashed border-gray-600/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 text-center hover:border-blue-500/50 transition-all duration-300 hover:bg-blue-500/5 min-h-[120px] sm:min-h-[140px] flex flex-col justify-center">
                 <input
                   type="file"
                   accept=".pdf"
@@ -3528,72 +3536,84 @@ const Holerites: React.FC = () => {
                 />
                 <label
                   htmlFor="payment-receipt-file-input"
-                  className="cursor-pointer block"
+                  className="cursor-pointer block w-full h-full flex flex-col justify-center items-center"
                 >
-             <div className="space-y-4">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl group-hover:from-blue-500/30 group-hover:to-purple-500/30 transition-all duration-300">
-                      <FileText size={32} className="text-blue-400 group-hover:text-blue-300 transition-colors duration-300" />
+                  <div className="space-y-3 sm:space-y-4 w-full">
+                    {/* Ícone responsivo */}
+                    <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl sm:rounded-2xl group-hover:from-blue-500/30 group-hover:to-purple-500/30 transition-all duration-300">
+                      <FileText size={20} className="sm:hidden text-blue-400 group-hover:text-blue-300 transition-colors duration-300" />
+                      <FileText size={32} className="hidden sm:block text-blue-400 group-hover:text-blue-300 transition-colors duration-300" />
                     </div>
-                    <div>
-                      <p className="text-white font-semibold text-lg mb-2">
+                    
+                    {/* Texto responsivo */}
+                    <div className="px-2">
+                      <p className="text-white font-semibold text-base sm:text-lg mb-1 sm:mb-2 leading-tight">
                         {processingPaymentReceipts ? 'Processando...' : 'Clique para selecionar arquivo PDF'}
                       </p>
-                      <p className="text-gray-400 text-sm">
+                      <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">
                         Apenas arquivos PDF são aceitos • Máximo 10MB
-                 </p>
-               </div>
+                      </p>
+                    </div>
+                    
+                    {/* Botão de ação - Otimizado para touch */}
                     {!processingPaymentReceipts && (
-                      <div className="inline-flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-2">
-                        <Upload size={16} className="text-blue-400" />
-                        <span className="text-blue-400 text-sm font-medium">Arraste e solte ou clique para selecionar</span>
+                      <div className="inline-flex items-center justify-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 sm:px-4 sm:py-2 min-h-[44px] sm:min-h-auto touch-manipulation">
+                        <Upload size={14} className="sm:hidden text-blue-400 flex-shrink-0" />
+                        <Upload size={16} className="hidden sm:block text-blue-400 flex-shrink-0" />
+                        <span className="text-blue-400 text-xs sm:text-sm font-medium leading-tight">
+                          <span className="sm:hidden">Toque para selecionar</span>
+                          <span className="hidden sm:inline">Arraste e solte ou clique para selecionar</span>
+                        </span>
                       </div>
-                         )}
-                       </div>
+                    )}
+                  </div>
                 </label>
-                   </div>
-               
-              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-                 <Button 
-                   variant="outline" 
+              </div>
+              
+              {/* Botões - Layout responsivo */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
+                <Button 
+                  variant="outline" 
                   onClick={() => setShowPaymentReceiptUploadModal(false)} 
                   disabled={processingPaymentReceipts}
-                  className="order-2 sm:order-1 flex-1 sm:flex-none border-2 border-gray-600/50 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500/50 px-6 py-3 rounded-xl font-semibold"
-                 >
-                   Cancelar
-                 </Button>
-               </div>
-             </div>
-           </DialogContent>
-         </Dialog>
+                  className="order-2 sm:order-1 flex-1 sm:flex-none border-2 border-gray-600/50 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500/50 px-4 py-3 sm:px-6 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base min-h-[44px] sm:min-h-auto touch-manipulation"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
-         {/* Modal de confirmação de exclusão de recibo */}
+         {/* Modal de confirmação de exclusão de recibo - RESPONSIVO */}
          <Dialog open={showReceiptDeleteModal} onOpenChange={setShowReceiptDeleteModal}>
-           <DialogContent className="w-[95vw] max-w-[500px] bg-seguranca-graphite border-gray-600 mx-4 sm:mx-auto">
-             <DialogHeader className="pb-4">
-               <DialogTitle className="text-seguranca-lightgray text-base sm:text-lg lg:text-xl">Confirmar Exclusão</DialogTitle>
+           <DialogContent className="w-[98vw] sm:w-[95vw] max-w-[500px] bg-seguranca-graphite border-gray-600 mx-2 sm:mx-4 rounded-xl sm:rounded-2xl">
+             <DialogHeader className="pb-3 sm:pb-4 px-2 sm:px-0">
+               <DialogTitle className="text-seguranca-lightgray text-base sm:text-lg lg:text-xl text-center">Confirmar Exclusão</DialogTitle>
              </DialogHeader>
-             <div className="space-y-4">
+             <div className="space-y-4 px-2 sm:px-0">
                <div className="text-center">
-                 <Trash2 size={40} className="mx-auto text-red-500 mb-4 sm:hidden" />
-                 <Trash2 size={48} className="mx-auto text-red-500 mb-4 hidden sm:block" />
-                 <p className="text-gray-400 mb-4 text-xs sm:text-sm">
+                 <Trash2 size={32} className="mx-auto text-red-500 mb-3 sm:hidden" />
+                 <Trash2 size={40} className="mx-auto text-red-500 mb-3 hidden sm:block md:hidden" />
+                 <Trash2 size={48} className="mx-auto text-red-500 mb-4 hidden md:block" />
+                 <p className="text-gray-400 mb-4 text-sm sm:text-base leading-relaxed px-2">
                    Tem certeza que deseja excluir este recibo?
                  </p>
                </div>
                
                {receiptToDelete && (
-                 <div className="bg-seguranca-black border border-gray-600 rounded-lg p-4">
+                 <div className="bg-seguranca-black border border-gray-600 rounded-lg p-3 sm:p-4">
                    <h4 className="text-seguranca-lightgray font-medium mb-2 text-sm sm:text-base">Recibo a ser excluído:</h4>
-                   <div className="text-gray-400 text-xs sm:text-sm space-y-1">
-                     <p><strong>Funcionário:</strong> {receiptToDelete.employeeName || 'Nome não extraído'}</p>
+                   <div className="text-gray-400 text-xs sm:text-sm space-y-2">
+                     <p className="break-words"><strong>Funcionário:</strong> {receiptToDelete.employeeName || 'Nome não extraído'}</p>
                      <p><strong>Mês/Ano:</strong> {receiptToDelete.month}/{receiptToDelete.year}</p>
                      <p><strong>Valor:</strong> R$ {Number(receiptToDelete.netSalary || receiptToDelete.grossSalary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                     <p><strong>Arquivo:</strong> <span className="truncate block">{receiptToDelete.fileName}</span></p>
+                     <p className="break-all"><strong>Arquivo:</strong> <span className="break-all">{receiptToDelete.fileName}</span></p>
                    </div>
                  </div>
                )}
                
-               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
                  <Button 
                    variant="outline" 
                    onClick={() => {
@@ -3601,14 +3621,14 @@ const Holerites: React.FC = () => {
                      setReceiptToDelete(null);
                    }} 
                    disabled={deletingReceipts}
-                   className="order-2 sm:order-1 flex-1 sm:flex-none"
+                   className="order-2 sm:order-1 flex-1 sm:flex-none min-h-[44px] sm:min-h-auto touch-manipulation"
                  >
                    Cancelar
                  </Button>
                  <Button 
                    onClick={() => receiptToDelete && handleDeleteReceipt(receiptToDelete.id)}
                    disabled={deletingReceipts}
-                   className="bg-red-600 hover:bg-red-700 text-white order-1 sm:order-2 flex-1 sm:flex-none"
+                   className="bg-red-600 hover:bg-red-700 text-white order-1 sm:order-2 flex-1 sm:flex-none min-h-[44px] sm:min-h-auto touch-manipulation"
                  >
                    {deletingReceipts ? 'Excluindo...' : 'Confirmar Exclusão'}
                  </Button>
