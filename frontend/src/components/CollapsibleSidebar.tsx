@@ -59,7 +59,18 @@ import {
   ClipboardCheck,
   ArrowRightLeft,
   Eye,
-  Activity
+  Activity,
+  UserPlus,
+  UserX,
+  Handshake,
+  CalendarDays,
+  Clock3,
+  FileBarChart,
+  TrendingUp,
+  FileSignature,
+  UserCheck,
+  Heart,
+  GraduationCap
 } from 'lucide-react';
 
 interface CollapsibleSidebarProps {
@@ -92,16 +103,41 @@ const mainMenuItems = [
     { icon: FileText, text: 'Guia de Transporte', to: '/operacional?tab=guia-transporte', id: 'operacional-guia-transporte' },
   ];
 
-// Módulo RH/Departamento Pessoal
+// Módulo RH - Menu principal
 const rhMenuItems = [
   { icon: Users, text: 'RH Principal', to: '/rh', id: 'rh' },
   { icon: User2, text: 'Funcionários', to: '/rh/funcionarios', id: 'rh-funcionarios' },
-  { icon: MapPin, text: 'Postos de Trabalho', to: '/postos', id: 'postos' },
-  { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'rh-funcoes' },
-  { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'rh-cargos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
-  { icon: Shield, text: 'Controle de EPI', to: '/epis', id: 'rh-epis' },
-  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'rh-gestao-documentos' },
+  { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
+  { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
+  { icon: FileBarChart, text: 'Avaliação de Desempenho', to: '/rh/avaliacao-desempenho', id: 'rh-avaliacao-desempenho' },
+  { icon: TrendingUp, text: 'Plano de Carreira', to: '/rh/plano-carreira', id: 'rh-plano-carreira' },
+  { icon: BarChart3, text: 'Relatórios RH', to: '/rh/relatorios', id: 'rh-relatorios' },
+];
+
+// Módulo Departamento Pessoal
+const departamentoPessoalMenuItems = [
+  { icon: UserPlus, text: 'Admissão de Funcionários', to: '/rh/admissao-funcionarios', id: 'dp-admissao-funcionarios' },
+  { icon: UserX, text: 'Demissão de Funcionários', to: '/rh/demissao-funcionarios', id: 'dp-demissao-funcionarios' },
+  { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
+  { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
+  { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
+  { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
+  { icon: Clock3, text: 'Horas Extras', to: '/rh/horas-extras', id: 'dp-horas-extras' },
+  { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'dp-ocorrencias' },
+  { icon: CreditCard, text: 'Vale Transporte', to: '/rh/vale-transporte', id: 'dp-vale-transporte' },
+  { icon: Home, text: 'Vale Refeição', to: '/rh/vale-refeicao', id: 'dp-vale-refeicao' },
+  { icon: Car, text: 'Vale Combustível', to: '/rh/vale-combustivel', id: 'dp-vale-combustivel' },
+  { icon: Heart, text: 'Plano de Saúde', to: '/rh/plano-saude', id: 'dp-plano-saude' },
+  { icon: FileSignature, text: 'Contratos', to: '/rh/contratos', id: 'dp-contratos' },
+  { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'dp-funcoes' },
+  { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'dp-cargos' },
+  { icon: MapPin, text: 'Postos', to: '/postos', id: 'dp-postos' },
+  { icon: Shield, text: 'EPIs', to: '/epis', id: 'dp-epis' },
+  { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico?emitir=1', id: 'dp-ordens-servico' },
+  { icon: UserCheck, text: 'LGPD', to: '/rh/lgpd', id: 'dp-lgpd' },
+  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'dp-gestao-documentos' },
+  { icon: Send, text: 'Envio de Holerites', to: '/envio-holerites', id: 'dp-envio-holerites' },
 ];
 
 // Módulo Comercial
@@ -213,6 +249,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       ...financeiroMenuItems,
       ...operacionalMenuItems,
       ...rhMenuItems,
+      ...departamentoPessoalMenuItems,
       ...comercialMenuItems,
       ...estoqueMenuItems,
       ...comprasMenuItems,
@@ -417,6 +454,40 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     to={item.to}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
+
+          {/* Departamento Pessoal */}
+          {shouldShowModule('EMPLOYEES_READ') && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider ml-4">
+                  Departamento Pessoal
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {departamentoPessoalMenuItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ml-4
                       ${isActive(item.id) 
                         ? 'bg-seguranca-black text-seguranca-yellow' 
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'

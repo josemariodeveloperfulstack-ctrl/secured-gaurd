@@ -193,38 +193,41 @@ const gestaoMensagensInternasMenuItems = [
 ];
 
 
-// Módulo RH/Departamento Pessoal
+// Módulo RH - Menu principal
 const rhMenuItems = [
   { icon: Users, text: 'RH Principal', to: '/rh', id: 'rh' },
   { icon: User2, text: 'Funcionários', to: '/rh/funcionarios', id: 'rh-funcionarios' },
-  { icon: UserPlus, text: 'Admissão de Funcionários', to: '/rh/admissao-funcionarios', id: 'rh-admissao-funcionarios' },
-  { icon: UserX, text: 'Demissão de Funcionários', to: '/rh/demissao-funcionarios', id: 'rh-demissao-funcionarios' },
-  { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'rh-admissao-demissao' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
-  { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'rh-remanejamentos' },
-  { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'rh-ferias' },
-  { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'rh-ponto-eletronico' },
-  { icon: Clock3, text: 'Horas Extras', to: '/rh/horas-extras', id: 'rh-horas-extras' },
-  { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'rh-ocorrencias' },
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
-  { icon: CreditCard, text: 'Vale Transporte', to: '/rh/vale-transporte', id: 'rh-vale-transporte' },
-  { icon: Home, text: 'Vale Refeição', to: '/rh/vale-refeicao', id: 'rh-vale-refeicao' },
-  { icon: Car, text: 'Vale Combustível', to: '/rh/vale-combustivel', id: 'rh-vale-combustivel' },
-  { icon: Heart, text: 'Plano de Saúde', to: '/rh/plano-saude', id: 'rh-plano-saude' },
   { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
-  { icon: BookOpen, text: 'Cursos', to: '/rh/cursos', id: 'rh-cursos' },
-  { icon: FileSignature, text: 'Contratos', to: '/rh/contratos', id: 'rh-contratos' },
-  { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'rh-funcoes' },
-  { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'rh-cargos' },
-  { icon: MapPin, text: 'Postos', to: '/postos', id: 'postos' },
-  { icon: Shield, text: 'EPIs', to: '/epis', id: 'rh-epis' },
-  { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico?emitir=1', id: 'rh-ordens-servico' },
-  { icon: UserCheck, text: 'LGPD', to: '/rh/lgpd', id: 'rh-lgpd' },
   { icon: FileBarChart, text: 'Avaliação de Desempenho', to: '/rh/avaliacao-desempenho', id: 'rh-avaliacao-desempenho' },
   { icon: TrendingUp, text: 'Plano de Carreira', to: '/rh/plano-carreira', id: 'rh-plano-carreira' },
-  { icon: BarChart3Icon, text: 'Relatórios', to: '/rh/relatorios', id: 'rh-relatorios' },
-  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'rh-gestao-documentos' },
-  { icon: Send, text: 'Envio de Holerites', to: '/envio-holerites', id: 'envio-holerites' },
+  { icon: BarChart3Icon, text: 'Relatórios RH', to: '/rh/relatorios', id: 'rh-relatorios' },
+];
+
+// Módulo Departamento Pessoal
+const departamentoPessoalMenuItems = [
+  { icon: UserPlus, text: 'Admissão de Funcionários', to: '/rh/admissao-funcionarios', id: 'dp-admissao-funcionarios' },
+  { icon: UserX, text: 'Demissão de Funcionários', to: '/rh/demissao-funcionarios', id: 'dp-demissao-funcionarios' },
+  { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
+  { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
+  { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
+  { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
+  { icon: Clock3, text: 'Horas Extras', to: '/rh/horas-extras', id: 'dp-horas-extras' },
+  { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'dp-ocorrencias' },
+  { icon: CreditCard, text: 'Vale Transporte', to: '/rh/vale-transporte', id: 'dp-vale-transporte' },
+  { icon: Home, text: 'Vale Refeição', to: '/rh/vale-refeicao', id: 'dp-vale-refeicao' },
+  { icon: Car, text: 'Vale Combustível', to: '/rh/vale-combustivel', id: 'dp-vale-combustivel' },
+  { icon: Heart, text: 'Plano de Saúde', to: '/rh/plano-saude', id: 'dp-plano-saude' },
+  { icon: FileSignature, text: 'Contratos', to: '/rh/contratos', id: 'dp-contratos' },
+  { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'dp-funcoes' },
+  { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'dp-cargos' },
+  { icon: MapPin, text: 'Postos', to: '/postos', id: 'dp-postos' },
+  { icon: Shield, text: 'EPIs', to: '/epis', id: 'dp-epis' },
+  { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico?emitir=1', id: 'dp-ordens-servico' },
+  { icon: UserCheck, text: 'LGPD', to: '/rh/lgpd', id: 'dp-lgpd' },
+  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'dp-gestao-documentos' },
+  { icon: Send, text: 'Envio de Holerites', to: '/envio-holerites', id: 'dp-envio-holerites' },
 ];
 
 // Módulo Operacional
@@ -323,6 +326,7 @@ export function AppSidebar() {
       ...mainMenuItems,
       ...empresasMenuItems,
       ...rhMenuItems,
+      ...departamentoPessoalMenuItems,
       ...operacionalMenuItems,
       ...comercialMenuItems,
       ...estoqueMenuItems,
@@ -493,13 +497,34 @@ export function AppSidebar() {
           </div>
         ))}
 
-        {/* Módulo RH/Departamento Pessoal */}
+        {/* Módulo Recursos Humanos */}
         <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">
           <Users size={16} className="mr-2 text-seguranca-yellow" />
-          RH / Departamento Pessoal
+          Recursos Humanos
         </div>
         {rhMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
+            <a 
+              href={item.to} 
+              className={`flex items-center p-3 rounded-lg transition-colors ${
+                isActive(item.id) 
+                  ? 'bg-seguranca-black text-seguranca-yellow' 
+                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+              }`}
+            >
+              <item.icon size={18} className="text-seguranca-yellow mr-3" />
+              <span>{item.text}</span>
+            </a>
+          </div>
+        ))}
+
+        {/* Departamento Pessoal */}
+        <div className="text-seguranca-lightgray mb-2 mt-4 flex items-center ml-4">
+          <UserCog size={16} className="mr-2 text-seguranca-yellow" />
+          Departamento Pessoal
+        </div>
+        {departamentoPessoalMenuItems.map(item => (
+          <div className="mb-2 ml-8" key={item.id}>
             <a 
               href={item.to} 
               className={`flex items-center p-3 rounded-lg transition-colors ${
