@@ -106,7 +106,7 @@ const ActivityManagement: React.FC = () => {
         status: filters.status === 'all' ? '' : filters.status
       };
       
-      const response = await api.get('/api/activity-logs', { params: apiFilters });
+      const response = await api.get('/activity-logs', { params: apiFilters });
       console.log('🔍 Resposta da API:', response.data);
       console.log('🔍 Primeiro item:', response.data[0]);
       setActivities(response.data);
@@ -124,7 +124,7 @@ const ActivityManagement: React.FC = () => {
 
   const exportActivities = async () => {
     try {
-      const response = await api.get('/api/activity-logs/export', { 
+      const response = await api.get('/activity-logs/export', { 
         params: filters,
         responseType: 'blob'
       });

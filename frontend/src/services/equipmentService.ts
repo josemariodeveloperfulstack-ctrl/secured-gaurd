@@ -17,7 +17,7 @@ export interface PaginatedResponse<T> {
 }
 
 class EquipmentService {
-  private readonly baseUrl = '/api/equipments';
+  private readonly baseUrl = '/equipments';
 
   // 🚨 SOLUÇÃO DE EMERGÊNCIA: Dados locais para entrega hoje
   private readonly STORAGE_KEY = 'secured_guard_equipments';

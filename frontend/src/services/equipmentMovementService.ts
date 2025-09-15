@@ -5,7 +5,7 @@ import {
 } from '@/types/equipmentMovement';
 
 class EquipmentMovementService {
-  private readonly baseUrl = '/api/equipment-movements';
+  private readonly baseUrl = '/equipment-movements';
 
   // Criar nova movimentação
   async createMovement(data: CreateEquipmentMovementRequest): Promise<EquipmentMovement> {

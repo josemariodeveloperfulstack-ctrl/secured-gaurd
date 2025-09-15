@@ -249,6 +249,16 @@ public class ReceiptProcessingService {
                 log.info("✅ Nome encontrado (padrão Itaú): {}", employeeName);
             }
             
+            // Padrão 1a: "Nome: [NOME]" seguido de qualquer coisa até "Agência:" - mais flexível
+            if (employeeName == null || employeeName.isEmpty()) {
+                Pattern namePattern1a = Pattern.compile("Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]{3,}?)(?=\\s*(?:Agência|Conta|\\n|$))", Pattern.CASE_INSENSITIVE);
+                Matcher nameMatcher1a = namePattern1a.matcher(text);
+                if (nameMatcher1a.find()) {
+                    employeeName = nameMatcher1a.group(1).trim();
+                    log.info("✅ Nome encontrado (padrão flexível): {}", employeeName);
+                }
+            }
+            
             // Padrão 1b: Específico para formato Itaú - "Nome: [NOME]" seguido de "Agência:"
             if (employeeName == null || employeeName.isEmpty()) {
                 Pattern namePattern1b = Pattern.compile("Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+?)\\s*Agência\\s*:", Pattern.CASE_INSENSITIVE);
@@ -402,9 +412,24 @@ public class ReceiptProcessingService {
                 String amountStr = amountMatcher1.group(1).replace(".", "").replace(",", ".");
                 try {
                     amount = Double.parseDouble(amountStr);
-                    log.info("Valor extraído (padrão Itaú): {}", amount);
+                    log.info("✅ Valor extraído (padrão Itaú): R$ {:.2f}", amount);
                 } catch (NumberFormatException e) {
                     log.warn("Erro ao converter valor: {}", amountStr);
+                }
+            }
+            
+            // Padrão 1a: "R$ [VALOR]" com espaço após R$ - mais flexível
+            if (amount == null) {
+                Pattern amountPattern1a = Pattern.compile("R\\$\\s+([\\d.,]+)", Pattern.CASE_INSENSITIVE);
+                Matcher amountMatcher1a = amountPattern1a.matcher(text);
+                if (amountMatcher1a.find()) {
+                    String amountStr = amountMatcher1a.group(1).replace(".", "").replace(",", ".");
+                    try {
+                        amount = Double.parseDouble(amountStr);
+                        log.info("✅ Valor extraído (padrão R$ com espaço): R$ {:.2f}", amount);
+                    } catch (NumberFormatException e) {
+                        log.warn("Erro ao converter valor: {}", amountStr);
+                    }
                 }
             }
             
@@ -516,28 +541,37 @@ public class ReceiptProcessingService {
                             data.year = Integer.parseInt(transferMatcher2.group(3));  // AAAA
                             log.info("✅ Período de referência extraído da data de transferência (formato com pontos): {}/{}", data.month, data.year);
                         } else {
-                            // Padrão 4: Nomes de meses em português
-                            String[] meses = {"JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", 
-                                             "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"};
-                            for (int i = 0; i < meses.length; i++) {
-                                if (text.toUpperCase().contains(meses[i])) {
-                                    data.month = i + 1;
-                                    // Procurar ano próximo (2020-2030)
-                                    Pattern anoPattern = Pattern.compile("(20[2-3][0-9])");
-                                    Matcher anoMatcher = anoPattern.matcher(text);
-                                    if (anoMatcher.find()) {
-                                        data.year = Integer.parseInt(anoMatcher.group(1));
-                                        log.info("✅ Período de referência encontrado via nome do mês: {}/{} ({})", data.month, data.year, meses[i]);
-                                        break;
+                            // Padrão 3c: "Transferência realizada em DD/MM/AAAA" (formato com barras)
+                            Pattern transferPattern3 = Pattern.compile("Transferência\\s+realizada\\s+em\\s+(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                            Matcher transferMatcher3 = transferPattern3.matcher(text);
+                            if (transferMatcher3.find()) {
+                                data.month = Integer.parseInt(transferMatcher3.group(2)); // MM
+                                data.year = Integer.parseInt(transferMatcher3.group(3));  // AAAA
+                                log.info("✅ Período de referência extraído da data de transferência (formato com barras): {}/{}", data.month, data.year);
+                            } else {
+                                // Padrão 4: Nomes de meses em português
+                                String[] meses = {"JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", 
+                                                 "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"};
+                                for (int i = 0; i < meses.length; i++) {
+                                    if (text.toUpperCase().contains(meses[i])) {
+                                        data.month = i + 1;
+                                        // Procurar ano próximo (2020-2030)
+                                        Pattern anoPattern = Pattern.compile("(20[2-3][0-9])");
+                                        Matcher anoMatcher = anoPattern.matcher(text);
+                                        if (anoMatcher.find()) {
+                                            data.year = Integer.parseInt(anoMatcher.group(1));
+                                            log.info("✅ Período de referência encontrado via nome do mês: {}/{} ({})", data.month, data.year, meses[i]);
+                                            break;
+                                        }
                                     }
                                 }
-                            }
-                            
-                            // Se ainda não encontrou, usar data atual como fallback
-                            if (data.month == 0 || data.year == 0) {
-                                data.month = LocalDateTime.now().getMonthValue();
-                                data.year = LocalDateTime.now().getYear();
-                                log.warn("⚠️ Período de referência não encontrado, usando data atual: {}/{}", data.month, data.year);
+                                
+                                // Se ainda não encontrou, usar data atual como fallback
+                                if (data.month == 0 || data.year == 0) {
+                                    data.month = LocalDateTime.now().getMonthValue();
+                                    data.year = LocalDateTime.now().getYear();
+                                    log.warn("⚠️ Período de referência não encontrado, usando data atual: {}/{}", data.month, data.year);
+                                }
                             }
                         }
                     }
@@ -575,6 +609,21 @@ public class ReceiptProcessingService {
                 log.warn("⚠️ Nome do funcionário não encontrado - usando nome genérico para debug");
                 data.employeeName = "NOVO FUNCIONÁRIO";
             }
+            
+            // Log detalhado dos dados extraídos
+            log.info("=== 📊 RESUMO DOS DADOS EXTRAÍDOS ===");
+            log.info("👤 Nome do funcionário: '{}'", data.employeeName);
+            log.info("💰 Valor: {}", data.amount != null ? String.format("R$ %.2f", data.amount) : "Não encontrado");
+            log.info("📅 Mês/Ano: {}/{}", data.month, data.year);
+            log.info("🏦 Banco: '{}'", data.bankName);
+            log.info("📄 Data de transferência: '{}'", data.transferDate);
+            log.info("🏢 Empresa: '{}'", data.companyName);
+            log.info("🔢 Agência debitada: '{}'", data.agency);
+            log.info("💳 Conta debitada: '{}'", data.account);
+            log.info("🔢 Agência creditada: '{}'", data.creditedAgency);
+            log.info("💳 Conta creditada: '{}'", data.creditedAccount);
+            log.info("🔐 Controle: '{}'", data.controlNumber);
+            log.info("🔑 Autenticação: '{}'", data.authentication);
 
             log.info("=== ✅ EXTRAÇÃO CONCLUÍDA ===");
             log.info("👤 Nome do Funcionário: {}", data.employeeName);

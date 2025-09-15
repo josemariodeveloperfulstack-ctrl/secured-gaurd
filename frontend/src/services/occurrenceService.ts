@@ -122,7 +122,7 @@ export const occurrenceService = {
       if (filters.endDate) params.append('endDate', filters.endDate);
       
       const queryString = params.toString();
-      const url = queryString ? `/api/occurrences?${queryString}` : '/api/occurrences';
+      const url = queryString ? `/occurrences?${queryString}` : '/occurrences';
       
       console.log('🔗 Tentando buscar ocorrências no backend:', url);
       const response = await api.get(url);
@@ -161,7 +161,7 @@ export const occurrenceService = {
   async getOccurrenceById(id: string): Promise<Occurrence> {
     try {
       console.log('🔗 Tentando buscar ocorrência por ID no backend:', id);
-      const response = await api.get(`/api/occurrences/${id}`);
+      const response = await api.get(`/occurrences/${id}`);
       console.log('✅ Ocorrência encontrada no backend');
       return response.data;
     } catch (error) {
@@ -201,7 +201,7 @@ export const occurrenceService = {
   async updateOccurrence(id: string, data: UpdateOccurrenceRequest): Promise<Occurrence> {
     try {
       console.log('🔗 Tentando atualizar ocorrência no backend:', id);
-      const response = await api.put(`/api/occurrences/${id}`, data);
+      const response = await api.put(`/occurrences/${id}`, data);
       console.log('✅ Ocorrência atualizada no backend');
       return response.data;
     } catch (error) {
@@ -222,7 +222,7 @@ export const occurrenceService = {
   async deleteOccurrence(id: string): Promise<void> {
     try {
       console.log('🔗 Tentando excluir ocorrência no backend:', id);
-      await api.delete(`/api/occurrences/${id}`);
+      await api.delete(`/occurrences/${id}`);
       console.log('✅ Ocorrência excluída no backend');
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando exclusão:', error);

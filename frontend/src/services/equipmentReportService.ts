@@ -5,7 +5,7 @@ import {
 } from '@/types/equipmentReport';
 
 class EquipmentReportService {
-  private readonly baseUrl = '/api/equipment-reports';
+  private readonly baseUrl = '/equipment-reports';
 
   // Gerar relatório geral
   async generateReport(filters: EquipmentReportFilters): Promise<EquipmentReport> {

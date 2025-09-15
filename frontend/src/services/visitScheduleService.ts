@@ -6,7 +6,7 @@ import {
   RouteOptimizationStats 
 } from '@/types/visit';
 
-const BASE_URL = '/api/visit-schedules';
+const BASE_URL = '/visit-schedules';
 
 export const visitScheduleService = {
   /**

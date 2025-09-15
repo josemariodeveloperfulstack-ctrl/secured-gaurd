@@ -45,7 +45,7 @@ export interface UpdateQuotationRequest extends Partial<CreateQuotationRequest> 
 }
 
 class QuotationService {
-  private base = '/api/purchase-quotations';
+  private base = '/purchase-quotations';
 
   async getAll(): Promise<Quotation[]> {
     const { data } = await api.get(this.base);

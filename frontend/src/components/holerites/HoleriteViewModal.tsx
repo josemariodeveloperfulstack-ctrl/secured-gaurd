@@ -98,53 +98,53 @@ export const HoleriteViewModal: React.FC<HoleriteViewModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[98vw] max-w-[95vw] h-[98vh] max-h-[98vh] overflow-hidden p-0 bg-gradient-to-br from-seguranca-graphite via-gray-800 to-seguranca-black border border-gray-600/50 mx-2 sm:mx-auto shadow-2xl">
-        {/* Header Moderno com Gradiente */}
-        <DialogHeader className="relative p-4 sm:p-6 pb-0 bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-gray-800 border-b border-gray-600/50">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
-            <DialogTitle className="text-seguranca-lightgray flex items-center gap-3 sm:gap-4 text-lg sm:text-xl lg:text-2xl">
-              <div className="relative">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-seguranca-yellow to-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <FileText className="text-seguranca-black" size={20} />
+      <DialogContent className="w-[95vw] h-[95vh] sm:w-[90vw] sm:h-[90vh] lg:max-w-6xl lg:max-h-[90vh] overflow-hidden p-0 bg-gradient-to-br from-seguranca-graphite via-gray-800 to-seguranca-black border border-gray-600/50 mx-2 sm:mx-auto shadow-2xl">
+        {/* Header Otimizado e Responsivo */}
+        <DialogHeader className="relative p-3 sm:p-4 lg:p-6 bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-gray-800 border-b border-gray-600/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 lg:gap-4">
+            <DialogTitle className="text-seguranca-lightgray flex items-center gap-2 sm:gap-3 lg:gap-4 text-base sm:text-lg lg:text-xl">
+              <div className="relative flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-seguranca-yellow to-yellow-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">
+                  <FileText className="text-seguranca-black" size={16} />
                 </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-seguranca-red rounded-full border-2 border-seguranca-graphite"></div>
+                <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 lg:w-4 lg:h-4 bg-seguranca-red rounded-full border-2 border-seguranca-graphite"></div>
               </div>
-              <div className="flex flex-col leading-tight">
-                <span className="break-words font-bold bg-gradient-to-r from-seguranca-lightgray to-white bg-clip-text text-transparent text-sm sm:text-base lg:text-lg">
+              <div className="flex flex-col leading-tight min-w-0 flex-1">
+                <span className="break-words font-bold bg-gradient-to-r from-seguranca-lightgray to-white bg-clip-text text-transparent text-xs sm:text-sm lg:text-base">
                   Visualização do Holerite
                 </span>
-                <div className="text-xs sm:text-sm text-gray-400 font-normal flex items-center gap-2 mt-0">
-                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-seguranca-yellow rounded-full"></div>
-                  <span className="truncate">{payslip.employeeName} - {payslip.month}/{payslip.year}</span>
+                <div className="text-xs sm:text-sm text-gray-400 font-normal flex items-center gap-1 sm:gap-2 mt-0">
+                  <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 lg:w-2 lg:h-2 bg-seguranca-yellow rounded-full flex-shrink-0"></div>
+                  <span className="truncate text-xs sm:text-sm">{payslip.employeeName} - {payslip.month}/{payslip.year}</span>
                 </div>
               </div>
             </DialogTitle>
             
-            {/* Controles de visualização modernos - Responsivos */}
-            <div className="flex flex-wrap items-center gap-1 sm:gap-2 bg-seguranca-black/50 rounded-xl p-1.5 sm:p-2 border border-gray-600/30">
+            {/* Controles de visualização otimizados */}
+            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 bg-seguranca-black/50 rounded-lg sm:rounded-xl p-1 sm:p-1.5 border border-gray-600/30">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => pdfUrl && window.open(pdfUrl, '_blank')}
                 disabled={!pdfUrl}
-                className="border-green-500/50 text-green-400 hover:bg-green-500 hover:text-white hover:scale-105 transition-all duration-200 h-7 w-7 sm:h-8 sm:w-8 p-0"
+                className="border-green-500/50 text-green-400 hover:bg-green-500 hover:text-white transition-all duration-200 h-6 w-6 sm:h-7 sm:w-7 p-0"
                 title="Abrir em nova aba"
               >
-                <FileText size={12} className="sm:w-4 sm:h-4" />
+                <FileText size={10} className="sm:w-3 sm:h-3" />
               </Button>
               
-              <div className="flex items-center gap-0.5 sm:gap-1 bg-seguranca-graphite rounded-lg px-1 sm:px-2 py-0.5 sm:py-1">
+              <div className="flex items-center gap-0.5 bg-seguranca-graphite rounded-md sm:rounded-lg px-1 py-0.5">
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={handleZoomOut}
                   disabled={zoom <= 0.5}
-                  className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-white hover:bg-seguranca-yellow/20"
+                  className="h-5 w-5 sm:h-6 sm:w-6 p-0 text-gray-400 hover:text-white hover:bg-seguranca-yellow/20"
                 >
-                  <ZoomOut size={10} className="sm:w-3.5 sm:h-3.5" />
+                  <ZoomOut size={8} className="sm:w-3 sm:h-3" />
                 </Button>
                 
-                <span className="text-xs text-seguranca-yellow font-mono min-w-[40px] sm:min-w-[50px] text-center bg-seguranca-black/50 px-1 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs">
+                <span className="text-xs text-seguranca-yellow font-mono min-w-[35px] sm:min-w-[45px] text-center bg-seguranca-black/50 px-1 py-0.5 rounded text-[9px] sm:text-xs">
                   {Math.round(zoom * 100)}%
                 </span>
                 
@@ -153,9 +153,9 @@ export const HoleriteViewModal: React.FC<HoleriteViewModalProps> = ({
                   variant="ghost"
                   onClick={handleZoomIn}
                   disabled={zoom >= 3}
-                  className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-white hover:bg-seguranca-yellow/20"
+                  className="h-5 w-5 sm:h-6 sm:w-6 p-0 text-gray-400 hover:text-white hover:bg-seguranca-yellow/20"
                 >
-                  <ZoomIn size={10} className="sm:w-3.5 sm:h-3.5" />
+                  <ZoomIn size={8} className="sm:w-3 sm:h-3" />
                 </Button>
               </div>
               
@@ -163,112 +163,113 @@ export const HoleriteViewModal: React.FC<HoleriteViewModalProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={handleRotate}
-                className="border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white hover:scale-105 transition-all duration-200 h-7 w-7 sm:h-8 sm:w-8 p-0"
+                className="border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white transition-all duration-200 h-6 w-6 sm:h-7 sm:w-7 p-0"
                 title="Rotacionar"
               >
-                <RotateCw size={12} className="sm:w-4 sm:h-4" />
+                <RotateCw size={10} className="sm:w-3 sm:h-3" />
               </Button>
               
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleReset}
-                className="border-gray-500/50 text-gray-400 hover:bg-gray-600 hover:text-white hover:scale-105 transition-all duration-200 h-7 w-7 sm:h-8 sm:w-8 p-0 text-[10px] sm:text-xs"
-                title="Resetar visualização"
+                className="border-gray-500/50 text-gray-400 hover:bg-gray-600 hover:text-white transition-all duration-200 h-6 w-6 sm:h-7 sm:w-7 p-0 text-[9px] sm:text-xs"
+                title="Resetar"
               >
-                <span className="hidden sm:inline">Reset</span>
-                <span className="sm:hidden">R</span>
+                <span className="hidden sm:inline">R</span>
+                <span className="sm:hidden text-[8px]">R</span>
               </Button>
             </div>
           </div>
         </DialogHeader>
         
         <div className="flex flex-col h-full">
-          {/* Informações do Funcionário - Design Moderno e Responsivo */}
-          <div className="px-4 sm:px-6 pt-2 sm:pt-4 pb-3 sm:pb-4 bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black border-b border-gray-600/50">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-seguranca-graphite/50 rounded-lg border border-gray-600/30 hover:border-seguranca-yellow/30 transition-colors duration-200">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-seguranca-yellow to-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <User size={14} className="text-seguranca-black sm:w-[18px] sm:h-[18px]" />
+          {/* Informações do Funcionário - Compacto e Responsivo */}
+          <div className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-2 sm:pb-3 bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black border-b border-gray-600/50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 p-2 sm:p-2.5 bg-seguranca-graphite/50 rounded-lg border border-gray-600/30 hover:border-seguranca-yellow/30 transition-colors duration-200">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-seguranca-yellow to-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <User size={12} className="text-seguranca-black sm:w-4 sm:h-4" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide">Funcionário</span>
-                  <span className="text-seguranca-lightgray font-semibold truncate text-sm sm:text-base">{payslip.employeeName}</span>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 uppercase tracking-wide">Funcionário</span>
+                  <span className="text-seguranca-lightgray font-semibold truncate text-xs sm:text-sm lg:text-base">{payslip.employeeName}</span>
                 </div>
               </div>
               
               {payslip.cpf && (
-                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-seguranca-graphite/50 rounded-lg border border-gray-600/30 hover:border-green-500/30 transition-colors duration-200">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-bold text-xs sm:text-sm">ID</span>
+                <div className="flex items-center gap-2 p-2 sm:p-2.5 bg-seguranca-graphite/50 rounded-lg border border-gray-600/30 hover:border-green-500/30 transition-colors duration-200">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-[10px] sm:text-xs">ID</span>
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide">CPF</span>
-                    <span className="text-seguranca-lightgray font-mono text-xs sm:text-sm">{payslip.cpf}</span>
+                    <span className="text-[9px] sm:text-[10px] text-gray-400 uppercase tracking-wide">CPF</span>
+                    <span className="text-seguranca-lightgray font-mono text-[10px] sm:text-xs">{payslip.cpf}</span>
                   </div>
                 </div>
               )}
               
-              <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-seguranca-graphite/50 rounded-lg border border-gray-600/30 hover:border-blue-500/30 transition-colors duration-200 sm:col-span-2 lg:col-span-1">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Calendar size={14} className="text-white sm:w-[18px] sm:h-[18px]" />
+              <div className="flex items-center gap-2 p-2 sm:p-2.5 bg-seguranca-graphite/50 rounded-lg border border-gray-600/30 hover:border-blue-500/30 transition-colors duration-200 sm:col-span-2 lg:col-span-1">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Calendar size={12} className="text-white sm:w-4 sm:h-4" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide">Período</span>
-                  <span className="text-seguranca-lightgray font-semibold text-sm sm:text-base">{payslip.month}/{payslip.year}</span>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 uppercase tracking-wide">Período</span>
+                  <span className="text-seguranca-lightgray font-semibold text-xs sm:text-sm lg:text-base">{payslip.month}/{payslip.year}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Área do PDF - Design Moderno e Responsivo */}
-          <div className="flex-1 bg-gradient-to-br from-seguranca-black via-gray-900 to-seguranca-black p-2 sm:p-4 overflow-hidden">
+          {/* Área do PDF - Otimizada e Responsiva */}
+          <div className="flex-1 bg-gradient-to-br from-seguranca-black via-gray-900 to-seguranca-black p-1 sm:p-2 lg:p-4 overflow-hidden">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <div className="relative">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-seguranca-yellow/20 mx-auto mb-6"></div>
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-seguranca-yellow absolute top-0 left-1/2 transform -translate-x-1/2"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-seguranca-yellow/20 mx-auto mb-4 sm:mb-6"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-transparent border-t-seguranca-yellow absolute top-0 left-1/2 transform -translate-x-1/2"></div>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-seguranca-lightgray text-lg font-semibold">Carregando PDF...</p>
-                    <p className="text-gray-400 text-sm">Preparando visualização do holerite</p>
+                  <div className="space-y-1 sm:space-y-2">
+                    <p className="text-seguranca-lightgray text-sm sm:text-lg font-semibold">Carregando PDF...</p>
+                    <p className="text-gray-400 text-xs sm:text-sm">Preparando visualização do holerite</p>
                   </div>
                 </div>
               </div>
             ) : error ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md">
-                  <div className="relative mb-6">
-                    <div className="w-20 h-20 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-2xl flex items-center justify-center mx-auto border border-red-500/30">
-                      <X size={40} className="text-red-500" />
+                  <div className="relative mb-4 sm:mb-6">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-2xl flex items-center justify-center mx-auto border border-red-500/30">
+                      <X size={32} className="text-red-500 sm:w-10 sm:h-10" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                    <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 bg-red-500 rounded-full flex items-center justify-center">
                       <span className="text-white text-xs font-bold">!</span>
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <p className="text-red-400 text-lg font-semibold mb-2">Erro ao carregar PDF</p>
-                      <p className="text-gray-400 text-sm">{error}</p>
+                      <p className="text-red-400 text-base sm:text-lg font-semibold mb-1 sm:mb-2">Erro ao carregar PDF</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">{error}</p>
                     </div>
                     <Button 
                       onClick={loadPdf} 
                       variant="outline" 
-                      className="border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white hover:scale-105 transition-all duration-200"
+                      size="sm"
+                      className="border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200 text-xs sm:text-sm"
                     >
-                      <RotateCw size={16} className="mr-2" />
+                      <RotateCw size={14} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
                       Tentar Novamente
                     </Button>
                   </div>
                 </div>
               </div>
             ) : pdfUrl ? (
-              <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-seguranca-black rounded-xl overflow-hidden border border-gray-600/30 shadow-2xl">
+              <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-seguranca-black rounded-lg sm:rounded-xl overflow-hidden border border-gray-600/30 shadow-2xl">
                 <div className="relative w-full h-full">
                   <iframe
                     src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                    className="w-full h-full border-0 rounded-xl"
+                    className="w-full h-full border-0 rounded-lg sm:rounded-xl"
                     style={{
                       transform: `scale(${zoom}) rotate(${rotation}deg)`,
                       transformOrigin: 'center center',
@@ -277,8 +278,8 @@ export const HoleriteViewModal: React.FC<HoleriteViewModalProps> = ({
                   />
                   {/* Overlay de zoom para melhor UX */}
                   {zoom !== 1 && (
-                    <div className="absolute top-4 right-4 bg-seguranca-black/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-600/50">
-                      <span className="text-seguranca-yellow text-sm font-mono">
+                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-seguranca-black/80 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-3 sm:py-2 border border-gray-600/50">
+                      <span className="text-seguranca-yellow text-xs sm:text-sm font-mono">
                         {Math.round(zoom * 100)}%
                       </span>
                     </div>
@@ -288,59 +289,63 @@ export const HoleriteViewModal: React.FC<HoleriteViewModalProps> = ({
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-gray-600/20 to-gray-700/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-600/30">
-                    <FileText size={32} className="text-gray-500" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-gray-600/20 to-gray-700/20 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 border border-gray-600/30">
+                    <FileText size={24} className="text-gray-500 sm:w-8 sm:h-8" />
                   </div>
-                  <p className="text-gray-400">Nenhum PDF disponível</p>
+                  <p className="text-gray-400 text-sm sm:text-base">Nenhum PDF disponível</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Botões de Ação - Design Moderno e Responsivo */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black border-t border-gray-600/50">
-            <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 justify-between items-center">
+          {/* Botões de Ação - Compactos e Responsivos */}
+          <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black border-t border-gray-600/50">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-between items-center">
               {/* Botão Fechar */}
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={handleClose}
-                className="border-gray-500/50 text-gray-400 hover:bg-gray-600 hover:text-white hover:scale-105 transition-all duration-200 order-1 lg:order-none w-full sm:w-auto"
+                className="border-gray-500/50 text-gray-400 hover:bg-gray-600 hover:text-white transition-all duration-200 order-1 sm:order-none w-full sm:w-auto text-xs sm:text-sm"
               >
-                <X size={14} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
-                <span className="text-sm sm:text-base">Fechar</span>
+                <X size={12} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
+                <span>Fechar</span>
               </Button>
               
               {/* Botões de Ação */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 order-2 lg:order-none w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 order-2 sm:order-none w-full sm:w-auto">
                 <Button 
                   variant="outline" 
+                  size="sm"
                   onClick={onSendEmail}
-                  className="border-green-500/50 text-green-400 hover:bg-green-500 hover:text-white hover:scale-105 transition-all duration-200 shadow-lg shadow-green-500/10 w-full sm:w-auto"
+                  className="border-green-500/50 text-green-400 hover:bg-green-500 hover:text-white transition-all duration-200 shadow-lg shadow-green-500/10 w-full sm:w-auto text-xs sm:text-sm"
                 >
-                  <Mail size={14} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline text-sm">Enviar Email</span>
-                  <span className="sm:hidden text-sm">Email</span>
+                  <Mail size={12} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Enviar Email</span>
+                  <span className="sm:hidden">Email</span>
                 </Button>
                 
                 {onSendWhatsApp && (
                   <Button 
                     variant="outline" 
+                    size="sm"
                     onClick={onSendWhatsApp}
-                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white hover:scale-105 transition-all duration-200 shadow-lg shadow-blue-500/10 w-full sm:w-auto"
+                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white transition-all duration-200 shadow-lg shadow-blue-500/10 w-full sm:w-auto text-xs sm:text-sm"
                   >
-                    <MessageSquare size={14} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline text-sm">Enviar WhatsApp</span>
-                    <span className="sm:hidden text-sm">WhatsApp</span>
+                    <MessageSquare size={12} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Enviar WhatsApp</span>
+                    <span className="sm:hidden">WhatsApp</span>
                   </Button>
                 )}
                 
                 <Button 
+                  size="sm"
                   onClick={onDownload}
-                  className="bg-gradient-to-r from-seguranca-red to-red-600 hover:from-seguranca-darkred hover:to-red-700 hover:scale-105 transition-all duration-200 shadow-lg shadow-seguranca-red/20 w-full sm:w-auto"
+                  className="bg-gradient-to-r from-seguranca-red to-red-600 hover:from-seguranca-darkred hover:to-red-700 transition-all duration-200 shadow-lg shadow-seguranca-red/20 w-full sm:w-auto text-xs sm:text-sm"
                 >
-                  <Download size={14} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline text-sm">Download PDF</span>
-                  <span className="sm:hidden text-sm">Download</span>
+                  <Download size={12} className="mr-1 sm:mr-2 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Download PDF</span>
+                  <span className="sm:hidden">Download</span>
                 </Button>
               </div>
             </div>

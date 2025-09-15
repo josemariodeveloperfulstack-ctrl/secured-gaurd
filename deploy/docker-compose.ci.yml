@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # DATABASE (CI/Test)
+  # ========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: secured-guard-db-ci
+    environment:
+      POSTGRES_DB: secured_guard_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ../../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+    networks:
+      - secured-guard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # REDIS CACHE (CI/Test)
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: secured-guard-redis-ci
+    ports:
+      - "6380:6379"
+    networks:
+      - secured-guard-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # BACKEND API (CI/Test)
+  # ========================================
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.dev
+    container_name: secured-guard-backend-ci
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_test
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - secured-guard-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # FRONTEND (CI/Test)
+  # ========================================
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.dev
+    container_name: secured-guard-frontend-ci
+    environment:
+      VITE_API_URL: http://localhost:8081/api
+      VITE_WS_URL: ws://localhost:8081/ws
+    ports:
+      - "5174:5173"
+    depends_on:
+      - backend
+    networks:
+      - secured-guard-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ========================================
+# NETWORKS
+# ========================================
+networks:
+  secured-guard-network:
+    driver: bridge

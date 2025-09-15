@@ -1,12 +1,17 @@
 version: '3.8'
 
+# ========================================
+# DOCKER COMPOSE PARA DESENVOLVIMENTO LOCAL
+# Para produção, use: deploy/docker-compose.prod.yml
+# ========================================
+
 services:
   # ========================================
   # DATABASE
   # ========================================
   postgres:
     image: postgres:15-alpine
-    container_name: envio-holerites-db
+    container_name: secured-guard-db-local
     environment:
       POSTGRES_DB: secured_guard
       POSTGRES_USER: postgres
@@ -17,7 +22,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -29,13 +34,13 @@ services:
   # ========================================
   redis:
     image: redis:7-alpine
-    container_name: envio-holerites-redis
+    container_name: secured-guard-redis-local
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -50,7 +55,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
-    container_name: envio-holerites-backend
+    container_name: secured-guard-backend-local
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard
@@ -72,7 +77,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
@@ -86,7 +91,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: envio-holerites-frontend
+    container_name: secured-guard-frontend-local
     environment:
       VITE_API_URL: http://localhost:8080/api
       VITE_WS_URL: ws://localhost:8080/ws
@@ -98,7 +103,7 @@ services:
     depends_on:
       - backend
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5173"]
       interval: 30s
@@ -121,7 +126,7 @@ services:
       - wppconnect_data:/app/.wwebjs_auth
       - wppconnect_logs:/app/logs
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/status"]
       interval: 30s
@@ -146,7 +151,7 @@ services:
       - baileys_data:/app/data
       - baileys_logs:/app/logs
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -174,7 +179,7 @@ services:
       - n8n_data:/home/node/.n8n
       - ./n8n-workflows:/home/node/.n8n/workflows
     networks:
-      - envio-holerites-network
+      - secured-guard-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
       interval: 30s
@@ -200,7 +205,7 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     networks:
-      - envio-holerites-network
+      - secured-guard-network
 
   grafana:
     image: grafana/grafana:latest
@@ -217,7 +222,7 @@ services:
     depends_on:
       - prometheus
     networks:
-      - envio-holerites-network
+      - secured-guard-network
 
   # ========================================
   # LOG AGGREGATION
@@ -234,7 +239,7 @@ services:
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
-      - envio-holerites-network
+      - secured-guard-network
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
@@ -246,7 +251,7 @@ services:
     depends_on:
       - elasticsearch
     networks:
-      - envio-holerites-network
+      - secured-guard-network
 
   # ========================================
   # REVERSE PROXY
@@ -264,7 +269,7 @@ services:
       - frontend
       - backend
     networks:
-      - envio-holerites-network
+      - secured-guard-network
 
 # ========================================
 # VOLUMES
@@ -287,5 +292,5 @@ volumes:
 # NETWORKS
 # ========================================
 networks:
-  envio-holerites-network:
+  secured-guard-network:
     driver: bridge 

@@ -140,7 +140,7 @@ export interface ConfiguracaoFluxo {
 }
 
 class FluxoCaixaService {
-  private baseURL = '/api/fluxo-caixa';
+  private baseURL = '/fluxo-caixa';
 
   // CRUD Movimentações
   async listarMovimentacoes(filtros?: {

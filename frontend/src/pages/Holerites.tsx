@@ -278,50 +278,46 @@ const Holerites: React.FC = () => {
     console.log('Excluindo holerites:', selectedHolerites);
   };
 
-  // Função para processar upload de comprovantes
+  // Função para processar upload de comprovantes - USANDO PROCESSAMENTO AUTOMÁTICO
   const handlePaymentReceiptUpload = async (file: File) => {
     try {
       setProcessingPaymentReceipts(true);
-      console.log('📤 Iniciando upload do comprovante:', file.name);
+      console.log('📤 Iniciando processamento automático do comprovante:', file.name);
       
-      // Tentar fazer upload via service
+      // Usar o novo endpoint de processamento automático
       try {
-        const newReceipt = await paymentReceiptService.uploadPaymentReceipt(
-          file, 
-          'NOVO FUNCIONÁRIO', 
-          1, // janeiro
-          2025
-        );
+        const formData = new FormData();
+        formData.append('file', file);
         
-        console.log('✅ Comprovante criado no backend:', newReceipt);
-        setPaymentReceipts(prev => [...prev, newReceipt]);
+        const response = await api.post('/receipts/process-automatic', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 60000, // 60 segundos para processamento
+        });
+        
+        const processedReceipts: PaymentReceipt[] = response.data;
+        console.log('✅ Comprovantes processados automaticamente:', processedReceipts);
+        
+        // Adicionar todos os comprovantes processados
+        setPaymentReceipts(prev => [...prev, ...processedReceipts]);
         
         toast({
           title: "Sucesso",
-          description: "Comprovante de pagamento processado e salvo com sucesso!",
+          description: `${processedReceipts.length} comprovante(s) processado(s) automaticamente!`,
         });
+        
       } catch (backendError) {
-        console.warn('⚠️ Erro no backend, usando simulação local:', backendError);
-        
-        // Fallback para simulação local
-        const newReceipt: PaymentReceipt = {
-          id: `pr-${Date.now()}`,
-          employeeName: 'NOVO FUNCIONÁRIO',
-          year: 2025,
-          month: 1,
-          fileName: file.name,
-          filePath: `uploads/payment-receipts/2025/01/${file.name}`,
-          status: 'PROCESSED',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        setPaymentReceipts(prev => [...prev, newReceipt]);
+        console.error('❌ Erro no processamento automático:', backendError);
         
         toast({
-          title: "Sucesso",
-          description: "Comprovante de pagamento processado com sucesso!",
+          title: "Erro",
+          description: "Erro ao processar comprovante automaticamente. Verifique se o arquivo está no formato correto.",
+          variant: "destructive"
         });
+        
+        // Não usar fallback - deixar o usuário tentar novamente
+        return;
       }
       
       setShowPaymentReceiptUploadModal(false);

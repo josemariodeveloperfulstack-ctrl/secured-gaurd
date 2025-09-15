@@ -47,7 +47,7 @@ export const activityLogService = {
       if (filters.page !== undefined) params.append('page', filters.page.toString());
       if (filters.size !== undefined) params.append('size', filters.size.toString());
       
-      const response = await api.get(`/api/activity-logs?${params.toString()}`);
+      const response = await api.get(`/activity-logs?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs:', error);
@@ -60,7 +60,7 @@ export const activityLogService = {
    */
   async getLogsByUser(userId: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/user/${userId}`);
+      const response = await api.get(`/activity-logs/user/${userId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por usuário:', error);
@@ -73,7 +73,7 @@ export const activityLogService = {
    */
   async getLogsByUsername(username: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/username/${username}`);
+      const response = await api.get(`/activity-logs/username/${username}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por username:', error);
@@ -86,7 +86,7 @@ export const activityLogService = {
    */
   async getLogsByPeriod(startDate: string, endDate: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/period?startDate=${startDate}&endDate=${endDate}`);
+      const response = await api.get(`/activity-logs/period?startDate=${startDate}&endDate=${endDate}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por período:', error);
@@ -99,7 +99,7 @@ export const activityLogService = {
    */
   async getLogsByAction(action: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/action/${action}`);
+      const response = await api.get(`/activity-logs/action/${action}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por ação:', error);
@@ -112,7 +112,7 @@ export const activityLogService = {
    */
   async getLogsByModule(module: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/module/${module}`);
+      const response = await api.get(`/activity-logs/module/${module}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por módulo:', error);
@@ -125,7 +125,7 @@ export const activityLogService = {
    */
   async getLogsByStatus(status: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/status/${status}`);
+      const response = await api.get(`/activity-logs/status/${status}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por status:', error);
@@ -138,7 +138,7 @@ export const activityLogService = {
    */
   async getLogsByIpAddress(ipAddress: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/ip/${ipAddress}`);
+      const response = await api.get(`/activity-logs/ip/${ipAddress}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por IP:', error);
@@ -151,7 +151,7 @@ export const activityLogService = {
    */
   async getLogsBySessionId(sessionId: string): Promise<UserActivityLog[]> {
     try {
-      const response = await api.get(`/api/activity-logs/session/${sessionId}`);
+      const response = await api.get(`/activity-logs/session/${sessionId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar logs por sessão:', error);
@@ -170,7 +170,7 @@ export const activityLogService = {
       if (module) params.append('module', module);
       if (details) params.append('details', details);
       
-      await api.post(`/api/activity-logs/start?${params.toString()}`);
+      await api.post(`/activity-logs/start?${params.toString()}`);
     } catch (error) {
       console.error('Erro ao iniciar atividade:', error);
       // Não lança erro para não interromper o fluxo principal
@@ -182,7 +182,7 @@ export const activityLogService = {
    */
   async endActivity(logId: string, status: string): Promise<void> {
     try {
-      await api.post(`/api/activity-logs/end/${logId}?status=${status}`);
+      await api.post(`/activity-logs/end/${logId}?status=${status}`);
     } catch (error) {
       console.error('Erro ao finalizar atividade:', error);
       // Não lança erro para não interromper o fluxo principal
@@ -201,7 +201,7 @@ export const activityLogService = {
       if (module) params.append('module', module);
       if (details) params.append('details', details);
       
-      await api.post(`/api/activity-logs/log?${params.toString()}`);
+      await api.post(`/activity-logs/log?${params.toString()}`);
     } catch (error) {
       console.error('Erro ao registrar atividade:', error);
       // Não lança erro para não interromper o fluxo principal
