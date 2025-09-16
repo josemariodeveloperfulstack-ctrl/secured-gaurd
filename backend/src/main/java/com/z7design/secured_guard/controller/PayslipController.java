@@ -15,10 +15,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,15 +28,10 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.Collections;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.GrantedAuthority;
-import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/payslips")
@@ -319,19 +314,46 @@ public class PayslipController {
                 return ResponseEntity.ok(result);
             }
             
-            List<UUID> ids = idStrings.stream()
-                .map(UUID::fromString)
-                .collect(java.util.stream.Collectors.toList());
+            log.info("🗑️ Tentando excluir {} payslips", idStrings.size());
             
-            Map<String, Object> result = payslipService.deleteMultiplePayslips(ids);
+            // Converter IDs para UUID com validação individual
+            List<UUID> validIds = new ArrayList<>();
+            List<String> invalidIds = new ArrayList<>();
+            
+            for (String idString : idStrings) {
+                try {
+                    UUID uuid = UUID.fromString(idString);
+                    validIds.add(uuid);
+                } catch (IllegalArgumentException e) {
+                    log.warn("ID inválido encontrado: {} - {}", idString, e.getMessage());
+                    invalidIds.add(idString);
+                }
+            }
+            
+            // Se todos os IDs são inválidos, retornar erro
+            if (validIds.isEmpty()) {
+                log.error("Todos os IDs fornecidos são inválidos: {}", invalidIds);
+                Map<String, Object> errorResult = new HashMap<>();
+                errorResult.put("deleted", 0);
+                errorResult.put("failed", idStrings.size());
+                errorResult.put("errors", List.of("Todos os IDs fornecidos são inválidos. IDs inválidos: " + String.join(", ", invalidIds)));
+                return ResponseEntity.badRequest().body(errorResult);
+            }
+            
+            // Se alguns IDs são inválidos, logar mas continuar com os válidos
+            if (!invalidIds.isEmpty()) {
+                log.warn("Alguns IDs são inválidos e serão ignorados: {}", invalidIds);
+            }
+            
+            Map<String, Object> result = payslipService.deleteMultiplePayslips(validIds);
+            
+            // Adicionar informações sobre IDs inválidos ao resultado
+            if (!invalidIds.isEmpty()) {
+                result.put("invalidIds", invalidIds);
+                result.put("invalidCount", invalidIds.size());
+            }
+            
             return ResponseEntity.ok(result);
-        } catch (IllegalArgumentException e) {
-            log.error("Erro ao converter IDs para UUID: {}", e.getMessage());
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("deleted", 0);
-            errorResult.put("failed", 0);
-            errorResult.put("errors", List.of("IDs inválidos: " + e.getMessage()));
-            return ResponseEntity.badRequest().body(errorResult);
         } catch (Exception e) {
             log.error("Erro inesperado ao excluir múltiplos payslips: {}", e.getMessage(), e);
             Map<String, Object> errorResult = new HashMap<>();

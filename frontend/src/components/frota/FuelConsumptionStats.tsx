@@ -83,12 +83,18 @@ export const FuelConsumptionStats: React.FC<FuelConsumptionStatsProps> = ({ vehi
     setError(null);
 
     try {
-      const response = await api.get(`/api/fuel-records/vehicle/${selectedVehicle}`);
+      console.log('🔍 Carregando estatísticas para veículo:', selectedVehicle);
+      const response = await api.get(`/fuel-records/vehicle/${selectedVehicle}`);
+      console.log('✅ Dados recebidos:', response.data?.length || 0, 'registros');
+      
       const records = response.data
         .filter(r => r.mileage != null)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+      console.log('📊 Registros válidos após filtro:', records.length);
+
       if (records.length < 2) {
+        console.log('⚠️ Poucos registros para calcular estatísticas');
         setStats(null);
         setHistoricalData([]);
         return;
@@ -137,11 +143,25 @@ export const FuelConsumptionStats: React.FC<FuelConsumptionStatsProps> = ({ vehi
       setHistoricalData(chartData);
 
     } catch (err: any) {
-      console.error('Erro ao carregar estatísticas:', err);
-      setError(err.response?.data?.message || err.message || 'Erro ao carregar estatísticas');
+      console.error('❌ Erro ao carregar estatísticas:', err);
+      
+      // Melhorar mensagem de erro baseada no tipo de erro
+      let errorMessage = 'Erro ao carregar estatísticas';
+      
+      if (err.response?.status === 500) {
+        errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (err.response?.status === 404) {
+        errorMessage = 'Veículo não encontrado ou sem registros de combustível.';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as estatísticas de consumo.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

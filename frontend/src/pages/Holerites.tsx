@@ -1176,6 +1176,15 @@ const Holerites: React.FC = () => {
       try {
         const result = await holeriteService.deleteMultipleHolerites(selectedHolerites);
         
+        // Verificar se há IDs inválidos
+        if (result.invalidCount && result.invalidCount > 0) {
+          toast({
+            title: "Aviso",
+            description: `${result.invalidCount} holerite${result.invalidCount > 1 ? 's' : ''} com ID${result.invalidCount > 1 ? 's' : ''} inválido${result.invalidCount > 1 ? 's' : ''} foram ignorado${result.invalidCount > 1 ? 's' : ''}.`,
+            variant: "destructive"
+          });
+        }
+        
         if (result.deleted === 0 && result.failed === 0) {
           toast({
             title: "Informação",
@@ -1198,16 +1207,27 @@ const Holerites: React.FC = () => {
         setSelectedHolerites([]);
         await loadHolerites();
       setShowDeleteModal(false);
-      } catch (error) {
+      } catch (error: any) {
       console.error('Erro ao excluir holerites:', error);
+      
+      // Melhorar mensagem de erro baseada no tipo de erro
+      let errorMessage = "Erro ao excluir holerites. Tente novamente.";
+      
+      if (error.response?.status === 400 && error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        if (errors.length > 0) {
+          errorMessage = errors[0]; // Usar a primeira mensagem de erro do backend
+        }
+      }
+      
         toast({
           title: "Erro",
-        description: "Erro ao excluir holerites. Tente novamente.",
+          description: errorMessage,
           variant: "destructive"
         });
-    } finally {
-      setIsDeleting(false);
-    }
+      } finally {
+        setIsDeleting(false);
+      }
   };
 
   const handleViewHolerite = (payslip: Holerite) => {

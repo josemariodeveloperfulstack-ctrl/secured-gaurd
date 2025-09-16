@@ -17,6 +17,11 @@ public class DriverDTO {
 
     public static DriverDTO fromEntity(Driver driver) {
         try {
+            if (driver == null) {
+                System.err.println("Driver é nulo - retornando DTO vazio");
+                return new DriverDTO();
+            }
+            
             DriverDTO dto = new DriverDTO();
             dto.setId(driver.getId());
             dto.setName(driver.getName());
@@ -28,7 +33,19 @@ public class DriverDTO {
         } catch (Exception e) {
             System.err.println("Erro ao converter Driver para DTO: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            
+            // Retornar DTO básico em caso de erro
+            DriverDTO fallbackDto = new DriverDTO();
+            try {
+                if (driver != null) {
+                    fallbackDto.setId(driver.getId());
+                    fallbackDto.setName(driver.getName() != null ? driver.getName() : "Nome não disponível");
+                }
+            } catch (Exception fallbackError) {
+                System.err.println("Erro no fallback do DriverDTO: " + fallbackError.getMessage());
+            }
+            
+            return fallbackDto;
         }
     }
 } 

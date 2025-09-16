@@ -205,7 +205,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
       
       // Tentar buscar da nova tabela de postos
       try {
-        const stationsResponse = await api.get('/api/fuel-stations');
+        const stationsResponse = await api.get('/fuel-stations');
         console.log('✅ Postos carregados da tabela fuel_stations:', stationsResponse.data);
         
         if (stationsResponse.data && Array.isArray(stationsResponse.data)) {
@@ -222,7 +222,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
       
       // Fallback: buscar dos registros de combustível
       console.log('🔄 Tentando fallback para registros de combustível...');
-      const fuelRecordsResponse = await api.get('/api/fuel-records');
+      const fuelRecordsResponse = await api.get('/fuel-records');
       console.log('📊 Registros de combustível para fallback:', fuelRecordsResponse.data);
       
       if (fuelRecordsResponse.data && Array.isArray(fuelRecordsResponse.data)) {
@@ -290,7 +290,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
     }
 
     try {
-      const response = await api.post('/api/fuel-stations', {
+      const response = await api.post('/fuel-stations', {
         name: newStationData.name.trim(),
         address: newStationData.address.trim(),
         city: newStationData.city.trim() || null,
