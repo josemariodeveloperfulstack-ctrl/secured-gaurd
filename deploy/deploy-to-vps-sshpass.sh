@@ -64,6 +64,8 @@ log "2. Configurando SSH..."
 # Criar diretório SSH
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
+touch ~/.ssh/known_hosts
+chmod 600 ~/.ssh/known_hosts
 
 # Adicionar chave do host
 ssh-keyscan -p $VPS_PORT $VPS_HOST >> ~/.ssh/known_hosts
