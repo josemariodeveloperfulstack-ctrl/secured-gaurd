@@ -44,9 +44,9 @@ fi
 # Verificar se o usuário tem SSH configurado
 if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
     echo "Configuração da VPS:"
-    read -p "IP da VPS: " VPS_HOST
-    read -p "Usuário SSH: " VPS_USER
-    read -p "Porta SSH (padrão 22): " VPS_PORT
+    read -p "IP da VPS:185.225.233.18" VPS_HOST
+    read -p "Usuário SSH: root" VPS_USER
+    read -p "Porta SSH (padrão 22):22 " VPS_PORT
     VPS_PORT=${VPS_PORT:-22}
 fi
 

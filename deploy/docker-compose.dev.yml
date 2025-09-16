@@ -15,7 +15,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-      - ../../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
     networks:
       - secured-guard-network
     healthcheck:
@@ -48,7 +48,7 @@ services:
   # ========================================
   backend:
     build:
-      context: ../../backend
+      context: ../backend
       dockerfile: Dockerfile.dev
     container_name: secured-guard-backend-dev
     environment:
@@ -61,7 +61,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ../../backend:/app
+      - ../backend:/app
       - backend_logs_dev:/app/logs
       - backend_uploads_dev:/app/uploads
     depends_on:
@@ -82,7 +82,7 @@ services:
   # ========================================
   frontend:
     build:
-      context: ../../frontend
+      context: ../frontend
       dockerfile: Dockerfile.dev
     container_name: secured-guard-frontend-dev
     environment:
@@ -91,7 +91,7 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ../../frontend:/app
+      - ../frontend:/app
       - /app/node_modules
     depends_on:
       - backend

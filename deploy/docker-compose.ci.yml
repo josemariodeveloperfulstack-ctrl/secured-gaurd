@@ -14,7 +14,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ../../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
     networks:
       - secured-guard-network
     healthcheck:
@@ -45,7 +45,7 @@ services:
   # ========================================
   backend:
     build:
-      context: ../../backend
+      context: ../backend
       dockerfile: Dockerfile.dev
     container_name: secured-guard-backend-ci
     environment:
@@ -75,7 +75,7 @@ services:
   # ========================================
   frontend:
     build:
-      context: ../../frontend
+      context: ../frontend
       dockerfile: Dockerfile.dev
     container_name: secured-guard-frontend-ci
     environment:

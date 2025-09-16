@@ -39,7 +39,7 @@ fi
 VPS_HOST="185.225.233.18"
 VPS_USER="root"
 VPS_PORT="22"
-VPS_PASSWORD='$7?NMo8&Ua:'
+VPS_PASSWORD='$7?NMo8&Ua'
 
 log "Deploy com sshpass (automação de senha)"
 echo ""
