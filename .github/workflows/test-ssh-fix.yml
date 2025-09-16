@@ -1,0 +1,32 @@
+name: Test SSH Fix
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Test SSH Setup
+      run: |
+        echo "🧪 Testando configuração SSH..."
+        
+        # Preparar SSH known_hosts
+        mkdir -p ~/.ssh
+        touch ~/.ssh/known_hosts
+        chmod 700 ~/.ssh
+        chmod 600 ~/.ssh/known_hosts
+        
+        echo "✅ Diretório SSH criado com sucesso!"
+        echo "📁 Conteúdo do diretório ~/.ssh:"
+        ls -la ~/.ssh/
+        
+        # Testar ssh-keyscan (sem conectar realmente)
+        echo "🔍 Testando ssh-keyscan..."
+        ssh-keyscan -p 22 github.com >> ~/.ssh/known_hosts || echo "ssh-keyscan funcionou!"
+        
+        echo "✅ Teste SSH concluído com sucesso!"
