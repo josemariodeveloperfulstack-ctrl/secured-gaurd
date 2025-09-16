@@ -6,7 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
-      - 'deploy/docker-compose.prod-final.yml'
+      - 'deploy/docker-compose.prod-domains.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -37,32 +37,37 @@ jobs:
           exit 1
         fi
         
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.7.0
-      with:
-        ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-        
     - name: Deploy to PROD Environment
       run: |
         # Configurações
         VPS_HOST="${{ secrets.VPS_HOST }}"
         VPS_USER="${{ secrets.VPS_USER }}"
         VPS_PORT="${{ secrets.VPS_PORT }}"
+        VPS_PASSWORD="${{ secrets.VPS_PASSWORD }}"
         
         echo "🚀 Deploying to PROD Environment..."
         echo "⚠️  PRODUCTION DEPLOYMENT - This will affect live users!"
+        
+        # Instalar sshpass
+        sudo apt-get update
+        sudo apt-get install -y sshpass
+        
+        # Criar diretório SSH se não existir
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        touch ~/.ssh/known_hosts
         
         # Adicionar host conhecido
         ssh-keyscan -p $VPS_PORT $VPS_HOST >> ~/.ssh/known_hosts
         
         # Fazer backup completo do banco de produção
-        ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker exec secured-guard-db-prod pg_dump -U postgres secured_guard > backups/prod_backup_$(date +%Y%m%d_%H%M%S).sql"
+        sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker exec secured-guard-db-prod pg_dump -U postgres secured_guard > backups/prod_backup_$(date +%Y%m%d_%H%M%S).sql"
         
         # Parar containers existentes
-        ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker-compose -f deploy/docker-compose.prod-final.yml down" || true
+        sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker-compose -f deploy/docker-compose.prod-domains.yml down" || true
         
         # Copiar código atualizado
-        rsync -avz --delete \
+        sshpass -p "$VPS_PASSWORD" rsync -avz --delete \
           --exclude='.git/' \
           --exclude='node_modules/' \
           --exclude='target/' \
@@ -70,22 +75,22 @@ jobs:
           --exclude='uploads/' \
           --exclude='logs/' \
           --exclude='backups/' \
-          -e "ssh -p $VPS_PORT" \
+          -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
           ./ $VPS_USER@$VPS_HOST:/opt/secured-guard/
         
         # Build e subir containers
-        ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker-compose -f deploy/docker-compose.prod-final.yml up -d --build"
+        sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker-compose -f deploy/docker-compose.prod-domains.yml up -d --build"
         
         # Aguardar serviços ficarem prontos
         sleep 30
         
         # Verificar status
-        ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker-compose -f deploy/docker-compose.prod-final.yml ps"
+        sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && docker-compose -f deploy/docker-compose.prod-domains.yml ps"
         
         # Testar endpoints
-        ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "curl -f https://prod.z7botsolutions.com.br/api/actuator/health || echo 'Backend health check failed'"
-        ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "curl -f https://prod.z7botsolutions.com.br/ || echo 'Frontend health check failed'"
+        sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "curl -f https://securedguard.z7botsolutions.com.br/api/actuator/health || echo 'Backend health check failed'"
+        sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "curl -f https://securedguard.z7botsolutions.com.br/ || echo 'Frontend health check failed'"
         
         echo "✅ PROD Environment deployed successfully!"
-        echo "🌐 Access: https://prod.z7botsolutions.com.br"
-        echo "📊 Backend API: https://prod.z7botsolutions.com.br/api"
+        echo "🌐 Access: https://securedguard.z7botsolutions.com.br"
+        echo "📊 Backend API: https://securedguard.z7botsolutions.com.br/api"
