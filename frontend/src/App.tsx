@@ -42,6 +42,7 @@ const DocumentosUnificados = lazy(() => import('@/pages/DocumentosUnificados'));
 const EPIs = lazy(() => import('@/pages/EPIs'));
 const Certificacoes = lazy(() => import('@/pages/Certificacoes'));
 const RH = lazy(() => import('@/pages/RH'));
+const SST = lazy(() => import('@/pages/RH/SST'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
@@ -508,6 +509,11 @@ function App() {
                     <Route path="/rh" element={
                       <ProtectedRoute>
                         <RH />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst" element={
+                      <ProtectedRoute>
+                        <SST />
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/funcionarios" element={

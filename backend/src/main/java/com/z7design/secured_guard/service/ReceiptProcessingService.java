@@ -179,7 +179,7 @@ public class ReceiptProcessingService {
                     .fileName(fileName)
                     .filePath(newPdfPath != null ? newPdfPath : "sem_pdf")
                     .status(PaymentReceiptStatus.PROCESSED)
-                    .createdAt(LocalDateTime.now())
+                    .processedAt(LocalDateTime.now())
                     // Campos bancários extraídos
                     .debitedAgency(receiptData.agency != null ? receiptData.agency : "0925")
                     .debitedAccount(receiptData.account != null ? receiptData.account : "98240 - 7")

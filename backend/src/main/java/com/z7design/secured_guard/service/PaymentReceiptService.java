@@ -271,6 +271,7 @@ public class PaymentReceiptService {
         dto.setNotes(paymentReceipt.getNotes());
         dto.setCreatedAt(paymentReceipt.getCreatedAt());
         dto.setUpdatedAt(paymentReceipt.getUpdatedAt());
+        dto.setProcessedAt(paymentReceipt.getProcessedAt());
         dto.setCreatedBy(paymentReceipt.getCreatedBy());
         dto.setUpdatedBy(paymentReceipt.getUpdatedBy());
         

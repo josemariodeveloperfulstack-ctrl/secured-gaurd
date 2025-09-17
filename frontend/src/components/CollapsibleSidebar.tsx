@@ -24,6 +24,8 @@ import {
   FileCheck,
   Calculator,
   AlertTriangle,
+  Stethoscope,
+  HardHat,
   Bell,
   Home,
   Menu,
@@ -111,6 +113,18 @@ const rhMenuItems = [
   { icon: FileBarChart, text: 'Avaliação de Desempenho', to: '/rh/avaliacao-desempenho', id: 'rh-avaliacao-desempenho' },
   { icon: TrendingUp, text: 'Plano de Carreira', to: '/rh/plano-carreira', id: 'rh-plano-carreira' },
   { icon: BarChart3, text: 'Relatórios RH', to: '/rh/relatorios', id: 'rh-relatorios' },
+];
+
+// Módulo SST - Saúde e Segurança do Trabalho
+const sstMenuItems = [
+  { icon: Shield, text: 'Controle SST', to: '/rh/sst', id: 'rh-sst' },
+  { icon: Stethoscope, text: 'Exames Médicos', to: '/rh/sst/exames', id: 'rh-sst-exames' },
+  { icon: HardHat, text: 'EPIs', to: '/rh/sst/epis', id: 'rh-sst-epis' },
+  { icon: AlertTriangle, text: 'Acidentes', to: '/rh/sst/acidentes', id: 'rh-sst-acidentes' },
+  { icon: GraduationCap, text: 'Treinamentos SST', to: '/rh/sst/treinamentos', id: 'rh-sst-treinamentos' },
+  { icon: FileCheck, text: 'Inspeções', to: '/rh/sst/inspecoes', id: 'rh-sst-inspecoes' },
+  { icon: Users, text: 'CIPA', to: '/rh/sst/cipa', id: 'rh-sst-cipa' },
+  { icon: BarChart3, text: 'Relatórios SST', to: '/rh/sst/relatorios', id: 'rh-sst-relatorios' },
 ];
 
 // Módulo Departamento Pessoal
@@ -447,6 +461,40 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               )}
               <nav className="space-y-1 px-4">
                 {rhMenuItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
+
+          {/* Grupo SST */}
+          {shouldShowModule('EMPLOYEES_READ') && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Saúde e Segurança (SST)
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {sstMenuItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}

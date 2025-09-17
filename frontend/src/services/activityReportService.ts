@@ -38,7 +38,39 @@ export const activityReportService = {
   // Criar novo relatório
   async createActivityReport(reportData: CreateActivityReportDTO): Promise<ActivityReport> {
     try {
-      const response = await api.post('/activity-reports', reportData);
+      const formData = new FormData();
+      
+      // Adicionar dados básicos
+      formData.append('employeeId', reportData.employeeId);
+      formData.append('clientId', reportData.clientId);
+      formData.append('workPostId', reportData.workPostId);
+      formData.append('date', reportData.date);
+      formData.append('startTime', reportData.startTime);
+      formData.append('endTime', reportData.endTime);
+      formData.append('description', reportData.description);
+      formData.append('absenceStatus', reportData.absenceStatus);
+      
+      // Adicionar equipamentos de segurança se existirem
+      if (reportData.ballisticPlate) {
+        formData.append('ballisticPlate', JSON.stringify(reportData.ballisticPlate));
+      }
+      if (reportData.weaponRegistry) {
+        formData.append('weaponRegistry', JSON.stringify(reportData.weaponRegistry));
+      }
+      
+      // Adicionar divergências e consulta médica
+      if (reportData.divergences) {
+        formData.append('divergences', reportData.divergences);
+      }
+      if (reportData.medicalConsultation) {
+        formData.append('medicalConsultation', JSON.stringify(reportData.medicalConsultation));
+      }
+
+      const response = await api.post('/api/activity-reports', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return response.data;
     } catch (error) {
       console.error('Erro ao criar relatório de atividade:', error);
@@ -68,17 +100,18 @@ export const activityReportService = {
   },
 
   // Upload de foto
-  async uploadPhoto(reportId: string, file: File, description: string): Promise<void> {
+  async uploadPhoto(reportId: string, file: File, description: string): Promise<ActivityReport> {
     try {
       const formData = new FormData();
       formData.append('photo', file);
       formData.append('description', description);
 
-      await api.post(`/api/activity-reports/${reportId}/photos`, formData, {
+      const response = await api.post(`/api/activity-reports/${reportId}/photos`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
+      return response.data;
     } catch (error) {
       console.error('Erro ao fazer upload da foto:', error);
       throw new Error('Falha ao fazer upload da foto');
@@ -86,26 +119,57 @@ export const activityReportService = {
   },
 
   // Upload de documento
-  async uploadDocument(reportId: string, file: File): Promise<void> {
+  async uploadDocument(reportId: string, file: File): Promise<ActivityReport> {
     try {
       const formData = new FormData();
       formData.append('document', file);
 
-      await api.post(`/api/activity-reports/${reportId}/documents`, formData, {
+      const response = await api.post(`/api/activity-reports/${reportId}/documents`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
+      return response.data;
     } catch (error) {
       console.error('Erro ao fazer upload do documento:', error);
       throw new Error('Falha ao fazer upload do documento');
     }
   },
 
-  // Aprovar relatório (supervisor)
-  async approveReport(id: string): Promise<ActivityReport> {
+  // Upload múltiplo de fotos
+  async uploadMultiplePhotos(reportId: string, files: File[]): Promise<ActivityReport> {
     try {
-      const response = await api.patch(`/api/activity-reports/${id}/approve`);
+      const uploadPromises = files.map((file, index) => 
+        this.uploadPhoto(reportId, file, `Foto ${index + 1} - ${new Date().toLocaleString()}`)
+      );
+      
+      const results = await Promise.all(uploadPromises);
+      return results[results.length - 1]; // Retorna o último resultado
+    } catch (error) {
+      console.error('Erro ao fazer upload das fotos:', error);
+      throw new Error('Falha ao fazer upload das fotos');
+    }
+  },
+
+  // Upload múltiplo de documentos
+  async uploadMultipleDocuments(reportId: string, files: File[]): Promise<ActivityReport> {
+    try {
+      const uploadPromises = files.map(file => 
+        this.uploadDocument(reportId, file)
+      );
+      
+      const results = await Promise.all(uploadPromises);
+      return results[results.length - 1]; // Retorna o último resultado
+    } catch (error) {
+      console.error('Erro ao fazer upload dos documentos:', error);
+      throw new Error('Falha ao fazer upload dos documentos');
+    }
+  },
+
+  // Aprovar relatório (supervisor)
+  async approveReport(id: string, supervisorId: string): Promise<ActivityReport> {
+    try {
+      const response = await api.patch(`/api/activity-reports/${id}/approve?supervisorId=${supervisorId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao aprovar relatório:', error);
@@ -114,9 +178,9 @@ export const activityReportService = {
   },
 
   // Rejeitar relatório (supervisor)
-  async rejectReport(id: string, reason: string): Promise<ActivityReport> {
+  async rejectReport(id: string, supervisorId: string, reason: string): Promise<ActivityReport> {
     try {
-      const response = await api.patch(`/api/activity-reports/${id}/reject`, { reason });
+      const response = await api.patch(`/api/activity-reports/${id}/reject?supervisorId=${supervisorId}&reason=${encodeURIComponent(reason)}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao rejeitar relatório:', error);

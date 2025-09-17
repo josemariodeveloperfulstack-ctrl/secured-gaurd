@@ -1,84 +1,108 @@
 package com.z7design.secured_guard.service;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.z7design.secured_guard.model.EPI;
 import com.z7design.secured_guard.model.EPIStatus;
 import com.z7design.secured_guard.repository.EPIRepository;
-
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Serviço para gerenciamento de EPIs (entidade original)
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
+@Transactional
 public class EPIService {
-    
+
     private final EPIRepository epiRepository;
-    
-    @Transactional
+
+    /**
+     * Cria um novo EPI
+     */
     public EPI create(EPI epi) {
+        log.info("Criando EPI: {}", epi.getName());
         return epiRepository.save(epi);
     }
-    
-    @Transactional
+
+    /**
+     * Atualiza um EPI existente
+     */
     public EPI update(UUID id, EPI epi) {
-        EPI existingEPI = findById(id);
-        epi.setId(existingEPI.getId());
-        return epiRepository.save(epi);
+        log.info("Atualizando EPI: {}", id);
+        return epiRepository.findById(id)
+                .map(existing -> {
+                    existing.setName(epi.getName());
+                    existing.setDescription(epi.getDescription());
+                    existing.setIssueDate(epi.getIssueDate());
+                    existing.setExpirationDate(epi.getExpirationDate());
+                    existing.setStatus(epi.getStatus());
+                    existing.setEmployee(epi.getEmployee());
+                    existing.setPosition(epi.getPosition());
+                    return epiRepository.save(existing);
+                })
+                .orElse(null);
     }
-    
-    @Transactional
+
+    /**
+     * Exclui um EPI
+     */
     public void delete(UUID id) {
+        log.info("Excluindo EPI: {}", id);
         epiRepository.deleteById(id);
     }
-    
+
+    /**
+     * Busca EPI por ID
+     */
+    @Transactional(readOnly = true)
     public EPI findById(UUID id) {
-        return epiRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("EPI not found"));
+        return epiRepository.findById(id).orElse(null);
     }
-    
+
+    /**
+     * Busca EPIs por funcionário
+     */
+    @Transactional(readOnly = true)
     public List<EPI> findByEmployeeId(UUID employeeId) {
         return epiRepository.findByEmployeeId(employeeId);
     }
-    
+
+    /**
+     * Busca EPIs por posição
+     */
+    @Transactional(readOnly = true)
     public List<EPI> findByPositionId(UUID positionId) {
         return epiRepository.findByPositionId(positionId);
     }
-    
+
+    /**
+     * Busca EPIs por status
+     */
+    @Transactional(readOnly = true)
     public List<EPI> findByStatus(EPIStatus status) {
         return epiRepository.findByStatus(status);
     }
-    
+
+    /**
+     * Busca EPIs próximos da expiração
+     */
+    @Transactional(readOnly = true)
     public List<EPI> findExpiringEPIs() {
-        LocalDateTime thirtyDaysFromNow = LocalDateTime.now().plusDays(30);
-        return epiRepository.findByExpirationDateBefore(thirtyDaysFromNow);
+        // TODO: Implementar lógica de busca por EPIs próximos da expiração
+        return epiRepository.findAll();
     }
-    
-    public List<EPI> findExpiredEPIs() {
-        return epiRepository.findByExpirationDateBefore(LocalDateTime.now());
-    }
-    
-    public List<EPI> findByEmployeeIdAndStatus(UUID employeeId, EPIStatus status) {
-        return epiRepository.findByEmployeeIdAndStatus(employeeId, status);
-    }
-    
-    public List<EPI> findByPositionIdAndStatus(UUID positionId, EPIStatus status) {
-        return epiRepository.findByPositionIdAndStatus(positionId, status);
-    }
-    
+
+    /**
+     * Busca todos os EPIs
+     */
+    @Transactional(readOnly = true)
     public List<EPI> findAll() {
         return epiRepository.findAll();
     }
-    
-    @Transactional
-    public EPI updateStatus(UUID id, EPIStatus status) {
-        EPI epi = findById(id);
-        epi.setStatus(status);
-        return epiRepository.save(epi);
-    }
-} 
+}

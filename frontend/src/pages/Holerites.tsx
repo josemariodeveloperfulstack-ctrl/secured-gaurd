@@ -449,8 +449,8 @@ const Holerites: React.FC = () => {
       // Remover da seleção se estiver selecionado
       setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => id !== receiptId));
       
-      // Recarregar lista
-      await loadReceipts();
+      // Recarregar lista de comprovantes de pagamento
+      await loadPaymentReceipts();
       
       toast({
         title: "Comprovante excluído",
@@ -520,7 +520,7 @@ const Holerites: React.FC = () => {
       }
       
       setSelectedPaymentReceipts([]);
-      await loadReceipts();
+      await loadPaymentReceipts();
     } catch (error) {
       console.error('Erro ao excluir comprovantes:', error);
       toast({
@@ -1509,9 +1509,9 @@ const Holerites: React.FC = () => {
         
         setShowReceiptUploadModal(false);
         
-        // Recarregar a lista de recibos após o upload
-        console.log('🔄 Recarregando lista de recibos...');
-        await loadReceipts();
+        // Recarregar a lista de comprovantes de pagamento após o upload
+        console.log('🔄 Recarregando lista de comprovantes de pagamento...');
+        await loadPaymentReceipts();
       } else {
         throw new Error(`Resposta inesperada do servidor: ${response.status}`);
       }
@@ -2833,7 +2833,7 @@ const Holerites: React.FC = () => {
                     </div>
                                     <div>
                                       <p className="text-gray-400 text-xs">Processado em</p>
-                                      <p className="font-semibold text-white">{new Date(receipt.updatedAt).toLocaleDateString('pt-BR')}</p>
+                                      <p className="font-semibold text-white">{formatDate(receipt.processedAt || receipt.updatedAt)}</p>
                         </div>
                                 </div>
                                   <div className="flex items-center space-x-2 text-gray-300">

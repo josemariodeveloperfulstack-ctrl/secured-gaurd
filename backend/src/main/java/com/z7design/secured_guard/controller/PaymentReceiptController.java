@@ -5,7 +5,6 @@ import com.z7design.secured_guard.dto.PaymentReceiptDTO;
 import com.z7design.secured_guard.service.PaymentReceiptService;
 import com.z7design.secured_guard.service.ReceiptProcessingService;
 import com.z7design.secured_guard.model.PaymentReceipt;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -162,7 +161,8 @@ public class PaymentReceiptController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
             
-            if (!file.getContentType().equals("application/pdf")) {
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.equals("application/pdf")) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
             
@@ -183,6 +183,7 @@ public class PaymentReceiptController {
                     dto.setFilePath(receipt.getFilePath());
                     dto.setStatus(receipt.getStatus());
                     dto.setCreatedAt(receipt.getCreatedAt());
+                    dto.setProcessedAt(receipt.getProcessedAt());
                     return dto;
                 })
                 .collect(java.util.stream.Collectors.toList());
