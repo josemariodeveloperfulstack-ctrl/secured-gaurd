@@ -197,81 +197,81 @@ export interface AssociateRiskToEmployeeDTO {
 export const sstService = {
   // Dashboard
   async getDashboardSummary(): Promise<SSTDashboardSummary> {
-    const response = await api.get('/api/sst/dashboard/summary');
+    const response = await api.get('/sst/dashboard/summary');
     return response.data;
   },
 
   // Alertas
   async getAlerts(): Promise<SSTAlert[]> {
-    const response = await api.get('/api/sst/alerts');
+    const response = await api.get('/sst/alerts');
     return response.data;
   },
 
   async getAlertsByEmployee(employeeId: string): Promise<SSTAlert[]> {
-    const response = await api.get(`/api/sst/alerts/employee/${employeeId}`);
+    const response = await api.get(`/sst/alerts/employee/${employeeId}`);
     return response.data;
   },
 
   async getUnreadAlerts(employeeId: string): Promise<SSTAlert[]> {
-    const response = await api.get(`/api/sst/alerts/unread/employee/${employeeId}`);
+    const response = await api.get(`/sst/alerts/unread/employee/${employeeId}`);
     return response.data;
   },
 
   async getOverdueAlerts(): Promise<SSTAlert[]> {
-    const response = await api.get('/api/sst/alerts/overdue');
+    const response = await api.get('/sst/alerts/overdue');
     return response.data;
   },
 
   async markAlertAsRead(alertId: string): Promise<void> {
-    await api.post(`/api/sst/alerts/${alertId}/read`);
+    await api.post(`/sst/alerts/${alertId}/read`);
   },
 
   async markAlertAsResolved(alertId: string): Promise<void> {
-    await api.post(`/api/sst/alerts/${alertId}/resolve`);
+    await api.post(`/sst/alerts/${alertId}/resolve`);
   },
 
   async getUnreadAlertsCount(employeeId: string): Promise<number> {
-    const response = await api.get(`/api/sst/alerts/count/unread/employee/${employeeId}`);
+    const response = await api.get(`/sst/alerts/count/unread/employee/${employeeId}`);
     return response.data;
   },
 
   // Riscos Ocupacionais
   async getOccupationalRisks(): Promise<OccupationalRisk[]> {
-    const response = await api.get('/api/sst/risks');
+    const response = await api.get('/sst/risks');
     return response.data;
   },
 
   async getOccupationalRiskById(id: string): Promise<OccupationalRisk> {
-    const response = await api.get(`/api/sst/risks/${id}`);
+    const response = await api.get(`/sst/risks/${id}`);
     return response.data;
   },
 
   async createOccupationalRisk(risk: Partial<OccupationalRisk>): Promise<OccupationalRisk> {
-    const response = await api.post('/api/sst/risks', risk);
+    const response = await api.post('/sst/risks', risk);
     return response.data;
   },
 
   async updateOccupationalRisk(id: string, risk: Partial<OccupationalRisk>): Promise<OccupationalRisk> {
-    const response = await api.put(`/api/sst/risks/${id}`, risk);
+    const response = await api.put(`/sst/risks/${id}`, risk);
     return response.data;
   },
 
   async deleteOccupationalRisk(id: string): Promise<void> {
-    await api.delete(`/api/sst/risks/${id}`);
+    await api.delete(`/sst/risks/${id}`);
   },
 
   async getEmployeeRisks(employeeId: string): Promise<EmployeeRisk[]> {
-    const response = await api.get(`/api/sst/risks/employee/${employeeId}`);
+    const response = await api.get(`/sst/risks/employee/${employeeId}`);
     return response.data;
   },
 
   async associateRiskToEmployee(data: AssociateRiskToEmployeeDTO): Promise<EmployeeRisk> {
-    const response = await api.post('/api/sst/risks/associate-employee', data);
+    const response = await api.post('/sst/risks/associate-employee', data);
     return response.data;
   },
 
   async associateRiskToPosition(positionId: string, riskId: string, riskLevel: string): Promise<void> {
-    await api.post('/api/sst/risks/associate-position', {
+    await api.post('/sst/risks/associate-position', {
       positionId,
       riskId,
       riskLevel
@@ -279,7 +279,7 @@ export const sstService = {
   },
 
   async copyRisksFromPositionToEmployee(employeeId: string, positionId: string): Promise<void> {
-    await api.post('/api/sst/risks/copy-position-to-employee', {
+    await api.post('/sst/risks/copy-position-to-employee', {
       employeeId,
       positionId
     });
@@ -287,209 +287,209 @@ export const sstService = {
 
   // Exames Médicos
   async getMedicalExams(): Promise<MedicalExam[]> {
-    const response = await api.get('/api/sst/medical-exams');
+    const response = await api.get('/sst/medical-exams');
     return response.data;
   },
 
   async getMedicalExamById(id: string): Promise<MedicalExam> {
-    const response = await api.get(`/api/sst/medical-exams/${id}`);
+    const response = await api.get(`/sst/medical-exams/${id}`);
     return response.data;
   },
 
   async createMedicalExam(exam: CreateMedicalExamDTO): Promise<MedicalExam> {
-    const response = await api.post('/api/sst/medical-exams', exam);
+    const response = await api.post('/sst/medical-exams', exam);
     return response.data;
   },
 
   async updateMedicalExam(id: string, exam: Partial<MedicalExam>): Promise<MedicalExam> {
-    const response = await api.put(`/api/sst/medical-exams/${id}`, exam);
+    const response = await api.put(`/sst/medical-exams/${id}`, exam);
     return response.data;
   },
 
   async deleteMedicalExam(id: string): Promise<void> {
-    await api.delete(`/api/sst/medical-exams/${id}`);
+    await api.delete(`/sst/medical-exams/${id}`);
   },
 
   async getMedicalExamsByEmployee(employeeId: string): Promise<MedicalExam[]> {
-    const response = await api.get(`/api/sst/medical-exams/employee/${employeeId}`);
+    const response = await api.get(`/sst/medical-exams/employee/${employeeId}`);
     return response.data;
   },
 
   async getMedicalExamsByStatus(status: string): Promise<MedicalExam[]> {
-    const response = await api.get(`/api/sst/medical-exams/status/${status}`);
+    const response = await api.get(`/sst/medical-exams/status/${status}`);
     return response.data;
   },
 
   async getMedicalExamsByCategory(category: string): Promise<MedicalExam[]> {
-    const response = await api.get(`/api/sst/medical-exams/category/${category}`);
+    const response = await api.get(`/sst/medical-exams/category/${category}`);
     return response.data;
   },
 
   async getExpiringMedicalExams(days: number = 30): Promise<MedicalExam[]> {
-    const response = await api.get(`/api/sst/medical-exams/expiring/${days}`);
+    const response = await api.get(`/sst/medical-exams/expiring/${days}`);
     return response.data;
   },
 
   // Treinamentos
   async getSSTTrainings(): Promise<SSTTraining[]> {
-    const response = await api.get('/api/sst/trainings');
+    const response = await api.get('/sst/trainings');
     return response.data;
   },
 
   async getSSTTrainingById(id: string): Promise<SSTTraining> {
-    const response = await api.get(`/api/sst/trainings/${id}`);
+    const response = await api.get(`/sst/trainings/${id}`);
     return response.data;
   },
 
   async createSSTTraining(training: Partial<SSTTraining>): Promise<SSTTraining> {
-    const response = await api.post('/api/sst/trainings', training);
+    const response = await api.post('/sst/trainings', training);
     return response.data;
   },
 
   async updateSSTTraining(id: string, training: Partial<SSTTraining>): Promise<SSTTraining> {
-    const response = await api.put(`/api/sst/trainings/${id}`, training);
+    const response = await api.put(`/sst/trainings/${id}`, training);
     return response.data;
   },
 
   async deleteSSTTraining(id: string): Promise<void> {
-    await api.delete(`/api/sst/trainings/${id}`);
+    await api.delete(`/sst/trainings/${id}`);
   },
 
   async getTrainingParticipations(): Promise<TrainingParticipation[]> {
-    const response = await api.get('/api/sst/training-participations');
+    const response = await api.get('/sst/training-participations');
     return response.data;
   },
 
   async getTrainingParticipationById(id: string): Promise<TrainingParticipation> {
-    const response = await api.get(`/api/sst/training-participations/${id}`);
+    const response = await api.get(`/sst/training-participations/${id}`);
     return response.data;
   },
 
   async createTrainingParticipation(participation: CreateTrainingParticipationDTO): Promise<TrainingParticipation> {
-    const response = await api.post('/api/sst/training-participations', participation);
+    const response = await api.post('/sst/training-participations', participation);
     return response.data;
   },
 
   async updateTrainingParticipation(id: string, participation: Partial<TrainingParticipation>): Promise<TrainingParticipation> {
-    const response = await api.put(`/api/sst/training-participations/${id}`, participation);
+    const response = await api.put(`/sst/training-participations/${id}`, participation);
     return response.data;
   },
 
   async deleteTrainingParticipation(id: string): Promise<void> {
-    await api.delete(`/api/sst/training-participations/${id}`);
+    await api.delete(`/sst/training-participations/${id}`);
   },
 
   async getTrainingParticipationsByEmployee(employeeId: string): Promise<TrainingParticipation[]> {
-    const response = await api.get(`/api/sst/training-participations/employee/${employeeId}`);
+    const response = await api.get(`/sst/training-participations/employee/${employeeId}`);
     return response.data;
   },
 
   async getExpiredOrExpiringTrainings(days: number = 30): Promise<TrainingParticipation[]> {
-    const response = await api.get(`/api/sst/training-participations/expired-or-expiring/${days}`);
+    const response = await api.get(`/sst/training-participations/expired-or-expiring/${days}`);
     return response.data;
   },
 
   // Acidentes
   async getAccidentRecords(): Promise<AccidentRecord[]> {
-    const response = await api.get('/api/sst/accidents');
+    const response = await api.get('/sst/accidents');
     return response.data;
   },
 
   async getAccidentRecordById(id: string): Promise<AccidentRecord> {
-    const response = await api.get(`/api/sst/accidents/${id}`);
+    const response = await api.get(`/sst/accidents/${id}`);
     return response.data;
   },
 
   async createAccidentRecord(accident: CreateAccidentRecordDTO): Promise<AccidentRecord> {
-    const response = await api.post('/api/sst/accidents', accident);
+    const response = await api.post('/sst/accidents', accident);
     return response.data;
   },
 
   async updateAccidentRecord(id: string, accident: Partial<AccidentRecord>): Promise<AccidentRecord> {
-    const response = await api.put(`/api/sst/accidents/${id}`, accident);
+    const response = await api.put(`/sst/accidents/${id}`, accident);
     return response.data;
   },
 
   async deleteAccidentRecord(id: string): Promise<void> {
-    await api.delete(`/api/sst/accidents/${id}`);
+    await api.delete(`/sst/accidents/${id}`);
   },
 
   async getAccidentRecordsByEmployee(employeeId: string): Promise<AccidentRecord[]> {
-    const response = await api.get(`/api/sst/accidents/employee/${employeeId}`);
+    const response = await api.get(`/sst/accidents/employee/${employeeId}`);
     return response.data;
   },
 
   async getAccidentRecordsByType(type: string): Promise<AccidentRecord[]> {
-    const response = await api.get(`/api/sst/accidents/type/${type}`);
+    const response = await api.get(`/sst/accidents/type/${type}`);
     return response.data;
   },
 
   async getAccidentRecordsByStatus(status: string): Promise<AccidentRecord[]> {
-    const response = await api.get(`/api/sst/accidents/status/${status}`);
+    const response = await api.get(`/sst/accidents/status/${status}`);
     return response.data;
   },
 
   async getAccidentStatistics(): Promise<any> {
-    const response = await api.get('/api/sst/accidents/statistics');
+    const response = await api.get('/sst/accidents/statistics');
     return response.data;
   },
 
   // EPIs
   async getPersonalProtectiveEquipments(): Promise<PersonalProtectiveEquipment[]> {
-    const response = await api.get('/api/sst/epis');
+    const response = await api.get('/sst/epis');
     return response.data;
   },
 
   async getPersonalProtectiveEquipmentById(id: string): Promise<PersonalProtectiveEquipment> {
-    const response = await api.get(`/api/sst/epis/${id}`);
+    const response = await api.get(`/sst/epis/${id}`);
     return response.data;
   },
 
   async createPersonalProtectiveEquipment(epi: Partial<PersonalProtectiveEquipment>): Promise<PersonalProtectiveEquipment> {
-    const response = await api.post('/api/sst/epis', epi);
+    const response = await api.post('/sst/epis', epi);
     return response.data;
   },
 
   async updatePersonalProtectiveEquipment(id: string, epi: Partial<PersonalProtectiveEquipment>): Promise<PersonalProtectiveEquipment> {
-    const response = await api.put(`/api/sst/epis/${id}`, epi);
+    const response = await api.put(`/sst/epis/${id}`, epi);
     return response.data;
   },
 
   async deletePersonalProtectiveEquipment(id: string): Promise<void> {
-    await api.delete(`/api/sst/epis/${id}`);
+    await api.delete(`/sst/epis/${id}`);
   },
 
   async getEPIDeliveries(): Promise<EPIDelivery[]> {
-    const response = await api.get('/api/sst/epi-deliveries');
+    const response = await api.get('/sst/epi-deliveries');
     return response.data;
   },
 
   async getEPIDeliveryById(id: string): Promise<EPIDelivery> {
-    const response = await api.get(`/api/sst/epi-deliveries/${id}`);
+    const response = await api.get(`/sst/epi-deliveries/${id}`);
     return response.data;
   },
 
   async createEPIDelivery(delivery: CreateEPIDeliveryDTO): Promise<EPIDelivery> {
-    const response = await api.post('/api/sst/epi-deliveries', delivery);
+    const response = await api.post('/sst/epi-deliveries', delivery);
     return response.data;
   },
 
   async updateEPIDelivery(id: string, delivery: Partial<EPIDelivery>): Promise<EPIDelivery> {
-    const response = await api.put(`/api/sst/epi-deliveries/${id}`, delivery);
+    const response = await api.put(`/sst/epi-deliveries/${id}`, delivery);
     return response.data;
   },
 
   async deleteEPIDelivery(id: string): Promise<void> {
-    await api.delete(`/api/sst/epi-deliveries/${id}`);
+    await api.delete(`/sst/epi-deliveries/${id}`);
   },
 
   async getEPIDeliveriesByEmployee(employeeId: string): Promise<EPIDelivery[]> {
-    const response = await api.get(`/api/sst/epi-deliveries/employee/${employeeId}`);
+    const response = await api.get(`/sst/epi-deliveries/employee/${employeeId}`);
     return response.data;
   },
 
   async getExpiringEPIDeliveries(days: number = 30): Promise<EPIDelivery[]> {
-    const response = await api.get(`/api/sst/epi-deliveries/expiring/${days}`);
+    const response = await api.get(`/sst/epi-deliveries/expiring/${days}`);
     return response.data;
   }
 };
