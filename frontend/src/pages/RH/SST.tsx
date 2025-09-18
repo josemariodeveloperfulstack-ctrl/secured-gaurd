@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,25 +29,49 @@ import {
   Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { sstService, SSTDashboardSummary, SSTAlert } from '@/services/sstService';
+import { useToast } from '@/hooks/use-toast';
 
 const SST: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // Estados para dados reais
+  const [sstStats, setSstStats] = useState<SSTDashboardSummary | null>(null);
+  const [alerts, setAlerts] = useState<SSTAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - será substituído por dados reais da API
-  const sstStats = {
-    totalEmployees: 150,
-    asoUpToDate: 142,
-    asoExpiring: 8,
-    epiValid: 145,
-    epiExpiring: 5,
-    accidentsThisMonth: 2,
-    accidentsLastMonth: 4,
-    trainingPending: 12,
-    inspectionPending: 3,
-    cipaMembers: 8,
-    cipaExpiring: 2
-  };
+  // Carregar dados do dashboard
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [dashboardData, alertsData] = await Promise.all([
+          sstService.getDashboardSummary(),
+          sstService.getAlerts()
+        ]);
+        
+        setSstStats(dashboardData);
+        setAlerts(alertsData);
+      } catch (err) {
+        console.error('Erro ao carregar dados do dashboard SST:', err);
+        setError('Erro ao carregar dados do dashboard');
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os dados do dashboard SST",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [toast]);
 
   const recentAccidents = [
     {
@@ -94,6 +118,48 @@ const SST: React.FC = () => {
     }
   ];
 
+  // Função para marcar alerta como lido
+  const handleMarkAlertAsRead = async (alertId: string) => {
+    try {
+      await sstService.markAlertAsRead(alertId);
+      setAlerts(prev => prev.map(alert => 
+        alert.id === alertId ? { ...alert, isRead: true } : alert
+      ));
+      toast({
+        title: "Sucesso",
+        description: "Alerta marcado como lido",
+      });
+    } catch (err) {
+      console.error('Erro ao marcar alerta como lido:', err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar o alerta como lido",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para marcar alerta como resolvido
+  const handleMarkAlertAsResolved = async (alertId: string) => {
+    try {
+      await sstService.markAlertAsResolved(alertId);
+      setAlerts(prev => prev.map(alert => 
+        alert.id === alertId ? { ...alert, isResolved: true, resolvedAt: new Date().toISOString() } : alert
+      ));
+      toast({
+        title: "Sucesso",
+        description: "Alerta marcado como resolvido",
+      });
+    } catch (err) {
+      console.error('Erro ao marcar alerta como resolvido:', err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar o alerta como resolvido",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'Baixa':
@@ -125,6 +191,40 @@ const SST: React.FC = () => {
     if (daysLeft <= 30) return 'text-yellow-600';
     return 'text-green-600';
   };
+
+  // Se estiver carregando, mostrar loading
+  if (loading) {
+    return (
+      <StandardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+            <p className="text-seguranca-lightgray">Carregando dados do SST...</p>
+          </div>
+        </div>
+      </StandardLayout>
+    );
+  }
+
+  // Se houver erro, mostrar mensagem de erro
+  if (error) {
+    return (
+      <StandardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-4">
+            <AlertTriangle className="h-8 w-8 text-red-500" />
+            <p className="text-red-500">{error}</p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="bg-seguranca-red hover:bg-seguranca-darkred"
+            >
+              Tentar Novamente
+            </Button>
+          </div>
+        </div>
+      </StandardLayout>
+    );
+  }
 
   return (
     <StandardLayout>
@@ -185,10 +285,10 @@ const SST: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-seguranca-lightgray">
-                    {sstStats.asoUpToDate}/{sstStats.totalEmployees}
+                    {sstStats ? `${sstStats.asoUpToDate}/${sstStats.totalEmployees}` : '0/0'}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {((sstStats.asoUpToDate / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários
+                    {sstStats ? `${((sstStats.asoUpToDate / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários` : '0% dos funcionários'}
                   </p>
                 </CardContent>
               </Card>
@@ -200,10 +300,10 @@ const SST: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-seguranca-lightgray">
-                    {sstStats.epiValid}/{sstStats.totalEmployees}
+                    {sstStats ? `${sstStats.epiValid}/${sstStats.totalEmployees}` : '0/0'}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {((sstStats.epiValid / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários
+                    {sstStats ? `${((sstStats.epiValid / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários` : '0% dos funcionários'}
                   </p>
                 </CardContent>
               </Card>
@@ -214,14 +314,14 @@ const SST: React.FC = () => {
                   <AlertTriangle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-seguranca-lightgray">{sstStats.accidentsThisMonth}</div>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{sstStats?.accidentsThisMonth || 0}</div>
                   <p className="text-xs text-gray-400 mt-1 flex items-center">
-                    {sstStats.accidentsThisMonth < sstStats.accidentsLastMonth ? (
+                    {sstStats && sstStats.accidentsThisMonth < sstStats.accidentsLastMonth ? (
                       <TrendingDown className="h-3 w-3 text-green-500 mr-1" />
                     ) : (
                       <TrendingUp className="h-3 w-3 text-red-500 mr-1" />
                     )}
-                    vs {sstStats.accidentsLastMonth} mês anterior
+                    vs {sstStats?.accidentsLastMonth || 0} mês anterior
                   </p>
                 </CardContent>
               </Card>
@@ -232,9 +332,9 @@ const SST: React.FC = () => {
                   <GraduationCap className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-seguranca-lightgray">{sstStats.trainingPending}</div>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{sstStats?.trainingPending || 0}</div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {sstStats.inspectionPending} inspeções pendentes
+                    {sstStats?.inspectionPending || 0} inspeções pendentes
                   </p>
                 </CardContent>
               </Card>
@@ -242,40 +342,76 @@ const SST: React.FC = () => {
 
             {/* Alertas e Notificações */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Itens Vencendo */}
+              {/* Alertas SST */}
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-yellow-500" />
-                    Vencimentos Próximos
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                    Alertas SST ({alerts.filter(a => !a.isRead).length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {expiringItems.length > 0 ? (
+                  {alerts.length > 0 ? (
                     <div className="space-y-3">
-                      {expiringItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-yellow-500">
-                          <div>
-                            <p className="font-medium text-seguranca-lightgray">{item.employee}</p>
-                            <p className="text-sm text-gray-400">
-                              {item.type}: {item.item || item.training}
-                            </p>
+                      {alerts.slice(0, 5).map((alert) => (
+                        <div key={alert.id} className={`flex items-center justify-between p-3 rounded-lg border ${
+                          alert.priority === 4 ? 'bg-red-900/20 border-red-500' :
+                          alert.priority === 3 ? 'bg-orange-900/20 border-orange-500' :
+                          alert.priority === 2 ? 'bg-yellow-900/20 border-yellow-500' :
+                          'bg-blue-900/20 border-blue-500'
+                        }`}>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-seguranca-lightgray">{alert.title}</p>
+                              {!alert.isRead && (
+                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-400">{alert.message}</p>
+                            {alert.employeeName && (
+                              <p className="text-xs text-gray-500">Funcionário: {alert.employeeName}</p>
+                            )}
                           </div>
-                          <div className="text-right">
-                            <Badge className={`${getExpiryColor(item.daysLeft)} bg-transparent border-0`}>
-                              {item.daysLeft} dias
-                            </Badge>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {new Date(item.expiryDate).toLocaleDateString('pt-BR')}
-                            </p>
+                          <div className="flex gap-2">
+                            {!alert.isRead && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMarkAlertAsRead(alert.id)}
+                                className="text-xs"
+                              >
+                                Marcar como lido
+                              </Button>
+                            )}
+                            {!alert.isResolved && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleMarkAlertAsResolved(alert.id)}
+                                className="text-xs bg-green-600 hover:bg-green-700"
+                              >
+                                Resolver
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
+                      {alerts.length > 5 && (
+                        <div className="text-center pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setActiveTab('actions')}
+                            className="text-seguranca-lightgray"
+                          >
+                            Ver todos os alertas ({alerts.length})
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-6">
                       <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                      <p className="text-seguranca-lightgray">Nenhum vencimento próximo</p>
+                      <p className="text-seguranca-lightgray">Nenhum alerta pendente</p>
                     </div>
                   )}
                 </CardContent>
