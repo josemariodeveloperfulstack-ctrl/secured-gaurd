@@ -1,0 +1,111 @@
+name: Deploy to VPS - Automatic
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  VPS_HOST: ${{ secrets.VPS_HOST }}
+  VPS_USER: ${{ secrets.VPS_USER }}
+  VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Debug - Show secrets
+      run: |
+        echo "🔍 Verificando configuração..."
+        echo "VPS_HOST: ${{ env.VPS_HOST }}"
+        echo "VPS_USER: ${{ env.VPS_USER }}"
+        echo "VPS_PORT: ${{ env.VPS_PORT }}"
+        
+        # Verify secrets are set
+        if [ -z "${{ env.VPS_HOST }}" ]; then
+          echo "❌ VPS_HOST não está configurado!"
+          exit 1
+        fi
+        if [ -z "${{ env.VPS_USER }}" ]; then
+          echo "❌ VPS_USER não está configurado!"
+          exit 1
+        fi
+        echo "✅ Secrets configurados corretamente!"
+        
+    - name: Setup SSH
+      run: |
+        echo "🔧 Configurando SSH..."
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        touch ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+        
+        # Add VPS host key to known_hosts
+        echo "🔑 Adicionando chave do host VPS..."
+        ssh-keyscan -p ${{ env.VPS_PORT }} ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts
+        
+        # Verify the known_hosts file
+        echo "📋 Verificando known_hosts:"
+        cat ~/.ssh/known_hosts
+        
+        echo "✅ SSH configurado!"
+        
+    - name: Test SSH Connection
+      run: |
+        echo "🔍 Testando conexão SSH..."
+        ssh -p ${{ env.VPS_PORT }} -o ConnectTimeout=10 -o BatchMode=yes ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "echo 'SSH OK'"
+        echo "✅ Conexão SSH funcionando!"
+        
+    - name: Deploy to VPS
+      run: |
+        echo "🚀 Fazendo deploy para VPS..."
+        
+        # Make scripts executable
+        chmod +x scripts/deploy-to-vps.sh
+        chmod +x deploy.sh
+        
+        # Set environment variables
+        export VPS_HOST="${{ env.VPS_HOST }}"
+        export VPS_USER="${{ env.VPS_USER }}"
+        export VPS_PORT="${{ env.VPS_PORT }}"
+        
+        # Execute deploy script
+        ./scripts/deploy-to-vps.sh
+        
+        echo "✅ Deploy concluído!"
+        
+    - name: Verify Deployment
+      run: |
+        echo "🔍 Verificando deployment..."
+        ssh -p ${{ env.VPS_PORT }} ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+          "cd /opt/secured-guard && git log --oneline -1 && docker compose -f deploy/docker-compose.prod.yml ps"
+        echo "✅ Verificação concluída!"
+        
+    - name: Test Domain
+      run: |
+        echo "🌐 Testando domínio do cliente..."
+        if curl -f -s https://securedguard.z7botsolutions.com.br > /dev/null; then
+          echo "✅ Domínio securedguard.z7botsolutions.com.br está funcionando"
+        else
+          echo "⚠️ Domínio pode estar com problema, mas VPS está funcionando"
+        fi
+        
+    - name: Notify Success
+      if: success()
+      run: |
+        echo "🎉 Deploy realizado com sucesso!"
+        echo "📱 Aplicação disponível em: https://securedguard.z7botsolutions.com.br"
+        echo "📊 Status: VPS atualizada com sucesso"
+        echo "🌐 Domínio: securedguard.z7botsolutions.com.br"
+        
+    - name: Notify Failure
+      if: failure()
+      run: |
+        echo "❌ Deploy falhou!"
+        echo "🚨 Verifique os logs do GitHub Actions para mais detalhes."
+        echo "🌐 Domínio: securedguard.z7botsolutions.com.br"

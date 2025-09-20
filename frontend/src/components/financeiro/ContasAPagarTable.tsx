@@ -136,86 +136,38 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Filtros */}
-      <Card className="bg-seguranca-graphite border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-seguranca-lightgray">
-            <Filter size={20} />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-seguranca-lightgray" size={16} />
-              <Input
-                placeholder="Buscar por descrição, fornecedor ou código..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-              />
-            </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent className="bg-seguranca-black border-gray-600">
-                <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todos os status</SelectItem>
-                <SelectItem value="ABERTA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Aberta</SelectItem>
-                <SelectItem value="PAGA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Paga</SelectItem>
-                <SelectItem value="ATRASADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Atrasada</SelectItem>
-                <SelectItem value="VENCIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Vencida</SelectItem>
-                <SelectItem value="CANCELADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelada</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={tipoFilter} onValueChange={setTipoFilter}>
-              <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                <SelectValue placeholder="Filtrar por tipo" />
-              </SelectTrigger>
-              <SelectContent className="bg-seguranca-black border-gray-600">
-                <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todos os tipos</SelectItem>
-                <SelectItem value="FIXA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Despesa Fixa</SelectItem>
-                <SelectItem value="VARIAVEL" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Despesa Variável</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Input
-              placeholder="Filtrar por fornecedor"
-              value={fornecedorFilter}
-              onChange={(e) => setFornecedorFilter(e.target.value)}
-              className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabela */}
-      <Card className="bg-seguranca-graphite border-gray-700">
-        <CardHeader>
+      {/* Listagem de Contas */}
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader className="bg-gradient-to-r from-gray-700 to-gray-600">
           <div className="flex justify-between items-center">
-            <CardTitle className="text-seguranca-lightgray">Listagem de Contas a Pagar</CardTitle>
-            <Button variant="outline" size="sm" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow">
+            <CardTitle className="text-white flex items-center gap-2">
+              <Calendar size={20} />
+              Listagem de Contas a Pagar
+            </CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
+            >
               <Download size={16} className="mr-2" />
               Exportar
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-gray-800 p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-gray-700">
-                  <TableHead className="text-seguranca-lightgray">Vencimento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Fornecedor</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Descrição</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Tipo</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Valor</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Baixa</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Dt. Pagamento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Ações</TableHead>
+                <TableRow className="border-gray-600 bg-gray-700">
+                  <TableHead className="text-gray-200 font-semibold">Vencimento</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Fornecedor</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Descrição</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Tipo</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Valor</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Status</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Baixa</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Dt. Pagamento</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -223,47 +175,48 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                   <TableRow 
                     key={conta.id} 
                     className={`
-                      ${isVencendoEmBreve(conta.vencimento) && conta.status === 'ABERTA' ? 'bg-seguranca-yellow/20' : ''}
-                      ${isBefore(conta.vencimento, new Date()) && conta.status === 'ABERTA' ? 'bg-seguranca-red/20' : ''}
+                      border-gray-600 hover:bg-gray-700 transition-colors duration-200
+                      ${isVencendoEmBreve(conta.vencimento) && conta.status === 'ABERTA' ? 'bg-yellow-500/10 border-yellow-500/30' : ''}
+                      ${isBefore(conta.vencimento, new Date()) && conta.status === 'ABERTA' ? 'bg-red-500/10 border-red-500/30' : ''}
                     `}
                   >
-                    <TableCell>
+                    <TableCell className="text-gray-300">
                       <div className="flex items-center gap-2">
                         {isVencendoEmBreve(conta.vencimento) && conta.status === 'ABERTA' && (
-                          <AlertTriangle size={16} className="text-seguranca-yellow" />
+                          <AlertTriangle size={16} className="text-yellow-500" />
                         )}
                         {isBefore(conta.vencimento, new Date()) && conta.status === 'ABERTA' && (
-                          <AlertTriangle size={16} className="text-seguranca-red" />
+                          <AlertTriangle size={16} className="text-red-500" />
                         )}
                         <span className={`
-                          ${isBefore(conta.vencimento, new Date()) && conta.status === 'ABERTA' ? 'text-seguranca-red font-medium' : ''}
-                          ${isVencendoEmBreve(conta.vencimento) && conta.status === 'ABERTA' ? 'text-seguranca-yellow' : ''}
+                          ${isBefore(conta.vencimento, new Date()) && conta.status === 'ABERTA' ? 'text-red-400 font-medium' : 'text-gray-300'}
+                          ${isVencendoEmBreve(conta.vencimento) && conta.status === 'ABERTA' ? 'text-yellow-400' : ''}
                         `}>
                           {format(conta.vencimento, 'dd/MM/yyyy', { locale: ptBR })}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium text-seguranca-lightgray">{conta.fornecedor}</TableCell>
-                    <TableCell className="text-seguranca-lightgray">
+                    <TableCell className="font-medium text-gray-200">{conta.fornecedor}</TableCell>
+                    <TableCell className="text-gray-300">
                       <div className="max-w-xs truncate" title={conta.descricao}>
                         {conta.descricao}
                       </div>
                     </TableCell>
                     <TableCell>{getTipoBadge(conta.tipo)}</TableCell>
-                    <TableCell className="font-semibold text-seguranca-lightgray">{formatCurrency(conta.valor)}</TableCell>
+                    <TableCell className="font-semibold text-gray-200">{formatCurrency(conta.valor)}</TableCell>
                     <TableCell>{getStatusBadge(conta.status, conta.vencimento)}</TableCell>
                     <TableCell>
                       {conta.baixa ? (
-                        <CheckCircle size={16} className="text-green-600" />
+                        <CheckCircle size={16} className="text-green-500" />
                       ) : (
-                        <XCircle size={16} className="text-seguranca-lightgray" />
+                        <XCircle size={16} className="text-gray-400" />
                       )}
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
+                    <TableCell className="text-gray-300">
                       {conta.dataPagamento ? format(conta.dataPagamento, 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -271,18 +224,23 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                             console.log('Botão de visualização clicado para conta:', conta);
                             onView(conta);
                           }} 
-                          className="text-seguranca-lightgray hover:text-seguranca-yellow"
+                          className="text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 transition-colors duration-200"
                         >
                           <Eye size={16} />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => onEdit(conta)} className="text-seguranca-lightgray hover:text-seguranca-yellow">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => onEdit(conta)} 
+                          className="text-gray-400 hover:text-yellow-500 hover:bg-yellow-500/10 transition-colors duration-200"
+                        >
                           <Edit size={16} />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 
                           onClick={() => onDelete(conta.id!)}
-                          className="text-seguranca-red hover:text-red-700"
+                          className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-colors duration-200"
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -294,8 +252,16 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
             </Table>
             
             {contasFiltradas.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-seguranca-lightgray">Nenhuma conta encontrada com os filtros aplicados.</p>
+              <div className="text-center py-12 bg-gray-800">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center">
+                    <Calendar className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-300 text-lg font-medium">Nenhuma conta encontrada</p>
+                    <p className="text-gray-500 text-sm mt-1">Ajuste os filtros para ver mais resultados</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

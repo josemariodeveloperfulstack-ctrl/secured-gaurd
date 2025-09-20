@@ -1,28 +1,42 @@
 import axios from 'axios';
+import { config } from '../../env.config';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: '', // Usar URLs relativas para que o proxy do Vite funcione
 });
 
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    console.log('🔗 Axios Request:', config.method?.toUpperCase(), config.url);
+    console.log('🔗 Base URL:', config.baseURL);
+    console.log('🔗 Full URL:', config.baseURL + config.url);
+    
     const token = localStorage.getItem(import.meta.env.VITE_TOKEN_KEY || 'token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('🔗 Token adicionado ao header');
+    } else {
+      console.log('🔗 Nenhum token encontrado');
     }
     
     return config;
   },
   (error) => {
+    console.error('❌ Erro no interceptor de requisição:', error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ Axios Response:', response.status, response.config.url);
+    return response;
+  },
   async (error) => {
+    console.error('❌ Axios Response Error:', error.response?.status, error.config?.url);
+    console.error('❌ Error details:', error.response?.data);
     const originalRequest = error.config;
 
     // Se o erro for 401 e não for uma tentativa de refresh

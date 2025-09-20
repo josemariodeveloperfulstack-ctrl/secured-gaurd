@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import fleetService from '@/services/fleetService';
 import driverService from '@/services/driverService';
+import { workPostService } from '@/services/workPostService';
+import { employeeService } from '@/services/employeeService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import { Driver } from '@/types/driver';
 import { Plus, User, Eye } from 'lucide-react';
@@ -66,7 +68,9 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
   const [showNewDriverModal, setShowNewDriverModal] = useState(false);
   const [newDriverData, setNewDriverData] = useState({
     name: '',
-    licenseNumber: ''
+    licenseNumber: '',
+    workPost: '',
+    employeeId: ''
   });
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [fuelStations, setFuelStations] = useState<string[]>([]);
@@ -74,6 +78,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
   const [showNewStationModal, setShowNewStationModal] = useState(false);
   const [newStationData, setNewStationData] = useState({
     name: '',
+    cep: '',
     address: '',
     city: '',
     state: '',
@@ -82,6 +87,109 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Função para buscar dados do CEP via API dos Correios
+  const fetchCEPData = async (cep: string) => {
+    try {
+      // Remove caracteres não numéricos do CEP
+      const cleanCEP = cep.replace(/\D/g, '');
+      
+      // Verifica se o CEP tem 8 dígitos
+      if (cleanCEP.length !== 8) {
+        return null;
+      }
+
+      // Usa a API ViaCEP (gratuita e confiável)
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        throw new Error('CEP não encontrado');
+      }
+
+      return {
+        address: data.logradouro || '',
+        city: data.localidade || '',
+        state: data.uf || ''
+      };
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      return null;
+    }
+  };
+
+  // Função para formatar CEP
+  const formatCEP = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 5) {
+      return numbers;
+    }
+    return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
+  };
+
+  // Função para formatar telefone
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) {
+      return numbers;
+    } else if (numbers.length <= 6) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    } else if (numbers.length <= 10) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    } else {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+    }
+  };
+
+  // Função para limpar dados do formulário
+  const clearStationForm = () => {
+    setNewStationData({
+      name: '',
+      cep: '',
+      address: '',
+      city: '',
+      state: '',
+      phone: '',
+      brand: ''
+    });
+  };
+
+  // Função para lidar com mudanças no CEP
+  const handleCEPChange = async (cep: string) => {
+    const formattedCEP = formatCEP(cep);
+    setNewStationData(prev => ({ ...prev, cep: formattedCEP }));
+    
+    // Se o CEP tem 8 dígitos, busca os dados automaticamente
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length === 8) {
+      const cepData = await fetchCEPData(cleanCEP);
+      if (cepData) {
+        setNewStationData(prev => ({
+          ...prev,
+          address: cepData.address,
+          city: cepData.city,
+          state: cepData.state
+        }));
+        
+        toast({
+          title: "✅ CEP encontrado",
+          description: "Endereço preenchido automaticamente.",
+        });
+      } else {
+        toast({
+          title: "❌ CEP não encontrado",
+          description: "Verifique o CEP digitado.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Função para lidar com mudanças no telefone
+  const handlePhoneChange = (phone: string) => {
+    const formattedPhone = formatPhone(phone);
+    setNewStationData(prev => ({ ...prev, phone: formattedPhone }));
+  };
 
   const { data: drivers = [], isLoading: driversLoading } = useQuery<Driver[]>({
     queryKey: ['drivers'],
@@ -115,6 +223,68 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
     retry: 1, // Tentar apenas uma vez para debug
   });
 
+  const { data: workPosts = [], isLoading: workPostsLoading } = useQuery<any[]>({
+    queryKey: ['workPosts'],
+    queryFn: async () => {
+      try {
+        console.log('🔍 Fazendo chamada para workPostService.getWorkPosts()...');
+        const response = await workPostService.getWorkPosts();
+        console.log('🔍 Resposta do backend para postos de trabalho:', response);
+        
+        // Verificar se é um array
+        if (Array.isArray(response)) {
+          console.log('🔍 Postos de trabalho recebidos como array:', response.length);
+          return response;
+        }
+        
+        console.log('🔍 Resposta não é um array:', typeof response, response);
+        return [];
+      } catch (error: any) {
+        console.error('🔍 Erro ao carregar postos de trabalho:', error);
+        console.error('🔍 Detalhes do erro:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+        return [];
+      }
+    },
+    enabled: isOpen,
+    retry: 1, // Tentar apenas uma vez para debug
+  });
+
+  const { data: employees = [], isLoading: employeesLoading } = useQuery<any[]>({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      try {
+        console.log('🔍 Fazendo chamada para employeeService.getEmployees()...');
+        const response = await employeeService.getEmployees();
+        console.log('🔍 Resposta do backend para funcionários:', response);
+        
+        // Verificar se é um array
+        if (Array.isArray(response)) {
+          console.log('🔍 Funcionários recebidos como array:', response.length);
+          return response;
+        }
+        
+        console.log('🔍 Resposta não é um array:', typeof response, response);
+        return [];
+      } catch (error: any) {
+        console.error('🔍 Erro ao carregar funcionários:', error);
+        console.error('🔍 Detalhes do erro:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+        return [];
+      }
+    },
+    enabled: isOpen,
+    retry: 1, // Tentar apenas uma vez para debug
+  });
+
   // Carregar postos de combustível
   const loadFuelStations = async () => {
     setLoadingStations(true);
@@ -123,7 +293,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
       
       // Tentar buscar da nova tabela de postos
       try {
-        const stationsResponse = await api.get('/fuel-stations');
+        const stationsResponse = await api.get('/api/fuel-stations');
         console.log('✅ Postos carregados da tabela fuel_stations:', stationsResponse.data);
         
         if (stationsResponse.data && Array.isArray(stationsResponse.data)) {
@@ -177,22 +347,23 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
 
   // Criar novo posto de combustível
   const createNewStation = async () => {
-    if (!newStationData.name.trim() || !newStationData.address.trim()) {
+    if (!newStationData.name.trim() || !newStationData.cep.trim() || !newStationData.address.trim()) {
       toast({
         title: "⚠️ Campos obrigatórios",
-        description: "Nome e endereço são obrigatórios para o posto.",
+        description: "Nome, CEP e endereço são obrigatórios para o posto.",
         variant: "default"
       });
       return;
     }
 
     try {
-      const response = await api.post('/fuel-stations', {
+      const response = await api.post('/api/fuel-stations', {
         name: newStationData.name.trim(),
+        zipCode: newStationData.cep.trim(),
         address: newStationData.address.trim(),
         city: newStationData.city.trim() || null,
         state: newStationData.state.trim() || null,
-        phone: newStationData.phone.trim() || null,
+        phone: newStationData.phone.trim() || "",
         brand: newStationData.brand.trim() || null
       });
 
@@ -214,7 +385,8 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
         brand: ''
       });
       
-      // Fechar modal
+      // Limpar formulário e fechar modal
+      clearStationForm();
       setShowNewStationModal(false);
       
       toast({
@@ -349,7 +521,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
       
       // Fechar modal e limpar dados
       setShowNewDriverModal(false);
-      setNewDriverData({ name: '', licenseNumber: '' });
+      setNewDriverData({ name: '', licenseNumber: '', workPost: '', employeeId: '' });
     },
     onError: (error: any) => {
       console.error('Erro ao criar motorista:', error);
@@ -419,7 +591,35 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
   // Nova query para buscar último abastecimento do veículo
   const { data: lastFuelRecord } = useQuery({
     queryKey: ['lastFuelRecord', formData.veiculo_id],
-    queryFn: () => formData.veiculo_id ? fleetService.getLastFuelRecord(formData.veiculo_id) : null,
+    queryFn: async () => {
+      if (!formData.veiculo_id) return null;
+      
+      try {
+        // Primeiro tentar buscar último abastecimento
+        const lastRecord = await fleetService.getLastFuelRecord(formData.veiculo_id);
+        if (lastRecord) {
+          console.log('🔍 Último abastecimento encontrado:', lastRecord);
+          return lastRecord;
+        }
+        
+        // Se não há abastecimentos, buscar km de cadastro do veículo
+        console.log('🔍 Nenhum abastecimento encontrado, buscando km de cadastro do veículo...');
+        const vehicle = veiculos.find(v => v.id === formData.veiculo_id);
+        if (vehicle && vehicle.currentMileage > 0) {
+          console.log('🔍 Usando km de cadastro do veículo:', vehicle.currentMileage);
+          return {
+            mileage: vehicle.currentMileage,
+            isFromVehicle: true // Flag para identificar que vem do veículo
+          };
+        }
+        
+        console.log('🔍 Nenhum km encontrado para o veículo');
+        return null;
+      } catch (error) {
+        console.error('❌ Erro ao buscar último abastecimento:', error);
+        return null;
+      }
+    },
     enabled: !!formData.veiculo_id
   });
 
@@ -434,12 +634,12 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
     });
     
     if (newMileage <= lastFuelRecord.mileage) {
-      return `⚠️ A quilometragem atual (${newMileage.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} km) não pode ser menor ou igual à quilometragem do último abastecimento (${lastFuelRecord.mileage.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} km). Por favor, informe o valor correto.`;
+      return `❌ A quilometragem atual (${newMileage.toLocaleString('pt-BR')} km) não pode ser menor ou igual à quilometragem do último abastecimento (${lastFuelRecord.mileage.toLocaleString('pt-BR')} km). Por favor, informe um valor maior.`;
     }
     
     const difference = newMileage - lastFuelRecord.mileage;
     if (difference > 2000) {
-      return `⚠️ Diferença muito alta (${difference.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} km). Verifique se a quilometragem está correta.`;
+      return `⚠️ Diferença elevada detectada (${difference.toLocaleString('pt-BR')} km). Confirme se os valores estão corretos antes de prosseguir.`;
     }
     
     return null;
@@ -468,8 +668,6 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
         return !formData.veiculo_id;
       case 'data_abastecimento':
         return !formData.data_abastecimento;
-      case 'combustivel':
-        return !formData.combustivel;
       case 'quilometragem':
         return !formData.quilometragem || !!mileageError;
       case 'litros':
@@ -564,7 +762,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
     }
     
     // Validar se todos os campos obrigatórios estão preenchidos
-    const requiredFields = ['veiculo_id', 'data_abastecimento', 'combustivel', 'quilometragem', 'litros', 'valor_litro', 'posto'];
+    const requiredFields = ['veiculo_id', 'data_abastecimento', 'quilometragem', 'litros', 'valor_litro', 'posto'];
     const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
     
     if (missingFields.length > 0) {
@@ -686,7 +884,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
 
               <div className="flex flex-col">
                 <Label htmlFor="combustivel" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
-                  Tipo de Combustível <span className="text-seguranca-red">*</span>
+                  Tipo de Combustível
                 </Label>
                 <Select 
                   value={formData.combustivel} 
@@ -694,11 +892,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                   onOpenChange={() => handleFieldBlur('combustivel')}
                 >
                   <SelectTrigger 
-                    className={`h-10 sm:h-11 border-2 transition-colors ${
-                      isFieldInvalid('combustivel')
-                        ? 'border-seguranca-red bg-seguranca-black text-seguranca-lightgray'
-                        : 'border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow'
-                    }`}
+                    className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
                   >
                     <SelectValue placeholder="Selecione o tipo de combustível" />
                   </SelectTrigger>
@@ -709,9 +903,6 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                     <SelectItem value="FLEX">Flex</SelectItem>
                   </SelectContent>
                 </Select>
-                {isFieldInvalid('combustivel') && (
-                  <p className="text-sm text-seguranca-red mt-1">Tipo de combustível é obrigatório</p>
-                )}
               </div>
             </div>
 
@@ -725,13 +916,19 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 <Input
                   id="km_anterior"
                   type="text"
-                  value={lastFuelRecord?.mileage ? lastFuelRecord.mileage.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+                  value={lastFuelRecord?.mileage ? lastFuelRecord.mileage.toLocaleString('pt-BR') : ''}
                   disabled
                   className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-graphite text-gray-400 cursor-not-allowed"
-                  placeholder={lastFuelRecord ? lastFuelRecord.mileage.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : 'Nenhum registro anterior'}
+                  placeholder={lastFuelRecord ? lastFuelRecord.mileage.toLocaleString('pt-BR') : 'Nenhum registro anterior'}
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  {lastFuelRecord ? 'Quilometragem do último abastecimento' : 'Primeiro abastecimento do veículo'}
+                  {lastFuelRecord ? 
+                    (lastFuelRecord.isFromVehicle ? 
+                      'Quilometragem de cadastro do veículo' : 
+                      'Quilometragem do último abastecimento'
+                    ) : 
+                    'Primeiro abastecimento do veículo'
+                  }
                 </p>
               </div>
 
@@ -762,7 +959,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                   <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                     <p className="text-xs text-blue-400 font-medium">Informação:</p>
                     <p className="text-xs text-blue-300">
-                      Diferença: {(Number(formData.quilometragem.replace(/\./g, '')) - lastFuelRecord.mileage).toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} km
+                      Diferença: {(Number(formData.quilometragem.replace(/\./g, '')) - lastFuelRecord.mileage).toLocaleString('pt-BR')} km
                       {Number(formData.quilometragem.replace(/\./g, '')) > lastFuelRecord.mileage && (
                         <span className="text-green-400 ml-2">✓ Válido</span>
                       )}
@@ -773,7 +970,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                   <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                     <p className="text-sm text-red-400 font-medium flex items-center gap-2">
                       <span className="text-red-500">⚠️</span>
-                      Validação de Quilometragem
+                      Erro de Quilometragem
                     </p>
                     <p className="text-sm text-red-300 mt-1">{mileageError}</p>
                   </div>
@@ -782,7 +979,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                   <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                     <p className="text-sm text-yellow-400 font-medium flex items-center gap-2">
                       <span className="text-yellow-500">⚠️</span>
-                      Aviso de Quilometragem
+                      Verificação de Quilometragem
                     </p>
                     <p className="text-sm text-yellow-300 mt-1">{mileageWarning}</p>
                   </div>
@@ -1083,36 +1280,64 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
 
       {/* Modal para Novo Motorista */}
       <Dialog open={showNewDriverModal} onOpenChange={setShowNewDriverModal}>
-        <DialogContent className="sm:max-w-md bg-seguranca-graphite border-gray-600">
-          <DialogHeader>
-            <DialogTitle className="text-lg text-seguranca-lightgray flex items-center">
-              <User size={20} className="mr-2 text-seguranca-yellow" />
-              Novo Motorista
+        <DialogContent className="w-[95vw] max-w-md sm:max-w-lg max-h-[95vh] overflow-y-auto mx-2 sm:mx-auto bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-base sm:text-lg lg:text-xl text-seguranca-lightgray flex items-center">
+              <User size={18} className="mr-2 text-seguranca-yellow flex-shrink-0" />
+              <span className="truncate">Novo Motorista</span>
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-sm sm:text-base text-gray-400 mt-2">
               Cadastre um novo motorista para usar no registro de abastecimento.
             </DialogDescription>
           </DialogHeader>
           
-          <form onSubmit={handleCreateDriver} className="space-y-4">
+          <form onSubmit={handleCreateDriver} className="space-y-3 sm:space-y-4">
             <div className="flex flex-col">
-              <Label htmlFor="driverName" className="text-sm text-seguranca-lightgray mb-2">
+              <Label htmlFor="driverName" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
                 Nome do Motorista <span className="text-seguranca-red">*</span>
               </Label>
-              <Input
-                id="driverName"
-                type="text"
-                value={newDriverData.name}
-                onChange={(e) => setNewDriverData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Nome completo do motorista"
+              <Select
+                value={newDriverData.employeeId}
+                onValueChange={(value) => {
+                  const selectedEmployee = employees.find(emp => emp.id === value);
+                  setNewDriverData(prev => ({ 
+                    ...prev, 
+                    employeeId: value,
+                    name: selectedEmployee ? selectedEmployee.name : ''
+                  }));
+                }}
                 required
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-              />
+              >
+                <SelectTrigger className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors">
+                  <SelectValue placeholder="Selecione o funcionário" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  {employeesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      Carregando funcionários...
+                    </SelectItem>
+                  ) : employees.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      Nenhum funcionário encontrado
+                    </SelectItem>
+                  ) : (
+                    employees.map((employee) => (
+                      <SelectItem 
+                        key={employee.id} 
+                        value={employee.id}
+                        className="text-seguranca-lightgray hover:bg-seguranca-black hover:text-white"
+                      >
+                        {employee.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="flex flex-col">
-              <Label htmlFor="driverLicense" className="text-sm text-seguranca-lightgray mb-2">
-                Número da CNH
+              <Label htmlFor="driverLicense" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Número da CNH <span className="text-seguranca-red">*</span>
               </Label>
               <Input
                 id="driverLicense"
@@ -1120,23 +1345,60 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 value={newDriverData.licenseNumber}
                 onChange={(e) => setNewDriverData(prev => ({ ...prev, licenseNumber: e.target.value }))}
                 placeholder="Número da carteira de habilitação"
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                required
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
             
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex flex-col">
+              <Label htmlFor="driverWorkPost" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Posto de Trabalho/Setor <span className="text-seguranca-red">*</span>
+              </Label>
+              <Select
+                value={newDriverData.workPost}
+                onValueChange={(value) => setNewDriverData(prev => ({ ...prev, workPost: value }))}
+                required
+              >
+                <SelectTrigger className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors">
+                  <SelectValue placeholder="Selecione o posto de trabalho" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  {workPostsLoading ? (
+                    <SelectItem value="loading" disabled>
+                      Carregando postos...
+                    </SelectItem>
+                  ) : workPosts.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      Nenhum posto encontrado
+                    </SelectItem>
+                  ) : (
+                    workPosts.map((workPost) => (
+                      <SelectItem 
+                        key={workPost.id} 
+                        value={workPost.id}
+                        className="text-seguranca-lightgray hover:bg-seguranca-black hover:text-white"
+                      >
+                        {workPost.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowNewDriverModal(false)}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:border-gray-500"
+                className="w-full sm:w-auto border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:border-gray-500 h-10 sm:h-11 text-sm sm:text-base"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={createDriverMutation.isPending || !newDriverData.name.trim()}
-                className="bg-seguranca-red hover:bg-seguranca-darkred text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={createDriverMutation.isPending || !newDriverData.employeeId || !newDriverData.licenseNumber.trim() || !newDriverData.workPost.trim()}
+                className="w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred text-white disabled:opacity-50 disabled:cursor-not-allowed h-10 sm:h-11 text-sm sm:text-base"
               >
                 {createDriverMutation.isPending ? 'Criando...' : 'Criar Motorista'}
               </Button>
@@ -1147,20 +1409,20 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
 
       {/* Modal para Novo Posto */}
       <Dialog open={showNewStationModal} onOpenChange={setShowNewStationModal}>
-        <DialogContent className="sm:max-w-md bg-seguranca-graphite border-gray-600">
-          <DialogHeader>
-            <DialogTitle className="text-lg text-seguranca-lightgray flex items-center">
-              <Plus size={20} className="mr-2 text-seguranca-yellow" />
-              Novo Posto de Combustível
+        <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[95vh] overflow-y-auto mx-2 sm:mx-auto bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-base sm:text-lg lg:text-xl text-seguranca-lightgray flex items-center">
+              <Plus size={18} className="mr-2 text-seguranca-yellow flex-shrink-0" />
+              <span className="truncate">Novo Posto de Combustível</span>
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-sm sm:text-base text-gray-400 mt-2">
               Cadastre um novo posto de combustível para usar no registro de abastecimento.
             </DialogDescription>
           </DialogHeader>
           
-          <form className="space-y-4">
+          <form className="space-y-3 sm:space-y-4">
             <div className="flex flex-col">
-              <Label htmlFor="stationName" className="text-sm text-seguranca-lightgray mb-2">
+              <Label htmlFor="stationName" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
                 Nome do Posto <span className="text-seguranca-red">*</span>
               </Label>
               <Input
@@ -1170,13 +1432,29 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 onChange={(e) => setNewStationData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Nome do posto de combustível"
                 required
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
             
             <div className="flex flex-col">
-              <Label htmlFor="stationAddress" className="text-sm text-seguranca-lightgray mb-2">
-                Endereço
+              <Label htmlFor="stationCEP" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                CEP <span className="text-seguranca-red">*</span>
+              </Label>
+              <Input
+                id="stationCEP"
+                type="text"
+                value={newStationData.cep}
+                onChange={(e) => handleCEPChange(e.target.value)}
+                placeholder="00000-000"
+                required
+                maxLength={9}
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
+              />
+            </div>
+            
+            <div className="flex flex-col">
+              <Label htmlFor="stationAddress" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Endereço <span className="text-seguranca-red">*</span>
               </Label>
               <Input
                 id="stationAddress"
@@ -1184,13 +1462,14 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 value={newStationData.address}
                 onChange={(e) => setNewStationData(prev => ({ ...prev, address: e.target.value }))}
                 placeholder="Endereço do posto"
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                required
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
 
             <div className="flex flex-col">
-              <Label htmlFor="stationCity" className="text-sm text-seguranca-lightgray mb-2">
-                Cidade
+              <Label htmlFor="stationCity" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Cidade <span className="text-seguranca-red">*</span>
               </Label>
               <Input
                 id="stationCity"
@@ -1198,13 +1477,14 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 value={newStationData.city}
                 onChange={(e) => setNewStationData(prev => ({ ...prev, city: e.target.value }))}
                 placeholder="Cidade do posto"
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                required
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
 
             <div className="flex flex-col">
-              <Label htmlFor="stationState" className="text-sm text-seguranca-lightgray mb-2">
-                Estado
+              <Label htmlFor="stationState" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Estado <span className="text-seguranca-red">*</span>
               </Label>
               <Input
                 id="stationState"
@@ -1212,27 +1492,30 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 value={newStationData.state}
                 onChange={(e) => setNewStationData(prev => ({ ...prev, state: e.target.value }))}
                 placeholder="Estado do posto"
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                required
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
 
             <div className="flex flex-col">
-              <Label htmlFor="stationPhone" className="text-sm text-seguranca-lightgray mb-2">
-                Telefone
+              <Label htmlFor="stationPhone" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Telefone <span className="text-seguranca-red">*</span>
               </Label>
               <Input
                 id="stationPhone"
                 type="text"
                 value={newStationData.phone}
-                onChange={(e) => setNewStationData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="Telefone do posto"
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="(00) 00000-0000"
+                required
+                maxLength={15}
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
 
             <div className="flex flex-col">
-              <Label htmlFor="stationBrand" className="text-sm text-seguranca-lightgray mb-2">
-                Marca
+              <Label htmlFor="stationBrand" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
+                Marca <span className="text-seguranca-red">*</span>
               </Label>
               <Input
                 id="stationBrand"
@@ -1240,23 +1523,27 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                 value={newStationData.brand}
                 onChange={(e) => setNewStationData(prev => ({ ...prev, brand: e.target.value }))}
                 placeholder="Marca do posto"
-                className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
+                required
+                className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors text-sm sm:text-base"
               />
             </div>
             
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowNewStationModal(false)}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:border-gray-500"
+                onClick={() => {
+                  clearStationForm();
+                  setShowNewStationModal(false);
+                }}
+                className="w-full sm:w-auto border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:border-gray-500 h-10 sm:h-11 text-sm sm:text-base"
               >
                 Cancelar
               </Button>
               <Button
                 type="button"
                 onClick={createNewStation}
-                className="bg-seguranca-red hover:bg-seguranca-darkred text-white"
+                className="w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred text-white h-10 sm:h-11 text-sm sm:text-base"
               >
                 Criar Posto
               </Button>

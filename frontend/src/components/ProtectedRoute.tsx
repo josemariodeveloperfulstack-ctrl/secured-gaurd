@@ -12,6 +12,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   console.log('🔒 ProtectedRoute: Verificando acesso...');
   console.log('🔒 Usuário:', user?.name, user?.role);
   console.log('🔒 Carregando:', isLoading);
+  console.log('🔒 Screen size:', window.innerWidth, 'x', window.innerHeight);
+  console.log('🔒 Is mobile:', window.innerWidth < 768);
 
   if (isLoading) {
     console.log('🔒 ProtectedRoute: Carregando...');

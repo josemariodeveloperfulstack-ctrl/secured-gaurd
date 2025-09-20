@@ -21,7 +21,10 @@ import {
   FileText,
   Send,
   CheckCircle,
-  Star
+  Star,
+  Instagram,
+  Facebook,
+  MessageCircle
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -66,10 +69,13 @@ const PortalVagas = () => {
   const loadVacancies = async () => {
     try {
       setLoading(true);
+      console.log('🔍 PortalVagas: Carregando vagas...');
       const vacancies = await hrService.getPublicJobVacancies();
+      console.log('🔍 PortalVagas: Vagas carregadas:', vacancies);
+      console.log('🔍 PortalVagas: Quantidade de vagas:', vacancies.length);
       setJobs(vacancies);
     } catch (error) {
-      console.error('Erro ao carregar vagas:', error);
+      console.error('❌ PortalVagas: Erro ao carregar vagas:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar vagas",
@@ -296,6 +302,7 @@ const PortalVagas = () => {
               <Shield className="h-12 w-12 sm:h-16 sm:w-16 text-gray-600 mx-auto mb-4" />
               <h3 className="text-xl sm:text-2xl font-bold text-gray-400 mb-2">Nenhuma vaga disponível</h3>
               <p className="text-sm sm:text-base text-gray-500">No momento não temos vagas abertas. Volte em breve!</p>
+              <p className="text-xs text-gray-600 mt-2">Debug: jobs.length = {jobs.length}</p>
             </div>
           ) : (
             <>
@@ -667,62 +674,126 @@ const PortalVagas = () => {
       {/* Footer */}
       <footer className="py-8 sm:py-12 px-4 border-t border-gray-700" style={{ backgroundColor: '#1a1a1a' }}>
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <Logo size="sm" type="full" />
+          {/* Primeira linha - Logo e Links */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-12 mb-8">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+                <Logo size="lg" type="full" />
               </div>
-              <p className="text-sm sm:text-base text-gray-300 mb-4">
+              <p className="text-sm sm:text-base lg:text-lg text-gray-300 mb-4 sm:mb-6 leading-relaxed">
                 Segurança patrimonial de qualidade para sua tranquilidade.
               </p>
+              <div className="flex flex-wrap gap-2 sm:gap-3 lg:gap-4">
+                <a href="tel:+553125591245" className="text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Telefone">
+                  <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
+                </a>
+                <a href="https://www.instagram.com/promover.vigilancia" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-pink-500 transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Instagram">
+                  <Instagram className="h-5 w-5 sm:h-6 sm:w-6" />
+                </a>
+                <a href="https://www.facebook.com/promover.vigilanciapatrimonial" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-500 transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Facebook">
+                  <Facebook className="h-5 w-5 sm:h-6 sm:w-6" />
+                </a>
+                <a href="https://maps.google.com/?q=Rua+Cel.+João+Camargos,+267+Centro+Contagem+MG" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Localização">
+                  <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
+                </a>
+              </div>
             </div>
             
             <div>
-              <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Serviços</h3>
-              <ul className="space-y-1 sm:space-y-2 text-sm sm:text-base text-gray-300">
-                <li><a href="/portal#servicos" className="hover:text-white">Vigilância Patrimonial</a></li>
-                <li><a href="/portal#servicos" className="hover:text-white">Portaria</a></li>
-                <li><a href="/portal#servicos" className="hover:text-white">Controlador de Acesso</a></li>
-                <li><a href="/portal#servicos" className="hover:text-white">Facilities</a></li>
+              <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Serviços</h3>
+              <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
+                <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Vigilância Patrimonial</a></li>
+                <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Portaria</a></li>
+                <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Controlador de Acesso</a></li>
+                <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Facilities</a></li>
               </ul>
             </div>
             
             <div>
-              <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Empresa</h3>
-              <ul className="space-y-1 sm:space-y-2 text-sm sm:text-base text-gray-300">
-                <li><a href="/portal#quem-somos" className="hover:text-white">Quem Somos</a></li>
-                <li><a href="/portal/vagas" className="hover:text-white">Trabalhe Conosco</a></li>
-                <li><a href="#" className="hover:text-white">Orçamento</a></li>
-                <li><a href="/portal#contato" className="hover:text-white">Contato</a></li>
-                <li><a href="/login" className="text-black hover:text-gray-800 px-2 py-1 rounded text-sm" style={{ backgroundColor: '#FFF600' }}>Área Administrativa</a></li>
+              <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Empresa</h3>
+              <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
+                <li><a href="/quem-somos" className="hover:text-white transition-colors block py-1">Quem Somos</a></li>
+                <li><a href="/trabalhe-conosco" className="hover:text-white transition-colors block py-1">Trabalhe Conosco</a></li>
+                <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Orçamento</a></li>
+                <li><a href="/contato" className="hover:text-white transition-colors block py-1">Contato</a></li>
+                <li className="mt-3 sm:mt-4">
+                  <a href="/login" className="inline-block text-black hover:text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded text-sm sm:text-base font-medium transition-colors" style={{ backgroundColor: '#FFF600' }}>
+                    Área Administrativa
+                  </a>
+                </li>
               </ul>
             </div>
             
             <div>
-              <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Contatos</h3>
-              <div className="space-y-1 sm:space-y-2 text-sm sm:text-base text-gray-300">
-                <p className="flex items-center">
-                  <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                  (31) 2559-1245
-                </p>
-                <p className="flex items-center">
-                  <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                  (31) 97130-3587
-                </p>
-                <p className="flex items-center">
-                  <Mail className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                  recrutamentopromover@gmail.com
-                </p>
-                <p className="flex items-center">
-                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                  Rua Cel. João Camargos, 267 – Centro – Contagem – MG
-                </p>
+              <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Legal</h3>
+              <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
+                <li><a href="/politicas-privacidade" className="hover:text-white transition-colors block py-1">Política de Privacidade</a></li>
+                <li><a href="/termos-condicoes" className="hover:text-white transition-colors block py-1">Termos e Condições</a></li>
+                <li><a href="#" className="hover:text-white transition-colors block py-1">Cookies</a></li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Segunda linha - Contatos centralizados em 2 colunas */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-5xl">
+              <h3 className="text-center text-xl sm:text-2xl lg:text-3xl font-semibold text-white mb-6 sm:mb-8">Contatos</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12">
+                {/* Sede Contagem */}
+                <div className="bg-gray-800/50 rounded-xl p-6 sm:p-8 border border-gray-700 hover:border-gray-600 transition-colors">
+                  <h4 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 flex items-center">
+                    <Building className="h-6 w-6 mr-3" />
+                    Sede – Contagem/MG
+                  </h4>
+                  <div className="space-y-4 text-sm sm:text-base text-gray-300">
+                    <p className="flex items-start">
+                      <MapPin className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+                      <span className="leading-relaxed">Rua Cel. João Camargos, 267<br />Centro – Contagem – MG</span>
+                    </p>
+                    <p className="flex items-center">
+                      <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                      <a href="tel:+553125591245" className="hover:text-white transition-colors font-medium">(31) 2559-1245</a>
+                    </p>
+                    <p className="flex items-center">
+                      <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                      <a href="tel:+5531971303587" className="hover:text-white transition-colors font-medium">(31) 97130-3587</a>
+                    </p>
+                    <p className="flex items-center">
+                      <Mail className="h-5 w-5 mr-3 flex-shrink-0" />
+                      <a href="mailto:recrutamentopromover@gmail.com" className="hover:text-white transition-colors text-xs sm:text-sm break-all">recrutamentopromover@gmail.com</a>
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Base Operacional Uberlândia */}
+                <div className="bg-gray-800/50 rounded-xl p-6 sm:p-8 border border-gray-700 hover:border-gray-600 transition-colors">
+                  <h4 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 flex items-center">
+                    <Building className="h-6 w-6 mr-3" />
+                    Base Operacional – Uberlândia/MG
+                  </h4>
+                  <div className="space-y-4 text-sm sm:text-base text-gray-300">
+                    <p className="flex items-start">
+                      <MapPin className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+                      <span className="leading-relaxed">Rua Jerônimo Martins Nascimento, 1.286<br />Bairro Nossa Senhora Aparecida – Uberlândia/MG</span>
+                    </p>
+                    <p className="flex items-center">
+                      <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                      <a href="tel:+553432192604" className="hover:text-white transition-colors font-medium">(34) 3219-2604</a>
+                    </p>
+                    <p className="flex items-center">
+                      <MessageCircle className="h-5 w-5 mr-3 flex-shrink-0" />
+                      <a href="https://wa.me/5531996868810" target="_blank" rel="noopener noreferrer" className="hover:text-green-400 transition-colors font-medium">
+                        (31) 9968-68810 (WhatsApp)
+                      </a>
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
           
           <div className="border-t border-gray-800 mt-6 pt-6 text-center text-gray-400">
-            <p className="text-xs sm:text-sm">&copy; 2024 Promover Vigilância Patrimonial. Todos os direitos reservados.</p>
+            <p className="text-xs sm:text-sm">&copy; 2025 Promover Vigilância Patrimonial. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>

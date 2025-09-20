@@ -39,7 +39,7 @@ import AdvancedFilters from '@/components/holerites/AdvancedFilters';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { payslipService } from '@/services/payslipService';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
 import api from '@/lib/axios';
 
@@ -289,7 +289,7 @@ const Holerites: React.FC = () => {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await api.post('/receipts/process-automatic', formData, {
+        const response = await api.post('/api/receipts/process-automatic', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -1380,7 +1380,7 @@ const Holerites: React.FC = () => {
       console.log('🔍 Permissões do usuário:', user?.permissions);
       console.log('🔍 Token no localStorage:', localStorage.getItem('token'));
       
-      const response = await api.get('/receipts');
+      const response = await api.get('/api/receipts');
       console.log('🔍 Resposta da API de recibos:', response);
       
       let receipts = [];
@@ -3162,6 +3162,9 @@ const Holerites: React.FC = () => {
               <DialogTitle className="text-seguranca-lightgray text-lg sm:text-xl">
                 Documento Unificado: {selectedUnifiedDocument?.holerite?.employeeName}
               </DialogTitle>
+              <DialogDescription className="text-gray-400 text-sm">
+                Visualização do documento unificado do funcionário
+              </DialogDescription>
             </DialogHeader>
             
             <div className="flex flex-col h-full px-6 pb-6">

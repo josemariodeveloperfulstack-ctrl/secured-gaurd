@@ -63,7 +63,7 @@ export const employeeService = {
   // Buscar todos os funcionários (sem filtros)
   async getAllEmployees(): Promise<Employee[]> {
     try {
-      const response = await api.get('/employees');
+      const response = await api.get('/api/employees');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar todos os funcionários:', error);
@@ -74,7 +74,7 @@ export const employeeService = {
   // Buscar funcionários por status
   async getEmployeesByStatus(status: string): Promise<Employee[]> {
     try {
-      const response = await api.get(`/employees/status/${status}`);
+      const response = await api.get(`/api/employees/status/${status}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários por status:', error);
@@ -85,7 +85,7 @@ export const employeeService = {
   // Buscar funcionários por unidade
   async getEmployeesByUnit(unitId: string): Promise<Employee[]> {
     try {
-      const response = await api.get(`/hr/employees/by-unit/${unitId}`);
+      const response = await api.get(`/api/hr/employees/by-unit/${unitId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários por unidade:', error);
@@ -96,7 +96,7 @@ export const employeeService = {
   // Buscar funcionários por posição
   async getEmployeesByPosition(positionId: string): Promise<Employee[]> {
     try {
-      const response = await api.get(`/hr/employees/by-position/${positionId}`);
+      const response = await api.get(`/api/hr/employees/by-position/${positionId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários por posição:', error);
@@ -107,7 +107,7 @@ export const employeeService = {
   // Buscar funcionário por ID
   async getEmployeeById(id: string): Promise<Employee> {
     try {
-      const response = await api.get(`/employees/${id}`);
+      const response = await api.get(`/api/employees/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionário por ID:', error);
@@ -118,7 +118,7 @@ export const employeeService = {
   // Criar novo funcionário
   async createEmployee(employee: Partial<Employee>): Promise<Employee> {
     try {
-      const response = await api.post('/employees', employee);
+      const response = await api.post('/api/employees', employee);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar funcionário:', error);
@@ -129,7 +129,7 @@ export const employeeService = {
   // Atualizar funcionário
   async updateEmployee(id: string, employee: Partial<Employee>): Promise<Employee> {
     try {
-      const response = await api.put(`/employees/${id}`, employee);
+      const response = await api.put(`/api/employees/${id}`, employee);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar funcionário:', error);
@@ -140,7 +140,7 @@ export const employeeService = {
   // Excluir funcionário
   async deleteEmployee(id: string): Promise<void> {
     try {
-      await api.delete(`/employees/${id}`);
+      await api.delete(`/api/employees/${id}`);
     } catch (error) {
       console.error('Erro ao excluir funcionário:', error);
       throw new Error('Falha ao excluir funcionário');
@@ -150,7 +150,7 @@ export const employeeService = {
   // Verificar se email já existe
   async checkEmailExists(email: string): Promise<boolean> {
     try {
-      await api.get(`/employees/email/${email}`);
+      await api.get(`/api/employees/email/${email}`);
       return true; // Se não lançar erro, o email existe
     } catch (error) {
       return false;
@@ -160,7 +160,7 @@ export const employeeService = {
   // Buscar funcionários com filtros avançados
   async searchEmployees(query: string): Promise<Employee[]> {
     try {
-      const response = await api.get(`/employees/search?q=${encodeURIComponent(query)}`);
+      const response = await api.get(`/api/employees/search?q=${encodeURIComponent(query)}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
@@ -171,7 +171,7 @@ export const employeeService = {
   // Buscar funcionários simplificados para seleção em formulários
   async searchSimpleEmployees(query: string): Promise<SimpleEmployee[]> {
     try {
-      const response = await api.get(`/employees/search/simple?q=${encodeURIComponent(query)}`);
+      const response = await api.get(`/api/employees/search/simple?q=${encodeURIComponent(query)}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);

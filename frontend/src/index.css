@@ -52,8 +52,14 @@
     @apply border-border;
   }
   
+  html {
+    scroll-behavior: smooth;
+  }
+  
   html, body {
     height: 100%;
+    width: 100%;
+    max-width: 100vw;
     @apply font-roboto bg-seguranca-black text-seguranca-lightgray;
   }
   
@@ -69,6 +75,7 @@
     margin: 0;
     @apply bg-seguranca-black;
   }
+  
 
   /* Scrollbar personalizada */
   ::-webkit-scrollbar {
@@ -329,6 +336,116 @@
   @media (max-width: 768px) {
     .mobile-button {
       @apply border-2 font-semibold;
+    }
+  }
+
+  /* Estilos específicos para o chatbot */
+  .chatbot-button {
+    @apply fixed z-50;
+    right: max(12px, min(24px, calc(100vw - 60px)));
+    bottom: 12px;
+  }
+
+  @media (min-width: 640px) {
+    .chatbot-button {
+      right: 24px;
+      bottom: 24px;
+    }
+  }
+
+  /* Prevenir scroll horizontal em modais */
+  .chatbot-modal {
+    max-width: calc(100vw - 16px) !important;
+    width: calc(100vw - 16px) !important;
+    margin: 8px !important;
+  }
+
+  @media (min-width: 640px) {
+    .chatbot-modal {
+      max-width: 28rem !important;
+      width: 28rem !important;
+      margin: 0 auto !important;
+    }
+  }
+  
+  /* Estilos para modal de especialista */
+  .specialist-modal {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: calc(100vw - 32px) !important;
+    width: calc(100vw - 32px) !important;
+    max-height: calc(100vh - 32px) !important;
+    margin: 0 !important;
+    overflow-x: hidden !important;
+  }
+  @media (min-width: 640px) {
+    .specialist-modal {
+      max-width: 600px !important;
+      width: 600px !important;
+    }
+  }
+  @media (min-width: 768px) {
+    .specialist-modal {
+      max-width: 700px !important;
+      width: 700px !important;
+    }
+  }
+  @media (min-width: 1024px) {
+    .specialist-modal {
+      max-width: 800px !important;
+      width: 800px !important;
+    }
+  }
+  
+  /* Garantir que conteúdo interno não cause overflow horizontal */
+  .specialist-modal * {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  
+  .specialist-modal .space-x-4 > * + * {
+    margin-left: 1rem !important;
+  }
+  
+  .specialist-modal .flex {
+    flex-wrap: wrap !important;
+  }
+
+  /* Garantir que elementos não causem overflow */
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Prevenir scroll horizontal global - mais específico */
+  @media (max-width: 640px) {
+    body {
+      overflow-x: hidden !important;
+    }
+    
+    /* Apenas containers que podem causar overflow */
+    .container {
+      max-width: 100vw !important;
+      padding-left: 1rem !important;
+      padding-right: 1rem !important;
+    }
+    
+    /* Garantir que seções não causem overflow */
+    section {
+      max-width: 100vw !important;
+      overflow-x: hidden !important;
+    }
+    
+    /* Garantir que elementos AOS sejam visíveis */
+    [data-aos] {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    
+    .aos-init {
+      opacity: 1 !important;
+      transform: none !important;
     }
   }
 }

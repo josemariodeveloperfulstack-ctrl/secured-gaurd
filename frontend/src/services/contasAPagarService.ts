@@ -205,10 +205,15 @@ export const contasAPagarService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
-    const response = await api.get(`/invoices?${params.toString()}`);
+    console.log('🔍 DEBUG: Fazendo requisição para /invoices com params:', params.toString());
+    const response = await api.get(`/api/invoices?${params.toString()}`);
+    
+    console.log('🔍 DEBUG: Resposta da API:', response.data);
     
     // Transformar dados do backend para o formato do frontend
     const invoices = Array.isArray(response.data) ? response.data : response.data.content || [];
+    
+    console.log('🔍 DEBUG: Invoices processados:', invoices);
     
     return invoices.map((invoice: any): ContaAPagar => ({
       id: invoice.id,
@@ -386,56 +391,66 @@ export const contasAPagarService = {
   // Buscar contas vencidas
   async getContasVencidas(): Promise<ContaAPagar[]> {
     const response = await api.get('/invoices/overdue');
-    return response.data.map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
+    return (Array.isArray(response.data) ? response.data : []).map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
   // Buscar contas vencendo em breve
   async getContasVencendoEmBreve(dias: number = 7): Promise<ContaAPagar[]> {
     const response = await api.get(`/invoices/due-soon/${dias}`);
-    return response.data.map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
+    return (Array.isArray(response.data) ? response.data : []).map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
   // ===== FORNECEDORES =====
   
   // Buscar todos os fornecedores
   async getFornecedores(): Promise<Supplier[]> {
-    const response = await api.get('/suppliers/all');
-    return response.data;
+    const response = await api.get('/api/suppliers/all');
+    console.log('🔍 DEBUG: Resposta da API /api/suppliers/all:', response.data);
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Buscar todas as empresas
+  async getEmpresas(): Promise<any[]> {
+    const response = await api.get('/api/units/all');
+    console.log('🔍 DEBUG: Resposta da API /api/units/all:', response.data);
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
   },
 
   // Criar fornecedor
   async createFornecedor(data: CreateSupplierRequest): Promise<Supplier> {
-    const response = await api.post('/suppliers', data);
+    const response = await api.post('/api/suppliers', data);
     return response.data;
   },
 
   // Atualizar fornecedor
   async updateFornecedor(id: string, data: UpdateSupplierRequest): Promise<Supplier> {
-    const response = await api.put(`/suppliers/${id}`, data);
+    const response = await api.put(`/api/suppliers/${id}`, data);
     return response.data;
   },
 
   // Excluir fornecedor
   async deleteFornecedor(id: string): Promise<void> {
-    await api.delete(`/suppliers/${id}`);
+    await api.delete(`/api/suppliers/${id}`);
   },
 
   // Alternar status (ativo/inativo)
   async toggleFornecedorStatus(id: string): Promise<Supplier> {
-    const response = await api.patch(`/suppliers/${id}/toggle-status`);
+    const response = await api.patch(`/api/suppliers/${id}/toggle-status`);
     return response.data;
   },
 
   // Listar fornecedores ativos
   async getFornecedoresAtivos(): Promise<Supplier[]> {
-    const response = await api.get('/suppliers/active');
+    const response = await api.get('/api/suppliers/active');
     return response.data;
   },
 
   // Buscar por CNPJ
   async getFornecedorByCnpj(cnpj: string): Promise<Supplier | null> {
     try {
-      const response = await api.get(`/suppliers/cnpj/${encodeURIComponent(cnpj)}`);
+      const response = await api.get(`/api/suppliers/cnpj/${encodeURIComponent(cnpj)}`);
       return response.data;
     } catch {
       return null;
@@ -444,7 +459,7 @@ export const contasAPagarService = {
 
   // Buscar fornecedor por ID
   async getFornecedorById(id: string): Promise<Supplier> {
-    const response = await api.get(`/suppliers/${id}`);
+    const response = await api.get(`/api/suppliers/${id}`);
     return response.data;
   },
 
@@ -720,7 +735,8 @@ export const contasAPagarService = {
       dataPagamento: parseDateFromBackend(invoice.paymentDate),
       observacoes: invoice.notes,
       categoria: invoice.category,
-      centroCusto: invoice.centroCusto
+      centroCusto: invoice.centroCusto,
+      createdAt: parseDateFromBackend(invoice.createdAt)
     };
   }
 };

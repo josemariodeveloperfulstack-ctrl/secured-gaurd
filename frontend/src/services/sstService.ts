@@ -197,13 +197,13 @@ export interface AssociateRiskToEmployeeDTO {
 export const sstService = {
   // Dashboard
   async getDashboardSummary(): Promise<SSTDashboardSummary> {
-    const response = await api.get('/sst/dashboard/summary');
+    const response = await api.get('/api/sst/dashboard/summary');
     return response.data;
   },
 
   // Alertas
   async getAlerts(): Promise<SSTAlert[]> {
-    const response = await api.get('/sst/alerts');
+    const response = await api.get('/api/sst/alerts');
     return response.data;
   },
 
@@ -218,7 +218,7 @@ export const sstService = {
   },
 
   async getOverdueAlerts(): Promise<SSTAlert[]> {
-    const response = await api.get('/sst/alerts/overdue');
+    const response = await api.get('/api/sst/alerts/overdue');
     return response.data;
   },
 
@@ -237,7 +237,7 @@ export const sstService = {
 
   // Riscos Ocupacionais
   async getOccupationalRisks(): Promise<OccupationalRisk[]> {
-    const response = await api.get('/sst/risks');
+    const response = await api.get('/api/sst/risks');
     return response.data;
   },
 
@@ -247,7 +247,7 @@ export const sstService = {
   },
 
   async createOccupationalRisk(risk: Partial<OccupationalRisk>): Promise<OccupationalRisk> {
-    const response = await api.post('/sst/risks', risk);
+    const response = await api.post('/api/sst/risks', risk);
     return response.data;
   },
 
@@ -266,12 +266,12 @@ export const sstService = {
   },
 
   async associateRiskToEmployee(data: AssociateRiskToEmployeeDTO): Promise<EmployeeRisk> {
-    const response = await api.post('/sst/risks/associate-employee', data);
+    const response = await api.post('/api/sst/risks/associate-employee', data);
     return response.data;
   },
 
   async associateRiskToPosition(positionId: string, riskId: string, riskLevel: string): Promise<void> {
-    await api.post('/sst/risks/associate-position', {
+    await api.post('/api/sst/risks/associate-position', {
       positionId,
       riskId,
       riskLevel
@@ -279,7 +279,7 @@ export const sstService = {
   },
 
   async copyRisksFromPositionToEmployee(employeeId: string, positionId: string): Promise<void> {
-    await api.post('/sst/risks/copy-position-to-employee', {
+    await api.post('/api/sst/risks/copy-position-to-employee', {
       employeeId,
       positionId
     });
@@ -287,7 +287,7 @@ export const sstService = {
 
   // Exames Médicos
   async getMedicalExams(): Promise<MedicalExam[]> {
-    const response = await api.get('/sst/medical-exams');
+    const response = await api.get('/api/sst/medical-exams');
     return response.data;
   },
 
@@ -297,7 +297,7 @@ export const sstService = {
   },
 
   async createMedicalExam(exam: CreateMedicalExamDTO): Promise<MedicalExam> {
-    const response = await api.post('/sst/medical-exams', exam);
+    const response = await api.post('/api/sst/medical-exams', exam);
     return response.data;
   },
 
@@ -332,7 +332,7 @@ export const sstService = {
 
   // Treinamentos
   async getSSTTrainings(): Promise<SSTTraining[]> {
-    const response = await api.get('/sst/trainings');
+    const response = await api.get('/api/sst/trainings');
     return response.data;
   },
 
@@ -342,7 +342,7 @@ export const sstService = {
   },
 
   async createSSTTraining(training: Partial<SSTTraining>): Promise<SSTTraining> {
-    const response = await api.post('/sst/trainings', training);
+    const response = await api.post('/api/sst/trainings', training);
     return response.data;
   },
 
@@ -356,7 +356,7 @@ export const sstService = {
   },
 
   async getTrainingParticipations(): Promise<TrainingParticipation[]> {
-    const response = await api.get('/sst/training-participations');
+    const response = await api.get('/api/sst/training-participations');
     return response.data;
   },
 
@@ -366,7 +366,7 @@ export const sstService = {
   },
 
   async createTrainingParticipation(participation: CreateTrainingParticipationDTO): Promise<TrainingParticipation> {
-    const response = await api.post('/sst/training-participations', participation);
+    const response = await api.post('/api/sst/training-participations', participation);
     return response.data;
   },
 
@@ -391,7 +391,7 @@ export const sstService = {
 
   // Acidentes
   async getAccidentRecords(): Promise<AccidentRecord[]> {
-    const response = await api.get('/sst/accidents');
+    const response = await api.get('/api/sst/accidents');
     return response.data;
   },
 
@@ -401,7 +401,7 @@ export const sstService = {
   },
 
   async createAccidentRecord(accident: CreateAccidentRecordDTO): Promise<AccidentRecord> {
-    const response = await api.post('/sst/accidents', accident);
+    const response = await api.post('/api/sst/accidents', accident);
     return response.data;
   },
 
@@ -430,13 +430,13 @@ export const sstService = {
   },
 
   async getAccidentStatistics(): Promise<any> {
-    const response = await api.get('/sst/accidents/statistics');
+    const response = await api.get('/api/sst/accidents/statistics');
     return response.data;
   },
 
   // EPIs
   async getPersonalProtectiveEquipments(): Promise<PersonalProtectiveEquipment[]> {
-    const response = await api.get('/sst/epis');
+    const response = await api.get('/api/sst/epis');
     return response.data;
   },
 
@@ -446,7 +446,7 @@ export const sstService = {
   },
 
   async createPersonalProtectiveEquipment(epi: Partial<PersonalProtectiveEquipment>): Promise<PersonalProtectiveEquipment> {
-    const response = await api.post('/sst/epis', epi);
+    const response = await api.post('/api/sst/epis', epi);
     return response.data;
   },
 
@@ -460,7 +460,7 @@ export const sstService = {
   },
 
   async getEPIDeliveries(): Promise<EPIDelivery[]> {
-    const response = await api.get('/sst/epi-deliveries');
+    const response = await api.get('/api/sst/epi-deliveries');
     return response.data;
   },
 
@@ -470,7 +470,7 @@ export const sstService = {
   },
 
   async createEPIDelivery(delivery: CreateEPIDeliveryDTO): Promise<EPIDelivery> {
-    const response = await api.post('/sst/epi-deliveries', delivery);
+    const response = await api.post('/api/sst/epi-deliveries', delivery);
     return response.data;
   },
 

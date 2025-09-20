@@ -149,11 +149,14 @@ const Financeiro: React.FC = () => {
       }
       
       setResumoFinanceiro(summary);
-      setTransactions(transactionsData);
-      setInvoices(invoicesData);
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
+      setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
     } catch (err) {
       console.error('Erro ao carregar dados financeiros:', err);
       setError('Erro ao carregar dados financeiros. Tente novamente.');
+      // Garantir que os estados sejam sempre arrays em caso de erro
+      setTransactions([]);
+      setInvoices([]);
       toast({
         title: "Erro",
         description: "Não foi possível carregar os dados financeiros.",
@@ -467,7 +470,7 @@ const Financeiro: React.FC = () => {
       if (editandoFatura) {
         console.log('DEBUG: Editando fatura existente');
         // Para edição, buscar a fatura original para comparar status/valor
-        const faturaAntiga = invoices.find(f => f.id === novaFatura.id);
+        const faturaAntiga = (invoices || []).find(f => f.id === novaFatura.id);
         console.log('DEBUG: Fatura antiga encontrada:', faturaAntiga);
         
         const dadosParaEnviar = {
@@ -581,10 +584,10 @@ const Financeiro: React.FC = () => {
   };
 
   // Receita Total: transações INCOME + faturas pagas
-  const receitaTransacoes = transactions
+  const receitaTransacoes = (transactions || [])
     .filter(t => t.type === 'INCOME')
     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-  const receitaFaturasPagas = invoices
+  const receitaFaturasPagas = (invoices || [])
     .filter(f => f.status === 'PAGA')
     .reduce((acc, f) => acc + (Number(f.amount) || 0), 0);
   const receitaTotal = receitaTransacoes + receitaFaturasPagas;
@@ -593,13 +596,13 @@ const Financeiro: React.FC = () => {
   const contasAReceberFaturas = invoices
     .filter(f => f.status === 'PENDENTE' || f.status === 'PENDENTE_ERRO')
     .reduce((acc, f) => acc + (Number(f.amount) || 0), 0);
-  const contasAReceberTransacoes = transactions
+  const contasAReceberTransacoes = (transactions || [])
     .filter(t => t.type === 'INCOME' && t.status === 'PENDING')
     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
   const contasAReceber = contasAReceberFaturas + contasAReceberTransacoes;
 
   // Despesa Total: transações EXPENSE
-  const despesaTotal = transactions
+  const despesaTotal = (transactions || [])
     .filter(t => t.type === 'EXPENSE')
     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
@@ -607,7 +610,7 @@ const Financeiro: React.FC = () => {
   const lucroLiquido = receitaTotal - despesaTotal;
 
   // Calcular contas a pagar (transações com status PENDING)
-  const contasAPagar = transactions
+  const contasAPagar = (transactions || [])
     .filter(t => t.type === 'EXPENSE' && t.status === 'PENDING')
     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
@@ -791,35 +794,6 @@ const Financeiro: React.FC = () => {
               <Plus size={18} className="mr-2" />
               <span className="hidden sm:inline">Nova Fatura</span>
               <span className="sm:hidden">Nova Fatura</span>
-            </Button>
-            <Button
-              onClick={async () => {
-                console.log('DEBUG: Testando APIs...');
-                try {
-                  const clientes = await clientService.getClients();
-                  console.log('DEBUG: API Clientes:', clientes);
-                  const contratos = await contractService.getContracts();
-                  console.log('DEBUG: API Contratos:', contratos);
-                  const unidades = await unitService.getAllUnits();
-                  console.log('DEBUG: API Unidades:', unidades);
-                  toast({
-                    title: "Teste",
-                    description: "APIs testadas, verifique o console",
-                    variant: "default"
-                  });
-                } catch (error) {
-                  console.error('DEBUG: Erro ao testar APIs:', error);
-                  toast({
-                    title: "Erro",
-                    description: "Falha ao testar APIs",
-                    variant: "destructive"
-                  });
-                }
-              }}
-              variant="outline"
-              className="border-yellow-600 text-yellow-400 hover:bg-yellow-600/20 text-sm"
-            >
-              🧪 Testar APIs
             </Button>
             <Button
               onClick={async () => {

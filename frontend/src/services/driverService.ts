@@ -9,31 +9,31 @@ export interface CreateDriverDTO {
 
 const driverService = {
   async getDrivers(): Promise<Driver[]> {
-    const response = await api.get('/drivers');
+    const response = await api.get('/api/drivers');
     return response.data;
   },
 
   async getDriver(id: string): Promise<Driver> {
-    const response = await api.get(`/drivers/${id}`);
+    const response = await api.get(`/api/drivers/${id}`);
     return response.data;
   },
 
   async createDriver(data: CreateDriverDTO): Promise<Driver> {
-    const response = await api.post('/drivers', data);
+    const response = await api.post('/api/drivers', data);
     return response.data;
   },
 
   async updateDriver(id: string, data: CreateDriverDTO): Promise<Driver> {
-    const response = await api.put(`/drivers/${id}`, data);
+    const response = await api.put(`/api/drivers/${id}`, data);
     return response.data;
   },
 
   async deactivateDriver(id: string): Promise<void> {
-    await api.patch(`/drivers/${id}/deactivate`);
+    await api.patch(`/api/drivers/${id}/deactivate`);
   },
 
   async deleteDriver(id: string): Promise<void> {
-    await api.delete(`/drivers/${id}`);
+    await api.delete(`/api/drivers/${id}`);
   },
 };
 

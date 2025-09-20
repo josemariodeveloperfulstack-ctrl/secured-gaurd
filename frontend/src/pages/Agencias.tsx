@@ -47,11 +47,11 @@ const Agencias: React.FC = () => {
       
       // Carregar agências
       const agenciesData = await bankAgencyService.getAllAgencies();
-      setAgencies(agenciesData);
+      setAgencies(Array.isArray(agenciesData) ? agenciesData : []);
       
       // Carregar bancos para filtro
       const banksData = await bankAgencyService.getAllBanks();
-      setBanks(banksData);
+      setBanks(Array.isArray(banksData) ? banksData : []);
       
       // Carregar estatísticas
       const stats = await bankAgencyService.getAgencyStatistics();
@@ -64,6 +64,9 @@ const Agencias: React.FC = () => {
         description: "Não foi possível carregar os dados",
         variant: "destructive"
       });
+      // Garantir que agencies e banks sejam sempre arrays
+      setAgencies([]);
+      setBanks([]);
     } finally {
       setLoading(false);
     }
@@ -91,7 +94,7 @@ const Agencias: React.FC = () => {
       setLoading(true);
       await bankAgencyService.deleteAgency(agencyId);
       
-      setAgencies(prev => prev.filter(agency => agency.id !== agencyId));
+      setAgencies(prev => (prev || []).filter(agency => agency.id !== agencyId));
       toast({
         title: "Sucesso",
         description: "Agência removida com sucesso!"
@@ -110,13 +113,13 @@ const Agencias: React.FC = () => {
 
   const handleFormSuccess = (agency: Agency) => {
     if (editingAgency) {
-      setAgencies(prev => prev.map(a => a.id === agency.id ? agency : a));
+      setAgencies(prev => (prev || []).map(a => a.id === agency.id ? agency : a));
       toast({
         title: "Sucesso",
         description: "Agência atualizada com sucesso!"
       });
     } else {
-      setAgencies(prev => [agency, ...prev]);
+      setAgencies(prev => [agency, ...(prev || [])]);
       toast({
         title: "Sucesso",
         description: "Agência criada com sucesso!"
@@ -146,7 +149,7 @@ const Agencias: React.FC = () => {
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
-  const filteredAgencies = agencies.filter(agency => {
+  const filteredAgencies = (agencies || []).filter(agency => {
     const matchesSearch = agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          agency.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          agency.bankName.toLowerCase().includes(searchTerm.toLowerCase()) ||

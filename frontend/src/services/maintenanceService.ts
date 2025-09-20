@@ -6,7 +6,7 @@ class MaintenanceService {
   async getAllMaintenances(): Promise<VehicleMaintenance[]> {
     try {
       console.log('🔗 MaintenanceService: Buscando manutenções...');
-      const response = await api.get('/maintenances');
+      const response = await api.get('/api/maintenances');
       console.log('✅ MaintenanceService: Manutenções carregadas:', response.data?.length || 0);
       return response.data || [];
     } catch (error) {
@@ -18,7 +18,7 @@ class MaintenanceService {
           id: '1',
           vehicleId: '1',
           vehiclePlate: 'ABC-1234',
-          date: '2024-01-20',
+          date: '2025-01-20',
           maintenanceType: 'PREVENTIVE',
           description: 'Manutenção preventiva programada - troca de óleo e filtros',
           cost: 450.00,
@@ -34,7 +34,7 @@ class MaintenanceService {
           id: '2',
           vehicleId: '2',
           vehiclePlate: 'DEF-5678',
-          date: '2024-01-18',
+          date: '2025-01-18',
           maintenanceType: 'CORRECTIVE',
           description: 'Limpeza interna lavagem do motor, alinhamento e balanceamento',
           cost: 24999.98,
@@ -97,7 +97,7 @@ class MaintenanceService {
           formData.append('files', file);
         });
         
-        const response = await api.post('/maintenances/upload', formData, {
+        const response = await api.post('/api/maintenances/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -105,7 +105,7 @@ class MaintenanceService {
         return response.data;
       } else {
         // Usar endpoint padrão sem arquivos
-        const response = await api.post('/maintenances', data);
+        const response = await api.post('/api/maintenances', data);
         return response.data;
       }
     } catch (error) {
@@ -213,7 +213,7 @@ class MaintenanceService {
   // Buscar manutenções por período
   async getMaintenancesByPeriod(startDate: string, endDate: string): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/maintenances/period', {
+      const response = await api.get('/api/maintenances/period', {
         params: { startDate, endDate }
       });
       return response.data;
@@ -226,7 +226,7 @@ class MaintenanceService {
   // Buscar manutenções agendadas para hoje
   async getScheduledForToday(): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/maintenances/scheduled/today');
+      const response = await api.get('/api/maintenances/scheduled/today');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções agendadas para hoje:', error);
@@ -237,7 +237,7 @@ class MaintenanceService {
   // Buscar manutenções urgentes
   async getUrgentMaintenances(): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/maintenances/urgent');
+      const response = await api.get('/api/maintenances/urgent');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções urgentes:', error);
@@ -248,7 +248,7 @@ class MaintenanceService {
   // Buscar manutenções vencidas
   async getOverdueMaintenances(): Promise<VehicleMaintenance[]> {
     try {
-      const response = await api.get('/maintenances/overdue');
+      const response = await api.get('/api/maintenances/overdue');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar manutenções vencidas:', error);
@@ -269,7 +269,7 @@ class MaintenanceService {
     averageCost: number;
   }> {
     try {
-      const response = await api.get('/maintenances/stats');
+      const response = await api.get('/api/maintenances/stats');
       const stats = response.data;
       
       // Calcular custo total e médio (se não estiver disponível no backend)

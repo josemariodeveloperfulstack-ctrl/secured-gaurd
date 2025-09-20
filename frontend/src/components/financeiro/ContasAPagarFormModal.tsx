@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +20,8 @@ export interface ContaAPagar {
   vencimento: Date;
   fornecedor: string;
   fornecedorId?: string;
+  empresa?: string;
+  empresaId?: string;
   descricao: string;
   tipo: 'FIXA' | 'VARIAVEL';
   valor: number;
@@ -31,6 +33,7 @@ export interface ContaAPagar {
   comprovante?: File;
   categoria?: string | undefined;
   centroCusto?: string | undefined;
+  createdAt?: Date; // Campo de data de lançamento
 }
 
 interface ContasAPagarFormModalProps {
@@ -51,12 +54,15 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fornecedores, setFornecedores] = useState<Supplier[]>([]);
+  const [empresas, setEmpresas] = useState<any[]>([]);
   
   const [formData, setFormData] = useState<ContaAPagar>({
     dataEmissao: new Date(),
     vencimento: new Date(),
     fornecedor: '',
     fornecedorId: '',
+    empresa: '',
+    empresaId: '',
     descricao: '',
     tipo: 'VARIAVEL',
     valor: 0,
@@ -79,7 +85,11 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     if (open) {
       // Carregar fornecedores
       contasAPagarService.getFornecedores()
-        .then(setFornecedores)
+        .then(data => {
+          console.log('🔍 DEBUG: Dados de fornecedores recebidos:', data);
+          const fornecedoresArray = Array.isArray(data) ? data : [];
+          setFornecedores(fornecedoresArray);
+        })
         .catch(error => {
           console.error('Erro ao carregar fornecedores:', error);
           toast({
@@ -91,6 +101,27 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           setFornecedores([
             { id: '1', name: 'Fornecedor Exemplo 1', isActive: true },
             { id: '2', name: 'Fornecedor Exemplo 2', isActive: true }
+          ]);
+        });
+
+      // Carregar empresas
+      contasAPagarService.getEmpresas()
+        .then(data => {
+          console.log('🔍 DEBUG: Dados de empresas recebidos:', data);
+          const empresasArray = Array.isArray(data) ? data : [];
+          setEmpresas(empresasArray);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar empresas:', error);
+          toast({
+            title: "Erro",
+            description: "Erro ao carregar empresas. Usando dados de exemplo.",
+            variant: "destructive"
+          });
+          // Fallback para dados de exemplo em caso de erro
+          setEmpresas([
+            { id: '1', name: 'Empresa Exemplo 1' },
+            { id: '2', name: 'Empresa Exemplo 2' }
           ]);
         });
 
@@ -254,9 +285,9 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             <DollarSign className="text-seguranca-yellow" size={24} />
             {editMode ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}
           </DialogTitle>
-          <p id="conta-pagar-description" className="text-sm text-seguranca-lightgray">
+          <DialogDescription id="conta-pagar-description" className="text-sm text-seguranca-lightgray">
             {editMode ? 'Edite os dados da conta a pagar selecionada.' : 'Preencha os dados para criar uma nova conta a pagar.'}
-          </p>
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -312,9 +343,33 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 <SelectValue placeholder="Selecione um fornecedor" />
               </SelectTrigger>
               <SelectContent className="bg-seguranca-black border-gray-600">
-                {fornecedores.map((fornecedor) => (
+                {(fornecedores || []).map((fornecedor) => (
                   <SelectItem key={fornecedor.id} value={fornecedor.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                     {fornecedor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Empresa */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-seguranca-lightgray">Empresa *</label>
+            <Select 
+              value={formData.empresaId} 
+              onValueChange={(value) => {
+                const empresa = empresas.find(e => e.id === value);
+                handleInputChange('empresaId', value);
+                handleInputChange('empresa', empresa?.name || '');
+              }}
+            >
+              <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                <SelectValue placeholder="Selecione uma empresa" />
+              </SelectTrigger>
+              <SelectContent className="bg-seguranca-black border-gray-600">
+                {(empresas || []).map((empresa) => (
+                  <SelectItem key={empresa.id} value={empresa.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                    {empresa.name}
                   </SelectItem>
                 ))}
               </SelectContent>

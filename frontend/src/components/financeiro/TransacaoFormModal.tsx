@@ -70,7 +70,9 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
   React.useEffect(() => {
     if (open) {
       unitService.getAllUnits().then(setUnits).catch(() => setUnits([]));
-      contasAPagarService.getFornecedores().then(setFornecedores).catch(() => setFornecedores([]));
+      contasAPagarService.getFornecedores()
+        .then(data => setFornecedores(Array.isArray(data) ? data : []))
+        .catch(() => setFornecedores([]));
       // Carregar categorias a partir das transações existentes (lista única)
       financialService.getTransactions()
         .then((txs) => {
@@ -433,7 +435,7 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__NONE__">Sem fornecedor</SelectItem>
-                    {fornecedores.map(f => (
+                    {(fornecedores || []).map(f => (
                       <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                     ))}
                   </SelectContent>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import SEO from '@/components/SEO';
 import { Button } from '@/components/ui/button';
@@ -20,19 +20,26 @@ import {
   Truck,
   ShoppingBag,
   Factory,
-  Heart
+  Heart,
+  Instagram,
+  Facebook,
+  MessageCircle
 } from 'lucide-react';
 import { useAOS } from '@/hooks/use-aos';
 import Logo from '@/components/Logo';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
-// Lazy load dos modais para melhor performance
-const QuoteModal = lazy(() => import('@/components/QuoteModal'));
-const WhatsAppChatbot = lazy(() => import('@/components/WhatsAppChatbot'));
+// Import modals directly
+import QuoteModal from '@/components/QuoteModal';
+import WhatsAppChatbot from '@/components/WhatsAppChatbot';
+import ContactModal from '@/components/ContactModal';
+import SpecialistModal from '@/components/SpecialistModal';
 
 const PortalHome = () => {
   const aos = useAOS();
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [isSpecialistModalOpen, setIsSpecialistModalOpen] = useState(false);
 
   // Memoizar dados estáticos para evitar recriação desnecessária
   const services = useMemo(() => [
@@ -122,7 +129,12 @@ const PortalHome = () => {
     Solicitar Orçamento
     <ArrowRight className="ml-2 h-5 w-5" />
   </Button>
-  <Button size="lg" variant="outline" className="text-yellow-400 border-yellow-400 hover:bg-yellow-400 hover:text-black text-lg px-8 py-4">
+  <Button 
+    size="lg" 
+    variant="outline" 
+    className="text-yellow-400 border-yellow-400 hover:bg-yellow-400 hover:text-black text-lg px-8 py-4"
+    onClick={() => setIsContactModalOpen(true)}
+  >
     Fale Conosco
   </Button>
 </div>
@@ -272,108 +284,175 @@ const PortalHome = () => {
               >
                 Solicitar Orçamento
               </Button>
-              <Button size="lg" variant="outline" className="text-white border-white hover:bg-white hover:text-red-600 text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="text-white border-white hover:bg-white hover:text-red-600 text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4"
+                onClick={() => setIsSpecialistModalOpen(true)}
+              >
                 Falar com Especialista
               </Button>
             </div>
           </div>
         </section>
 
+
         {/* Footer */}
         <footer className="py-8 sm:py-12 px-4 border-t border-gray-700" style={{ backgroundColor: '#1a1a1a' }}>
           <div className="container mx-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12">
-              <div data-aos={aos.fadeRight}>
-                <div className="flex items-center space-x-2 mb-4">
-                  <Logo size="sm" type="full" />
+            {/* Primeira linha - Logo e Links */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-12 mb-8">
+              <div data-aos={aos.fadeRight} className="sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+                  <Logo size="lg" type="full" />
                 </div>
-                <p className="text-sm sm:text-base text-gray-300 mb-4">
+                <p className="text-sm sm:text-base lg:text-lg text-gray-300 mb-4 sm:mb-6 leading-relaxed">
                   Segurança patrimonial de qualidade para sua tranquilidade.
                 </p>
-                <div className="flex space-x-3 sm:space-x-4">
-                  <a href="#" className="text-gray-400 hover:text-white">
-                    <Phone className="h-4 w-4 sm:h-5 sm:w-5" />
+                <div className="flex flex-wrap gap-2 sm:gap-3 lg:gap-4">
+                  <a href="tel:+553125591245" className="text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Telefone">
+                    <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
                   </a>
-                  <a href="#" className="text-gray-400 hover:text-white">
-                    <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <a href="https://www.instagram.com/promover.vigilancia" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-pink-500 transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Instagram">
+                    <Instagram className="h-5 w-5 sm:h-6 sm:w-6" />
                   </a>
-                  <a href="#" className="text-gray-400 hover:text-white">
-                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <a href="https://www.facebook.com/promover.vigilanciapatrimonial" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-500 transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Facebook">
+                    <Facebook className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </a>
+                  <a href="https://maps.google.com/?q=Rua+Cel.+João+Camargos,+267+Centro+Contagem+MG" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-lg hover:bg-gray-800" title="Localização">
+                    <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
                   </a>
                 </div>
               </div>
               
               <div data-aos={aos.fadeUp} data-aos-delay="100">
-                <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Serviços</h3>
-                <ul className="space-y-1 sm:space-y-2 text-sm sm:text-base text-gray-300">
-                  <li><a href="#" className="hover:text-white">Vigilância Patrimonial</a></li>
-                  <li><a href="#" className="hover:text-white">Portaria</a></li>
-                  <li><a href="#" className="hover:text-white">Controlador de Acesso</a></li>
-                  <li><a href="#" className="hover:text-white">Facilities</a></li>
+                <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Serviços</h3>
+                <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
+                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Vigilância Patrimonial</a></li>
+                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Portaria</a></li>
+                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Controlador de Acesso</a></li>
+                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Facilities</a></li>
                 </ul>
               </div>
               
               <div data-aos={aos.fadeUp} data-aos-delay="200">
-                <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Empresa</h3>
-                <ul className="space-y-1 sm:space-y-2 text-sm sm:text-base text-gray-300">
-                  <li><a href="#" className="hover:text-white">Quem Somos</a></li>
-                  <li><a href="/portal/vagas" className="hover:text-white">Trabalhe Conosco</a></li>
-                  <li><a href="#" className="hover:text-white">Orçamento</a></li>
-                  <li><a href="#contato" className="hover:text-white">Contato</a></li>
-                  <li><a href="/login" className="text-black hover:text-gray-800 px-2 py-1 rounded text-sm" style={{ backgroundColor: '#FFF600' }}>Área Administrativa</a></li>
+                <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Empresa</h3>
+                <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
+                  <li><a href="/quem-somos" className="hover:text-white transition-colors block py-1">Quem Somos</a></li>
+                  <li><a href="/trabalhe-conosco" className="hover:text-white transition-colors block py-1">Trabalhe Conosco</a></li>
+                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Orçamento</a></li>
+                  <li><a href="/contato" className="hover:text-white transition-colors block py-1">Contato</a></li>
+                  <li className="mt-3 sm:mt-4">
+                    <a href="/login" className="inline-block text-black hover:text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded text-sm sm:text-base font-medium transition-colors" style={{ backgroundColor: '#FFF600' }}>
+                      Área Administrativa
+                    </a>
+                  </li>
                 </ul>
               </div>
               
-              <div data-aos={aos.fadeLeft}>
-                <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Contatos</h3>
-                <div className="space-y-1 sm:space-y-2 text-sm sm:text-base text-gray-300">
+              <div data-aos={aos.fadeUp} data-aos-delay="300">
+                <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Legal</h3>
+                <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
+                  <li><a href="/politicas-privacidade" className="hover:text-white transition-colors block py-1">Política de Privacidade</a></li>
+                  <li><a href="/termos-condicoes" className="hover:text-white transition-colors block py-1">Termos e Condições</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors block py-1">Cookies</a></li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Segunda linha - Contatos centralizados em 2 colunas */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-5xl" data-aos={aos.fadeUp} data-aos-delay="400">
+                <h3 className="text-center text-xl sm:text-2xl lg:text-3xl font-semibold text-white mb-6 sm:mb-8">Contatos</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12">
+                  {/* Sede Contagem */}
+                  <div className="bg-gray-800/50 rounded-xl p-6 sm:p-8 border border-gray-700 hover:border-gray-600 transition-colors">
+                    <h4 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 flex items-center">
+                      <Building className="h-6 w-6 mr-3" />
+                      Sede – Contagem/MG
+                    </h4>
+                    <div className="space-y-4 text-sm sm:text-base text-gray-300">
+                      <p className="flex items-start">
+                        <MapPin className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="leading-relaxed">Rua Cel. João Camargos, 267<br />Centro – Contagem – MG</span>
+                      </p>
+                      <p className="flex items-center">
+                        <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <a href="tel:+553125591245" className="hover:text-white transition-colors font-medium">(31) 2559-1245</a>
+                      </p>
                   <p className="flex items-center">
-                    <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    (31) 2559-1245
+                        <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <a href="tel:+5531971303587" className="hover:text-white transition-colors font-medium">(31) 97130-3587</a>
                   </p>
                   <p className="flex items-center">
-                    <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    (31) 97130-3587
+                        <Mail className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <a href="mailto:comercial@promovervigilancia.com.br" className="hover:text-white transition-colors text-xs sm:text-sm break-all">comercial@promovervigilancia.com.br</a>
                   </p>
                   <p className="flex items-center">
-                    <Mail className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    comercial@promovervigilancia.com.br
+                        <Mail className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <a href="mailto:planejamento@promovervigilancia.com.br" className="hover:text-white transition-colors text-xs sm:text-sm break-all">planejamento@promovervigilancia.com.br</a>
                   </p>
                   <p className="flex items-center">
-                    <Mail className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    planejamento@promovervigilancia.com.br
+                        <Clock className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <span className="font-medium">Atendimento 24h por dia</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Base Operacional Uberlândia */}
+                  <div className="bg-gray-800/50 rounded-xl p-6 sm:p-8 border border-gray-700 hover:border-gray-600 transition-colors">
+                    <h4 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 flex items-center">
+                      <Building className="h-6 w-6 mr-3" />
+                      Base Operacional – Uberlândia/MG
+                    </h4>
+                    <div className="space-y-4 text-sm sm:text-base text-gray-300">
+                      <p className="flex items-start">
+                        <MapPin className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="leading-relaxed">Rua Jerônimo Martins Nascimento, 1.286<br />Bairro Nossa Senhora Aparecida – Uberlândia/MG</span>
                   </p>
                   <p className="flex items-center">
-                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Rua Cel. João Camargos, 267 – Centro – Contagem – MG
+                        <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <a href="tel:+553432192604" className="hover:text-white transition-colors font-medium">(34) 3219-2604</a>
                   </p>
                   <p className="flex items-center">
-                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    24h por dia
-                  </p>
+                        <MessageCircle className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <a href="https://wa.me/5531996868810" target="_blank" rel="noopener noreferrer" className="hover:text-green-400 transition-colors font-medium">
+                          (31) 9968-68810 (WhatsApp)
+                        </a>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
             
             <div className="border-t border-gray-800 mt-6 pt-6 text-center text-gray-400" data-aos={aos.fadeUp}>
-              <p className="text-xs sm:text-sm">&copy; 2024 Promover Vigilância Patrimonial. Todos os direitos reservados.</p>
+              <p className="text-xs sm:text-sm">&copy; 2025 Promover Vigilância Patrimonial. Todos os direitos reservados.</p>
             </div>
           </div>
         </footer>
       </div>
       
       {/* Quote Modal */}
-      <Suspense fallback={<LoadingSpinner />}>
         <QuoteModal 
           isOpen={isQuoteModalOpen} 
           onClose={() => setIsQuoteModalOpen(false)} 
         />
-      </Suspense>
+      
+      {/* Contact Modal */}
+      <ContactModal 
+        isOpen={isContactModalOpen} 
+        onClose={() => setIsContactModalOpen(false)} 
+      />
+      
+      {/* Specialist Modal */}
+      <SpecialistModal 
+        isOpen={isSpecialistModalOpen} 
+        onClose={() => setIsSpecialistModalOpen(false)} 
+      />
       
       {/* WhatsApp Chatbot */}
-      <Suspense fallback={<LoadingSpinner />}>
         <WhatsAppChatbot />
-      </Suspense>
     </>
   );
 };

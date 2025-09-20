@@ -4,7 +4,7 @@
 -- =====================================================
 
 -- 1. Tabela de Tipos de Risco Ocupacional
-CREATE TABLE occupational_risk_types (
+CREATE TABLE IF NOT EXISTS occupational_risk_types (
     id UUID PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
@@ -16,7 +16,7 @@ CREATE TABLE occupational_risk_types (
 );
 
 -- 2. Tabela de Riscos por Cargo/Posição
-CREATE TABLE position_risks (
+CREATE TABLE IF NOT EXISTS position_risks (
     id UUID PRIMARY KEY,
     position_id UUID NOT NULL,
     risk_type_id UUID NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE position_risks (
 );
 
 -- 3. Tabela de Riscos por Funcionário (exceções/ajustes)
-CREATE TABLE employee_risks (
+CREATE TABLE IF NOT EXISTS employee_risks (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     risk_type_id UUID NOT NULL,
@@ -48,9 +48,9 @@ CREATE TABLE employee_risks (
 );
 
 -- 4. Tabela de EPIs (Equipamentos de Proteção Individual)
-CREATE TABLE personal_protective_equipment (
+CREATE TABLE IF NOT EXISTS personal_protective_equipment (
     id UUID PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     category VARCHAR(50) NOT NULL, -- CABECA, OLHOS, AUDITIVO, RESPIRATORIO, MAOS, PES, CORPO
     ca_number VARCHAR(50), -- Número do CA (Certificado de Aprovação)
@@ -67,7 +67,7 @@ CREATE TABLE personal_protective_equipment (
 );
 
 -- 5. Tabela de EPIs por Risco (matriz de obrigatoriedade)
-CREATE TABLE risk_required_epis (
+CREATE TABLE IF NOT EXISTS risk_required_epis (
     id UUID PRIMARY KEY,
     risk_type_id UUID NOT NULL,
     epi_id UUID NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE risk_required_epis (
 );
 
 -- 6. Tabela de Controle de Entrega de EPIs
-CREATE TABLE epi_deliveries (
+CREATE TABLE IF NOT EXISTS epi_deliveries (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     epi_id UUID NOT NULL,
@@ -101,9 +101,9 @@ CREATE TABLE epi_deliveries (
 );
 
 -- 7. Tabela de Tipos de Exames Médicos
-CREATE TABLE medical_exam_types (
+CREATE TABLE IF NOT EXISTS medical_exam_types (
     id UUID PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     exam_category VARCHAR(50) NOT NULL, -- ADMISSIONAL, PERIODICO, RETORNO, MUDANCA_FUNCAO, DEMISSIONAL
     validity_months INTEGER, -- Validade em meses (null = sem validade)
@@ -115,7 +115,7 @@ CREATE TABLE medical_exam_types (
 );
 
 -- 8. Tabela de Controle de Exames Médicos (ASO)
-CREATE TABLE medical_exams (
+CREATE TABLE IF NOT EXISTS medical_exams (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     exam_type_id UUID NOT NULL,
@@ -137,9 +137,9 @@ CREATE TABLE medical_exams (
 );
 
 -- 9. Tabela de Treinamentos em SST
-CREATE TABLE sst_trainings (
+CREATE TABLE IF NOT EXISTS sst_trainings (
     id UUID PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     training_type VARCHAR(50) NOT NULL, -- NR_35, CIPA, NR_10, BRIGADA_INCENDIO, etc.
     duration_hours INTEGER NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE sst_trainings (
 );
 
 -- 10. Tabela de Participação em Treinamentos
-CREATE TABLE training_participations (
+CREATE TABLE IF NOT EXISTS training_participations (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     training_id UUID NOT NULL,
@@ -172,7 +172,7 @@ CREATE TABLE training_participations (
 );
 
 -- 11. Tabela de Registro de Acidentes
-CREATE TABLE accident_records (
+CREATE TABLE IF NOT EXISTS accident_records (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     accident_date DATE NOT NULL,
@@ -202,7 +202,7 @@ CREATE TABLE accident_records (
 );
 
 -- 12. Tabela de Quase-Acidentes
-CREATE TABLE near_miss_records (
+CREATE TABLE IF NOT EXISTS near_miss_records (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     incident_date DATE NOT NULL,
@@ -225,7 +225,7 @@ CREATE TABLE near_miss_records (
 );
 
 -- 13. Tabela de Inspeções de Segurança
-CREATE TABLE safety_inspections (
+CREATE TABLE IF NOT EXISTS safety_inspections (
     id UUID PRIMARY KEY,
     inspection_date DATE NOT NULL,
     location VARCHAR(255) NOT NULL,
@@ -243,7 +243,7 @@ CREATE TABLE safety_inspections (
 );
 
 -- 14. Tabela de Não Conformidades
-CREATE TABLE non_conformities (
+CREATE TABLE IF NOT EXISTS non_conformities (
     id UUID PRIMARY KEY,
     inspection_id UUID,
     accident_id UUID,
@@ -270,7 +270,7 @@ CREATE TABLE non_conformities (
 );
 
 -- 15. Tabela de Membros da CIPA
-CREATE TABLE cipa_members (
+CREATE TABLE IF NOT EXISTS cipa_members (
     id UUID PRIMARY KEY,
     employee_id UUID NOT NULL,
     mandate_year INTEGER NOT NULL,
@@ -287,7 +287,7 @@ CREATE TABLE cipa_members (
 );
 
 -- 16. Tabela de Reuniões da CIPA
-CREATE TABLE cipa_meetings (
+CREATE TABLE IF NOT EXISTS cipa_meetings (
     id UUID PRIMARY KEY,
     meeting_date DATE NOT NULL,
     meeting_time TIME,
@@ -308,7 +308,7 @@ CREATE TABLE cipa_meetings (
 );
 
 -- 17. Tabela de Alertas SST
-CREATE TABLE sst_alerts (
+CREATE TABLE IF NOT EXISTS sst_alerts (
     id UUID PRIMARY KEY,
     alert_type VARCHAR(50) NOT NULL, -- EPI_VENCIMENTO, EXAME_VENCIMENTO, TREINAMENTO_VENCIMENTO, ACIDENTE, NAO_CONFORMIDADE
     title VARCHAR(255) NOT NULL,
@@ -333,122 +333,123 @@ CREATE TABLE sst_alerts (
 -- =====================================================
 
 -- Índices para consultas frequentes
-CREATE INDEX idx_position_risks_position_id ON position_risks(position_id);
-CREATE INDEX idx_employee_risks_employee_id ON employee_risks(employee_id);
-CREATE INDEX idx_epi_deliveries_employee_id ON epi_deliveries(employee_id);
-CREATE INDEX idx_epi_deliveries_delivery_date ON epi_deliveries(delivery_date);
-CREATE INDEX idx_medical_exams_employee_id ON medical_exams(employee_id);
-CREATE INDEX idx_medical_exams_status ON medical_exams(status);
-CREATE INDEX idx_medical_exams_exam_date ON medical_exams(exam_date);
-CREATE INDEX idx_training_participations_employee_id ON training_participations(employee_id);
-CREATE INDEX idx_training_participations_status ON training_participations(status);
-CREATE INDEX idx_accident_records_employee_id ON accident_records(employee_id);
-CREATE INDEX idx_accident_records_accident_date ON accident_records(accident_date);
-CREATE INDEX idx_near_miss_records_employee_id ON near_miss_records(employee_id);
-CREATE INDEX idx_near_miss_records_incident_date ON near_miss_records(incident_date);
-CREATE INDEX idx_safety_inspections_inspector_id ON safety_inspections(inspector_user_id);
-CREATE INDEX idx_safety_inspections_inspection_date ON safety_inspections(inspection_date);
-CREATE INDEX idx_non_conformities_status ON non_conformities(status);
-CREATE INDEX idx_non_conformities_due_date ON non_conformities(due_date);
-CREATE INDEX idx_cipa_members_employee_id ON cipa_members(employee_id);
-CREATE INDEX idx_cipa_members_mandate_year ON cipa_members(mandate_year);
-CREATE INDEX idx_sst_alerts_employee_id ON sst_alerts(employee_id);
-CREATE INDEX idx_sst_alerts_alert_type ON sst_alerts(alert_type);
-CREATE INDEX idx_sst_alerts_is_read ON sst_alerts(is_read);
-CREATE INDEX idx_sst_alerts_due_date ON sst_alerts(due_date);
+CREATE INDEX IF NOT EXISTS idx_position_risks_position_id ON position_risks(position_id);
+CREATE INDEX IF NOT EXISTS idx_employee_risks_employee_id ON employee_risks(employee_id);
+CREATE INDEX IF NOT EXISTS idx_epi_deliveries_employee_id ON epi_deliveries(employee_id);
+CREATE INDEX IF NOT EXISTS idx_epi_deliveries_delivery_date ON epi_deliveries(delivery_date);
+CREATE INDEX IF NOT EXISTS idx_medical_exams_employee_id ON medical_exams(employee_id);
+CREATE INDEX IF NOT EXISTS idx_medical_exams_status ON medical_exams(status);
+CREATE INDEX IF NOT EXISTS idx_medical_exams_exam_date ON medical_exams(exam_date);
+CREATE INDEX IF NOT EXISTS idx_training_participations_employee_id ON training_participations(employee_id);
+CREATE INDEX IF NOT EXISTS idx_training_participations_status ON training_participations(status);
+CREATE INDEX IF NOT EXISTS idx_accident_records_employee_id ON accident_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_accident_records_accident_date ON accident_records(accident_date);
+CREATE INDEX IF NOT EXISTS idx_near_miss_records_employee_id ON near_miss_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_near_miss_records_incident_date ON near_miss_records(incident_date);
+CREATE INDEX IF NOT EXISTS idx_safety_inspections_inspector_id ON safety_inspections(inspector_user_id);
+CREATE INDEX IF NOT EXISTS idx_safety_inspections_inspection_date ON safety_inspections(inspection_date);
+CREATE INDEX IF NOT EXISTS idx_non_conformities_status ON non_conformities(status);
+CREATE INDEX IF NOT EXISTS idx_non_conformities_due_date ON non_conformities(due_date);
+CREATE INDEX IF NOT EXISTS idx_cipa_members_employee_id ON cipa_members(employee_id);
+CREATE INDEX IF NOT EXISTS idx_cipa_members_mandate_year ON cipa_members(mandate_year);
+CREATE INDEX IF NOT EXISTS idx_sst_alerts_employee_id ON sst_alerts(employee_id);
+CREATE INDEX IF NOT EXISTS idx_sst_alerts_alert_type ON sst_alerts(alert_type);
+CREATE INDEX IF NOT EXISTS idx_sst_alerts_is_read ON sst_alerts(is_read);
+CREATE INDEX IF NOT EXISTS idx_sst_alerts_due_date ON sst_alerts(due_date);
 
 -- =====================================================
 -- TRIGGERS PARA ATUALIZAÇÃO AUTOMÁTICA DO updated_at
 -- =====================================================
 
-CREATE TRIGGER update_occupational_risk_types_updated_at
+CREATE OR REPLACE TRIGGER update_occupational_risk_types_updated_at
     BEFORE UPDATE ON occupational_risk_types
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_position_risks_updated_at
+CREATE OR REPLACE TRIGGER update_position_risks_updated_at
     BEFORE UPDATE ON position_risks
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_employee_risks_updated_at
+CREATE OR REPLACE TRIGGER update_employee_risks_updated_at
     BEFORE UPDATE ON employee_risks
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_personal_protective_equipment_updated_at
+CREATE OR REPLACE TRIGGER update_personal_protective_equipment_updated_at
     BEFORE UPDATE ON personal_protective_equipment
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_risk_required_epis_updated_at
+CREATE OR REPLACE TRIGGER update_risk_required_epis_updated_at
     BEFORE UPDATE ON risk_required_epis
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_epi_deliveries_updated_at
+CREATE OR REPLACE TRIGGER update_epi_deliveries_updated_at
     BEFORE UPDATE ON epi_deliveries
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_medical_exam_types_updated_at
+CREATE OR REPLACE TRIGGER update_medical_exam_types_updated_at
     BEFORE UPDATE ON medical_exam_types
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_medical_exams_updated_at
+CREATE OR REPLACE TRIGGER update_medical_exams_updated_at
     BEFORE UPDATE ON medical_exams
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_sst_trainings_updated_at
+CREATE OR REPLACE TRIGGER update_sst_trainings_updated_at
     BEFORE UPDATE ON sst_trainings
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_training_participations_updated_at
+CREATE OR REPLACE TRIGGER update_training_participations_updated_at
     BEFORE UPDATE ON training_participations
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_accident_records_updated_at
+CREATE OR REPLACE TRIGGER update_accident_records_updated_at
     BEFORE UPDATE ON accident_records
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_near_miss_records_updated_at
+CREATE OR REPLACE TRIGGER update_near_miss_records_updated_at
     BEFORE UPDATE ON near_miss_records
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_safety_inspections_updated_at
+CREATE OR REPLACE TRIGGER update_safety_inspections_updated_at
     BEFORE UPDATE ON safety_inspections
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_non_conformities_updated_at
+CREATE OR REPLACE TRIGGER update_non_conformities_updated_at
     BEFORE UPDATE ON non_conformities
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_cipa_members_updated_at
+CREATE OR REPLACE TRIGGER update_cipa_members_updated_at
     BEFORE UPDATE ON cipa_members
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_cipa_meetings_updated_at
+CREATE OR REPLACE TRIGGER update_cipa_meetings_updated_at
     BEFORE UPDATE ON cipa_meetings
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_sst_alerts_updated_at
+CREATE OR REPLACE TRIGGER update_sst_alerts_updated_at
     BEFORE UPDATE ON sst_alerts
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
--- DADOS INICIAIS (SEED DATA)
+-- DADOS INICIAIS (SEED DATA) - COMENTADOS PARA EVITAR CONFLITOS
 -- =====================================================
+/*
 
 -- Tipos de Risco Ocupacional
 INSERT INTO occupational_risk_types (id, name, description, category, severity_level) VALUES
@@ -506,6 +507,7 @@ INSERT INTO personal_protective_equipment (id, name, description, category, ca_n
 (gen_random_uuid(), 'Bota de Segurança', 'Bota de segurança com biqueira de aço', 'PES', '44444', 'Brametal', 'PAR', 25, 50, 120.00),
 (gen_random_uuid(), 'Cinto de Segurança', 'Cinto de segurança para trabalho em altura', 'CORPO', '55555', '3M', 'UNIDADE', 20, 40, 180.00),
 (gen_random_uuid(), 'Avental de Proteção', 'Avental de proteção química', 'CORPO', '66666', 'Dupont', 'UNIDADE', 15, 30, 85.00);
+*/
 
 -- =====================================================
 -- COMENTÁRIOS DAS TABELAS

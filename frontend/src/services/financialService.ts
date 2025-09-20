@@ -116,19 +116,19 @@ export const financialService = {
 
   // Criar nova transação
   async createTransaction(data: CreateTransactionRequest): Promise<FinancialTransaction> {
-    const response = await api.post('/financial/transactions', data);
+    const response = await api.post('/api/financial/transactions', data);
     return response.data;
   },
 
   // Atualizar transação
   async updateTransaction(id: string, unitId: string, data: any): Promise<FinancialTransaction> {
-    const response = await api.put(`/financial/transactions/unit/${unitId}/transaction/${id}`, data);
+    const response = await api.put(`/api/financial/transactions/unit/${unitId}/transaction/${id}`, data);
     return response.data;
   },
 
   // Excluir transação
   async deleteTransaction(id: string): Promise<void> {
-    await api.delete(`/financial/transactions/${id}`);
+    await api.delete(`/api/financial/transactions/${id}`);
   },
 
   // ===== FATURAS =====
@@ -145,7 +145,7 @@ export const financialService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
-    const response = await api.get(`/invoices?${params.toString()}`);
+    const response = await api.get(`/api/invoices?${params.toString()}`);
     if (Array.isArray(response.data)) {
       return response.data;
     }
@@ -157,25 +157,25 @@ export const financialService = {
 
   // Criar nova fatura
   async createInvoice(data: CreateInvoiceRequest): Promise<Invoice> {
-    const response = await api.post('/invoices', data);
+    const response = await api.post('/api/invoices', data);
     return response.data;
   },
 
   // Marcar fatura como paga
   async markInvoiceAsPaid(id: string, paymentDate?: string): Promise<Invoice> {
-    const response = await api.put(`/invoices/${id}/paid`, { paymentDate });
+    const response = await api.put(`/api/invoices/${id}/paid`, { paymentDate });
     return response.data;
   },
 
   // Editar fatura
   async updateInvoice(id: string, data: Partial<CreateInvoiceRequest>): Promise<Invoice> {
-    const response = await api.put(`/invoices/${id}`, data);
+    const response = await api.put(`/api/invoices/${id}`, data);
     return response.data;
   },
 
   // Excluir fatura
   async deleteInvoice(id: string): Promise<void> {
-    await api.delete(`/invoices/${id}`);
+    await api.delete(`/api/invoices/${id}`);
   },
 
   // ===== RELATÓRIOS =====
@@ -185,7 +185,7 @@ export const financialService = {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
-    const response = await api.get(`/invoices/reports/summary?${params.toString()}`);
+    const response = await api.get(`/api/invoices/reports/summary?${params.toString()}`);
     return response.data;
   },
 
@@ -195,7 +195,7 @@ export const financialService = {
     if (params.centro) qs.append('centro', params.centro);
     if (params.startDate) qs.append('startDate', params.startDate);
     if (params.endDate) qs.append('endDate', params.endDate);
-    const { data } = await api.get(`/invoices/reports/by-cost-center?${qs.toString()}`);
+    const { data } = await api.get(`/api/invoices/reports/by-cost-center?${qs.toString()}`);
     return data as { total: number; items: any[] };
   },
 

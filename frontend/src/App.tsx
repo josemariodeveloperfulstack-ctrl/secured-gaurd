@@ -15,11 +15,17 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 // Portal Público - Carregamento imediato (página inicial)
 import PortalHome from '@/pages/PortalHome';
 import PortalVagas from '@/pages/PortalVagas';
+import QuemSomos from '@/pages/QuemSomos';
+import ServicosPublico from '@/pages/Servicos';
+import PoliticasPrivacidade from '@/pages/PoliticasPrivacidade';
+import TermosCondicoes from '@/pages/TermosCondicoes';
+import Contato from '@/pages/Contato';
+import CookieConsent from '@/components/CookieConsent';
 
 // Sistema Administrativo - Lazy loading para páginas administrativas
-const Login = lazy(() => import('@/pages/Login'));
-const Index = lazy(() => import('@/pages/Index'));
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Login = lazy(() => import('@/pages/Login').catch(() => ({ default: () => <div>Erro ao carregar Login</div> })));
+const Index = lazy(() => import('@/pages/Index').catch(() => ({ default: () => <div>Erro ao carregar Index</div> })));
+const Dashboard = lazy(() => import('@/pages/Dashboard').catch(() => ({ default: () => <div>Erro ao carregar Dashboard</div> })));
 const Funcionarios = lazy(() => import('@/pages/Funcionarios'));
 const Usuarios = lazy(() => import('@/pages/Usuarios'));
 const Roles = lazy(() => import('@/pages/Roles'));
@@ -43,6 +49,12 @@ const EPIs = lazy(() => import('@/pages/EPIs'));
 const Certificacoes = lazy(() => import('@/pages/Certificacoes'));
 const RH = lazy(() => import('@/pages/RH'));
 const SST = lazy(() => import('@/pages/RH/SST'));
+const SSTEPIs = lazy(() => import('@/pages/RH/SST/EPIs'));
+const SSTExamesMedicos = lazy(() => import('@/pages/RH/SST/ExamesMedicos'));
+const SSTRelatorios = lazy(() => import('@/pages/RH/SST/Relatorios'));
+const SSTRiscosOcupacionais = lazy(() => import('@/pages/RH/SST/RiscosOcupacionais'));
+const SSTTemplates = lazy(() => import('@/pages/RH/SST/Templates'));
+const SSTCIPA = lazy(() => import('@/pages/RH/SST/CIPA'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
@@ -135,13 +147,13 @@ function App() {
 
     // Inicializar AOS com configurações otimizadas para performance
     AOS.init({
-      duration: 600, // Reduzido de 800 para 600
+      duration: 300, // Reduzido para animações mais rápidas
       easing: 'ease-out', // Mudado para ease-out (mais performático)
       once: true,
       mirror: false,
-      offset: 100, // Aumentado para reduzir animações desnecessárias
-      delay: 50, // Reduzido de 100 para 50
-      disable: 'mobile' // Desabilitar em mobile para melhor performance
+      offset: 50, // Reduzido para animações mais cedo
+      delay: 0, // Sem delay
+      disable: false // Habilitado em mobile
     });
 
     // Re-inicializar AOS quando a rota mudar (com debounce)
@@ -179,12 +191,22 @@ function App() {
                     {/* Portal Público */}
                     <Route path="/" element={<PortalHome />} />
                     <Route path="/portal" element={<PortalHome />} />
-                    <Route path="/portal/vagas" element={<PortalVagas />} />
+                    <Route path="/quem-somos" element={<QuemSomos />} />
+                    <Route path="/servicos" element={<ServicosPublico />} />
+                    <Route path="/trabalhe-conosco" element={<PortalVagas />} />
+                    <Route path="/contato" element={<Contato />} />
+                    <Route path="/politicas-privacidade" element={<PoliticasPrivacidade />} />
+                    <Route path="/termos-condicoes" element={<TermosCondicoes />} />
                     
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
                     <Route path="/login" element={
-                      <Suspense fallback={<LoadingSpinner />}>
+                      <Suspense fallback={
+                        <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-seguranca-yellow"></div>
+                          <p className="mt-4 text-seguranca-lightgray">Carregando sistema de login...</p>
+                        </div>
+                      }>
                         <Login />
                       </Suspense>
                     } />
@@ -514,6 +536,36 @@ function App() {
                     <Route path="/rh/sst" element={
                       <ProtectedRoute>
                         <SST />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/epis" element={
+                      <ProtectedRoute>
+                        <SSTEPIs />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/exames" element={
+                      <ProtectedRoute>
+                        <SSTExamesMedicos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/relatorios" element={
+                      <ProtectedRoute>
+                        <SSTRelatorios />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/riscos" element={
+                      <ProtectedRoute>
+                        <SSTRiscosOcupacionais />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/templates" element={
+                      <ProtectedRoute>
+                        <SSTTemplates />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/cipa" element={
+                      <ProtectedRoute>
+                        <SSTCIPA />
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/funcionarios" element={
@@ -874,6 +926,7 @@ function App() {
                     } />
                   </Routes>
                   <Toaster />
+                  <CookieConsent />
                 </AuthProvider>
               </BrowserRouter>
             </NotificationProvider>
