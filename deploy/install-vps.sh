@@ -252,26 +252,26 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # Parar containers existentes
-log "Parando containers existentes..."
+log "2. Parando containers existentes..."
 docker compose -f $PROJECT_DIR/deploy/docker-compose.prod.yml down 2>/dev/null || true
 
 # Fazer backup do banco (se existir)
 if docker ps -q -f name=secured-guard-db-prod | grep -q .; then
-    log "Fazendo backup do banco de dados..."
+    log "3. Fazendo backup do banco de dados..."
     docker exec secured-guard-db-prod pg_dump -U postgres secured_guard > $PROJECT_DIR/backups/backup_$(date +%Y%m%d_%H%M%S).sql
 fi
 
 # Build e subir containers
-log "Fazendo build e subindo containers..."
+log "4. Fazendo build e subindo containers..."
 cd $PROJECT_DIR
 docker compose -f deploy/docker-compose.prod.yml up -d --build
 
 # Aguardar serviços ficarem prontos
-log "Aguardando serviços ficarem prontos..."
+log "5. Aguardando serviços ficarem prontos..."
 sleep 30
 
 # Verificar status
-log "Verificando status dos serviços..."
+log "6. Verificando status dos serviços..."
 docker compose -f deploy/docker-compose.prod.yml ps
 
 log "Deploy concluído com sucesso!"
