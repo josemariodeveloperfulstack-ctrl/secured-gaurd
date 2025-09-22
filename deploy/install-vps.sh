@@ -223,6 +223,9 @@ set -e
 PROJECT_DIR="/opt/secured-guard"
 ENV_FILE="$PROJECT_DIR/.env"
 
+# Configurar Git para evitar problemas de propriedade
+git config --global --add safe.directory /opt/secured-guard
+
 # Cores
 GREEN='\033[0;32m'
 RED='\033[0;31m'
