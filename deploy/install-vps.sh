@@ -332,7 +332,7 @@ sudo tee /opt/secured-guard/.env > /dev/null <<EOF
 
 # Database
 POSTGRES_DB=secured_guard
-POSTGRES_USER=postgres
+POSTGRES_USER=postgressg
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
 
 # Redis
