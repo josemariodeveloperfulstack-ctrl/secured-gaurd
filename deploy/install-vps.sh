@@ -34,9 +34,9 @@ info() {
     echo -e "${BLUE}[INFO] $1${NC}"
 }
 
-# Verificar se é root
+# Verificar se é root (permitir execução como root na VPS)
 if [[ $EUID -eq 0 ]]; then
-   error "Este script não deve ser executado como root. Use um usuário com sudo."
+   warning "⚠️ Executando instalação como root; prosseguindo."
 fi
 
 # ========================================
