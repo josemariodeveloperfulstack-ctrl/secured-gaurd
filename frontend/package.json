@@ -89,11 +89,11 @@
     "vaul": "^0.9.3",
     "yup": "^1.7.0",
     "zod": "^3.23.8",
-    "zustand": "^5.0.6"
+    "zustand": "^5.0.6",
+    "@rollup/rollup-linux-x64-musl": "^4.45.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
-    "@rollup/rollup-win32-x64-msvc": "^4.44.1",
     "@tailwindcss/typography": "^0.5.15",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.1",

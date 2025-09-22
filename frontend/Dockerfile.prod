@@ -7,8 +7,14 @@ WORKDIR /app
 # Copiar arquivos de dependências
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm ci --only=production
+# Configurar npm para Linux
+ENV npm_config_optional=false
+ENV npm_config_platform=linux
+ENV npm_config_audit=false
+ENV npm_config_fund=false
+
+# Instalar dependências (omitir dev e opcionais)
+RUN npm ci --omit=dev --no-optional || npm install --omit=dev --no-optional
 
 # Copiar código fonte
 COPY . .
