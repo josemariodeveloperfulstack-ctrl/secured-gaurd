@@ -35,13 +35,19 @@ if [ ! -f "deploy/install-vps.sh" ]; then
     error "Execute este script a partir do diretório raiz do projeto SecuredGuard"
 fi
 
-# Configurações
-VPS_HOST="185.225.233.18"
-VPS_USER="root"
-VPS_PORT="22"
-VPS_PASSWORD='$7?NMo8&Ua'
+# Configurações (usar variáveis de ambiente se disponíveis)
+VPS_HOST="${VPS_HOST:-185.225.233.18}"
+VPS_USER="${VPS_USER:-root}"
+VPS_PORT="${VPS_PORT:-22}"
+VPS_PASSWORD="${VPS_PASSWORD:-$7?NMo8&Ua}"
 
 log "Deploy com sshpass (automação de senha)"
+echo ""
+info "Configurações:"
+info "  VPS_HOST: $VPS_HOST"
+info "  VPS_USER: $VPS_USER"
+info "  VPS_PORT: $VPS_PORT"
+info "  VPS_PASSWORD: [OCULTO]"
 echo ""
 
 # ========================================
