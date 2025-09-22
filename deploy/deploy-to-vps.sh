@@ -38,11 +38,19 @@ fi
 
 # Verificar se o usuário tem SSH configurado
 if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
-    echo "Configuração da VPS:"
-    read -p "IP da VPS: " VPS_HOST
-    read -p "Usuário SSH: " VPS_USER
-    read -p "Porta SSH (padrão 22): " VPS_PORT
-    VPS_PORT=${VPS_PORT:-22}
+    # Se executando localmente na VPS, usar configurações padrão
+    if [ "$VPS_LOCAL" = "1" ]; then
+        VPS_HOST="localhost"
+        VPS_USER="root"
+        VPS_PORT="22"
+        log "Executando deploy local na VPS..."
+    else
+        echo "Configuração da VPS:"
+        read -p "IP da VPS: " VPS_HOST
+        read -p "Usuário SSH: " VPS_USER
+        read -p "Porta SSH (padrão 22): " VPS_PORT
+        VPS_PORT=${VPS_PORT:-22}
+    fi
 fi
 
 log "Iniciando deploy para VPS: $VPS_USER@$VPS_HOST:$VPS_PORT"

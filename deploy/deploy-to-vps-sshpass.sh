@@ -144,7 +144,7 @@ log "Código copiado para VPS!"
 log "6. Executando deploy na VPS..."
 
 # Recriar script deploy.sh com correção e executar
-sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && cp deploy/deploy-to-vps.sh deploy.sh && chmod +x deploy.sh && ./deploy.sh"
+sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && cp deploy/deploy-to-vps.sh deploy.sh && chmod +x deploy.sh && VPS_LOCAL=1 ./deploy.sh"
 
 log "Deploy concluído!"
 
