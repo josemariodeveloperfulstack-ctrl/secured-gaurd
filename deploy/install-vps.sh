@@ -74,11 +74,19 @@ sudo apt install -y \
 # ========================================
 log "Instalando Docker..."
 
-# Remover versões antigas
+# Remover versões antigas e chaves existentes
 sudo apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+sudo rm -f /usr/share/keyrings/docker-archive-keyring.gpg
 
 # Adicionar repositório oficial do Docker (não-interativo)
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+if ! curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
+    error "Falha ao baixar chave GPG do Docker"
+fi
+
+# Verificar se a chave foi criada
+if [ ! -f /usr/share/keyrings/docker-archive-keyring.gpg ]; then
+    error "Chave GPG do Docker não foi criada"
+fi
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
