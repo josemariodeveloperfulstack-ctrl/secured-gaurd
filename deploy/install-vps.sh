@@ -43,6 +43,11 @@ fi
 # 1. ATUALIZAR SISTEMA
 # ========================================
 log "Atualizando sistema..."
+
+# Configurar ambiente não-interativo
+export DEBIAN_FRONTEND=noninteractive
+export UCF_FORCE_CONFFNEW=1
+
 sudo apt update && sudo apt upgrade -y
 
 # ========================================
@@ -72,21 +77,23 @@ log "Instalando Docker..."
 # Remover versões antigas
 sudo apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
 
-# Adicionar repositório oficial do Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# Adicionar repositório oficial do Docker (não-interativo)
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Instalar Docker
 sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Adicionar usuário ao grupo docker
-sudo usermod -aG docker $USER
+# Adicionar usuário atual ao grupo docker (se não for root)
+if [[ $EUID -ne 0 ]]; then
+    sudo usermod -aG docker $USER
+fi
 
-# Habilitar Docker no boot
-sudo systemctl enable docker
+# Iniciar e habilitar Docker
 sudo systemctl start docker
+sudo systemctl enable docker
 
 log "Docker instalado com sucesso!"
 
