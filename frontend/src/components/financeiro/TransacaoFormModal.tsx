@@ -70,9 +70,7 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
   React.useEffect(() => {
     if (open) {
       unitService.getAllUnits().then(setUnits).catch(() => setUnits([]));
-      contasAPagarService.getFornecedores()
-        .then(data => setFornecedores(Array.isArray(data) ? data : []))
-        .catch(() => setFornecedores([]));
+      contasAPagarService.getFornecedores().then(setFornecedores).catch(() => setFornecedores([]));
       // Carregar categorias a partir das transações existentes (lista única)
       financialService.getTransactions()
         .then((txs) => {
@@ -220,7 +218,7 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
     if (!comprovanteFile) return '';
     const formData = new FormData();
     formData.append('file', comprovanteFile);
-    const response = await api.post('/api/uploads/comprovantes', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const response = await api.post('/uploads/comprovantes', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     return response.data.url;
   };
 
@@ -435,7 +433,7 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__NONE__">Sem fornecedor</SelectItem>
-                    {(fornecedores || []).map(f => (
+                    {fornecedores.map(f => (
                       <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                     ))}
                   </SelectContent>

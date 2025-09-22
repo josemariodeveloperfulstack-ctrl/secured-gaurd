@@ -205,7 +205,7 @@ class HoleriteService {
   }
 
   // Excluir múltiplos holerites
-  async deleteMultipleHolerites(ids: string[]): Promise<{ deleted: number; failed: number; errors: string[] }> {
+  async deleteMultipleHolerites(ids: string[]): Promise<{ deleted: number; failed: number; errors: string[]; invalidIds?: string[]; invalidCount?: number }> {
     try {
       console.log('🗑️ Excluindo múltiplos holerites:', ids);
       
@@ -213,8 +213,20 @@ class HoleriteService {
       
       console.log('✅ Holerites excluídos com sucesso:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao excluir múltiplos holerites:', error);
+      
+      // Se for um erro 400, tentar extrair informações do response
+      if (error.response?.status === 400 && error.response?.data) {
+        const errorData = error.response.data;
+        console.error('Detalhes do erro 400:', errorData);
+        
+        // Se contém informações sobre IDs inválidos, logar
+        if (errorData.invalidIds) {
+          console.error('IDs inválidos encontrados:', errorData.invalidIds);
+        }
+      }
+      
       throw error;
     }
   }

@@ -113,7 +113,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
         litros: abastecimento.quantity.toString(),
         valor_litro: valorLitro,
         valor_total: abastecimento.cost.toString(),
-        posto: abastecimento.station || '',
+        posto: abastecimento.station,
         driverId: abastecimento.driver?.id || '',
         observacoes: abastecimento.notes || ''
       });
@@ -127,7 +127,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
         litros: abastecimento.quantity.toString(),
         valor_litro: valorLitro,
         valor_total: abastecimento.cost.toString(),
-        posto: abastecimento.station || '',
+        posto: abastecimento.station,
         driverId: abastecimento.driver?.id || '',
         observacoes: abastecimento.notes || ''
       });
@@ -179,35 +179,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
   // Nova query para buscar último abastecimento do veículo
   const { data: lastFuelRecord } = useQuery({
     queryKey: ['lastFuelRecord', formData.veiculo_id],
-    queryFn: async () => {
-      if (!formData.veiculo_id) return null;
-      
-      try {
-        // Primeiro tentar buscar último abastecimento
-        const lastRecord = await fleetService.getLastFuelRecord(formData.veiculo_id);
-        if (lastRecord) {
-          console.log('🔍 Último abastecimento encontrado (edit):', lastRecord);
-          return lastRecord;
-        }
-        
-        // Se não há abastecimentos, buscar km de cadastro do veículo
-        console.log('🔍 Nenhum abastecimento encontrado, buscando km de cadastro do veículo (edit)...');
-        const vehicle = veiculos.find(v => v.id === formData.veiculo_id);
-        if (vehicle && vehicle.currentMileage > 0) {
-          console.log('🔍 Usando km de cadastro do veículo (edit):', vehicle.currentMileage);
-          return {
-            mileage: vehicle.currentMileage,
-            isFromVehicle: true // Flag para identificar que vem do veículo
-          };
-        }
-        
-        console.log('🔍 Nenhum km encontrado para o veículo (edit)');
-        return null;
-      } catch (error) {
-        console.error('❌ Erro ao buscar último abastecimento (edit):', error);
-        return null;
-      }
-    },
+    queryFn: () => formData.veiculo_id ? fleetService.getLastFuelRecord(formData.veiculo_id) : null,
     enabled: !!formData.veiculo_id
   });
 
@@ -233,7 +205,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
       
       // Tentar buscar da nova tabela de postos
       try {
-        const stationsResponse = await api.get('/api/fuel-stations');
+        const stationsResponse = await api.get('/fuel-stations');
         console.log('✅ Postos carregados da tabela fuel_stations:', stationsResponse.data);
         
         if (stationsResponse.data && Array.isArray(stationsResponse.data)) {
@@ -250,7 +222,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
       
       // Fallback: buscar dos registros de combustível
       console.log('🔄 Tentando fallback para registros de combustível...');
-      const fuelRecordsResponse = await api.get('/api/fuel-records');
+      const fuelRecordsResponse = await api.get('/fuel-records');
       console.log('📊 Registros de combustível para fallback:', fuelRecordsResponse.data);
       
       if (fuelRecordsResponse.data && Array.isArray(fuelRecordsResponse.data)) {
@@ -318,7 +290,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
     }
 
     try {
-      const response = await api.post('/api/fuel-stations', {
+      const response = await api.post('/fuel-stations', {
         name: newStationData.name.trim(),
         address: newStationData.address.trim(),
         city: newStationData.city.trim() || null,
@@ -387,12 +359,12 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
     });
     
     if (newMileage <= lastFuelRecord.mileage) {
-      return `❌ A quilometragem atual (${newMileage.toLocaleString('pt-BR')} km) não pode ser menor ou igual à quilometragem do último abastecimento (${lastFuelRecord.mileage.toLocaleString('pt-BR')} km). Por favor, informe um valor maior.`;
+      return `⚠️ A quilometragem atual (${newMileage.toLocaleString()} km) não pode ser menor ou igual à quilometragem do último abastecimento (${lastFuelRecord.mileage.toLocaleString()} km). Por favor, informe o valor correto.`;
     }
     
     const difference = newMileage - lastFuelRecord.mileage;
     if (difference > 2000) {
-      return `⚠️ Diferença elevada detectada (${difference.toLocaleString('pt-BR')} km). Confirme se os valores estão corretos antes de prosseguir.`;
+      return `⚠️ Diferença muito alta (${difference.toLocaleString()} km). Verifique se a quilometragem está correta.`;
     }
     
     return null;
@@ -581,12 +553,11 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
 
     // Validar campos obrigatórios
     if (!fuelRecordData.vehicleId || !fuelRecordData.date || !fuelRecordData.fuelType || 
-        !fuelRecordData.station || isNaN(fuelRecordData.quantity) || isNaN(fuelRecordData.cost) || isNaN(fuelRecordData.mileage)) {
+        isNaN(fuelRecordData.quantity) || isNaN(fuelRecordData.cost) || isNaN(fuelRecordData.mileage)) {
       console.error('❌ Campos obrigatórios inválidos:', {
         vehicleId: fuelRecordData.vehicleId,
         date: fuelRecordData.date,
         fuelType: fuelRecordData.fuelType,
-        station: fuelRecordData.station,
         quantity: fuelRecordData.quantity,
         cost: fuelRecordData.cost,
         mileage: fuelRecordData.mileage
@@ -744,13 +715,7 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
                 placeholder={lastFuelRecord ? lastFuelRecord.mileage.toLocaleString() : 'Nenhum registro anterior'}
               />
               <p className="text-xs text-gray-400 mt-1">
-                {lastFuelRecord ? 
-                  (lastFuelRecord.isFromVehicle ? 
-                    'Quilometragem de cadastro do veículo' : 
-                    'Quilometragem do último abastecimento'
-                  ) : 
-                  'Primeiro abastecimento do veículo'
-                }
+                {lastFuelRecord ? 'Quilometragem do último abastecimento' : 'Primeiro abastecimento do veículo'}
               </p>
             </div>
 

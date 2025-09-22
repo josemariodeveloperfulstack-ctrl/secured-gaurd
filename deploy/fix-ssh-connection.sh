@@ -47,6 +47,12 @@ chmod 700 ~/.ssh
 # 2. ADICIONAR CHAVE DO HOST
 # ========================================
 log "2. Adicionando chave do host..."
+
+# Criar diretório SSH se não existir
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+touch ~/.ssh/known_hosts
+
 ssh-keyscan -p $VPS_PORT $VPS_HOST >> ~/.ssh/known_hosts
 
 # ========================================

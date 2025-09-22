@@ -48,8 +48,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🔍 AuthContext: Carregando usuário...');
         console.log('🔍 Token encontrado:', !!token);
         console.log('🔍 Usuário salvo:', !!savedUser);
-        console.log('🔍 Screen size:', window.innerWidth, 'x', window.innerHeight);
-        console.log('🔍 Is mobile:', window.innerWidth < 768);
         
         if (token && savedUser) {
           const userData = JSON.parse(savedUser);
@@ -121,15 +119,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       console.log('🔍 Tentando fazer login com:', email);
-      console.log('🔍 URL da requisição:', '/api/auth/login');
-      console.log('🔍 Dados enviados:', { username: email, password: '***' });
+      
+      // Removido teste de comunicação para evitar erros desnecessários
       
       // Enviar username em vez de email para corresponder ao backend
-      // Usar caminho completo com /api
-      const response = await api.post('/api/auth/login', { username: email, password });
+      // Usar caminho relativo ao baseURL para evitar duplicação de "/api"
+      const response = await api.post('/auth/login', { username: email, password });
       
       console.log('🔍 Resposta do login:', response.status, response.data);
-      console.log('🔍 Headers da resposta:', response.headers);
       
       // Obter os roles do backend (array ou string)
       let userRoles: string[] = [];
@@ -189,12 +186,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Navegar apenas após login bem-sucedido
       navigate('/dashboard');
     } catch (error) {
-      console.error('❌ Erro no login:', error);
-      console.error('❌ Detalhes do erro:', error.response?.data);
-      console.error('❌ Status do erro:', error.response?.status);
-      console.error('❌ URL que falhou:', error.config?.url);
-      console.error('❌ Método da requisição:', error.config?.method);
-      console.error('❌ Headers da requisição:', error.config?.headers);
+      console.error('Erro no login:', error);
+      console.error('Detalhes do erro:', error.response?.data);
+      console.error('Status do erro:', error.response?.status);
       toast({
         title: 'Erro ao fazer login',
         description: 'Verifique suas credenciais e tente novamente.',
@@ -224,7 +218,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!token) return;
 
       // Buscar dados atualizados do usuário
-      const response = await api.get('/api/users/profile');
+      const response = await api.get('/users/profile');
       if (response.data) {
         const updatedUser = {
           ...user,
@@ -251,7 +245,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     refreshAuthToken: async () => {
       try {
-        const response = await api.post('/api/auth/refresh-token', {
+        const response = await api.post('/auth/refresh-token', {
           refreshToken
         });
 

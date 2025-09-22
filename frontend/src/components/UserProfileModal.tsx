@@ -174,7 +174,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) 
       }
 
       // Fazer a requisição para atualizar o perfil
-      const response = await api.put('/api/users/profile', updateData);
+      const response = await api.put('/users/profile', updateData);
       
       if (response.status === 200) {
         toast.success('Perfil atualizado com sucesso!');
