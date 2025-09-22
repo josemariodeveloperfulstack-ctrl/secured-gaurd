@@ -240,6 +240,18 @@ error() {
     exit 1
 }
 
+# Verificar se estamos no diretório correto
+cd $PROJECT_DIR
+
+# Atualizar código do repositório (se for um repositório Git)
+if [ -d ".git" ]; then
+    log "1. Atualizando código do repositório..."
+    git config --global --add safe.directory $PROJECT_DIR
+    git pull origin main || git pull origin ci || true
+else
+    log "1. Pulando atualização Git (não é um repositório Git)"
+fi
+
 # Verificar se arquivo .env existe
 if [ ! -f "$ENV_FILE" ]; then
     error "Arquivo .env não encontrado! Copie o env.example e configure as variáveis."
