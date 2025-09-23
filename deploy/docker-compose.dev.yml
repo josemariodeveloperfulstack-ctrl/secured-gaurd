@@ -7,10 +7,12 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: secured-guard-db-dev
+    env_file:
+      - ../.env
     environment:
-      POSTGRES_DB: secured_guard
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB_DEV:-secured_guard_dev}
+      POSTGRES_USER: ${POSTGRES_USER_DEV:-postgressg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_DEV:-dev_password_change_me}
     ports:
       - "5432:5432"
     volumes:
@@ -51,11 +53,13 @@ services:
       context: ../backend
       dockerfile: Dockerfile.dev
     container_name: secured-guard-backend-dev
+    env_file:
+      - ../.env
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB_DEV:-secured_guard_dev}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER_DEV:-postgressg}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_DEV:-dev_password_change_me}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
     ports:

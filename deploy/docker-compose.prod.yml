@@ -7,6 +7,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: secured-guard-db-prod
+    env_file:
+      - ../.env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-secured_guard}
       POSTGRES_USER: ${POSTGRES_USER:-postgressg}
@@ -31,6 +33,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: secured-guard-redis-prod
+    env_file:
+      - ../.env
     ports:
       - "6379:6379"
     volumes:
@@ -53,6 +57,8 @@ services:
       context: ../backend
       dockerfile: Dockerfile.prod
     container_name: secured-guard-backend-prod
+    env_file:
+      - ../.env
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-secured_guard}
