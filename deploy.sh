@@ -31,27 +31,42 @@ log "🚀 Iniciando script de deploy na VPS..."
 # 0. PREPARAR VARIÁVEIS (.env RAIZ)
 # ========================================
 log "0. Verificando arquivo .env na raiz do projeto..."
+gen_pass() { # $1 = token fixo a inserir (prod/dev/ci)
+  # 24 rand base64 sem quebras + token no meio
+  local rand; rand=$(openssl rand -base64 18 | tr -d '\n')
+  echo "${rand:0:8}$1${rand:8}"
+}
+
+ensure_kv() { # $1 key, $2 value
+  if grep -q "^$1=" ./.env 2>/dev/null; then
+    :
+  else
+    echo "$1=$2" >> ./.env
+  fi
+}
+
 if [ ! -f ./.env ]; then
-  warn "Arquivo .env não encontrado. Gerando um padrão seguro..."
-  cat > ./.env << 'EOF'
-POSTGRES_DB=secured_guard_prod
-POSTGRES_USER=postgressg
-POSTGRES_PASSWORD=Q9m!vSGci@2025productionA7#xLd
-
-POSTGRES_DB_DEV=secured_guard_dev
-POSTGRES_USER_DEV=postgressg
-POSTGRES_PASSWORD_DEV=K4u^p3SGdev@2025noR8!z
-
-POSTGRES_DB_CI=secured_guard_ci
-POSTGRES_USER_CI=postgressg
-POSTGRES_PASSWORD_CI=Bt7!cSGci@2025M4$qy
-
-REDIS_PASSWORD=rP6@wZ!8cY2#qLmD
-EOF
-  log "✅ .env criado na raiz. Ajuste os valores se necessário."
-else
-  log "✅ .env encontrado."
+  warn "Arquivo .env não encontrado. Gerando automaticamente..."
+  : > ./.env
 fi
+
+# Chaves obrigatórias com defaults e senhas geradas contendo tokens
+ensure_kv POSTGRES_DB secured_guard_prod
+ensure_kv POSTGRES_USER postgressg
+ensure_kv POSTGRES_PASSWORD "$(gen_pass SGprod@2025)"
+
+ensure_kv POSTGRES_DB_DEV secured_guard_dev
+ensure_kv POSTGRES_USER_DEV postgressg
+ensure_kv POSTGRES_PASSWORD_DEV "$(gen_pass SGdev@2025no)"
+
+ensure_kv POSTGRES_DB_CI secured_guard_ci
+ensure_kv POSTGRES_USER_CI postgressg
+ensure_kv POSTGRES_PASSWORD_CI "$(gen_pass SGci@2025)"
+
+ensure_kv REDIS_PASSWORD "$(openssl rand -base64 24 | tr -d '\n')"
+
+log "✅ .env preparado. Conteúdo (sem senhas):"
+grep -E '^(POSTGRES_DB(_DEV|_CI)?|POSTGRES_USER(_DEV|_CI)?|REDIS_PASSWORD)=' ./.env | sed 's/POSTGRES_PASSWORD.*/POSTGRES_PASSWORD=********/g' | sed 's/REDIS_PASSWORD=.*/REDIS_PASSWORD=********/g'
 
 # ========================================
 # 1. ATUALIZAR CÓDIGO
@@ -115,17 +130,18 @@ log "✅ Frontend compilado com sucesso!"
 # ========================================
 log "4. Subindo Postgres (produção) e garantindo banco/usuário..."
 cd .. # Voltar raiz do projeto
-source ./.env
-docker compose -f deploy/docker-compose.prod.yml up -d postgres
+set -a; source ./.env; set +a
+docker compose --env-file ./.env -f deploy/docker-compose.prod.yml up -d postgres
 sleep 3
-docker compose -f deploy/docker-compose.prod.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB:-secured_guard_prod}'\" | grep -q 1 || psql -U postgres -c \"CREATE DATABASE ${POSTGRES_DB:-secured_guard_prod} OWNER ${POSTGRES_USER:-postgressg};\""
-docker compose -f deploy/docker-compose.prod.yml exec postgres psql -U postgres -c "ALTER USER ${POSTGRES_USER:-postgressg} WITH PASSWORD '${POSTGRES_PASSWORD}';" || warn "Não foi possível alterar senha do usuário agora. Verifique volume existente."
+docker compose --env-file ./.env -f deploy/docker-compose.prod.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}'\" | grep -q 1 || psql -U postgres -c \"CREATE USER ${POSTGRES_USER} WITH SUPERUSER PASSWORD '${POSTGRES_PASSWORD}';\""
+docker compose --env-file ./.env -f deploy/docker-compose.prod.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'\" | grep -q 1 || psql -U postgres -c \"CREATE DATABASE ${POSTGRES_DB} OWNER ${POSTGRES_USER};\""
+docker compose --env-file ./.env -f deploy/docker-compose.prod.yml exec postgres bash -lc "set +H; psql -U postgres -v pw='${POSTGRES_PASSWORD}' -c \"ALTER USER ${POSTGRES_USER} WITH PASSWORD :'pw';\"" || warn "Não foi possível alterar senha do usuário agora. Verifique volume existente."
 
 # ========================================
 # 5. BACKEND (PRODUÇÃO): SUBIR E DEIXAR FLYWAY RODAR
 # ========================================
 log "5. Subindo backend (produção) para executar migrações Flyway..."
-docker compose -f deploy/docker-compose.prod.yml up -d backend
+docker compose --env-file ./.env -f deploy/docker-compose.prod.yml up -d backend
 sleep 5
 docker compose -f deploy/docker-compose.prod.yml logs --since=2m backend | grep -i flyway || true
 
@@ -133,7 +149,7 @@ docker compose -f deploy/docker-compose.prod.yml logs --since=2m backend | grep 
 # 6. RESTART FRONTEND/REDIS/NGINX (PRODUÇÃO)
 # ========================================
 log "6. Reiniciando demais serviços Docker (produção)..."
-docker compose -f deploy/docker-compose.prod.yml up -d --build redis frontend nginx
+docker compose --env-file ./.env -f deploy/docker-compose.prod.yml up -d --build redis frontend nginx
 log "✅ Serviços Docker (produção) atualizados!"
 
 # ========================================
@@ -141,13 +157,14 @@ log "✅ Serviços Docker (produção) atualizados!"
 # ========================================
 if [ -f deploy/docker-compose.dev.yml ]; then
   log "7. Subindo Postgres (dev) e garantindo banco/usuário..."
-  docker compose -f deploy/docker-compose.dev.yml up -d postgres
+  docker compose --env-file ./.env -f deploy/docker-compose.dev.yml up -d postgres
   sleep 3
-  docker compose -f deploy/docker-compose.dev.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB_DEV:-secured_guard_dev}'\" | grep -q 1 || psql -U postgres -c \"CREATE DATABASE ${POSTGRES_DB_DEV:-secured_guard_dev} OWNER ${POSTGRES_USER_DEV:-postgressg};\""
-  docker compose -f deploy/docker-compose.dev.yml exec postgres psql -U postgres -c "ALTER USER ${POSTGRES_USER_DEV:-postgressg} WITH PASSWORD '${POSTGRES_PASSWORD_DEV}';" || warn "Não foi possível alterar senha do usuário dev agora."
+  docker compose --env-file ./.env -f deploy/docker-compose.dev.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER_DEV}'\" | grep -q 1 || psql -U postgres -c \"CREATE USER ${POSTGRES_USER_DEV} WITH SUPERUSER PASSWORD '${POSTGRES_PASSWORD_DEV}';\""
+  docker compose --env-file ./.env -f deploy/docker-compose.dev.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB_DEV}'\" | grep -q 1 || psql -U postgres -c \"CREATE DATABASE ${POSTGRES_DB_DEV} OWNER ${POSTGRES_USER_DEV};\""
+  docker compose --env-file ./.env -f deploy/docker-compose.dev.yml exec postgres bash -lc "set +H; psql -U postgres -v pw='${POSTGRES_PASSWORD_DEV}' -c \"ALTER USER ${POSTGRES_USER_DEV} WITH PASSWORD :'pw';\"" || warn "Não foi possível alterar senha do usuário dev agora."
 
   log "7.1 Subindo backend (dev) para executar migrações Flyway..."
-  docker compose -f deploy/docker-compose.dev.yml up -d backend
+  docker compose --env-file ./.env -f deploy/docker-compose.dev.yml up -d backend
   sleep 5
   docker compose -f deploy/docker-compose.dev.yml logs --since=2m backend | grep -i flyway || true
 else
@@ -159,13 +176,14 @@ fi
 # ========================================
 if [ -f deploy/docker-compose.ci.yml ]; then
   log "8. Subindo Postgres (ci) e garantindo banco/usuário..."
-  docker compose -f deploy/docker-compose.ci.yml up -d postgres
+  docker compose --env-file ./.env -f deploy/docker-compose.ci.yml up -d postgres
   sleep 3
-  docker compose -f deploy/docker-compose.ci.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB_CI:-secured_guard_ci}'\" | grep -q 1 || psql -U postgres -c \"CREATE DATABASE ${POSTGRES_DB_CI:-secured_guard_ci} OWNER ${POSTGRES_USER_CI:-postgressg};\""
-  docker compose -f deploy/docker-compose.ci.yml exec postgres psql -U postgres -c "ALTER USER ${POSTGRES_USER_CI:-postgressg} WITH PASSWORD '${POSTGRES_PASSWORD_CI}';" || warn "Não foi possível alterar senha do usuário ci agora."
+  docker compose --env-file ./.env -f deploy/docker-compose.ci.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER_CI}'\" | grep -q 1 || psql -U postgres -c \"CREATE USER ${POSTGRES_USER_CI} WITH SUPERUSER PASSWORD '${POSTGRES_PASSWORD_CI}';\""
+  docker compose --env-file ./.env -f deploy/docker-compose.ci.yml exec postgres sh -c "psql -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB_CI}'\" | grep -q 1 || psql -U postgres -c \"CREATE DATABASE ${POSTGRES_DB_CI} OWNER ${POSTGRES_USER_CI};\""
+  docker compose --env-file ./.env -f deploy/docker-compose.ci.yml exec postgres bash -lc "set +H; psql -U postgres -v pw='${POSTGRES_PASSWORD_CI}' -c \"ALTER USER ${POSTGRES_USER_CI} WITH PASSWORD :'pw';\"" || warn "Não foi possível alterar senha do usuário ci agora."
 
   log "8.1 Subindo backend (ci) para executar migrações Flyway..."
-  docker compose -f deploy/docker-compose.ci.yml up -d backend
+  docker compose --env-file ./.env -f deploy/docker-compose.ci.yml up -d backend
   sleep 5
   docker compose -f deploy/docker-compose.ci.yml logs --since=2m backend | grep -i flyway || true
 else
