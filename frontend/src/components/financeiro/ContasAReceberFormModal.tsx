@@ -25,11 +25,13 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
 import { contasAReceberService, Cliente } from '@/services/contasAReceberService';
+import { measurementService, MeasurementBulletin } from '@/services/measurementService';
 
 interface ContaAReceberFormData {
   clienteId: string;
   numeroFatura: string;
   numeroMedicao?: string;
+  measurementId?: string;
   descricao: string;
   valor: number;
   dataEmissao: Date;
@@ -66,11 +68,16 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [showPaymentMethodSuggestions, setShowPaymentMethodSuggestions] = useState(false);
+  const [selectMeasurementOpen, setSelectMeasurementOpen] = useState(false);
+  const [measurementResults, setMeasurementResults] = useState<MeasurementBulletin[]>([]);
+  const [measurementLoading, setMeasurementLoading] = useState(false);
+  const [selectedMeasurement, setSelectedMeasurement] = useState<MeasurementBulletin | null>(null);
   
   const [formData, setFormData] = useState<ContaAReceberFormData>({
     clienteId: '',
     numeroFatura: '',
     numeroMedicao: '',
+    measurementId: '',
     descricao: '',
     valor: 0,
     dataEmissao: new Date(),
@@ -94,6 +101,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
         clienteId: contaData.client?.id || '',
         numeroFatura: contaData.invoiceNumber || '',
         numeroMedicao: contaData.measurementNumber || '',
+        measurementId: contaData.measurementId || '',
         descricao: contaData.description || '',
         valor: contaData.amount || 0,
         dataEmissao: contaData.issueDate ? new Date(contaData.issueDate) : new Date(),
@@ -112,6 +120,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
         clienteId: '',
         numeroFatura: '',
         numeroMedicao: '',
+        measurementId: '',
         descricao: '',
         valor: 0,
         dataEmissao: new Date(),
@@ -216,6 +225,26 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const openSelectMeasurement = async () => {
+    setSelectMeasurementOpen(true);
+    try {
+      setMeasurementLoading(true);
+      const data = await measurementService.getAll();
+      setMeasurementResults(data);
+    } finally {
+      setMeasurementLoading(false);
+    }
+  };
+
+  const linkSelectedMeasurement = (m: MeasurementBulletin) => {
+    setSelectedMeasurement(m);
+    // Preenche o número de medição com um identificador legível (id curto ou período)
+    const human = m.id ? m.id : '';
+    handleInputChange('numeroMedicao', human);
+    handleInputChange('measurementId', m.id || '');
+    setSelectMeasurementOpen(false);
+  };
+
   const handleClienteChange = (clienteId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     setSelectedCliente(cliente || null);
@@ -284,6 +313,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           clientId: formData.clienteId,
           invoiceNumber: formData.numeroFatura,
           measurementNumber: formData.numeroMedicao,
+          measurementId: formData.measurementId,
           description: formData.descricao,
           amount: formData.valor,
           issueDate: formatDateForBackend(formData.dataEmissao),
@@ -303,6 +333,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           clientId: formData.clienteId,
           invoiceNumber: formData.numeroFatura,
           measurementNumber: formData.numeroMedicao,
+          measurementId: formData.measurementId,
           description: formData.descricao,
           amount: formData.valor,
           issueDate: formatDateForBackend(formData.dataEmissao),
@@ -535,6 +566,14 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     placeholder="Ex: MED-2024-001"
                     className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   />
+                  <div className="mt-2 flex gap-2">
+                    <Button type="button" variant="outline" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black" onClick={openSelectMeasurement}>
+                      Selecionar Medição
+                    </Button>
+                    {selectedMeasurement && (
+                      <Badge className="bg-seguranca-yellow text-seguranca-black">{selectedMeasurement.clientName || 'Medição selecionada'}</Badge>
+                    )}
+                  </div>
                   
                   {/* Sugestões de números de medição */}
                   {showMeasurementSuggestions && measurementNumbers.length > 0 && (
@@ -749,6 +788,60 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
             </Button>
           </div>
         </form>
+
+        {/* Modal Selecionar Medição */}
+        <Dialog open={selectMeasurementOpen} onOpenChange={setSelectMeasurementOpen}>
+          <DialogContent className="max-w-4xl bg-seguranca-graphite border-gray-700 text-seguranca-lightgray">
+            <DialogHeader>
+              <DialogTitle>Selecionar Medição</DialogTitle>
+              <DialogDescription>Busque e selecione um boletim de medição para vincular.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                {/* Filtros simples futuros: cliente/período/status */}
+                <Button type="button" variant="outline" className="border-gray-600" onClick={async () => {
+                  setMeasurementLoading(true);
+                  try {
+                    const data = await measurementService.getAll();
+                    setMeasurementResults(data);
+                  } finally { setMeasurementLoading(false); }
+                }}>Recarregar</Button>
+              </div>
+              <div className="overflow-x-auto rounded border border-gray-700">
+                <table className="w-full text-sm">
+                  <thead className="bg-seguranca-black/60">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Cliente</th>
+                      <th className="px-3 py-2 text-left">Período</th>
+                      <th className="px-3 py-2 text-left">Contrato</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-left">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {measurementLoading ? (
+                      <tr><td className="px-3 py-4" colSpan={5}>Carregando medições...</td></tr>
+                    ) : measurementResults.length === 0 ? (
+                      <tr><td className="px-3 py-4" colSpan={5}>Nenhuma medição encontrada.</td></tr>
+                    ) : (
+                      measurementResults.map((m) => (
+                        <tr key={m.id} className="border-t border-gray-700">
+                          <td className="px-3 py-2">{m.clientName || '-'}</td>
+                          <td className="px-3 py-2">{m.periodStart || '-'} {m.periodEnd ? `→ ${m.periodEnd}` : ''}</td>
+                          <td className="px-3 py-2">{m.contractNumber || '-'}</td>
+                          <td className="px-3 py-2">{m.status || '-'}</td>
+                          <td className="px-3 py-2">
+                            <Button type="button" variant="outline" className="border-gray-600" onClick={() => linkSelectedMeasurement(m)}>Vincular</Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

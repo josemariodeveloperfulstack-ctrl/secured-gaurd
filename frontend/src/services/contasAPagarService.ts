@@ -412,8 +412,8 @@ export const contasAPagarService = {
 
   // Buscar todas as empresas
   async getEmpresas(): Promise<any[]> {
-    const response = await api.get('/api/units/all');
-    console.log('🔍 DEBUG: Resposta da API /api/units/all:', response.data);
+    const response = await api.get('/api/units');
+    console.log('🔍 DEBUG: Resposta da API /api/units:', response.data);
     const data = response.data;
     return Array.isArray(data) ? data : [];
   },

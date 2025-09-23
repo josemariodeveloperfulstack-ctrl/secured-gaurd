@@ -457,7 +457,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-medium text-seguranca-lightgray">Código de Barras</label>
             <Input
-              value={formData.codigoBarras}
+              value={formData.codigoBarras || ''}
               onChange={(e) => handleInputChange('codigoBarras', e.target.value)}
               placeholder="Código de barras do boleto"
               className="border-seguranca-graphite bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
@@ -587,7 +587,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-medium text-seguranca-lightgray">Observações</label>
             <Textarea
-              value={formData.observacoes}
+              value={formData.observacoes || ''}
               onChange={(e) => handleInputChange('observacoes', e.target.value)}
               placeholder="Observações sobre a conta"
               rows={3}

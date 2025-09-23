@@ -1,7 +1,6 @@
 -- Criação das tabelas para gestão de modelos e geração de documentos dinâmicos
 
--- Tabela para armazenar modelos de documentos
-CREATE TABLE modelos_documentos (
+CREATE TABLE IF NOT EXISTS modelos_documentos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome_modelo VARCHAR(255) NOT NULL,
     tipo_arquivo VARCHAR(10) NOT NULL CHECK (tipo_arquivo IN ('docx', 'pdf')),
@@ -20,8 +19,11 @@ CREATE TABLE modelos_documentos (
     extraivel BOOLEAN DEFAULT true -- false para PDFs escaneados/imagem
 );
 
--- Tabela para armazenar documentos gerados a partir dos modelos
-CREATE TABLE documentos_gerados (
+-- Garantir coluna extraivel quando a tabela já existia sem ela
+ALTER TABLE modelos_documentos
+    ADD COLUMN IF NOT EXISTS extraivel BOOLEAN DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS documentos_gerados (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     modelo_id UUID NOT NULL REFERENCES modelos_documentos(id),
     funcionario_id UUID NOT NULL REFERENCES employees(id),
@@ -40,8 +42,7 @@ CREATE TABLE documentos_gerados (
     criado_por UUID REFERENCES users(id)
 );
 
--- Tabela para histórico de assinaturas (para auditoria)
-CREATE TABLE assinaturas_documentos (
+CREATE TABLE IF NOT EXISTS assinaturas_documentos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     documento_gerado_id UUID NOT NULL REFERENCES documentos_gerados(id),
     usuario_id UUID NOT NULL REFERENCES users(id),
@@ -54,21 +55,20 @@ CREATE TABLE assinaturas_documentos (
     observacoes TEXT
 );
 
--- Índices para melhor performance
-CREATE INDEX idx_modelos_documentos_nome ON modelos_documentos(nome_modelo);
-CREATE INDEX idx_modelos_documentos_categoria ON modelos_documentos(categoria);
-CREATE INDEX idx_modelos_documentos_ativo ON modelos_documentos(ativo);
-CREATE INDEX idx_modelos_documentos_data_criacao ON modelos_documentos(data_criacao);
+CREATE INDEX IF NOT EXISTS idx_modelos_documentos_nome ON modelos_documentos(nome_modelo);
+CREATE INDEX IF NOT EXISTS idx_modelos_documentos_categoria ON modelos_documentos(categoria);
+CREATE INDEX IF NOT EXISTS idx_modelos_documentos_ativo ON modelos_documentos(ativo);
+CREATE INDEX IF NOT EXISTS idx_modelos_documentos_data_criacao ON modelos_documentos(data_criacao);
 
-CREATE INDEX idx_documentos_gerados_modelo_id ON documentos_gerados(modelo_id);
-CREATE INDEX idx_documentos_gerados_funcionario_id ON documentos_gerados(funcionario_id);
-CREATE INDEX idx_documentos_gerados_status ON documentos_gerados(status);
-CREATE INDEX idx_documentos_gerados_data_criacao ON documentos_gerados(data_criacao);
-CREATE INDEX idx_documentos_gerados_data_vencimento ON documentos_gerados(data_vencimento);
+CREATE INDEX IF NOT EXISTS idx_documentos_gerados_modelo_id ON documentos_gerados(modelo_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_gerados_funcionario_id ON documentos_gerados(funcionario_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_gerados_status ON documentos_gerados(status);
+CREATE INDEX IF NOT EXISTS idx_documentos_gerados_data_criacao ON documentos_gerados(data_criacao);
+CREATE INDEX IF NOT EXISTS idx_documentos_gerados_data_vencimento ON documentos_gerados(data_vencimento);
 
-CREATE INDEX idx_assinaturas_documento_id ON assinaturas_documentos(documento_gerado_id);
-CREATE INDEX idx_assinaturas_usuario_id ON assinaturas_documentos(usuario_id);
-CREATE INDEX idx_assinaturas_data ON assinaturas_documentos(data_assinatura);
+CREATE INDEX IF NOT EXISTS idx_assinaturas_documento_id ON assinaturas_documentos(documento_gerado_id);
+CREATE INDEX IF NOT EXISTS idx_assinaturas_usuario_id ON assinaturas_documentos(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_assinaturas_data ON assinaturas_documentos(data_assinatura);
 
 -- Comentários nas tabelas
 COMMENT ON TABLE modelos_documentos IS 'Armazena modelos de documentos com placeholders para geração dinâmica';

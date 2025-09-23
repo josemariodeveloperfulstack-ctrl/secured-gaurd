@@ -43,6 +43,7 @@ export interface CreateContaAReceberRequest {
   clientId: string;
   invoiceNumber: string;
   measurementNumber?: string;
+  measurementId?: string;
   description: string;
   amount: number;
   issueDate: string;
@@ -59,30 +60,22 @@ export interface UpdateContaAReceberRequest extends CreateContaAReceberRequest {
 class ContasAReceberService {
   // Buscar todas as contas a receber
   async getContasAReceber(): Promise<ContaAReceber[]> {
-    // TODO: Temporariamente usando dados mockados devido a problemas no backend
-    console.log('Usando dados mockados para contas a receber (backend com problemas)');
-    return this.getMockContasAReceber();
-    
-    /* Código original comentado temporariamente
     try {
       console.log('Buscando contas a receber da API...');
       const response = await api.get('/accounts-receivable/all');
       console.log('Contas a receber recebidas:', response.data);
-      // Garantir que sempre retornamos um array
-      return Array.isArray(response.data) ? response.data : this.getMockContasAReceber();
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error('Erro ao buscar contas a receber:', error);
-      // Retornar dados mockados temporariamente
-      return this.getMockContasAReceber();
+      return [];
     }
-    */
   }
 
   // Buscar conta por ID
   async getContaAReceberById(id: string): Promise<ContaAReceber | null> {
     try {
       console.log('Buscando conta a receber por ID:', id);
-      const response = await api.get(`/api/accounts-receivable/${id}`);
+      const response = await api.get(`/accounts-receivable/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar conta a receber:', error);
@@ -142,7 +135,7 @@ class ContasAReceberService {
       console.log('Dados da requisição de atualização:', requestData);
       console.log('ID da conta:', id);
 
-      const response = await api.put(`/api/accounts-receivable/${id}`, requestData);
+      const response = await api.put(`/accounts-receivable/${id}`, requestData);
       console.log('Conta a receber atualizada:', response.data);
       return response.data;
     } catch (error: any) {
@@ -157,7 +150,7 @@ class ContasAReceberService {
   async deleteContaAReceber(id: string): Promise<void> {
     try {
       console.log('Excluindo conta a receber:', id);
-      await api.delete(`/api/accounts-receivable/${id}`);
+      await api.delete(`/accounts-receivable/${id}`);
       console.log('Conta a receber excluída com sucesso');
     } catch (error) {
       console.error('Erro ao excluir conta a receber:', error);
@@ -169,7 +162,7 @@ class ContasAReceberService {
   async markAsPaid(id: string, dataPagamento: string): Promise<ContaAReceber> {
     try {
       console.log('Marcando conta como paga:', id, dataPagamento);
-      const response = await api.put(`/api/accounts-receivable/${id}/mark-paid?paymentDate=${this.formatDateForBackend(dataPagamento)}`);
+      const response = await api.put(`/accounts-receivable/${id}/mark-paid?paymentDate=${this.formatDateForBackend(dataPagamento)}`);
       console.log('Conta marcada como paga:', response.data);
       return response.data;
     } catch (error) {
@@ -195,7 +188,7 @@ class ContasAReceberService {
   // Buscar cliente por ID
   async getClienteById(id: string): Promise<Cliente | null> {
     try {
-      const response = await api.get(`/api/clients/${id}`);
+      const response = await api.get(`/clients/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);
@@ -266,7 +259,7 @@ class ContasAReceberService {
   async searchInvoiceNumbers(term: string): Promise<string[]> {
     try {
       console.log('Buscando números de fatura para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/invoice-number?term=${encodeURIComponent(term)}`);
+      const response = await api.get(`/accounts-receivable/search/invoice-number?term=${encodeURIComponent(term)}`);
       console.log('Números de fatura encontrados:', response.data);
       return response.data || [];
     } catch (error) {
@@ -279,7 +272,7 @@ class ContasAReceberService {
   async searchMeasurementNumbers(term: string): Promise<string[]> {
     try {
       console.log('Buscando números de medição para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/measurement-number?term=${encodeURIComponent(term)}`);
+      const response = await api.get(`/accounts-receivable/search/measurement-number?term=${encodeURIComponent(term)}`);
       console.log('Números de medição encontrados:', response.data);
       return response.data || [];
     } catch (error) {
@@ -292,7 +285,7 @@ class ContasAReceberService {
   async searchCategories(term: string): Promise<string[]> {
     try {
       console.log('Buscando categorias para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/categories?term=${encodeURIComponent(term)}`);
+      const response = await api.get(`/accounts-receivable/search/categories?term=${encodeURIComponent(term)}`);
       console.log('Categorias encontradas:', response.data);
       return response.data || [];
     } catch (error) {
@@ -305,7 +298,7 @@ class ContasAReceberService {
   async searchPaymentMethods(term: string): Promise<string[]> {
     try {
       console.log('Buscando formas de pagamento para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/payment-methods?term=${encodeURIComponent(term)}`);
+      const response = await api.get(`/accounts-receivable/search/payment-methods?term=${encodeURIComponent(term)}`);
       console.log('Formas de pagamento encontradas:', response.data);
       return response.data || [];
     } catch (error) {

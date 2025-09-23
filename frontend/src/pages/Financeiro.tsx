@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Filter, Eye, DollarSign, TrendingUp, TrendingDown, Calendar, Loader2, AlertCircle, RefreshCw, Trash, Calculator, Clock, CheckCircle, FileText } from 'lucide-react';
 import { TransacaoFormModal } from '@/components/financeiro/TransacaoFormModal';
 import { ContaReceberModal } from '@/components/financeiro/ContaReceberModal';
+import { ContasAReceber as ContasAReceberComponent } from '@/components/financeiro/ContasAReceber';
 import { FaturaViewModal } from '@/components/financeiro/FaturaViewModal';
 import { ConfirmarPagamentoModal } from '@/components/financeiro/ConfirmarPagamentoModal';
 import { FinanceiroDashboard } from '@/components/financeiro/FinanceiroDashboard';
@@ -764,10 +765,11 @@ const Financeiro: React.FC = () => {
   return (
     <StandardLayout>
       <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+        <div className="rounded-xl bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black p-4 sm:p-6 border border-gray-700 shadow-xl">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">Financeiro</h1>
-            <p className="text-sm sm:text-base text-gray-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Financeiro</h1>
+            <p className="text-sm sm:text-base text-gray-300 mt-1">
               Gestão financeira, faturas e movimentações
               {loadingEditData && (
                 <span className="ml-2 text-seguranca-yellow flex items-center">
@@ -780,7 +782,7 @@ const Financeiro: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             <Button
               onClick={() => setShowTransacaoModal(true)}
-              className="bg-seguranca-red hover:bg-seguranca-darkred text-sm"
+              className="bg-seguranca-red hover:bg-seguranca-darkred text-sm shadow-md shadow-seguranca-red/20"
             >
               <Plus size={18} className="mr-2" />
               <span className="hidden sm:inline">Nova Transação</span>
@@ -789,7 +791,7 @@ const Financeiro: React.FC = () => {
             <Button
               onClick={abrirModalNovaFatura}
               variant="outline"
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-sm"
+              className="border-gray-600 text-white hover:bg-seguranca-black text-sm shadow-md shadow-black/10"
             >
               <Plus size={18} className="mr-2" />
               <span className="hidden sm:inline">Nova Fatura</span>
@@ -846,7 +848,7 @@ const Financeiro: React.FC = () => {
                 }
               }}
               variant="outline"
-              className="border-blue-600 text-blue-400 hover:bg-blue-600/20 text-sm"
+              className="border-blue-600 text-blue-400 hover:bg-blue-600/20 text-sm shadow-md shadow-blue-600/10"
               disabled={loadingEditData}
             >
               {loadingEditData ? (
@@ -860,38 +862,39 @@ const Financeiro: React.FC = () => {
             </Button>
           </div>
         </div>
+        </div>
 
         {/* Resumo Financeiro */}
         {resumoFinanceiro && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card className="bg-seguranca-graphite border-gray-600 p-4">
+            <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow-xl ring-1 ring-white/5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Receita Total</p>
-                  <p className="text-2xl font-bold text-green-500">
+                  <p className="text-sm text-gray-300">Receita Total</p>
+                  <p className="text-2xl font-bold text-green-400">
                     R$ {receitaTotal.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-500" />
+                <TrendingUp className="h-8 w-8 text-green-400" />
               </div>
             </Card>
 
-            <Card className="bg-seguranca-graphite border-gray-600 p-4">
+            <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow-xl ring-1 ring-white/5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Despesa Total</p>
-                  <p className="text-2xl font-bold text-red-500">
+                  <p className="text-sm text-gray-300">Despesa Total</p>
+                  <p className="text-2xl font-bold text-red-400">
                     R$ {despesaTotal.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <TrendingDown className="h-8 w-8 text-red-500" />
+                <TrendingDown className="h-8 w-8 text-red-400" />
               </div>
             </Card>
 
-            <Card className="bg-seguranca-graphite border-gray-600 p-4">
+            <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow-xl ring-1 ring-white/5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Lucro Líquido</p>
+                  <p className="text-sm text-gray-300">Lucro Líquido</p>
                   <p className="text-2xl font-bold text-seguranca-yellow">
                     R$ {lucroLiquido.toLocaleString('pt-BR')}
                   </p>
@@ -900,34 +903,34 @@ const Financeiro: React.FC = () => {
               </div>
             </Card>
 
-            <Card className="bg-seguranca-graphite border-gray-600 p-4">
+            <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow-xl ring-1 ring-white/5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Contas a Receber</p>
-                  <p className="text-2xl font-bold text-blue-500">
+                  <p className="text-sm text-gray-300">Contas a Receber</p>
+                  <p className="text-2xl font-bold text-blue-400">
                     R$ {contasAReceber.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <Calendar className="h-8 w-8 text-blue-500" />
+                <Calendar className="h-8 w-8 text-blue-400" />
               </div>
             </Card>
 
-            <Card className="bg-seguranca-graphite border-gray-600 p-4">
+            <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow-xl ring-1 ring-white/5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Contas a Pagar</p>
-                  <p className="text-2xl font-bold text-orange-500">
+                  <p className="text-sm text-gray-300">Contas a Pagar</p>
+                  <p className="text-2xl font-bold text-orange-400">
                     R$ {contasAPagar.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <TrendingDown className="h-8 w-8 text-orange-500" />
+                <TrendingDown className="h-8 w-8 text-orange-400" />
               </div>
             </Card>
           </div>
         )}
 
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="bg-seguranca-graphite border-gray-600 p-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-1">
+          <TabsList className="bg-seguranca-graphite/80 backdrop-blur border-gray-700 p-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-1 rounded-lg shadow-inner">
             <TabsTrigger value="dashboard" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow text-xs px-2 py-1">
               Dashboard
             </TabsTrigger>
@@ -968,7 +971,7 @@ const Financeiro: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="faturas">
-            <Card className="bg-seguranca-graphite border-gray-600 p-3 sm:p-6">
+            <Card className="bg-seguranca-graphite border-gray-700 p-3 sm:p-6 rounded-xl shadow-xl">
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -976,18 +979,18 @@ const Financeiro: React.FC = () => {
                     placeholder="Buscar faturas..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray text-sm"
+                    className="pl-10 bg-seguranca-black/80 border-gray-700 text-white text-sm rounded-md"
                   />
                 </div>
                 <Button
-                  className="bg-seguranca-red hover:bg-seguranca-darkred text-sm"
+                  className="bg-seguranca-red hover:bg-seguranca-darkred text-sm shadow-md shadow-seguranca-red/20"
                   onClick={abrirModalNovaFatura}
                 >
                   <Plus size={18} className="mr-2" />
                   <span className="hidden sm:inline">Nova Fatura</span>
                   <span className="sm:hidden">Nova</span>
                 </Button>
-                <Button variant="outline" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-sm">
+                <Button variant="outline" className="border-gray-700 text-white hover:bg-seguranca-black text-sm">
                   <Filter size={18} className="mr-2" />
                   <span className="hidden sm:inline">Filtros</span>
                   <span className="sm:hidden">Filtros</span>
@@ -1005,10 +1008,10 @@ const Financeiro: React.FC = () => {
                   icon={DollarSign}
                 />
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-lg ring-1 ring-white/5 shadow">
                   <table className="w-full min-w-[700px]">
                     <thead>
-                      <tr className="border-b border-gray-600">
+                      <tr className="border-b border-gray-700/80 bg-seguranca-black/40">
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-medium text-seguranca-lightgray text-xs sm:text-sm">Número</th>
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-medium text-seguranca-lightgray text-xs sm:text-sm">Cliente</th>
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-medium text-seguranca-lightgray text-xs sm:text-sm">Valor</th>
@@ -1019,7 +1022,7 @@ const Financeiro: React.FC = () => {
                     </thead>
                     <tbody>
                       {filteredInvoices.map((fatura) => (
-                        <tr key={fatura.id} className="border-b border-gray-700 hover:bg-seguranca-black/50">
+                        <tr key={fatura.id} className="border-b border-gray-800 hover:bg-seguranca-black/60 transition-colors">
                           <td className="py-2 sm:py-3 px-2 sm:px-4 text-seguranca-lightgray text-xs sm:text-sm">{fatura.invoiceNumber}</td>
                           <td className="py-2 sm:py-3 px-2 sm:px-4 text-seguranca-lightgray text-xs sm:text-sm max-w-[150px] truncate" title={fatura.clientName}>{fatura.clientName}</td>
                           <td className="py-2 sm:py-3 px-2 sm:px-4 text-seguranca-lightgray text-xs sm:text-sm">
@@ -1051,7 +1054,7 @@ const Financeiro: React.FC = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleViewFatura(fatura)}
-                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black p-1 sm:p-2"
+                                className="border-gray-700 text-white hover:bg-seguranca-black p-1 sm:p-2"
                               >
                                 <Eye size={14} className="sm:w-4 sm:h-4" />
                               </Button>
@@ -1162,17 +1165,17 @@ const Financeiro: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="contas-pagar">
-            <Card className="bg-seguranca-graphite border-gray-600 p-3 sm:p-6">
+            <Card className="bg-seguranca-graphite border-gray-700 p-3 sm:p-6 rounded-xl shadow-xl">
               {/* Cabeçalho com resumo */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div>
-                    <h3 className="text-xl font-semibold text-seguranca-lightgray">Contas a Pagar</h3>
-                    <p className="text-gray-400">Gerencie suas contas e compromissos financeiros</p>
+                    <h3 className="text-xl font-semibold text-white">Contas a Pagar</h3>
+                    <p className="text-gray-300">Gerencie suas contas e compromissos financeiros</p>
                   </div>
                   <Button
                     onClick={() => setShowTransacaoModal(true)}
-                    className="bg-seguranca-red hover:bg-seguranca-darkred"
+                    className="bg-seguranca-red hover:bg-seguranca-darkred shadow-md shadow-seguranca-red/20"
                   >
                     <Plus size={18} className="mr-2" />
                     Nova Conta a Pagar
@@ -1181,16 +1184,16 @@ const Financeiro: React.FC = () => {
 
                 {/* Cards de Resumo */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
-                      <p className="text-sm text-gray-400">Total a Pagar</p>
-                      <p className="text-2xl font-bold text-orange-500">R$ {contasAPagar.toLocaleString('pt-BR')}</p>
+                      <p className="text-sm text-gray-300">Total a Pagar</p>
+                      <p className="text-2xl font-bold text-orange-400">R$ {contasAPagar.toLocaleString('pt-BR')}</p>
                     </div>
                   </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
-                      <p className="text-sm text-gray-400">Vencidas</p>
-                      <p className="text-2xl font-bold text-red-500">
+                      <p className="text-sm text-gray-300">Vencidas</p>
+                      <p className="text-2xl font-bold text-red-400">
                         R$ {filteredTransactions
                           .filter(t => t.type === 'EXPENSE' && t.status === 'PENDING' && new Date(t.date) < new Date())
                           .reduce((acc, t) => acc + (Number(t.amount) || 0), 0)
@@ -1198,10 +1201,10 @@ const Financeiro: React.FC = () => {
                       </p>
                     </div>
                   </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
-                      <p className="text-sm text-gray-400">A Vencer (30 dias)</p>
-                      <p className="text-2xl font-bold text-yellow-500">
+                      <p className="text-sm text-gray-300">A Vencer (30 dias)</p>
+                      <p className="text-2xl font-bold text-yellow-400">
                         R$ {filteredTransactions
                           .filter(t => {
                             const vencimento = new Date(t.date);
@@ -1215,10 +1218,10 @@ const Financeiro: React.FC = () => {
                       </p>
                     </div>
                   </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
-                      <p className="text-sm text-gray-400">Pagas no Mês</p>
-                      <p className="text-2xl font-bold text-green-500">
+                      <p className="text-sm text-gray-300">Pagas no Mês</p>
+                      <p className="text-2xl font-bold text-green-400">
                         R$ {filteredTransactions
                           .filter(t => {
                             const dataTransacao = new Date(t.date);
@@ -1244,19 +1247,19 @@ const Financeiro: React.FC = () => {
                     placeholder="Buscar por descrição, fornecedor..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    className="pl-10 bg-seguranca-black/80 border-gray-700 text-white rounded-md"
                   />
                 </div>
                 
                 {/* Segunda linha - Filtros */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                  <select className="bg-seguranca-black border-gray-600 text-seguranca-lightgray rounded px-3 py-2 text-sm border">
+                  <select className="bg-seguranca-black/80 border-gray-700 text-white rounded px-3 py-2 text-sm border">
                     <option value="">Status</option>
                     <option value="PENDING">Pendente</option>
                     <option value="CONFIRMED">Pago</option>
                     <option value="CANCELLED">Cancelado</option>
                   </select>
-                  <select className="bg-seguranca-black border-gray-600 text-seguranca-lightgray rounded px-3 py-2 text-sm border">
+                  <select className="bg-seguranca-black/80 border-gray-700 text-white rounded px-3 py-2 text-sm border">
                     <option value="">Centro de Custo</option>
                     <option value="OPERACIONAL">Operacional</option>
                     <option value="ADMINISTRATIVO">Administrativo</option>
@@ -1266,18 +1269,18 @@ const Financeiro: React.FC = () => {
                   <Input
                     type="date"
                     placeholder="Data início"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray text-sm"
+                    className="bg-seguranca-black/80 border-gray-700 text-white text-sm rounded"
                   />
                   <Input
                     type="date"
                     placeholder="Data fim"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray text-sm"
+                    className="bg-seguranca-black/80 border-gray-700 text-white text-sm rounded"
                   />
-                <Button variant="outline" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-sm">
+                <Button variant="outline" className="border-gray-700 text-white hover:bg-seguranca-black text-sm shadow">
                     <Filter size={16} className="sm:mr-2" />
                     <span className="hidden sm:inline">Filtrar</span>
                   </Button>
-                  <Button variant="outline" className="border-blue-600 text-blue-400 hover:bg-blue-600/20 text-sm">
+                  <Button variant="outline" className="border-blue-600 text-blue-400 hover:bg-blue-600/20 text-sm shadow">
                     <span className="hidden sm:inline">📊 Relatório</span>
                     <span className="sm:hidden">📊</span>
                 </Button>
@@ -1305,10 +1308,10 @@ const Financeiro: React.FC = () => {
               ) : (
                 <>
                   {/* Tabela Desktop (md e acima) */}
-                  <div className="hidden md:block overflow-x-auto">
+                  <div className="hidden md:block overflow-x-auto rounded-lg ring-1 ring-white/5 shadow">
                     <table className="w-full min-w-[900px]">
                     <thead>
-                      <tr className="border-b border-gray-600">
+                      <tr className="border-b border-gray-800 bg-seguranca-black/40">
                           <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Data</th>
                           <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Descrição</th>
                           <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Fornecedor</th>
@@ -1328,7 +1331,7 @@ const Financeiro: React.FC = () => {
                             const diasAteVencimento = Math.ceil((new Date(conta.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
                             
                             return (
-                              <tr key={conta.id} className={`border-b border-gray-700 hover:bg-seguranca-black/50 ${isVencida ? 'bg-red-900/20' : ''}`}>
+                              <tr key={conta.id} className={`border-b border-gray-800 hover:bg-seguranca-black/60 transition-colors ${isVencida ? 'bg-red-900/20' : ''}`}>
                                 <td className="py-3 px-2 lg:px-4 text-gray-400 text-sm">
                                   {new Date(conta.date).toLocaleDateString('pt-BR')}
                           </td>
@@ -1433,7 +1436,7 @@ const Financeiro: React.FC = () => {
                         const diasAteVencimento = Math.ceil((new Date(conta.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
                         
                         return (
-                          <Card key={conta.id} className={`bg-seguranca-black border-gray-600 p-4 ${isVencida ? 'border-red-500' : ''}`}>
+                          <Card key={conta.id} className={`bg-seguranca-black border-gray-700 p-4 rounded-xl shadow ${isVencida ? 'border-red-500' : ''}`}>
                             <div className="space-y-3">
                               {/* Header */}
                               <div className="flex justify-between items-start">
@@ -1545,404 +1548,10 @@ const Financeiro: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="contas-receber">
-            <Card className="bg-seguranca-graphite border-gray-600 p-3 sm:p-6">
-              {/* Cabeçalho */}
-              <div className="mb-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                  <div>
-                    <h3 className="text-xl font-semibold text-seguranca-lightgray">Contas a Receber</h3>
-                    <p className="text-gray-400">Gerencie suas contas a receber e controle de inadimplência</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                    >
-                      <FileText size={16} className="mr-2" />
-                      Relatório Inadimplência
-                    </Button>
-                    <Button
-                      onClick={() => setShowContaReceberModal(true)}
-                      className="bg-seguranca-red hover:bg-seguranca-darkred"
-                    >
-                      <Plus size={16} className="mr-2" />
-                      Nova Conta
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Cards de Resumo */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-400">Total a Receber</p>
-                        <p className="text-2xl font-bold text-blue-500">
-                          R$ 35.500
-                        </p>
-                      </div>
-                      <DollarSign className="h-8 w-8 text-blue-500" />
-                    </div>
-                  </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-400">Valor Recebido</p>
-                        <p className="text-2xl font-bold text-green-500">
-                          R$ 14.500
-                        </p>
-                      </div>
-                      <CheckCircle className="h-8 w-8 text-green-500" />
-                    </div>
-                  </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-400">Valor Vencido</p>
-                        <p className="text-2xl font-bold text-red-500">
-                          R$ 15.000
-                        </p>
-                      </div>
-                      <AlertCircle className="h-8 w-8 text-red-500" />
-                    </div>
-                  </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-400">Taxa Inadimplência</p>
-                        <p className="text-2xl font-bold text-orange-500">33,3%</p>
-                      </div>
-                      <TrendingUp className="h-8 w-8 text-orange-500" />
-                    </div>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Filtros */}
-              <div className="space-y-4 mb-6">
-                {/* Primeira linha - Busca e Filtros */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <Input
-                      placeholder="Buscar por cliente, fatura ou descrição..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <select className="bg-seguranca-black border-gray-600 text-seguranca-lightgray rounded px-3 py-2 text-sm border">
-                      <option value="">Todos Status</option>
-                      <option value="PENDENTE">Pendente</option>
-                      <option value="PARCIAL">Parcial</option>
-                      <option value="PAGO">Pago</option>
-                      <option value="VENCIDO">Vencido</option>
-                    </select>
-                    <select className="bg-seguranca-black border-gray-600 text-seguranca-lightgray rounded px-3 py-2 text-sm border">
-                      <option value="">Todas</option>
-                      <option value="30">Últimos 30 dias</option>
-                      <option value="60">Últimos 60 dias</option>
-                      <option value="90">Últimos 90 dias</option>
-                    </select>
-                    <Button variant="outline" className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black">
-                      <Filter size={16} className="mr-2" />
-                      Filtros Avançados
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tabs Lista/Dashboard */}
-              <div className="mb-6">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="bg-seguranca-black border-gray-600 text-gray-400 hover:bg-seguranca-black"
-                  >
-                    Lista de Contas
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  >
-                    Dashboard
-                  </Button>
-                </div>
-              </div>
-
-              {/* Dashboard com dois cards lado a lado */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Status das Contas */}
-                <Card className="bg-seguranca-black border-gray-600 p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Clock className="h-5 w-5 text-blue-500" />
-                    <h4 className="text-lg font-semibold text-seguranca-lightgray">Status das Contas</h4>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-seguranca-lightgray">Vencido</span>
-                      <span className="text-lg font-bold text-red-500">R$ 15.000</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-seguranca-lightgray">Pago</span>
-                      <span className="text-lg font-bold text-green-500">R$ 8.500</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-seguranca-lightgray">Parcial</span>
-                      <span className="text-lg font-bold text-yellow-500">R$ 12.000</span>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Contas Vencidas */}
-                <Card className="bg-seguranca-black border-gray-600 p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                    <h4 className="text-lg font-semibold text-seguranca-lightgray">Contas Vencidas</h4>
-                  </div>
-                  <div className="text-center py-12">
-                    <p className="text-gray-400 mb-2">Nenhuma conta vencida encontrada</p>
-                    <p className="text-gray-400">no período selecionado</p>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Lista de Contas (quando não estiver vazia) */}
-              {loading ? (
-                <div className="flex justify-center items-center py-8 mt-6">
-                  <Loader2 size={32} className="animate-spin text-seguranca-yellow" />
-                  <span className="ml-2 text-seguranca-lightgray">Carregando contas a receber...</span>
-                </div>
-              ) : filteredTransactions.filter(t => t.type === 'INCOME').length === 0 ? (
-                <div className="text-center py-12 mt-6">
-                  <TrendingUp className="mx-auto h-12 w-12 text-gray-500 mb-4" />
-                  <p className="text-gray-400">Nenhuma conta a receber encontrada</p>
-                  <Button
-                    onClick={() => setShowContaReceberModal(true)}
-                    className="mt-4 bg-seguranca-red hover:bg-seguranca-darkred"
-                  >
-                    <Plus size={18} className="mr-2" />
-                    Criar primeira conta
-                  </Button>
-                </div>
-              ) : (
-                <div className="mt-6">
-                  {/* Tabela Desktop */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
-                      <thead>
-                        <tr className="border-b border-gray-600">
-                          <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Data</th>
-                          <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Cliente</th>
-                          <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Descrição</th>
-                          <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Vencimento</th>
-                          <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Valor</th>
-                          <th className="text-left py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Status</th>
-                          <th className="text-center py-3 px-2 lg:px-4 font-medium text-seguranca-lightgray text-sm">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTransactions
-                          .filter(transaction => transaction.type === 'INCOME')
-                          .map((conta) => {
-                            const isVencida = new Date(conta.date) < new Date() && conta.status === 'PENDING';
-                            const diasAteVencimento = Math.ceil((new Date(conta.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-                            
-                            return (
-                              <tr key={conta.id} className={`border-b border-gray-700 hover:bg-seguranca-black/50 ${isVencida ? 'bg-red-900/20' : ''}`}>
-                                <td className="py-3 px-2 lg:px-4 text-gray-400 text-sm">
-                                  {new Date(conta.date).toLocaleDateString('pt-BR')}
-                                </td>
-                                <td className="py-3 px-2 lg:px-4 text-seguranca-lightgray text-sm max-w-[150px] lg:max-w-[200px] truncate" title={conta.supplierName || 'Cliente'}>
-                                  {conta.supplierName || 'Cliente não informado'}
-                                </td>
-                                <td className="py-3 px-2 lg:px-4 text-seguranca-lightgray text-sm max-w-[150px] lg:max-w-[200px] truncate" title={conta.description}>
-                                  {conta.description}
-                                </td>
-                                <td className="py-3 px-2 lg:px-4 text-sm">
-                                  <div className="flex flex-col">
-                                    <span className={`text-sm ${isVencida ? 'text-red-400' : diasAteVencimento <= 7 ? 'text-yellow-400' : 'text-gray-400'}`}>
-                                      {new Date(conta.date).toLocaleDateString('pt-BR')}
-                                    </span>
-                                    {conta.status === 'PENDING' && (
-                                      <span className={`text-xs ${isVencida ? 'text-red-400' : diasAteVencimento <= 7 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                                        {isVencida 
-                                          ? `Vencida há ${Math.abs(diasAteVencimento)} dias` 
-                                          : diasAteVencimento <= 7 
-                                          ? `Vence em ${diasAteVencimento} dias`
-                                          : ''
-                                        }
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-3 px-2 lg:px-4 font-medium text-sm text-green-500">
-                                  R$ {(Number(conta.amount) || 0).toLocaleString('pt-BR')}
-                                </td>
-                                <td className="py-3 px-2 lg:px-4">
-                                  <Badge
-                                    className={`text-xs ${
-                                      conta.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
-                                      conta.status === 'PENDING' ? (isVencida ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800') :
-                                      conta.status === 'CANCELLED' ? 'bg-gray-100 text-gray-800' :
-                                      'bg-yellow-100 text-yellow-800'
-                                    }`}
-                                  >
-                                    {conta.status === 'CONFIRMED' ? 'Recebido' :
-                                     conta.status === 'PENDING' ? (isVencida ? 'Vencido' : 'Pendente') :
-                                     conta.status === 'CANCELLED' ? 'Cancelado' :
-                                     'Parcial'}
-                                  </Badge>
-                                </td>
-                                <td className="py-3 px-2 lg:px-4">
-                                  <div className="flex justify-center gap-1">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => abrirModalEditarTransacao(conta)}
-                                      className="border-blue-500 text-blue-600 hover:bg-blue-50 p-1 h-8 w-8"
-                                    >
-                                      ✏️
-                                    </Button>
-                                    {conta.status === 'PENDING' && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          console.log('Marcar como recebido:', conta.id);
-                                        }}
-                                        className="border-green-500 text-green-600 hover:bg-green-50 p-1 h-8 w-8"
-                                      >
-                                        ✓
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        console.log('Enviar cobrança:', conta.id);
-                                      }}
-                                      className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 p-1 h-8 w-8"
-                                    >
-                                      📧
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Cards Mobile */}
-                  <div className="md:hidden space-y-4">
-                    {filteredTransactions
-                      .filter(transaction => transaction.type === 'INCOME')
-                      .map((conta) => {
-                        const isVencida = new Date(conta.date) < new Date() && conta.status === 'PENDING';
-                        const diasAteVencimento = Math.ceil((new Date(conta.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-                        
-                        return (
-                          <Card key={conta.id} className={`bg-seguranca-black border-gray-600 p-4 ${isVencida ? 'border-red-500' : ''}`}>
-                            <div className="space-y-3">
-                              {/* Header */}
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-seguranca-lightgray text-sm mb-1">{conta.description}</h4>
-                                  <p className="text-gray-400 text-xs">{conta.supplierName || 'Cliente não informado'}</p>
-                                </div>
-                                <Badge
-                                  className={`text-xs ml-2 ${
-                                    conta.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
-                                    conta.status === 'PENDING' ? (isVencida ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800') :
-                                    conta.status === 'CANCELLED' ? 'bg-gray-100 text-gray-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                  }`}
-                                >
-                                  {conta.status === 'CONFIRMED' ? 'Recebido' :
-                                   conta.status === 'PENDING' ? (isVencida ? 'Vencido' : 'Pendente') :
-                                   conta.status === 'CANCELLED' ? 'Cancelado' :
-                                   'Parcial'}
-                                </Badge>
-                              </div>
-
-                              {/* Valor */}
-                              <div className="text-right">
-                                <span className="text-xl font-bold text-green-500">
-                                  R$ {(Number(conta.amount) || 0).toLocaleString('pt-BR')}
-                                </span>
-                              </div>
-
-                              {/* Informações */}
-                              <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div>
-                                  <span className="text-gray-400">Data:</span>
-                                  <p className="text-seguranca-lightgray">{new Date(conta.date).toLocaleDateString('pt-BR')}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Vencimento:</span>
-                                  <div className="flex flex-col">
-                                    <span className={`text-sm ${isVencida ? 'text-red-400' : diasAteVencimento <= 7 ? 'text-yellow-400' : 'text-seguranca-lightgray'}`}>
-                                      {new Date(conta.date).toLocaleDateString('pt-BR')}
-                                    </span>
-                                    {conta.status === 'PENDING' && (
-                                      <span className={`text-xs ${isVencida ? 'text-red-400' : diasAteVencimento <= 7 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                                        {isVencida 
-                                          ? `Vencida há ${Math.abs(diasAteVencimento)} dias` 
-                                          : diasAteVencimento <= 7 
-                                          ? `Vence em ${diasAteVencimento} dias`
-                                          : ''
-                                        }
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Ações */}
-                              <div className="flex gap-2 pt-2 border-t border-gray-700">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => abrirModalEditarTransacao(conta)}
-                                  className="flex-1 border-blue-500 text-blue-600 hover:bg-blue-50 text-xs"
-                                >
-                                  ✏️ Editar
-                                </Button>
-                                {conta.status === 'PENDING' && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      console.log('Marcar como recebido:', conta.id);
-                                    }}
-                                    className="flex-1 border-green-500 text-green-600 hover:bg-green-50 text-xs"
-                                  >
-                                    ✓ Receber
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    console.log('Enviar cobrança:', conta.id);
-                                  }}
-                                  className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 text-xs px-3"
-                                >
-                                  📧
-                                </Button>
-                              </div>
-                            </div>
-                          </Card>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-            </Card>
-              </TabsContent>
+            <div className="rounded-xl overflow-hidden">
+              <ContasAReceberComponent />
+            </div>
+          </TabsContent>
 
           <TabsContent value="fluxo-caixa">
             <Card className="bg-seguranca-graphite border-gray-600 p-3 sm:p-6">
@@ -1951,25 +1560,25 @@ const Financeiro: React.FC = () => {
                 <h3 className="text-xl font-semibold text-seguranca-lightgray mb-2">Fluxo de Caixa</h3>
                 <p className="text-gray-400 mb-6">Controle detalhado das entradas e saídas financeiras</p>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
                       <p className="text-sm text-gray-400">Saldo Atual</p>
                       <p className="text-2xl font-bold text-seguranca-yellow">R$ {lucroLiquido.toLocaleString('pt-BR')}</p>
                     </div>
                   </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
                       <p className="text-sm text-gray-400">Entradas</p>
                       <p className="text-2xl font-bold text-green-500">R$ {receitaTotal.toLocaleString('pt-BR')}</p>
                     </div>
                   </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
                       <p className="text-sm text-gray-400">Saídas</p>
                       <p className="text-2xl font-bold text-red-500">R$ {despesaTotal.toLocaleString('pt-BR')}</p>
                     </div>
                   </Card>
-                  <Card className="bg-seguranca-black border-gray-600 p-4">
+                  <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 p-4 rounded-xl shadow ring-1 ring-white/5">
                     <div className="text-center">
                       <p className="text-sm text-gray-400">Projeção</p>
                       <p className="text-2xl font-bold text-blue-500">R$ {(lucroLiquido * 1.1).toLocaleString('pt-BR')}</p>
