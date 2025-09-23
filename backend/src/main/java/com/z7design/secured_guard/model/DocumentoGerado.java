@@ -65,6 +65,7 @@ public class DocumentoGerado {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @Builder.Default
     private StatusDocumento status = StatusDocumento.PENDENTE;
     
     @ManyToOne(fetch = FetchType.LAZY)

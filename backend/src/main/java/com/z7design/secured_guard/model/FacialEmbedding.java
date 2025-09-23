@@ -43,12 +43,14 @@ public class FacialEmbedding {
     private LocalDateTime lastUsed;
     
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
     
     @Column(name = "confidence_score", precision = 3, scale = 2)
     private BigDecimal confidenceScore;
     
     @Column(name = "liveness_verified")
+    @Builder.Default
     private Boolean livenessVerified = false;
     
     // Método para atualizar último uso

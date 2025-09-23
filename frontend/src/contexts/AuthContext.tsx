@@ -123,8 +123,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Removido teste de comunicação para evitar erros desnecessários
       
       // Enviar username em vez de email para corresponder ao backend
-      // Usar caminho relativo ao baseURL para evitar duplicação de "/api"
-      const response = await api.post('/auth/login', { username: email, password });
+      // Usar caminho completo com /api para garantir que o proxy funcione
+      const response = await api.post('/api/auth/login', { username: email, password });
       
       console.log('🔍 Resposta do login:', response.status, response.data);
       
@@ -218,7 +218,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!token) return;
 
       // Buscar dados atualizados do usuário
-      const response = await api.get('/users/profile');
+      const response = await api.get('/api/users/profile');
       if (response.data) {
         const updatedUser = {
           ...user,
@@ -245,7 +245,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     refreshAuthToken: async () => {
       try {
-        const response = await api.post('/auth/refresh-token', {
+        const response = await api.post('/api/auth/refresh-token', {
           refreshToken
         });
 
