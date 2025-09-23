@@ -52,6 +52,10 @@ jobs:
       - name: Write .env on VPS
         env:
           VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          POSTGRES_PASSWORD_PROD: ${{ secrets.POSTGRES_PASSWORD_PROD }}
+          POSTGRES_PASSWORD_DEV: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_PASSWORD_CI: ${{ secrets.POSTGRES_PASSWORD_CI }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           sshpass -p "$VPS_PASSWORD" ssh -p "${{ secrets.VPS_SSH_PORT }}" -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
             set -e; \
@@ -59,14 +63,14 @@ jobs:
             cat > /opt/secured-guard/.env << 'EOF'\n\
             POSTGRES_DB=secured_guard_prod\n\
             POSTGRES_USER=postgressg\n\
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD_PROD }}\n\
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD_PROD:-S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx}\n\
             POSTGRES_DB_DEV=secured_guard_dev\n\
             POSTGRES_USER_DEV=postgressg\n\
-            POSTGRES_PASSWORD_DEV=${{ secrets.POSTGRES_PASSWORD_DEV }}\n\
+            POSTGRES_PASSWORD_DEV=${POSTGRES_PASSWORD_DEV:-S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx}\n\
             POSTGRES_DB_CI=secured_guard_ci\n\
             POSTGRES_USER_CI=postgressg\n\
-            POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}\n\
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}\n\
+            POSTGRES_PASSWORD_CI=${POSTGRES_PASSWORD_CI:-S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx}\n\
+            REDIS_PASSWORD=${REDIS_PASSWORD:-&x&EySFN8BErT3uU%r$&hjGQ}\n\
             EOF\n\
           "
 
