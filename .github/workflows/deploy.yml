@@ -52,26 +52,24 @@ jobs:
       - name: Write .env on VPS
         env:
           VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
-          POSTGRES_PASSWORD_PROD: ${{ secrets.POSTGRES_PASSWORD_PROD }}
-          POSTGRES_PASSWORD_DEV: ${{ secrets.POSTGRES_PASSWORD_DEV }}
-          POSTGRES_PASSWORD_CI: ${{ secrets.POSTGRES_PASSWORD_CI }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           sshpass -p "$VPS_PASSWORD" ssh -p "${{ secrets.VPS_SSH_PORT }}" -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
             set -e; \
             mkdir -p /opt/secured-guard; \
-            cat > /opt/secured-guard/.env << 'EOF'\n\
-            POSTGRES_DB=secured_guard_prod\n\
-            POSTGRES_USER=postgressg\n\
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD_PROD:-S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx}\n\
-            POSTGRES_DB_DEV=secured_guard_dev\n\
-            POSTGRES_USER_DEV=postgressg\n\
-            POSTGRES_PASSWORD_DEV=${POSTGRES_PASSWORD_DEV:-S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx}\n\
-            POSTGRES_DB_CI=secured_guard_ci\n\
-            POSTGRES_USER_CI=postgressg\n\
-            POSTGRES_PASSWORD_CI=${POSTGRES_PASSWORD_CI:-S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx}\n\
-            REDIS_PASSWORD=${REDIS_PASSWORD:-&x&EySFN8BErT3uU%r$&hjGQ}\n\
-            EOF\n\
+            echo 'POSTGRES_DB=secured_guard_prod' > /opt/secured-guard/.env; \
+            echo 'POSTGRES_USER=postgressg' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_PASSWORD=S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_DB_DEV=secured_guard_dev' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_USER_DEV=postgressg' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_PASSWORD_DEV=S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_DB_CI=secured_guard_ci' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_USER_CI=postgressg' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_PASSWORD_CI=S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx' >> /opt/secured-guard/.env; \
+            echo 'REDIS_PASSWORD=redis_secured_guard_2024' >> /opt/secured-guard/.env; \
+            echo 'JWT_SECRET=795927eaf0f77f4687edf8c7faaf30e2bd60d1c2215c0015ce9ddc83c8119615a3dec0755b6109a88d5077e6e4344a5b00be395e4c02a57ed923f95f1afebfed' >> /opt/secured-guard/.env; \
+            chmod 600 /opt/secured-guard/.env; \
+            echo 'Arquivo .env criado com sucesso'; \
+            cat /opt/secured-guard/.env; \
           "
 
       - name: Docker login (optional)
