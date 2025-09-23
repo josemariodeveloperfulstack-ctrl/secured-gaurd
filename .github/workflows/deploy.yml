@@ -14,6 +14,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup SSH and sshpass
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
         run: |
           echo "🔧 Configurando SSH e sshpass..."
           
@@ -27,8 +30,13 @@ jobs:
           touch ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           
-          # Add VPS host key to known_hosts
-          ssh-keyscan -p "${{ secrets.VPS_SSH_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          # Add VPS host key to known_hosts (with error handling)
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_SSH_PORT" ]; then
+            echo "🔑 Adicionando chave SSH da VPS: $VPS_HOST:$VPS_SSH_PORT"
+            ssh-keyscan -p "$VPS_SSH_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts || echo "⚠️ Aviso: Não foi possível adicionar chave SSH"
+          else
+            echo "⚠️ Aviso: VPS_HOST ou VPS_SSH_PORT não configurados"
+          fi
           
           echo "✅ SSH e sshpass configurados com sucesso!"
 
