@@ -13,7 +13,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
-      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+      - ../scripts/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d/migration:ro
     networks:
       - secured-guard-network
     healthcheck:
