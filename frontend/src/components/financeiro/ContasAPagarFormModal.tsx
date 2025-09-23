@@ -127,16 +127,52 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
       // Carregar categorias
       contasAPagarService.getCategories()
-        .then(setCategories)
+        .then(data => {
+          console.log('🔍 DEBUG: Dados de categorias recebidos:', data);
+          const categoriasArray = Array.isArray(data) ? data : [];
+          setCategories(categoriasArray);
+        })
         .catch(error => {
           console.error('Erro ao carregar categorias:', error);
+          toast({
+            title: "Erro",
+            description: "Erro ao carregar categorias. Usando dados de exemplo.",
+            variant: "destructive"
+          });
+          // Fallback para dados de exemplo em caso de erro
+          setCategories([
+            'Aluguel',
+            'Energia Elétrica',
+            'Telefone/Internet',
+            'Material de Escritório',
+            'Manutenção',
+            'Outros'
+          ]);
         });
 
       // Carregar centros de custo
       contasAPagarService.getCostCenters()
-        .then(setCostCenters)
+        .then(data => {
+          console.log('🔍 DEBUG: Dados de centros de custo recebidos:', data);
+          const centrosArray = Array.isArray(data) ? data : [];
+          setCostCenters(centrosArray);
+        })
         .catch(error => {
           console.error('Erro ao carregar centros de custo:', error);
+          toast({
+            title: "Erro",
+            description: "Erro ao carregar centros de custo. Usando dados de exemplo.",
+            variant: "destructive"
+          });
+          // Fallback para dados de exemplo em caso de erro
+          setCostCenters([
+            'Administrativo',
+            'Operacional',
+            'Comercial',
+            'Financeiro',
+            'TI',
+            'RH'
+          ]);
         });
     }
   }, [open]);
@@ -332,7 +368,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor *</label>
             <Select 
-              value={formData.fornecedorId} 
+              value={formData.fornecedorId || ""} 
               onValueChange={(value) => {
                 const fornecedor = fornecedores.find(f => f.id === value);
                 handleInputChange('fornecedorId', value);
@@ -356,7 +392,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-medium text-seguranca-lightgray">Empresa *</label>
             <Select 
-              value={formData.empresaId} 
+              value={formData.empresaId || ""} 
               onValueChange={(value) => {
                 const empresa = empresas.find(e => e.id === value);
                 handleInputChange('empresaId', value);
@@ -470,12 +506,12 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               <label className="text-sm font-medium text-seguranca-lightgray">Categoria</label>
               {!showNewCategoryInput ? (
                 <div className="flex gap-2">
-                  <Select value={formData.categoria || undefined} onValueChange={handleCategoryChange}>
+                  <Select value={formData.categoria || ""} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="flex-1 border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
-                      {categories.map((category) => (
+                      {Array.isArray(categories) && categories.map((category) => (
                         <SelectItem key={category} value={category} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                           {category}
                         </SelectItem>
@@ -520,12 +556,12 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Centro de Custo</label>
-              <Select value={formData.centroCusto || undefined} onValueChange={(value) => handleInputChange('centroCusto', value)}>
+              <Select value={formData.centroCusto || ""} onValueChange={(value) => handleInputChange('centroCusto', value)}>
                 <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue placeholder="Selecione um centro de custo" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-black border-gray-600">
-                  {costCenters.map((costCenter) => (
+                  {Array.isArray(costCenters) && costCenters.map((costCenter) => (
                     <SelectItem key={costCenter} value={costCenter} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                       {costCenter}
                     </SelectItem>
