@@ -91,7 +91,7 @@ const mainMenuItems = [
   // Módulo Operacional - Correspondente às abas da página
   const operacionalMenuItems = [
     { icon: BarChart3, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
-    { icon: ClipboardList, text: 'Serviços', to: '/servicos', id: 'servicos' },
+    { icon: ClipboardList, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
     { icon: Shield, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
     { icon: MapPin, text: 'Controle de Visitas', to: '/controle-visitas-avancado', id: 'controle-visitas' },
     { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },

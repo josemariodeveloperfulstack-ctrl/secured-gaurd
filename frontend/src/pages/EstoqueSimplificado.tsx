@@ -65,9 +65,9 @@ const EstoqueSimplificado: React.FC = () => {
       ]);
       
       setStockReport(report);
-      setStockItems(items);
+      setStockItems(Array.isArray(items) ? items : []);
       setRecentMovements(movements);
-      setActiveAlerts(alerts);
+      setActiveAlerts(Array.isArray(alerts) ? alerts : []);
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -208,11 +208,11 @@ const EstoqueSimplificado: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-seguranca-lightgray">
               <Bell className="h-5 w-5" />
-              Alertas Ativos ({activeAlerts.length})
+              Alertas Ativos ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {activeAlerts.length === 0 ? (
+            {!Array.isArray(activeAlerts) || activeAlerts.length === 0 ? (
               <p className="text-gray-400 text-center py-4">Nenhum alerta ativo</p>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -353,7 +353,7 @@ const EstoqueSimplificado: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="alerts" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
               <Bell className="h-4 w-4 mr-2" />
-              Alertas ({activeAlerts.length})
+              Alertas ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
             </TabsTrigger>
             <TabsTrigger value="reports" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
               <FileText className="h-4 w-4 mr-2" />
@@ -383,7 +383,7 @@ const EstoqueSimplificado: React.FC = () => {
 
           <TabsContent value="alerts" className="mt-6">
             <StockAlertsPanel
-              alerts={activeAlerts}
+              alerts={Array.isArray(activeAlerts) ? activeAlerts : []}
               onRefresh={handleRefresh}
             />
           </TabsContent>

@@ -45,7 +45,7 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
   onCreateMovement,
   onRefresh
 }) => {
-  const [items, setItems] = useState<StockItem[]>(initialItems);
+  const [items, setItems] = useState<StockItem[]>(Array.isArray(initialItems) ? initialItems : []);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -53,7 +53,7 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    setItems(initialItems);
+    setItems(Array.isArray(initialItems) ? initialItems : []);
   }, [initialItems]);
 
   const handleSearch = async () => {
@@ -95,7 +95,7 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
     }
   };
 
-  const filteredItems = items.filter(item => {
+  const filteredItems = (Array.isArray(items) ? items : []).filter(item => {
     const matchesSearch = !searchTerm || 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||

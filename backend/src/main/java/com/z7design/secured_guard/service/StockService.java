@@ -242,12 +242,30 @@ public class StockService {
             String searchTerm,
             Pageable pageable) {
         
-        log.info("Buscando movimentações com filtros");
-        
-        return stockMovementRepository.findByFilters(
-                stockItemId, employeeId, movementType, reason, unitId, 
-                startDate, endDate, searchTerm, pageable)
-                .map(StockMovementDTO::fromEntity);
+        try {
+            log.info("Buscando movimentações com filtros - Item: {}, Funcionário: {}, Tipo: {}", 
+                    stockItemId, employeeId, movementType);
+            
+            Page<StockMovement> movements = stockMovementRepository.findByFilters(
+                    stockItemId, employeeId, movementType, reason, unitId, 
+                    startDate, endDate, searchTerm, pageable);
+            
+            log.info("Encontradas {} movimentações", movements.getTotalElements());
+            
+            return movements.map(movement -> {
+                try {
+                    return StockMovementDTO.fromEntity(movement);
+                } catch (Exception e) {
+                    log.error("Erro ao converter movimentação {}: {}", movement.getId(), e.getMessage());
+                    return null;
+                }
+            });
+            
+        } catch (Exception e) {
+            log.error("Erro ao buscar movimentações com filtros: {}", e.getMessage(), e);
+            // Return empty page instead of throwing exception
+            return Page.empty(pageable);
+        }
     }
 
     public List<StockMovementDTO> getMovementsByItem(UUID itemId) {

@@ -18,11 +18,12 @@ export const stockService = {
 
   async getAllItems(): Promise<StockItem[]> {
     try {
-      const response = await api.get('/stock/items');
-      return response.data;
+      const response = await api.get('/api/stock/items');
+      return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar itens de estoque:', error);
-      throw new Error('Falha ao buscar itens de estoque');
+      // Return empty array instead of throwing error to prevent component crash
+      return [];
     }
   },
 
@@ -155,10 +156,17 @@ export const stockService = {
       params.append('size', size.toString());
       
       const response = await api.get(`/api/stock/movements/search?${params.toString()}`);
-      return response.data;
+      return {
+        content: response.data.content || [],
+        totalElements: response.data.totalElements || 0
+      };
     } catch (error) {
       console.error('Erro ao buscar movimentações:', error);
-      throw new Error('Falha ao buscar movimentações');
+      // Return empty result instead of throwing error
+      return {
+        content: [],
+        totalElements: 0
+      };
     }
   },
 
@@ -196,21 +204,22 @@ export const stockService = {
 
   async getActiveAlerts(): Promise<StockAlert[]> {
     try {
-      const response = await api.get('/stock/alerts');
-      return response.data;
+      const response = await api.get('/api/stock/alerts');
+      return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar alertas ativos:', error);
-      throw new Error('Falha ao buscar alertas');
+      // Return empty array instead of throwing error to prevent component crash
+      return [];
     }
   },
 
   async getUnreadAlerts(): Promise<StockAlert[]> {
     try {
-      const response = await api.get('/stock/alerts/unread');
-      return response.data;
+      const response = await api.get('/api/stock/alerts/unread');
+      return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar alertas não lidos:', error);
-      throw new Error('Falha ao buscar alertas não lidos');
+      return [];
     }
   },
 

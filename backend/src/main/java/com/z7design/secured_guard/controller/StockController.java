@@ -18,7 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -177,11 +176,16 @@ public class StockController {
             @Parameter(description = "Termo de busca") @RequestParam(required = false) String searchTerm,
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
         
-        log.info("GET /api/stock/movements/search - Buscando movimentações");
-        Page<StockMovementDTO> movements = stockService.getMovementsWithFilters(
-                stockItemId, employeeId, movementType, reason, unitId, 
-                startDate, endDate, searchTerm, pageable);
-        return ResponseEntity.ok(movements);
+        try {
+            log.info("GET /api/stock/movements/search - Buscando movimentações com filtros");
+            Page<StockMovementDTO> movements = stockService.getMovementsWithFilters(
+                    stockItemId, employeeId, movementType, reason, unitId, 
+                    startDate, endDate, searchTerm, pageable);
+            return ResponseEntity.ok(movements);
+        } catch (Exception e) {
+            log.error("Erro ao buscar movimentações: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @GetMapping("/movements/item/{itemId}")
