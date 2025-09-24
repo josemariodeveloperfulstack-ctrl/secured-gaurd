@@ -13,40 +13,63 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.VPS_SSH_KEY }}
-
-      - name: Add VPS to known_hosts
+      - name: Setup SSH and sshpass
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
         run: |
+          echo "🔧 Configurando SSH e sshpass..."
+          
+          # Install sshpass for password authentication
+          sudo apt-get update -y
+          sudo apt-get install -y sshpass dos2unix
+          
+          # Ensure SSH directory and known_hosts exist
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.VPS_SSH_PORT }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+          touch ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          
+          # Add VPS host key to known_hosts (with error handling)
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_SSH_PORT" ]; then
+            echo "🔑 Adicionando chave SSH da VPS: $VPS_HOST:$VPS_SSH_PORT"
+            ssh-keyscan -p "$VPS_SSH_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts || echo "⚠️ Aviso: Não foi possível adicionar chave SSH"
+          else
+            echo "⚠️ Aviso: VPS_HOST ou VPS_SSH_PORT não configurados"
+          fi
+          
+          echo "✅ SSH e sshpass configurados com sucesso!"
 
       - name: Push repo to VPS directory
+        env:
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
           rsync -az --delete \
             --exclude ".git" \
+            -e "sshpass -p $VPS_PASSWORD ssh -p ${{ secrets.VPS_SSH_PORT }} -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/secured-guard/
 
       - name: Write .env on VPS
+        env:
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
-          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+          sshpass -p "$VPS_PASSWORD" ssh -p "${{ secrets.VPS_SSH_PORT }}" -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
             set -e; \
             mkdir -p /opt/secured-guard; \
-            cat > /opt/secured-guard/.env << 'EOF'\n\
-            POSTGRES_DB=secured_guard_prod\n\
-            POSTGRES_USER=postgressg\n\
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD_PROD }}\n\
-            POSTGRES_DB_DEV=secured_guard_dev\n\
-            POSTGRES_USER_DEV=postgressg\n\
-            POSTGRES_PASSWORD_DEV=${{ secrets.POSTGRES_PASSWORD_DEV }}\n\
-            POSTGRES_DB_CI=secured_guard_ci\n\
-            POSTGRES_USER_CI=postgressg\n\
-            POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}\n\
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}\n\
-            EOF\n\
+            echo 'POSTGRES_DB=secured_guard_prod' > /opt/secured-guard/.env; \
+            echo 'POSTGRES_USER=postgressg' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_PASSWORD=S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_DB_DEV=secured_guard_dev' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_USER_DEV=postgressg' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_PASSWORD_DEV=S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_DB_CI=secured_guard_ci' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_USER_CI=postgressg' >> /opt/secured-guard/.env; \
+            echo 'POSTGRES_PASSWORD_CI=S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx' >> /opt/secured-guard/.env; \
+            echo 'REDIS_PASSWORD=redis_secured_guard_2024' >> /opt/secured-guard/.env; \
+            echo 'JWT_SECRET=795927eaf0f77f4687edf8c7faaf30e2bd60d1c2215c0015ce9ddc83c8119615a3dec0755b6109a88d5077e6e4344a5b00be395e4c02a57ed923f95f1afebfed' >> /opt/secured-guard/.env; \
+            chmod 600 /opt/secured-guard/.env; \
+            echo 'Arquivo .env criado com sucesso'; \
+            cat /opt/secured-guard/.env; \
           "
 
       - name: Docker login (optional)
@@ -55,8 +78,10 @@ jobs:
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Build and deploy (prod)
+        env:
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
-          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+          sshpass -p "$VPS_PASSWORD" ssh -p "${{ secrets.VPS_SSH_PORT }}" -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
             set -e; \
             cd /opt/secured-guard; \
             source ./.env || true; \
@@ -69,8 +94,10 @@ jobs:
           "
 
       - name: Build and deploy (dev) if compose exists
+        env:
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
-          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+          sshpass -p "$VPS_PASSWORD" ssh -p "${{ secrets.VPS_SSH_PORT }}" -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
             set -e; \
             if [ -f /opt/secured-guard/deploy/docker-compose.dev.yml ]; then \
               cd /opt/secured-guard; \
@@ -87,8 +114,10 @@ jobs:
           "
 
       - name: Build and deploy (ci) if compose exists
+        env:
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
-          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+          sshpass -p "$VPS_PASSWORD" ssh -p "${{ secrets.VPS_SSH_PORT }}" -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
             set -e; \
             if [ -f /opt/secured-guard/deploy/docker-compose.ci.yml ]; then \
               cd /opt/secured-guard; \

@@ -79,6 +79,23 @@ const Medicao: React.FC = () => {
       setDashboardLoading(true);
       const bulletins = await measurementService.getBulletins();
       
+      // Verificar se bulletins é um array válido
+      if (!Array.isArray(bulletins)) {
+        console.warn('⚠️ measurementService.getBulletins() retornou dados inválidos:', bulletins);
+        setDashboardData({
+          totalBulletins: 0,
+          completeBulletins: 0,
+          simplifiedBulletins: 0,
+          pendingBulletins: 0,
+          validatedBulletins: 0,
+          totalValue: 0,
+          monthlyData: [],
+          statusDistribution: {} as Record<MeasurementStatus, number>,
+          hasData: false
+        });
+        return;
+      }
+      
       // Calcular estatísticas com melhor diferenciação
       const totalBulletins = bulletins.length;
       
