@@ -65,7 +65,10 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
     return `${day}/${month}/${year}`;
   };
 
-  const filteredEscalas = escalas.filter(escala => {
+  // Verificar se escalas é um array válido
+  const safeEscalas = Array.isArray(escalas) ? escalas : [];
+  
+  const filteredEscalas = safeEscalas.filter(escala => {
     const matchesSearch = 
       (escala.employee?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
       (escala.location?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
