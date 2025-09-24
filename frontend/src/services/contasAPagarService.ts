@@ -217,7 +217,6 @@ export const contasAPagarService = {
     
     return invoices.map((invoice: any): ContaAPagar => ({
       id: invoice.id,
-      numeroFatura: invoice.invoiceNumber,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
@@ -242,7 +241,6 @@ export const contasAPagarService = {
     
     return {
       id: invoice.id,
-      numeroFatura: invoice.invoiceNumber,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
@@ -289,15 +287,11 @@ export const contasAPagarService = {
       issueDate: formatDateForBackend(conta.dataEmissao) || '',
       paymentDate: formatDateForBackend(conta.dataPagamento),
       barcode: conta.codigoBarras,
-      category: conta.categoria || undefined,
+      category: conta.categoria === 'NENHUMA' ? undefined : conta.categoria,
       notes: conta.observacoes,
-      centroCusto: conta.centroCusto || undefined
+      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto
     };
 
-    // Adicionar invoiceNumber apenas se fornecido
-    if (conta.numeroFatura && conta.numeroFatura.trim()) {
-      requestData.invoiceNumber = conta.numeroFatura;
-    }
 
     console.log('Dados da requisição:', requestData);
 
@@ -316,7 +310,6 @@ export const contasAPagarService = {
   async updateContaAPagar(id: string, conta: Partial<ContaAPagar>): Promise<ContaAPagar> {
     const requestData: Partial<CreateContaAPagarRequest> = {};
     
-    if (conta.numeroFatura && conta.numeroFatura.trim()) requestData.invoiceNumber = conta.numeroFatura;
     if (conta.descricao) requestData.description = conta.descricao;
     if (conta.fornecedorId) requestData.supplierId = conta.fornecedorId;
     if (conta.valor !== undefined) requestData.amount = conta.valor;
@@ -326,9 +319,9 @@ export const contasAPagarService = {
     if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
     if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
     if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
-    if (conta.categoria !== undefined) requestData.category = conta.categoria;
+    if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
     if (conta.observacoes) requestData.notes = conta.observacoes;
-    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto;
+    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
     
     // Se não há unitId, buscar uma unidade padrão
     if (!requestData.unitId) {
@@ -452,20 +445,10 @@ export const contasAPagarService = {
 
   // Buscar todas as empresas
   async getEmpresas(): Promise<any[]> {
-    try {
-      const response = await api.get('/api/units/all');
-      console.log('🔍 DEBUG: Resposta da API /api/units/all:', response.data);
-      const data = response.data;
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error('❌ Erro ao buscar empresas:', error);
-      // Retornar dados de exemplo em caso de erro
-      return [
-        { id: '1', name: 'Empresa Principal', isActive: true },
-        { id: '2', name: 'Filial 1', isActive: true },
-        { id: '3', name: 'Filial 2', isActive: true }
-      ];
-    }
+    const response = await api.get('/api/units');
+    console.log('🔍 DEBUG: Resposta da API /api/units:', response.data);
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
   },
 
   // Criar fornecedor
@@ -771,7 +754,6 @@ export const contasAPagarService = {
   mapInvoiceToContaAPagar(invoice: any): ContaAPagar {
     return {
       id: invoice.id,
-      numeroFatura: invoice.invoiceNumber,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',

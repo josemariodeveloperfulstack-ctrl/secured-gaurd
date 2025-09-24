@@ -184,10 +184,10 @@ const ConciliacaoBancaria: React.FC = () => {
     >
       <div className="space-y-6">
         {/* Header com ações */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div className="rounded-xl bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black p-4 border border-gray-700 shadow-xl flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
           <div>
-            <h1 className="text-2xl font-bold text-seguranca-lightgray">Conciliação Bancária</h1>
-            <p className="text-seguranca-lightgray/70 mt-1">
+            <h1 className="text-2xl font-bold text-white tracking-tight">Conciliação Bancária</h1>
+            <p className="text-gray-300 mt-1">
               Gerencie arquivos bancários e compare com os registros do sistema
             </p>
           </div>
@@ -196,7 +196,7 @@ const ConciliacaoBancaria: React.FC = () => {
               onClick={handleRefresh}
               disabled={loading}
               variant="outline"
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
+              className="border-gray-700 text-white hover:bg-seguranca-black hover:text-seguranca-yellow shadow"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
@@ -205,14 +205,14 @@ const ConciliacaoBancaria: React.FC = () => {
               onClick={handleGenerateSummaryReport}
               disabled={loading}
               variant="outline"
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
+              className="border-gray-700 text-white hover:bg-seguranca-black hover:text-seguranca-yellow shadow"
             >
               <BarChart3 className="w-4 h-4 mr-2" />
               Relatório Resumo
             </Button>
             <Button
               onClick={() => setUploadModalOpen(true)}
-              className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+              className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90 shadow-md shadow-yellow-500/20"
             >
               <Plus className="w-4 h-4 mr-2" />
               Importar Arquivo
@@ -222,7 +222,7 @@ const ConciliacaoBancaria: React.FC = () => {
 
         {/* Cards de resumo */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 rounded-xl shadow ring-1 ring-white/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-seguranca-lightgray">
                 Total de Arquivos
@@ -237,7 +237,7 @@ const ConciliacaoBancaria: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 rounded-xl shadow ring-1 ring-white/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-seguranca-lightgray">
                 Processados
@@ -252,7 +252,7 @@ const ConciliacaoBancaria: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 rounded-xl shadow ring-1 ring-white/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-seguranca-lightgray">
                 Processando
@@ -267,7 +267,7 @@ const ConciliacaoBancaria: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-gradient-to-b from-seguranca-black to-seguranca-graphite border-gray-700 rounded-xl shadow ring-1 ring-white/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-seguranca-lightgray">
                 Com Erro
@@ -285,7 +285,7 @@ const ConciliacaoBancaria: React.FC = () => {
 
         {/* Tabs principais */}
         <Tabs defaultValue="files" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border-gray-700">
+          <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite/80 backdrop-blur border-gray-700 rounded-lg">
             <TabsTrigger value="files" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
               Arquivos Importados
             </TabsTrigger>
@@ -306,14 +306,14 @@ const ConciliacaoBancaria: React.FC = () => {
                     placeholder="Buscar por nome do arquivo ou banco..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-700 rounded-md bg-seguranca-black/80 text-white placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   />
                 </div>
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                className="px-3 py-2 border border-gray-700 rounded-md bg-seguranca-black/80 text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
               >
                 <option value="ALL">Todos os status</option>
                 <option value="PROCESSING">Processando</option>
@@ -325,7 +325,7 @@ const ConciliacaoBancaria: React.FC = () => {
             {/* Lista de arquivos */}
             <div className="grid gap-4">
               {filteredFiles.map((file) => (
-                <Card key={file.id} className="bg-seguranca-graphite border-gray-700">
+                <Card key={file.id} className="bg-seguranca-graphite border-gray-700 rounded-xl shadow">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
@@ -368,7 +368,7 @@ const ConciliacaoBancaria: React.FC = () => {
                           onClick={() => handleViewFile(file)}
                           variant="outline"
                           size="sm"
-                          className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
+                          className="border-gray-700 text-white hover:bg-seguranca-black hover:text-seguranca-yellow"
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -377,7 +377,7 @@ const ConciliacaoBancaria: React.FC = () => {
                             onClick={() => handleGenerateReport(file.id)}
                             variant="outline"
                             size="sm"
-                            className="border-gray-600 text-blue-400 hover:bg-blue-500 hover:text-white"
+                            className="border-gray-700 text-blue-400 hover:bg-blue-500 hover:text-white"
                           >
                             <BarChart3 className="w-4 h-4" />
                           </Button>
@@ -386,7 +386,7 @@ const ConciliacaoBancaria: React.FC = () => {
                           onClick={() => handleDeleteFile(file.id)}
                           variant="outline"
                           size="sm"
-                          className="border-gray-600 text-red-400 hover:bg-red-500 hover:text-white"
+                          className="border-gray-700 text-red-400 hover:bg-red-500 hover:text-white"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -397,7 +397,7 @@ const ConciliacaoBancaria: React.FC = () => {
               ))}
               
               {filteredFiles.length === 0 && (
-                <Card className="bg-seguranca-graphite border-gray-700">
+                <Card className="bg-seguranca-graphite border-gray-700 rounded-xl shadow">
                   <CardContent className="p-8 text-center">
                     <FileText className="w-12 h-12 text-gray-500 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">
@@ -428,7 +428,7 @@ const ConciliacaoBancaria: React.FC = () => {
           <TabsContent value="accounts" className="space-y-4">
             <div className="grid gap-4">
               {bankAccounts.map((account) => (
-                <Card key={account.id} className="bg-seguranca-graphite border-gray-700">
+                <Card key={account.id} className="bg-seguranca-graphite border-gray-700 rounded-xl shadow">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">

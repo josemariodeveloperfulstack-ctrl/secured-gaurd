@@ -2,12 +2,29 @@ import axios from 'axios';
 import { config } from '../../env.config';
 
 const api = axios.create({
-  baseURL: '', // Usar URLs relativas para que o proxy do Vite funcione
+  baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    // Normaliza URLs para evitar duplicação de "/api/api/..."
+    try {
+      const base = (config.baseURL || '').replace(/\/$/, '');
+      let url = config.url || '';
+      if (typeof url === 'string') {
+        // Remove base duplicada: base termina com /api e url começa com /api
+        if (base.endsWith('/api') && url.startsWith('/api/')) {
+          url = url.substring(4); // remove prefixo '/api'
+        }
+        // Garante que URLs relativas comecem com '/'
+        if (!url.startsWith('/')) {
+          url = `/${url}`;
+        }
+        config.url = url;
+      }
+    } catch (_) {}
+
     console.log('🔗 Axios Request:', config.method?.toUpperCase(), config.url);
     console.log('🔗 Base URL:', config.baseURL);
     console.log('🔗 Full URL:', config.baseURL + config.url);

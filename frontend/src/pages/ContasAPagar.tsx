@@ -20,7 +20,7 @@ import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashb
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { format, addDays, isBefore } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 
 const ContasAPagar: React.FC = () => {
   const { toast } = useToast();

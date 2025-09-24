@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, DollarSign, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, DollarSign, TrendingUp, TrendingDown, Calendar, Loader2, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ContasAPagarTab from '@/components/financeiro/ContasAPagarTab';
+import ContasAReceberTab from '@/components/financeiro/ContasAReceberTab';
+import FluxoCaixaTab from '@/components/financeiro/FluxoCaixaTab';
+import PagamentosTab from '@/components/financeiro/PagamentosTab';
+import RelatoriosTab from '@/components/financeiro/RelatoriosTab';
+import CentroCustosTab from '@/components/financeiro/CentroCustosTab';
 
 const FinanceiroSimple: React.FC = () => {
   const { toast } = useToast();
@@ -58,7 +64,7 @@ const FinanceiroSimple: React.FC = () => {
     <StandardLayout>
       <div className="container mx-auto p-6">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="bg-seguranca-graphite border-gray-600 p-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-1">
+          <TabsList className="bg-seguranca-graphite/80 backdrop-blur border-gray-700 p-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-1 rounded-lg shadow-inner">
             <TabsTrigger value="dashboard" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow text-xs px-2 py-1">
               Dashboard
             </TabsTrigger>
@@ -148,57 +154,27 @@ const FinanceiroSimple: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="contas-pagar">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Contas a Pagar</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <ContasAPagarTab />
           </TabsContent>
 
           <TabsContent value="contas-receber">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Contas a Receber</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <ContasAReceberTab />
           </TabsContent>
 
           <TabsContent value="fluxo-caixa">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Fluxo de Caixa</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <FluxoCaixaTab />
           </TabsContent>
 
           <TabsContent value="pagamentos">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Pagamentos</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <PagamentosTab />
           </TabsContent>
 
           <TabsContent value="relatorios-financeiros">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Relatórios Financeiros</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <RelatoriosTab />
           </TabsContent>
 
           <TabsContent value="centro-custos">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Centro de Custos</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <CentroCustosTab />
           </TabsContent>
 
           <TabsContent value="faturas">
@@ -224,4 +200,5 @@ const FinanceiroSimple: React.FC = () => {
   );
 };
 
-export default FinanceiroSimple;
+const Financeiro = FinanceiroSimple;
+export default Financeiro;

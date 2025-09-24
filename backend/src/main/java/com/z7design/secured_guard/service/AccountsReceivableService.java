@@ -77,7 +77,12 @@ public class AccountsReceivableService {
         AccountsReceivable account = new AccountsReceivable();
         account.setClient(client);
         account.setInvoiceNumber(dto.getInvoiceNumber());
-        account.setMeasurementNumber(dto.getMeasurementNumber());
+        // Se measurementId for enviado, preferir preencher measurementNumber com o id (ou buscar número posteriormente)
+        if (dto.getMeasurementId() != null && (dto.getMeasurementNumber() == null || dto.getMeasurementNumber().isBlank())) {
+            account.setMeasurementNumber(dto.getMeasurementId().toString());
+        } else {
+            account.setMeasurementNumber(dto.getMeasurementNumber());
+        }
         account.setDescription(dto.getDescription());
         account.setAmount(dto.getAmount());
         account.setAmountPaid(dto.getAmountPaid() != null ? dto.getAmountPaid() : BigDecimal.ZERO);
@@ -121,7 +126,11 @@ public class AccountsReceivableService {
         
         // Atualizar campos
         account.setInvoiceNumber(dto.getInvoiceNumber());
-        account.setMeasurementNumber(dto.getMeasurementNumber());
+        if (dto.getMeasurementId() != null && (dto.getMeasurementNumber() == null || dto.getMeasurementNumber().isBlank())) {
+            account.setMeasurementNumber(dto.getMeasurementId().toString());
+        } else {
+            account.setMeasurementNumber(dto.getMeasurementNumber());
+        }
         account.setDescription(dto.getDescription());
         account.setAmount(dto.getAmount());
         account.setAmountPaid(dto.getAmountPaid() != null ? dto.getAmountPaid() : BigDecimal.ZERO);
