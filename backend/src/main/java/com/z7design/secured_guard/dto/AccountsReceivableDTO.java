@@ -27,6 +27,9 @@ public class AccountsReceivableDTO {
     
     @Size(max = 100, message = "Número da medição deve ter no máximo 100 caracteres")
     private String measurementNumber;
+
+    // Suporte a vinculação por ID da medição (opcional)
+    private UUID measurementId;
     
     @NotBlank(message = "Descrição é obrigatória")
     @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")

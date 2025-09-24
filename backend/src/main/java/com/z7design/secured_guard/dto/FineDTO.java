@@ -33,8 +33,17 @@ public class FineDTO {
     public static FineDTO fromEntity(Fine fine) {
         FineDTO dto = new FineDTO();
         dto.setId(fine.getId());
-        dto.setVehicleId(fine.getVehicle().getId());
-        dto.setVehiclePlate(fine.getVehicle().getPlate());
+        // Informações do veículo (proteger contra nulos/lazy)
+        if (fine.getVehicle() != null) {
+            try {
+                dto.setVehicleId(fine.getVehicle().getId());
+                dto.setVehiclePlate(fine.getVehicle().getPlate());
+            } catch (Exception ignored) {
+                // Em caso de lazy/object not found, mantemos campos nulos
+                dto.setVehicleId(null);
+                dto.setVehiclePlate(null);
+            }
+        }
         
         // Informações do motorista
         if (fine.getDriver() != null) {

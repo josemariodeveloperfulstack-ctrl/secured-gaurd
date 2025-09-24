@@ -1,434 +1,518 @@
 import api from '@/lib/axios';
-
-export interface Cliente {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  mobile: string;
-  cnpj: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
-  notes?: string;
-}
-
-export interface ContaAReceber {
-  id: string;
-  client: Cliente;
-  invoiceNumber: string;
-  measurementNumber?: string;
-  description: string;
-  amount: number;
-  amountPaid: number;
-  pendingAmount: number;
-  issueDate: string;
-  dueDate: string;
-  paymentDate?: string;
-  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'PARTIAL';
-  category: 'INVOICE' | 'NOTE' | 'ADVANCE' | 'SERVICE' | 'PRODUCT' | 'OTHER';
-  paymentMethod: 'PIX' | 'BOLETO' | 'TRANSFER' | 'CASH' | 'CARD';
-  overdueDays: number;
-  lateFee: number;
-  latePenalty: number;
-  notes?: string;
-}
+import { ContaAReceber } from '@/components/financeiro/ContasAReceberFormModal';
+import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 
 export interface CreateContaAReceberRequest {
-  clientId: string;
-  invoiceNumber: string;
-  measurementNumber?: string;
+  invoiceNumber?: string;
   description: string;
+  clientId: string | null;
+  unitId: string;
   amount: number;
-  issueDate: string;
+  type: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO';
+  status: 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA';
   dueDate: string;
-  category: string;
-  paymentMethod: string;
+  issueDate: string;
+  paymentDate?: string;
+  barcode?: string;
+  category?: string;
   notes?: string;
+  centroCusto?: string;
 }
 
-export interface UpdateContaAReceberRequest extends CreateContaAReceberRequest {
+export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberRequest> {
   id: string;
 }
 
-class ContasAReceberService {
-  // Buscar todas as contas a receber
-  async getContasAReceber(): Promise<ContaAReceber[]> {
-    // TODO: Temporariamente usando dados mockados devido a problemas no backend
-    console.log('Usando dados mockados para contas a receber (backend com problemas)');
-    return this.getMockContasAReceber();
+export interface ContasAReceberFilters {
+  status?: string;
+  type?: string;
+  clientId?: string;
+  startDate?: string;
+  endDate?: string;
+  searchTerm?: string;
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDir?: 'ASC' | 'DESC';
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  cnpj?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  category?: string;
+  isActive: boolean;
+}
+
+export interface CreateClientRequest {
+  name: string;
+  cnpj: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  category?: string;
+  notes?: string;
+}
+
+export type UpdateClientRequest = Partial<CreateClientRequest> & {
+  isActive?: boolean;
+};
+
+export interface ContasAReceberReport {
+  totalContas: number;
+  totalValor: number;
+  contasAbertas: number;
+  valorAbertas: number;
+  contasVencidas: number;
+  valorVencidas: number;
+  contasRecebidas: number;
+  valorRecebidas: number;
+  contasVencendoEm7Dias: number;
+  valorVencendoEm7Dias: number;
+  porTipo: {
+    fatura: { count: number; valor: number };
+    medicao: { count: number; valor: number };
+    servico: { count: number; valor: number };
+    produto: { count: number; valor: number };
+  };
+  porStatus: Array<{
+    status: string;
+    count: number;
+    valor: number;
+  }>;
+}
+
+export const contasAReceberService = {
+  // ===== CONTAS A RECEBER =====
+  
+  // Buscar todas as contas
+  async getContasAReceber(filters: ContasAReceberFilters = {}): Promise<ContaAReceber[]> {
+    const params = new URLSearchParams();
     
-    /* Código original comentado temporariamente
-    try {
-      console.log('Buscando contas a receber da API...');
-      const response = await api.get('/accounts-receivable/all');
-      console.log('Contas a receber recebidas:', response.data);
-      // Garantir que sempre retornamos um array
-      return Array.isArray(response.data) ? response.data : this.getMockContasAReceber();
-    } catch (error) {
-      console.error('Erro ao buscar contas a receber:', error);
-      // Retornar dados mockados temporariamente
-      return this.getMockContasAReceber();
-    }
-    */
-  }
+    if (filters.status) params.append('status', filters.status);
+    if (filters.type) params.append('type', filters.type);
+    if (filters.clientId) params.append('clientId', filters.clientId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
+    if (filters.page !== undefined) params.append('page', filters.page.toString());
+    if (filters.size !== undefined) params.append('size', filters.size.toString());
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortDir) params.append('sortDir', filters.sortDir);
+
+    console.log('🔍 DEBUG: Fazendo requisição para /accounts-receivable com params:', params.toString());
+    const response = await api.get(`/api/accounts-receivable?${params.toString()}`);
+    
+    console.log('🔍 DEBUG: Resposta da API:', response.data);
+    
+    // Transformar dados do backend para o formato do frontend
+    const accounts = Array.isArray(response.data) ? response.data : response.data.content || [];
+    
+    console.log('🔍 DEBUG: Accounts processados:', accounts);
+    
+    return accounts.map((account: any): ContaAReceber => ({
+      id: account.id,
+      numeroFatura: account.invoiceNumber,
+      dataEmissao: parseDateFromBackend(account.issueDate),
+      vencimento: parseDateFromBackend(account.dueDate) || new Date(),
+      cliente: account.clientName || 'Não informado',
+      clienteId: account.clientId,
+      empresa: account.unitName || 'Não informado',
+      empresaId: account.unitId,
+      descricao: account.description,
+      tipo: mapBackendTypeToFrontend(account.type),
+      valor: parseFloat(account.amount),
+      codigoBarras: account.barcode,
+      status: mapBackendStatusToFrontend(account.status),
+      baixa: account.baixa || false,
+      dataPagamento: parseDateFromBackend(account.paymentDate),
+      observacoes: account.notes,
+      categoria: account.category,
+      centroCusto: account.centroCusto
+    }));
+  },
 
   // Buscar conta por ID
-  async getContaAReceberById(id: string): Promise<ContaAReceber | null> {
+  async getContaAReceberById(id: string): Promise<ContaAReceber> {
+    const response = await api.get(`/api/accounts-receivable/${id}`);
+    const account = response.data;
+    
+    return {
+      id: account.id,
+      numeroFatura: account.invoiceNumber,
+      dataEmissao: parseDateFromBackend(account.issueDate),
+      vencimento: parseDateFromBackend(account.dueDate) || new Date(),
+      cliente: account.clientName || 'Não informado',
+      clienteId: account.clientId,
+      empresa: account.unitName || 'Não informado',
+      empresaId: account.unitId,
+      descricao: account.description,
+      tipo: mapBackendTypeToFrontend(account.type),
+      valor: parseFloat(account.amount),
+      codigoBarras: account.barcode,
+      status: mapBackendStatusToFrontend(account.status),
+      baixa: account.baixa || false,
+      dataPagamento: parseDateFromBackend(account.paymentDate),
+      observacoes: account.notes,
+      categoria: account.category,
+      centroCusto: account.centroCusto
+    };
+  },
+
+  // Criar nova conta
+  async createContaAReceber(conta: Omit<ContaAReceber, 'id'>): Promise<ContaAReceber> {
+    // Buscar uma unidade padrão ou usar UUID padrão
+    let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+    
     try {
-      console.log('Buscando conta a receber por ID:', id);
-      const response = await api.get(`/api/accounts-receivable/${id}`);
-      return response.data;
+      const unitsResponse = await api.get('/units');
+      if (unitsResponse.data && unitsResponse.data.length > 0) {
+        unitId = unitsResponse.data[0].id;
+      }
     } catch (error) {
-      console.error('Erro ao buscar conta a receber:', error);
-      return null;
+      console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
     }
-  }
 
-  // Criar nova conta a receber
-  async createContaAReceber(conta: CreateContaAReceberRequest): Promise<ContaAReceber> {
+    const requestData: CreateContaAReceberRequest = {
+      description: conta.descricao,
+      clientId: conta.clienteId || null,
+      unitId: unitId,
+      amount: Number(conta.valor) || 0,
+      type: mapFrontendTypeToBackend(conta.tipo),
+      status: mapFrontendStatusToBackend(conta.status) as any,
+      dueDate: formatDateForBackend(conta.vencimento) || '',
+      issueDate: formatDateForBackend(conta.dataEmissao) || '',
+      paymentDate: formatDateForBackend(conta.dataPagamento),
+      barcode: conta.codigoBarras,
+      category: conta.categoria === 'NENHUMA' ? undefined : conta.categoria,
+      notes: conta.observacoes,
+      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto
+    };
+
+    // Adicionar invoiceNumber apenas se fornecido
+    if (conta.numeroFatura && conta.numeroFatura.trim()) {
+      requestData.invoiceNumber = conta.numeroFatura;
+    }
+
+    console.log('Dados da requisição:', requestData);
+
     try {
-      console.log('Criando conta a receber:', conta);
-      
-      const requestData = {
-        clientId: conta.clientId,
-        invoiceNumber: conta.invoiceNumber,
-        measurementNumber: conta.measurementNumber,
-        description: conta.description,
-        amount: Number(conta.amount) || 0,
-        issueDate: this.formatDateForBackend(conta.issueDate),
-        dueDate: this.formatDateForBackend(conta.dueDate),
-        category: conta.category,
-        paymentMethod: conta.paymentMethod,
-        notes: conta.notes || undefined
-      };
-
-      console.log('Dados da requisição:', requestData);
-
-      const response = await api.post('/accounts-receivable', requestData);
-      console.log('Conta a receber criada:', response.data);
-      return response.data;
+      const response = await api.post('/api/accounts-receivable', requestData);
+      return this.getContaAReceberById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao criar conta a receber:', error);
       console.error('Response data:', error.response?.data);
       console.error('Response status:', error.response?.status);
       throw error;
     }
-  }
+  },
 
-  // Atualizar conta a receber
-  async updateContaAReceber(id: string, conta: UpdateContaAReceberRequest): Promise<ContaAReceber> {
+  // Atualizar conta
+  async updateContaAReceber(id: string, conta: Partial<ContaAReceber>): Promise<ContaAReceber> {
+    const requestData: Partial<CreateContaAReceberRequest> = {};
+    
+    if (conta.descricao) requestData.description = conta.descricao;
+    if (conta.clienteId) requestData.clientId = conta.clienteId;
+    if (conta.valor !== undefined) requestData.amount = conta.valor;
+    if (conta.tipo) requestData.type = mapFrontendTypeToBackend(conta.tipo);
+    if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) as any;
+    if (conta.dataEmissao) requestData.issueDate = formatDateForBackend(conta.dataEmissao);
+    if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
+    if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
+    if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
+    if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
+    if (conta.observacoes) requestData.notes = conta.observacoes;
+    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
+    
+    // Se não há unitId, buscar uma unidade padrão
+    if (!requestData.unitId) {
+      try {
+        const unitsResponse = await api.get('/api/units');
+        if (unitsResponse.data && unitsResponse.data.length > 0) {
+          requestData.unitId = unitsResponse.data[0].id;
+        } else {
+          requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+        }
+      } catch (error) {
+        console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
+        requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+      }
+    }
+
+    console.log('Dados da requisição de atualização:', requestData);
+    console.log('ID da conta:', id);
+
     try {
-      console.log('Atualizando conta a receber:', id, conta);
-      
-      const requestData = {
-        clientId: conta.clientId,
-        invoiceNumber: conta.invoiceNumber,
-        measurementNumber: conta.measurementNumber,
-        description: conta.description,
-        amount: Number(conta.amount) || 0,
-        issueDate: this.formatDateForBackend(conta.issueDate),
-        dueDate: this.formatDateForBackend(conta.dueDate),
-        category: conta.category,
-        paymentMethod: conta.paymentMethod,
-        notes: conta.notes || undefined
-      };
-
-      console.log('Dados da requisição de atualização:', requestData);
-      console.log('ID da conta:', id);
-
       const response = await api.put(`/api/accounts-receivable/${id}`, requestData);
-      console.log('Conta a receber atualizada:', response.data);
-      return response.data;
+      return this.getContaAReceberById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao atualizar conta a receber:', error);
       console.error('Response data:', error.response?.data);
       console.error('Response status:', error.response?.status);
+      console.error('Request data enviado:', requestData);
       throw error;
     }
-  }
+  },
 
-  // Excluir conta a receber
+  // Excluir conta
   async deleteContaAReceber(id: string): Promise<void> {
-    try {
-      console.log('Excluindo conta a receber:', id);
-      await api.delete(`/api/accounts-receivable/${id}`);
-      console.log('Conta a receber excluída com sucesso');
-    } catch (error) {
-      console.error('Erro ao excluir conta a receber:', error);
-      throw error;
-    }
-  }
+    await api.delete(`/api/accounts-receivable/${id}`);
+  },
 
-  // Marcar como paga
-  async markAsPaid(id: string, dataPagamento: string): Promise<ContaAReceber> {
+  async getCategories(): Promise<string[]> {
     try {
-      console.log('Marcando conta como paga:', id, dataPagamento);
-      const response = await api.put(`/api/accounts-receivable/${id}/mark-paid?paymentDate=${this.formatDateForBackend(dataPagamento)}`);
-      console.log('Conta marcada como paga:', response.data);
+      const response = await api.get('/api/accounts-receivable/categories');
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      throw new Error('Resposta inválida da API');
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+      return [
+        'Serviços de Segurança',
+        'Consultoria',
+        'Manutenção',
+        'Equipamentos',
+        'Treinamento',
+        'Auditoria',
+        'Outros'
+      ];
+    }
+  },
+
+  async getCostCenters(): Promise<string[]> {
+    try {
+      const response = await api.get('/api/accounts-receivable/cost-centers');
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      throw new Error('Resposta inválida da API');
+    } catch (error) {
+      console.error('Erro ao carregar centros de custo:', error);
+      return [
+        'Administrativo',
+        'Operacional',
+        'Comercial',
+        'Financeiro',
+        'Recursos Humanos',
+        'Tecnologia da Informação',
+        'Marketing',
+        'Vendas',
+        'Produção',
+        'Logística'
+      ];
+    }
+  },
+
+  // Marcar conta como recebida
+  async marcarComoRecebida(id: string, dataPagamento: Date): Promise<ContaAReceber> {
+    const response = await api.patch(`/api/accounts-receivable/${id}/mark-as-paid`, {
+      paymentDate: formatDateForBackend(dataPagamento)
+    });
+    return this.getContaAReceberById(response.data.id);
+  },
+
+  // Buscar contas vencidas
+  async getContasVencidas(): Promise<ContaAReceber[]> {
+    const response = await api.get('/api/accounts-receivable/overdue');
+    return (Array.isArray(response.data) ? response.data : []).map((account: any) => this.mapAccountToContaAReceber(account));
+  },
+
+  // Buscar contas vencendo em breve
+  async getContasVencendoEmBreve(dias: number = 7): Promise<ContaAReceber[]> {
+    const response = await api.get(`/api/accounts-receivable/due-soon/${dias}`);
+    return (Array.isArray(response.data) ? response.data : []).map((account: any) => this.mapAccountToContaAReceber(account));
+  },
+
+  // ===== CLIENTES =====
+  
+  // Buscar todos os clientes
+  async getClientes(): Promise<Client[]> {
+    const response = await api.get('/api/clients/all');
+    console.log('🔍 DEBUG: Resposta da API /api/clients/all:', response.data);
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Buscar todas as empresas
+  async getEmpresas(): Promise<any[]> {
+    const response = await api.get('/api/units');
+    console.log('🔍 DEBUG: Resposta da API /api/units:', response.data);
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Criar cliente
+  async createCliente(data: CreateClientRequest): Promise<Client> {
+    const response = await api.post('/api/clients', data);
+    return response.data;
+  },
+
+  // Atualizar cliente
+  async updateCliente(id: string, data: UpdateClientRequest): Promise<Client> {
+    const response = await api.put(`/api/clients/${id}`, data);
+    return response.data;
+  },
+
+  // Excluir cliente
+  async deleteCliente(id: string): Promise<void> {
+    await api.delete(`/api/clients/${id}`);
+  },
+
+  // Alternar status (ativo/inativo)
+  async toggleClienteStatus(id: string): Promise<Client> {
+    const response = await api.patch(`/api/clients/${id}/toggle-status`);
+    return response.data;
+  },
+
+  // Listar clientes ativos
+  async getClientesAtivos(): Promise<Client[]> {
+    const response = await api.get('/api/clients/active');
+    return response.data;
+  },
+
+  // Buscar por CNPJ
+  async getClienteByCnpj(cnpj: string): Promise<Client | null> {
+    try {
+      const response = await api.get(`/api/clients/cnpj/${encodeURIComponent(cnpj)}`);
       return response.data;
-    } catch (error) {
-      console.error('Erro ao marcar como paga:', error);
-      throw error;
-    }
-  }
-
-  // Buscar clientes
-  async getClientes(): Promise<Cliente[]> {
-    try {
-      console.log('Buscando clientes da API...');
-      const response = await api.get('/clients/all');
-      console.log('Clientes recebidos:', response.data);
-      // Garantir que sempre retornamos um array
-      return Array.isArray(response.data) ? response.data : this.getMockClientes();
-    } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
-      return this.getMockClientes();
-    }
-  }
-
-  // Buscar cliente por ID
-  async getClienteById(id: string): Promise<Cliente | null> {
-    try {
-      const response = await api.get(`/api/clients/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar cliente:', error);
+    } catch {
       return null;
     }
-  }
+  },
 
-  // Gerar relatório de inadimplência
-  async generateDefaultReport(): Promise<Blob> {
-    try {
-      const response = await api.get('/receivables/reports/default', {
-        responseType: 'blob'
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-      throw error;
-    }
-  }
+  // Buscar cliente por ID
+  async getClienteById(id: string): Promise<Client> {
+    const response = await api.get(`/api/clients/${id}`);
+    return response.data;
+  },
 
-  // Formatar data para o backend (YYYY-MM-DD)
-  private formatDateForBackend(date: string | Date): string {
-    if (!date) return '';
+  // ===== RELATÓRIOS =====
+  
+  // Gerar relatório de contas a receber
+  async getRelatorioContasAReceber(startDate?: string, endDate?: string): Promise<ContasAReceberReport> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
     
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toISOString().split('T')[0];
-  }
+    const response = await api.get(`/api/accounts-receivable/reports/summary?${params.toString()}`);
+    return response.data;
+  },
 
-  // Formatar data para exibição (DD/MM/YYYY)
-  formatDateForDisplay(date: string | Date): string {
-    if (!date) return '';
-    
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString('pt-BR');
-  }
+  // Obter estatísticas rápidas
+  async getEstatisticas(): Promise<any> {
+    const [contasVencidas, contasVencendoEmBreve, resumo] = await Promise.all([
+      this.getContasVencidas(),
+      this.getContasVencendoEmBreve(),
+      this.getRelatorioContasAReceber()
+    ]);
 
-  // Calcular dias de atraso
-  calculateDaysOverdue(dataVencimento: string | Date): number {
-    const vencimento = typeof dataVencimento === 'string' ? new Date(dataVencimento) : dataVencimento;
-    const hoje = new Date();
-    const diffTime = hoje.getTime() - vencimento.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  }
+    return {
+      contasVencidas: contasVencidas.length,
+      valorVencidas: contasVencidas.reduce((sum, c) => sum + c.valor, 0),
+      contasVencendoEmBreve: contasVencendoEmBreve.length,
+      valorVencendoEmBreve: contasVencendoEmBreve.reduce((sum, c) => sum + c.valor, 0),
+      ...resumo
+    };
+  },
 
-  // Calcular valor pendente
-  calculatePendingValue(valor: number, valorPago: number): number {
-    return Math.max(0, valor - valorPago);
+  // Método auxiliar para mapear account para ContaAReceber
+  mapAccountToContaAReceber(account: any): ContaAReceber {
+    return {
+      id: account.id,
+      numeroFatura: account.invoiceNumber,
+      dataEmissao: parseDateFromBackend(account.issueDate),
+      vencimento: parseDateFromBackend(account.dueDate) || new Date(),
+      cliente: account.clientName || 'Não informado',
+      clienteId: account.clientId,
+      empresa: account.unitName || 'Não informado',
+      empresaId: account.unitId,
+      descricao: account.description,
+      tipo: mapBackendTypeToFrontend(account.type),
+      valor: parseFloat(account.amount),
+      codigoBarras: account.barcode,
+      status: mapBackendStatusToFrontend(account.status),
+      baixa: account.baixa || false,
+      dataPagamento: parseDateFromBackend(account.paymentDate),
+      observacoes: account.notes,
+      categoria: account.category,
+      centroCusto: account.centroCusto,
+      createdAt: parseDateFromBackend(account.createdAt)
+    };
   }
+};
 
-  // Determinar status da conta
-  determineStatus(dataVencimento: string | Date, valorPago: number, valor: number): string {
-    const hoje = new Date();
-    const vencimento = typeof dataVencimento === 'string' ? new Date(dataVencimento) : dataVencimento;
-    
-    if (valorPago >= valor) {
-      return 'pago';
-    } else if (valorPago > 0) {
-      return 'parcial';
-    } else if (vencimento < hoje) {
-      return 'vencido';
-    } else {
-      return 'pendente';
-    }
-  }
-
-  // Buscar números de fatura
-  async searchInvoiceNumbers(term: string): Promise<string[]> {
-    try {
-      console.log('Buscando números de fatura para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/invoice-number?term=${encodeURIComponent(term)}`);
-      console.log('Números de fatura encontrados:', response.data);
-      return response.data || [];
-    } catch (error) {
-      console.error('Erro ao buscar números de fatura:', error);
-      return [];
-    }
-  }
-
-  // Buscar números de medição
-  async searchMeasurementNumbers(term: string): Promise<string[]> {
-    try {
-      console.log('Buscando números de medição para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/measurement-number?term=${encodeURIComponent(term)}`);
-      console.log('Números de medição encontrados:', response.data);
-      return response.data || [];
-    } catch (error) {
-      console.error('Erro ao buscar números de medição:', error);
-      return [];
-    }
-  }
-
-  // Buscar categorias
-  async searchCategories(term: string): Promise<string[]> {
-    try {
-      console.log('Buscando categorias para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/categories?term=${encodeURIComponent(term)}`);
-      console.log('Categorias encontradas:', response.data);
-      return response.data || [];
-    } catch (error) {
-      console.error('Erro ao buscar categorias:', error);
-      return [];
-    }
-  }
-
-  // Buscar formas de pagamento
-  async searchPaymentMethods(term: string): Promise<string[]> {
-    try {
-      console.log('Buscando formas de pagamento para termo:', term);
-      const response = await api.get(`/api/accounts-receivable/search/payment-methods?term=${encodeURIComponent(term)}`);
-      console.log('Formas de pagamento encontradas:', response.data);
-      return response.data || [];
-    } catch (error) {
-      console.error('Erro ao buscar formas de pagamento:', error);
-      return [];
-    }
-  }
-
-  // Método para retornar clientes mockados temporariamente
-  private getMockClientes(): Cliente[] {
-    return [
-      {
-        id: 'CLI-001',
-        name: 'Empresa ABC Ltda',
-        email: 'contato@empresaabc.com',
-        phone: '(11) 1234-5678',
-        mobile: '(11) 98765-4321',
-        cnpj: '12.345.678/0001-90',
-        address: 'Rua das Flores, 123',
-        city: 'São Paulo',
-        state: 'SP',
-        zipCode: '01234-567',
-        contactName: 'João Silva',
-        contactEmail: 'joao@empresaabc.com',
-        contactPhone: '(11) 1234-5678',
-        status: 'ACTIVE',
-        notes: 'Cliente preferencial'
-      },
-      {
-        id: 'CLI-002',
-        name: 'Tech Solutions S.A.',
-        email: 'financeiro@techsolutions.com',
-        phone: '(21) 2345-6789',
-        mobile: '(21) 98765-4321',
-        cnpj: '98.765.432/0001-10',
-        address: 'Av. Tecnologia, 456',
-        city: 'Rio de Janeiro',
-        state: 'RJ',
-        zipCode: '20000-000',
-        contactName: 'Maria Santos',
-        contactEmail: 'maria@techsolutions.com',
-        contactPhone: '(21) 2345-6789',
-        status: 'ACTIVE',
-        notes: 'Cliente corporativo'
-      }
-    ];
-  }
-
-  // Método para retornar dados mockados temporariamente
-  private getMockContasAReceber(): ContaAReceber[] {
-    return [
-      {
-        id: 'CAR-001',
-        client: {
-          id: 'CLI-001',
-          name: 'Empresa ABC Ltda',
-          email: 'contato@empresaabc.com',
-          phone: '(11) 1234-5678',
-          mobile: '(11) 98765-4321',
-          cnpj: '12.345.678/0001-90',
-          address: 'Rua das Flores, 123',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01234-567',
-          contactName: 'João Silva',
-          contactEmail: 'joao@empresaabc.com',
-          contactPhone: '(11) 1234-5678',
-          status: 'ACTIVE',
-          notes: 'Cliente preferencial'
-        },
-        invoiceNumber: 'FAT-2024-001',
-        measurementNumber: 'MED-2024-001',
-        description: 'Serviços de segurança - Janeiro 2024',
-        amount: 15000.00,
-        amountPaid: 0,
-        pendingAmount: 15000.00,
-        issueDate: '2024-01-01',
-        dueDate: '2024-01-31',
-        status: 'PENDING',
-        category: 'SERVICE',
-        paymentMethod: 'BOLETO',
-        overdueDays: 0,
-        lateFee: 0,
-        latePenalty: 0,
-        notes: 'Pagamento em dia'
-      },
-      {
-        id: 'CAR-002',
-        client: {
-          id: 'CLI-002',
-          name: 'Tech Solutions S.A.',
-          email: 'financeiro@techsolutions.com',
-          phone: '(21) 2345-6789',
-          mobile: '(21) 98765-4321',
-          cnpj: '98.765.432/0001-10',
-          address: 'Av. Tecnologia, 456',
-          city: 'Rio de Janeiro',
-          state: 'RJ',
-          zipCode: '20000-000',
-          contactName: 'Maria Santos',
-          contactEmail: 'maria@techsolutions.com',
-          contactPhone: '(21) 2345-6789',
-          status: 'ACTIVE',
-          notes: 'Cliente corporativo'
-        },
-        invoiceNumber: 'FAT-2024-002',
-        measurementNumber: 'MED-2024-002',
-        description: 'Consultoria em segurança digital',
-        amount: 25000.00,
-        amountPaid: 12500.00,
-        pendingAmount: 12500.00,
-        issueDate: '2024-01-15',
-        dueDate: '2024-02-15',
-        status: 'PARTIAL',
-        category: 'SERVICE',
-        paymentMethod: 'PIX',
-        overdueDays: 0,
-        lateFee: 0,
-        latePenalty: 0,
-        notes: 'Pagamento parcial realizado'
-      }
-    ];
+// Função auxiliar para mapear tipo do frontend para backend
+function mapFrontendTypeToBackend(frontendType: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO'): string {
+  switch (frontendType) {
+    case 'FATURA':
+      return 'INVOICE';
+    case 'MEDICAO':
+      return 'MEASUREMENT';
+    case 'SERVICO':
+      return 'SERVICE';
+    case 'PRODUTO':
+      return 'PRODUCT';
+    default:
+      return 'INVOICE';
   }
 }
 
-export const contasAReceberService = new ContasAReceberService();
+// Função auxiliar para mapear tipo do backend para frontend
+function mapBackendTypeToFrontend(backendType: string): 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO' {
+  switch (backendType) {
+    case 'INVOICE':
+      return 'FATURA';
+    case 'MEASUREMENT':
+      return 'MEDICAO';
+    case 'SERVICE':
+      return 'SERVICO';
+    case 'PRODUCT':
+      return 'PRODUTO';
+    default:
+      return 'FATURA';
+  }
+}
+
+// Função auxiliar para mapear status do frontend para backend
+function mapFrontendStatusToBackend(frontendStatus: 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA'): string {
+  switch (frontendStatus) {
+    case 'ABERTA':
+      return 'PENDING';
+    case 'RECEBIDA':
+      return 'PAID';
+    case 'CANCELADA':
+      return 'CANCELLED';
+    case 'VENCIDA':
+      return 'OVERDUE';
+    default:
+      return 'PENDING';
+  }
+}
+
+// Função auxiliar para mapear status do backend para frontend
+function mapBackendStatusToFrontend(backendStatus: string): 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA' {
+  switch (backendStatus) {
+    case 'PENDING':
+    case 'PENDING_ERROR':
+    case 'SOLICITADA':
+      return 'ABERTA';
+    case 'PAID':
+    case 'PAID_PREVIOUSLY':
+      return 'RECEBIDA';
+    case 'CANCELLED':
+      return 'CANCELADA';
+    case 'OVERDUE':
+      return 'VENCIDA';
+    default:
+      return 'ABERTA';
+  }
+}

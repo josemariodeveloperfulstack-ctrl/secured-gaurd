@@ -16,6 +16,7 @@ public class SimpleEmployeeDTO {
     private String document;
     private String email;
     private String phone;
+    private String cnhNumber;
     private String registrationNumber;
     private String positionName;
     private String unitName;

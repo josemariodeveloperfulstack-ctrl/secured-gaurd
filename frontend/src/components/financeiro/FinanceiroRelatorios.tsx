@@ -82,10 +82,13 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
           unitService.getAllUnits(),
           contasAPagarService.getFornecedores()
         ]);
-        setUnits(unitsData);
-        setFornecedores(fornecedoresData);
+        setUnits(Array.isArray(unitsData) ? unitsData : []);
+        setFornecedores(Array.isArray(fornecedoresData) ? fornecedoresData : []);
       } catch (error) {
         console.error('Erro ao carregar dados auxiliares:', error);
+        // Garantir que os estados sejam sempre arrays
+        setUnits([]);
+        setFornecedores([]);
       }
     };
     loadAuxData();
@@ -376,7 +379,7 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {units.map(unit => (
+                  {(units || []).map(unit => (
                     <SelectItem key={unit.id} value={unit.id}>{unit.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -392,7 +395,7 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {fornecedores.map(fornecedor => (
+                  {(fornecedores || []).map(fornecedor => (
                     <SelectItem key={fornecedor.id} value={fornecedor.id}>{fornecedor.name}</SelectItem>
                   ))}
                 </SelectContent>

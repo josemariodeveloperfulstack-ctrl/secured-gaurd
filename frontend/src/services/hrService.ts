@@ -260,7 +260,7 @@ class HRService {
       if (filters?.position) params.append('position', filters.position);
       if (filters?.function) params.append('function', filters.function);
 
-      const url = `/hr/employees${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/api/hr/employees${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get(url);
       
       return response.data.map((emp: EmployeeAPI) => this.mapEmployeeFromAPI(emp));
@@ -273,7 +273,7 @@ class HRService {
   // Buscar funcionário por ID
   async getEmployee(id: number): Promise<Employee | null> {
     try {
-      const response = await api.get(`/hr/employees/${id}`);
+      const response = await api.get(`/api/hr/employees/${id}`);
       return this.mapEmployeeFromAPI(response.data);
     } catch (error) {
       console.error('Erro ao buscar funcionário:', error);
@@ -284,7 +284,7 @@ class HRService {
   // Criar novo funcionário
   async createEmployee(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee> {
     try {
-      const response = await api.post('/hr/employees', employee);
+      const response = await api.post('/api/hr/employees', employee);
       return this.mapEmployeeFromAPI(response.data);
     } catch (error) {
       console.error('Erro ao criar funcionário:', error);
@@ -295,7 +295,7 @@ class HRService {
   // Atualizar funcionário
   async updateEmployee(id: number, employee: Partial<Employee>): Promise<Employee> {
     try {
-      const response = await api.put(`/hr/employees/${id}`, employee);
+      const response = await api.put(`/api/hr/employees/${id}`, employee);
       return this.mapEmployeeFromAPI(response.data);
     } catch (error) {
       console.error('Erro ao atualizar funcionário:', error);
@@ -365,7 +365,7 @@ class HRService {
   // Criar vaga
   async createJobVacancy(vacancy: Omit<JobVacancy, 'id' | 'createdAt' | 'updatedAt'>): Promise<JobVacancy> {
     try {
-      const response = await api.post('/hr/vacancies', vacancy);
+      const response = await api.post('/api/hr/vacancies', vacancy);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar vaga:', error);
@@ -398,7 +398,7 @@ class HRService {
   async getPublicJobVacancies(): Promise<JobVacancy[]> {
     try {
       console.log('🔍 Fazendo requisição GET para /api/public/vacancies');
-      const response = await api.get('/public/vacancies');
+      const response = await api.get('/api/public/vacancies');
       console.log('✅ Resposta recebida:', response.data);
       console.log('📊 Tipo da resposta:', typeof response.data);
       console.log('📊 É array?', Array.isArray(response.data));
@@ -491,7 +491,7 @@ class HRService {
   // Criar remanejamento
   async createTransfer(transfer: Omit<Transfer, 'id' | 'createdAt' | 'updatedAt'>): Promise<Transfer> {
     try {
-      const response = await api.post('/hr/transfers', transfer);
+      const response = await api.post('/api/hr/transfers', transfer);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar remanejamento:', error);
@@ -545,7 +545,7 @@ class HRService {
   // Criar ocorrência
   async createOccurrence(occurrence: Omit<Occurrence, 'id' | 'createdAt' | 'updatedAt'>): Promise<Occurrence> {
     try {
-      const response = await api.post('/hr/occurrences', occurrence);
+      const response = await api.post('/api/hr/occurrences', occurrence);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar ocorrência:', error);
@@ -596,7 +596,7 @@ class HRService {
   // Criar férias
   async createVacation(vacation: Omit<Vacation, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vacation> {
     try {
-      const response = await api.post('/hr/vacations', vacation);
+      const response = await api.post('/api/hr/vacations', vacation);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar férias:', error);
@@ -843,7 +843,7 @@ class HRService {
     byPosition: Record<string, number>;
   }> {
     try {
-      const response = await api.get('/hr/stats');
+      const response = await api.get('/api/hr/stats');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas de RH:', error);
@@ -909,8 +909,8 @@ class HRService {
           position: 'Vigilante',
           function: 'Segurança Patrimonial',
           unit: 'Unidade Centro',
-          admissionDate: '2024-01-15',
-          probationEndDate: '2024-03-01',
+          admissionDate: '2025-01-15',
+          probationEndDate: '2025-03-01',
           contractType: 'EXPERIENCE',
           salary: 1800.00,
           status: 'ACTIVE'
@@ -943,15 +943,95 @@ class HRService {
         position: 'Vigilante',
         function: 'Segurança Patrimonial',
         location: 'São Paulo, SP',
-        requirements: ['Ensino Médio Completo', 'Experiência mínima de 1 ano'],
+        requirements: ['Ensino Médio Completo', 'Experiência mínima de 1 ano', 'Disponibilidade para trabalhar em horários alternados'],
         workSchedule: '12x36',
         salary: 1800.00,
-        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica'],
-        deadline: '2024-02-15',
+        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica', 'Vale Alimentação'],
+        deadline: '2025-02-15',
         status: 'OPEN',
         applications: 5,
         createdAt: '2024-01-20T14:30:00Z',
         updatedAt: '2024-01-20T14:30:00Z'
+      },
+      {
+        id: '2',
+        title: 'Porteiro',
+        position: 'Porteiro',
+        function: 'Portaria e Recepção',
+        location: 'Belo Horizonte, MG',
+        requirements: ['Ensino Médio Completo', 'Boa comunicação', 'Experiência com atendimento ao público'],
+        workSchedule: '6x1',
+        salary: 1600.00,
+        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica'],
+        deadline: '2025-02-20',
+        status: 'OPEN',
+        applications: 3,
+        createdAt: '2024-01-22T10:00:00Z',
+        updatedAt: '2024-01-22T10:00:00Z'
+      },
+      {
+        id: '3',
+        title: 'Supervisor de Segurança',
+        position: 'Supervisor',
+        function: 'Supervisão Operacional',
+        location: 'Rio de Janeiro, RJ',
+        requirements: ['Ensino Superior em Segurança ou áreas afins', 'Experiência mínima de 3 anos', 'CNH categoria B'],
+        workSchedule: 'Administrativo',
+        salary: 3500.00,
+        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica', 'Vale Alimentação', 'Plano Odontológico'],
+        deadline: '2025-02-25',
+        status: 'OPEN',
+        applications: 8,
+        createdAt: '2024-01-25T09:30:00Z',
+        updatedAt: '2024-01-25T09:30:00Z'
+      },
+      {
+        id: '4',
+        title: 'Controlador de Acesso',
+        position: 'Controlador',
+        function: 'Controle de Acesso',
+        location: 'Brasília, DF',
+        requirements: ['Ensino Médio Completo', 'Conhecimento em sistemas de controle', 'Experiência com tecnologia'],
+        workSchedule: '8x40',
+        salary: 2000.00,
+        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica', 'Participação nos Lucros'],
+        deadline: '2025-03-01',
+        status: 'OPEN',
+        applications: 2,
+        createdAt: '2024-01-28T14:15:00Z',
+        updatedAt: '2024-01-28T14:15:00Z'
+      },
+      {
+        id: '5',
+        title: 'Vigia Noturno',
+        position: 'Vigia',
+        function: 'Vigilância Noturna',
+        location: 'Salvador, BA',
+        requirements: ['Ensino Médio Completo', 'Disponibilidade para trabalho noturno', 'Experiência em segurança'],
+        workSchedule: '12x36',
+        salary: 1900.00,
+        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica', 'Adicional Noturno'],
+        deadline: '2025-03-05',
+        status: 'OPEN',
+        applications: 4,
+        createdAt: '2024-01-30T11:45:00Z',
+        updatedAt: '2024-01-30T11:45:00Z'
+      },
+      {
+        id: '6',
+        title: 'Auxiliar de Facilities',
+        position: 'Auxiliar',
+        function: 'Facilities e Manutenção',
+        location: 'Fortaleza, CE',
+        requirements: ['Ensino Fundamental Completo', 'Experiência em limpeza e manutenção', 'Disponibilidade para horários flexíveis'],
+        workSchedule: '6x1',
+        salary: 1400.00,
+        benefits: ['Vale Transporte', 'Vale Refeição', 'Assistência Médica'],
+        deadline: '2025-03-10',
+        status: 'OPEN',
+        applications: 6,
+        createdAt: '2024-02-01T08:20:00Z',
+        updatedAt: '2024-02-01T08:20:00Z'
       }
     ];
   }
@@ -969,7 +1049,7 @@ class HRService {
         fromFunction: 'Segurança Patrimonial',
         toFunction: 'Segurança Patrimonial',
         reason: 'Necessidade operacional',
-        transferDate: '2024-01-25',
+        transferDate: '2025-01-25',
         approvedBy: 'admin@empresa.com',
         status: 'APPROVED',
         notes: 'Transferência aprovada pelo gerente',
@@ -987,7 +1067,7 @@ class HRService {
         employeeName: 'João Silva Santos',
         type: 'MEDICAL_CERTIFICATE',
         description: 'Atestado médico por gripe',
-        date: '2024-01-22',
+        date: '2025-01-22',
         duration: 3,
         documentUrl: '/documents/atestado_joao.pdf',
         status: 'APPROVED',
@@ -1007,10 +1087,10 @@ class HRService {
         employeeId: 1,
         employeeName: 'João Silva Santos',
         type: 'REGULAR',
-        acquisitionPeriod: '2024',
-        concessionPeriod: '2024',
-        startDate: '2024-02-01',
-        endDate: '2024-02-30',
+        acquisitionPeriod: '2025',
+        concessionPeriod: '2025',
+        startDate: '2025-02-01',
+        endDate: '2025-02-28',
         days: 30,
         status: 'PLANNED',
         notes: 'Férias programadas',

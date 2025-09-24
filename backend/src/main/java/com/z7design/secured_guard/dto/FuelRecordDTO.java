@@ -71,9 +71,12 @@ public class FuelRecordDTO {
                 try {
                     dto.setDriver(DriverDTO.fromEntity(fuelRecord.getDriver()));
                 } catch (Exception driverException) {
-                    System.err.println("Erro ao converter motorista: " + driverException.getMessage());
+                    System.err.println("Erro ao converter motorista para FuelRecord " + fuelRecord.getId() + ": " + driverException.getMessage());
                     // Continuar sem o motorista se houver erro
+                    dto.setDriver(null);
                 }
+            } else {
+                dto.setDriver(null);
             }
             
             dto.setNotes(fuelRecord.getNotes());

@@ -7,9 +7,11 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: secured-guard-db-prod
+    env_file:
+      - ../.env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-secured_guard}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-secured_guard_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-postgressg}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
@@ -19,7 +21,7 @@ services:
     networks:
       - secured-guard-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgressg}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,15 +33,17 @@ services:
   redis:
     image: redis:7-alpine
     container_name: secured-guard-redis-prod
+    env_file:
+      - ../.env
     ports:
       - "6379:6379"
     volumes:
       - redis_data_prod:/data
     networks:
       - secured-guard-network
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-secured_guard_redis_2024}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-secured_guard_redis_2024}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -53,10 +57,12 @@ services:
       context: ../backend
       dockerfile: Dockerfile.prod
     container_name: secured-guard-backend-prod
+    env_file:
+      - ../.env
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-secured_guard}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-secured_guard_prod}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgressg}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379

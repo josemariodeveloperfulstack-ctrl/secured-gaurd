@@ -34,15 +34,20 @@ info() {
     echo -e "${BLUE}[INFO] $1${NC}"
 }
 
-# Verificar se é root
+# Verificar se é root (permitir execução como root na VPS)
 if [[ $EUID -eq 0 ]]; then
-   error "Este script não deve ser executado como root. Use um usuário com sudo."
+   warning "⚠️ Executando instalação como root; prosseguindo."
 fi
 
 # ========================================
 # 1. ATUALIZAR SISTEMA
 # ========================================
 log "Atualizando sistema..."
+
+# Configurar ambiente não-interativo
+export DEBIAN_FRONTEND=noninteractive
+export UCF_FORCE_CONFFNEW=1
+
 sudo apt update && sudo apt upgrade -y
 
 # ========================================
@@ -69,24 +74,34 @@ sudo apt install -y \
 # ========================================
 log "Instalando Docker..."
 
-# Remover versões antigas
+# Remover versões antigas e chaves existentes
 sudo apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+sudo rm -f /usr/share/keyrings/docker-archive-keyring.gpg
 
-# Adicionar repositório oficial do Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# Adicionar repositório oficial do Docker (não-interativo)
+if ! curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
+    error "Falha ao baixar chave GPG do Docker"
+fi
+
+# Verificar se a chave foi criada
+if [ ! -f /usr/share/keyrings/docker-archive-keyring.gpg ]; then
+    error "Chave GPG do Docker não foi criada"
+fi
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Instalar Docker
 sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Adicionar usuário ao grupo docker
-sudo usermod -aG docker $USER
+# Adicionar usuário atual ao grupo docker (se não for root)
+if [[ $EUID -ne 0 ]]; then
+    sudo usermod -aG docker $USER
+fi
 
-# Habilitar Docker no boot
-sudo systemctl enable docker
+# Iniciar e habilitar Docker
 sudo systemctl start docker
+sudo systemctl enable docker
 
 log "Docker instalado com sucesso!"
 
@@ -208,6 +223,9 @@ set -e
 PROJECT_DIR="/opt/secured-guard"
 ENV_FILE="$PROJECT_DIR/.env"
 
+# Configurar Git para evitar problemas de propriedade
+git config --global --add safe.directory /opt/secured-guard
+
 # Cores
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -222,32 +240,38 @@ error() {
     exit 1
 }
 
+# Verificar se estamos no diretório correto
+cd $PROJECT_DIR
+
+# Pular atualização Git (código já foi copiado via rsync)
+log "1. Código já atualizado via rsync, pulando git pull..."
+
 # Verificar se arquivo .env existe
 if [ ! -f "$ENV_FILE" ]; then
     error "Arquivo .env não encontrado! Copie o env.example e configure as variáveis."
 fi
 
 # Parar containers existentes
-log "Parando containers existentes..."
+log "2. Parando containers existentes..."
 docker compose -f $PROJECT_DIR/deploy/docker-compose.prod.yml down 2>/dev/null || true
 
 # Fazer backup do banco (se existir)
 if docker ps -q -f name=secured-guard-db-prod | grep -q .; then
-    log "Fazendo backup do banco de dados..."
+    log "3. Fazendo backup do banco de dados..."
     docker exec secured-guard-db-prod pg_dump -U postgres secured_guard > $PROJECT_DIR/backups/backup_$(date +%Y%m%d_%H%M%S).sql
 fi
 
 # Build e subir containers
-log "Fazendo build e subindo containers..."
+log "4. Fazendo build e subindo containers..."
 cd $PROJECT_DIR
 docker compose -f deploy/docker-compose.prod.yml up -d --build
 
 # Aguardar serviços ficarem prontos
-log "Aguardando serviços ficarem prontos..."
+log "5. Aguardando serviços ficarem prontos..."
 sleep 30
 
 # Verificar status
-log "Verificando status dos serviços..."
+log "6. Verificando status dos serviços..."
 docker compose -f deploy/docker-compose.prod.yml ps
 
 log "Deploy concluído com sucesso!"
@@ -332,7 +356,7 @@ sudo tee /opt/secured-guard/.env > /dev/null <<EOF
 
 # Database
 POSTGRES_DB=secured_guard
-POSTGRES_USER=postgres
+POSTGRES_USER=postgressg
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
 
 # Redis

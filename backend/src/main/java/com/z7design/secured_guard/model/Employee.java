@@ -103,6 +103,9 @@ public class Employee {
     @Column
     private String email;
     
+    @Column(name = "cnh_number", length = 20, unique = true)
+    private String cnhNumber;
+    
     // Dados Pessoais
     // @NotBlank(message = "O estado civil é obrigatório")
     // @Column(name = "marital_status")

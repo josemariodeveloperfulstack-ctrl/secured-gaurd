@@ -78,18 +78,22 @@ public class Unit {
     
     @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"parent", "children", "employees", "payrolls", "locations", "client"})
+    @Builder.Default
     private List<Unit> children = new ArrayList<>();
     
     @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"unit", "user", "position"})
+    @Builder.Default
     private List<Employee> employees = new ArrayList<>();
     
     @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"position", "unit", "documents", "benefits", "scaleHistory", "occurrences", "payrolls", "epis", "employee"})
+    @Builder.Default
     private List<Payroll> payrolls = new ArrayList<>();
     
     @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"unit"})
+    @Builder.Default
     private List<Location> locations = new ArrayList<>();
     
     @ManyToOne(fetch = FetchType.LAZY)
@@ -111,6 +115,7 @@ public class Unit {
     private String manager;
     
     @Column(nullable = false)
+    @Builder.Default
     private boolean active = true;
     
     @PrePersist

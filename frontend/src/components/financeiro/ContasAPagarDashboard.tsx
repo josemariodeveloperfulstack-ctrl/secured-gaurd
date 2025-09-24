@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { ContaAPagar } from './ContasAPagarFormModal';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import { TrendingUp, TrendingDown, AlertTriangle, DollarSign } from 'lucide-react';
 
 interface DashboardProps {

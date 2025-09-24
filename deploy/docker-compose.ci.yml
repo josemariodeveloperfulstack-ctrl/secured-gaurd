@@ -2,6 +2,74 @@ version: '3.8'
 
 services:
   # ========================================
+  # DATABASE (CI)
+  # ========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: secured-guard-db-ci
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_CI:-secured_guard_ci}
+      POSTGRES_USER: ${POSTGRES_USER_CI:-postgressg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CI:-ci_password_change_me}
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres_data_ci:/var/lib/postgresql/data
+      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+    networks:
+      - secured-guard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_CI:-postgressg}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ========================================
+  # BACKEND API (CI)
+  # ========================================
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    container_name: secured-guard-backend-ci
+    env_file:
+      - ../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB_CI:-secured_guard_ci}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER_CI:-postgressg}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_CI:-ci_password_change_me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - secured-guard-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+# ========================================
+# VOLUMES
+# ========================================
+volumes:
+  postgres_data_ci:
+
+# ========================================
+# NETWORKS
+# ========================================
+networks:
+  secured-guard-network:
+    driver: bridge
+version: '3.8'
+
+services:
+  # ========================================
   # DATABASE (CI/Test)
   # ========================================
   postgres:

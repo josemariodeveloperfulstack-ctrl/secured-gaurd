@@ -23,6 +23,9 @@ import {
   Route,
   Camera,
   Briefcase,
+  Stethoscope,
+  HardHat,
+  AlertTriangle,
   Phone,
   Clock,
   UserCog,
@@ -281,6 +284,64 @@ export function DynamicSidebar() {
       id: 'holerites',
       requiredPermission: 'PAYSLIPS_READ'
     },
+
+    // ===== MÓDULO SST - SAÚDE E SEGURANÇA DO TRABALHO =====
+    {
+      icon: Shield,
+      text: 'Controle SST',
+      to: '/rh/sst',
+      id: 'rh-sst',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: Stethoscope,
+      text: 'Exames Médicos',
+      to: '/rh/sst/exames',
+      id: 'rh-sst-exames',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: HardHat,
+      text: 'EPIs',
+      to: '/rh/sst/epis',
+      id: 'rh-sst-epis',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: AlertTriangle,
+      text: 'Acidentes',
+      to: '/rh/sst/acidentes',
+      id: 'rh-sst-acidentes',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: GraduationCap,
+      text: 'Treinamentos SST',
+      to: '/rh/sst/treinamentos',
+      id: 'rh-sst-treinamentos',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: FileCheck,
+      text: 'Inspeções',
+      to: '/rh/sst/inspecoes',
+      id: 'rh-sst-inspecoes',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: Users,
+      text: 'CIPA',
+      to: '/rh/sst/cipa',
+      id: 'rh-sst-cipa',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: BarChart3,
+      text: 'Relatórios SST',
+      to: '/rh/sst/relatorios',
+      id: 'rh-sst-relatorios',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
     {
       icon: Truck,
       text: 'Frota',
@@ -486,6 +547,9 @@ export function DynamicSidebar() {
       ),
       rh: filteredItems.filter(item =>
         ['rh', 'rh-funcionarios', 'rh-vagas', 'rh-remanejamentos', 'rh-ferias', 'rh-ocorrencias', 'rh-beneficios', 'rh-funcoes', 'rh-cargos', 'postos', 'rh-epis', 'rh-ordens-servico', 'rh-admissao-demissao', 'rh-admissao-funcionarios', 'rh-lgpd', 'rh-relatorios', 'rh-gestao-documentos', 'envio-holerites'].includes(item.id)
+      ),
+      sst: filteredItems.filter(item =>
+        ['rh-sst', 'rh-sst-exames', 'rh-sst-epis', 'rh-sst-acidentes', 'rh-sst-treinamentos', 'rh-sst-inspecoes', 'rh-sst-cipa', 'rh-sst-relatorios'].includes(item.id)
       ),
       financeiro: filteredItems.filter(item =>
         ['modulo-financeiro', 'gestao-financeira-dashboard', 'gestao-financeira-contas-pagar', 'gestao-financeira-contas-receber', 'gestao-financeira-fluxo-caixa', 'gestao-financeira-movimentacoes', 'gestao-financeira-conciliacao', 'gestao-financeira-relatorios', 'gestao-financeira-orcamento', 'gestao-financeira-centros-custo'].includes(item.id)
@@ -849,6 +913,40 @@ export function DynamicSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
                 {menuGroups.rh.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={getActiveId() === item.id}
+                      className={`
+                        flex items-center p-3 rounded-lg transition-colors
+                        ${getActiveId() === item.id
+                          ? 'bg-seguranca-black text-seguranca-yellow'
+                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                        }
+                      `}
+                    >
+                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
+                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
+                        <span className="ml-3 truncate">{item.text}</span>
+                      </ScrollPreservingLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Módulo SST */}
+        {menuGroups.sst && menuGroups.sst.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
+              <Shield size={16} className="mr-2 text-seguranca-yellow" />
+              Saúde e Segurança (SST)
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {menuGroups.sst.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       asChild

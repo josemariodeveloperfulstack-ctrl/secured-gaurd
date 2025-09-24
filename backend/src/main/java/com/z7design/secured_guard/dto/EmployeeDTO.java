@@ -1,7 +1,6 @@
 package com.z7design.secured_guard.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.core.JsonParser;
@@ -17,7 +16,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -36,6 +34,7 @@ public class EmployeeDTO {
     // private String currentScale;
     private String email;
     private String phone;
+    private String cnhNumber;
     @JsonDeserialize(using = AddressDeserializer.class)
     private AddressDTO address;
     private BankInfoDTO bankInfo;

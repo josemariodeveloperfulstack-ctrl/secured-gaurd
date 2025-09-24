@@ -21,7 +21,7 @@ class KmControlService {
   async getKmControls(): Promise<KmControl[]> {
     try {
       console.log('🔍 KmControlService: Buscando registros de controle de KM...');
-      const response = await axios.get('/frota/km-controls');
+      const response = await axios.get('/api/frota/km-controls');
       console.log('✅ KmControlService: Resposta recebida:', response.data);
       console.log('📊 KmControlService: Total de registros:', response.data?.length || 0);
       
@@ -123,7 +123,7 @@ class KmControlService {
    */
   async createKmControl(kmControl: Omit<KmControl, 'id' | 'createdAt' | 'updatedAt'>): Promise<KmControl> {
     try {
-      const response = await axios.post('/frota/km-controls', kmControl, {
+      const response = await axios.post('/api/frota/km-controls', kmControl, {
         headers: { 'Content-Type': 'application/json' }
       });
       return response.data;
@@ -198,7 +198,7 @@ class KmControlService {
    */
   async getKmControlsWithObservations(): Promise<KmControl[]> {
     try {
-      const response = await axios.get('/frota/km-controls/with-observations');
+      const response = await axios.get('/api/frota/km-controls/with-observations');
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar registros com observações:', error);
@@ -211,7 +211,7 @@ class KmControlService {
    */
   async getSupervisors(): Promise<string[]> {
     try {
-      const response = await axios.get('/frota/km-controls/supervisors');
+      const response = await axios.get('/api/frota/km-controls/supervisors');
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar supervisores:', error);
@@ -224,7 +224,7 @@ class KmControlService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await axios.get('/frota/km-controls/test');
+      const response = await axios.get('/api/frota/km-controls/test');
       console.log('✅ Teste de conexão KmControl:', response.data);
       return true;
     } catch (error) {
@@ -239,7 +239,7 @@ class KmControlService {
   async createTestData(): Promise<KmControl[]> {
     try {
       console.log('🔧 KmControlService: Criando dados de teste...');
-      const response = await axios.post('/frota/km-controls/create-test-data');
+      const response = await axios.post('/api/frota/km-controls/create-test-data');
       console.log('✅ KmControlService: Dados de teste criados:', response.data);
       return response.data.data || response.data;
     } catch (error) {

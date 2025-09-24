@@ -134,16 +134,16 @@ const WhatsAppChatbot: React.FC = () => {
     switch (step) {
       case 1:
         return (
-          <div className="space-y-4">
-            <div className="text-center mb-4">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                <User className="h-8 w-8 text-green-600" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="text-center mb-3 sm:mb-4">
+              <div className="bg-green-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                <User className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Olá! 👋</h3>
-              <p className="text-gray-300">Para começarmos, qual é o seu nome?</p>
+              <h3 className="text-base sm:text-lg font-semibold text-white">Olá! 👋</h3>
+              <p className="text-sm sm:text-base text-gray-300">Para começarmos, qual é o seu nome?</p>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="name" className="text-gray-300">Nome Completo</Label>
+                <Label htmlFor="name" className="text-sm sm:text-base text-gray-300">Nome Completo</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -151,9 +151,10 @@ const WhatsAppChatbot: React.FC = () => {
                 placeholder="Digite seu nome"
                 onKeyPress={(e) => e.key === 'Enter' && handleNextStep()}
                 autoFocus
+                className="text-sm sm:text-base"
               />
             </div>
-            <Button onClick={handleNextStep} className="w-full bg-green-600 hover:bg-green-700">
+            <Button onClick={handleNextStep} className="w-full bg-green-600 hover:bg-green-700 text-sm sm:text-base">
               Continuar
             </Button>
           </div>
@@ -161,16 +162,16 @@ const WhatsAppChatbot: React.FC = () => {
 
       case 2:
         return (
-          <div className="space-y-4">
-            <div className="text-center mb-4">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                <Mail className="h-8 w-8 text-green-600" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="text-center mb-3 sm:mb-4">
+              <div className="bg-green-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Ótimo, {formData.name}! 📧</h3>
-              <p className="text-gray-300">Agora preciso do seu email para contato:</p>
+              <h3 className="text-base sm:text-lg font-semibold text-white">Ótimo, {formData.name}! 📧</h3>
+              <p className="text-sm sm:text-base text-gray-300">Agora preciso do seu email para contato:</p>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-300">Email</Label>
+                <Label htmlFor="email" className="text-sm sm:text-base text-gray-300">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -179,17 +180,18 @@ const WhatsAppChatbot: React.FC = () => {
                 placeholder="seu@email.com"
                 onKeyPress={(e) => e.key === 'Enter' && handleNextStep()}
                 autoFocus
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
                 onClick={() => setStep(1)}
-                className="flex-1"
+                className="flex-1 text-sm sm:text-base"
               >
                 Voltar
               </Button>
-              <Button onClick={handleNextStep} className="flex-1 bg-green-600 hover:bg-green-700">
+              <Button onClick={handleNextStep} className="flex-1 bg-green-600 hover:bg-green-700 text-sm sm:text-base">
                 Continuar
               </Button>
             </div>
@@ -198,16 +200,16 @@ const WhatsAppChatbot: React.FC = () => {
 
       case 3:
         return (
-          <div className="space-y-4">
-            <div className="text-center mb-4">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                <Phone className="h-8 w-8 text-green-600" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="text-center mb-3 sm:mb-4">
+              <div className="bg-green-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                <Phone className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Perfeito! 📞</h3>
-              <p className="text-gray-300">Por último, seu telefone para contato:</p>
+              <h3 className="text-base sm:text-lg font-semibold text-white">Perfeito! 📞</h3>
+              <p className="text-sm sm:text-base text-gray-300">Por último, seu telefone para contato:</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-gray-300">Telefone</Label>
+              <Label htmlFor="phone" className="text-sm sm:text-base text-gray-300">Telefone</Label>
               <Input
                 id="phone"
                 value={formData.phone}
@@ -215,17 +217,18 @@ const WhatsAppChatbot: React.FC = () => {
                 placeholder="(00) 00000-0000"
                 onKeyPress={(e) => e.key === 'Enter' && handleNextStep()}
                 autoFocus
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
                 onClick={() => setStep(2)}
-                className="flex-1"
+                className="flex-1 text-sm sm:text-base"
               >
                 Voltar
               </Button>
-              <Button onClick={handleNextStep} className="flex-1 bg-green-600 hover:bg-green-700">
+              <Button onClick={handleNextStep} className="flex-1 bg-green-600 hover:bg-green-700 text-sm sm:text-base">
                 Continuar
               </Button>
             </div>
@@ -234,38 +237,38 @@ const WhatsAppChatbot: React.FC = () => {
 
       case 4:
         return (
-          <div className="space-y-4">
-            <div className="text-center mb-4">
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <div className="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center">
-                  <MessageSquare className="h-6 w-6 text-blue-600" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="text-center mb-3 sm:mb-4">
+              <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="bg-blue-100 rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center">
+                  <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                 </div>
               </div>
-              <h3 className="text-lg font-semibold text-white">Escolha como prefere conversar 💬</h3>
-              <p className="text-gray-300">Selecione a opção que for mais conveniente para você:</p>
+              <h3 className="text-base sm:text-lg font-semibold text-white">Escolha como prefere conversar 💬</h3>
+              <p className="text-sm sm:text-base text-gray-300">Selecione a opção que for mais conveniente para você:</p>
             </div>
             
             {/* Resumo dos dados */}
-            <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-300">
+            <div className="bg-gray-800 rounded-lg p-3 text-xs sm:text-sm text-gray-300">
               <p><strong className="text-white">Nome:</strong> {formData.name}</p>
               <p><strong className="text-white">Email:</strong> {formData.email}</p>
               <p><strong className="text-white">Telefone:</strong> {formData.phone}</p>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <Button 
                 onClick={() => {
                   setChatMode('whatsapp');
                   setStep(5);
                 }}
-                className="w-full bg-green-600 hover:bg-green-700 text-white p-4 h-auto"
+                className="w-full bg-green-600 hover:bg-green-700 text-white p-3 sm:p-4 h-auto"
                 variant="default"
               >
-                <div className="flex items-center justify-center space-x-3">
-                  <MessageCircle className="h-6 w-6" />
-                  <div className="text-left">
-                    <div className="font-semibold">Continuar no WhatsApp</div>
-                    <div className="text-sm opacity-90">Resposta mais rápida e direta</div>
+                <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+                  <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                  <div className="text-left min-w-0 flex-1">
+                    <div className="font-semibold text-sm sm:text-base">Continuar no WhatsApp</div>
+                    <div className="text-xs sm:text-sm opacity-90">Resposta mais rápida e direta</div>
                   </div>
                 </div>
               </Button>
@@ -275,14 +278,14 @@ const WhatsAppChatbot: React.FC = () => {
                   setChatMode('website');
                   setStep(5);
                 }}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white p-4 h-auto"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 sm:p-4 h-auto"
                 variant="default"
               >
-                <div className="flex items-center justify-center space-x-3">
-                  <Globe className="h-6 w-6" />
-                  <div className="text-left">
-                    <div className="font-semibold">Conversar aqui no site</div>
-                    <div className="text-sm opacity-90">Chat integrado e prático</div>
+                <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+                  <Globe className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                  <div className="text-left min-w-0 flex-1">
+                    <div className="font-semibold text-sm sm:text-base">Conversar aqui no site</div>
+                    <div className="text-xs sm:text-sm opacity-90">Chat integrado e prático</div>
                   </div>
                 </div>
               </Button>
@@ -291,7 +294,7 @@ const WhatsAppChatbot: React.FC = () => {
             <Button 
               variant="outline" 
               onClick={() => setStep(3)}
-              className="w-full"
+              className="w-full text-sm sm:text-base"
             >
               Voltar
             </Button>
@@ -301,46 +304,48 @@ const WhatsAppChatbot: React.FC = () => {
       case 5:
         if (chatMode === 'whatsapp') {
           return (
-            <div className="space-y-4">
-              <div className="text-center mb-4">
-                <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                  <MessageCircle className="h-8 w-8 text-green-600" />
+            <div className="space-y-3 sm:space-y-4">
+              <div className="text-center mb-3 sm:mb-4">
+                <div className="bg-green-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                  <MessageCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Mensagem para WhatsApp 📱</h3>
-                <p className="text-gray-300">Digite sua mensagem que será enviada via WhatsApp:</p>
+                <h3 className="text-base sm:text-lg font-semibold text-white">Mensagem para WhatsApp 📱</h3>
+                <p className="text-sm sm:text-base text-gray-300">Digite sua mensagem que será enviada via WhatsApp:</p>
               </div>
               
               <div className="space-y-2">
-                 <Label htmlFor="message" className="text-gray-300">Sua mensagem</Label>
+                 <Label htmlFor="message" className="text-sm sm:text-base text-gray-300">Sua mensagem</Label>
                 <Textarea
                   id="message"
                   value={formData.message}
                   onChange={(e) => handleInputChange('message', e.target.value)}
                   placeholder="Digite sua mensagem ou dúvida..."
-                  rows={4}
+                  rows={3}
                   autoFocus
+                  className="text-sm sm:text-base"
                 />
               </div>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   onClick={() => setStep(4)}
-                  className="flex-1"
+                  className="flex-1 text-sm sm:text-base"
                   disabled={isSubmitting}
                 >
                   Voltar
                 </Button>
                 <Button 
                   onClick={handleSubmitWhatsApp} 
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-sm sm:text-base"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     'Enviando...'
                   ) : (
                     <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Enviar via WhatsApp
+                      <Send className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Enviar via WhatsApp</span>
+                      <span className="sm:hidden">Enviar</span>
                     </>
                   )}
                 </Button>
@@ -349,25 +354,25 @@ const WhatsAppChatbot: React.FC = () => {
           );
         } else {
           return (
-            <div className="space-y-4">
-              <div className="text-center mb-4">
-                <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                  <Globe className="h-8 w-8 text-blue-600" />
+            <div className="space-y-3 sm:space-y-4">
+              <div className="text-center mb-3 sm:mb-4">
+                <div className="bg-blue-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                  <Globe className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Chat do Site 💻</h3>
-                <p className="text-gray-300">Converse conosco aqui mesmo!</p>
+                <h3 className="text-base sm:text-lg font-semibold text-white">Chat do Site 💻</h3>
+                <p className="text-sm sm:text-base text-gray-300">Converse conosco aqui mesmo!</p>
               </div>
               
               {/* Chat Messages */}
-              <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 h-64 overflow-y-auto space-y-3">
+              <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 sm:p-4 h-48 sm:h-64 overflow-y-auto space-y-2 sm:space-y-3">
                 {chatMessages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                    <div className={`max-w-[80%] sm:max-w-xs px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm ${
                       msg.sender === 'user' 
                         ? 'bg-blue-500 text-white' 
                         : 'bg-gray-700 text-gray-200'
                     }`}>
-                      <p className="text-sm">{msg.text}</p>
+                      <p className="text-xs sm:text-sm break-words">{msg.text}</p>
                       <p className="text-xs opacity-70 mt-1">
                         {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </p>
@@ -383,21 +388,21 @@ const WhatsAppChatbot: React.FC = () => {
                   onChange={(e) => setCurrentMessage(e.target.value)}
                   placeholder="Digite sua mensagem..."
                   onKeyPress={(e) => e.key === 'Enter' && handleSendWebsiteMessage()}
-                  className="flex-1"
+                  className="flex-1 text-sm sm:text-base"
                 />
                 <Button 
                   onClick={handleSendWebsiteMessage}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 px-3 sm:px-4"
                   disabled={!currentMessage.trim()}
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
               
               <Button 
                 variant="outline" 
                 onClick={() => setStep(4)}
-                className="w-full"
+                className="w-full text-sm sm:text-base"
               >
                 Voltar às opções
               </Button>
@@ -412,53 +417,67 @@ const WhatsAppChatbot: React.FC = () => {
 
   return (
     <>
+      {/* Estilos para prevenir scroll horizontal */}
+      <style jsx>{`
+        @media (max-width: 640px) {
+          body {
+            overflow-x: hidden !important;
+          }
+          .chatbot-modal {
+            max-width: calc(100vw - 16px) !important;
+            width: calc(100vw - 16px) !important;
+            margin: 8px !important;
+          }
+        }
+      `}</style>
+      
       {/* Botão Flutuante */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="chatbot-button">
         <Button
           onClick={() => setIsOpen(true)}
-          className="bg-green-500 hover:bg-green-600 text-white rounded-full w-16 h-16 shadow-lg hover:shadow-xl transition-all duration-300 animate-pulse"
+          className="bg-green-500 hover:bg-green-600 text-white rounded-full w-12 h-12 sm:w-16 sm:h-16 shadow-lg hover:shadow-xl transition-all duration-300 animate-pulse"
           size="lg"
         >
-          <MessageCircle className="h-8 w-8" />
+          <MessageCircle className="h-5 w-5 sm:h-8 sm:w-8" />
         </Button>
       </div>
 
       {/* Modal do Chatbot */}
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full bg-gray-900 border-gray-700">
+        <DialogContent className="chatbot-modal max-w-md w-[calc(100vw-16px)] sm:w-full max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700 mx-2 sm:mx-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
-                <div className="flex items-center gap-2">
+              <DialogTitle className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="bg-green-500 rounded-full p-1.5">
-                    <MessageCircle className="h-4 w-4 text-white" />
+                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                   </div>
                 </div>
-                Atendimento Promover
+                <span className="truncate">Atendimento Promover</span>
               </DialogTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleClose}
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 flex-shrink-0 ml-2"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-300">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              Online - Resposta rápida
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-300">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
+              <span>Online - Resposta rápida</span>
             </div>
           </DialogHeader>
 
-          <div className="py-4">
+          <div className="py-2 sm:py-4">
             {/* Indicador de progresso */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="flex space-x-2">
+            <div className="flex items-center justify-center mb-4 sm:mb-6">
+              <div className="flex space-x-1 sm:space-x-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
-                    className={`w-3 h-3 rounded-full ${
+                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
                       i <= step ? (chatMode === 'whatsapp' ? 'bg-green-500' : chatMode === 'website' ? 'bg-blue-500' : 'bg-gray-500') : 'bg-gray-300'
                     } transition-colors duration-300`}
                   />

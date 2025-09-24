@@ -59,6 +59,7 @@ public class EquipmentMovement {
     private String notes;
     
     @Column(name = "returned", nullable = false)
+    @Builder.Default
     private Boolean returned = false;
     
     @Column(name = "condition_on_withdrawal", length = 100)

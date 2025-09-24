@@ -37,6 +37,7 @@ public class AssinaturaDocumento {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_assinatura", nullable = false)
+    @Builder.Default
     private TipoAssinatura tipoAssinatura = TipoAssinatura.ELETRONICA;
     
     @Column(name = "ip_address")

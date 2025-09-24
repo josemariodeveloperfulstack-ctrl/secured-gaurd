@@ -303,9 +303,9 @@ const Frota: React.FC = () => {
     console.log('🚗 Veículo encontrado para multa:', vehicle);
 
     const mappedMulta = {
-      id: fine.id.toString(),
-      veiculo_id: fine.vehicleId.toString(),
-      placa: fine.vehiclePlate,
+      id: (fine?.id != null ? fine.id.toString() : ''),
+      veiculo_id: (fine?.vehicleId != null ? fine.vehicleId.toString() : ''),
+      placa: fine.vehiclePlate || '',
       marca: vehicle?.brand || '',
       modelo: vehicle?.model || '',
       // TESTE: Adicionar dados de motorista para teste

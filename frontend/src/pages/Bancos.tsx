@@ -47,7 +47,7 @@ const Bancos: React.FC = () => {
       
       // Carregar bancos
       const banksData = await bankAgencyService.getAllBanks();
-      setBanks(banksData);
+      setBanks(Array.isArray(banksData) ? banksData : []);
       
       // Carregar estatísticas
       const stats = await bankAgencyService.getBankStatistics();
@@ -60,6 +60,8 @@ const Bancos: React.FC = () => {
         description: "Não foi possível carregar os dados",
         variant: "destructive"
       });
+      // Garantir que banks seja sempre um array
+      setBanks([]);
     } finally {
       setLoading(false);
     }
@@ -87,7 +89,7 @@ const Bancos: React.FC = () => {
       setLoading(true);
       await bankAgencyService.deleteBank(bankId);
       
-      setBanks(prev => prev.filter(bank => bank.id !== bankId));
+      setBanks(prev => (prev || []).filter(bank => bank.id !== bankId));
       toast({
         title: "Sucesso",
         description: "Banco removido com sucesso!"
@@ -106,13 +108,13 @@ const Bancos: React.FC = () => {
 
   const handleFormSuccess = (bank: Bank) => {
     if (editingBank) {
-      setBanks(prev => prev.map(b => b.id === bank.id ? bank : b));
+      setBanks(prev => (prev || []).map(b => b.id === bank.id ? bank : b));
       toast({
         title: "Sucesso",
         description: "Banco atualizado com sucesso!"
       });
     } else {
-      setBanks(prev => [bank, ...prev]);
+      setBanks(prev => [bank, ...(prev || [])]);
       toast({
         title: "Sucesso",
         description: "Banco criado com sucesso!"
@@ -141,7 +143,7 @@ const Bancos: React.FC = () => {
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
-  const filteredBanks = banks.filter(bank => {
+  const filteredBanks = (banks || []).filter(bank => {
     const matchesSearch = bank.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          bank.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (bank.shortName && bank.shortName.toLowerCase().includes(searchTerm.toLowerCase()));

@@ -17,6 +17,7 @@ export interface PaymentReceipt {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  processedAt?: string;
   // Campos bancários
   debitedAgency?: string;
   debitedAccount?: string;

@@ -1,0 +1,107 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - ci
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add VPS to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.VPS_SSH_PORT }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Push repo to VPS directory
+        run: |
+          rsync -az --delete \
+            --exclude ".git" \
+            ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/secured-guard/
+
+      - name: Write .env on VPS
+        run: |
+          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+            set -e; \
+            mkdir -p /opt/secured-guard; \
+            cat > /opt/secured-guard/.env << 'EOF'\n\
+            POSTGRES_DB=secured_guard_prod\n\
+            POSTGRES_USER=postgressg\n\
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD_PROD }}\n\
+            POSTGRES_DB_DEV=secured_guard_dev\n\
+            POSTGRES_USER_DEV=postgressg\n\
+            POSTGRES_PASSWORD_DEV=${{ secrets.POSTGRES_PASSWORD_DEV }}\n\
+            POSTGRES_DB_CI=secured_guard_ci\n\
+            POSTGRES_USER_CI=postgressg\n\
+            POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}\n\
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}\n\
+            EOF\n\
+          "
+
+      - name: Docker login (optional)
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build and deploy (prod)
+        run: |
+          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+            set -e; \
+            cd /opt/secured-guard; \
+            source ./.env || true; \
+            docker compose -f deploy/docker-compose.prod.yml up -d postgres; \
+            sleep 3; \
+            docker compose -f deploy/docker-compose.prod.yml exec postgres sh -c \"psql -U postgres -tc 'SELECT 1 FROM pg_database WHERE datname='''\$POSTGRES_DB''' ' | grep -q 1 || psql -U postgres -c 'CREATE DATABASE '"\$POSTGRES_DB"' OWNER '"\$POSTGRES_USER"';\"; \
+            docker compose -f deploy/docker-compose.prod.yml exec postgres psql -U postgres -c \"ALTER USER \$POSTGRES_USER WITH PASSWORD '\$POSTGRES_PASSWORD';\" || true; \
+            docker compose -f deploy/docker-compose.prod.yml up -d --build backend redis frontend nginx; \
+            docker compose -f deploy/docker-compose.prod.yml ps; \
+          "
+
+      - name: Build and deploy (dev) if compose exists
+        run: |
+          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+            set -e; \
+            if [ -f /opt/secured-guard/deploy/docker-compose.dev.yml ]; then \
+              cd /opt/secured-guard; \
+              source ./.env || true; \
+              docker compose -f deploy/docker-compose.dev.yml up -d postgres; \
+              sleep 3; \
+              docker compose -f deploy/docker-compose.dev.yml exec postgres sh -c \"psql -U postgres -tc 'SELECT 1 FROM pg_database WHERE datname='''\$POSTGRES_DB_DEV''' ' | grep -q 1 || psql -U postgres -c 'CREATE DATABASE '"\$POSTGRES_DB_DEV"' OWNER '"\$POSTGRES_USER_DEV"';\"; \
+              docker compose -f deploy/docker-compose.dev.yml exec postgres psql -U postgres -c \"ALTER USER \$POSTGRES_USER_DEV WITH PASSWORD '\$POSTGRES_PASSWORD_DEV';\" || true; \
+              docker compose -f deploy/docker-compose.dev.yml up -d --build backend; \
+              docker compose -f deploy/docker-compose.dev.yml ps; \
+            else \
+              echo 'dev compose not found, skipping'; \
+            fi; \
+          "
+
+      - name: Build and deploy (ci) if compose exists
+        run: |
+          ssh -p "${{ secrets.VPS_SSH_PORT }}" ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+            set -e; \
+            if [ -f /opt/secured-guard/deploy/docker-compose.ci.yml ]; then \
+              cd /opt/secured-guard; \
+              source ./.env || true; \
+              docker compose -f deploy/docker-compose.ci.yml up -d postgres; \
+              sleep 3; \
+              docker compose -f deploy/docker-compose.ci.yml exec postgres sh -c \"psql -U postgres -tc 'SELECT 1 FROM pg_database WHERE datname='''\$POSTGRES_DB_CI''' ' | grep -q 1 || psql -U postgres -c 'CREATE DATABASE '"\$POSTGRES_DB_CI"' OWNER '"\$POSTGRES_USER_CI"';\"; \
+              docker compose -f deploy/docker-compose.ci.yml exec postgres psql -U postgres -c \"ALTER USER \$POSTGRES_USER_CI WITH PASSWORD '\$POSTGRES_PASSWORD_CI';\" || true; \
+              docker compose -f deploy/docker-compose.ci.yml up -d --build backend; \
+              docker compose -f deploy/docker-compose.ci.yml ps; \
+            else \
+              echo 'ci compose not found, skipping'; \
+            fi; \
+          "
+
+

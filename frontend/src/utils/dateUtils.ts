@@ -1,5 +1,5 @@
 import { format, parse, isValid } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 
 /**
  * Utilitários para conversão de datas entre formato brasileiro e formato do banco

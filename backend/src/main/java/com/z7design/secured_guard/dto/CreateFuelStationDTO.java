@@ -29,7 +29,7 @@ public class CreateFuelStationDTO {
     @Pattern(regexp = "\\d{5}-\\d{3}", message = "CEP deve estar no formato 00000-000")
     private String zipCode;
     
-    @Pattern(regexp = "\\(\\d{2}\\) \\d{4,5}-\\d{4}", message = "Telefone deve estar no formato (00) 00000-0000")
+    @Pattern(regexp = "^(|\\(\\d{2}\\) \\d{4,5}-\\d{4})$", message = "Telefone deve estar no formato (00) 00000-0000 ou vazio")
     private String phone;
     
     @Email(message = "Email deve ser válido")

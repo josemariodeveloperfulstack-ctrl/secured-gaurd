@@ -39,7 +39,7 @@ import AdvancedFilters from '@/components/holerites/AdvancedFilters';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { payslipService } from '@/services/payslipService';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
 import api from '@/lib/axios';
 
@@ -289,7 +289,7 @@ const Holerites: React.FC = () => {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await api.post('/receipts/process-automatic', formData, {
+        const response = await api.post('/api/receipts/process-automatic', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -449,8 +449,8 @@ const Holerites: React.FC = () => {
       // Remover da seleção se estiver selecionado
       setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => id !== receiptId));
       
-      // Recarregar lista
-      await loadReceipts();
+      // Recarregar lista de comprovantes de pagamento
+      await loadPaymentReceipts();
       
       toast({
         title: "Comprovante excluído",
@@ -520,7 +520,7 @@ const Holerites: React.FC = () => {
       }
       
       setSelectedPaymentReceipts([]);
-      await loadReceipts();
+      await loadPaymentReceipts();
     } catch (error) {
       console.error('Erro ao excluir comprovantes:', error);
       toast({
@@ -1176,6 +1176,15 @@ const Holerites: React.FC = () => {
       try {
         const result = await holeriteService.deleteMultipleHolerites(selectedHolerites);
         
+        // Verificar se há IDs inválidos
+        if (result.invalidCount && result.invalidCount > 0) {
+          toast({
+            title: "Aviso",
+            description: `${result.invalidCount} holerite${result.invalidCount > 1 ? 's' : ''} com ID${result.invalidCount > 1 ? 's' : ''} inválido${result.invalidCount > 1 ? 's' : ''} foram ignorado${result.invalidCount > 1 ? 's' : ''}.`,
+            variant: "destructive"
+          });
+        }
+        
         if (result.deleted === 0 && result.failed === 0) {
           toast({
             title: "Informação",
@@ -1198,16 +1207,27 @@ const Holerites: React.FC = () => {
         setSelectedHolerites([]);
         await loadHolerites();
       setShowDeleteModal(false);
-      } catch (error) {
+      } catch (error: any) {
       console.error('Erro ao excluir holerites:', error);
+      
+      // Melhorar mensagem de erro baseada no tipo de erro
+      let errorMessage = "Erro ao excluir holerites. Tente novamente.";
+      
+      if (error.response?.status === 400 && error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        if (errors.length > 0) {
+          errorMessage = errors[0]; // Usar a primeira mensagem de erro do backend
+        }
+      }
+      
         toast({
           title: "Erro",
-        description: "Erro ao excluir holerites. Tente novamente.",
+          description: errorMessage,
           variant: "destructive"
         });
-    } finally {
-      setIsDeleting(false);
-    }
+      } finally {
+        setIsDeleting(false);
+      }
   };
 
   const handleViewHolerite = (payslip: Holerite) => {
@@ -1380,7 +1400,7 @@ const Holerites: React.FC = () => {
       console.log('🔍 Permissões do usuário:', user?.permissions);
       console.log('🔍 Token no localStorage:', localStorage.getItem('token'));
       
-      const response = await api.get('/receipts');
+      const response = await api.get('/api/receipts');
       console.log('🔍 Resposta da API de recibos:', response);
       
       let receipts = [];
@@ -1509,9 +1529,9 @@ const Holerites: React.FC = () => {
         
         setShowReceiptUploadModal(false);
         
-        // Recarregar a lista de recibos após o upload
-        console.log('🔄 Recarregando lista de recibos...');
-        await loadReceipts();
+        // Recarregar a lista de comprovantes de pagamento após o upload
+        console.log('🔄 Recarregando lista de comprovantes de pagamento...');
+        await loadPaymentReceipts();
       } else {
         throw new Error(`Resposta inesperada do servidor: ${response.status}`);
       }
@@ -2833,7 +2853,7 @@ const Holerites: React.FC = () => {
                     </div>
                                     <div>
                                       <p className="text-gray-400 text-xs">Processado em</p>
-                                      <p className="font-semibold text-white">{new Date(receipt.updatedAt).toLocaleDateString('pt-BR')}</p>
+                                      <p className="font-semibold text-white">{formatDate(receipt.processedAt || receipt.updatedAt)}</p>
                         </div>
                                 </div>
                                   <div className="flex items-center space-x-2 text-gray-300">
@@ -3162,6 +3182,9 @@ const Holerites: React.FC = () => {
               <DialogTitle className="text-seguranca-lightgray text-lg sm:text-xl">
                 Documento Unificado: {selectedUnifiedDocument?.holerite?.employeeName}
               </DialogTitle>
+              <DialogDescription className="text-gray-400 text-sm">
+                Visualização do documento unificado do funcionário
+              </DialogDescription>
             </DialogHeader>
             
             <div className="flex flex-col h-full px-6 pb-6">

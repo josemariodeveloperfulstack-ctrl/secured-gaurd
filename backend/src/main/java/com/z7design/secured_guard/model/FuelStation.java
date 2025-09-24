@@ -77,6 +77,7 @@ public class FuelStation {
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private FuelStationStatus status = FuelStationStatus.ACTIVE;
     
     @Column

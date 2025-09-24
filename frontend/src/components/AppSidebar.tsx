@@ -20,6 +20,8 @@ import {
   FileCheck,
   Calculator,
   AlertTriangle,
+  Stethoscope,
+  HardHat,
   Bell,
   UserCheck,
   Award,
@@ -203,6 +205,18 @@ const rhMenuItems = [
   { icon: FileBarChart, text: 'Avaliação de Desempenho', to: '/rh/avaliacao-desempenho', id: 'rh-avaliacao-desempenho' },
   { icon: TrendingUp, text: 'Plano de Carreira', to: '/rh/plano-carreira', id: 'rh-plano-carreira' },
   { icon: BarChart3Icon, text: 'Relatórios RH', to: '/rh/relatorios', id: 'rh-relatorios' },
+];
+
+// Módulo SST - Saúde e Segurança do Trabalho
+const sstMenuItems = [
+  { icon: Shield, text: 'Controle SST', to: '/rh/sst', id: 'rh-sst' },
+  { icon: Stethoscope, text: 'Exames Médicos', to: '/rh/sst/exames', id: 'rh-sst-exames' },
+  { icon: HardHat, text: 'EPIs', to: '/rh/sst/epis', id: 'rh-sst-epis' },
+  { icon: AlertTriangle, text: 'Acidentes', to: '/rh/sst/acidentes', id: 'rh-sst-acidentes' },
+  { icon: GraduationCap, text: 'Treinamentos SST', to: '/rh/sst/treinamentos', id: 'rh-sst-treinamentos' },
+  { icon: FileCheck, text: 'Inspeções', to: '/rh/sst/inspecoes', id: 'rh-sst-inspecoes' },
+  { icon: Users, text: 'CIPA', to: '/rh/sst/cipa', id: 'rh-sst-cipa' },
+  { icon: BarChart3Icon, text: 'Relatórios SST', to: '/rh/sst/relatorios', id: 'rh-sst-relatorios' },
 ];
 
 // Módulo Departamento Pessoal
@@ -504,6 +518,27 @@ export function AppSidebar() {
         </div>
         {rhMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
+            <a 
+              href={item.to} 
+              className={`flex items-center p-3 rounded-lg transition-colors ${
+                isActive(item.id) 
+                  ? 'bg-seguranca-black text-seguranca-yellow' 
+                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+              }`}
+            >
+              <item.icon size={18} className="text-seguranca-yellow mr-3" />
+              <span>{item.text}</span>
+            </a>
+          </div>
+        ))}
+
+        {/* Módulo SST */}
+        <div className="text-seguranca-lightgray mb-2 mt-4 flex items-center ml-4">
+          <Shield size={16} className="mr-2 text-seguranca-yellow" />
+          Saúde e Segurança (SST)
+        </div>
+        {sstMenuItems.map(item => (
+          <div className="mb-2 ml-8" key={item.id}>
             <a 
               href={item.to} 
               className={`flex items-center p-3 rounded-lg transition-colors ${

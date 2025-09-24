@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -97,11 +98,63 @@ public class FuelRecordController {
     
     @GetMapping("/vehicle/{vehicleId}")
     public ResponseEntity<List<FuelRecordDTO>> getFuelRecordsByVehicle(@PathVariable UUID vehicleId) {
-        List<FuelRecord> fuelRecords = fuelRecordRepository.findByVehicleIdWithVehicleAndDriver(vehicleId);
-        List<FuelRecordDTO> fuelRecordDTOs = fuelRecords.stream()
-                .map(FuelRecordDTO::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(fuelRecordDTOs);
+        try {
+            log.info("🔍 Buscando registros de combustível para veículo: {}", vehicleId);
+            
+            List<FuelRecord> fuelRecords = fuelRecordRepository.findByVehicleIdWithVehicleAndDriver(vehicleId);
+            log.info("📊 Encontrados {} registros para o veículo {}", fuelRecords.size(), vehicleId);
+            
+            List<FuelRecordDTO> fuelRecordDTOs = fuelRecords.stream()
+                    .map(fuelRecord -> {
+                        try {
+                            return FuelRecordDTO.fromEntity(fuelRecord);
+                        } catch (Exception e) {
+                            log.warn("⚠️ Erro ao converter registro {} para DTO: {}", fuelRecord.getId(), e.getMessage());
+                            // Retornar DTO básico sem dados problemáticos
+                            FuelRecordDTO dto = new FuelRecordDTO();
+                            dto.setId(fuelRecord.getId());
+                            dto.setDate(fuelRecord.getDate());
+                            dto.setFuelType(fuelRecord.getFuelType());
+                            dto.setQuantity(fuelRecord.getQuantity());
+                            dto.setCost(fuelRecord.getCost());
+                            dto.setMileage(fuelRecord.getMileage());
+                            dto.setStation(fuelRecord.getStation());
+                            dto.setNotes(fuelRecord.getNotes());
+                            dto.setReceiptUrl(fuelRecord.getReceiptUrl());
+                            dto.setCostCenter(fuelRecord.getCostCenter());
+                            
+                            // Tentar definir dados do veículo de forma segura
+                            if (fuelRecord.getVehicle() != null) {
+                                try {
+                                    dto.setVehicleId(fuelRecord.getVehicle().getId());
+                                    dto.setVehiclePlate(fuelRecord.getVehicle().getPlate());
+                                } catch (Exception ve) {
+                                    log.warn("⚠️ Erro ao acessar dados do veículo: {}", ve.getMessage());
+                                }
+                            }
+                            
+                            // Tentar definir dados do motorista de forma segura
+                            if (fuelRecord.getDriver() != null) {
+                                try {
+                                    dto.setDriver(DriverDTO.fromEntity(fuelRecord.getDriver()));
+                                } catch (Exception de) {
+                                    log.warn("⚠️ Erro ao converter motorista: {}", de.getMessage());
+                                    // Continuar sem o motorista
+                                }
+                            }
+                            
+                            return dto;
+                        }
+                    })
+                    .collect(Collectors.toList());
+            
+            log.info("✅ Convertidos {} DTOs com sucesso", fuelRecordDTOs.size());
+            return ResponseEntity.ok(fuelRecordDTOs);
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar registros de combustível para veículo {}: {}", vehicleId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
     
     @GetMapping("/vehicle/{vehicleId}/period")

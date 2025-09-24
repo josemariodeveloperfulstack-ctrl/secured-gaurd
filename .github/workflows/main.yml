@@ -1,0 +1,39 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  VPS_HOST: ${{ secrets.VPS_HOST }}
+  VPS_USER: ${{ secrets.VPS_USER }}
+  VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      run: |
+        echo "🔧 Configurando SSH..."
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        touch ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+        ssh-keyscan -p ${{ env.VPS_PORT }} ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts
+        echo "✅ SSH configurado!"
+        
+    - name: Deploy to VPS
+      run: |
+        echo "�� Iniciando deploy para VPS..."
+        chmod +x deploy/deploy-to-vps.sh
+        export VPS_HOST="${{ env.VPS_HOST }}"
+        export VPS_USER="${{ env.VPS_USER }}"
+        export VPS_PORT="${{ env.VPS_PORT }}"
+        ./deploy/deploy-to-vps.sh
+        echo "✅ Deploy concluído!"

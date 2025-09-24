@@ -2,41 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { 
-  DollarSign, 
-  User, 
-  CalendarDays, 
-  FileText, 
-  CreditCard,
-  Building,
-  Mail,
-  Phone,
-  MapPin,
-  Save,
-  X
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
-import { contasAReceberService, Cliente } from '@/services/contasAReceberService';
+import { contasAReceberService, Client } from '@/services/contasAReceberService';
 
-interface ContaAReceberFormData {
-  clienteId: string;
-  numeroFatura: string;
-  numeroMedicao?: string;
+export interface ContaAReceber {
+  id?: string;
+  numeroFatura?: string;
+  dataEmissao?: Date;
+  vencimento: Date;
+  cliente: string;
+  clienteId?: string;
+  empresa?: string;
+  empresaId?: string;
   descricao: string;
+  tipo: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO';
   valor: number;
-  dataEmissao: Date;
-  dataVencimento: Date;
-  categoria: 'fatura' | 'nota' | 'adiantamento' | 'servico' | 'produto' | 'outros';
-  formaPagamento: 'pix' | 'boleto' | 'transferencia' | 'dinheiro' | 'cartao';
+  codigoBarras?: string;
+  status: 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA';
+  baixa: boolean;
+  dataPagamento?: Date;
   observacoes?: string;
+  comprovante?: File;
+  categoria?: string | undefined;
+  centroCusto?: string | undefined;
+  createdAt?: Date;
 }
 
 interface ContasAReceberFormModalProps {
@@ -44,7 +40,7 @@ interface ContasAReceberFormModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   editMode?: boolean;
-  contaData?: any;
+  initialData?: ContaAReceber | null;
 }
 
 export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = ({
@@ -52,266 +48,177 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
   onOpenChange,
   onSuccess,
   editMode = false,
-  contaData
+  initialData = null
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const [invoiceNumbers, setInvoiceNumbers] = useState<string[]>([]);
-  const [showInvoiceSuggestions, setShowInvoiceSuggestions] = useState(false);
-  const [measurementNumbers, setMeasurementNumbers] = useState<string[]>([]);
-  const [showMeasurementSuggestions, setShowMeasurementSuggestions] = useState(false);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  const [showPaymentMethodSuggestions, setShowPaymentMethodSuggestions] = useState(false);
+  const [clientes, setClientes] = useState<Client[]>([]);
+  const [empresas, setEmpresas] = useState<any[]>([]);
   
-  const [formData, setFormData] = useState<ContaAReceberFormData>({
-    clienteId: '',
+  const [formData, setFormData] = useState<ContaAReceber>({
     numeroFatura: '',
-    numeroMedicao: '',
-    descricao: '',
-    valor: 0,
     dataEmissao: new Date(),
-    dataVencimento: new Date(),
-    categoria: 'fatura',
-    formaPagamento: 'pix',
-    observacoes: ''
+    vencimento: new Date(),
+    cliente: '',
+    clienteId: '',
+    empresa: '',
+    empresaId: '',
+    descricao: '',
+    tipo: 'FATURA',
+    valor: 0,
+    codigoBarras: '',
+    status: 'ABERTA',
+    baixa: false,
+    dataPagamento: undefined,
+    observacoes: '',
+    categoria: undefined,
+    centroCusto: undefined
   });
 
-  // Carregar clientes quando o modal abre
+  const [categories, setCategories] = useState<string[]>([]);
+  const [costCenters, setCostCenters] = useState<string[]>([]);
+
+  // Carregar dados quando o modal abrir
   useEffect(() => {
     if (open) {
-      loadClientes();
+      // Carregar clientes
+      contasAReceberService.getClientes()
+        .then(data => {
+          const clientesArray = Array.isArray(data) ? data : [];
+          setClientes(clientesArray);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar clientes:', error);
+          setClientes([
+            { id: '1', name: 'Cliente Exemplo 1', isActive: true },
+            { id: '2', name: 'Cliente Exemplo 2', isActive: true }
+          ]);
+        });
+
+      // Carregar empresas
+      contasAReceberService.getEmpresas()
+        .then(data => {
+          const empresasArray = Array.isArray(data) ? data : [];
+          setEmpresas(empresasArray);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar empresas:', error);
+          setEmpresas([
+            { id: '1', name: 'Empresa Exemplo 1' },
+            { id: '2', name: 'Empresa Exemplo 2' }
+          ]);
+        });
+
+      // Carregar categorias
+      contasAReceberService.getCategories()
+        .then(data => {
+          const categoriasArray = Array.isArray(data) ? data : [];
+          setCategories(categoriasArray);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar categorias:', error);
+          setCategories([
+            'Serviços de Segurança',
+            'Consultoria',
+            'Manutenção',
+            'Equipamentos',
+            'Treinamento',
+            'Auditoria',
+            'Outros'
+          ]);
+        });
+
+      // Carregar centros de custo
+      contasAReceberService.getCostCenters()
+        .then(data => {
+          const centrosArray = Array.isArray(data) ? data : [];
+          setCostCenters(centrosArray);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar centros de custo:', error);
+          setCostCenters([
+            'Administrativo',
+            'Operacional',
+            'Comercial',
+            'Financeiro',
+            'Recursos Humanos',
+            'Tecnologia da Informação',
+            'Marketing',
+            'Vendas',
+            'Produção',
+            'Logística'
+          ]);
+        });
     }
   }, [open]);
 
-  // Preencher dados quando em modo de edição
+  // Atualizar dados do formulário quando initialData mudar
   useEffect(() => {
-    if (editMode && contaData) {
-      setFormData({
-        clienteId: contaData.client?.id || '',
-        numeroFatura: contaData.invoiceNumber || '',
-        numeroMedicao: contaData.measurementNumber || '',
-        descricao: contaData.description || '',
-        valor: contaData.amount || 0,
-        dataEmissao: contaData.issueDate ? new Date(contaData.issueDate) : new Date(),
-        dataVencimento: contaData.dueDate ? new Date(contaData.dueDate) : new Date(),
-        categoria: contaData.category || 'fatura',
-        formaPagamento: contaData.paymentMethod || 'pix',
-        observacoes: contaData.notes || ''
-      });
-      
-      if (contaData.client) {
-        setSelectedCliente(contaData.client);
+    if (open) {
+      if (editMode && initialData) {
+        setFormData({
+          ...initialData,
+          dataEmissao: initialData.dataEmissao || new Date(),
+          vencimento: initialData.vencimento || new Date(),
+          dataPagamento: initialData.dataPagamento || undefined,
+          observacoes: initialData.observacoes || '',
+          categoria: initialData.categoria || '',
+          centroCusto: initialData.centroCusto || ''
+        });
+      } else {
+        // Resetar formulário para modo de criação
+        setFormData({
+          numeroFatura: '',
+          dataEmissao: new Date(),
+          vencimento: new Date(),
+          cliente: '',
+          clienteId: '',
+          empresa: '',
+          empresaId: '',
+          descricao: '',
+          tipo: 'FATURA',
+          valor: 0,
+          codigoBarras: '',
+          status: 'ABERTA',
+          baixa: false,
+          dataPagamento: undefined,
+          observacoes: '',
+          categoria: undefined,
+          centroCusto: undefined
+        });
       }
-    } else {
-      // Reset form quando não está em modo de edição
-      setFormData({
-        clienteId: '',
-        numeroFatura: '',
-        numeroMedicao: '',
-        descricao: '',
-        valor: 0,
-        dataEmissao: new Date(),
-        dataVencimento: new Date(),
-        categoria: 'fatura',
-        formaPagamento: 'pix',
-        observacoes: ''
-      });
-      setSelectedCliente(null);
     }
-  }, [editMode, contaData, open]);
+  }, [editMode, initialData, open]);
 
-  const loadClientes = async () => {
-    try {
-      console.log('Carregando clientes da API...');
-      const clientesData = await contasAReceberService.getClientes();
-      console.log('Clientes carregados:', clientesData);
-      setClientes(clientesData);
-    } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar a lista de clientes",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const searchInvoiceNumbers = async (term: string) => {
-    if (term.length < 2) {
-      setInvoiceNumbers([]);
-      setShowInvoiceSuggestions(false);
-      return;
-    }
-
-    try {
-      const numbers = await contasAReceberService.searchInvoiceNumbers(term);
-      setInvoiceNumbers(numbers);
-      setShowInvoiceSuggestions(true);
-    } catch (error) {
-      console.error('Erro ao buscar números de fatura:', error);
-      setInvoiceNumbers([]);
-      setShowInvoiceSuggestions(false);
-    }
-  };
-
-  const searchMeasurementNumbers = async (term: string) => {
-    if (term.length < 2) {
-      setMeasurementNumbers([]);
-      setShowMeasurementSuggestions(false);
-      return;
-    }
-
-    try {
-      const numbers = await contasAReceberService.searchMeasurementNumbers(term);
-      setMeasurementNumbers(numbers);
-      setShowMeasurementSuggestions(true);
-    } catch (error) {
-      console.error('Erro ao buscar números de medição:', error);
-      setMeasurementNumbers([]);
-      setShowMeasurementSuggestions(false);
-    }
-  };
-
-  const searchCategories = async (term: string) => {
-    if (term.length < 1) {
-      setCategories([]);
-      setShowCategorySuggestions(false);
-      return;
-    }
-
-    try {
-      const cats = await contasAReceberService.searchCategories(term);
-      setCategories(cats);
-      setShowCategorySuggestions(true);
-    } catch (error) {
-      console.error('Erro ao buscar categorias:', error);
-      setCategories([]);
-      setShowCategorySuggestions(false);
-    }
-  };
-
-  const searchPaymentMethods = async (term: string) => {
-    if (term.length < 1) {
-      setPaymentMethods([]);
-      setShowPaymentMethodSuggestions(false);
-      return;
-    }
-
-    try {
-      const methods = await contasAReceberService.searchPaymentMethods(term);
-      setPaymentMethods(methods);
-      setShowPaymentMethodSuggestions(true);
-    } catch (error) {
-      console.error('Erro ao buscar formas de pagamento:', error);
-      setPaymentMethods([]);
-      setShowPaymentMethodSuggestions(false);
-    }
-  };
-
-  const handleInputChange = (field: keyof ContaAReceberFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleClienteChange = (clienteId: string) => {
-    const cliente = clientes.find(c => c.id === clienteId);
-    setSelectedCliente(cliente || null);
-    handleInputChange('clienteId', clienteId);
-  };
-
-  // Função para formatar valor para exibição (formato brasileiro)
-  const formatCurrencyForDisplay = (value: number | null): string => {
-    if (value === null || value === undefined) return '0,00';
-    
-    const formatted = value.toFixed(2).replace('.', ',');
-    const parts = formatted.split(',');
-    const integerPart = parts[0];
-    const decimalPart = parts[1];
-    
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    
-    return `${formattedInteger},${decimalPart}`;
-  };
-
-  // Função para converter string brasileira para número
-  const parseBrazilianCurrency = (value: string): number => {
-    if (!value || value.trim() === '') return 0;
-    
-    const cleanValue = value.replace(/\./g, '').replace(',', '.');
-    const parsed = parseFloat(cleanValue);
-    return isNaN(parsed) ? 0 : parsed;
+  const handleInputChange = (field: keyof ContaAReceber, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.clienteId) {
+    if (!formData.cliente || !formData.descricao || !formData.valor || !formData.vencimento) {
       toast({
         title: "Erro",
-        description: "Selecione um cliente",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!formData.descricao.trim()) {
-      toast({
-        title: "Erro",
-        description: "Descrição é obrigatória",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (formData.valor <= 0) {
-      toast({
-        title: "Erro",
-        description: "Valor deve ser maior que zero",
+        description: "Preencha todos os campos obrigatórios",
         variant: "destructive"
       });
       return;
     }
 
     setLoading(true);
-    
     try {
-      if (editMode && contaData?.id) {
-        // Atualizar conta existente
-        await contasAReceberService.updateContaAReceber(contaData.id, {
-          clientId: formData.clienteId,
-          invoiceNumber: formData.numeroFatura,
-          measurementNumber: formData.numeroMedicao,
-          description: formData.descricao,
-          amount: formData.valor,
-          issueDate: formatDateForBackend(formData.dataEmissao),
-          dueDate: formatDateForBackend(formData.dataVencimento),
-          category: formData.categoria.toUpperCase(),
-          paymentMethod: formData.formaPagamento.toUpperCase(),
-          notes: formData.observacoes
-        });
-        
+      if (editMode && initialData?.id) {
+        await contasAReceberService.updateContaAReceber(initialData.id, formData);
         toast({
           title: "Sucesso",
           description: "Conta a receber atualizada com sucesso!"
         });
       } else {
-        // Criar nova conta
-        await contasAReceberService.createContaAReceber({
-          clientId: formData.clienteId,
-          invoiceNumber: formData.numeroFatura,
-          measurementNumber: formData.numeroMedicao,
-          description: formData.descricao,
-          amount: formData.valor,
-          issueDate: formatDateForBackend(formData.dataEmissao),
-          dueDate: formatDateForBackend(formData.dataVencimento),
-          category: formData.categoria.toUpperCase(),
-          paymentMethod: formData.formaPagamento.toUpperCase(),
-          notes: formData.observacoes
-        });
-        
+        await contasAReceberService.createContaAReceber(formData);
         toast({
           title: "Sucesso",
           description: "Conta a receber criada com sucesso!"
@@ -320,12 +227,11 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
       
       onSuccess();
       onOpenChange(false);
-      
     } catch (error) {
-      console.error('Erro ao salvar conta a receber:', error);
+      console.error('Erro ao salvar conta:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a conta a receber",
+        description: "Erro ao salvar conta a receber. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -333,74 +239,123 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      'ACTIVE': { color: 'bg-green-500 text-white', label: 'Ativo' },
-      'INACTIVE': { color: 'bg-gray-500 text-white', label: 'Inativo' },
-      'BLOCKED': { color: 'bg-red-500 text-white', label: 'Bloqueado' }
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['ACTIVE'];
-    return <Badge className={config.color}>{config.label}</Badge>;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-seguranca-lightgray">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-seguranca-lightgray">
-            <DollarSign className="text-seguranca-yellow" size={24} />
+          <DialogTitle className="text-xl font-bold text-green-500 flex items-center gap-2">
+            <Plus size={20} />
             {editMode ? 'Editar Conta a Receber' : 'Nova Conta a Receber'}
           </DialogTitle>
-          <DialogDescription className="text-seguranca-lightgray">
-            {editMode ? 'Edite os dados da conta a receber selecionada.' : 'Preencha os dados para criar uma nova conta a receber.'}
+          <DialogDescription className="text-gray-300">
+            {editMode ? 'Atualize as informações da conta a receber' : 'Preencha os dados da nova conta a receber'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Datas */}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Seção 1: Informações Básicas */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray flex items-center gap-2 border-b border-gray-700 pb-2">
-              <CalendarDays className="text-seguranca-yellow" size={20} />
-              Datas
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <FileText size={18} />
+              Informações Básicas
             </h3>
-            
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Número da Fatura */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Data de Emissão *</label>
-                <DatePicker
-                  selected={formData.dataEmissao}
-                  onChange={(date: Date) => handleInputChange('dataEmissao', date)}
-                  {...DEFAULT_DATE_PICKER_PROPS}
-                  className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                  required
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <FileText size={14} />
+                  Número da Fatura
+                </label>
+                <Input
+                  value={formData.numeroFatura}
+                  onChange={(e) => handleInputChange('numeroFatura', e.target.value)}
+                  placeholder="Ex: FAT-2024-001"
+                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 />
               </div>
 
+              {/* Descrição */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Data de Vencimento *</label>
-                <DatePicker
-                  selected={formData.dataVencimento}
-                  onChange={(date: Date) => handleInputChange('dataVencimento', date)}
-                  {...DEFAULT_DATE_PICKER_PROPS}
-                  className="w-full p-2 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <FileText size={14} />
+                  Descrição *
+                </label>
+                <Input
+                  value={formData.descricao}
+                  onChange={(e) => handleInputChange('descricao', e.target.value)}
+                  placeholder="Descrição do serviço/produto"
+                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   required
                 />
               </div>
             </div>
           </div>
 
-          {/* Informações do Cliente */}
+          {/* Seção 2: Datas */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray flex items-center gap-2 border-b border-gray-700 pb-2">
-              <User className="text-seguranca-yellow" size={20} />
-              Informações do Cliente
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <CalendarDays size={18} />
+              Datas Importantes
             </h3>
-            
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Data de Emissão */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Cliente *</label>
-                <Select value={formData.clienteId} onValueChange={handleClienteChange}>
+                <label className="text-sm font-medium text-blue-400 flex items-center gap-2">
+                  <CalendarDays size={14} />
+                  Data de Emissão *
+                </label>
+                <DatePicker
+                  selected={formData.dataEmissao}
+                  onChange={(date) => handleInputChange('dataEmissao', date)}
+                  dateFormat="dd/MM/yyyy"
+                  locale={ptBR}
+                  className="w-full px-3 py-2 border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                  {...DEFAULT_DATE_PICKER_PROPS}
+                  required
+                />
+              </div>
+
+              {/* Data de Vencimento */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-green-400 flex items-center gap-2">
+                  <CalendarDays size={14} />
+                  Data de Vencimento *
+                </label>
+                <DatePicker
+                  selected={formData.vencimento}
+                  onChange={(date) => handleInputChange('vencimento', date)}
+                  dateFormat="dd/MM/yyyy"
+                  locale={ptBR}
+                  className="w-full px-3 py-2 border border-green-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                  {...DEFAULT_DATE_PICKER_PROPS}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção 3: Cliente e Empresa */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <Users size={18} />
+              Cliente e Empresa
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cliente */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Users size={14} />
+                  Cliente *
+                </label>
+                <Select
+                  value={formData.clienteId}
+                  onValueChange={(value) => {
+                    const cliente = clientes.find(c => c.id === value);
+                    handleInputChange('clienteId', value);
+                    handleInputChange('cliente', cliente?.name || '');
+                  }}
+                  required
+                >
                   <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
@@ -411,341 +366,245 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                         value={cliente.id}
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
-                        <div className="flex items-center justify-between w-full">
-                          <span>{cliente.name}</span>
-                          {getStatusBadge(cliente.status)}
-                        </div>
+                        {cliente.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {selectedCliente && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-seguranca-lightgray">Informações do Cliente</label>
-                  <div className="p-3 bg-seguranca-black/50 rounded-lg border border-gray-600">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Mail className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Building className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.cnpj}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="text-seguranca-yellow" size={14} />
-                        <span className="text-seguranca-lightgray">{selectedCliente.city}/{selectedCliente.state}</span>
-                      </div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-gray-600">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Contato:</span>
-                        <span className="text-seguranca-yellow">{selectedCliente.contactName}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Telefone:</span>
-                        <span className="text-seguranca-lightgray">{selectedCliente.contactPhone}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Empresa */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Building2 size={14} />
+                  Empresa *
+                </label>
+                <Select
+                  value={formData.empresaId}
+                  onValueChange={(value) => {
+                    const empresa = empresas.find(e => e.id === value);
+                    handleInputChange('empresaId', value);
+                    handleInputChange('empresa', empresa?.name || '');
+                  }}
+                  required
+                >
+                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione uma empresa" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {empresas.map((empresa) => (
+                      <SelectItem 
+                        key={empresa.id} 
+                        value={empresa.id}
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {empresa.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
-          {/* Informações da Conta */}
+          {/* Seção 4: Informações Financeiras */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray flex items-center gap-2 border-b border-gray-700 pb-2">
-              <FileText className="text-seguranca-yellow" size={20} />
-              Informações da Conta
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <DollarSign size={18} />
+              Informações Financeiras
             </h3>
-            
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Tipo */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Número da Fatura *</label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={formData.numeroFatura}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleInputChange('numeroFatura', value);
-                      searchInvoiceNumbers(value);
-                    }}
-                    onFocus={() => {
-                      if (invoiceNumbers.length > 0) {
-                        setShowInvoiceSuggestions(true);
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay para permitir clique nas sugestões
-                      setTimeout(() => setShowInvoiceSuggestions(false), 200);
-                    }}
-                    placeholder="Ex: FAT-2024-001"
-                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                    required
-                  />
-                  
-                  {/* Sugestões de números de fatura */}
-                  {showInvoiceSuggestions && invoiceNumbers.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {invoiceNumbers.map((number, index) => (
-                        <div
-                          key={index}
-                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
-                          onClick={() => {
-                            handleInputChange('numeroFatura', number);
-                            setShowInvoiceSuggestions(false);
-                          }}
-                        >
-                          {number}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Tag size={14} />
+                  Tipo *
+                </label>
+                <Select
+                  value={formData.tipo}
+                  onValueChange={(value) => handleInputChange('tipo', value)}
+                  required
+                >
+                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="FATURA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Fatura
+                    </SelectItem>
+                    <SelectItem value="MEDICAO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Medição
+                    </SelectItem>
+                    <SelectItem value="SERVICO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Serviço
+                    </SelectItem>
+                    <SelectItem value="PRODUTO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Produto
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
+              {/* Valor */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Número da Medição</label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={formData.numeroMedicao || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleInputChange('numeroMedicao', value);
-                      searchMeasurementNumbers(value);
-                    }}
-                    onFocus={() => {
-                      if (measurementNumbers.length > 0) {
-                        setShowMeasurementSuggestions(true);
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay para permitir clique nas sugestões
-                      setTimeout(() => setShowMeasurementSuggestions(false), 200);
-                    }}
-                    placeholder="Ex: MED-2024-001"
-                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                  />
-                  
-                  {/* Sugestões de números de medição */}
-                  {showMeasurementSuggestions && measurementNumbers.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {measurementNumbers.map((number, index) => (
-                        <div
-                          key={index}
-                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
-                          onClick={() => {
-                            handleInputChange('numeroMedicao', number);
-                            setShowMeasurementSuggestions(false);
-                          }}
-                        >
-                          {number}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <label className="text-sm font-medium text-green-400 flex items-center gap-2">
+                  <DollarSign size={14} />
+                  Valor *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.valor}
+                  onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  className="border-green-500 bg-seguranca-black text-green-300 placeholder:text-green-400/60 focus:border-green-400 focus:ring-green-400 font-medium"
+                  required
+                />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={formData.categoria}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleInputChange('categoria', value);
-                      searchCategories(value);
-                    }}
-                    onFocus={() => {
-                      if (categories.length > 0) {
-                        setShowCategorySuggestions(true);
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay para permitir clique nas sugestões
-                      setTimeout(() => setShowCategorySuggestions(false), 200);
-                    }}
-                    placeholder="Digite ou selecione uma categoria"
-                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                    required
-                  />
-                  
-                  {/* Sugestões de categorias */}
-                  {showCategorySuggestions && categories.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {categories.map((category, index) => (
-                        <div
-                          key={index}
-                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
-                          onClick={() => {
-                            handleInputChange('categoria', category.toLowerCase());
-                            setShowCategorySuggestions(false);
-                          }}
-                        >
-                          {category}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Descrição *</label>
-              <Textarea
-                value={formData.descricao}
-                onChange={(e) => handleInputChange('descricao', e.target.value)}
-                placeholder="Descreva os serviços ou produtos fornecidos..."
-                className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                rows={3}
-                required
-              />
             </div>
           </div>
 
-          {/* Valores e Pagamento */}
+          {/* Seção 5: Classificação */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray flex items-center gap-2 border-b border-gray-700 pb-2">
-              <DollarSign className="text-seguranca-yellow" size={20} />
-              Valores e Pagamento
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <Tag size={18} />
+              Classificação
             </h3>
-            
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Categoria */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Valor *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-seguranca-lightgray">R$</span>
-                  <Input
-                    type="text"
-                    value={formatCurrencyForDisplay(formData.valor)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value;
-                      let cleanValue = rawValue.replace(/[^\d,.]/g, '');
-                      
-                      if (cleanValue.includes('.') && cleanValue.includes(',')) {
-                        cleanValue = cleanValue.replace(/\./g, '');
-                      }
-                      
-                      if (cleanValue.includes('.') && !cleanValue.includes(',')) {
-                        cleanValue = cleanValue.replace('.', ',');
-                      }
-                      
-                      const parts = cleanValue.split(',');
-                      if (parts.length > 2) {
-                        cleanValue = parts[0] + ',' + parts.slice(1).join('');
-                      }
-                      
-                      if (parts.length === 2 && parts[1].length > 2) {
-                        cleanValue = parts[0] + ',' + parts[1].substring(0, 2);
-                      }
-                      
-                      const numericValue = parseBrazilianCurrency(cleanValue);
-                      handleInputChange('valor', numericValue);
-                    }}
-                    placeholder="0,00"
-                    className="w-full p-2 pl-10 border border-gray-600 rounded-md bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                    required
-                  />
-                </div>
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Tag size={14} />
+                  Categoria
+                </label>
+                <Select
+                  value={formData.categoria || 'NENHUMA'}
+                  onValueChange={(value) => handleInputChange('categoria', value)}
+                >
+                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem 
+                      value="NENHUMA"
+                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                    >
+                      Nenhuma categoria
+                    </SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem 
+                        key={category} 
+                        value={category}
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
+              {/* Centro de Custo */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Forma de Pagamento *</label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={formData.formaPagamento}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleInputChange('formaPagamento', value);
-                      searchPaymentMethods(value);
-                    }}
-                    onFocus={() => {
-                      if (paymentMethods.length > 0) {
-                        setShowPaymentMethodSuggestions(true);
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay para permitir clique nas sugestões
-                      setTimeout(() => setShowPaymentMethodSuggestions(false), 200);
-                    }}
-                    placeholder="Digite ou selecione uma forma de pagamento"
-                    className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                    required
-                  />
-                  
-                  {/* Sugestões de formas de pagamento */}
-                  {showPaymentMethodSuggestions && paymentMethods.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {paymentMethods.map((method, index) => (
-                        <div
-                          key={index}
-                          className="px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-black cursor-pointer text-sm"
-                          onClick={() => {
-                            handleInputChange('formaPagamento', method.toLowerCase());
-                            setShowPaymentMethodSuggestions(false);
-                          }}
-                        >
-                          {method}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Tag size={14} />
+                  Centro de Custo
+                </label>
+                <Select
+                  value={formData.centroCusto || 'NENHUM'}
+                  onValueChange={(value) => handleInputChange('centroCusto', value)}
+                >
+                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione um centro de custo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem 
+                      value="NENHUM"
+                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                    >
+                      Nenhum centro de custo
+                    </SelectItem>
+                    {costCenters.map((center) => (
+                      <SelectItem 
+                        key={center} 
+                        value={center}
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {center}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
 
-          {/* Observações */}
+          {/* Seção 6: Informações Adicionais */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray flex items-center gap-2 border-b border-gray-700 pb-2">
-              <FileText className="text-seguranca-yellow" size={20} />
-              Observações
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <FileText size={18} />
+              Informações Adicionais
             </h3>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Observações</label>
-              <Textarea
-                value={formData.observacoes}
-                onChange={(e) => handleInputChange('observacoes', e.target.value)}
-                placeholder="Observações adicionais..."
-                className="w-full border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                rows={4}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Código de Barras */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <FileText size={14} />
+                  Código de Barras
+                </label>
+                <Input
+                  value={formData.codigoBarras}
+                  onChange={(e) => handleInputChange('codigoBarras', e.target.value)}
+                  placeholder="Código de barras (opcional)"
+                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                />
+              </div>
+
+              {/* Observações */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <FileText size={14} />
+                  Observações
+                </label>
+                <Textarea
+                  value={formData.observacoes}
+                  onChange={(e) => handleInputChange('observacoes', e.target.value)}
+                  placeholder="Observações adicionais (opcional)"
+                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  rows={3}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-700">
+          {/* Botões */}
+          <div className="flex justify-end gap-3 pt-6 border-t border-gray-600">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="flex-1 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
+              className="border-gray-600 text-white hover:bg-seguranca-black"
               disabled={loading}
             >
-              <X className="w-4 h-4 mr-2" />
               Cancelar
             </Button>
             <Button
               type="submit"
-              className="flex-1 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+              className="bg-green-600 hover:bg-green-700"
               disabled={loading}
             >
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? 'Salvando...' : editMode ? 'Atualizar' : 'Salvar'}
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Plus size={16} className="mr-2" />
+                  {editMode ? 'Atualizar' : 'Criar'} Conta
+                </>
+              )}
             </Button>
           </div>
         </form>

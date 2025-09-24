@@ -218,7 +218,7 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
     if (!comprovanteFile) return '';
     const formData = new FormData();
     formData.append('file', comprovanteFile);
-    const response = await api.post('/api/uploads/comprovantes', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const response = await api.post('/uploads/comprovantes', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     return response.data.url;
   };
 

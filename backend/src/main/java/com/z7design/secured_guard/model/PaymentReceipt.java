@@ -67,6 +67,9 @@ public class PaymentReceipt {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+    
     @Column(name = "created_by")
     private UUID createdBy;
     
@@ -256,6 +259,14 @@ public class PaymentReceipt {
         this.updatedAt = updatedAt;
     }
     
+    public LocalDateTime getProcessedAt() {
+        return processedAt;
+    }
+    
+    public void setProcessedAt(LocalDateTime processedAt) {
+        this.processedAt = processedAt;
+    }
+    
     public UUID getCreatedBy() {
         return createdBy;
     }
@@ -378,6 +389,16 @@ public class PaymentReceipt {
     }
     
     // Métodos de callback
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        // A data de processamento será definida manualmente quando o comprovante for processado
+        if (this.processedAt == null) {
+            this.processedAt = LocalDateTime.now();
+        }
+    }
+    
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();

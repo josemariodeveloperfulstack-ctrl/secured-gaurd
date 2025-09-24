@@ -538,6 +538,20 @@ const RH: React.FC = () => {
                   </p>
                 </CardContent>
               </Card>
+
+              <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/sst')}>
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-red-500" />
+                    Controle SST
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-sm">
+                    Saúde e Segurança do Trabalho - Conformidade legal
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>

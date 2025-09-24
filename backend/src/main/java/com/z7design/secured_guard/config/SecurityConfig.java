@@ -61,6 +61,8 @@ public class SecurityConfig {
                 .requestMatchers("/files/**").permitAll()
                 // Endpoints HR - requerem permissões específicas
                 .requestMatchers("/api/hr/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
+                // Endpoints SST - requerem permissões específicas
+                .requestMatchers("/api/sst/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
                 // Endpoints de usuários - requerem permissões específicas
                 .requestMatchers("/api/users/**").hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE", "USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de grupos - requerem permissões específicas
@@ -75,6 +77,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/frota/**").authenticated()
                 // Endpoints de fuel-records - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/fuel-records/**").authenticated()
+                // Endpoints de fuel-stations - requerem apenas autenticação (temporário para desenvolvimento)
+                .requestMatchers("/api/fuel-stations/**").authenticated()
                 // Endpoints de veículos - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/vehicles/**").authenticated()
                 // Endpoints de work-posts - requerem apenas autenticação (temporário para debug)
@@ -88,7 +92,12 @@ public class SecurityConfig {
                 // Endpoints financeiros - requerem permissões específicas
                 .requestMatchers("/api/financial/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de invoices (contas a pagar) - requerem permissões específicas
-                .requestMatchers("/api/invoices/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                // Endpoints de invoices (contas a pagar) - temporariamente permitir para SUPER_ADMIN
+                .requestMatchers("/api/invoices/**").hasAnyAuthority("ROLE_SUPER_ADMIN")
+                // Endpoints de suppliers (fornecedores) - temporariamente permitir para SUPER_ADMIN
+                .requestMatchers("/api/suppliers/**").hasAnyAuthority("ROLE_SUPER_ADMIN")
+                // Endpoints de units (empresas) - temporariamente permitir para SUPER_ADMIN
+                .requestMatchers("/api/units/**").hasAnyAuthority("ROLE_SUPER_ADMIN")
                 // Endpoints de accounts-receivable (contas a receber) - requerem permissões específicas
                 .requestMatchers("/api/accounts-receivable/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de scheduled-payments (pagamentos agendados) - requerem permissões específicas

@@ -20,9 +20,21 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
+  // Debug logs para mobile
+  useEffect(() => {
+    console.log('🔍 Login component mounted');
+    console.log('🔍 User state:', user);
+    console.log('🔍 Screen size:', window.innerWidth, 'x', window.innerHeight);
+    console.log('🔍 Is mobile:', window.innerWidth < 768);
+    console.log('🔍 User agent:', navigator.userAgent);
+    console.log('🔍 Touch support:', 'ontouchstart' in window);
+  }, []);
+
   // If already logged in, redirect to dashboard
   useEffect(() => {
+    console.log('🔍 Login useEffect - user check:', user);
     if (user) {
+      console.log('🔍 User already logged in, redirecting to dashboard');
       navigate('/dashboard');
     }
   }, [user, navigate]);

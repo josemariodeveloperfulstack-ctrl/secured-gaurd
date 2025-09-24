@@ -53,6 +53,7 @@ public class PaymentReceiptDTO {
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime processedAt;
     
     private UUID createdBy;
     private UUID updatedBy;
@@ -242,6 +243,14 @@ public class PaymentReceiptDTO {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public LocalDateTime getProcessedAt() {
+        return processedAt;
+    }
+    
+    public void setProcessedAt(LocalDateTime processedAt) {
+        this.processedAt = processedAt;
     }
     
     public UUID getCreatedBy() {

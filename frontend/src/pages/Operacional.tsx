@@ -263,18 +263,19 @@ const Operacional: React.FC = () => {
 
   const handleSaveActivityReport = async (reportData: CreateActivityReportDTO) => {
     try {
+      let savedReport;
       if (selectedActivityReport) {
         // Atualizar relatório existente
-        const updatedReport = await activityReportService.updateActivityReport(selectedActivityReport.id, reportData);
-        setActivityReports(prev => prev.map(r => r.id === selectedActivityReport.id ? updatedReport : r));
+        savedReport = await activityReportService.updateActivityReport(selectedActivityReport.id, reportData);
+        setActivityReports(prev => prev.map(r => r.id === selectedActivityReport.id ? savedReport : r));
         toast({
           title: 'Sucesso!',
           description: 'Relatório atualizado com sucesso.',
         });
       } else {
         // Criar novo relatório
-        const newReport = await activityReportService.createActivityReport(reportData);
-        setActivityReports(prev => [newReport, ...prev]);
+        savedReport = await activityReportService.createActivityReport(reportData);
+        setActivityReports(prev => [savedReport, ...prev]);
         toast({
           title: 'Sucesso!',
           description: 'Relatório criado com sucesso.',
@@ -282,12 +283,14 @@ const Operacional: React.FC = () => {
       }
       setShowActivityReportModal(false);
       setSelectedActivityReport(null);
+      return savedReport; // Retornar o relatório salvo para permitir upload de arquivos
     } catch (error) {
       toast({
         title: 'Erro',
         description: 'Erro ao salvar relatório.',
         variant: 'destructive',
       });
+      throw error; // Re-throw para permitir tratamento no modal
     }
   };
 
@@ -552,38 +555,38 @@ const Operacional: React.FC = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-8">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Dashboard
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 h-auto">
+            <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="equipamentos" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Equipamentos
+            <TabsTrigger value="equipamentos" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Equipamentos</span>
             </TabsTrigger>
-            <TabsTrigger value="escalas" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Escalas
+            <TabsTrigger value="escalas" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Escalas</span>
             </TabsTrigger>
-            <TabsTrigger value="notificacoes" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Notificações
+            <TabsTrigger value="notificacoes" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Notificações</span>
             </TabsTrigger>
-            <TabsTrigger value="ocorrencias" className="flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              Ocorrências
+            <TabsTrigger value="ocorrencias" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Ocorrências</span>
             </TabsTrigger>
-            <TabsTrigger value="atividades" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Registro de Atividade
+            <TabsTrigger value="atividades" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Atividades</span>
             </TabsTrigger>
-            <TabsTrigger value="troca-plantao" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Troca de Plantão
+            <TabsTrigger value="troca-plantao" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Plantão</span>
             </TabsTrigger>
-            <TabsTrigger value="guia-transporte" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Guia de Transporte
+            <TabsTrigger value="guia-transporte" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Transporte</span>
             </TabsTrigger>
           </TabsList>
 
