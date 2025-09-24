@@ -35,7 +35,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import axios from 'axios';
-import { config } from '@/env.config';
+import { config } from '../../../env.config';
 
 interface CentroCusto {
   id: string;
