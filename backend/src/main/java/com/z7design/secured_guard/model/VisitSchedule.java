@@ -51,6 +51,7 @@ public class VisitSchedule {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @Builder.Default
     private VisitScheduleStatus status = VisitScheduleStatus.PLANNED;
     
     @Column(name = "total_estimated_time")

@@ -35,13 +35,19 @@ if [ ! -f "deploy/install-vps.sh" ]; then
     error "Execute este script a partir do diretório raiz do projeto SecuredGuard"
 fi
 
-# Configurações
-VPS_HOST="185.225.233.18"
-VPS_USER="root"
-VPS_PORT="22"
-VPS_PASSWORD='$7?NMo8&Ua'
+# Configurações (usar variáveis de ambiente se disponíveis)
+VPS_HOST="${VPS_HOST:-185.225.233.18}"
+VPS_USER="${VPS_USER:-root}"
+VPS_PORT="${VPS_PORT:-22}"
+VPS_PASSWORD="${VPS_PASSWORD:-$7?NMo8&Ua}"
 
 log "Deploy com sshpass (automação de senha)"
+echo ""
+info "Configurações:"
+info "  VPS_HOST: $VPS_HOST"
+info "  VPS_USER: $VPS_USER"
+info "  VPS_PORT: $VPS_PORT"
+info "  VPS_PASSWORD: [OCULTO]"
 echo ""
 
 # ========================================
@@ -137,7 +143,8 @@ log "Código copiado para VPS!"
 # ========================================
 log "6. Executando deploy na VPS..."
 
-sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && ./deploy.sh"
+# Recriar script deploy.sh com correção e executar
+sshpass -p "$VPS_PASSWORD" ssh -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "cd /opt/secured-guard && cp deploy/deploy-to-vps.sh deploy.sh && chmod +x deploy.sh && VPS_LOCAL=1 ./deploy.sh"
 
 log "Deploy concluído!"
 

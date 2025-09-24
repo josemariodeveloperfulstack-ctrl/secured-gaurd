@@ -40,6 +40,7 @@ public class SystemNotification {
     private LocalDateTime timestamp;
     
     @Column(name = "read", nullable = false)
+    @Builder.Default
     private Boolean read = false;
     
     @ManyToOne(fetch = FetchType.LAZY)

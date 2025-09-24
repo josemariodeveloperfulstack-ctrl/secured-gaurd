@@ -134,6 +134,7 @@ public class WorkPost {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "location", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<WorkSchedule> workSchedules = new ArrayList<>();
     
     @PrePersist

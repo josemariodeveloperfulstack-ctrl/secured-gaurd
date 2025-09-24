@@ -1,5 +1,5 @@
 # Dockerfile para produção do backend
-FROM openjdk:17-jdk-slim as builder
+FROM eclipse-temurin:17-jdk-jammy as builder
 
 # Instalar dependências necessárias
 RUN apt-get update && apt-get install -y \
@@ -14,6 +14,9 @@ COPY pom.xml .
 COPY mvnw .
 COPY .mvn .mvn
 
+# Corrigir permissões e line endings do mvnw
+RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
+
 # Baixar dependências
 RUN ./mvnw dependency:go-offline -B
 
@@ -24,7 +27,7 @@ COPY src ./src
 RUN ./mvnw clean package -DskipTests
 
 # Stage de produção
-FROM openjdk:17-jre-slim
+FROM eclipse-temurin:17-jre-jammy
 
 # Instalar dependências necessárias
 RUN apt-get update && apt-get install -y \

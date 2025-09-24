@@ -217,7 +217,6 @@ export const contasAPagarService = {
     
     return invoices.map((invoice: any): ContaAPagar => ({
       id: invoice.id,
-      numeroFatura: invoice.invoiceNumber,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
@@ -237,12 +236,11 @@ export const contasAPagarService = {
 
   // Buscar conta por ID
   async getContaAPagarById(id: string): Promise<ContaAPagar> {
-    const response = await api.get(`/invoices/${id}`);
+    const response = await api.get(`/api/invoices/${id}`);
     const invoice = response.data;
     
     return {
       id: invoice.id,
-      numeroFatura: invoice.invoiceNumber,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
@@ -289,20 +287,16 @@ export const contasAPagarService = {
       issueDate: formatDateForBackend(conta.dataEmissao) || '',
       paymentDate: formatDateForBackend(conta.dataPagamento),
       barcode: conta.codigoBarras,
-      category: conta.categoria || undefined,
+      category: conta.categoria === 'NENHUMA' ? undefined : conta.categoria,
       notes: conta.observacoes,
-      centroCusto: conta.centroCusto || undefined
+      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto
     };
 
-    // Adicionar invoiceNumber apenas se fornecido
-    if (conta.numeroFatura && conta.numeroFatura.trim()) {
-      requestData.invoiceNumber = conta.numeroFatura;
-    }
 
     console.log('Dados da requisição:', requestData);
 
     try {
-      const response = await api.post('/invoices', requestData);
+      const response = await api.post('/api/invoices', requestData);
       return this.getContaAPagarById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao criar conta a pagar:', error);
@@ -316,7 +310,6 @@ export const contasAPagarService = {
   async updateContaAPagar(id: string, conta: Partial<ContaAPagar>): Promise<ContaAPagar> {
     const requestData: Partial<CreateContaAPagarRequest> = {};
     
-    if (conta.numeroFatura && conta.numeroFatura.trim()) requestData.invoiceNumber = conta.numeroFatura;
     if (conta.descricao) requestData.description = conta.descricao;
     if (conta.fornecedorId) requestData.supplierId = conta.fornecedorId;
     if (conta.valor !== undefined) requestData.amount = conta.valor;
@@ -326,14 +319,14 @@ export const contasAPagarService = {
     if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
     if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
     if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
-    if (conta.categoria !== undefined) requestData.category = conta.categoria;
+    if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
     if (conta.observacoes) requestData.notes = conta.observacoes;
-    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto;
+    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
     
     // Se não há unitId, buscar uma unidade padrão
     if (!requestData.unitId) {
       try {
-        const unitsResponse = await api.get('/units');
+        const unitsResponse = await api.get('/api/units');
         if (unitsResponse.data && unitsResponse.data.length > 0) {
           requestData.unitId = unitsResponse.data[0].id;
         } else {
@@ -349,7 +342,7 @@ export const contasAPagarService = {
     console.log('ID da conta:', id);
 
     try {
-      const response = await api.put(`/invoices/${id}`, requestData);
+      const response = await api.put(`/api/invoices/${id}`, requestData);
       return this.getContaAPagarById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao atualizar conta a pagar:', error);
@@ -362,27 +355,67 @@ export const contasAPagarService = {
 
   // Excluir conta
   async deleteContaAPagar(id: string): Promise<void> {
-    await api.delete(`/invoices/${id}`);
+    await api.delete(`/api/invoices/${id}`);
   },
 
   async getCategories(): Promise<string[]> {
     try {
-      const response = await api.get('/invoices/categories');
-      return response.data || [];
+      const response = await api.get('/api/invoices/categories');
+      // Verificar se a resposta é um array válido
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      // Se não for array ou for HTML, usar fallback
+      throw new Error('Resposta inválida da API');
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
-      return [];
+      // Retornar categorias padrão
+      return [
+        'Aluguel',
+        'Energia Elétrica',
+        'Telefone/Internet',
+        'Material de Escritório',
+        'Manutenção',
+        'Combustível',
+        'Alimentação',
+        'Transporte',
+        'Seguros',
+        'Impostos',
+        'Outros'
+      ];
     }
   },
 
   async getCostCenters(): Promise<string[]> {
-    const response = await api.get('/invoices/cost-centers');
-    return response.data;
+    try {
+      const response = await api.get('/api/invoices/cost-centers');
+      // Verificar se a resposta é um array válido
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      // Se não for array ou for HTML, usar fallback
+      throw new Error('Resposta inválida da API');
+    } catch (error) {
+      console.error('Erro ao carregar centros de custo:', error);
+      // Retornar centros de custo padrão
+      return [
+        'Administrativo',
+        'Operacional',
+        'Comercial',
+        'Financeiro',
+        'Recursos Humanos',
+        'Tecnologia da Informação',
+        'Marketing',
+        'Vendas',
+        'Produção',
+        'Logística'
+      ];
+    }
   },
 
   // Marcar conta como paga
   async marcarComoPaga(id: string, dataPagamento: Date): Promise<ContaAPagar> {
-    const response = await api.patch(`/invoices/${id}/mark-as-paid`, {
+    const response = await api.patch(`/api/invoices/${id}/mark-as-paid`, {
       paymentDate: formatDateForBackend(dataPagamento)
     });
     return this.getContaAPagarById(response.data.id);
@@ -390,13 +423,13 @@ export const contasAPagarService = {
 
   // Buscar contas vencidas
   async getContasVencidas(): Promise<ContaAPagar[]> {
-    const response = await api.get('/invoices/overdue');
+    const response = await api.get('/api/invoices/overdue');
     return (Array.isArray(response.data) ? response.data : []).map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
   // Buscar contas vencendo em breve
   async getContasVencendoEmBreve(dias: number = 7): Promise<ContaAPagar[]> {
-    const response = await api.get(`/invoices/due-soon/${dias}`);
+    const response = await api.get(`/api/invoices/due-soon/${dias}`);
     return (Array.isArray(response.data) ? response.data : []).map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
@@ -471,7 +504,7 @@ export const contasAPagarService = {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     
-    const response = await api.get(`/invoices/reports/summary?${params.toString()}`);
+    const response = await api.get(`/api/invoices/reports/summary?${params.toString()}`);
     return response.data;
   },
 
@@ -721,7 +754,6 @@ export const contasAPagarService = {
   mapInvoiceToContaAPagar(invoice: any): ContaAPagar {
     return {
       id: invoice.id,
-      numeroFatura: invoice.invoiceNumber,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',

@@ -61,6 +61,7 @@ public class Document {
     private String description;
     
     @Column(name = "signed")
+    @Builder.Default
     private Boolean signed = false;
     
     @Column(name = "signature_date")

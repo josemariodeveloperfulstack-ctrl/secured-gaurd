@@ -50,6 +50,7 @@ public class Training {
     
     @OneToMany(mappedBy = "training")
     @JsonIgnoreProperties("training")
+    @Builder.Default
     private List<EmployeeCertification> certifications = new ArrayList<>();
     
     @Column(name = "created_at")

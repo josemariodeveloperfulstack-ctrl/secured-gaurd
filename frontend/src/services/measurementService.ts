@@ -20,6 +20,11 @@ class MeasurementService {
     return Array.isArray(res.data) ? res.data : [];
   }
 
+  async getBulletins(): Promise<MeasurementBulletin[]> {
+    const res = await api.get('/api/measurements/all');
+    return Array.isArray(res.data) ? res.data : [];
+  }
+
   async search(params: {
     status?: string;
     contractNumber?: string;

@@ -92,6 +92,7 @@ public class User implements UserDetails {
         joinColumns = @JoinColumn(name = "user_id"),
         inverseJoinColumns = @JoinColumn(name = "role_id")
     )
+    @Builder.Default
     private Set<Role> roles = new HashSet<>();
     
     @ManyToMany(fetch = jakarta.persistence.FetchType.EAGER)
@@ -100,14 +101,17 @@ public class User implements UserDetails {
         joinColumns = @JoinColumn(name = "user_id"),
         inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
+    @Builder.Default
     private Set<Permission> permissions = new HashSet<>();
     
     @NotNull(message = "User status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
     
     @Column(nullable = false)
+    @Builder.Default
     private boolean active = true;
     
     @ManyToMany(fetch = jakarta.persistence.FetchType.EAGER)
@@ -117,6 +121,7 @@ public class User implements UserDetails {
         inverseJoinColumns = @JoinColumn(name = "group_id")
     )
     @JsonIgnore
+    @Builder.Default
     private Set<UserGroupEntity> groups = new HashSet<>();
     
     @CreationTimestamp

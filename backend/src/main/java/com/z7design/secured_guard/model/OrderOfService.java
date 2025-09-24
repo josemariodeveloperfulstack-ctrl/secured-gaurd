@@ -55,6 +55,7 @@ public class OrderOfService {
     private String documentUrl;
     
     @Column(name = "signed", nullable = false)
+    @Builder.Default
     private Boolean signed = false;
     
     @Column(name = "created_at", nullable = false)

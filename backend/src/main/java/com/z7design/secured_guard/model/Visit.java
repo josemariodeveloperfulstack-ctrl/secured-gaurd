@@ -47,6 +47,7 @@ public class Visit {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @Builder.Default
     private VisitStatus status = VisitStatus.PENDING;
     
     @Column(name = "observations", columnDefinition = "TEXT")
@@ -60,22 +61,28 @@ public class Visit {
     
     // Dados de checklist rápido
     @Column(name = "security_check")
+    @Builder.Default
     private Boolean securityCheck = false;
     
     @Column(name = "equipment_check")
+    @Builder.Default
     private Boolean equipmentCheck = false;
     
     @Column(name = "staff_check")
+    @Builder.Default
     private Boolean staffCheck = false;
     
     @Column(name = "procedure_check")
+    @Builder.Default
     private Boolean procedureCheck = false;
     
     // Campos para otimização de rota
     @Column(name = "estimated_duration_minutes")
+    @Builder.Default
     private Integer estimatedDurationMinutes = 30; // Duração estimada da visita
     
     @Column(name = "priority_level")
+    @Builder.Default
     private Integer priorityLevel = 1; // 1-5 (1=baixa, 5=alta prioridade)
     
     @Column(name = "preferred_time_start")

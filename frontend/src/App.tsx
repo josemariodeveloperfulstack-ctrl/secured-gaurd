@@ -32,7 +32,7 @@ const Roles = lazy(() => import('@/pages/Roles'));
 const Clientes = lazy(() => import('@/pages/Clientes'));
 const Fornecedores = lazy(() => import('@/pages/Fornecedores'));
 const Contratos = lazy(() => import('@/pages/Contratos'));
-const Financeiro = lazy(() => import('@/pages/Financeiro'));
+const Financeiro = lazy(() => import('@/pages/Financeiro').catch(() => ({ default: () => <div>Erro ao carregar Financeiro</div> })));
 const Medicao = lazy(() => import('@/pages/Medicao'));
 const ContasAPagar = lazy(() => import('@/pages/ContasAPagar'));
 const ContasAReceber = lazy(() => import('@/pages/ContasAReceber'));

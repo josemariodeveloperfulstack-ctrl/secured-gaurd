@@ -50,6 +50,7 @@ public class CreateEquipmentDTO {
     
     private LocalDate validityDate;
     
+    @Builder.Default
     private Boolean isDangerous = false;
     
     private String notes;
