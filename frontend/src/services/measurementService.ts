@@ -37,7 +37,17 @@ export const measurementService = {
       } else {
         // Buscar todos os boletins (usar endpoint sem paginação)
         const response = await api.get('/measurements/all');
-        return response.data || [];
+        const data = response.data;
+        
+        // Garantir que sempre retornamos um array
+        if (Array.isArray(data)) {
+          return data;
+        } else if (data && Array.isArray(data.content)) {
+          return data.content;
+        } else {
+          console.warn('⚠️ API retornou dados em formato inesperado:', data);
+          return [];
+        }
       }
     } catch (error) {
       console.error('Erro ao buscar boletins de medição:', error);
