@@ -25,10 +25,11 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
+          POSTGRES_USER: postgressg
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: secured_guard_test
         options: >-
-          --health-cmd pg_isready
+          --health-cmd pg_isready -U postgressg
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -70,6 +71,15 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
 
+    - name: 🔧 Aguardar PostgreSQL estar pronto
+      run: |
+        echo "Aguardando PostgreSQL ficar disponível..."
+        until pg_isready -h localhost -p 5432 -U postgressg; do
+          echo "PostgreSQL não está pronto ainda..."
+          sleep 2
+        done
+        echo "PostgreSQL está pronto!"
+
     - name: 📦 Instalar dependências Frontend
       working-directory: ./frontend
       run: npm ci
@@ -80,7 +90,7 @@ jobs:
         mvn clean test -Dspring.profiles.active=test
       env:
         SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
-        SPRING_DATASOURCE_USERNAME: postgres
+        SPRING_DATASOURCE_USERNAME: postgressg
         SPRING_DATASOURCE_PASSWORD: postgres
         SPRING_REDIS_HOST: localhost
         SPRING_REDIS_PORT: 6379
