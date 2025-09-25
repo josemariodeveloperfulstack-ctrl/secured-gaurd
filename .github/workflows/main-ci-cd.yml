@@ -84,10 +84,14 @@ jobs:
       working-directory: ./frontend
       run: npm ci
 
+    - name: 🔧 Dar permissão ao Maven Wrapper
+      working-directory: ./backend
+      run: chmod +x ./mvnw
+
     - name: 🧪 Testes Backend
       working-directory: ./backend
       run: |
-        mvn clean test -Dspring.profiles.active=test
+        ./mvnw clean test -Dspring.profiles.active=test
       env:
         SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
         SPRING_DATASOURCE_USERNAME: postgressg
@@ -155,7 +159,7 @@ jobs:
 
     - name: 🏗️ Build Backend JAR
       working-directory: ./backend
-      run: mvn clean package -DskipTests
+      run: ./mvnw clean package -DskipTests
 
     - name: 🏗️ Build Frontend
       working-directory: ./frontend
