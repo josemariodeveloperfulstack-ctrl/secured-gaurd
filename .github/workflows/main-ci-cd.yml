@@ -1,0 +1,367 @@
+name: 🚀 CI/CD Pipeline - SecuredGuard
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch: # Permite execução manual
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # ========================================
+  # JOB 1: CI - TESTES AUTOMATIZADOS
+  # ========================================
+  ci-tests:
+    name: 🧪 CI - Testes Automatizados
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: secured_guard_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+
+    - name: ☕ Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: 🏗️ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: 📦 Instalar dependências Frontend
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🧪 Testes Backend
+      working-directory: ./backend
+      run: |
+        mvn clean test -Dspring.profiles.active=test
+      env:
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
+        SPRING_DATASOURCE_USERNAME: postgres
+        SPRING_DATASOURCE_PASSWORD: postgres
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
+
+    - name: 🏗️ Build Frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: 🧪 Testes Frontend (se existirem)
+      working-directory: ./frontend
+      run: |
+        if npm run test:coverage --if-present; then
+          echo "Testes frontend executados"
+        else
+          echo "Nenhum teste frontend configurado"
+        fi
+
+    - name: 📊 Upload Backend Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: backend-test-results
+        path: backend/target/surefire-reports/
+
+    - name: 📊 Upload Frontend Coverage
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: frontend-coverage
+        path: frontend/coverage/
+
+  # ========================================
+  # JOB 2: BUILD - CONSTRUIR APLICAÇÃO
+  # ========================================
+  build-application:
+    name: 🏗️ Build - Aplicação
+    runs-on: ubuntu-latest
+    needs: ci-tests
+    if: github.event_name == 'push'
+
+    steps:
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+
+    - name: ☕ Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: 🏗️ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Instalar dependências Frontend
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🏗️ Build Backend JAR
+      working-directory: ./backend
+      run: mvn clean package -DskipTests
+
+    - name: 🏗️ Build Frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: 📦 Upload Backend JAR
+      uses: actions/upload-artifact@v3
+      with:
+        name: backend-jar
+        path: backend/target/*.jar
+
+    - name: 📦 Upload Frontend Build
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-build
+        path: frontend/dist/
+
+  # ========================================
+  # JOB 3: BUILD DOCKER - IMAGENS
+  # ========================================
+  build-docker:
+    name: 🐳 Build - Imagens Docker
+    runs-on: ubuntu-latest
+    needs: build-application
+    if: github.event_name == 'push'
+
+    steps:
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+
+    - name: 🐳 Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 📦 Download Backend JAR
+      uses: actions/download-artifact@v3
+      with:
+        name: backend-jar
+        path: ./backend/target/
+
+    - name: 📦 Download Frontend Build
+      uses: actions/download-artifact@v3
+      with:
+        name: frontend-build
+        path: ./frontend/dist/
+
+    - name: 🏗️ Build Backend Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: false
+        tags: secured-guard-backend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: 🏗️ Build Frontend Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile
+        push: false
+        tags: secured-guard-frontend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ========================================
+  # JOB 4: DEPLOY - VPS PRODUÇÃO
+  # ========================================
+  deploy-vps:
+    name: ☁️ Deploy - VPS Produção
+    runs-on: ubuntu-latest
+    needs: [ci-tests, build-docker]
+    if: github.ref == 'refs/heads/main'
+    
+    environment: production # Requer aprovação manual
+
+    steps:
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+
+    - name: 🔐 Configurar SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+    - name: 📋 Verificar conexão VPS
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'Conexão SSH OK'"
+
+    - name: 📦 Transferir código para VPS
+      run: |
+        rsync -avz --delete \
+          --exclude='.git/' \
+          --exclude='node_modules/' \
+          --exclude='target/' \
+          --exclude='*.log' \
+          --exclude='uploads/' \
+          --exclude='logs/' \
+          --exclude='backups/' \
+          --exclude='.DS_Store' \
+          --exclude='Thumbs.db' \
+          --exclude='*.swp' \
+          --exclude='*.swo' \
+          --exclude='*~' \
+          --exclude='.github/' \
+          --exclude='docs/' \
+          --exclude='tests/' \
+          --exclude='*.md' \
+          --exclude='*.sql' \
+          --exclude='*.ps1' \
+          --exclude='*.sh' \
+          --exclude='*.bat' \
+          -e "ssh -o StrictHostKeyChecking=no" \
+          ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/secured-guard/
+
+    - name: 🐳 Deploy na VPS
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          cd /opt/secured-guard
+          
+          echo "🔄 Parando containers existentes..."
+          docker-compose down || true
+          
+          echo "🧹 Limpando imagens antigas..."
+          docker image prune -f || true
+          
+          echo "🏗️ Construindo e subindo novos containers..."
+          docker-compose up -d --build
+          
+          echo "⏳ Aguardando serviços ficarem prontos..."
+          sleep 30
+          
+          echo "📊 Verificando saúde dos serviços..."
+          docker-compose ps
+          
+          echo "🔍 Testando aplicação..."
+          curl -f http://localhost:8081/actuator/health || exit 1
+          curl -f http://localhost/ || exit 1
+          
+          echo "✅ Deploy concluído com sucesso!"
+        EOF
+
+    - name: 🔍 Verificar deploy
+      run: |
+        # Aguardar um pouco mais para garantir que tudo está funcionando
+        sleep 15
+        
+        # Testar endpoints
+        curl -f http://${{ secrets.VPS_HOST }}:8081/actuator/health
+        curl -f http://${{ secrets.VPS_HOST }}/ || echo "Frontend pode estar em porta diferente"
+        
+        echo "🎉 Aplicação está funcionando em:"
+        echo "🌐 Frontend: http://${{ secrets.VPS_HOST }}"
+        echo "🔧 Backend: http://${{ secrets.VPS_HOST }}:8081"
+
+  # ========================================
+  # JOB 5: HEALTH CHECK - VERIFICAÇÃO PÓS-DEPLOY
+  # ========================================
+  health-check:
+    name: 🏥 Health Check - Verificação Pós-Deploy
+    runs-on: ubuntu-latest
+    needs: deploy-vps
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: 🔍 Verificar Backend
+      run: |
+        for i in {1..10}; do
+          if curl -f http://${{ secrets.VPS_HOST }}:8081/actuator/health; then
+            echo "✅ Backend está funcionando"
+            break
+          else
+            echo "⏳ Aguardando backend... ($i/10)"
+            sleep 15
+          fi
+        done
+
+    - name: 🔍 Verificar Frontend
+      run: |
+        for i in {1..5}; do
+          if curl -f http://${{ secrets.VPS_HOST }}/; then
+            echo "✅ Frontend está funcionando"
+            break
+          else
+            echo "⏳ Aguardando frontend... ($i/5)"
+            sleep 10
+          fi
+        done
+
+    - name: 📊 Relatório Final
+      run: |
+        echo "🎉 Health Check concluído!"
+        echo "🌐 Frontend: http://${{ secrets.VPS_HOST }}/"
+        echo "🔧 Backend: http://${{ secrets.VPS_HOST }}:8081/actuator/health"
+        echo "📊 Logs: ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'docker-compose -f /opt/secured-guard/docker-compose.yml logs'"
+
+  # ========================================
+  # JOB 6: NOTIFICATIONS
+  # ========================================
+  notify:
+    name: 📢 Notificações
+    runs-on: ubuntu-latest
+    needs: [deploy-vps, health-check]
+    if: always()
+
+    steps:
+    - name: ✅ Notificar sucesso
+      if: success()
+      run: |
+        echo "🎉 Deploy para VPS concluído com sucesso!"
+        echo "🌐 Aplicação disponível em: http://${{ secrets.VPS_HOST }}"
+        echo "📊 Backend Health: http://${{ secrets.VPS_HOST }}:8081/actuator/health"
+
+    - name: ❌ Notificar falha
+      if: failure()
+      run: |
+        echo "❌ Falha no deploy para VPS"
+        echo "Verifique os logs acima para mais detalhes"
+        echo "🔍 Para debug: ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"

@@ -62,7 +62,7 @@ services:
       SPRING_REDIS_PASSWORD: redis_secured_guard_2024
       JAVA_OPTS: "-Xmx1g -Xms512m"
     ports:
-      - "8080:8081"
+      - "8081:8081"
     volumes:
       - backend_logs_prod:/app/logs
       - backend_uploads_prod:/app/uploads
@@ -89,8 +89,8 @@ services:
       dockerfile: Dockerfile.prod
     container_name: secured-guard-frontend-prod
     environment:
-      VITE_API_URL: http://localhost:8080
-      VITE_WS_URL: ws://localhost:8080/ws
+      VITE_API_URL: http://localhost:8081
+      VITE_WS_URL: ws://localhost:8081/ws
     ports:
       - "80:80"
     depends_on:

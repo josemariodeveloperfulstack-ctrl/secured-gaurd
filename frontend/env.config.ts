@@ -1,7 +1,7 @@
 // Configuration file for environment variables
 export const config = {
   // API Configuration
-  API_URL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  API_URL: import.meta.env.VITE_API_URL || 'http://localhost:8081',
   
   // Authentication
   TOKEN_KEY: import.meta.env.VITE_TOKEN_KEY || 'token',
