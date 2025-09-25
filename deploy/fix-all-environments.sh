@@ -27,10 +27,11 @@ fix_environment() {
     echo "🧹 Limpando containers órfãos..."
     docker container prune -f
     
-    # Verificar se .env existe
-    if [ ! -f ".env" ]; then
-        echo -e "${YELLOW}⚠️ Arquivo .env não encontrado, criando...${NC}"
-        cat > .env << EOF
+    # Verificar se arquivo .env específico existe
+    local env_file="deploy/env.${env,,}"
+    if [ ! -f "$env_file" ]; then
+        echo -e "${YELLOW}⚠️ Arquivo $env_file não encontrado, criando...${NC}"
+        cat > "$env_file" << EOF
 # Database
 POSTGRES_DB=secured_guard_${env,,}
 POSTGRES_USER=postgressg
@@ -45,8 +46,12 @@ JWT_SECRET=mySecretKey123456789012345678901234567890
 # Environment
 SPRING_PROFILES_ACTIVE=${env,,}
 EOF
-        echo -e "${GREEN}✅ Arquivo .env criado para $env${NC}"
+        echo -e "${GREEN}✅ Arquivo $env_file criado${NC}"
     fi
+    
+    # Copiar arquivo .env específico para .env
+    cp "$env_file" .env
+    echo -e "${GREEN}✅ Arquivo .env configurado para $env${NC}"
     
     # Subir ambiente
     echo "🚀 Subindo ambiente $env..."
