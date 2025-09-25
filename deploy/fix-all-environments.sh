@@ -78,9 +78,9 @@ EOF
 }
 
 # Corrigir cada ambiente
-fix_environment "DEV" "docker-compose.dev.yml" "secured-guard-backend-dev"
-fix_environment "PROD" "docker-compose.prod.yml" "secured-guard-backend-prod"
-fix_environment "CI" "docker-compose.ci.yml" "secured-guard-backend-ci"
+fix_environment "DEV" "deploy/docker-compose.dev.yml" "secured-guard-backend-dev"
+fix_environment "PROD" "deploy/docker-compose.prod.yml" "secured-guard-backend-prod"
+fix_environment "CI" "deploy/docker-compose.ci.yml" "secured-guard-backend-ci"
 
 echo ""
 echo "🎉 Correção concluída!"
