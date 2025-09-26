@@ -24,6 +24,14 @@ export const positionService = {
     return response.data;
   },
 
+  // Buscar posições com filtro dinâmico
+  async searchPositions(query?: string): Promise<Position[]> {
+    const response = await api.get('/positions/search', {
+      params: query ? { query } : {}
+    });
+    return response.data;
+  },
+
   // Buscar posição por ID
   async getPositionById(id: string): Promise<Position> {
     const response = await api.get(`/api/positions/${id}`);
