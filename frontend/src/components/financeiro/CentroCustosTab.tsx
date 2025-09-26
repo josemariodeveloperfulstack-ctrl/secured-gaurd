@@ -34,8 +34,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import axios from 'axios';
-import { config } from '@/env.config';
+import api from '@/lib/axios';
 
 interface CentroCusto {
   id: string;
@@ -105,7 +104,7 @@ const CentroCustosTab: React.FC = () => {
       setLoading(true);
       
       // Carregar centros de custo da API
-      const response = await axios.get(`${config.API_URL}/api/cost-centers`);
+      const response = await api.get('/cost-centers');
       setCentrosCusto(response.data);
 
     } catch (error) {
@@ -135,7 +134,7 @@ const CentroCustosTab: React.FC = () => {
           status: formData.status
         };
         
-        await axios.put(`${config.API_URL}/api/cost-centers/${editingCentro.id}`, updateData);
+        await api.put(`/cost-centers/${editingCentro.id}`, updateData);
         toast({
           title: "Sucesso",
           description: "Centro de custo atualizado com sucesso!",
@@ -152,7 +151,7 @@ const CentroCustosTab: React.FC = () => {
           status: formData.status
         };
         
-        await axios.post(`${config.API_URL}/api/cost-centers`, createData);
+        await api.post('/cost-centers', createData);
         toast({
           title: "Sucesso",
           description: "Centro de custo criado com sucesso!",
@@ -197,7 +196,7 @@ const CentroCustosTab: React.FC = () => {
 
   const handleExcluirCentro = async (id: string) => {
     try {
-      await axios.delete(`${config.API_URL}/api/cost-centers/${id}`);
+      await api.delete(`/cost-centers/${id}`);
       toast({
         title: "Sucesso",
         description: "Centro de custo excluído com sucesso!",

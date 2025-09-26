@@ -254,10 +254,10 @@ const QuemSomos = () => {
               <div>
                 <h3 className="text-lg font-semibold text-white mb-4">Serviços</h3>
                 <ul className="space-y-2">
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Vigilância Patrimonial</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Portaria</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Controlador de Acesso</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Facilities</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Vigilância Patrimonial</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Portaria</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Controlador de Acesso</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Facilities</a></li>
                 </ul>
               </div>
 
@@ -266,7 +266,7 @@ const QuemSomos = () => {
                 <h3 className="text-lg font-semibold text-white mb-4">Empresa</h3>
                 <ul className="space-y-2">
                   <li><a href="/quem-somos" className="hover:text-white transition-colors block py-1">Quem Somos</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Serviços</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Serviços</a></li>
                   <li><a href="/trabalhe-conosco" className="hover:text-white transition-colors block py-1">Trabalhe Conosco</a></li>
                   <li><a href="/contato" className="hover:text-white transition-colors block py-1">Contato</a></li>
                 </ul>

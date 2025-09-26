@@ -93,6 +93,7 @@ const CentrosDeCusto = lazy(() => import('@/pages/CentrosDeCusto'));
 // Páginas adicionais
 const Filiais = lazy(() => import('@/pages/Filiais'));
 const Servicos = lazy(() => import('@/pages/Servicos'));
+const GestaoServicos = lazy(() => import('@/pages/GestaoServicos'));
 const Operacional = lazy(() => import('@/pages/Operacional'));
 const ControleRondas = lazy(() => import('@/pages/ControleRondas'));
 
@@ -192,7 +193,7 @@ function App() {
                     <Route path="/" element={<PortalHome />} />
                     <Route path="/portal" element={<PortalHome />} />
                     <Route path="/quem-somos" element={<QuemSomos />} />
-                    <Route path="/servicos" element={<ServicosPublico />} />
+                    <Route path="/servicos-publico" element={<ServicosPublico />} />
                     <Route path="/trabalhe-conosco" element={<PortalVagas />} />
                     <Route path="/contato" element={<Contato />} />
                     <Route path="/politicas-privacidade" element={<PoliticasPrivacidade />} />
@@ -335,7 +336,9 @@ function App() {
                     } />
                     <Route path="/servicos" element={
                       <ProtectedRoute>
-                        <Servicos />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoServicos />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     

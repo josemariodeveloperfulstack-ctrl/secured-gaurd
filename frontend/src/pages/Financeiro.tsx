@@ -13,6 +13,8 @@ import FluxoCaixaTab from '@/components/financeiro/FluxoCaixaTab';
 import PagamentosTab from '@/components/financeiro/PagamentosTab';
 import RelatoriosTab from '@/components/financeiro/RelatoriosTab';
 import CentroCustosTab from '@/components/financeiro/CentroCustosTab';
+import FaturasTab from '@/components/financeiro/FaturasTab';
+import MedicoesTab from '@/components/financeiro/MedicoesTab';
 
 const FinanceiroSimple: React.FC = () => {
   const { toast } = useToast();
@@ -178,21 +180,11 @@ const FinanceiroSimple: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="faturas">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Faturas</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <FaturasTab />
           </TabsContent>
 
           <TabsContent value="medicoes">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center py-8">
-                <h2 className="text-2xl font-bold text-seguranca-lightgray mb-4">Medições</h2>
-                <p className="text-gray-400">Funcionalidade em desenvolvimento</p>
-              </div>
-            </Card>
+            <MedicoesTab />
           </TabsContent>
         </Tabs>
       </div>

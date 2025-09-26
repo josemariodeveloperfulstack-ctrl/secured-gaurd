@@ -328,10 +328,10 @@ const PortalHome = () => {
               <div data-aos={aos.fadeUp} data-aos-delay="100">
                 <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-4 sm:mb-6">Serviços</h3>
                 <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Vigilância Patrimonial</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Portaria</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Controlador de Acesso</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Facilities</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Vigilância Patrimonial</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Portaria</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Controlador de Acesso</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Facilities</a></li>
                 </ul>
               </div>
               
@@ -340,7 +340,7 @@ const PortalHome = () => {
                 <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-gray-300">
                   <li><a href="/quem-somos" className="hover:text-white transition-colors block py-1">Quem Somos</a></li>
                   <li><a href="/trabalhe-conosco" className="hover:text-white transition-colors block py-1">Trabalhe Conosco</a></li>
-                  <li><a href="/servicos" className="hover:text-white transition-colors block py-1">Orçamento</a></li>
+                  <li><a href="/servicos-publico" className="hover:text-white transition-colors block py-1">Orçamento</a></li>
                   <li><a href="/contato" className="hover:text-white transition-colors block py-1">Contato</a></li>
                   <li className="mt-3 sm:mt-4">
                     <a href="/login" className="inline-block text-black hover:text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded text-sm sm:text-base font-medium transition-colors" style={{ backgroundColor: '#FFF600' }}>
