@@ -52,13 +52,9 @@ jobs:
       working-directory: ./frontend
       run: npm ci
 
-    - name: 🔧 Dar permissão ao Maven Wrapper
-      working-directory: ./backend
-      run: chmod +x ./mvnw
-
     - name: 🏗️ Build Backend JAR
       working-directory: ./backend
-      run: ./mvnw clean package -DskipTests
+      run: mvn clean package -DskipTests
 
     - name: 🏗️ Build Frontend
       working-directory: ./frontend

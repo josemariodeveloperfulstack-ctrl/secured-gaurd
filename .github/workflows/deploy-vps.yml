@@ -76,7 +76,7 @@ jobs:
         ./mvnw clean test -Dspring.profiles.active=test
       env:
         SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
-        SPRING_DATASOURCE_USERNAME: postgres
+        SPRING_DATASOURCE_USERNAME: postgressg
         SPRING_DATASOURCE_PASSWORD: postgres
         SPRING_REDIS_HOST: localhost
         SPRING_REDIS_PORT: 6379
