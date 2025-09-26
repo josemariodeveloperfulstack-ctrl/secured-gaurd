@@ -165,7 +165,7 @@ services:
     image: n8nio/n8n:latest
     container_name: envio-holerites-n8n
     environment:
-      N8N_BASIC_AUTH_ACTIVE: true
+      N8N_BASIC_AUTH_ACTIVE: "true"
       N8N_BASIC_AUTH_USER: admin
       N8N_BASIC_AUTH_PASSWORD: admin123
       N8N_HOST: localhost
@@ -212,7 +212,7 @@ services:
     container_name: envio-holerites-grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin123
-      GF_USERS_ALLOW_SIGN_UP: false
+      GF_USERS_ALLOW_SIGN_UP: "false"
     ports:
       - "3001:3000"
     volumes:
@@ -293,4 +293,5 @@ volumes:
 # ========================================
 networks:
   secured-guard-network:
-    driver: bridge 
+    external: true
+    name: secured-guard

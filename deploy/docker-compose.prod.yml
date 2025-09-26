@@ -137,7 +137,5 @@ volumes:
 # ========================================
 networks:
   secured-guard-prod:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.27.0.0/16
+    external: true
+    name: secured-guard

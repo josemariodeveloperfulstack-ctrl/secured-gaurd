@@ -118,11 +118,20 @@ jobs:
           ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/secured-guard/
 
         sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          set -e
           cd /opt/secured-guard
-          docker-compose down || true
-          docker-compose up -d --build
-          sleep 30
-          docker-compose ps
+          # Ensure external network exists
+          docker network ls --format '{{.Name}}' | grep -q '^secured-guard$' || docker network create --driver bridge secured-guard
+          # Use prod domains compose when present, fallback to prod
+          if [ -f deploy/docker-compose.prod-domains.yml ]; then
+            docker compose -f deploy/docker-compose.prod-domains.yml down || true
+            docker compose -f deploy/docker-compose.prod-domains.yml up -d --build
+            docker compose -f deploy/docker-compose.prod-domains.yml ps
+          else
+            docker compose -f deploy/docker-compose.prod.yml down || true
+            docker compose -f deploy/docker-compose.prod.yml up -d --build
+            docker compose -f deploy/docker-compose.prod.yml ps
+          fi
           echo "Deploy completed successfully!"
         EOF
 

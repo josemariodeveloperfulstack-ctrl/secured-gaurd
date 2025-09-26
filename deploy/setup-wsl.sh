@@ -66,9 +66,21 @@ fi
 log "✅ Pré-requisitos OK!"
 
 # ========================================
-# 2. CONFIGURAR ARQUIVO .env PARA WSL
+# 2. CRIAR REDE DOCKER COMPARTILHADA
 # ========================================
-log "2. Configurando arquivo .env para WSL..."
+log "2. Criando rede Docker compartilhada 'secured-guard' (se não existir)..."
+
+if ! docker network ls --format '{{.Name}}' | grep -q '^secured-guard$'; then
+    docker network create --driver bridge secured-guard || error "Falha ao criar a rede Docker 'secured-guard'"
+    log "Rede 'secured-guard' criada."
+else
+    log "Rede 'secured-guard' já existe."
+fi
+
+# ========================================
+# 3. CONFIGURAR ARQUIVO .env PARA WSL
+# ========================================
+log "3. Configurando arquivo .env para WSL..."
 
 # Criar .env.wsl se não existir
 if [ ! -f ".env.wsl" ]; then
@@ -127,9 +139,9 @@ else
 fi
 
 # ========================================
-# 3. CONFIGURAR DOCKER COMPOSE PARA WSL
+# 4. CONFIGURAR DOCKER COMPOSE PARA WSL
 # ========================================
-log "3. Configurando Docker Compose para WSL..."
+log "4. Configurando Docker Compose para WSL..."
 
 # Parar containers existentes
 log "🛑 Parando containers existentes..."
@@ -143,9 +155,9 @@ if [ "$1" = "--clean" ]; then
 fi
 
 # ========================================
-# 4. SUBIR SERVIÇOS
+# 5. SUBIR SERVIÇOS
 # ========================================
-log "4. Subindo serviços no WSL..."
+log "5. Subindo serviços no WSL..."
 
 # Usar arquivo .env.wsl
 export $(cat .env.wsl | grep -v '^#' | xargs)
@@ -158,9 +170,9 @@ log "⏳ Aguardando serviços ficarem prontos..."
 sleep 10
 
 # ========================================
-# 5. VERIFICAR STATUS
+# 6. VERIFICAR STATUS
 # ========================================
-log "5. Verificando status dos serviços..."
+log "6. Verificando status dos serviços..."
 
 # Verificar PostgreSQL
 if docker-compose exec -T postgres pg_isready -U postgres &>/dev/null; then
@@ -192,9 +204,9 @@ else
 fi
 
 # ========================================
-# 6. EXECUTAR MIGRAÇÕES
+# 7. EXECUTAR MIGRAÇÕES
 # ========================================
-log "6. Executando migrações do banco..."
+log "7. Executando migrações do banco..."
 
 # Aguardar backend ficar totalmente pronto
 sleep 15
@@ -207,7 +219,7 @@ else
 fi
 
 # ========================================
-# 7. MOSTRAR STATUS FINAL
+# 8. MOSTRAR STATUS FINAL
 # ========================================
 log "📊 Status dos serviços:"
 docker-compose ps
