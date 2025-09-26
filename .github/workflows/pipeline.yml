@@ -1,0 +1,135 @@
+name: Pipeline SecuredGuard
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+
+jobs:
+  test-and-deploy:
+    name: Test & Deploy
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgressg
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: secured_guard_test
+        options: >-
+          --health-cmd pg_isready -U postgressg
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgressg; do
+          sleep 2
+        done
+
+    - name: Install Frontend Dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run Backend Tests
+      working-directory: ./backend
+      run: mvn clean test -Dspring.profiles.active=test
+      env:
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
+        SPRING_DATASOURCE_USERNAME: postgressg
+        SPRING_DATASOURCE_PASSWORD: postgres
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
+
+    - name: Build Frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: Build Backend
+      working-directory: ./backend
+      run: mvn clean package -DskipTests
+
+    - name: Deploy to VPS
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Starting VPS deployment..."
+        
+        sudo apt-get update
+        sudo apt-get install -y sshpass
+        
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz --delete \
+          -e "ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT }}" \
+          --exclude='.git/' \
+          --exclude='node_modules/' \
+          --exclude='target/' \
+          --exclude='*.log' \
+          --exclude='uploads/' \
+          --exclude='logs/' \
+          --exclude='backups/' \
+          --exclude='.DS_Store' \
+          --exclude='Thumbs.db' \
+          --exclude='*.swp' \
+          --exclude='*.swo' \
+          --exclude='*~' \
+          --exclude='.github/' \
+          --exclude='docs/' \
+          --exclude='tests/' \
+          --exclude='*.md' \
+          --exclude='*.sql' \
+          --exclude='*.ps1' \
+          --exclude='*.sh' \
+          --exclude='*.bat' \
+          ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/secured-guard/
+
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          cd /opt/secured-guard
+          docker-compose down || true
+          docker-compose up -d --build
+          sleep 30
+          docker-compose ps
+          echo "Deploy completed successfully!"
+        EOF
+
+    - name: Verify Deployment
+      if: github.ref == 'refs/heads/main'
+      run: |
+        sleep 15
+        echo "Deployment completed!"
+        echo "Frontend: http://${{ secrets.VPS_HOST }}"
+        echo "Backend: http://${{ secrets.VPS_HOST }}:8081"
