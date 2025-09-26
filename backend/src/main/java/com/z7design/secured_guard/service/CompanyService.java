@@ -1,19 +1,17 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.CompanyDTO;
+import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.CompanyRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,294 +21,151 @@ import java.util.stream.Collectors;
 @Slf4j
 @Transactional
 public class CompanyService {
-
+    
     private final CompanyRepository companyRepository;
-
-    // Buscar todas as empresas
-    @Cacheable("companies")
+    
+    /**
+     * Buscar todas as empresas
+     */
     public List<CompanyDTO> getAllCompanies() {
         log.info("Buscando todas as empresas");
-        return companyRepository.findAll().stream()
-                .map(this::convertToDTO)
+        return companyRepository.findAllByOrderByNameAsc().stream()
+                .map(CompanyDTO::fromEntity)
                 .collect(Collectors.toList());
     }
-
-    // Buscar empresa por ID
-    @Cacheable(value = "companies", key = "#id")
+    
+    /**
+     * Buscar empresas com filtro dinâmico
+     */
+    public List<CompanyDTO> searchCompanies(String query) {
+        log.info("Buscando empresas com query: {}", query);
+        List<Company> companies;
+        
+        if (query == null || query.trim().isEmpty()) {
+            companies = companyRepository.findAllByOrderByNameAsc();
+        } else {
+            companies = companyRepository.searchCompanies(query.trim());
+        }
+        
+        return companies.stream()
+                .map(CompanyDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Buscar empresa por ID
+     */
     public CompanyDTO getCompanyById(UUID id) {
-        log.info("Buscando empresa com ID: {}", id);
+        log.info("Buscando empresa por ID: {}", id);
         Company company = companyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + id));
-        return convertToDTO(company);
+        return CompanyDTO.fromEntity(company);
     }
-
-    // Buscar empresa por CNPJ
-    public CompanyDTO getCompanyByCnpj(String cnpj) {
-        log.info("Buscando empresa por CNPJ: {}", cnpj);
-        Company company = companyRepository.findByCnpj(cnpj)
-                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com CNPJ: " + cnpj));
-        return convertToDTO(company);
+    
+    /**
+     * Buscar empresa por sigla
+     */
+    public CompanyDTO getCompanyBySigla(String sigla) {
+        log.info("Buscando empresa por sigla: {}", sigla);
+        Company company = companyRepository.findBySigla(sigla)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com sigla: " + sigla));
+        return CompanyDTO.fromEntity(company);
     }
-
-    // Criar nova empresa
-    @CacheEvict(value = "companies", allEntries = true)
-    public CompanyDTO createCompany(CompanyDTO companyDTO, UUID currentUserId) {
-        log.info("Criando nova empresa: {}", companyDTO.getName());
+    
+    /**
+     * Criar nova empresa
+     */
+    public CompanyDTO createCompany(CompanyDTO dto) {
+        log.info("Criando nova empresa: {}", dto.getName());
         
-        // Validar se CNPJ já existe
-        if (companyDTO.getCnpj() != null && companyRepository.existsByCnpj(companyDTO.getCnpj())) {
-            throw new IllegalArgumentException("CNPJ já cadastrado: " + companyDTO.getCnpj());
-        }
-
-        // Validar se nome já existe
-        if (companyRepository.existsByName(companyDTO.getName())) {
-            throw new IllegalArgumentException("Nome da empresa já cadastrado: " + companyDTO.getName());
-        }
-
-        Company company = convertToEntity(companyDTO);
-        
-        // Só definir createdBy se currentUserId não for null
-        if (currentUserId != null) {
-            company.setCreatedBy(currentUserId);
+        // Validar sigla única
+        if (companyRepository.existsBySigla(dto.getSigla())) {
+            throw new BusinessException("Já existe uma empresa com a sigla: " + dto.getSigla());
         }
         
-        company.setStatus(Company.CompanyStatus.ACTIVE);
+        // Validar CNPJ único (se fornecido)
+        if (dto.getCnpj() != null && !dto.getCnpj().trim().isEmpty()) {
+            if (companyRepository.existsByCnpj(dto.getCnpj())) {
+                throw new BusinessException("Já existe uma empresa com o CNPJ: " + dto.getCnpj());
+            }
+        }
         
-        Company savedCompany = companyRepository.save(company);
-        log.info("Empresa criada com sucesso: {}", savedCompany.getId());
+        Company company = dto.toEntity();
+        company.setStatus(dto.getStatus() != null ? dto.getStatus() : CompanyStatus.ACTIVE);
         
-        return convertToDTO(savedCompany);
+        company = companyRepository.save(company);
+        log.info("Empresa criada com sucesso - ID: {}", company.getId());
+        return CompanyDTO.fromEntity(company);
     }
-
-    // Atualizar empresa
-    @CacheEvict(value = "companies", allEntries = true)
-    public CompanyDTO updateCompany(UUID id, CompanyDTO companyDTO, UUID currentUserId) {
-        log.info("Atualizando empresa com ID: {}", id);
+    
+    /**
+     * Atualizar empresa
+     */
+    public CompanyDTO updateCompany(UUID id, CompanyDTO dto) {
+        log.info("Atualizando empresa ID: {}", id);
         
         Company existingCompany = companyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + id));
-
-        // Validar se CNPJ já existe (se foi alterado)
-        if (companyDTO.getCnpj() != null && !companyDTO.getCnpj().equals(existingCompany.getCnpj()) &&
-            companyRepository.existsByCnpj(companyDTO.getCnpj())) {
-            throw new IllegalArgumentException("CNPJ já cadastrado: " + companyDTO.getCnpj());
-        }
-
-        // Validar se nome já existe (se foi alterado)
-        if (!companyDTO.getName().equals(existingCompany.getName()) &&
-            companyRepository.existsByName(companyDTO.getName())) {
-            throw new IllegalArgumentException("Nome da empresa já cadastrado: " + companyDTO.getName());
-        }
-
-        updateCompanyFromDTO(existingCompany, companyDTO);
         
-        // Só definir updatedBy se currentUserId não for null
-        if (currentUserId != null) {
-            existingCompany.setUpdatedBy(currentUserId);
+        // Validar sigla única (exceto para a própria empresa)
+        if (!existingCompany.getSigla().equals(dto.getSigla()) && 
+            companyRepository.existsBySigla(dto.getSigla())) {
+            throw new BusinessException("Já existe uma empresa com a sigla: " + dto.getSigla());
         }
         
-        Company updatedCompany = companyRepository.save(existingCompany);
-        log.info("Empresa atualizada com sucesso: {}", updatedCompany.getId());
+        // Validar CNPJ único (se fornecido)
+        if (dto.getCnpj() != null && !dto.getCnpj().trim().isEmpty()) {
+            if (!existingCompany.getCnpj().equals(dto.getCnpj()) && 
+                companyRepository.existsByCnpj(dto.getCnpj())) {
+                throw new BusinessException("Já existe uma empresa com o CNPJ: " + dto.getCnpj());
+            }
+        }
         
-        return convertToDTO(updatedCompany);
+        // Atualizar campos
+        existingCompany.setName(dto.getName());
+        existingCompany.setSigla(dto.getSigla());
+        existingCompany.setDescription(dto.getDescription());
+        existingCompany.setCnpj(dto.getCnpj());
+        existingCompany.setAddress(dto.getAddress());
+        existingCompany.setPhone(dto.getPhone());
+        existingCompany.setEmail(dto.getEmail());
+        existingCompany.setWebsite(dto.getWebsite());
+        existingCompany.setStatus(dto.getStatus());
+        
+        existingCompany = companyRepository.save(existingCompany);
+        log.info("Empresa atualizada com sucesso - ID: {}", existingCompany.getId());
+        return CompanyDTO.fromEntity(existingCompany);
     }
-
-    // Deletar empresa
-    @CacheEvict(value = "companies", allEntries = true)
+    
+    /**
+     * Excluir empresa
+     */
     public void deleteCompany(UUID id) {
-        log.info("Deletando empresa com ID: {}", id);
+        log.info("Excluindo empresa ID: {}", id);
         
         if (!companyRepository.existsById(id)) {
             throw new ResourceNotFoundException("Empresa não encontrada com ID: " + id);
         }
         
+        // Verificar se há funcionários associados
+        Company company = companyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + id));
+        
+        if (company.getEmployees() != null && !company.getEmployees().isEmpty()) {
+            throw new BusinessException("Não é possível excluir a empresa pois há funcionários associados a ela");
+        }
+        
         companyRepository.deleteById(id);
-        log.info("Empresa deletada com sucesso: {}", id);
+        log.info("Empresa excluída com sucesso - ID: {}", id);
     }
-
-    // Buscar empresas por status
-    public List<CompanyDTO> getCompaniesByStatus(Company.CompanyStatus status) {
-        log.info("Buscando empresas por status: {}", status);
-        return companyRepository.findByStatus(status).stream()
-                .map(this::convertToDTO)
+    
+    /**
+     * Buscar empresas ativas
+     */
+    public List<CompanyDTO> getActiveCompanies() {
+        log.info("Buscando empresas ativas");
+        return companyRepository.findByStatusOrderByNameAsc(CompanyStatus.ACTIVE).stream()
+                .map(CompanyDTO::fromEntity)
                 .collect(Collectors.toList());
     }
-
-    // Buscar empresas por cidade
-    public List<CompanyDTO> getCompaniesByCity(String city) {
-        log.info("Buscando empresas por cidade: {}", city);
-        return companyRepository.findByCityContainingIgnoreCase(city).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Buscar empresas por estado
-    public List<CompanyDTO> getCompaniesByState(String state) {
-        log.info("Buscando empresas por estado: {}", state);
-        return companyRepository.findByState(state).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Buscar empresas por setor
-    public List<CompanyDTO> getCompaniesBySector(String sector) {
-        log.info("Buscando empresas por setor: {}", sector);
-        return companyRepository.findBySectorContainingIgnoreCase(sector).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Buscar empresas por tipo
-    public List<CompanyDTO> getCompaniesByType(String type) {
-        log.info("Buscando empresas por tipo: {}", type);
-        return companyRepository.findByType(type).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Buscar empresas por tamanho
-    public List<CompanyDTO> getCompaniesBySize(String size) {
-        log.info("Buscando empresas por tamanho: {}", size);
-        return companyRepository.findBySize(size).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Busca avançada
-    public Page<CompanyDTO> getCompaniesByAdvancedFilters(
-            String name, String cnpj, String city, String state, 
-            String sector, Company.CompanyStatus status, String type, Pageable pageable) {
-        log.info("Buscando empresas com filtros avançados");
-        return companyRepository.findByAdvancedFilters(name, cnpj, city, state, sector, status, type, pageable)
-                .map(this::convertToDTO);
-    }
-
-    // Busca por termo
-    public List<CompanyDTO> searchCompanies(String searchTerm) {
-        log.info("Buscando empresas por termo: {}", searchTerm);
-        return companyRepository.findBySearchTerm(searchTerm).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Estatísticas
-    public long getActiveCompaniesCount() {
-        return companyRepository.countByStatus(Company.CompanyStatus.ACTIVE);
-    }
-
-    public long getCompaniesCountByStatus(Company.CompanyStatus status) {
-        return companyRepository.countByStatus(status);
-    }
-
-    public long getCompaniesCountByState(String state) {
-        return companyRepository.countByState(state);
-    }
-
-    public long getCompaniesCountBySector(String sector) {
-        return companyRepository.countBySector(sector);
-    }
-
-    public long getCompaniesCountByType(String type) {
-        return companyRepository.countByType(type);
-    }
-
-    public long getCompaniesCountBySize(String size) {
-        return companyRepository.countBySize(size);
-    }
-
-    // Conversão DTO para Entity
-    private Company convertToEntity(CompanyDTO dto) {
-        return Company.builder()
-                .id(dto.getId())
-                .name(dto.getName())
-                .tradeName(dto.getTradeName())
-                .cnpj(dto.getCnpj())
-                .inscricaoEstadual(dto.getInscricaoEstadual())
-                .inscricaoMunicipal(dto.getInscricaoMunicipal())
-                .address(dto.getAddress())
-                .city(dto.getCity())
-                .state(dto.getState())
-                .zipCode(dto.getZipCode())
-                .phone(dto.getPhone())
-                .email(dto.getEmail())
-                .website(dto.getWebsite())
-                .contactPerson(dto.getContactPerson())
-                .contactPhone(dto.getContactPhone())
-                .contactEmail(dto.getContactEmail())
-                .description(dto.getDescription())
-                .status(dto.getStatus())
-                .type(dto.getType())
-                .sector(dto.getSector())
-                .size(dto.getSize())
-                .annualRevenue(dto.getAnnualRevenue())
-                .employeeCount(dto.getEmployeeCount())
-                .notes(dto.getNotes())
-                .createdAt(dto.getCreatedAt())
-                .updatedAt(dto.getUpdatedAt())
-                .createdBy(dto.getCreatedBy())
-                .updatedBy(dto.getUpdatedBy())
-                .build();
-    }
-
-    // Conversão Entity para DTO
-    private CompanyDTO convertToDTO(Company company) {
-        return CompanyDTO.builder()
-                .id(company.getId())
-                .name(company.getName())
-                .tradeName(company.getTradeName())
-                .cnpj(company.getCnpj())
-                .inscricaoEstadual(company.getInscricaoEstadual())
-                .inscricaoMunicipal(company.getInscricaoMunicipal())
-                .address(company.getAddress())
-                .city(company.getCity())
-                .state(company.getState())
-                .zipCode(company.getZipCode())
-                .phone(company.getPhone())
-                .email(company.getEmail())
-                .website(company.getWebsite())
-                .contactPerson(company.getContactPerson())
-                .contactPhone(company.getContactPhone())
-                .contactEmail(company.getContactEmail())
-                .description(company.getDescription())
-                .status(company.getStatus())
-                .type(company.getType())
-                .sector(company.getSector())
-                .size(company.getSize())
-                .annualRevenue(company.getAnnualRevenue())
-                .employeeCount(company.getEmployeeCount())
-                .notes(company.getNotes())
-                .createdAt(company.getCreatedAt())
-                .updatedAt(company.getUpdatedAt())
-                .createdBy(company.getCreatedBy())
-                .updatedBy(company.getUpdatedBy())
-                .build();
-    }
-
-    // Atualizar Entity a partir do DTO
-    private void updateCompanyFromDTO(Company company, CompanyDTO dto) {
-        company.setName(dto.getName());
-        company.setTradeName(dto.getTradeName());
-        company.setCnpj(dto.getCnpj());
-        company.setInscricaoEstadual(dto.getInscricaoEstadual());
-        company.setInscricaoMunicipal(dto.getInscricaoMunicipal());
-        company.setAddress(dto.getAddress());
-        company.setCity(dto.getCity());
-        company.setState(dto.getState());
-        company.setZipCode(dto.getZipCode());
-        company.setPhone(dto.getPhone());
-        company.setEmail(dto.getEmail());
-        company.setWebsite(dto.getWebsite());
-        company.setContactPerson(dto.getContactPerson());
-        company.setContactPhone(dto.getContactPhone());
-        company.setContactEmail(dto.getContactEmail());
-        company.setDescription(dto.getDescription());
-        company.setStatus(dto.getStatus());
-        company.setType(dto.getType());
-        company.setSector(dto.getSector());
-        company.setSize(dto.getSize());
-        company.setAnnualRevenue(dto.getAnnualRevenue());
-        company.setEmployeeCount(dto.getEmployeeCount());
-        company.setNotes(dto.getNotes());
-        company.setUpdatedAt(LocalDateTime.now());
-    }
-} 
+}
