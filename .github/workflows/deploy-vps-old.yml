@@ -73,7 +73,7 @@ jobs:
     - name: 🧪 Testes Backend
       run: |
         cd backend
-        ./mvnw clean test -Dspring.profiles.active=test
+        mvn clean test -Dspring.profiles.active=test
       env:
         SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
         SPRING_DATASOURCE_USERNAME: postgressg
