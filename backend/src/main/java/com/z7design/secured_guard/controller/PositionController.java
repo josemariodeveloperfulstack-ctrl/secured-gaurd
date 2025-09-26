@@ -2,7 +2,6 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.PositionDTO;
 import com.z7design.secured_guard.service.PositionService;
-import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,6 +37,24 @@ public class PositionController {
         log.debug("Buscando todos os cargos");
         List<PositionDTO> positions = positionService.getAllPositions();
         return ResponseEntity.ok(positions);
+    }
+    
+    @GetMapping("/search")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Buscar cargos", description = "Busca cargos por nome com filtro dinâmico")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cargos encontrados com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<PositionDTO>> searchPositions(@RequestParam(required = false) String query) {
+        log.debug("Buscando cargos com query: {}", query);
+        try {
+            List<PositionDTO> positions = positionService.searchPositions(query);
+            return ResponseEntity.ok(positions);
+        } catch (Exception e) {
+            log.error("Erro ao buscar cargos: ", e);
+            throw new RuntimeException("Erro ao buscar cargos: " + e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")

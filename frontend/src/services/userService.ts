@@ -9,6 +9,13 @@ export const userService = {
     return response.data;
   },
 
+  // Buscar usuários com filtro dinâmico
+  async searchUsers(query?: string): Promise<User[]> {
+    const params = query ? { query } : {};
+    const response = await api.get('/api/users/search', { params });
+    return response.data;
+  },
+
   // Buscar usuário por ID
   async getUserById(id: string): Promise<User> {
     const response = await api.get(`/users/${id}`);

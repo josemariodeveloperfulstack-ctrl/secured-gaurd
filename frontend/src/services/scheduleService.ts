@@ -53,8 +53,30 @@ export const scheduleService = {
    * Busca todas as escalas de trabalho.
    */
   async findAll(): Promise<Schedule[]> {
-    const response = await api.get('/schedules');
-    return response.data;
+    try {
+      const response = await api.get('/api/schedules');
+      const data = response.data;
+      
+      console.log('🔍 ScheduleService - Dados recebidos:', typeof data, data);
+      
+      // Garantir que sempre retornamos um array
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.content)) {
+        return data.content;
+      } else if (data && typeof data === 'number') {
+        // Se o backend retornou apenas um número (count), retornar array vazio
+        console.warn('⚠️ API retornou apenas contagem de escalas:', data);
+        return [];
+      } else {
+        console.warn('⚠️ API retornou dados em formato inesperado:', data);
+        return [];
+      }
+    } catch (error) {
+      console.error('Erro ao buscar escalas de trabalho:', error);
+      // Em caso de erro, retornar lista vazia em vez de lançar exceção
+      return [];
+    }
   },
 
   /**
@@ -80,7 +102,7 @@ export const scheduleService = {
    * @param date - A data no formato 'YYYY-MM-DD'.
    */
   async findByDate(date: string): Promise<Schedule[]> {
-    const response = await api.get('/schedules/date', { params: { date } });
+    const response = await api.get('/api/schedules/date', { params: { date } });
     return response.data;
   },
 
@@ -89,7 +111,7 @@ export const scheduleService = {
    * @param data - Os dados da nova escala.
    */
   async create(data: CreateScheduleDTO): Promise<Schedule> {
-    const response = await api.post('/schedules', data);
+    const response = await api.post('/api/schedules', data);
     return response.data;
   },
 
@@ -112,19 +134,38 @@ export const scheduleService = {
   },
 
   /**
-   * Busca todas as escalas de trabalho.
+   * Busca todas as escalas de trabalho (com suporte a filtros para compatibilidade).
    */
-  async getSchedules(): Promise<Schedule[]> {
-    const response = await api.get('/schedules');
-    return response.data;
+  async getSchedules(filters?: any): Promise<Schedule[]> {
+    try {
+      const response = await api.get('/api/schedules');
+      const data = response.data;
+      
+      console.log('🔍 ScheduleService.getSchedules - Dados recebidos:', typeof data, data);
+      
+      // Garantir que sempre retornamos um array
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.content)) {
+        return data.content;
+      } else if (data && typeof data === 'number') {
+        // Se o backend retornou apenas um número (count), retornar array vazio
+        console.warn('⚠️ API retornou apenas contagem de escalas:', data);
+        return [];
+      } else {
+        console.warn('⚠️ API retornou dados em formato inesperado:', data);
+        return [];
+      }
+    } catch (error) {
+      console.error('Erro ao buscar escalas de trabalho:', error);
+      return [];
+    }
   },
 
   /**
-   * Busca escalas de trabalho por uma data específica.
-   * @param date - A data no formato 'YYYY-MM-DD'.
+   * Exclui uma escala de trabalho (alias para delete para compatibilidade)
    */
-  async getSchedulesByDate(date: string): Promise<Schedule[]> {
-    const response = await api.get('/schedules/date', { params: { date } });
-    return response.data;
+  async deleteSchedule(id: string): Promise<void> {
+    await this.delete(id);
   },
 }; 

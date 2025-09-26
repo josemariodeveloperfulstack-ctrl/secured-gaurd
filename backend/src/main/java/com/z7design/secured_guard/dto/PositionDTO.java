@@ -48,13 +48,17 @@ public class PositionDTO {
 
     // Método para converter entidade para DTO
     public static PositionDTO fromEntity(com.z7design.secured_guard.model.Position entity) {
+        if (entity == null) {
+            return null;
+        }
+        
         return PositionDTO.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .baseSalary(entity.getBaseSalary())
                 .unitId(entity.getUnit() != null ? entity.getUnit().getId() : null)
-                .unitName(entity.getUnit() != null ? entity.getUnit().getName() : null)
+                .unitName(entity.getUnit() != null ? entity.getUnit().getName() : "Sem unidade")
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

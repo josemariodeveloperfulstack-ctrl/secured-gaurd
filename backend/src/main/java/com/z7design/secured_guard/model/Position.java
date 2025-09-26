@@ -31,7 +31,7 @@ public class Position {
     @Column(nullable = false)
     private BigDecimal baseSalary;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "unit_id")
     private Unit unit;
 

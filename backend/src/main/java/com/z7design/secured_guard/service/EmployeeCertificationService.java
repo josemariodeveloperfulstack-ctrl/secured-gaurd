@@ -80,6 +80,10 @@ public class EmployeeCertificationService {
         return certificationRepository.findByExpirationDateBetween(startDate, endDate);
     }
     
+    public List<EmployeeCertification> findAll() {
+        return certificationRepository.findAll();
+    }
+    
     private void validateCertification(EmployeeCertification certification) {
         if (certification.getIssueDate() == null) {
             throw new IllegalArgumentException("Data de emissão é obrigatória");

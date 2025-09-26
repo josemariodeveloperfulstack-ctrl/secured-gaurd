@@ -156,7 +156,10 @@ const OcorrenciasTable: React.FC<OcorrenciasTableProps> = ({
     return new Date(dateString).toLocaleString('pt-BR');
   };
 
-  const filteredOcorrencias = ocorrencias.filter(ocorrencia => {
+  // Verificar se ocorrencias é um array válido
+  const safeOcorrencias = Array.isArray(ocorrencias) ? ocorrencias : [];
+  
+  const filteredOcorrencias = safeOcorrencias.filter(ocorrencia => {
     const searchTermLower = searchTerm.toLowerCase();
     const matchesSearch = 
       ocorrencia.title.toLowerCase().includes(searchTermLower) ||
@@ -188,7 +191,7 @@ const OcorrenciasTable: React.FC<OcorrenciasTableProps> = ({
     }
   };
 
-  if (ocorrencias.length === 0) {
+  if (safeOcorrencias.length === 0) {
     return (
       <Card className="bg-seguranca-graphite border-gray-600">
         <CardContent className="p-6">

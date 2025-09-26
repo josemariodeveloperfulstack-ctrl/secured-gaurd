@@ -1,0 +1,205 @@
+name: 🚀 CI/CD Pipeline - SecuredGuard (NEW)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+
+jobs:
+  ci-tests:
+    name: 🧪 CI - Testes Automatizados
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgressg
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: secured_guard_test
+        options: >-
+          --health-cmd pg_isready -U postgressg
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+
+    - name: ☕ Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: 🏗️ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: 🔧 Aguardar PostgreSQL estar pronto
+      run: |
+        echo "Aguardando PostgreSQL ficar disponível..."
+        until pg_isready -h localhost -p 5432 -U postgressg; do
+          echo "PostgreSQL não está pronto ainda..."
+          sleep 2
+        done
+        echo "PostgreSQL está pronto!"
+
+    - name: 📦 Instalar dependências Frontend
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🧪 Testes Backend
+      working-directory: ./backend
+      run: |
+        echo "Executando testes com Maven..."
+        mvn clean test -Dspring.profiles.active=test
+      env:
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
+        SPRING_DATASOURCE_USERNAME: postgressg
+        SPRING_DATASOURCE_PASSWORD: postgres
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
+
+    - name: 🏗️ Build Frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: ✅ Testes Concluídos
+      run: |
+        echo "✅ Todos os testes foram executados com sucesso!"
+        echo "🔧 Backend: Testes Maven executados"
+        echo "🏗️ Frontend: Build executado"
+        echo "🎉 Pipeline CI/CD funcionando corretamente!"
+
+  # ========================================
+  # JOB 2: BUILD E DEPLOY
+  # ========================================
+  build-and-deploy:
+    name: 🚀 Build e Deploy
+    runs-on: ubuntu-latest
+    needs: ci-tests
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+
+    - name: ☕ Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: 🏗️ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Instalar dependências Frontend
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🏗️ Build Backend
+      working-directory: ./backend
+      run: mvn clean package -DskipTests
+
+    - name: 🏗️ Build Frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: 🚀 Deploy para VPS (usando senha)
+      run: |
+        echo "🚀 Iniciando deploy para VPS..."
+        
+        # Instalar sshpass para usar senha
+        sudo apt-get update
+        sudo apt-get install -y sshpass
+        
+        # Fazer deploy usando senha
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz --delete \
+          -e "ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT }}" \
+          --exclude='.git/' \
+          --exclude='node_modules/' \
+          --exclude='target/' \
+          --exclude='*.log' \
+          --exclude='uploads/' \
+          --exclude='logs/' \
+          --exclude='backups/' \
+          --exclude='.DS_Store' \
+          --exclude='Thumbs.db' \
+          --exclude='*.swp' \
+          --exclude='*.swo' \
+          --exclude='*~' \
+          --exclude='.github/' \
+          --exclude='docs/' \
+          --exclude='tests/' \
+          --exclude='*.md' \
+          --exclude='*.sql' \
+          --exclude='*.ps1' \
+          --exclude='*.sh' \
+          --exclude='*.bat' \
+          ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/secured-guard/
+
+        # Executar deploy na VPS usando senha
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          cd /opt/secured-guard
+          
+          echo "🔄 Parando containers existentes..."
+          docker-compose down || true
+          
+          echo "🏗️ Construindo e subindo novos containers..."
+          docker-compose up -d --build
+          
+          echo "⏳ Aguardando serviços ficarem prontos..."
+          sleep 30
+          
+          echo "📊 Verificando saúde dos serviços..."
+          docker-compose ps
+          
+          echo "✅ Deploy concluído com sucesso!"
+        EOF
+
+    - name: 🔍 Verificar Deploy
+      run: |
+        echo "🔍 Verificando deploy..."
+        sleep 15
+        
+        # Testar endpoints
+        curl -f http://${{ secrets.VPS_HOST }}:8081/actuator/health || echo "Backend pode estar iniciando..."
+        curl -f http://${{ secrets.VPS_HOST }}/ || echo "Frontend pode estar iniciando..."
+        
+        echo "🎉 Deploy concluído!"
+        echo "🌐 Frontend: http://${{ secrets.VPS_HOST }}"
+        echo "🔧 Backend: http://${{ secrets.VPS_HOST }}:8081"

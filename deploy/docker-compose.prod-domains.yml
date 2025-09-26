@@ -128,5 +128,5 @@ volumes:
 # ========================================
 networks:
   secured-guard-network:
-    driver: bridge
-    external: false
+    external: true
+    name: secured-guard

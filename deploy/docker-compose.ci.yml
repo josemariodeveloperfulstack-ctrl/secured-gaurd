@@ -2,74 +2,6 @@ version: '3.8'
 
 services:
   # ========================================
-  # DATABASE (CI)
-  # ========================================
-  postgres:
-    image: postgres:15-alpine
-    container_name: secured-guard-db-ci
-    env_file:
-      - ../.env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB_CI:-secured_guard_ci}
-      POSTGRES_USER: ${POSTGRES_USER_CI:-postgressg}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CI:-ci_password_change_me}
-    ports:
-      - "55432:5432"
-    volumes:
-      - postgres_data_ci:/var/lib/postgresql/data
-      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_CI:-postgressg}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # ========================================
-  # BACKEND API (CI)
-  # ========================================
-  backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile.prod
-    container_name: secured-guard-backend-ci
-    env_file:
-      - ../.env
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB_CI:-secured_guard_ci}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER_CI:-postgressg}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_CI:-ci_password_change_me}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
-# ========================================
-# VOLUMES
-# ========================================
-volumes:
-  postgres_data_ci:
-
-# ========================================
-# NETWORKS
-# ========================================
-networks:
-  secured-guard-network:
-    driver: bridge
-version: '3.8'
-
-services:
-  # ========================================
   # DATABASE (CI/Test)
   # ========================================
   postgres:
@@ -79,17 +11,20 @@ services:
       POSTGRES_DB: secured_guard_test
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
-      - "5433:5432"
+      - "55432:5432"
     volumes:
+      - postgres_data_ci:/var/lib/postgresql/data
       - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
     networks:
-      - secured-guard-network
+      - secured-guard-ci
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # ========================================
   # REDIS CACHE (CI/Test)
@@ -99,14 +34,17 @@ services:
     container_name: secured-guard-redis-ci
     ports:
       - "6380:6379"
+    volumes:
+      - redis_data_ci:/data
     networks:
-      - secured-guard-network
+      - secured-guard-ci
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # ========================================
   # BACKEND API (CI/Test)
@@ -114,7 +52,7 @@ services:
   backend:
     build:
       context: ../backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.prod
     container_name: secured-guard-backend-ci
     environment:
       SPRING_PROFILES_ACTIVE: test
@@ -123,20 +61,29 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      # Configurações para testes
+      TEST_SHOW_SQL: "false"
+      TEST_HIBERNATE_DDL_AUTO: "create-drop"
+      LOG_LEVEL_ROOT: "WARN"
+      LOG_LEVEL_APP: "INFO"
     ports:
       - "8081:8080"
+    volumes:
+      - backend_logs_ci:/app/logs
+      - backend_uploads_ci:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - secured-guard-network
+      - secured-guard-ci
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # ========================================
   # FRONTEND (CI/Test)
@@ -144,26 +91,59 @@ services:
   frontend:
     build:
       context: ../frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.prod
     container_name: secured-guard-frontend-ci
     environment:
       VITE_API_URL: http://localhost:8081/api
       VITE_WS_URL: ws://localhost:8081/ws
+      NODE_ENV: test
     ports:
-      - "5174:5173"
+      - "5174:80"
     depends_on:
       - backend
     networks:
-      - secured-guard-network
+      - secured-guard-ci
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
+
+  # ========================================
+  # NGINX (CI/Test)
+  # ========================================
+  nginx:
+    image: nginx:alpine
+    container_name: secured-guard-nginx-ci
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx-ci.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - secured-guard-ci
+    restart: unless-stopped
+
+# ========================================
+# VOLUMES
+# ========================================
+volumes:
+  postgres_data_ci:
+    driver: local
+  redis_data_ci:
+    driver: local
+  backend_logs_ci:
+    driver: local
+  backend_uploads_ci:
+    driver: local
 
 # ========================================
 # NETWORKS
 # ========================================
 networks:
-  secured-guard-network:
-    driver: bridge
+  secured-guard-ci:
+    external: true
+    name: secured-guard

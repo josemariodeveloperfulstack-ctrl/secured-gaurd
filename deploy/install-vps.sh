@@ -120,7 +120,20 @@ docker compose version
 log "Docker Compose instalado com sucesso!"
 
 # ========================================
-# 5. CONFIGURAR FIREWALL
+# 5. CRIAR REDE DOCKER COMPARTILHADA
+# ========================================
+log "Criando rede Docker compartilhada 'secured-guard' (se não existir)..."
+
+# Criar rede externa para todos os ambientes
+if ! docker network ls --format '{{.Name}}' | grep -q '^secured-guard$'; then
+  docker network create --driver bridge secured-guard || error "Falha ao criar a rede Docker 'secured-guard'"
+  log "Rede 'secured-guard' criada."
+else
+  log "Rede 'secured-guard' já existe."
+fi
+
+# ========================================
+# 6. CONFIGURAR FIREWALL
 # ========================================
 log "Configurando firewall..."
 

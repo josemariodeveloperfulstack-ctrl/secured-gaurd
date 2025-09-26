@@ -47,6 +47,9 @@ import { ActivityReport, CreateActivityReportDTO, ActivityReportFilters } from '
 import ActivityReportsTable from '@/components/operacional/ActivityReportsTable';
 import ActivityReportModal from '@/components/operacional/ActivityReportModal';
 import ShiftChangeTable from '@/components/operacional/ShiftChangeTable';
+import OrderOfServiceTable from '@/components/operacional/OrderOfServiceTable';
+import OrderOfServiceFormModal from '@/components/operacional/OrderOfServiceFormModal';
+import { orderOfServiceService, OrderOfService, CreateOrderOfServiceRequest } from '@/services/orderOfServiceService';
 import { useToast } from '@/hooks/use-toast';
 
 const Operacional: React.FC = () => {
@@ -67,6 +70,10 @@ const Operacional: React.FC = () => {
   const [selectedOcorrencia, setSelectedOcorrencia] = useState<Occurrence | null>(null);
   const [showEscalaModal, setShowEscalaModal] = useState(false);
   const [selectedEscala, setSelectedEscala] = useState<Schedule | null>(null);
+  const [ordersOfService, setOrdersOfService] = useState<OrderOfService[]>([]);
+  const [isLoadingOrdersOfService, setIsLoadingOrdersOfService] = useState(false);
+  const [showOrderOfServiceModal, setShowOrderOfServiceModal] = useState(false);
+  const [selectedOrderOfService, setSelectedOrderOfService] = useState<OrderOfService | null>(null);
 
   const { toast } = useToast();
 
@@ -93,6 +100,8 @@ const Operacional: React.FC = () => {
       loadOcorrencias();
     } else if (activeTab === 'atividades') {
       loadActivityReports();
+    } else if (activeTab === 'servicos') {
+      loadOrdersOfService();
     }
   }, [activeTab]);
 
@@ -138,8 +147,20 @@ const Operacional: React.FC = () => {
     setIsLoadingOcorrencias(true);
     try {
       const data = await occurrenceService.getOccurrences();
-      setOcorrencias(data);
-      console.log('✅ Ocorrências carregadas:', data.length);
+      
+      // Verificar se os dados são um array válido
+      if (Array.isArray(data)) {
+        setOcorrencias(data);
+        console.log('✅ Ocorrências carregadas:', data.length);
+      } else {
+        console.warn('⚠️ Dados de ocorrências não são um array válido:', data);
+        setOcorrencias([]);
+        toast({
+          title: 'Aviso',
+          description: 'Formato de dados inválido recebido do servidor.',
+          variant: 'default',
+        });
+      }
     } catch (error) {
       console.warn('⚠️ Erro ao carregar ocorrências, usando dados de fallback:', error);
       // O occurrenceService já tem fallback interno, então não precisamos fazer nada aqui
@@ -187,6 +208,87 @@ const Operacional: React.FC = () => {
 
   const handleRefreshActivityReports = () => {
     loadActivityReports();
+  };
+
+  const loadOrdersOfService = async () => {
+    setIsLoadingOrdersOfService(true);
+    try {
+      const data = await orderOfServiceService.getOrders();
+      
+      // Verificar se os dados são um array válido
+      if (Array.isArray(data)) {
+        setOrdersOfService(data);
+        console.log('✅ Ordens de serviço carregadas:', data.length);
+      } else {
+        console.warn('⚠️ Dados de ordens de serviço não são um array válido:', data);
+        setOrdersOfService([]);
+        toast({
+          title: 'Aviso',
+          description: 'Formato de dados inválido recebido do servidor.',
+          variant: 'default',
+        });
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao carregar ordens de serviço, usando dados vazios:', error);
+      setOrdersOfService([]);
+      toast({
+        title: 'Aviso',
+        description: 'Não foi possível carregar as ordens de serviço do servidor. Mostrando dados locais.',
+        variant: 'default',
+      });
+    } finally {
+      setIsLoadingOrdersOfService(false);
+    }
+  };
+
+  const handleRefreshOrdersOfService = () => {
+    loadOrdersOfService();
+  };
+
+  const handleCreateOrderOfService = () => {
+    setSelectedOrderOfService(null);
+    setShowOrderOfServiceModal(true);
+  };
+
+  const handleEditOrderOfService = (order: OrderOfService) => {
+    setSelectedOrderOfService(order);
+    setShowOrderOfServiceModal(true);
+  };
+
+  const handleViewOrderOfService = (order: OrderOfService) => {
+    setSelectedOrderOfService(order);
+    setShowOrderOfServiceModal(true);
+  };
+
+  const handleDeleteOrderOfService = async (order: OrderOfService) => {
+    if (window.confirm('Tem certeza que deseja excluir esta ordem de serviço?')) {
+      try {
+        await orderOfServiceService.deleteOrder(order.id);
+        setOrdersOfService(prev => prev.filter(o => o.id !== order.id));
+        toast({
+          title: 'Sucesso!',
+          description: 'Ordem de serviço excluída com sucesso.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível excluir a ordem de serviço.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const handleSubmitOrderOfService = async (data: CreateOrderOfServiceRequest) => {
+    if (selectedOrderOfService) {
+      // Atualizar ordem existente
+      await orderOfServiceService.updateOrder(selectedOrderOfService.id, data);
+      setOrdersOfService(prev => prev.map(o => o.id === selectedOrderOfService.id ? { ...o, ...data } : o));
+    } else {
+      // Criar nova ordem
+      const newOrder = await orderOfServiceService.createOrder(data);
+      setOrdersOfService(prev => [newOrder, ...prev]);
+    }
   };
 
   const handleCreateActivityReport = () => {
@@ -580,6 +682,10 @@ const Operacional: React.FC = () => {
               <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">Atividades</span>
             </TabsTrigger>
+            <TabsTrigger value="servicos" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Serviços</span>
+            </TabsTrigger>
             <TabsTrigger value="troca-plantao" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">Plantão</span>
@@ -726,6 +832,18 @@ const Operacional: React.FC = () => {
             />
           </TabsContent>
 
+          <TabsContent value="servicos" className="mt-6">
+            <OrderOfServiceTable
+              orders={ordersOfService}
+              isLoading={isLoadingOrdersOfService}
+              onRefresh={handleRefreshOrdersOfService}
+              onCreate={handleCreateOrderOfService}
+              onEdit={handleEditOrderOfService}
+              onDelete={handleDeleteOrderOfService}
+              onView={handleViewOrderOfService}
+            />
+          </TabsContent>
+
           <TabsContent value="troca-plantao" className="mt-6">
             <ShiftChangeTable onRefresh={() => { }} />
           </TabsContent>
@@ -757,6 +875,15 @@ const Operacional: React.FC = () => {
           onOpenChange={setShowActivityReportModal}
           report={selectedActivityReport}
           onSave={handleSaveActivityReport}
+        />
+
+        {/* Modal de Ordem de Serviço */}
+        <OrderOfServiceFormModal
+          isOpen={showOrderOfServiceModal}
+          onClose={() => setShowOrderOfServiceModal(false)}
+          onSubmit={handleSubmitOrderOfService}
+          order={selectedOrderOfService}
+          mode={selectedOrderOfService ? 'edit' : 'create'}
         />
       </div>
     </StandardLayout>

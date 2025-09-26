@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ========================================
   # DATABASE
@@ -7,19 +5,18 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: secured-guard-db-prod
-    env_file:
-      - ../.env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-secured_guard_prod}
-      POSTGRES_USER: ${POSTGRES_USER:-postgressg}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: secured_guard_prod
+      POSTGRES_USER: postgressg
+      POSTGRES_PASSWORD: S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx
     ports:
       - "5432:5432"
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
-      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+      - ../scripts/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d/migration:ro
     networks:
-      - secured-guard-network
+      - secured-guard-prod
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgressg}"]
       interval: 10s
@@ -33,17 +30,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: secured-guard-redis-prod
-    env_file:
-      - ../.env
     ports:
       - "6379:6379"
     volumes:
       - redis_data_prod:/data
     networks:
-      - secured-guard-network
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-secured_guard_redis_2024}
+      - secured-guard-prod
+    command: redis-server --appendonly yes --requirepass redis_secured_guard_2024
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-secured_guard_redis_2024}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "redis_secured_guard_2024", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,19 +52,17 @@ services:
       context: ../backend
       dockerfile: Dockerfile.prod
     container_name: secured-guard-backend-prod
-    env_file:
-      - ../.env
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-secured_guard_prod}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgressg}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_prod
+      SPRING_DATASOURCE_USERNAME: postgressg
+      SPRING_DATASOURCE_PASSWORD: S7UGKd%bnKW0!lhBA#BRJLCd!IpXvsnx
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_REDIS_PASSWORD: redis_secured_guard_2024
       JAVA_OPTS: "-Xmx1g -Xms512m"
     ports:
-      - "8080:8080"
+      - "8081:8081"
     volumes:
       - backend_logs_prod:/app/logs
       - backend_uploads_prod:/app/uploads
@@ -79,9 +72,9 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - secured-guard-network
+      - secured-guard-prod
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -95,12 +88,15 @@ services:
       context: ../frontend
       dockerfile: Dockerfile.prod
     container_name: secured-guard-frontend-prod
+    environment:
+      VITE_API_URL: http://localhost:8081
+      VITE_WS_URL: ws://localhost:8081/ws
     ports:
       - "80:80"
     depends_on:
       - backend
     networks:
-      - secured-guard-network
+      - secured-guard-prod
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
@@ -124,7 +120,7 @@ services:
       - frontend
       - backend
     networks:
-      - secured-guard-network
+      - secured-guard-prod
     restart: unless-stopped
 
 # ========================================
@@ -140,5 +136,6 @@ volumes:
 # NETWORKS
 # ========================================
 networks:
-  secured-guard-network:
-    driver: bridge
+  secured-guard-prod:
+    external: true
+    name: secured-guard

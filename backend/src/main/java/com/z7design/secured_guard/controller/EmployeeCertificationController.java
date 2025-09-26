@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +37,7 @@ public class EmployeeCertificationController {
 
     @Operation(summary = "Lista certificações com filtros")
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<List<EmployeeCertification>> find(
             @RequestParam(value = "employeeId", required = false) UUID employeeId,
             @RequestParam(value = "trainingId", required = false) UUID trainingId,
@@ -55,23 +57,26 @@ public class EmployeeCertificationController {
             return ResponseEntity.ok(certificationService.findExpiringSoon(expiringBefore));
         }
         // default: retornar todos
-        return ResponseEntity.ok(certificationService.findExpiringBetween(LocalDate.MIN, LocalDate.MAX));
+        return ResponseEntity.ok(certificationService.findAll());
     }
 
     @Operation(summary = "Cria certificação")
     @PostMapping
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<EmployeeCertification> create(@RequestBody EmployeeCertification certification) {
         return ResponseEntity.ok(certificationService.create(certification));
     }
 
     @Operation(summary = "Atualiza certificação")
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<EmployeeCertification> update(@PathVariable UUID id, @RequestBody EmployeeCertification certification) {
         return ResponseEntity.ok(certificationService.update(id, certification));
     }
 
     @Operation(summary = "Renova certificação")
     @PutMapping("/{id}/renew")
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<EmployeeCertification> renew(@PathVariable UUID id,
             @RequestParam("expirationDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate newExpirationDate) {
         return ResponseEntity.ok(certificationService.renew(id, newExpirationDate));
@@ -79,6 +84,7 @@ public class EmployeeCertificationController {
 
     @Operation(summary = "Cancela certificação")
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_DELETE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<Void> cancel(@PathVariable UUID id) {
         certificationService.cancel(id);
         return ResponseEntity.noContent().build();

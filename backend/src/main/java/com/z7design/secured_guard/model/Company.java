@@ -1,126 +1,99 @@
 package com.z7design.secured_guard.model;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+@Data
 @Entity
 @Table(name = "companies")
-@Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Company {
-
+    
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
-    @Column(name = "name", nullable = false, length = 255)
+    
+    @NotBlank(message = "Company name is required")
+    @Size(max = 100, message = "Company name must not exceed 100 characters")
+    @Column(nullable = false, length = 100)
     private String name;
-
-    @Column(name = "trade_name", length = 255)
-    private String tradeName;
-
-    @Column(name = "cnpj", length = 18, unique = true)
-    private String cnpj;
-
-    @Column(name = "inscricao_estadual", length = 20)
-    private String inscricaoEstadual;
-
-    @Column(name = "inscricao_municipal", length = 20)
-    private String inscricaoMunicipal;
-
-    @Column(name = "address", length = 500)
-    private String address;
-
-    @Column(name = "city", length = 100)
-    private String city;
-
-    @Column(name = "state", length = 2)
-    private String state;
-
-    @Column(name = "zip_code", length = 10)
-    private String zipCode;
-
-    @Column(name = "phone", length = 20)
-    private String phone;
-
-    @Column(name = "email", length = 255)
-    private String email;
-
-    @Column(name = "website", length = 255)
-    private String website;
-
-    @Column(name = "contact_person", length = 255)
-    private String contactPerson;
-
-    @Column(name = "contact_phone", length = 20)
-    private String contactPhone;
-
-    @Column(name = "contact_email", length = 255)
-    private String contactEmail;
-
-    @Column(name = "description", length = 1000)
+    
+    @NotBlank(message = "Company sigla is required")
+    @Size(min = 2, max = 10, message = "Company sigla must be between 2 and 10 characters")
+    @Column(nullable = false, unique = true, length = 10)
+    private String sigla;
+    
+    @Column(columnDefinition = "TEXT")
     private String description;
-
-    @Column(name = "status", length = 20)
+    
+    @Size(max = 18, message = "CNPJ must not exceed 18 characters")
+    @Column(length = 18, unique = true)
+    private String cnpj;
+    
+    @Size(max = 255, message = "Address must not exceed 255 characters")
+    @Column(length = 255)
+    private String address;
+    
+    @Size(max = 20, message = "Phone must not exceed 20 characters")
+    @Column(length = 20)
+    private String phone;
+    
+    @Email(message = "Invalid email format")
+    @Size(max = 100, message = "Email must not exceed 100 characters")
+    @Column(length = 100)
+    private String email;
+    
+    @Size(max = 255, message = "Website must not exceed 255 characters")
+    @Column(length = 255)
+    private String website;
+    
+    @NotNull(message = "Company status is required")
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private CompanyStatus status;
-
-    @Column(name = "type", length = 50)
-    private String type; // LTDA, ME, EIRELI, S.A, etc.
-
-    @Column(name = "sector", length = 100)
-    private String sector; // Setor de atuação
-
-    @Column(name = "size", length = 50)
-    private String size; // Pequena, Média, Grande
-
-    @Column(name = "annual_revenue", columnDefinition = "NUMERIC(15,2)")
-    private Double annualRevenue;
-
-    @Column(name = "employee_count")
-    private Integer employeeCount;
-
-    @Column(name = "notes", length = 1000)
-    private String notes;
-
+    
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
+    
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
-
-    @Column(name = "created_by")
-    private UUID createdBy;
-
-    @Column(name = "updated_by")
-    private UUID updatedBy;
-
+    
+    // Relacionamentos
+    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference("company-employees")
+    private List<Employee> employees;
+    
     public enum CompanyStatus {
-        ACTIVE("Ativa"),
-        INACTIVE("Inativa"),
-        PENDING("Pendente"),
-        SUSPENDED("Suspensa");
-
+        ACTIVE("Ativo"),
+        INACTIVE("Inativo"),
+        SUSPENDED("Suspenso");
+        
         private final String description;
-
+        
         CompanyStatus(String description) {
             this.description = description;
         }
-
+        
         public String getDescription() {
             return description;
         }
     }
-} 
+}

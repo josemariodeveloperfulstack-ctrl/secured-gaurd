@@ -91,7 +91,7 @@ const mainMenuItems = [
   // Módulo Operacional - Correspondente às abas da página
   const operacionalMenuItems = [
     { icon: BarChart3, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
-    { icon: ClipboardList, text: 'Serviços', to: '/servicos', id: 'servicos' },
+    { icon: ClipboardList, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
     { icon: Shield, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
     { icon: MapPin, text: 'Controle de Visitas', to: '/controle-visitas-avancado', id: 'controle-visitas' },
     { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },
@@ -129,27 +129,38 @@ const sstMenuItems = [
 
 // Módulo Departamento Pessoal
 const departamentoPessoalMenuItems = [
-  { icon: UserPlus, text: 'Admissão de Funcionários', to: '/rh/admissao-funcionarios', id: 'dp-admissao-funcionarios' },
-  { icon: UserX, text: 'Demissão de Funcionários', to: '/rh/demissao-funcionarios', id: 'dp-demissao-funcionarios' },
+  // Gestão de Funcionários
+  { icon: Users, text: 'Funcionários', to: '/rh/funcionarios', id: 'dp-funcionarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
+  
+  // Gestão de Tempo e Frequência
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
   { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
   { icon: Clock3, text: 'Horas Extras', to: '/rh/horas-extras', id: 'dp-horas-extras' },
+  
+  // Gestão de Ocorrências e Eventos
   { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'dp-ocorrencias' },
-  { icon: CreditCard, text: 'Vale Transporte', to: '/rh/vale-transporte', id: 'dp-vale-transporte' },
-  { icon: Home, text: 'Vale Refeição', to: '/rh/vale-refeicao', id: 'dp-vale-refeicao' },
-  { icon: Car, text: 'Vale Combustível', to: '/rh/vale-combustivel', id: 'dp-vale-combustivel' },
-  { icon: Heart, text: 'Plano de Saúde', to: '/rh/plano-saude', id: 'dp-plano-saude' },
-  { icon: FileSignature, text: 'Contratos', to: '/rh/contratos', id: 'dp-contratos' },
+  
+  // Benefícios (agrupados)
+  { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'dp-beneficios' },
+  
+  // Estrutura Organizacional
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'dp-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'dp-cargos' },
-  { icon: MapPin, text: 'Postos', to: '/postos', id: 'dp-postos' },
-  { icon: Shield, text: 'EPIs', to: '/epis', id: 'dp-epis' },
-  { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico?emitir=1', id: 'dp-ordens-servico' },
+  { icon: MapPin, text: 'Postos', to: '/rh/postos', id: 'dp-postos' },
+  
+  // Segurança e Compliance
+  { icon: Shield, text: 'EPIs', to: '/rh/epis', id: 'dp-epis' },
   { icon: UserCheck, text: 'LGPD', to: '/rh/lgpd', id: 'dp-lgpd' },
-  { icon: FileText, text: 'Gestão de Documentos', to: '/rh/gestao-documentos', id: 'dp-gestao-documentos' },
-  { icon: Send, text: 'Envio de Holerites', to: '/envio-holerites', id: 'dp-envio-holerites' },
+  
+  // Documentos e Contratos
+  { icon: FileSignature, text: 'Documentos', to: '/rh/documentos', id: 'dp-documentos' },
+  { icon: Send, text: 'Holerites', to: '/rh/holerites', id: 'dp-holerites' },
+  
+  // Operações
+  { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico', id: 'dp-ordens-servico' },
+  { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'dp-vagas' },
 ];
 
 // Módulo Comercial
@@ -363,6 +374,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -396,6 +408,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -430,6 +443,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -464,6 +478,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -498,6 +513,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -532,6 +548,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ml-4
                       ${isActive(item.id) 
@@ -565,6 +582,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 <ScrollPreservingLink
                   key={item.id}
                   to={item.to}
+                  preserveScroll={true}
                   className={`
                     flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                     ${isActive(item.id) 
@@ -597,6 +615,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 <ScrollPreservingLink
                   key={item.id}
                   to={item.to}
+                  preserveScroll={true}
                   className={`
                     flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                     ${isActive(item.id) 
@@ -629,6 +648,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 <ScrollPreservingLink
                   key={item.id}
                   to={item.to}
+                  preserveScroll={true}
                   className={`
                     flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                     ${isActive(item.id) 
@@ -662,6 +682,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -696,6 +717,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -730,13 +752,14 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
-                                         className={`
-                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                       ${isActive(item.id) 
-                         ? 'bg-seguranca-black text-seguranca-yellow' 
-                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                       }
-                     `}
+                    preserveScroll={true}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
                   >
                     <item.icon 
                       size={18} 
@@ -764,6 +787,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
+                    preserveScroll={true}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 

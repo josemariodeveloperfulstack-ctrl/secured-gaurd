@@ -1,0 +1,121 @@
+name: Sync Branches
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Source branch to sync from'
+        required: true
+        default: 'main'
+        type: string
+      target_branches:
+        description: 'Target branches to sync to (comma separated)'
+        required: true
+        default: 'ci,dev'
+        type: string
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+    
+    - name: Sync branches
+      run: |
+        SOURCE_BRANCH="${{ github.event.inputs.source_branch || 'main' }}"
+        TARGET_BRANCHES="${{ github.event.inputs.target_branches || 'ci,dev' }}"
+        
+        echo "🔄 Sincronizando branches..."
+        echo "Source: $SOURCE_BRANCH"
+        echo "Targets: $TARGET_BRANCHES"
+        
+        # Convert comma-separated string to array
+        IFS=',' read -ra BRANCHES <<< "$TARGET_BRANCHES"
+        
+        for branch in "${BRANCHES[@]}"; do
+          branch=$(echo "$branch" | xargs) # trim whitespace
+          
+          echo ""
+          echo "📋 Processando branch: $branch"
+          
+          # Check if branch exists
+          if git show-ref --verify --quiet refs/heads/$branch; then
+            echo "✅ Branch $branch existe localmente"
+          else
+            echo "🆕 Branch $branch não existe, criando..."
+            git checkout -b $branch
+            git push -u origin $branch
+            continue
+          fi
+          
+          # Switch to target branch
+          git checkout $branch
+          
+          # Merge from source branch
+          echo "🔄 Fazendo merge de $SOURCE_BRANCH para $branch..."
+          if git merge origin/$SOURCE_BRANCH --no-edit; then
+            echo "✅ Merge bem-sucedido"
+            
+            # Push to remote
+            git push origin $branch
+            echo "✅ Branch $branch atualizada"
+          else
+            echo "❌ Conflito de merge em $branch"
+            echo "Resolvendo conflitos automaticamente..."
+            
+            # Try to resolve conflicts automatically
+            git status --porcelain | grep "^UU" | cut -c4- | while read file; do
+              echo "Resolvendo conflito em: $file"
+              # Keep both versions for most files
+              git checkout --theirs "$file" 2>/dev/null || git checkout --ours "$file" 2>/dev/null || true
+            done
+            
+            # Add resolved files
+            git add .
+            
+            # Commit merge
+            if git commit --no-edit; then
+              git push origin $branch
+              echo "✅ Conflitos resolvidos e branch $branch atualizada"
+            else
+              echo "❌ Não foi possível resolver conflitos em $branch"
+            fi
+          fi
+        done
+        
+        echo ""
+        echo "🎉 Sincronização concluída!"
+        
+    - name: Create summary
+      run: |
+        echo "## 📋 Resumo da Sincronização" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Source Branch:** ${{ github.event.inputs.source_branch || 'main' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Target Branches:** ${{ github.event.inputs.target_branches || 'ci,dev' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Branches Atualizadas:" >> $GITHUB_STEP_SUMMARY
+        
+        TARGET_BRANCHES="${{ github.event.inputs.target_branches || 'ci,dev' }}"
+        IFS=',' read -ra BRANCHES <<< "$TARGET_BRANCHES"
+        
+        for branch in "${BRANCHES[@]}"; do
+          branch=$(echo "$branch" | xargs)
+          echo "- \`$branch\`" >> $GITHUB_STEP_SUMMARY
+        done
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

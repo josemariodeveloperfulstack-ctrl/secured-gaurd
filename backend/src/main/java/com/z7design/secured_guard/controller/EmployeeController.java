@@ -6,7 +6,6 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +27,7 @@ public class EmployeeController {
     private final EmployeeService employeeService;
     
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar todos os funcionários", description = "Retorna uma lista de todos os funcionários")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários retornada com sucesso"),
@@ -178,6 +178,7 @@ public class EmployeeController {
     }
     
     @GetMapping("/search/simple")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Buscar funcionários simplificados", description = "Retorna dados simplificados de funcionários para seleção em formulários")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários simplificados retornada com sucesso"),

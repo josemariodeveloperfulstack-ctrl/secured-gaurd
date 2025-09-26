@@ -77,7 +77,14 @@ class EquipmentService {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        // Verificar se o resultado é um array
+        if (Array.isArray(parsed)) {
+          return parsed;
+        } else {
+          console.warn('⚠️ Dados no localStorage não são um array:', parsed);
+          return [];
+        }
       }
     } catch (error) {
       console.error('Erro ao ler localStorage:', error);
@@ -202,6 +209,21 @@ class EquipmentService {
 
       // Se o backend retorna array simples, aplicar paginação no frontend
       const equipments = response.data;
+      
+      // Verificar se equipments é um array válido
+      if (!Array.isArray(equipments)) {
+        console.warn('⚠️ Backend retornou dados que não são um array:', equipments);
+        return {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          size: size,
+          number: page,
+          first: true,
+          last: true
+        };
+      }
+      
       console.log('✅ Backend conectado! Equipamentos carregados:', equipments.length);
 
       // Aplicar filtros se fornecidos
@@ -242,6 +264,20 @@ class EquipmentService {
 
       // Fallback para dados locais quando backend não está disponível
       const equipments = this.getEquipmentsFromStorage();
+
+      // Verificar se equipments é um array válido
+      if (!Array.isArray(equipments)) {
+        console.warn('⚠️ Dados locais não são um array válido:', equipments);
+        return {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          size: size,
+          number: page,
+          first: true,
+          last: true
+        };
+      }
 
       // Aplicar filtros se fornecidos
       let filteredData = equipments;

@@ -11,7 +11,7 @@ const menu = [
   { icon: FileText, label: 'Contratos', to: '/contratos', permission: 'CONTRACTS_READ' },
   { icon: Calendar, label: 'Escalas', to: '/escalas', permission: 'EMPLOYEES_READ' },
   { icon: Building2, label: 'Clientes', to: '/clientes', permission: 'CLIENTS_READ' },
-  { icon: ClipboardList, label: 'Serviços', to: '/servicos', permission: 'CONTRACTS_READ' },
+  { icon: ClipboardList, label: 'Serviços', to: '/operacional?tab=servicos', permission: 'CONTRACTS_READ' },
   { icon: DollarSign, label: 'Financeiro', to: '/financeiro', permission: 'FINANCIAL_READ' },
   { icon: FileSpreadsheet, label: 'Holerites', to: '/holerites', permission: 'PAYSLIPS_READ' },
   { icon: Truck, label: 'Frota', to: '/frota', permission: 'FINANCIAL_READ' },

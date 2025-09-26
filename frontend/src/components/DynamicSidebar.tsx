@@ -161,8 +161,8 @@ export function DynamicSidebar() {
     {
       icon: ClipboardList,
       text: 'Serviços',
-      to: '/servicos',
-      id: 'servicos',
+      to: '/operacional?tab=servicos',
+      id: 'operacional-servicos',
       requiredPermission: 'CONTRACTS_READ'
     },
 

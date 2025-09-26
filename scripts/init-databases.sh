@@ -9,9 +9,9 @@ echo "🗄️ Inicializando bancos de dados SecuredGuard..."
 
 # Lista de bancos para criar (além do banco padrão)
 DATABASES=(
+    "secured_guard_dev"
     "secured_guard_test"
     "secured_guard_staging" 
-    "secured_guard_prod"
     "secured_guard_ci"
 )
 

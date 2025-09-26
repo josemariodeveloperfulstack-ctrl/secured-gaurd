@@ -31,6 +31,22 @@ public class PositionService {
                 .map(PositionDTO::fromEntity)
                 .collect(Collectors.toList());
     }
+    
+    public List<PositionDTO> searchPositions(String query) {
+        log.info("Buscando cargos com query: {}", query);
+        List<Position> positions;
+        
+        if (query == null || query.trim().isEmpty()) {
+            positions = positionRepository.findAllByOrderByNameAsc();
+        } else {
+            positions = positionRepository.searchPositions(query.trim());
+        }
+        
+        return positions.stream()
+                .map(PositionDTO::fromEntity)
+                .filter(dto -> dto != null) // Filtrar DTOs nulos
+                .collect(Collectors.toList());
+    }
 
     public PositionDTO getPositionById(UUID id) {
         log.info("Buscando cargo por ID: {}", id);

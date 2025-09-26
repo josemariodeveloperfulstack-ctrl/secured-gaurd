@@ -7,6 +7,7 @@ interface ScrollPreservingLinkProps {
   className?: string;
   children: React.ReactNode;
   onClick?: () => void;
+  preserveScroll?: boolean; // Nova prop para controlar se deve preservar scroll
   [key: string]: any; // Para outras props do Link
 }
 
@@ -19,10 +20,11 @@ export const ScrollPreservingLink: React.FC<ScrollPreservingLinkProps> = ({
   className, 
   children, 
   onClick,
+  preserveScroll = true, // Por padrão, preserva o scroll
   ...props 
 }) => {
   const location = useLocation();
-  const { forceScrollToTop } = useScrollPreservation();
+  const { preserveCurrentScroll, saveScrollPosition } = useScrollPreservation();
 
   const handleClick = (e: React.MouseEvent) => {
     // Se estamos navegando para a mesma página, não fazer nada
@@ -31,8 +33,11 @@ export const ScrollPreservingLink: React.FC<ScrollPreservingLinkProps> = ({
       return;
     }
 
-    // Se estamos navegando para uma página diferente, preservar scroll
-    // Não chamar forceScrollToTop() para manter a posição atual
+    // Se deve preservar scroll, salvar a posição atual
+    if (preserveScroll) {
+      // Salvar posição atual antes de navegar
+      saveScrollPosition(location.pathname);
+    }
     
     // Executar onClick personalizado se fornecido
     if (onClick) {
