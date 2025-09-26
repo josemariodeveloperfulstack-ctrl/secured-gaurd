@@ -61,15 +61,23 @@ public class AuthenticationController {
         try {
             AuthenticationResponse response = authenticationService.authenticate(request);
             
-            // Log da atividade de login bem-sucedido
-            logService.logUserActivity(request.getUsername(), "LOGIN", 
-                "Login realizado com sucesso via " + request.getUsername());
+            // Log da atividade de login bem-sucedido (comentado temporariamente para debug)
+            try {
+                logService.logUserActivity(request.getUsername(), "LOGIN", 
+                    "Login realizado com sucesso via " + request.getUsername());
+            } catch (Exception logError) {
+                System.err.println("Erro no log service: " + logError.getMessage());
+            }
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            // Log da tentativa de login falhada
-            logService.logUserActivity(request.getUsername(), "LOGIN_FAILED", 
-                "Tentativa de login falhou: " + e.getMessage());
+            // Log da tentativa de login falhada (comentado temporariamente para debug)
+            try {
+                logService.logUserActivity(request.getUsername(), "LOGIN_FAILED", 
+                    "Tentativa de login falhou: " + e.getMessage());
+            } catch (Exception logError) {
+                System.err.println("Erro no log service ao falhar: " + logError.getMessage());
+            }
             throw e;
         }
     }

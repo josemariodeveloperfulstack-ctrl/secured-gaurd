@@ -19,19 +19,18 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        System.out.println("🔍 CustomUserDetailsService: Buscando usuário: " + username);
+        
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + username));
+                .orElseThrow(() -> {
+                    System.out.println("❌ CustomUserDetailsService: Usuário não encontrado: " + username);
+                    return new UsernameNotFoundException("Usuário não encontrado: " + username);
+                });
 
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .authorities(user.getRoles().stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
-                        .collect(Collectors.toList()))
-                .accountExpired(false)
-                .accountLocked(!user.isActive())
-                .credentialsExpired(false)
-                .disabled(!user.isActive())
-                .build();
+        System.out.println("✅ CustomUserDetailsService: Usuário encontrado: " + user.getUsername() + ", Ativo: " + user.isActive());
+        System.out.println("🔍 CustomUserDetailsService: Roles: " + user.getRoles().stream().map(role -> role.getName()).collect(Collectors.toList()));
+
+        // Retornar o próprio User da aplicação que implementa UserDetails
+        return user;
     }
 }

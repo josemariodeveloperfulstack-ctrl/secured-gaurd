@@ -130,6 +130,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
         log.error("Erro interno do servidor: {}", ex.getMessage(), ex);
         
+        // Log específico para debugging
+        if (request.getDescription(false).contains("/auth/login")) {
+            log.error("ERRO NO LOGIN - Classe da exceção: {}", ex.getClass().getName());
+            log.error("ERRO NO LOGIN - Stack trace completo: ", ex);
+            if (ex.getCause() != null) {
+                log.error("ERRO NO LOGIN - Causa raiz: {}", ex.getCause().getMessage());
+            }
+        }
+        
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
