@@ -84,13 +84,17 @@ jobs:
       working-directory: ./frontend
       run: npm ci
 
-    - name: 🔧 Dar permissão ao Maven Wrapper
+    - name: 🔧 Configurar Maven Wrapper
       working-directory: ./backend
-      run: chmod +x ./mvnw
+      run: |
+        chmod +x ./mvnw
+        ls -la ./mvnw
+        echo "Maven Wrapper configurado com sucesso"
 
     - name: 🧪 Testes Backend
       working-directory: ./backend
       run: |
+        echo "Executando testes com Maven Wrapper..."
         ./mvnw clean test -Dspring.profiles.active=test
       env:
         SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/secured_guard_test
