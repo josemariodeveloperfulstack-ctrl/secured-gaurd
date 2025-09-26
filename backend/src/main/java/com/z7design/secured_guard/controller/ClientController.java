@@ -30,6 +30,7 @@ public class ClientController {
     private final ClientService clientService;
     
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar todos os clientes", description = "Retorna uma lista paginada de todos os clientes")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de clientes retornada com sucesso"),
@@ -41,6 +42,7 @@ public class ClientController {
     }
     
     @GetMapping("/all")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar todos os clientes (sem paginação)", description = "Retorna uma lista completa de todos os clientes")
     public ResponseEntity<List<ClientDTO>> getAllWithoutPagination() {
         return ResponseEntity.ok(clientService.getAllClients(Pageable.unpaged()).getContent());
@@ -58,6 +60,7 @@ public class ClientController {
     }
     
     @GetMapping("/select")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar clientes para seleção", description = "Retorna uma lista de clientes para seleção")
     public ResponseEntity<List<ClientDTO>> getForSelect() {
         return ResponseEntity.ok(clientService.getAllClients(Pageable.unpaged()).getContent());

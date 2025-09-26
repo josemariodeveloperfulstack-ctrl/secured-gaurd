@@ -42,6 +42,7 @@ public class UnitController {
     private UnitService unitService;
     
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar todas as unidades", description = "Retorna uma lista de todas as unidades")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de unidades retornada com sucesso"),
@@ -54,6 +55,7 @@ public class UnitController {
     }
     
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar unidades ativas", description = "Retorna uma lista de todas as unidades ativas")
     public ResponseEntity<List<UnitDTO>> getAllActive() {
         log.debug("Buscando unidades ativas");
@@ -62,6 +64,7 @@ public class UnitController {
     }
     
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Buscar unidade por ID", description = "Retorna uma unidade específica pelo ID")
     public ResponseEntity<UnitDTO> getById(@PathVariable UUID id) {
         log.debug("Buscando unidade por ID: {}", id);
@@ -78,6 +81,7 @@ public class UnitController {
     }
     
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Buscar unidades por nome", description = "Retorna unidades que contenham o nome especificado")
     public ResponseEntity<List<UnitDTO>> searchByName(
             @Parameter(description = "Nome para busca") @RequestParam String name) {
@@ -136,6 +140,7 @@ public class UnitController {
     }
     
     @PostMapping
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Criar nova unidade", description = "Cria uma nova unidade/centro de custo")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Unidade criada com sucesso"),
@@ -149,6 +154,7 @@ public class UnitController {
     }
     
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Atualizar unidade", description = "Atualiza uma unidade existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Unidade atualizada com sucesso"),
@@ -171,6 +177,7 @@ public class UnitController {
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_DELETE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Excluir unidade", description = "Desativa uma unidade (soft delete)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Unidade excluída com sucesso"),

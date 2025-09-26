@@ -58,6 +58,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/all")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar todos os postos de trabalho (sem paginação)", description = "Retorna uma lista completa de todos os postos de trabalho")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -177,6 +178,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/client/{clientId}")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar postos por cliente", description = "Retorna postos de um cliente específico")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -187,6 +189,20 @@ public class WorkPostController {
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
         Page<WorkPost> workPosts = workPostService.findByClient(UUID.fromString(clientId), pageable);
         Page<WorkPostDTO> workPostDTOs = workPostService.convertToDTOPage(workPosts);
+        return ResponseEntity.ok(workPostDTOs);
+    }
+    
+    @GetMapping("/client/{clientId}/all")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Listar todos os postos por cliente (sem paginação)", description = "Retorna todos os postos de um cliente específico")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<WorkPostDTO>> getAllWorkPostsByClient(
+            @Parameter(description = "ID do cliente") @PathVariable String clientId) {
+        List<WorkPost> workPosts = workPostService.findByClient(UUID.fromString(clientId));
+        List<WorkPostDTO> workPostDTOs = workPostService.convertToDTOList(workPosts);
         return ResponseEntity.ok(workPostDTOs);
     }
     
