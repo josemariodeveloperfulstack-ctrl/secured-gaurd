@@ -141,6 +141,10 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
+    public List<User> searchUsers(String query) {
+        return userRepository.searchUsers(query);
+    }
+
     public RoleRepository getRoleRepository() {
         return roleRepository;
     }

@@ -2,7 +2,6 @@ package com.z7design.secured_guard.repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,4 +40,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "JOIN u.roles r " +
            "WHERE u.active = true AND r.name = 'SUPERVISOR'")
     List<User> findSupervisors();
+
+    /**
+     * Busca usuários por nome, email ou username
+     */
+    @Query("SELECT DISTINCT u FROM User u " +
+           "WHERE u.active = true AND " +
+           "(LOWER(u.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "ORDER BY u.name ASC")
+    List<User> searchUsers(@Param("query") String query);
 } 

@@ -99,6 +99,32 @@ public class UserController {
         
         return ResponseEntity.ok(dto);
     }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @Operation(summary = "Buscar usuários", description = "Busca usuários por nome, email ou username com filtro dinâmico")
+    public ResponseEntity<List<UserListResponseDTO>> searchUsers(@RequestParam(required = false) String query) {
+        List<User> users;
+        
+        if (query == null || query.trim().isEmpty()) {
+            users = userService.findAll();
+        } else {
+            users = userService.searchUsers(query.trim());
+        }
+        
+        List<UserListResponseDTO> dtos = users.stream().map(user -> {
+            UserListResponseDTO dto = new UserListResponseDTO();
+            dto.setId(user.getId().toString());
+            dto.setName(user.getName());
+            dto.setUsername(user.getUsername());
+            dto.setEmail(user.getEmail());
+            dto.setActive(user.isActive());
+            dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
+            return dto;
+        }).collect(java.util.stream.Collectors.toList());
+        
+        return ResponseEntity.ok(dtos);
+    }
     
     @PostMapping
     @PreAuthorize("hasAuthority('USERS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
