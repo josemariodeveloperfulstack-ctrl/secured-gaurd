@@ -420,7 +420,7 @@ const ContasAPagar: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-700">Ano:</span>
                 <div className="flex gap-2">
-                  {[2024, 2025, 2026].map(ano => (
+                  {[2025, 2026].map(ano => (
                     <Button
                       key={ano}
                       variant={ano === anoSelecionado ? "default" : "outline"}
