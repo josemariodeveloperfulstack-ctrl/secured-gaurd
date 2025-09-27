@@ -1,6 +1,6 @@
 CREATE TABLE unified_documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    payslip_id UUID REFERENCES payslips(id),
+    payslip_id UUID,
     receipt_id UUID REFERENCES payment_receipts(id),
     employee_id UUID REFERENCES employees(id),
     employee_name VARCHAR(255),

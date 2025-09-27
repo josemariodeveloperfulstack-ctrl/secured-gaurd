@@ -16,8 +16,46 @@ CREATE TABLE IF NOT EXISTS vehicle_maintenances (
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
 );
 
--- Índices para melhorar performance
+-- Adicionar colunas que podem estar faltando
+DO $$
+BEGIN
+    -- Adicionar coluna status se não existir
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'vehicle_maintenances' AND column_name = 'status'
+    ) THEN
+        ALTER TABLE vehicle_maintenances ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'SCHEDULED';
+    END IF;
+    
+    -- Adicionar coluna priority se não existir
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'vehicle_maintenances' AND column_name = 'priority'
+    ) THEN
+        ALTER TABLE vehicle_maintenances ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM';
+    END IF;
+END $$;
+
+-- Índices para melhorar performance (apenas se as colunas existirem)
 CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_vehicle_id ON vehicle_maintenances(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_date ON vehicle_maintenances(date);
-CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_status ON vehicle_maintenances(status);
-CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_priority ON vehicle_maintenances(priority);
+
+-- Criar índices condicionalmente
+DO $$
+BEGIN
+    -- Índice para status se a coluna existir
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'vehicle_maintenances' AND column_name = 'status'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_status ON vehicle_maintenances(status);
+    END IF;
+    
+    -- Índice para priority se a coluna existir
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'vehicle_maintenances' AND column_name = 'priority'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_vehicle_maintenances_priority ON vehicle_maintenances(priority);
+    END IF;
+END $$;
