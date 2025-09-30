@@ -48,7 +48,7 @@ public class SecurityConfig {
                 // Endpoints públicos (sem autenticação)
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/files/**").permitAll()
-                .requestMatchers("/api/test/health").permitAll()
+                .requestMatchers("/api/test/**").permitAll()
                 .requestMatchers("/api/payslips/test-download/**").permitAll()
                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
@@ -123,7 +123,22 @@ public class SecurityConfig {
                 .requestMatchers("/api/positions/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
                 // Endpoints de multas - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/fines/**").authenticated()
+                // Endpoints de dashboard - requerem apenas autenticação para usuários logados
+                .requestMatchers("/api/dashboard/**").authenticated()
+                // Endpoints operacionais - temporariamente públicos para teste de integração
+                .requestMatchers("/api/schedules/**").permitAll()
+                .requestMatchers("/api/activity-reports/**").permitAll()
+                .requestMatchers("/api/orders-of-service/**").permitAll()
+                .requestMatchers("/api/operational/**").permitAll()
+                .requestMatchers("/api/occurrences/**").permitAll()
+                // Endpoints de controle de visitas - temporariamente públicos para desenvolvimento
+                .requestMatchers("/api/visits/**").permitAll()
                 // Endpoints de medições - requerem permissões específicas
+                .requestMatchers("/api/measurements/test-pdf").permitAll()
+                .requestMatchers("/api/measurements/*/pdf").permitAll()
+                .requestMatchers("/api/measurements/*/excel").permitAll()
+                .requestMatchers("/api/measurements/bulk/pdf").permitAll()
+                .requestMatchers("/api/measurements/bulk/excel").permitAll()
                 .requestMatchers("/api/measurements/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de estoque - requerem permissões específicas
                 .requestMatchers("/api/stock/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")

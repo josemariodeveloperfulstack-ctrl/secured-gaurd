@@ -6,60 +6,46 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class VisitDTO {
     
     private UUID id;
-    
-    @NotNull(message = "Data da visita é obrigatória")
-    private LocalDate visitDate;
-    
-    @NotNull(message = "Supervisor é obrigatório")
     private UUID supervisorId;
-    
-    @NotNull(message = "Setor é obrigatório")
-    private UUID unitId;
-    
-    private VisitStatus status;
-    private String observations;
-    private LocalDateTime arrivalTime;
-    private LocalDateTime departureTime;
-    
-    // Checklist
-    private Boolean securityCheck;
-    private Boolean equipmentCheck;
-    private Boolean staffCheck;
-    private Boolean procedureCheck;
-    
-    // Campos para otimização de rota
-    private Integer estimatedDurationMinutes;
-    private Integer priorityLevel;
-    private LocalDateTime preferredTimeStart;
-    private LocalDateTime preferredTimeEnd;
-    private Integer routeOrder;
-    private Integer travelTimeToNextMinutes;
-    private Double travelDistanceToNextKm;
-    
-    // Dados para exibição
     private String supervisorName;
-    private String unitName;
-    private String unitAddress;
-    private Double unitLatitude;
-    private Double unitLongitude;
-    private String unitAddressCity;
-    private String unitAddressState;
+    private UUID workPostId;
+    private String workPostName;
+    private UUID clientId;
+    private String clientName;
+    private LocalDate visitDate;
+    private LocalTime visitTime;
+    private String description;
+    private String observations;
+    private VisitStatus status;
+    private List<UUID> presentEmployees;
+    private List<String> presentEmployeeNames;
+    private List<String> attachedFiles;
+    private List<String> photos;
     
-    // Relacionamento com escala
-    private UUID visitScheduleId;
+    // Geolocalização
+    private Double latitude;
+    private Double longitude;
+    private String locationAddress;
+    
+    // QR Code
+    private String qrCodeScanned;
+    private Boolean qrCodeVerified;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String createdByName;
+    private String updatedByName;
 }

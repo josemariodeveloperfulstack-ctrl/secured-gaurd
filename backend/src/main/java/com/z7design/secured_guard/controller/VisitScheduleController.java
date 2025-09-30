@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "feature.visitSchedule.enabled", havingValue = "true", matchIfMissing = false)
 @RequestMapping("/api/visit-schedules")
 @RequiredArgsConstructor
 @Slf4j

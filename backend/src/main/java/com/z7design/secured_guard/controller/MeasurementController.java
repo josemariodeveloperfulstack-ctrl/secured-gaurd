@@ -4,12 +4,14 @@ import com.z7design.secured_guard.dto.MeasurementBulletinDTO;
 import com.z7design.secured_guard.dto.CalculationMemoryDTO;
 import com.z7design.secured_guard.model.enums.MeasurementStatus;
 import com.z7design.secured_guard.service.MeasurementService;
+import com.z7design.secured_guard.service.MeasurementReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -24,10 +26,12 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/measurements")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Boletins de Medição", description = "Endpoints para gestão de boletins de medição")
 public class MeasurementController {
     
     private final MeasurementService measurementService;
+    private final MeasurementReportService measurementReportService;
     
     @GetMapping
     @Operation(summary = "Listar todos os boletins", description = "Retorna uma lista paginada de todos os boletins de medição")
@@ -209,6 +213,112 @@ public class MeasurementController {
         return ResponseEntity.ok(result);
     }
     
+    @GetMapping("/test-pdf")
+    @Operation(summary = "Teste de geração de PDF", description = "Endpoint para testar geração de PDF simples")
+    public ResponseEntity<byte[]> testPDF() {
+        try {
+            byte[] pdfBytes = measurementReportService.generateTestPDF();
+            String fileName = "teste_pdf.pdf";
+            
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro no teste de PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    @GetMapping("/{id}/pdf")
+    @Operation(summary = "Gerar PDF do boletim", description = "Gera PDF de um boletim específico")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Boletim não encontrado"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar PDF"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<byte[]> generatePDF(@PathVariable String id) {
+        try {
+            byte[] pdfBytes = measurementReportService.generateBulletinPDF(UUID.fromString(id));
+            String fileName = "boletim_medicao_" + id + ".pdf";
+            
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF para boletim {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @GetMapping("/{id}/excel")
+    @Operation(summary = "Gerar Excel do boletim", description = "Gera arquivo Excel de um boletim específico")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Excel gerado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Boletim não encontrado"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar Excel"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<byte[]> generateExcel(@PathVariable String id) {
+        try {
+            byte[] excelBytes = measurementReportService.generateBulletinExcel(UUID.fromString(id));
+            String fileName = "boletim_medicao_" + id + ".xlsx";
+            
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                    .body(excelBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @PostMapping("/bulk/pdf")
+    @Operation(summary = "Gerar PDFs em lote", description = "Gera PDFs de múltiplos boletins selecionados")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "PDFs gerados com sucesso"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar PDFs"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<byte[]> generateBulkPDF(@RequestBody List<String> bulletinIds) {
+        try {
+            List<UUID> uuids = bulletinIds.stream().map(UUID::fromString).toList();
+            byte[] pdfBytes = measurementReportService.generateBulkBulletinsPDF(uuids);
+            String fileName = "boletins_medicao_" + java.time.LocalDate.now() + ".pdf";
+            
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @PostMapping("/bulk/excel")
+    @Operation(summary = "Gerar Excel em lote", description = "Gera arquivo Excel com múltiplos boletins")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Excel gerado com sucesso"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar Excel"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<byte[]> generateBulkExcel(@RequestBody List<String> bulletinIds) {
+        try {
+            List<UUID> uuids = bulletinIds.stream().map(UUID::fromString).toList();
+            byte[] excelBytes = measurementReportService.generateBulkBulletinsExcel(uuids);
+            String fileName = "boletins_medicao_" + java.time.LocalDate.now() + ".xlsx";
+            
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                    .body(excelBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir boletim", description = "Exclui um boletim do sistema")
     @ApiResponses(value = {

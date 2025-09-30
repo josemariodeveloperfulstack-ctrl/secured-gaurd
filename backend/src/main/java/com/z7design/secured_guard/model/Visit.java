@@ -2,7 +2,6 @@ package com.z7design.secured_guard.model;
 
 import com.z7design.secured_guard.model.enums.VisitStatus;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,105 +11,102 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
 @Table(name = "visits")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Visit {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
-    @NotNull(message = "Data da visita é obrigatória")
-    @Column(name = "visit_date", nullable = false)
-    private LocalDate visitDate;
-    
-    @NotNull(message = "Supervisor é obrigatório")
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "supervisor_id", nullable = false)
+    @JoinColumn(name = "supervisor_id", nullable = true)
     private Employee supervisor;
-    
-    @NotNull(message = "Setor é obrigatório")
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "unit_id", nullable = false)
-    private Unit unit;
-    
-    // Referência à escala de visitas
+    @JoinColumn(name = "work_post_id", nullable = true)
+    private WorkPost workPost;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "visit_schedule_id")
-    private VisitSchedule visitSchedule;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    @Builder.Default
-    private VisitStatus status = VisitStatus.PENDING;
-    
-    @Column(name = "observations", columnDefinition = "TEXT")
+    @JoinColumn(name = "client_id", nullable = true)
+    private Client client;
+
+    @Column(nullable = false)
+    private LocalDate visitDate;
+
+    @Column(nullable = false)
+    private LocalTime visitTime;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(columnDefinition = "TEXT")
     private String observations;
-    
-    @Column(name = "arrival_time")
-    private LocalDateTime arrivalTime;
-    
-    @Column(name = "departure_time")
-    private LocalDateTime departureTime;
-    
-    // Dados de checklist rápido
-    @Column(name = "security_check")
-    @Builder.Default
-    private Boolean securityCheck = false;
-    
-    @Column(name = "equipment_check")
-    @Builder.Default
-    private Boolean equipmentCheck = false;
-    
-    @Column(name = "staff_check")
-    @Builder.Default
-    private Boolean staffCheck = false;
-    
-    @Column(name = "procedure_check")
-    @Builder.Default
-    private Boolean procedureCheck = false;
-    
-    // Campos para otimização de rota
-    @Column(name = "estimated_duration_minutes")
-    @Builder.Default
-    private Integer estimatedDurationMinutes = 30; // Duração estimada da visita
-    
-    @Column(name = "priority_level")
-    @Builder.Default
-    private Integer priorityLevel = 1; // 1-5 (1=baixa, 5=alta prioridade)
-    
-    @Column(name = "preferred_time_start")
-    private LocalDateTime preferredTimeStart; // Horário preferencial de início
-    
-    @Column(name = "preferred_time_end")
-    private LocalDateTime preferredTimeEnd; // Horário preferencial de fim
-    
-    @Column(name = "route_order")
-    private Integer routeOrder; // Ordem na rota otimizada
-    
-    @Column(name = "travel_time_to_next_minutes")
-    private Integer travelTimeToNextMinutes; // Tempo de viagem para próxima visita
-    
-    @Column(name = "travel_distance_to_next_km")
-    private Double travelDistanceToNextKm; // Distância para próxima visita
-    
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private VisitStatus status;
+
+    // Temporariamente comentado para debug
+    // @ElementCollection(fetch = FetchType.LAZY)
+    // @CollectionTable(name = "visit_employees", joinColumns = @JoinColumn(name = "visit_id"))
+    // @Column(name = "employee_id")
+    // private List<UUID> presentEmployees = new ArrayList<>();
+
+    // @ElementCollection(fetch = FetchType.LAZY)
+    // @CollectionTable(name = "visit_files", joinColumns = @JoinColumn(name = "visit_id"))
+    // @Column(name = "file_path")
+    // private List<String> attachedFiles = new ArrayList<>();
+
+    // @ElementCollection(fetch = FetchType.LAZY)
+    // @CollectionTable(name = "visit_photos", joinColumns = @JoinColumn(name = "visit_id"))
+    // @Column(name = "photo_path")
+    // private List<String> photos = new ArrayList<>();
+
+    // Geolocalização
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "location_address")
+    private String locationAddress;
+
+    // QR Code
+    @Column(name = "qr_code_scanned")
+    private String qrCodeScanned;
+
+    @Column(name = "qr_code_verified")
+    private Boolean qrCodeVerified = false;
+
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-    
-    // Unique constraint para evitar múltiplas visitas no mesmo dia/setor/supervisor
-    @Table(uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"visit_date", "supervisor_id", "unit_id"})
-    })
-    public static class VisitConstraints {}
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private User updatedBy;
+
+    // Relação opcional com a escala/roteiro de visitas
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "visit_schedule_id")
+    private VisitSchedule visitSchedule;
 }
