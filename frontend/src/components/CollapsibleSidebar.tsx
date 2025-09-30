@@ -93,7 +93,7 @@ const mainMenuItems = [
     { icon: BarChart3, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
     { icon: ClipboardList, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
     { icon: Shield, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
-    { icon: MapPin, text: 'Controle de Visitas', to: '/controle-visitas-avancado', id: 'controle-visitas' },
+    { icon: MapPin, text: 'Controle de Visitas', to: '/operacional?tab=controle-visitas', id: 'operacional-controle-visitas' },
     { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },
     { icon: AlertTriangle, text: 'Notificações', to: '/operacional?tab=notificacoes', id: 'operacional-notificacoes' },
     { icon: Eye, text: 'Ocorrências', to: '/operacional?tab=ocorrencias', id: 'operacional-ocorrencias' },
@@ -101,6 +101,7 @@ const mainMenuItems = [
     { icon: Clock, text: 'Troca de Plantão', to: '/operacional?tab=troca-plantao', id: 'operacional-troca-plantao' },
     { icon: Route, text: 'Controle de Rondas', to: '/controle-rondas', id: 'controle-rondas' },
     { icon: FileText, text: 'Guia de Transporte', to: '/operacional?tab=guia-transporte', id: 'operacional-guia-transporte' },
+    { icon: ClipboardCheck, text: 'Gestão Operacional', to: '/operacional?tab=gestao-operacional', id: 'operacional-gestao' },
   ];
 
 // Módulo RH - Menu principal

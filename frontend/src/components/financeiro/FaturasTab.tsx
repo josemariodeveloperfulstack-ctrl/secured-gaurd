@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import CurrencyInput from 'react-currency-input-field';
 import {
   FileText,
   DollarSign,
@@ -68,6 +69,19 @@ interface Invoice {
   notes?: string;
 }
 
+interface FormData {
+  invoiceNumber: string;
+  description: string;
+  amount: string;
+  type: 'FIXA' | 'VARIAVEL';
+  status: 'PENDENTE' | 'PAGA' | 'VENCIDA' | 'CANCELADA';
+  dueDate: string;
+  issueDate: string;
+  category?: string;
+  centroCusto?: string;
+  notes?: string;
+}
+
 interface InvoiceSummary {
   totalInvoices: number;
   pendingInvoices: number;
@@ -105,10 +119,10 @@ const FaturasTab: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('TODOS');
   
   // Formulário
-  const [formData, setFormData] = useState<Partial<Invoice>>({
+  const [formData, setFormData] = useState<Partial<FormData>>({
     invoiceNumber: '',
     description: '',
-    amount: 0,
+    amount: '0,00',
     type: 'VARIAVEL',
     status: 'PENDENTE',
     dueDate: '',
@@ -171,16 +185,22 @@ const FaturasTab: React.FC = () => {
 
   const handleSalvarFatura = async () => {
     try {
+      // Converter o valor de string para number antes de enviar
+      const dataToSend = {
+        ...formData,
+        amount: parseFloat(formData.amount?.replace(',', '.') || '0')
+      };
+
       if (editingInvoice) {
         // Atualizar fatura existente
-        await api.put(`/invoices/${editingInvoice.id}`, formData);
+        await api.put(`/invoices/${editingInvoice.id}`, dataToSend);
         toast({
           title: "Sucesso",
           description: "Fatura atualizada com sucesso",
         });
       } else {
         // Criar nova fatura
-        await api.post('/invoices', formData);
+        await api.post('/invoices', dataToSend);
         toast({
           title: "Sucesso",
           description: "Fatura criada com sucesso",
@@ -192,7 +212,7 @@ const FaturasTab: React.FC = () => {
       setFormData({
         invoiceNumber: '',
         description: '',
-        amount: 0,
+        amount: '0,00',
         type: 'VARIAVEL',
         status: 'PENDENTE',
         dueDate: '',
@@ -256,7 +276,7 @@ const FaturasTab: React.FC = () => {
     setFormData({
       invoiceNumber: invoice.invoiceNumber,
       description: invoice.description,
-      amount: invoice.amount,
+      amount: invoice.amount ? invoice.amount.toFixed(2).replace('.', ',') : '0,00',
       type: invoice.type,
       status: invoice.status,
       dueDate: invoice.dueDate,
@@ -278,7 +298,7 @@ const FaturasTab: React.FC = () => {
     setFormData({
       invoiceNumber: '',
       description: '',
-      amount: 0,
+      amount: '0,00',
       type: 'VARIAVEL',
       status: 'PENDENTE',
       dueDate: '',
@@ -597,14 +617,21 @@ const FaturasTab: React.FC = () => {
               
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Valor *</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})}
-                  placeholder="0.00"
-                  className="bg-seguranca-black border-gray-600 text-white"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-bold">R$</span>
+                  <CurrencyInput
+                    prefix=""
+                    decimalSeparator="," 
+                    groupSeparator="."
+                    decimalsLimit={2}
+                    fixedDecimalLength={2}
+                    value={formData.amount}
+                    onValueChange={(value) => setFormData({...formData, amount: value || '0,00'})}
+                    placeholder="0,00"
+                    className="w-full pl-10 pr-3 py-2 bg-seguranca-black border border-gray-600 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent"
+                    required
+                  />
+                </div>
               </div>
             </div>
             

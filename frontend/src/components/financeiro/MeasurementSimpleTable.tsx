@@ -21,7 +21,9 @@ import {
   Clock,
   AlertCircle,
   X,
-  Bug
+  Bug,
+  FileDown,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -197,6 +199,80 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   const handleBulkDelete = () => {
     if (selectedBulletins.size === 0) return;
     setShowBulkDeleteDialog(true);
+  };
+
+  // Funções de exportação
+  const handleExportPDF = async (bulletin: MeasurementBulletin) => {
+    try {
+      console.log(`📄 Iniciando geração de PDF para boletim: ${bulletin.id}`);
+      
+      const blob = await measurementService.generateBulletinPDF(bulletin.id);
+      
+      // Verificar se o blob é válido
+      if (!blob || blob.size === 0) {
+        throw new Error('PDF gerado está vazio');
+      }
+      
+      console.log('✅ PDF recebido, tamanho:', blob.size, 'bytes');
+      console.log('📄 Tipo do blob:', blob.type);
+      
+      // Criar URL do blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Criar link de download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `boletim_medicao_${bulletin.id}.pdf`;
+      link.style.display = 'none';
+      
+      // Adicionar ao DOM, clicar e remover
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Limpar URL do blob
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+      
+      toast({
+        title: "Sucesso",
+        description: `PDF gerado com sucesso! (${Math.round(blob.size / 1024)} KB)`,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao gerar PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportExcel = async (bulletin: MeasurementBulletin) => {
+    try {
+      const blob = await measurementService.generateBulletinExcel(bulletin.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `boletim_medicao_${bulletin.id}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Sucesso",
+        description: "Excel gerado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao gerar Excel:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar Excel. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const confirmBulkDelete = async () => {
@@ -496,6 +572,26 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
                           <Edit className="h-4 w-4" />
                         </Button>
                       )}
+                      
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleExportPDF(bulletin)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 h-8 w-8 p-0"
+                        title="Exportar PDF"
+                      >
+                        <FileDown className="h-4 w-4" />
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleExportExcel(bulletin)}
+                        className="text-green-400 hover:text-green-300 hover:bg-green-400/10 h-8 w-8 p-0"
+                        title="Exportar Excel"
+                      >
+                        <FileSpreadsheet className="h-4 w-4" />
+                      </Button>
                       
                       {bulletin.status === 'PENDING' && (
                         <Button

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -6,6 +6,8 @@ import { PermissionDebug } from '@/components/PermissionDebug';
 import { DashboardCard, DashboardGrid } from '@/components/DashboardCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { 
   BarChart3, 
@@ -24,13 +26,75 @@ import {
   Calculator,
   ClipboardList,
   UserCog,
-  UserCheck
+  UserCheck,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Bell,
+  AlertTriangle,
+  Package,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Info,
+  Loader2,
+  RefreshCw,
+  CreditCard,
+  Banknote,
+  MessageSquare
 } from 'lucide-react';
 import { getRoleDisplayName, getRoleColor } from '@/utils/permissions';
+import { dashboardService, DashboardStats } from '@/services/dashboardService';
+import { useToast } from '@/hooks/use-toast';
 
 const Index: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Carregar dados do dashboard
+  const loadDashboardData = async (showToast = false) => {
+    try {
+      setRefreshing(true);
+      const dashboardData = await dashboardService.getDashboardSummary();
+      setStats(dashboardData);
+      
+      if (showToast) {
+        toast({
+          title: "Dashboard atualizado",
+          description: "Dados atualizados com sucesso",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do dashboard:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados do dashboard",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  // Atualizar dados automaticamente a cada 5 minutos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 300000); // 5 minutos
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (!user) {
     return (
@@ -40,30 +104,265 @@ const Index: React.FC = () => {
     );
   }
 
+  // Renderizar estatísticas em tempo real
+  const renderStatsCards = () => {
+    if (loading || !stats) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="bg-seguranca-black border-gray-700">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center h-24">
+                  <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-all duration-300 hover:shadow-lg hover:shadow-seguranca-yellow/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm font-medium">Total de Usuários</p>
+                <p className="text-2xl font-bold text-seguranca-lightgray">
+                  {dashboardService.formatNumber(stats.totalUsers)}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-blue-500" />
+            </div>
+            <div className="flex items-center mt-3">
+              <span className="text-gray-400 text-sm">
+                {stats.activeUsers} ativos
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-all duration-300 hover:shadow-lg hover:shadow-seguranca-yellow/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm font-medium">Contratos Ativos</p>
+                <p className="text-2xl font-bold text-seguranca-lightgray">
+                  {dashboardService.formatNumber(stats.activeContracts)}
+                </p>
+              </div>
+              <FileText className="h-8 w-8 text-green-500" />
+            </div>
+            <div className="flex items-center mt-3">
+              <span className="text-gray-400 text-sm">
+                {stats.totalClients} clientes
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-all duration-300 hover:shadow-lg hover:shadow-seguranca-yellow/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm font-medium">Receita Mensal</p>
+                <p className="text-2xl font-bold text-seguranca-yellow">
+                  {dashboardService.formatCurrency(stats.monthlyRevenue)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-yellow-500" />
+            </div>
+            <div className="flex items-center mt-3">
+              <span className="text-gray-400 text-sm">
+                Total: {dashboardService.formatCurrency(stats.totalRevenue)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-all duration-300 hover:shadow-lg hover:shadow-seguranca-yellow/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm font-medium">Equipamentos</p>
+                <p className="text-2xl font-bold text-seguranca-lightgray">
+                  {dashboardService.formatNumber(stats.totalEquipment)}
+                </p>
+              </div>
+              <Package className="h-8 w-8 text-orange-500" />
+            </div>
+            <div className="flex items-center mt-3">
+              <span className="text-gray-400 text-sm">
+                {stats.equipmentInUse} em uso
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  // Renderizar notificações e alertas
+  const renderNotifications = () => {
+    if (!stats) return null;
+
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="bg-seguranca-black border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+              <Bell className="h-5 w-5 text-seguranca-yellow" />
+              Notificações Recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stats.systemAlerts && stats.systemAlerts.length > 0 ? (
+                stats.systemAlerts.slice(0, 5).map((alert) => (
+                  <div key={alert.id} className="flex items-start gap-3 p-3 bg-seguranca-graphite rounded-lg hover:bg-gray-700 transition-colors">
+                    <AlertTriangle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${dashboardService.getStatusColor(alert.type)}`} />
+                    <div className="flex-1">
+                      <p className="text-seguranca-lightgray text-sm font-medium">
+                        {alert.title}
+                      </p>
+                      <p className="text-gray-400 text-xs">
+                        {alert.message}
+                      </p>
+                      <p className="text-gray-500 text-xs mt-1">
+                        {dashboardService.getRelativeTime(alert.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Bell className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400">Nenhuma notificação recente</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+      </Card>
+
+        <Card className="bg-seguranca-black border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+              <Activity className="h-5 w-5 text-seguranca-yellow" />
+              Atividade Recente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stats.recentActivities && stats.recentActivities.length > 0 ? (
+                stats.recentActivities.slice(0, 5).map((activity) => (
+                  <div key={activity.id} className="flex items-center gap-3 p-3 bg-seguranca-graphite rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{dashboardService.getActivityIcon(activity.module)}</span>
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-seguranca-lightgray text-sm">
+                        {activity.user}: {activity.action}
+                      </p>
+                      <p className="text-gray-400 text-xs">
+                        {activity.module} • {dashboardService.getRelativeTime(activity.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400">Nenhuma atividade recente</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <StandardLayout>
-      {/* Debug de permissões (apenas para SUPER_ADMIN ou desenvolvimento) */}
-      <PermissionDebug />
-
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-seguranca-lightgray mb-2">
-          Bem-vindo, {user.name}!
-        </h1>
-        <p className="text-seguranca-lightgray">
-          Acesse as funcionalidades disponíveis através do menu lateral.
-          {user.role === 'SUPER_ADMIN' && (
-            <span className="ml-2 text-seguranca-yellow font-semibold">
-              🟥 Você tem acesso total ao sistema
-            </span>
-          )}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-seguranca-lightgray mb-2">
+              Bem-vindo, {user.name}!
+            </h1>
+            <p className="text-seguranca-lightgray">
+              Acesse as funcionalidades disponíveis através do menu lateral.
+              {user.role === 'SUPER_ADMIN' && (
+                <span className="ml-2 text-seguranca-yellow font-semibold">
+                  🟥 Você tem acesso total ao sistema
+                </span>
+              )}
+            </p>
+          </div>
+          <Button
+            onClick={() => loadDashboardData(true)}
+            disabled={refreshing}
+            variant="outline"
+            size="sm"
+            className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Atualizando...' : 'Atualizar'}
+          </Button>
+        </div>
       </div>
 
-      {/* Cards de resumo baseados no role */}
-      <DashboardGrid>
+      {/* Dashboard com abas */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite border border-gray-700">
+          <TabsTrigger 
+            value="overview" 
+            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+          >
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger 
+            value="modules" 
+            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+          >
+            Módulos
+          </TabsTrigger>
+          <TabsTrigger 
+            value="activity" 
+            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+          >
+            Atividade
+          </TabsTrigger>
+          <TabsTrigger 
+            value="profile" 
+            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+          >
+            Perfil
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          {renderStatsCards()}
+          {renderNotifications()}
+        </TabsContent>
+
+        <TabsContent value="modules" className="mt-6">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-seguranca-lightgray">Módulos Disponíveis</h2>
+                <p className="text-gray-400">Acesse as funcionalidades baseadas em suas permissões</p>
+              </div>
+            </div>
+            
+            {/* Cards de resumo baseados no role */}
+            <DashboardGrid>
         {/* SUPER_ADMIN - Acesso total */}
         {user.role === 'SUPER_ADMIN' && (
           <>
+            {/* Módulos de Sistema */}
             <DashboardCard
               title="Controle Total"
               value="🟥"
@@ -99,6 +398,377 @@ const Index: React.FC = () => {
               action={{
                 label: "Gerenciar Grupos",
                 onClick: () => navigate('/grupos'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Sistema"
+              value="🟥"
+              description="Configurações avançadas do sistema"
+              icon={Database}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Configurar",
+                onClick: () => navigate('/sistema'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos Operacionais */}
+            <DashboardCard
+              title="Operacional"
+              value="🟥"
+              description="Controle operacional e escalas"
+              icon={Shield}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/operacional'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Controle de Visitas"
+              value="🟥"
+              description="Gestão avançada de visitas"
+              icon={Target}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/controle-visitas-avancado'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Supervisão"
+              value="🟥"
+              description="Supervisão principal do sistema"
+              icon={Shield}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/supervisao'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos de RH */}
+            <DashboardCard
+              title="Funcionários"
+              value="🟥"
+              description="Gestão completa de funcionários"
+              icon={Users}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/funcionarios'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Postos de Trabalho"
+              value="🟥"
+              description="Gestão de postos e funções"
+              icon={Target}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/postos'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Funções"
+              value="🟥"
+              description="Gestão de funções e cargos"
+              icon={Settings}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/rh/funcoes'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Cargos"
+              value="🟥"
+              description="Gestão de cargos e hierarquia"
+              icon={ClipboardList}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/rh/cargos'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Holerites"
+              value="🟥"
+              description="Gestão de holerites e pagamentos"
+              icon={FileText}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/holerites'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos SST */}
+            <DashboardCard
+              title="SST"
+              value="🟥"
+              description="Saúde e Segurança do Trabalho"
+              icon={Shield}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/rh/sst'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Exames Médicos"
+              value="🟥"
+              description="Gestão de exames médicos"
+              icon={Activity}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/rh/sst/exames'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="EPIs"
+              value="🟥"
+              description="Gestão de equipamentos de proteção"
+              icon={Package}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/rh/sst/epis'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos Comerciais */}
+            <DashboardCard
+              title="Clientes"
+              value="🟥"
+              description="Gestão de clientes e contratos"
+              icon={Building}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/clientes'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Contratos"
+              value="🟥"
+              description="Gestão de contratos de segurança"
+              icon={FileText}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/contratos'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Leads"
+              value="🟥"
+              description="Gestão de leads e oportunidades"
+              icon={Target}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/leads'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Propostas"
+              value="🟥"
+              description="Controle de propostas comerciais"
+              icon={FileCheck}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/propostas'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos Financeiros */}
+            <DashboardCard
+              title="Financeiro"
+              value="🟥"
+              description="Controle financeiro completo"
+              icon={DollarSign}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/financeiro'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Contas a Pagar"
+              value="🟥"
+              description="Gestão de contas a pagar"
+              icon={CreditCard}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/gestao-financeira/contas-pagar'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Contas a Receber"
+              value="🟥"
+              description="Gestão de contas a receber"
+              icon={Banknote}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/gestao-financeira/contas-receber'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Fluxo de Caixa"
+              value="🟥"
+              description="Controle de fluxo de caixa"
+              icon={TrendingUp}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/gestao-financeira/fluxo-caixa'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Conciliação Bancária"
+              value="🟥"
+              description="Conciliação de movimentações bancárias"
+              icon={Calculator}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/gestao-financeira/conciliacao'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos de Frota e Operações */}
+            <DashboardCard
+              title="Frota"
+              value="🟥"
+              description="Controle de veículos e manutenção"
+              icon={Truck}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/frota'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Filiais"
+              value="🟥"
+              description="Gestão de filiais e unidades"
+              icon={Building}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/filiais'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Serviços"
+              value="🟥"
+              description="Controle de serviços prestados"
+              icon={ClipboardList}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Gerenciar",
+                onClick: () => navigate('/operacional?tab=servicos'),
+                variant: 'default'
+              }}
+            />
+
+            {/* Módulos de Relatórios e Suporte */}
+            <DashboardCard
+              title="Relatórios"
+              value="🟥"
+              description="Relatórios e análises do sistema"
+              icon={BarChart3}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/relatorios'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Gestão de Atividades"
+              value="🟥"
+              description="Controle de atividades do sistema"
+              icon={Activity}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/atividades'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Central de Suporte"
+              value="🟥"
+              description="Central de suporte e atendimento"
+              icon={Bell}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/suporte'),
+                variant: 'default'
+              }}
+            />
+
+            <DashboardCard
+              title="Gestão de Mensagens"
+              value="🟥"
+              description="Sistema de mensagens internas"
+              icon={MessageSquare}
+              iconColor="text-seguranca-yellow"
+              action={{
+                label: "Acessar",
+                onClick: () => navigate('/gestao-mensagens/inbox'),
                 variant: 'default'
               }}
             />
@@ -329,36 +999,237 @@ const Index: React.FC = () => {
             />
           </>
         )}
-      </DashboardGrid>
+            </DashboardGrid>
+          </div>
+        </TabsContent>
 
-      {/* Informações do usuário */}
-      <div className="mt-8 p-6 bg-seguranca-graphite rounded-lg border border-gray-700">
-        <h2 className="text-xl font-semibold text-seguranca-lightgray mb-4">
-          Informações da Sessão
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-400">Nome:</p>
-            <p className="text-seguranca-lightgray font-medium">{user.name}</p>
+        <TabsContent value="activity" className="mt-6">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-seguranca-lightgray">Atividade do Sistema</h2>
+            <Card className="bg-seguranca-black border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-seguranca-yellow" />
+                  Log de Atividades
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-seguranca-graphite rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <div className="flex-1">
+                      <p className="text-seguranca-lightgray text-sm font-medium">
+                        Sistema iniciado com sucesso
+                      </p>
+                      <p className="text-gray-400 text-xs">Todos os serviços estão funcionando normalmente</p>
+                      <p className="text-gray-500 text-xs mt-1">Agora</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-seguranca-graphite rounded-lg">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    <div className="flex-1">
+                      <p className="text-seguranca-lightgray text-sm font-medium">
+                        Usuário logado no sistema
+                      </p>
+                      <p className="text-gray-400 text-xs">{user.name} acessou o dashboard</p>
+                      <p className="text-gray-500 text-xs mt-1">1 minuto atrás</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-seguranca-graphite rounded-lg">
+                    <Database className="h-5 w-5 text-purple-500" />
+                    <div className="flex-1">
+                      <p className="text-seguranca-lightgray text-sm font-medium">
+                        Backup automático realizado
+                      </p>
+                      <p className="text-gray-400 text-xs">Backup completo do sistema concluído</p>
+                      <p className="text-gray-500 text-xs mt-1">15 minutos atrás</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div>
-            <p className="text-sm text-gray-400">Email:</p>
-            <p className="text-seguranca-lightgray font-medium">{user.email}</p>
+        </TabsContent>
+
+        <TabsContent value="profile" className="mt-6">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-seguranca-lightgray">Informações do Perfil</h2>
+            
+            {/* Perfil Principal */}
+            <Card className="bg-seguranca-black border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                  <User className="h-5 w-5 text-seguranca-yellow" />
+                  Dados da Sessão
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">Nome:</p>
+                    <p className="text-seguranca-lightgray font-medium text-lg">{user.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">Email:</p>
+                    <p className="text-seguranca-lightgray font-medium">{user.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">Cargo:</p>
+                    <Badge className={`${getRoleColor(user.role)} mt-1 text-sm`}>
+                      {getRoleDisplayName(user.role)}
+                      {user.role === 'SUPER_ADMIN' && ' 🟥'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">Departamento:</p>
+                    <p className="text-seguranca-lightgray font-medium">
+                      {user.department || 'Não informado'}
+                    </p>
+                  </div>
+                </div>
+                
+                {user.role === 'SUPER_ADMIN' && (
+                  <div className="mt-6 p-4 bg-seguranca-graphite border border-seguranca-yellow rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="h-5 w-5 text-seguranca-yellow" />
+                      <h3 className="text-seguranca-yellow font-semibold">Acesso Administrativo Total</h3>
+                    </div>
+                    <p className="text-seguranca-lightgray text-sm">
+                      Como SUPER_ADMIN, você tem acesso irrestrito a todas as funcionalidades do sistema.
+                      Use esse poder com responsabilidade.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Estatísticas do Usuário */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-seguranca-black border-gray-700 hover:border-blue-500 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Sessão Ativa</p>
+                      <p className="text-lg font-bold text-blue-500">Online</p>
+                    </div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-black border-gray-700 hover:border-green-500 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Último Acesso</p>
+                      <p className="text-lg font-bold text-green-500">Agora</p>
+                    </div>
+                    <Clock className="h-5 w-5 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-black border-gray-700 hover:border-purple-500 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Permissões</p>
+                      <p className="text-lg font-bold text-purple-500">80/80</p>
+                    </div>
+                    <Shield className="h-5 w-5 text-purple-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Ações Rápidas do Perfil */}
+            <Card className="bg-seguranca-black border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-seguranca-yellow" />
+                  Ações Rápidas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Button 
+                    variant="outline" 
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
+                    onClick={() => navigate('/profile')}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Editar Perfil
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
+                    onClick={() => navigate('/configuracoes')}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configurações
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
+                    onClick={() => navigate('/usuarios')}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Gerenciar Usuários
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="bg-red-600 border-red-600 text-white hover:bg-red-700 hover:border-red-700"
+                    onClick={logout}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sair
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Informações do Sistema */}
+            <Card className="bg-seguranca-black border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                  <Info className="h-5 w-5 text-seguranca-yellow" />
+                  Informações do Sistema
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Versão do Sistema:</p>
+                    <p className="text-seguranca-lightgray font-medium">v2.1.0</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Última Atualização:</p>
+                    <p className="text-seguranca-lightgray font-medium">29/09/2024</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Ambiente:</p>
+                    <Badge className="bg-green-100 text-green-800">Produção</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Status:</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-green-500 text-sm font-medium">Operacional</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div>
-            <p className="text-sm text-gray-400">Cargo:</p>
-            <Badge className={`${getRoleColor(user.role)} mt-1`}>
-              {getRoleDisplayName(user.role)}
-              {user.role === 'SUPER_ADMIN' && ' 🟥'}
-            </Badge>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400">Departamento:</p>
-            <p className="text-seguranca-lightgray font-medium">
-              {user.department || 'Não informado'}
-            </p>
-          </div>
-        </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Debug de permissões (apenas para SUPER_ADMIN ou desenvolvimento) - Movido para baixo */}
+      <div className="mt-8">
+        <PermissionDebug />
       </div>
     </StandardLayout>
   );

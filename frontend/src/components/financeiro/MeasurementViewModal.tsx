@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Eye, 
   FileText, 
@@ -14,9 +15,12 @@ import {
   AlertCircle,
   Clock,
   User,
-  FileCheck
+  FileCheck,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { MeasurementBulletin } from '@/types/measurement';
+import { measurementService } from '@/services/measurementService';
 
 interface MeasurementViewModalProps {
   open: boolean;
@@ -29,6 +33,54 @@ export const MeasurementViewModal: React.FC<MeasurementViewModalProps> = ({
   onOpenChange,
   bulletin
 }) => {
+  const { toast } = useToast();
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  // Função para gerar relatório PDF
+  const handleGenerateReport = async () => {
+    try {
+      setGeneratingReport(true);
+      console.log(`📄 Gerando relatório para boletim: ${bulletin.id}`);
+      
+      const blob = await measurementService.generateBulletinPDF(bulletin.id);
+      if (!blob || blob.size === 0) {
+        throw new Error('Relatório gerado está vazio');
+      }
+      
+      console.log('✅ Relatório recebido, tamanho:', blob.size, 'bytes');
+      
+      // Criar URL para download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `boletim_medicao_${bulletin.contractNumber || bulletin.id}.pdf`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Limpar URL após download
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+      
+      toast({
+        title: "Sucesso",
+        description: `Relatório gerado com sucesso! (${Math.round(blob.size / 1024)} KB)`,
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro ao gerar relatório:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao gerar relatório: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   // Obter propriedades do status
   const getStatusProps = (status: string) => {
     switch (status) {
@@ -259,7 +311,27 @@ export const MeasurementViewModal: React.FC<MeasurementViewModalProps> = ({
           )}
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-600">
+          <div className="flex justify-between items-center pt-4 border-t border-gray-600">
+            <div className="flex gap-3">
+              <Button
+                onClick={handleGenerateReport}
+                disabled={generatingReport}
+                className="bg-seguranca-yellow hover:bg-yellow-600 text-black font-medium"
+              >
+                {generatingReport ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Gerar Relatório PDF
+                  </>
+                )}
+              </Button>
+            </div>
+            
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}

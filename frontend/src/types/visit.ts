@@ -1,41 +1,34 @@
-// Definindo o tipo UUID para ser usado em todas as interfaces
-export type UUID = string;
-
 export interface Visit {
-  id?: UUID;
+  id: string;
+  supervisorId: string;
+  supervisorName: string;
+  workPostId: string;
+  workPostName: string;
+  clientId: string;
+  clientName: string;
   visitDate: string;
-  supervisorId: UUID;
-  unitId: UUID;
-  visitScheduleId?: UUID;
-  status: VisitStatus;
+  visitTime: string;
+  description?: string;
   observations?: string;
-  arrivalTime?: string;
-  departureTime?: string;
-  securityCheck?: boolean;
-  equipmentCheck?: boolean;
-  staffCheck?: boolean;
-  procedureCheck?: boolean;
+  status: VisitStatus;
+  presentEmployees: string[];
+  presentEmployeeNames?: string[];
+  attachedFiles: string[];
+  photos: string[];
   
-  // Campos para otimização de rota
-  estimatedDurationMinutes?: number;
-  priorityLevel?: number;
-  preferredTimeStart?: string;
-  preferredTimeEnd?: string;
-  routeOrder?: number;
-  travelTimeToNextMinutes?: number;
-  travelDistanceToNextKm?: number;
+  // Geolocalização
+  latitude?: number;
+  longitude?: number;
+  locationAddress?: string;
   
-  // Dados para exibição
-  supervisorName?: string;
-  unitName?: string;
-  unitAddress?: string;
-  unitLatitude?: number;
-  unitLongitude?: number;
-  unitAddressCity?: string;
-  unitAddressState?: string;
+  // QR Code
+  qrCodeScanned?: string;
+  qrCodeVerified: boolean;
   
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdByName?: string;
+  updatedByName?: string;
 }
 
 export enum VisitStatus {
@@ -43,66 +36,6 @@ export enum VisitStatus {
   COMPLETED = 'COMPLETED',
   NOT_COMPLETED = 'NOT_COMPLETED',
   CANCELLED = 'CANCELLED'
-}
-
-export interface VisitStatistics {
-  totalVisits: number;
-  completedVisits: number;
-  pendingVisits: number;
-  notCompletedVisits: number;
-  completionRate: number;
-}
-
-export interface CreateVisitDTO {
-  visitDate: string;
-  supervisorId: UUID;
-  unitId: UUID;
-  observations?: string;
-}
-
-export interface UpdateVisitDTO {
-  status?: VisitStatus;
-  observations?: string;
-  arrivalTime?: string;
-  departureTime?: string;
-  securityCheck?: boolean;
-  equipmentCheck?: boolean;
-  staffCheck?: boolean;
-  procedureCheck?: boolean;
-  estimatedDurationMinutes?: number;
-  priorityLevel?: number;
-  preferredTimeStart?: string;
-  preferredTimeEnd?: string;
-}
-
-// Novos tipos para Escalas de Visita
-export interface VisitSchedule {
-  id?: UUID;
-  scheduleDate: string;
-  supervisorId: UUID;
-  clientId: UUID;
-  startTime: string;
-  endTime: string;
-  status: VisitScheduleStatus;
-  totalEstimatedTimeMinutes?: number;
-  totalTravelDistanceKm?: number;
-  observations?: string;
-  optimizedRoute?: string;
-  routeOptimizationScore?: number;
-  visits?: Visit[];
-  
-  // Dados para exibição
-  supervisorName?: string;
-  clientName?: string;
-  
-  // Controle de execução
-  startedAt?: string;
-  completedAt?: string;
-  cancelledAt?: string;
-  cancellationReason?: string;
-  
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export enum VisitScheduleStatus {
@@ -113,23 +46,100 @@ export enum VisitScheduleStatus {
   RESCHEDULED = 'RESCHEDULED'
 }
 
-export interface CreateVisitScheduleDTO {
-  supervisorId: UUID;
-  clientId: UUID;
-  scheduleDate: string;
-  unitIds: UUID[];
-  startTime: string;
-  endTime: string;
+export interface CreateVisitRequest {
+  supervisorId: string;
+  workPostId: string;
+  clientId: string;
+  visitDate: string;
+  visitTime: string;
+  description?: string;
   observations?: string;
+  status?: VisitStatus;
+  presentEmployees?: string[];
+  attachedFiles?: string[];
+  photos?: string[];
+  
+  // Geolocalização
+  latitude?: number;
+  longitude?: number;
+  locationAddress?: string;
+  
+  // QR Code
+  qrCodeScanned?: string;
+  qrCodeVerified?: boolean;
 }
 
-export interface RouteOptimizationStats {
+export interface VisitFilters {
+  supervisorId?: string;
+  workPostId?: string;
+  clientId?: string;
+  status?: VisitStatus;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface VisitCalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  supervisor: string;
+  workPost: string;
+  client: string;
+  status: VisitStatus;
+  color: string;
+}
+
+export interface GeolocationData {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  timestamp: number;
+}
+
+export interface QRCodeData {
+  workPostId: string;
+  workPostName: string;
+  clientId: string;
+  clientName: string;
+  employees: {
+    id: string;
+    name: string;
+    position: string;
+  }[];
+}
+
+export interface VisitStatistics {
   totalVisits: number;
-  totalDistanceKm: number;
-  totalTravelTimeMinutes: number;
-  totalVisitTimeMinutes: number;
-  totalDayTimeMinutes: number;
-  efficiencyScore: number;
+  completedVisits: number;
+  pendingVisits: number;
+  cancelledVisits: number;
+  completionRate: number;
+  averageDuration: number;
+}
+
+export interface VisitSchedule {
+  id: string;
+  scheduleDate: string;
+  supervisorId: string;
+  supervisorName: string;
+  clientId: string;
+  clientName: string;
+  startTime: string;
+  endTime: string;
+  status: VisitScheduleStatus;
+  totalEstimatedTimeMinutes?: number;
+  totalTravelDistanceKm?: number;
+  routeOptimizationScore?: number;
+  observations?: string;
+  optimizedRoute?: string;
+  visits: Visit[];
+  startedAt?: string;
+  completedAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EfficiencyReport {
@@ -140,42 +150,4 @@ export interface EfficiencyReport {
   avgOptimizationScore: number;
   totalDistanceKm: number;
   totalTimeHours: number;
-}
-
-export interface Unit {
-  id: UUID;
-  name: string;
-  description?: string;
-  address: string;
-  phone?: string;
-  email?: string;
-  code?: string;
-  manager?: string;
-  active: boolean;
-  latitude?: number;
-  longitude?: number;
-  addressCity?: string;
-  addressState?: string;
-  addressZipCode?: string;
-  clientId?: UUID;
-  clientName?: string;
-}
-
-export interface Client {
-  id: UUID;
-  name: string;
-  cnpj: string;
-  email?: string;
-  phone?: string;
-  mobile?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  contactName?: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  status: string;
-  notes?: string;
-  units?: Unit[];
 }

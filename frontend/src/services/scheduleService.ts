@@ -73,9 +73,12 @@ export const scheduleService = {
         return [];
       }
     } catch (error) {
-      console.error('Erro ao buscar escalas de trabalho:', error);
-      // Em caso de erro, retornar lista vazia em vez de lançar exceção
-      return [];
+      console.error('❌ Erro detalhado ao buscar escalas de trabalho:', error);
+      console.error('❌ Status:', error.response?.status);
+      console.error('❌ Data:', error.response?.data);
+      console.error('❌ Headers:', error.response?.headers);
+      // Em caso de erro, lançar exceção para que o componente possa tratar
+      throw error;
     }
   },
 

@@ -47,6 +47,38 @@
   }
 }
 
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+  
+  /* Indicadores de scroll visuais */
+  .scroll-indicator-left {
+    background: linear-gradient(to right, rgba(243, 244, 246, 1), rgba(243, 244, 246, 0));
+  }
+  
+  .scroll-indicator-right {
+    background: linear-gradient(to left, rgba(243, 244, 246, 1), rgba(243, 244, 246, 0));
+  }
+  
+  .dark .scroll-indicator-left {
+    background: linear-gradient(to right, rgba(31, 41, 55, 1), rgba(31, 41, 55, 0));
+  }
+  
+  .dark .scroll-indicator-right {
+    background: linear-gradient(to left, rgba(31, 41, 55, 1), rgba(31, 41, 55, 0));
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
