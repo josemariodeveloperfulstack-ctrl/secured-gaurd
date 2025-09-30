@@ -104,7 +104,7 @@ public class CostCenterController {
     
     @PostMapping
     @Operation(summary = "Criar centro de custo", description = "Cria um novo centro de custo")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<CostCenterDTO> create(@Valid @RequestBody CreateCostCenterDTO dto) {
         log.info("Criando novo centro de custo: {}", dto.getCode());
         
@@ -118,7 +118,7 @@ public class CostCenterController {
     
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar centro de custo", description = "Atualiza um centro de custo existente")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<CostCenterDTO> update(
             @PathVariable UUID id, 
             @Valid @RequestBody UpdateCostCenterDTO dto) {
@@ -134,7 +134,7 @@ public class CostCenterController {
     
     @PatchMapping("/{id}/spent")
     @Operation(summary = "Atualizar valor gasto", description = "Atualiza o valor gasto de um centro de custo")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<CostCenterDTO> updateSpentAmount(
             @PathVariable UUID id,
             @Parameter(description = "Novo valor gasto") 
@@ -147,7 +147,7 @@ public class CostCenterController {
     
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir centro de custo", description = "Exclui um centro de custo")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ROLE_SUPER_ADMIN','ROLE_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         log.info("Excluindo centro de custo: {}", id);
         costCenterService.delete(id);
@@ -156,7 +156,7 @@ public class CostCenterController {
     
     @GetMapping("/departments")
     @Operation(summary = "Listar departamentos", description = "Lista todos os departamentos distintos")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<List<String>> getDepartments() {
         log.info("Listando departamentos distintos");
         List<String> departments = costCenterService.getDistinctDepartments();
@@ -165,7 +165,7 @@ public class CostCenterController {
     
     @GetMapping("/summary")
     @Operation(summary = "Resumo dos centros de custo", description = "Retorna um resumo estatístico dos centros de custo")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<CostCenterSummaryDTO> getSummary() {
         log.info("Gerando resumo dos centros de custo");
         CostCenterSummaryDTO summary = costCenterService.getSummary();
