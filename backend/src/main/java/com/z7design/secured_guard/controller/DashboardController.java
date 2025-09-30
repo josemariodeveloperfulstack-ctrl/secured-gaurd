@@ -26,7 +26,7 @@ public class DashboardController {
         summary = "Obter resumo do dashboard", 
         description = "Retorna estatísticas gerais do sistema para o dashboard principal"
     )
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'RH', 'FINANCEIRO', 'OPERACIONAL', 'CLIENTE')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','CLIENTE','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_CLIENTE')")
     public ResponseEntity<DashboardSummaryDTO> getDashboardSummary() {
         try {
             log.info("Solicitando resumo do dashboard");
@@ -49,7 +49,7 @@ public class DashboardController {
         summary = "Obter estatísticas rápidas", 
         description = "Retorna estatísticas básicas para widgets do dashboard"
     )
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'RH', 'FINANCEIRO', 'OPERACIONAL', 'CLIENTE')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','CLIENTE','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_CLIENTE')")
     public ResponseEntity<Object> getQuickStats() {
         try {
             log.info("Solicitando estatísticas rápidas do dashboard");
