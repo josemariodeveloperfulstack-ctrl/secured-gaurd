@@ -29,6 +29,7 @@ public class VisitDTO {
     private String unitName;
     private String unitAddress;
     private String unitAddressCity;
+    private String unitAddressState;
     private Double unitLatitude;
     private Double unitLongitude;
     private UUID visitScheduleId;
