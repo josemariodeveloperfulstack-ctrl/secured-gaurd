@@ -274,6 +274,7 @@ public class VisitService {
                     .clientName(visit.getClient() != null ? visit.getClient().getName() : "N/A")
                     .unitId(visit.getUnit() != null ? visit.getUnit().getId() : null)
                     .unitName(visit.getUnit() != null ? visit.getUnit().getName() : "N/A")
+                    .visitScheduleId(visit.getVisitSchedule() != null ? visit.getVisitSchedule().getId() : null)
                     .visitDate(visit.getVisitDate())
                     .visitTime(visit.getVisitTime())
                     .description(visit.getDescription())

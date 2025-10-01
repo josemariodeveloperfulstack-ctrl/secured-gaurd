@@ -27,6 +27,7 @@ public class VisitDTO {
     private String clientName;
     private UUID unitId;
     private String unitName;
+    private UUID visitScheduleId;
     private LocalDate visitDate;
     private LocalTime visitTime;
     private String description;
