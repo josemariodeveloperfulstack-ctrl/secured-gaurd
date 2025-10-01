@@ -275,6 +275,7 @@ public class VisitService {
                     .unitId(visit.getUnit() != null ? visit.getUnit().getId() : null)
                     .unitName(visit.getUnit() != null ? visit.getUnit().getName() : "N/A")
                     .unitAddress(visit.getUnit() != null ? visit.getUnit().getAddress() : "N/A")
+                    .unitAddressCity(visit.getUnit() != null ? visit.getUnit().getCity() : "N/A")
                     .unitLatitude(visit.getUnit() != null ? visit.getUnit().getLatitude() : null)
                     .unitLongitude(visit.getUnit() != null ? visit.getUnit().getLongitude() : null)
                     .visitScheduleId(visit.getVisitSchedule() != null ? visit.getVisitSchedule().getId() : null)
