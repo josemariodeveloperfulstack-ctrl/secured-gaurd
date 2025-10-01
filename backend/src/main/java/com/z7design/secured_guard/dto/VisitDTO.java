@@ -25,6 +25,8 @@ public class VisitDTO {
     private String workPostName;
     private UUID clientId;
     private String clientName;
+    private UUID unitId;
+    private String unitName;
     private LocalDate visitDate;
     private LocalTime visitTime;
     private String description;
@@ -34,6 +36,21 @@ public class VisitDTO {
     private List<String> presentEmployeeNames;
     private List<String> attachedFiles;
     private List<String> photos;
+    
+    // Campos de agendamento/roteiro
+    private LocalTime arrivalTime;
+    private LocalTime departureTime;
+    private Boolean securityCheck;
+    private Boolean equipmentCheck;
+    private Boolean staffCheck;
+    private Boolean procedureCheck;
+    private Integer estimatedDurationMinutes;
+    private Integer priorityLevel;
+    private LocalTime preferredTimeStart;
+    private LocalTime preferredTimeEnd;
+    private Integer routeOrder;
+    private Integer travelTimeToNextMinutes;
+    private Double travelDistanceToNextKm;
     
     // Geolocalização
     private Double latitude;
