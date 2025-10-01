@@ -225,7 +225,7 @@ public class VisitService {
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new RuntimeException("Visita não encontrada"));
 
-        String fileName = fileStorageService.storeFile(file, "visits");
+        String fileName = fileStorageService.storeFile(file);
         
         List<String> files = visit.getAttachedFiles();
         if (files == null) {
@@ -247,7 +247,7 @@ public class VisitService {
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new RuntimeException("Visita não encontrada"));
 
-        String fileName = fileStorageService.storeFile(photo, "visits/photos");
+        String fileName = fileStorageService.storeFile(photo);
         
         List<String> photos = visit.getPhotos();
         if (photos == null) {
@@ -277,9 +277,9 @@ public class VisitService {
                     .description(visit.getDescription())
                     .observations(visit.getObservations())
                     .status(visit.getStatus())
-                    .presentEmployees(List.of()) // Temporariamente vazio
-                    .attachedFiles(List.of()) // Temporariamente vazio
-                    .photos(List.of()) // Temporariamente vazio
+                    .presentEmployees(visit.getPresentEmployees() != null ? visit.getPresentEmployees() : List.of())
+                    .attachedFiles(visit.getAttachedFiles() != null ? visit.getAttachedFiles() : List.of())
+                    .photos(visit.getPhotos() != null ? visit.getPhotos() : List.of())
                     .latitude(visit.getLatitude())
                     .longitude(visit.getLongitude())
                     .locationAddress(visit.getLocationAddress())

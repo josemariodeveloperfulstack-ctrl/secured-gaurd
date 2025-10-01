@@ -56,21 +56,67 @@ public class Visit {
     @Column(nullable = false)
     private VisitStatus status;
 
-    // Temporariamente comentado para debug
-    // @ElementCollection(fetch = FetchType.LAZY)
-    // @CollectionTable(name = "visit_employees", joinColumns = @JoinColumn(name = "visit_id"))
-    // @Column(name = "employee_id")
-    // private List<UUID> presentEmployees = new ArrayList<>();
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "visit_employees", joinColumns = @JoinColumn(name = "visit_id"))
+    @Column(name = "employee_id")
+    @Builder.Default
+    private List<UUID> presentEmployees = new ArrayList<>();
 
-    // @ElementCollection(fetch = FetchType.LAZY)
-    // @CollectionTable(name = "visit_files", joinColumns = @JoinColumn(name = "visit_id"))
-    // @Column(name = "file_path")
-    // private List<String> attachedFiles = new ArrayList<>();
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "visit_files", joinColumns = @JoinColumn(name = "visit_id"))
+    @Column(name = "file_path")
+    @Builder.Default
+    private List<String> attachedFiles = new ArrayList<>();
 
-    // @ElementCollection(fetch = FetchType.LAZY)
-    // @CollectionTable(name = "visit_photos", joinColumns = @JoinColumn(name = "visit_id"))
-    // @Column(name = "photo_path")
-    // private List<String> photos = new ArrayList<>();
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "visit_photos", joinColumns = @JoinColumn(name = "visit_id"))
+    @Column(name = "photo_path")
+    @Builder.Default
+    private List<String> photos = new ArrayList<>();
+
+    // Campos de agendamento/roteiro
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id")
+    private Unit unit;
+
+    @Column(name = "arrival_time")
+    private LocalTime arrivalTime;
+
+    @Column(name = "departure_time")
+    private LocalTime departureTime;
+
+    @Column(name = "security_check")
+    private Boolean securityCheck;
+
+    @Column(name = "equipment_check")
+    private Boolean equipmentCheck;
+
+    @Column(name = "staff_check")
+    private Boolean staffCheck;
+
+    @Column(name = "procedure_check")
+    private Boolean procedureCheck;
+
+    @Column(name = "estimated_duration_minutes")
+    private Integer estimatedDurationMinutes;
+
+    @Column(name = "priority_level")
+    private Integer priorityLevel;
+
+    @Column(name = "preferred_time_start")
+    private LocalTime preferredTimeStart;
+
+    @Column(name = "preferred_time_end")
+    private LocalTime preferredTimeEnd;
+
+    @Column(name = "route_order")
+    private Integer routeOrder;
+
+    @Column(name = "travel_time_to_next_minutes")
+    private Integer travelTimeToNextMinutes;
+
+    @Column(name = "travel_distance_to_next_km")
+    private Double travelDistanceToNextKm;
 
     // Geolocalização
     @Column(name = "latitude")
