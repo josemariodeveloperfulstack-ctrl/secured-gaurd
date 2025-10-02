@@ -85,9 +85,9 @@ public class SecurityConfig {
                 // Endpoints de work-posts - requerem apenas autenticação (temporário para debug)
                 .requestMatchers("/api/work-posts/test-create").permitAll()
                 .requestMatchers("/api/work-posts/test-clients").permitAll()
-                .requestMatchers("/api/work-posts/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "HR", "GESTOR", "SUPERVISOR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR", "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                .requestMatchers("/api/work-posts/**").authenticated()
                 // Endpoints de clientes - requerem permissões específicas
-                .requestMatchers("/api/clients/**").hasAnyAuthority("CLIENTS_READ", "CLIENTS_WRITE", "CLIENTS_CREATE", "CLIENTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                .requestMatchers("/api/clients/**").authenticated()
                 // Endpoints de contratos - requerem permissões específicas
                 .requestMatchers("/api/contracts/**").hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE", "CONTRACTS_CREATE", "CONTRACTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR")
                 // Endpoints financeiros - requerem permissões específicas
@@ -117,10 +117,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/chat/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
                 // Endpoints de mensagens - requerem permissões específicas
                 .requestMatchers("/api/v1/messages/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
-                // Endpoints de funcionários - requerem permissões específicas
-                .requestMatchers("/api/employees/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
-                // Endpoints de cargos/posições - requerem permissões específicas
-                .requestMatchers("/api/positions/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
+                // Endpoints de funcionários - temporariamente acessíveis a usuários autenticados
+                .requestMatchers("/api/employees/**").authenticated()
+                // Endpoints de cargos/posições - temporariamente acessíveis a usuários autenticados
+                .requestMatchers("/api/positions/**").authenticated()
                 // Endpoints de multas - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/fines/**").authenticated()
                 // Endpoints de dashboard - requerem apenas autenticação para usuários logados

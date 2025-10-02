@@ -14,7 +14,7 @@ export const clientService = {
   // Buscar todos os clientes
   async getAllClients(): Promise<Client[]> {
     try {
-      const response = await api.get('/api/clients/all');
+      const response = await api.get('/clients/all');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
@@ -25,7 +25,7 @@ export const clientService = {
   // Buscar clientes para seleção
   async getClientsForSelect(): Promise<Client[]> {
     try {
-      const response = await api.get('/api/clients/select');
+      const response = await api.get('/clients/select');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar clientes para seleção:', error);
@@ -36,7 +36,7 @@ export const clientService = {
   // Buscar cliente por ID
   async getClientById(id: string): Promise<Client> {
     try {
-      const response = await api.get(`/api/clients/${id}`);
+      const response = await api.get(`/clients/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);

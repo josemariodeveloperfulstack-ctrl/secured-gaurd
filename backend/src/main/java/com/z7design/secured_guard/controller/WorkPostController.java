@@ -1,11 +1,9 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.WorkPostDTO;
-import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
-import com.z7design.secured_guard.service.ClientService;
 import com.z7design.secured_guard.service.WorkPostService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,7 +38,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class WorkPostController {
     
     private final WorkPostService workPostService;
-    private final ClientService clientService;
     private final WorkPostRepository workPostRepository;
     
     @GetMapping
@@ -193,7 +190,6 @@ public class WorkPostController {
     }
     
     @GetMapping("/client/{clientId}/all")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Listar todos os postos por cliente (sem paginação)", description = "Retorna todos os postos de um cliente específico")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -326,6 +322,7 @@ public class WorkPostController {
         }
     }
     
+    /*
     @GetMapping("/test-clients")
     @Operation(summary = "Listar clientes para teste", description = "Endpoint para listar clientes disponíveis")
     @PreAuthorize("permitAll()")
@@ -343,6 +340,7 @@ public class WorkPostController {
             return ResponseEntity.internalServerError().body("Erro: " + e.getMessage());
         }
     }
+    */
     
     @GetMapping("/debug")
     @Operation(summary = "Debug detalhado", description = "Endpoint de debug para identificar problemas")

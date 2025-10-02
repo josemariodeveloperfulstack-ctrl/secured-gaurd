@@ -34,7 +34,7 @@ export const positionService = {
 
   // Buscar posição por ID
   async getPositionById(id: string): Promise<Position> {
-    const response = await api.get(`/api/positions/${id}`);
+    const response = await api.get(`/positions/${id}`);
     return response.data;
   },
 
@@ -46,12 +46,12 @@ export const positionService = {
 
   // Atualizar posição
   async updatePosition(id: string, positionData: PositionDTO): Promise<Position> {
-    const response = await api.put(`/api/positions/${id}`, positionData);
+    const response = await api.put(`/positions/${id}`, positionData);
     return response.data;
   },
 
   // Excluir posição
   async deletePosition(id: string): Promise<void> {
-    await api.delete(`/api/positions/${id}`);
+    await api.delete(`/positions/${id}`);
   }
 }; 

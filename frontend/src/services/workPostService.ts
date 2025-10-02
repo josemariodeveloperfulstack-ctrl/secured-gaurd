@@ -16,7 +16,7 @@ export const workPostService = {
   // Buscar todos os postos de trabalho
   async getAllWorkPosts(): Promise<WorkPost[]> {
     try {
-      const response = await api.get('/api/work-posts/all');
+      const response = await api.get('/work-posts/all');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar postos de trabalho:', error);
@@ -27,7 +27,7 @@ export const workPostService = {
   // Buscar postos por cliente
   async getWorkPostsByClient(clientId: string): Promise<WorkPost[]> {
     try {
-      const response = await api.get(`/api/work-posts/client/${clientId}/all`);
+      const response = await api.get(`/work-posts/client/${clientId}/all`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar postos por cliente:', error);
@@ -38,7 +38,7 @@ export const workPostService = {
   // Buscar posto por ID
   async getWorkPostById(id: string): Promise<WorkPost> {
     try {
-      const response = await api.get(`/api/work-posts/${id}`);
+      const response = await api.get(`/work-posts/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar posto de trabalho:', error);

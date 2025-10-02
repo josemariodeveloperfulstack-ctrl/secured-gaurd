@@ -4,13 +4,13 @@ import { Company, CompanyFilters, CompanyStats, CompanyStatus } from '@/types/co
 export const companyService = {
   // Buscar todas as empresas
   async getAllCompanies(): Promise<Company[]> {
-    const response = await api.get('/companies');
+    const response = await api.get('/api/companies');
     return response.data;
   },
 
   // Buscar empresa por ID
   async getCompanyById(id: string): Promise<Company> {
-    const response = await api.get(`/companies/${id}`);
+    const response = await api.get(`/api/companies/${id}`);
     return response.data;
   },
 

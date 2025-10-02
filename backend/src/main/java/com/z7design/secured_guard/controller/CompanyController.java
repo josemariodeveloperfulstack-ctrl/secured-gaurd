@@ -29,7 +29,6 @@ public class CompanyController {
     private final CompanyService companyService;
     
     @GetMapping
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Listar todas as empresas", description = "Retorna uma lista de todas as empresas")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Empresas listadas com sucesso"),
