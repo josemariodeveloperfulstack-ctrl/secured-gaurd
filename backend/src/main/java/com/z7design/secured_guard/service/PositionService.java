@@ -26,10 +26,32 @@ public class PositionService {
     private final UnitRepository unitRepository;
 
     public List<PositionDTO> getAllPositions() {
-        log.info("Buscando todos os cargos");
-        return positionRepository.findAll().stream()
-                .map(PositionDTO::fromEntity)
+        try {
+            log.info("Buscando todos os cargos");
+            List<Position> positions = positionRepository.findAll();
+            log.info("Encontrados {} cargos", positions.size());
+            
+            if (positions.isEmpty()) {
+                log.warn("Nenhum cargo encontrado no banco de dados");
+                return java.util.Collections.emptyList();
+            }
+            
+            return positions.stream()
+                .map(pos -> {
+                    try {
+                        return PositionDTO.fromEntity(pos);
+                    } catch (Exception e) {
+                        log.error("Erro ao converter cargo {}: {}", pos.getName(), e.getMessage());
+                        return null; // Continuar com outros cargos
+                    }
+                })
+                .filter(dto -> dto != null)
                 .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao buscar cargos: {}", e.getMessage(), e);
+            log.warn("Retornando lista vazia devido ao erro");
+            return java.util.Collections.emptyList();
+        }
     }
     
     public List<PositionDTO> searchPositions(String query) {

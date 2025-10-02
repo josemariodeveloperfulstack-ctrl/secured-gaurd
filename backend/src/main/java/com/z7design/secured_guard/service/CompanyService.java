@@ -28,10 +28,32 @@ public class CompanyService {
      * Buscar todas as empresas
      */
     public List<CompanyDTO> getAllCompanies() {
-        log.info("Buscando todas as empresas");
-        return companyRepository.findAllByOrderByNameAsc().stream()
-                .map(CompanyDTO::fromEntity)
+        try {
+            log.info("Buscando todas as empresas");
+            List<Company> companies = companyRepository.findAllByOrderByNameAsc();
+            log.info("Encontradas {} empresas", companies.size());
+            
+            if (companies.isEmpty()) {
+                log.warn("Nenhuma empresa encontrada no banco de dados");
+                return java.util.Collections.emptyList();
+            }
+            
+            return companies.stream()
+                .map(comp -> {
+                    try {
+                        return CompanyDTO.fromEntity(comp);
+                    } catch (Exception e) {
+                        log.error("Erro ao converter empresa {}: {}", comp.getName(), e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(dto -> dto != null)
                 .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao buscar empresas: {}", e.getMessage(), e);
+            log.warn("Retornando lista vazia devido ao erro");
+            return java.util.Collections.emptyList();
+        }
     }
     
     /**

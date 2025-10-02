@@ -33,9 +33,30 @@ public class EmployeeController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<List<EmployeeDTO>> getAll() {
-        List<Employee> employees = employeeService.findAll();
-        List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO).collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        try {
+            System.out.println("🔍 EmployeeController.getAll - Iniciando busca...");
+            List<Employee> employees = employeeService.findAll();
+            System.out.println("📊 EmployeeController.getAll - Encontrados " + employees.size() + " funcionários");
+            
+            List<EmployeeDTO> dtos = employees.stream()
+                .map(emp -> {
+                    try {
+                        System.out.println("🔧 Convertendo funcionário: " + emp.getName());
+                        return employeeService.toDTO(emp);
+                    } catch (Exception e) {
+                        System.err.println("❌ Erro ao converter funcionário " + emp.getName() + ": " + e.getMessage());
+                        throw e;
+                    }
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            System.out.println("✅ EmployeeController.getAll - Retornando " + dtos.size() + " DTOs");
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeController.getAll - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     @GetMapping("/{id}")

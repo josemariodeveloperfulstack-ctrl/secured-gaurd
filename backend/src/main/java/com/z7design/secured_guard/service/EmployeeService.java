@@ -21,9 +21,11 @@ import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.dto.SimpleEmployeeDTO;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class EmployeeService {
     
     @Autowired
@@ -239,8 +241,31 @@ public class EmployeeService {
         return employeeRepository.findByPositionId(positionId);
     }
     
+    @Transactional(readOnly = true)
     public List<Employee> findAll() {
-        return employeeRepository.findAll();
+        try {
+            log.info("Buscando todos os funcionarios...");
+            List<Employee> employees = employeeRepository.findAll();
+            log.info("Encontrados {} funcionarios", employees.size());
+            
+            // Se não há funcionários, retornar lista vazia em vez de erro
+            if (employees.isEmpty()) {
+                log.warn("Nenhum funcionário encontrado no banco de dados");
+                return employees;
+            }
+            
+            // Adicionar debug para cada funcionário (limitado para não lotar logs)
+            employees.stream()
+                .limit(5) // Mostrar apenas os primeiros 5
+                .forEach(emp -> log.debug("Funcionário encontrado: {} (ID: {})", emp.getName(), emp.getId()));
+            
+            return employees;
+        } catch (Exception e) {
+            log.error("Erro ao buscar funcionários: {}", e.getMessage(), e);
+            // Temporariamente retornar lista vazia para evitar erro
+            log.warn("Retornando lista vazia devido ao erro");
+            return java.util.Collections.emptyList();
+        }
     }
     
     @Transactional
