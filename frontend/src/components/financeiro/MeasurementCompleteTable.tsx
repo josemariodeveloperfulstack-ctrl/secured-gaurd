@@ -33,6 +33,7 @@ import { MeasurementViewModal } from './MeasurementViewModal';
 import { MeasurementDeleteDialog } from './MeasurementDeleteDialog';
 import { MeasurementValidationModal } from './MeasurementValidationModal';
 import { BulkDeleteDialog } from './BulkDeleteDialog';
+import api from '@/lib/axios';
 
 interface MeasurementCompleteTableProps {
   onView?: (bulletin: MeasurementBulletin) => void;
@@ -106,44 +107,27 @@ export default function MeasurementCompleteTable({
     }
   };
 
-  // Função para testar a API
+  // Função para testar a API (usa axios com token do interceptor)
   const testAPI = async () => {
     try {
       console.log('🧪 Testando conectividade com API de medições...');
-      
-      // Testar endpoint básico
-      const response = await fetch('http://localhost:8081/api/measurements', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
+      const response = await api.get('/measurements');
       console.log('📡 Status da resposta:', response.status);
-      console.log('📡 Headers da resposta:', Object.fromEntries(response.headers.entries()));
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ API funcionando! Dados recebidos:', data);
-        toast({
-          title: "API OK!",
-          description: `Endpoint funcionando. ${Array.isArray(data) ? data.length : 0} registros encontrados.`,
-          variant: "default"
-        });
-      } else {
-        const errorText = await response.text();
-        console.error('❌ API retornou erro:', response.status, errorText);
-        toast({
-          title: "Erro na API",
-          description: `Status ${response.status}: ${errorText}`,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('💥 Erro ao testar API:', error);
+      console.log('📡 Headers da resposta:', response.headers);
+      const data = response.data;
+      console.log('✅ API funcionando! Dados recebidos:', data);
       toast({
-        title: "Erro de Conectividade",
-        description: "Não foi possível conectar com a API",
+        title: "API OK!",
+        description: `Endpoint funcionando. ${Array.isArray(data?.content) ? data.content.length : Array.isArray(data) ? data.length : 0} registros encontrados.`,
+        variant: "default"
+      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const details = error?.response?.data ? JSON.stringify(error.response.data) : String(error);
+      console.error('❌ API retornou erro:', status, details);
+      toast({
+        title: "Erro na API",
+        description: `Status ${status || 'desconhecido'}: ${details}`,
         variant: "destructive"
       });
     }

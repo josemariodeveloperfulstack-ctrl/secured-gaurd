@@ -133,13 +133,17 @@ public class SecurityConfig {
                 .requestMatchers("/api/occurrences/**").permitAll()
                 // Endpoints de controle de visitas - temporariamente públicos para desenvolvimento
                 .requestMatchers("/api/visits/**").permitAll()
-                // Endpoints de medições - requerem permissões específicas
+                // Endpoints de medições - liberar GET autenticado e manter POST/PUT/DELETE restritos
                 .requestMatchers("/api/measurements/test-pdf").permitAll()
                 .requestMatchers("/api/measurements/*/pdf").permitAll()
                 .requestMatchers("/api/measurements/*/excel").permitAll()
                 .requestMatchers("/api/measurements/bulk/pdf").permitAll()
                 .requestMatchers("/api/measurements/bulk/excel").permitAll()
-                .requestMatchers("/api/measurements/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/measurements/**").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/measurements/**").hasAnyAuthority("FINANCIAL_WRITE", "FINANCIAL_CREATE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/measurements/**").hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/measurements/**").hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/measurements/**").hasAnyAuthority("FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de estoque - requerem permissões específicas
                 .requestMatchers("/api/stock/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Endpoints de modelos de documentos - temporariamente público para teste

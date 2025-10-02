@@ -105,7 +105,7 @@ public class EmployeeController {
             Employee employee = employeeService.updateStatus(UUID.fromString(id), employmentStatus);
             return ResponseEntity.ok(employee);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Status inválido: " + status);
+            throw new IllegalArgumentException("Status inválido: " + status);
         }
     }
 
@@ -129,7 +129,7 @@ public class EmployeeController {
             return ResponseEntity.ok(dtos);
         } catch (IllegalArgumentException e) {
             System.err.println("[ERROR] EmployeeController.getByStatus - Status inválido: " + status);
-            throw new RuntimeException("Status inválido: " + status);
+            throw new IllegalArgumentException("Status inválido: " + status);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.getByStatus - Erro geral: " + e.getMessage());
             e.printStackTrace();
