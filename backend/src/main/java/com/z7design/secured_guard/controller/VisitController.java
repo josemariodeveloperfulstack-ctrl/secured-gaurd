@@ -37,8 +37,14 @@ public class VisitController {
     public ResponseEntity<Page<VisitDTO>> getAllVisits(
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
         log.info("GET /api/visits - Listando visitas");
-        Page<VisitDTO> visits = visitService.findAll(pageable);
-        return ResponseEntity.ok(visits);
+        try {
+            Page<VisitDTO> visits = visitService.findAll(pageable);
+            return ResponseEntity.ok(visits);
+        } catch (Exception e) {
+            log.error("Erro ao buscar visitas, retornando página vazia: {}", e.getMessage(), e);
+            // Retornar página vazia em caso de erro
+            return ResponseEntity.ok(Page.empty(pageable));
+        }
     }
 
     @GetMapping("/{id}")

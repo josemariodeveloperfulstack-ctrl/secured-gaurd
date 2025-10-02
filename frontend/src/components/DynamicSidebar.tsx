@@ -284,6 +284,13 @@ export function DynamicSidebar() {
       id: 'holerites',
       requiredPermission: 'PAYSLIPS_READ'
     },
+    {
+      icon: FileSpreadsheet,
+      text: 'Folha de Pagamento',
+      to: '/payrolls',
+      id: 'payrolls',
+      requiredPermission: 'PAYSLIPS_READ'
+    },
 
     // ===== MÓDULO SST - SAÚDE E SEGURANÇA DO TRABALHO =====
     {
@@ -573,7 +580,7 @@ export function DynamicSidebar() {
         ['frota'].includes(item.id)
       ),
       holerites: filteredItems.filter(item =>
-        ['holerites'].includes(item.id)
+        ['holerites', 'payrolls'].includes(item.id)
       ),
       mensagens: filteredItems.filter(item =>
         ['mensagens', 'chat-interno', 'gestao-mensagens', 'gestao-mensagens-internas', 'gestao-mensagens-internas-enviar', 'gestao-mensagens-internas-notificacoes', 'gestao-mensagens-internas-grupos'].includes(item.id)

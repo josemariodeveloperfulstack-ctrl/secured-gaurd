@@ -104,4 +104,7 @@ public interface CostCenterRepository extends JpaRepository<CostCenter, UUID> {
     
     @Query("SELECT cc FROM CostCenter cc ORDER BY cc.name ASC")
     Page<CostCenter> findAllOrderByName(Pageable pageable);
+    
+    @Query("SELECT cc.code FROM CostCenter cc WHERE cc.code LIKE :pattern ORDER BY cc.code DESC LIMIT 1")
+    String findLastCodeByPattern(@Param("pattern") String pattern);
 }

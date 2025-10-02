@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Upload, QrCode, MapPin, User, Building, Clock, FileText } from 'lucide-react';
+import { X, Camera, Upload, QrCode, MapPin, User, Building, Clock, FileText, Scan } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,14 +9,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CreateVisitRequest, VisitStatus } from '@/types/visit';
+import { CreateVisitRequest, VisitStatus, Visit } from '@/types/visit';
 import { visitService } from '@/services/visitService';
+import api from '@/lib/axios';
 
 interface VisitFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   visit?: Visit | null;
   onSave: (data: CreateVisitRequest) => void;
+}
+
+interface Supervisor {
+  id: string;
+  name: string;
+  cpf: string;
+}
+
+interface Client {
+  id: string;
+  name: string;
+}
+
+interface WorkPost {
+  id: string;
+  name: string;
+  clientId: string;
 }
 
 export const VisitFormModal: React.FC<VisitFormModalProps> = ({
@@ -33,7 +51,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     visitTime: '',
     description: '',
     observations: '',
-    status: VisitStatus.SCHEDULED,
+    status: VisitStatus.PENDING,
     presentEmployees: [],
     attachedFiles: [],
     photos: [],
@@ -49,11 +67,243 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
   const [scanningQR, setScanningQR] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [capturedPhotos, setCapturedPhotos] = useState<File[]>([]);
+  
+  // Dados do banco
+  const [supervisorCpf, setSupervisorCpf] = useState('');
+  const [supervisorName, setSupervisorName] = useState('');
+  const [loadingSupervisor, setLoadingSupervisor] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [allWorkPosts, setAllWorkPosts] = useState<WorkPost[]>([]);
+  const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
+  
+  // Reconhecimento facial
+  const [showFacialRecognition, setShowFacialRecognition] = useState(false);
+  const [capturedFace, setCapturedFace] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
+
+  // Carregar clientes e postos de trabalho
+  useEffect(() => {
+    if (open) {
+      loadClients();
+      loadWorkPosts();
+    }
+  }, [open]);
+
+  // Filtrar postos de trabalho quando cliente for selecionado
+  useEffect(() => {
+    if (formData.clientId) {
+      const filtered = allWorkPosts.filter(wp => wp.clientId === formData.clientId);
+      setFilteredWorkPosts(filtered);
+      
+      // Se o posto atual não pertence ao cliente selecionado, limpar
+      if (formData.workPostId && !filtered.some(wp => wp.id === formData.workPostId)) {
+        setFormData(prev => ({ ...prev, workPostId: '' }));
+      }
+    } else {
+      setFilteredWorkPosts([]);
+      setFormData(prev => ({ ...prev, workPostId: '' }));
+    }
+  }, [formData.clientId, allWorkPosts]);
+
+  const loadClients = async () => {
+    try {
+      const response = await api.get('/api/clients/all');
+      setClients(response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar lista de clientes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadWorkPosts = async () => {
+    try {
+      const response = await api.get('/api/work-posts/all');
+      setAllWorkPosts(response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar postos de trabalho:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar lista de postos de trabalho",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSupervisorCpfChange = (cpf: string) => {
+    setSupervisorCpf(cpf);
+    
+    // Limpar nome e ID se CPF for apagado
+    if (!cpf) {
+      setSupervisorName('');
+      setFormData(prev => ({ ...prev, supervisorId: '' }));
+    }
+  };
+
+  const handleSupervisorCpfBlur = async () => {
+    if (!supervisorCpf || supervisorCpf.length < 11) {
+      return;
+    }
+
+    setLoadingSupervisor(true);
+    try {
+      // Buscar supervisor por CPF
+      const response = await api.get(`/api/employees/search/simple?q=${supervisorCpf}`);
+      
+      if (response.data && response.data.length > 0) {
+        const supervisor = response.data[0];
+        setSupervisorName(supervisor.name);
+        setFormData(prev => ({ ...prev, supervisorId: supervisor.id }));
+        
+        toast({
+          title: "Supervisor encontrado",
+          description: `${supervisor.name}`,
+        });
+      } else {
+        setSupervisorName('');
+        setFormData(prev => ({ ...prev, supervisorId: '' }));
+        
+        toast({
+          title: "Supervisor não encontrado",
+          description: "CPF não encontrado no sistema",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar supervisor:', error);
+      setSupervisorName('');
+      setFormData(prev => ({ ...prev, supervisorId: '' }));
+      
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar supervisor",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSupervisor(false);
+    }
+  };
+
+  const startFacialRecognition = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user' } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setShowFacialRecognition(true);
+      }
+    } catch (error) {
+      console.error('Erro ao acessar câmera:', error);
+      toast({
+        title: "Erro ao acessar câmera",
+        description: "Não foi possível acessar a câmera. Verifique as permissões.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopFacialRecognition = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setShowFacialRecognition(false);
+    setCapturedFace(null);
+  };
+
+  const captureFace = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (context) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = canvas.toDataURL('image/jpeg');
+        setCapturedFace(imageData);
+        
+        // Simular reconhecimento facial
+        // Em produção, aqui seria feita a chamada para uma API de reconhecimento facial
+        processFacialRecognition(imageData);
+      }
+    }
+  };
+
+  const processFacialRecognition = async (imageData: string) => {
+    setLoadingSupervisor(true);
+    
+    try {
+      // SIMULAÇÃO: Em produção, aqui você enviaria a imagem para uma API de reconhecimento facial
+      // que retornaria o ID ou CPF do funcionário identificado
+      
+      // Por enquanto, vamos simular um pequeno delay e mostrar uma mensagem
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "Reconhecimento facial",
+        description: "Funcionalidade em desenvolvimento. Por favor, use o CPF para identificação.",
+        variant: "destructive",
+      });
+      
+      stopFacialRecognition();
+      
+      /* 
+      // CÓDIGO PARA PRODUÇÃO (quando tiver API de reconhecimento facial):
+      const formData = new FormData();
+      formData.append('image', imageData);
+      
+      const response = await api.post('/api/facial-recognition/identify', formData);
+      
+      if (response.data && response.data.employeeId) {
+        const employee = response.data;
+        setSupervisorName(employee.name);
+        setSupervisorCpf(employee.cpf);
+        setFormData(prev => ({ ...prev, supervisorId: employee.id }));
+        
+        toast({
+          title: "Supervisor identificado",
+          description: `${employee.name}`,
+        });
+        
+        stopFacialRecognition();
+      } else {
+        toast({
+          title: "Supervisor não identificado",
+          description: "Não foi possível identificar o supervisor. Tente novamente.",
+          variant: "destructive",
+        });
+      }
+      */
+    } catch (error) {
+      console.error('Erro no reconhecimento facial:', error);
+      toast({
+        title: "Erro no reconhecimento",
+        description: "Erro ao processar reconhecimento facial",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSupervisor(false);
+    }
+  };
+
+  const retryCapture = () => {
+    setCapturedFace(null);
+  };
 
   useEffect(() => {
     if (visit) {
@@ -75,6 +325,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
         qrCodeScanned: visit.qrCodeScanned || '',
         qrCodeVerified: visit.qrCodeVerified || false,
       });
+      setSupervisorName(visit.supervisorName || '');
     } else {
       // Reset form for new visit
       setFormData({
@@ -85,7 +336,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
         visitTime: new Date().toTimeString().slice(0, 5),
         description: '',
         observations: '',
-        status: VisitStatus.SCHEDULED,
+        status: VisitStatus.PENDING,
         presentEmployees: [],
         attachedFiles: [],
         photos: [],
@@ -95,6 +346,8 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
         qrCodeScanned: '',
         qrCodeVerified: false,
       });
+      setSupervisorCpf('');
+      setSupervisorName('');
     }
     setUploadedFiles([]);
     setCapturedPhotos([]);
@@ -108,108 +361,90 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
   };
 
   const handleCaptureLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocalização não suportada",
+        description: "Seu navegador não suporta geolocalização",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCapturingLocation(true);
-    try {
-      const location = await visitService.getCurrentLocation();
-      
-      setFormData(prev => ({
-        ...prev,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        locationAddress: `Lat: ${location.latitude.toFixed(6)}, Lng: ${location.longitude.toFixed(6)}`,
-      }));
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        setFormData(prev => ({
+          ...prev,
+          latitude,
+          longitude,
+          locationAddress: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+        }));
 
+        toast({
+          title: "Localização capturada",
+          description: `Lat: ${latitude.toFixed(6)}, Long: ${longitude.toFixed(6)}`,
+        });
+
+        setCapturingLocation(false);
+      },
+      (error) => {
+        console.error('Erro ao capturar localização:', error);
+        toast({
+          title: "Erro ao capturar localização",
+          description: error.message,
+          variant: "destructive",
+        });
+        setCapturingLocation(false);
+      }
+    );
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setUploadedFiles(prev => [...prev, ...files]);
+  };
+
+  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setCapturedPhotos(prev => [...prev, ...files]);
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.supervisorId) {
       toast({
-        title: 'Sucesso',
-        description: 'Localização capturada com sucesso',
+        title: "Supervisor obrigatório",
+        description: "Informe o CPF do supervisor",
+        variant: "destructive",
       });
-    } catch (error) {
-      console.error('Erro ao capturar localização:', error);
+      return;
+    }
+
+    if (!formData.clientId) {
       toast({
-        title: 'Erro',
-        description: 'Falha ao capturar localização. Verifique as permissões do navegador.',
-        variant: 'destructive',
+        title: "Cliente obrigatório",
+        description: "Selecione um cliente",
+        variant: "destructive",
       });
-    } finally {
-      setCapturingLocation(false);
+      return;
     }
-  };
 
-  const handleScanQRCode = async () => {
-    setScanningQR(true);
-    try {
-      // Simular leitura de QR Code
-      // Em um sistema real, isso seria integrado com uma biblioteca de QR Code
-      const qrData = await visitService.simulateQRCodeScan('mock-qr-data');
-      
-      setFormData(prev => ({
-        ...prev,
-        workPostId: qrData.workPostId,
-        clientId: qrData.clientId,
-        qrCodeScanned: JSON.stringify(qrData),
-        qrCodeVerified: true,
-        presentEmployees: qrData.employees.map(emp => emp.id),
-      }));
-
+    if (!formData.workPostId) {
       toast({
-        title: 'Sucesso',
-        description: `QR Code lido com sucesso! ${qrData.employees.length} funcionário(s) carregado(s).`,
+        title: "Posto de trabalho obrigatório",
+        description: "Selecione um posto de trabalho",
+        variant: "destructive",
       });
-    } catch (error) {
-      console.error('Erro ao ler QR Code:', error);
-      toast({
-        title: 'Erro',
-        description: 'Falha ao ler QR Code',
-        variant: 'destructive',
-      });
-    } finally {
-      setScanningQR(false);
+      return;
     }
-  };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const newFiles = Array.from(files);
-      setUploadedFiles(prev => [...prev, ...newFiles]);
-    }
-  };
-
-  const handleCameraCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const newPhotos = Array.from(files);
-      setCapturedPhotos(prev => [...prev, ...newPhotos]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removePhoto = (index: number) => {
-    setCapturedPhotos(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
     setLoading(true);
-
     try {
-      const submitData = {
-        ...formData,
-        attachedFiles: [...(formData.attachedFiles || []), ...uploadedFiles.map(f => f.name)],
-        photos: [...(formData.photos || []), ...capturedPhotos.map(f => f.name)],
-      };
-
-      onSave(submitData);
+      await onSave(formData);
+      onOpenChange(false);
     } catch (error) {
       console.error('Erro ao salvar visita:', error);
-      toast({
-        title: 'Erro',
-        description: 'Falha ao salvar visita',
-        variant: 'destructive',
-      });
     } finally {
       setLoading(false);
     }
@@ -219,174 +454,272 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700">
         <DialogHeader>
-          <DialogTitle className="text-white text-xl">
+          <DialogTitle className="text-seguranca-yellow text-xl font-bold">
             {visit ? 'Editar Visita' : 'Nova Visita'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Informações Básicas */}
+        <div className="space-y-6">
+          {/* Identificação do Supervisor */}
           <Card className="bg-seguranca-black border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Clock className="w-5 h-5 mr-2" />
-                Informações Básicas
+              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
+                <User size={20} />
+                Identificação do Supervisor
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-300">Data da Visita *</Label>
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">CPF do Supervisor *</Label>
+                  <Input
+                    value={supervisorCpf}
+                    onChange={(e) => handleSupervisorCpfChange(e.target.value)}
+                    onBlur={handleSupervisorCpfBlur}
+                    placeholder="000.000.000-00"
+                    className="bg-white text-black"
+                    disabled={loadingSupervisor}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Nome do Supervisor</Label>
+                  <Input
+                    value={supervisorName}
+                    readOnly
+                    placeholder="Nome será carregado automaticamente"
+                    className="bg-gray-700 text-white"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={startFacialRecognition}
+                  className="flex items-center gap-2"
+                  disabled={loadingSupervisor}
+                >
+                  <Scan size={16} />
+                  Reconhecimento Facial
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Modal de Reconhecimento Facial */}
+          {showFacialRecognition && (
+            <Dialog open={showFacialRecognition} onOpenChange={stopFacialRecognition}>
+              <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-700">
+                <DialogHeader>
+                  <DialogTitle className="text-seguranca-yellow">
+                    Reconhecimento Facial do Supervisor
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4">
+                  {!capturedFace ? (
+                    <>
+                      <div className="relative bg-black rounded-lg overflow-hidden">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          className="w-full h-auto"
+                          style={{ maxHeight: '400px' }}
+                        />
+                      </div>
+                      
+                      <div className="flex gap-3 justify-center">
+                        <Button
+                          onClick={captureFace}
+                          className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-600"
+                        >
+                          <Camera size={16} className="mr-2" />
+                          Capturar Foto
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={stopFacialRecognition}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative bg-black rounded-lg overflow-hidden">
+                        <img
+                          src={capturedFace}
+                          alt="Foto capturada"
+                          className="w-full h-auto"
+                          style={{ maxHeight: '400px' }}
+                        />
+                      </div>
+                      
+                      {loadingSupervisor && (
+                        <div className="text-center space-y-2">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-yellow mx-auto"></div>
+                          <p className="text-seguranca-lightgray">
+                            Processando reconhecimento facial...
+                          </p>
+                        </div>
+                      )}
+                      
+                      {!loadingSupervisor && (
+                        <div className="flex gap-3 justify-center">
+                          <Button
+                            onClick={retryCapture}
+                            variant="outline"
+                          >
+                            Tirar Outra Foto
+                          </Button>
+                          <Button
+                            onClick={stopFacialRecognition}
+                          >
+                            Fechar
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                
+                {/* Canvas oculto para processar a imagem */}
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Cliente e Posto de Trabalho */}
+          <Card className="bg-seguranca-black border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
+                <Building size={20} />
+                Local da Visita
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Cliente - PRIMEIRO */}
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Cliente *</Label>
+                  <Select
+                    value={formData.clientId}
+                    onValueChange={(value) => handleInputChange('clientId', value)}
+                  >
+                    <SelectTrigger className="bg-white text-black">
+                      <SelectValue placeholder="Selecione o cliente" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      {clients.map((client) => (
+                        <SelectItem 
+                          key={client.id} 
+                          value={client.id}
+                          className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        >
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Posto de Trabalho - SEGUNDO */}
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Posto de Trabalho *</Label>
+                  <Select
+                    value={formData.workPostId}
+                    onValueChange={(value) => handleInputChange('workPostId', value)}
+                    disabled={!formData.clientId}
+                  >
+                    <SelectTrigger className="bg-white text-black">
+                      <SelectValue placeholder={
+                        formData.clientId 
+                          ? "Selecione o posto de trabalho" 
+                          : "Selecione um cliente primeiro"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      {filteredWorkPosts.map((workPost) => (
+                        <SelectItem 
+                          key={workPost.id} 
+                          value={workPost.id}
+                          className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        >
+                          {workPost.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.clientId && filteredWorkPosts.length === 0 && (
+                    <p className="text-xs text-yellow-500">
+                      Nenhum posto de trabalho encontrado para este cliente
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Funcionários Presentes - Leitura de QR Code */}
+              <div className="space-y-2 mt-4">
+                <Label className="text-seguranca-lightgray flex items-center gap-2">
+                  <QrCode size={16} />
+                  Funcionários Presentes no Posto
+                </Label>
+                <Button
+                  type="button"
+                  onClick={() => setScanningQR(true)}
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2"
+                  disabled={scanningQR || !formData.workPostId}
+                >
+                  <QrCode size={16} />
+                  {scanningQR ? 'Escaneando QR Code...' : 'Escanear QR Code dos Funcionários'}
+                </Button>
+                {!formData.workPostId && (
+                  <p className="text-xs text-yellow-500">
+                    Selecione o posto de trabalho primeiro
+                  </p>
+                )}
+                {formData.presentEmployees && formData.presentEmployees.length > 0 && (
+                  <div className="mt-2 p-3 bg-seguranca-graphite rounded-lg">
+                    <p className="text-sm text-seguranca-lightgray font-medium">
+                      ✓ {formData.presentEmployees.length} funcionário(s) registrado(s)
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Data e Hora */}
+          <Card className="bg-seguranca-black border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
+                <Clock size={20} />
+                Data e Hora
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Data da Visita *</Label>
                   <Input
                     type="date"
                     value={formData.visitDate}
                     onChange={(e) => handleInputChange('visitDate', e.target.value)}
-                    className="bg-seguranca-graphite border-gray-600 text-white"
-                    required
+                    className="bg-white text-black"
                   />
                 </div>
-                
-                <div>
-                  <Label className="text-gray-300">Horário *</Label>
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Hora da Visita *</Label>
                   <Input
                     type="time"
                     value={formData.visitTime}
                     onChange={(e) => handleInputChange('visitTime', e.target.value)}
-                    className="bg-seguranca-graphite border-gray-600 text-white"
-                    required
+                    className="bg-white text-black"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-300">Supervisor *</Label>
-                  <Input
-                    value={formData.supervisorId}
-                    onChange={(e) => handleInputChange('supervisorId', e.target.value)}
-                    placeholder="ID do supervisor"
-                    className="bg-seguranca-graphite border-gray-600 text-white"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Label className="text-gray-300">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleInputChange('status', value)}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={VisitStatus.SCHEDULED}>Agendada</SelectItem>
-                      <SelectItem value={VisitStatus.IN_PROGRESS}>Em Andamento</SelectItem>
-                      <SelectItem value={VisitStatus.COMPLETED}>Concluída</SelectItem>
-                      <SelectItem value={VisitStatus.CANCELLED}>Cancelada</SelectItem>
-                      <SelectItem value={VisitStatus.MISSED}>Não Realizada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-300">Posto de Trabalho *</Label>
-                  <Input
-                    value={formData.workPostId}
-                    onChange={(e) => handleInputChange('workPostId', e.target.value)}
-                    placeholder="ID do posto de trabalho"
-                    className="bg-seguranca-graphite border-gray-600 text-white"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Label className="text-gray-300">Cliente *</Label>
-                  <Input
-                    value={formData.clientId}
-                    onChange={(e) => handleInputChange('clientId', e.target.value)}
-                    placeholder="ID do cliente"
-                    className="bg-seguranca-graphite border-gray-600 text-white"
-                    required
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* QR Code e Localização */}
-          <Card className="bg-seguranca-black border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <QrCode className="w-5 h-5 mr-2" />
-                QR Code e Localização
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleScanQRCode}
-                  disabled={scanningQR}
-                  className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                >
-                  <QrCode className="w-4 h-4 mr-2" />
-                  {scanningQR ? 'Lendo...' : 'Ler QR Code'}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCaptureLocation}
-                  disabled={capturingLocation}
-                  className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                >
-                  <MapPin className="w-4 h-4 mr-2" />
-                  {capturingLocation ? 'Capturando...' : 'Capturar Localização'}
-                </Button>
-              </div>
-
-              {formData.qrCodeVerified && (
-                <div className="p-3 bg-green-900/20 border border-green-500 rounded-lg">
-                  <div className="flex items-center text-green-400">
-                    <QrCode className="w-4 h-4 mr-2" />
-                    <span>QR Code verificado com sucesso</span>
-                  </div>
-                </div>
-              )}
-
-              {formData.latitude && formData.longitude && (
-                <div className="p-3 bg-blue-900/20 border border-blue-500 rounded-lg">
-                  <div className="flex items-center text-blue-400">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    <span>Localização capturada: {formData.locationAddress}</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Funcionários Presentes */}
-          <Card className="bg-seguranca-black border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <User className="w-5 h-5 mr-2" />
-                Funcionários Presentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {formData.presentEmployees?.map((employeeId, index) => (
-                  <Badge key={index} className="bg-seguranca-yellow text-black mr-2">
-                    Funcionário {employeeId}
-                  </Badge>
-                ))}
-                {(!formData.presentEmployees || formData.presentEmployees.length === 0) && (
-                  <p className="text-gray-400 text-sm">Nenhum funcionário adicionado</p>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -394,156 +727,142 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
           {/* Descrição e Observações */}
           <Card className="bg-seguranca-black border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Descrição e Observações
+              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
+                <FileText size={20} />
+                Detalhes da Visita
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label className="text-gray-300">Descrição da Visita</Label>
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Descrição</Label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Descreva os detalhes da visita..."
-                  className="bg-seguranca-graphite border-gray-600 text-white min-h-[100px]"
+                  placeholder="Descreva o motivo da visita"
+                  className="bg-white text-black"
+                  rows={3}
                 />
               </div>
-
-              <div>
-                <Label className="text-gray-300">Observações</Label>
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Observações</Label>
                 <Textarea
                   value={formData.observations}
                   onChange={(e) => handleInputChange('observations', e.target.value)}
-                  placeholder="Observações adicionais..."
-                  className="bg-seguranca-graphite border-gray-600 text-white min-h-[100px]"
+                  placeholder="Observações adicionais"
+                  className="bg-white text-black"
+                  rows={3}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Upload de Arquivos e Fotos */}
+          {/* Geolocalização */}
           <Card className="bg-seguranca-black border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Upload className="w-5 h-5 mr-2" />
-                Arquivos e Fotos
+              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
+                <MapPin size={20} />
+                Geolocalização
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Upload de Arquivos */}
-              <div>
-                <Label className="text-gray-300">Arquivos</Label>
-                <div className="flex space-x-2 mb-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Arquivo
-                  </Button>
+              <Button
+                type="button"
+                onClick={handleCaptureLocation}
+                disabled={capturingLocation}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <MapPin size={16} />
+                {capturingLocation ? 'Capturando localização...' : 'Capturar Localização Atual'}
+              </Button>
+              {formData.latitude && formData.longitude && (
+                <div className="text-sm text-seguranca-lightgray">
+                  <p>Latitude: {formData.latitude.toFixed(6)}</p>
+                  <p>Longitude: {formData.longitude.toFixed(6)}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Anexos e Fotos */}
+          <Card className="bg-seguranca-black border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
+                <Upload size={20} />
+                Anexos e Fotos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <input
                     ref={fileInputRef}
                     type="file"
                     multiple
-                    accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                </div>
-                
-                {uploadedFiles.length > 0 && (
-                  <div className="space-y-2">
-                    {uploadedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-seguranca-graphite rounded">
-                        <span className="text-white text-sm">{file.name}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFile(index)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Captura de Fotos */}
-              <div>
-                <Label className="text-gray-300">Fotos</Label>
-                <div className="flex space-x-2 mb-2">
                   <Button
                     type="button"
+                    onClick={() => fileInputRef.current?.click()}
                     variant="outline"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                    className="w-full flex items-center justify-center gap-2"
                   >
-                    <Camera className="w-4 h-4 mr-2" />
-                    Tirar Foto
+                    <Upload size={16} />
+                    Anexar Arquivos
                   </Button>
+                  {uploadedFiles.length > 0 && (
+                    <p className="text-xs text-seguranca-lightgray mt-2">
+                      {uploadedFiles.length} arquivo(s) selecionado(s)
+                    </p>
+                  )}
+                </div>
+                <div>
                   <input
                     ref={cameraInputRef}
                     type="file"
-                    multiple
                     accept="image/*"
                     capture="environment"
+                    multiple
                     onChange={handleCameraCapture}
                     className="hidden"
                   />
+                  <Button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2"
+                  >
+                    <Camera size={16} />
+                    Tirar Foto
+                  </Button>
+                  {capturedPhotos.length > 0 && (
+                    <p className="text-xs text-seguranca-lightgray mt-2">
+                      {capturedPhotos.length} foto(s) capturada(s)
+                    </p>
+                  )}
                 </div>
-
-                {capturedPhotos.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {capturedPhotos.map((photo, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={URL.createObjectURL(photo)}
-                          alt={`Foto ${index + 1}`}
-                          className="w-full h-24 object-cover rounded border border-gray-600"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removePhoto(index)}
-                          className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700"
-                        >
-                          <X className="w-3 h-3 text-white" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
+        </div>
 
-          {/* Botões de Ação */}
-          <div className="flex justify-end space-x-4 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              Cancelar
-            </Button>
-            
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black"
-            >
-              {loading ? 'Salvando...' : (visit ? 'Atualizar' : 'Criar')}
-            </Button>
-          </div>
-        </form>
+        {/* Botões de Ação */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !formData.supervisorId || !formData.clientId || !formData.workPostId}
+            className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-600"
+          >
+            {loading ? 'Salvando...' : visit ? 'Atualizar' : 'Salvar Visita'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

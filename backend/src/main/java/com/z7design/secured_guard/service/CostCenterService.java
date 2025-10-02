@@ -85,13 +85,20 @@ public class CostCenterService {
     public CostCenterDTO create(CreateCostCenterDTO dto) {
         log.info("Criando novo centro de custo: {}", dto.getCode());
         
+        // Gerar código automaticamente se não fornecido
+        String code = dto.getCode();
+        if (code == null || code.trim().isEmpty()) {
+            code = generateNextCode();
+            log.info("Código gerado automaticamente: {}", code);
+        }
+        
         // Verificar se o código já existe
-        if (costCenterRepository.existsByCode(dto.getCode())) {
-            throw new RuntimeException("Já existe um centro de custo com o código: " + dto.getCode());
+        if (costCenterRepository.existsByCode(code)) {
+            throw new RuntimeException("Já existe um centro de custo com o código: " + code);
         }
         
         CostCenter costCenter = CostCenter.builder()
-                .code(dto.getCode())
+                .code(code)
                 .name(dto.getName())
                 .description(dto.getDescription())
                 .responsible(dto.getResponsible())
@@ -106,6 +113,28 @@ public class CostCenterService {
         log.info("Centro de custo criado com sucesso: {}", savedCostCenter.getId());
         
         return CostCenterDTO.fromEntity(savedCostCenter);
+    }
+    
+    /**
+     * Gera o próximo código disponível para centro de custo
+     * Formato: CC001, CC002, CC003, etc.
+     */
+    private String generateNextCode() {
+        // Buscar o maior código numérico existente
+        String lastCode = costCenterRepository.findLastCodeByPattern("CC%");
+        
+        int nextNumber = 1;
+        if (lastCode != null && lastCode.startsWith("CC")) {
+            try {
+                String numberPart = lastCode.substring(2);
+                nextNumber = Integer.parseInt(numberPart) + 1;
+            } catch (NumberFormatException e) {
+                log.warn("Erro ao parsear código existente: {}", lastCode);
+                nextNumber = 1;
+            }
+        }
+        
+        return String.format("CC%03d", nextNumber);
     }
     
     public CostCenterDTO update(UUID id, UpdateCostCenterDTO dto) {

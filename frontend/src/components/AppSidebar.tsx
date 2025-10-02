@@ -329,6 +329,7 @@ export function AppSidebar() {
       { icon: BarChart3, text: 'Dashboard', to: '/dashboard', id: 'dashboard' },
       { icon: DollarSign, text: 'Financeiro', to: '/financeiro', id: 'financeiro' },
       { icon: FileSpreadsheet, text: 'Holerites', to: '/holerites', id: 'holerites' },
+      { icon: FileSpreadsheet, text: 'Folha de Pagamento', to: '/payrolls', id: 'payrolls' },
       { icon: FileText, text: 'Documentos Unificados', to: '/documentos-unificados', id: 'documentos-unificados' },
       { icon: Truck, text: 'Frota', to: '/frota', id: 'frota' },
       { icon: FileText, text: 'Relatórios', to: '/relatorios', id: 'relatorios' },

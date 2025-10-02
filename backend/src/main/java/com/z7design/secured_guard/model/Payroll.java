@@ -83,6 +83,23 @@ public class Payroll {
     @NotBlank(message = "Document URL is required")
     @Column(name = "document_url")
     private String documentUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @lombok.Builder.Default
+    private com.z7design.secured_guard.model.enums.PayrollStatus status = com.z7design.secured_guard.model.enums.PayrollStatus.PENDING;
+
+    @Column(name = "payment_date")
+    private java.time.LocalDate paymentDate;
+
+    @Column(name = "notes")
+    private String notes;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt;

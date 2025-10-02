@@ -4,11 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import org.springframework.mail.MailException;
-import org.springframework.mail.MailParseException;
 import java.io.File;
 
 @Service
@@ -61,6 +62,27 @@ public class EmailService {
             return false;
         } catch (Exception e) {
             log.error("💥 Erro inesperado ao enviar email: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Envia email com anexo em bytes (PDF)
+     */
+    public boolean sendEmailWithAttachment(String toEmail, String subject, String htmlBody, byte[] attachmentBytes, String attachmentFileName) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            helper.addAttachment(attachmentFileName, new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+            mailSender.send(message);
+            log.info("✅ Email com anexo enviado para {} ({} bytes)", toEmail, attachmentBytes != null ? attachmentBytes.length : 0);
+            return true;
+        } catch (Exception e) {
+            log.error("💥 Erro ao enviar email com anexo: {}", e.getMessage(), e);
             return false;
         }
     }

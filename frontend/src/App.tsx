@@ -63,6 +63,7 @@ const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const Profile = lazy(() => import('@/pages/Profile'));
 import Holerites from '@/pages/Holerites';
 const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
+const Payroll = lazy(() => import('@/pages/Payroll'));
 const PayslipView = lazy(() => import('@/pages/PayslipView'));
 const Mensagens = lazy(() => import('@/pages/Mensagens'));
 const GestaoMensagens = lazy(() => import('@/pages/GestaoMensagens'));
@@ -755,6 +756,13 @@ function App() {
                     <Route path="/payslip" element={
                       <ProtectedRoute>
                         <PayslipView />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/payrolls" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Payroll />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     

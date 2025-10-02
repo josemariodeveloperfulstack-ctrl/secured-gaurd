@@ -290,9 +290,9 @@ export const contasAReceberService = {
 
   async getCostCenters(): Promise<string[]> {
     try {
-      const response = await api.get('/api/accounts-receivable/cost-centers');
+      const response = await api.get('/api/cost-centers');
       if (Array.isArray(response.data)) {
-        return response.data;
+        return response.data.map((center: any) => center.name);
       }
       throw new Error('Resposta inválida da API');
     } catch (error) {

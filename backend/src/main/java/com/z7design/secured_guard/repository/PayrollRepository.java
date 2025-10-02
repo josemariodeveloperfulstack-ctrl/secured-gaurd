@@ -1,6 +1,5 @@
 package com.z7design.secured_guard.repository;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,4 +33,7 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
     
     @Query("SELECT p FROM Payroll p WHERE p.referenceMonth LIKE :year || '%'")
     List<Payroll> findByYear(@Param("year") Integer year);
+
+    @Query("SELECT COALESCE(SUM(p.netSalary), 0) FROM Payroll p WHERE p.referenceMonth = :referenceMonth")
+    Double sumNetSalaryByReferenceMonth(@Param("referenceMonth") String referenceMonth);
 } 

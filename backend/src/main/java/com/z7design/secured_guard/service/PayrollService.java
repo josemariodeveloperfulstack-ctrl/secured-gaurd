@@ -1,16 +1,17 @@
 package com.z7design.secured_guard.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Payroll;
 import com.z7design.secured_guard.repository.PayrollRepository;
+import com.z7design.secured_guard.model.enums.PayrollStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,7 +28,8 @@ public class PayrollService {
     
     @Transactional
     public Payroll update(UUID id, Payroll payroll) {
-        Payroll existingPayroll = findById(id);
+        // Ensure entity exists, then persist updated fields
+        findById(id);
         payroll.setId(id);
         return payrollRepository.save(payroll);
     }
@@ -65,5 +67,44 @@ public class PayrollService {
     
     public List<Payroll> findAll() {
         return payrollRepository.findAll();
+    }
+
+    // ===== Transições de status =====
+    @Transactional
+    public Payroll approve(UUID id) {
+        Payroll payroll = findById(id);
+        payroll.setStatus(PayrollStatus.APPROVED);
+        payroll.setApprovedAt(LocalDateTime.now());
+        return payrollRepository.save(payroll);
+    }
+
+    @Transactional
+    public Payroll markAsPaid(UUID id, LocalDate paymentDate) {
+        Payroll payroll = findById(id);
+        payroll.setStatus(PayrollStatus.PAID);
+        payroll.setPaymentDate(paymentDate != null ? paymentDate : LocalDate.now());
+        payroll.setClosedAt(LocalDateTime.now());
+        return payrollRepository.save(payroll);
+    }
+
+    @Transactional
+    public Payroll cancel(UUID id) {
+        Payroll payroll = findById(id);
+        payroll.setStatus(PayrollStatus.CANCELLED);
+        return payrollRepository.save(payroll);
+    }
+
+    public Double getTotalNetSalaryByReferenceMonth(String referenceMonth) {
+        return payrollRepository.sumNetSalaryByReferenceMonth(referenceMonth);
+    }
+
+    @Transactional
+    public Payroll reopen(UUID id) {
+        Payroll payroll = findById(id);
+        payroll.setStatus(PayrollStatus.PENDING);
+        payroll.setPaymentDate(null);
+        payroll.setApprovedAt(null);
+        payroll.setClosedAt(null);
+        return payrollRepository.save(payroll);
     }
 } 

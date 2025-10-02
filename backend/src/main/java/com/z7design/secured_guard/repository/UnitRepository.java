@@ -39,6 +39,9 @@ public interface UnitRepository extends JpaRepository<Unit, UUID> {
     // Buscar por código
     Optional<Unit> findByCode(String code);
     
+    // Verificar se existe por código
+    boolean existsByCode(String code);
+    
     // Buscar por código e ativa
     Optional<Unit> findByCodeAndActiveTrue(String code);
     

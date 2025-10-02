@@ -27,7 +27,7 @@ public class EmployeeController {
     private final EmployeeService employeeService;
     
     @GetMapping
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
     @Operation(summary = "Listar todos os funcionários", description = "Retorna uma lista de todos os funcionários")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários retornada com sucesso"),
@@ -178,7 +178,7 @@ public class EmployeeController {
     }
     
     @GetMapping("/search/simple")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
     @Operation(summary = "Buscar funcionários simplificados", description = "Retorna dados simplificados de funcionários para seleção em formulários")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários simplificados retornada com sucesso"),

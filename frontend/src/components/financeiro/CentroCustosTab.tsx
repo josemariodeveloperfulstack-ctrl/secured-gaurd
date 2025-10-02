@@ -214,6 +214,43 @@ const CentroCustosTab: React.FC = () => {
     }
   };
 
+  // Função para gerar código automaticamente
+  const handleGenerateCode = async () => {
+    try {
+      // Simular geração de código baseado nos existentes
+      const existingCodes = centrosCusto.map(c => c.code).filter(code => code.startsWith('CC'));
+      let nextNumber = 1;
+      
+      if (existingCodes.length > 0) {
+        const numbers = existingCodes
+          .map(code => {
+            const match = code.match(/CC(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+          })
+          .filter(num => num > 0);
+        
+        if (numbers.length > 0) {
+          nextNumber = Math.max(...numbers) + 1;
+        }
+      }
+      
+      const newCode = `CC${nextNumber.toString().padStart(3, '0')}`;
+      setFormData(prev => ({ ...prev, code: newCode }));
+      
+      toast({
+        title: "Código gerado",
+        description: `Código ${newCode} gerado automaticamente`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar código:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar código automaticamente",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     carregarDados();
   }, []);
@@ -517,13 +554,25 @@ const CentroCustosTab: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-seguranca-lightgray">Código *</label>
-                <Input
-                  value={formData.code}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                  placeholder="Ex: CC001"
-                  className="border-gray-600 bg-seguranca-black text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={formData.code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                    placeholder="Ex: CC001"
+                    className="border-gray-600 bg-seguranca-black text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateCode}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white whitespace-nowrap"
+                    title="Gerar código automaticamente"
+                  >
+                    <RefreshCw size={16} />
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-seguranca-lightgray">Nome *</label>

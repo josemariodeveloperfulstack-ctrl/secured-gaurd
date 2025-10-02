@@ -349,6 +349,55 @@ public class TestController {
         }
     }
 
+    @GetMapping("/create-agencies-table")
+    public ResponseEntity<Map<String, Object>> createAgenciesTable() {
+        try {
+            try (Connection connection = dataSource.getConnection()) {
+                String sql = """
+                    CREATE TABLE IF NOT EXISTS agencies (
+                        id UUID PRIMARY KEY,
+                        bank_id UUID,
+                        code VARCHAR(50),
+                        short_name VARCHAR(100),
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        manager VARCHAR(150),
+                        manager_email VARCHAR(150),
+                        manager_phone VARCHAR(50),
+                        phone VARCHAR(50),
+                        address TEXT,
+                        city VARCHAR(120),
+                        state VARCHAR(10),
+                        zip_code VARCHAR(20),
+                        notes TEXT,
+                        status VARCHAR(30) DEFAULT 'ACTIVE',
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITHOUT TIME ZONE
+                    )
+                    """;
+                
+                connection.createStatement().execute(sql);
+                
+                // Add indexes
+                connection.createStatement().execute("CREATE INDEX IF NOT EXISTS idx_agencies_code ON agencies(code)");
+                connection.createStatement().execute("CREATE INDEX IF NOT EXISTS idx_agencies_name ON agencies(name)");
+                
+                return ResponseEntity.ok(Map.of(
+                    "message", "Agencies table created successfully",
+                    "timestamp", System.currentTimeMillis(),
+                    "status", "OK"
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "error", e.getMessage(),
+                "stackTrace", e.getStackTrace()[0].toString(),
+                "timestamp", System.currentTimeMillis(),
+                "status", "ERROR"
+            ));
+        }
+    }
+
     @GetMapping("/create-simple-visit")
     public ResponseEntity<Map<String, Object>> createSimpleVisit() {
         try {

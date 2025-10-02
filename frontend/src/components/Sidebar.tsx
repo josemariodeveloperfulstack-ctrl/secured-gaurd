@@ -54,6 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage = 'dashboard' }) => {
     { icon: <ClipboardList size={20} />, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
     { icon: <DollarSign size={20} />, text: 'Financeiro', to: '/financeiro', id: 'financeiro' },
     { icon: <FileSpreadsheet size={20} />, text: 'Holerites', to: '/holerites', id: 'holerites' },
+    { icon: <FileSpreadsheet size={20} />, text: 'Folha de Pagamento', to: '/payrolls', id: 'payrolls' },
     { icon: <Truck size={20} />, text: 'Frota', to: '/frota', id: 'frota' },
     { icon: <Building2 size={20} />, text: 'Filiais', to: '/filiais', id: 'filiais' },
     { icon: <Route size={20} />, text: 'Rota Semanal', to: '/rota-semanal-supervisao', id: 'rota-semanal' },

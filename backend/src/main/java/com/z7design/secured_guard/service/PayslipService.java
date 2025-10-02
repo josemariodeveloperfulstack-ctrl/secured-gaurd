@@ -782,6 +782,34 @@ public class PayslipService {
         return payslipRepository.findByFileName(fileName);
     }
 
+    public Optional<String> resolvePayslipPathByCpfMonthYear(String cpf, Integer month, Integer year) {
+        Payslip payslip = payslipRepository.findFirstByCpfAndMonthAndYear(cpf, month, year);
+        if (payslip == null) {
+            return Optional.empty();
+        }
+        // Primeiro tentar no diretório padrão do serviço
+        String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
+        Path candidate = Paths.get(OUTPUT_DIR, mesAno, payslip.getFileName());
+        if (Files.exists(candidate)) {
+            return Optional.of(candidate.toString());
+        }
+        // Fallbacks: caminhos conhecidos usados por PdfService/processadores
+        String pastaReferencia = String.format("%02d_%d", payslip.getMonth(), payslip.getYear());
+        Path alt1 = Paths.get("uploads", "holerites_processados", pastaReferencia, payslip.getFileName());
+        if (Files.exists(alt1)) {
+            return Optional.of(alt1.toString());
+        }
+        Path alt2 = Paths.get(System.getProperty("payslips.upload.dir", "uploads/payslips"), payslip.getFileName());
+        if (Files.exists(alt2)) {
+            return Optional.of(alt2.toString());
+        }
+        Path alt3 = Paths.get("backend/payslips_output", payslip.getFileName());
+        if (Files.exists(alt3)) {
+            return Optional.of(alt3.toString());
+        }
+        return Optional.empty();
+    }
+
     // Exclusão individual de payslip
     public void deletePayslip(UUID id) {
         Payslip payslip = payslipRepository.findById(id)

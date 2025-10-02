@@ -22,4 +22,6 @@ public interface PayslipRepository extends JpaRepository<Payslip, java.util.UUID
     
     @Query("SELECT p FROM Payslip p WHERE p.month = :month AND p.year = :year")
     List<Payslip> findByMonthAndYear(@Param("month") Integer month, @Param("year") Integer year);
+
+    Payslip findFirstByCpfAndMonthAndYear(String cpf, Integer month, Integer year);
 } 

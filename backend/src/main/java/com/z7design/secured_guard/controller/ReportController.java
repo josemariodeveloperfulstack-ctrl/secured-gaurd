@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,6 +31,10 @@ public class ReportController {
     
     private final ContasAPagarReportService contasAPagarReportService;
     private final ReportTemplateService reportTemplateService;
+    private final com.z7design.secured_guard.service.ReportService reportService;
+    private final com.z7design.secured_guard.service.EmailService emailService;
+    @Value("${accounting.email:contabilidade@empresa.com}")
+    private String defaultAccountingEmail;
     
     @GetMapping("/contas-a-pagar")
     @Operation(summary = "Relatório de Contas a Pagar por Período", 
@@ -69,6 +74,43 @@ public class ReportController {
             log.error("Erro ao gerar relatório de contas a pagar: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Erro ao gerar relatório: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/payroll/pdf")
+    @Operation(summary = "Relatório PDF da Folha de Pagamento", description = "Gera relatório PDF para envio à contabilidade.")
+    public ResponseEntity<byte[]> generatePayrollPdf(
+            @RequestParam(required = false) String referenceMonth,
+            @RequestParam(required = false) java.util.UUID unitId,
+            @RequestParam(required = false) java.util.UUID employeeId) {
+        try {
+            byte[] pdf = reportService.generatePayrollReportPdf(referenceMonth, unitId, employeeId);
+            return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-folha.pdf")
+                .body(pdf);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/payroll/send-email")
+    @Operation(summary = "Enviar relatório de folha em PDF por email", description = "Gera o PDF e envia para a contabilidade.")
+    public ResponseEntity<Void> sendPayrollPdfByEmail(
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String referenceMonth,
+            @RequestParam(required = false) java.util.UUID unitId,
+            @RequestParam(required = false) java.util.UUID employeeId) {
+        try {
+            byte[] pdf = reportService.generatePayrollReportPdf(referenceMonth, unitId, employeeId);
+            String subject = "Relatório de Folha - " + (referenceMonth != null ? referenceMonth : "Período");
+            String body = "<p>Segue em anexo o relatório de folha de pagamento." + (referenceMonth != null ? (" Competência: <strong>" + referenceMonth + "</strong>.") : "") + "</p>";
+            String toEmail = (to != null && !to.isBlank()) ? to : defaultAccountingEmail;
+            boolean ok = emailService.sendEmailWithAttachment(toEmail, subject, body, pdf, "relatorio-folha.pdf");
+            if (ok) return ResponseEntity.ok().build();
+            return ResponseEntity.status(500).build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
         }
     }
     

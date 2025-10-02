@@ -148,9 +148,14 @@ public class UnitController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<UnitDTO> createUnit(@Valid @RequestBody CreateUnitRequest request) {
-        log.info("Criando nova unidade: {}", request.getName());
-        UnitDTO createdUnit = unitService.createUnitFromRequest(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdUnit);
+        try {
+            log.info("Criando nova unidade: {}", request.getName());
+            UnitDTO createdUnit = unitService.createUnitFromRequest(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdUnit);
+        } catch (Exception e) {
+            log.error("Erro ao criar unidade: {}", e.getMessage(), e);
+            throw e;
+        }
     }
     
     @PutMapping("/{id}")

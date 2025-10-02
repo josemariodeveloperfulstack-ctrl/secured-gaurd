@@ -270,7 +270,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.numeroFatura}
                   onChange={(e) => handleInputChange('numeroFatura', e.target.value)}
                   placeholder="Ex: FAT-2024-001"
-                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 />
               </div>
 
@@ -284,7 +284,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.descricao}
                   onChange={(e) => handleInputChange('descricao', e.target.value)}
                   placeholder="Descrição do serviço/produto"
-                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   required
                 />
               </div>
@@ -300,7 +300,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Data de Emissão */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-400 flex items-center gap-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
                   <CalendarDays size={14} />
                   Data de Emissão *
                 </label>
@@ -309,7 +309,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   onChange={(date) => handleInputChange('dataEmissao', date)}
                   dateFormat="dd/MM/yyyy"
                   locale={ptBR}
-                  className="w-full px-3 py-2 border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
                   {...DEFAULT_DATE_PICKER_PROPS}
                   required
                 />
@@ -317,7 +317,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
 
               {/* Data de Vencimento */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-green-400 flex items-center gap-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
                   <CalendarDays size={14} />
                   Data de Vencimento *
                 </label>
@@ -326,7 +326,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   onChange={(date) => handleInputChange('vencimento', date)}
                   dateFormat="dd/MM/yyyy"
                   locale={ptBR}
-                  className="w-full px-3 py-2 border border-green-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
                   {...DEFAULT_DATE_PICKER_PROPS}
                   required
                 />
@@ -356,7 +356,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   }}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
@@ -388,7 +388,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   }}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione uma empresa" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
@@ -425,7 +425,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   onValueChange={(value) => handleInputChange('tipo', value)}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
@@ -458,7 +458,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.valor}
                   onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
                   placeholder="0,00"
-                  className="border-green-500 bg-seguranca-black text-green-300 placeholder:text-green-400/60 focus:border-green-400 focus:ring-green-400 font-medium"
+                  className="border-green-500 bg-white text-black placeholder:text-gray-500 focus:border-green-400 focus:ring-green-400 font-medium"
                   required
                 />
               </div>
@@ -482,7 +482,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.categoria || 'NENHUMA'}
                   onValueChange={(value) => handleInputChange('categoria', value)}
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione uma categoria" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
@@ -515,7 +515,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.centroCusto || 'NENHUM'}
                   onValueChange={(value) => handleInputChange('centroCusto', value)}
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione um centro de custo" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
@@ -557,7 +557,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.codigoBarras}
                   onChange={(e) => handleInputChange('codigoBarras', e.target.value)}
                   placeholder="Código de barras (opcional)"
-                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                 />
               </div>
 
@@ -571,7 +571,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   value={formData.observacoes}
                   onChange={(e) => handleInputChange('observacoes', e.target.value)}
                   placeholder="Observações adicionais (opcional)"
-                  className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   rows={3}
                 />
               </div>

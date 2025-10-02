@@ -118,9 +118,17 @@ public class UnitService {
     public UnitDTO createUnitFromRequest(CreateUnitRequest request) {
         log.info("Criando nova unidade: {}", request.getName());
         
-        // Verificar se o código já existe
-        if (unitRepository.findByCode(request.getCode()).isPresent()) {
-            throw new BusinessException("Já existe uma unidade com o código: " + request.getCode());
+        // Normalizar código (converter null ou vazio para null)
+        String normalizedCode = request.getCode();
+        if (normalizedCode != null && normalizedCode.trim().isEmpty()) {
+            normalizedCode = null;
+        }
+        
+        // Verificar se o código já existe (apenas se não for null)
+        if (normalizedCode != null) {
+            if (unitRepository.existsByCode(normalizedCode)) {
+                throw new BusinessException("Já existe uma unidade com o código: " + normalizedCode);
+            }
         }
         
         // Verificar se o cliente existe
@@ -139,7 +147,7 @@ public class UnitService {
         
         Unit unit = Unit.builder()
                 .name(request.getName())
-                .code(request.getCode())
+                .code(normalizedCode)
                 .description(request.getDescription())
                 .address(request.getAddress())
                 .phone(request.getPhone())
@@ -164,7 +172,7 @@ public class UnitService {
         
         // Verificar se o código já existe (se foi alterado)
         if (request.getCode() != null && !request.getCode().equals(unit.getCode())) {
-            if (unitRepository.findByCode(request.getCode()).isPresent()) {
+            if (unitRepository.existsByCode(request.getCode())) {
                 throw new BusinessException("Já existe uma unidade com o código: " + request.getCode());
             }
         }

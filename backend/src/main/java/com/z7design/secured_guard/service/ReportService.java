@@ -1,11 +1,8 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.config.JasperReportsConfig;
-import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.dto.CompanyDTO;
 import com.z7design.secured_guard.dto.ProductDTO;
-import com.z7design.secured_guard.dto.InventoryItemDTO;
-import com.z7design.secured_guard.dto.FinancialTransactionDTO;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.InventoryItem;
 import com.z7design.secured_guard.model.FinancialTransaction;
@@ -13,24 +10,18 @@ import com.z7design.secured_guard.exception.ReportGenerationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
-import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
-import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
-import net.sf.jasperreports.export.SimpleExporterInput;
-import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
-import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
+ 
 import org.springframework.stereotype.Service;
-import org.springframework.util.ResourceUtils;
-
-import java.io.File;
-import java.io.FileNotFoundException;
+ 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import com.z7design.secured_guard.model.KmControl;
-import com.z7design.secured_guard.repository.KmControlRepository; // Importar KmControlRepository
+// import com.z7design.secured_guard.repository.KmControlRepository; // Importar KmControlRepository
 
 @Service
 @RequiredArgsConstructor
@@ -43,7 +34,9 @@ public class ReportService {
     private final ProductService productService;
     private final InventoryItemService inventoryItemService;
     private final FinancialTransactionService financialTransactionService;
-    private final KmControlRepository kmControlRepository; // Injetar KmControlRepository
+    // private final KmControlRepository kmControlRepository; // Injetar KmControlRepository (usado em relatórios de KM)
+    private final com.z7design.secured_guard.repository.PayrollRepository payrollRepository;
+    private final com.z7design.secured_guard.service.PayrollService payrollService;
 
     /**
      * Gera relatório de funcionários em PDF
@@ -182,6 +175,45 @@ public class ReportService {
         } catch (JRException | IOException e) {
             log.error("Erro ao gerar relatório consolidado em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório consolidado", e);
+        }
+    }
+
+    /**
+     * Gera relatório de folha de pagamento em PDF
+     */
+    public byte[] generatePayrollReportPdf(String referenceMonth, UUID unitId, UUID employeeId) {
+        try {
+            Map<String, Object> parameters = jasperReportsConfig.createDefaultParameters();
+            parameters.put("REFERENCE_MONTH", referenceMonth);
+            if (unitId != null) parameters.put("UNIT_ID", unitId.toString());
+            if (employeeId != null) parameters.put("EMPLOYEE_ID", employeeId.toString());
+
+            // Montar dataset básico da folha
+            List<com.z7design.secured_guard.model.Payroll> data;
+            if (employeeId != null && referenceMonth != null) {
+                data = payrollService.findByEmployeeId(employeeId).stream()
+                    .filter(p -> referenceMonth.equals(p.getReferenceMonth()))
+                    .toList();
+            } else if (unitId != null && referenceMonth != null) {
+                data = payrollService.findByUnitId(unitId).stream()
+                    .filter(p -> referenceMonth.equals(p.getReferenceMonth()))
+                    .toList();
+            } else if (referenceMonth != null) {
+                data = payrollRepository.findByReferenceMonth(referenceMonth);
+            } else {
+                data = payrollService.findAll();
+            }
+
+            parameters.put("TOTAL_NET", data.stream().map(p -> p.getNetSalary() == null ? 0d : p.getNetSalary()).reduce(0d, Double::sum));
+
+            return jasperReportsConfig.generatePdfReport(
+                "reports/payroll_report.jrxml",
+                data,
+                parameters
+            );
+        } catch (JRException | IOException e) {
+            log.error("Erro ao gerar relatório de folha em PDF", e);
+            throw new ReportGenerationException("Erro ao gerar relatório de folha", e);
         }
     }
 

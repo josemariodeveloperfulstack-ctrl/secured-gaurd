@@ -388,10 +388,10 @@ export const contasAPagarService = {
 
   async getCostCenters(): Promise<string[]> {
     try {
-      const response = await api.get('/api/invoices/cost-centers');
+      const response = await api.get('/api/cost-centers');
       // Verificar se a resposta é um array válido
       if (Array.isArray(response.data)) {
-        return response.data;
+        return response.data.map((center: any) => center.name);
       }
       // Se não for array ou for HTML, usar fallback
       throw new Error('Resposta inválida da API');

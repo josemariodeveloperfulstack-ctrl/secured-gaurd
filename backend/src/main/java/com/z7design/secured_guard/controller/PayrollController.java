@@ -3,7 +3,6 @@ package com.z7design.secured_guard.controller;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +30,8 @@ import lombok.RequiredArgsConstructor;
 public class PayrollController {
     
     private final PayrollService payrollService;
+    private final com.z7design.secured_guard.service.PayslipService payslipService;
+    private final com.z7design.secured_guard.service.EnvioService envioService;
     
     @Operation(summary = "Cria uma nova folha de pagamento",
                description = "Adiciona uma nova folha de pagamento ao sistema. Requer o papel de ADMIN ou GESTOR.")
@@ -190,5 +191,160 @@ public class PayrollController {
     @GetMapping
     public ResponseEntity<List<Payroll>> findAll() {
         return ResponseEntity.ok(payrollService.findAll());
+    }
+
+    // ===== Endpoints adicionais =====
+    @PutMapping("/{id}/approve")
+    public ResponseEntity<Payroll> approve(@PathVariable UUID id) {
+        return ResponseEntity.ok(payrollService.approve(id));
+    }
+
+    @PutMapping("/{id}/paid")
+    public ResponseEntity<Payroll> markAsPaid(
+            @PathVariable UUID id,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String dateStr = body != null ? body.get("paymentDate") : null;
+        java.time.LocalDate paymentDate = null;
+        if (dateStr != null && !dateStr.isBlank()) {
+            paymentDate = java.time.LocalDate.parse(dateStr);
+        }
+        return ResponseEntity.ok(payrollService.markAsPaid(id, paymentDate));
+    }
+
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<Payroll> cancel(@PathVariable UUID id) {
+        return ResponseEntity.ok(payrollService.cancel(id));
+    }
+
+    @GetMapping("/total-salary/{referenceMonth}")
+    public ResponseEntity<Double> getTotalSalaryByReferenceMonth(@PathVariable String referenceMonth) {
+        return ResponseEntity.ok(payrollService.getTotalNetSalaryByReferenceMonth(referenceMonth));
+    }
+
+    @PutMapping("/{id}/reopen")
+    public ResponseEntity<Payroll> reopen(@PathVariable UUID id) {
+        return ResponseEntity.ok(payrollService.reopen(id));
+    }
+
+    // ===== Integrações com holerite: download e envio por email =====
+    @GetMapping("/{employeeCpf}/{month}/{year}/download")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadPayslipByCpfMonthYear(
+            @PathVariable String employeeCpf,
+            @PathVariable Integer month,
+            @PathVariable Integer year) throws java.net.MalformedURLException {
+        java.util.Optional<String> pathOpt = payslipService.resolvePayslipPathByCpfMonthYear(employeeCpf, month, year);
+        if (pathOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        java.nio.file.Path filePath = java.nio.file.Paths.get(pathOpt.get());
+        org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+        if (!resource.exists() || !resource.isReadable()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+            .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName().toString() + "\"")
+            .body(resource);
+    }
+
+    @PostMapping("/{employeeId}/{month}/{year}/send-email")
+    public ResponseEntity<com.z7design.secured_guard.dto.EnvioResponse> sendPayslipByEmail(
+            @PathVariable UUID employeeId,
+            @PathVariable Integer month,
+            @PathVariable Integer year) {
+        // Monta request para envio individual via email
+        com.z7design.secured_guard.dto.EnvioRequest request = new com.z7design.secured_guard.dto.EnvioRequest();
+        request.setTipo("email");
+        request.setFuncionarioId(employeeId.toString());
+        com.z7design.secured_guard.dto.EnvioResponse response = envioService.enviarIndividual(request);
+        if (response.isSucesso()) {
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @GetMapping("/report.csv")
+    public ResponseEntity<String> reportCsv(
+            @RequestParam(required = false) String referenceMonth,
+            @RequestParam(required = false) String unitId,
+            @RequestParam(required = false) String employeeId) {
+        // CSV simples: id,employee,cpf,unit,referenceMonth,gross,net,status
+        StringBuilder sb = new StringBuilder();
+        sb.append("id,employee,cpf,unit,referenceMonth,gross,net,status\n");
+        java.util.List<Payroll> all = payrollService.findAll();
+        for (Payroll p : all) {
+            String empName = p.getEmployee() != null ? p.getEmployee().getName() : "";
+            String cpf = p.getEmployee() != null ? p.getEmployee().getDocument() : "";
+            String unit = p.getUnit() != null ? p.getUnit().getName() : "";
+            sb.append(p.getId()).append(",")
+              .append(empName).append(",")
+              .append(cpf).append(",")
+              .append(unit).append(",")
+              .append(p.getReferenceMonth()).append(",")
+              .append(p.getGrossSalary() != null ? p.getGrossSalary() : 0).append(",")
+              .append(p.getNetSalary() != null ? p.getNetSalary() : 0).append(",")
+              .append(p.getStatus() != null ? p.getStatus() : "").append("\n");
+        }
+        return ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+            .body(sb.toString());
+    }
+
+    // Alias compatível com frontend existente
+    @GetMapping("/report")
+    public ResponseEntity<String> report(
+            @RequestParam(required = false) String referenceMonth,
+            @RequestParam(required = false) String unitId,
+            @RequestParam(required = false) String employeeId) {
+        return reportCsv(referenceMonth, unitId, employeeId);
+    }
+
+    // Compatível com payrollService.ts: sendPayrollByEmail(id, email)
+    @PostMapping("/{id}/send-email")
+    public ResponseEntity<com.z7design.secured_guard.dto.EnvioResponse> sendPayrollByEmail(
+            @PathVariable UUID id,
+            @RequestBody(required = false) java.util.Map<String, Object> body) {
+        Payroll payroll = payrollService.findById(id);
+        if (payroll.getEmployee() == null || payroll.getEmployee().getId() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        com.z7design.secured_guard.dto.EnvioRequest request = new com.z7design.secured_guard.dto.EnvioRequest();
+        request.setTipo("email");
+        request.setFuncionarioId(payroll.getEmployee().getId().toString());
+        // Campo email no body é opcional e atualmente não é utilizado pelo serviço
+        com.z7design.secured_guard.dto.EnvioResponse response = envioService.enviarIndividual(request);
+        if (response.isSucesso()) {
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadByPayrollId(@PathVariable UUID id) throws java.net.MalformedURLException {
+        Payroll payroll = payrollService.findById(id);
+        String cpf = payroll.getEmployee() != null ? payroll.getEmployee().getDocument() : null;
+        if (cpf == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // referenceMonth formato YYYY-MM
+        String[] parts = payroll.getReferenceMonth().split("-");
+        if (parts.length != 2) {
+            return ResponseEntity.notFound().build();
+        }
+        Integer year = Integer.parseInt(parts[0]);
+        Integer month = Integer.parseInt(parts[1]);
+        java.util.Optional<String> pathOpt = payslipService.resolvePayslipPathByCpfMonthYear(cpf, month, year);
+        if (pathOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        java.nio.file.Path filePath = java.nio.file.Paths.get(pathOpt.get());
+        org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+        if (!resource.exists() || !resource.isReadable()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+            .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName().toString() + "\"")
+            .body(resource);
     }
 } 
