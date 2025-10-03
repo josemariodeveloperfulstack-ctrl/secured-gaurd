@@ -69,7 +69,13 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
   const filteredPositions = positions.filter(p => p.name.toLowerCase().includes(positionQuery.toLowerCase()));
   const filteredCompanies = companies.filter(c => c.name.toLowerCase().includes(companyQuery.toLowerCase()));
   const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientQuery.toLowerCase()));
-  const filteredUnits = (units as any[]).filter((u: any) => (u.name || '').toLowerCase().includes(unitQuery.toLowerCase()));
+  
+  // Filter units based on selected client
+  const selectedClient = clients.find(c => formData.client === c.name);
+  const clientUnits = selectedClient 
+    ? (units as any[]).filter((u: any) => u.clientId === selectedClient.id || u.client_id === selectedClient.id)
+    : units;
+  const filteredUnits = clientUnits.filter((u: any) => (u.name || '').toLowerCase().includes(unitQuery.toLowerCase()));
 
   // Reset form when modal opens/closes or order changes
   useEffect(() => {
@@ -199,11 +205,18 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
 
   const handleClientSelect = (clientId: string) => {
     const cli = clients.find(c => c.id === clientId);
-    setFormData(prev => ({ ...prev, client: cli?.name || '' }));
+    setFormData(prev => ({ 
+      ...prev, 
+      client: cli?.name || '',
+      // Clear workplace when client changes
+      workplace: ''
+    }));
+    // Clear unit search query when client changes
+    setUnitQuery('');
   };
 
   const handleUnitSelect = (unitId: string) => {
-    const u = (units as any[]).find((x: any) => x.id === unitId);
+    const u = clientUnits.find((x: any) => x.id === unitId);
     setFormData(prev => ({ ...prev, workplace: (u as any)?.name || '' }));
   };
 
