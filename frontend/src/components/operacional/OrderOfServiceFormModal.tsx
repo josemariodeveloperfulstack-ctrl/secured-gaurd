@@ -60,6 +60,25 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  // Search state for autocomplete
+  const [employeeQuery, setEmployeeQuery] = useState('');
+  const [positionQuery, setPositionQuery] = useState('');
+  const [companyQuery, setCompanyQuery] = useState('');
+  const [clientQuery, setClientQuery] = useState('');
+  const [unitQuery, setUnitQuery] = useState('');
+
+  // Derived filtered lists
+  const filteredEmployees = employees.filter(e => e.name.toLowerCase().includes(employeeQuery.toLowerCase()));
+  const filteredPositions = positions.filter(p => p.name.toLowerCase().includes(positionQuery.toLowerCase()));
+  const filteredCompanies = companies.filter(c => c.name.toLowerCase().includes(companyQuery.toLowerCase()));
+  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientQuery.toLowerCase()));
+  
+  // Filter units based on selected client
+  const selectedClient = clients.find(c => formData.client === c.name);
+  const clientUnits = selectedClient 
+    ? (units as any[]).filter((u: any) => u.clientId === selectedClient.id || u.client_id === selectedClient.id)
+    : units;
+  const filteredUnits = clientUnits.filter((u: any) => (u.name || '').toLowerCase().includes(unitQuery.toLowerCase()));
   // Reset form when modal opens/closes or order changes
   useEffect(() => {
     if (isOpen) {
@@ -229,6 +248,37 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
       console.error('❌ Erro ao carregar posts de trabalho:', error);
       setWorkPosts([]);
     }
+  };
+
+  const handlePositionSelect = (positionId: string) => {
+    const pos = positions.find(p => p.id === positionId);
+    setFormData(prev => ({ ...prev, role: pos?.name || '' }));
+  };
+
+  const handleCompanySelect = (companyId: string) => {
+    const comp = companies.find(c => c.id === companyId);
+    setFormData(prev => ({ ...prev, company: comp?.name || '' }));
+  };
+
+  const handleClientSelect = (clientId: string) => {
+    const cli = clients.find(c => c.id === clientId);
+    setFormData(prev => ({ 
+      ...prev, 
+      client: cli?.name || '',
+      // Clear workplace when client changes
+      workplace: ''
+    }));
+    // Load work posts for the selected client
+    if (cli) {
+      loadWorkPostsByClient(cli.id);
+    }
+    // Clear unit search query when client changes
+    setUnitQuery('');
+  };
+
+  const handleUnitSelect = (unitId: string) => {
+    const u = clientUnits.find((x: any) => x.id === unitId);
+    setFormData(prev => ({ ...prev, workplace: (u as any)?.name || '' }));
   };
 
   const handleUpload = async (file: File | null) => {
