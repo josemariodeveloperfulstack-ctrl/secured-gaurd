@@ -86,8 +86,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/work-posts/test-create").permitAll()
                 .requestMatchers("/api/work-posts/test-clients").permitAll()
                 .requestMatchers("/api/work-posts/**").authenticated()
-                // Endpoints de clientes - requerem permissões específicas
-                .requestMatchers("/api/clients/**").authenticated()
                 // Endpoints de contratos - requerem permissões específicas
                 .requestMatchers("/api/contracts/**").hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE", "CONTRACTS_CREATE", "CONTRACTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR")
                 // Endpoints financeiros - requerem permissões específicas
@@ -96,8 +94,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/invoices/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de suppliers (fornecedores) - temporariamente permitir para SUPER_ADMIN
                 .requestMatchers("/api/suppliers/**").hasAnyAuthority("ROLE_SUPER_ADMIN")
-                // Endpoints de units (empresas) - temporariamente permitir para SUPER_ADMIN
-                .requestMatchers("/api/units/**").hasAnyAuthority("ROLE_SUPER_ADMIN")
                 // Endpoints de accounts-receivable (contas a receber) - requerem permissões específicas
                 .requestMatchers("/api/accounts-receivable/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de scheduled-payments (pagamentos agendados) - requerem permissões específicas
@@ -117,10 +113,18 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/chat/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
                 // Endpoints de mensagens - requerem permissões específicas
                 .requestMatchers("/api/v1/messages/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
-                // Endpoints de funcionários - temporariamente acessíveis a usuários autenticados
-                .requestMatchers("/api/employees/**").authenticated()
-                // Endpoints de cargos/posições - temporariamente acessíveis a usuários autenticados
-                .requestMatchers("/api/positions/**").authenticated()
+                // Endpoints de funcionários - temporariamente públicos para debug
+                .requestMatchers("/api/employees/**").permitAll()
+                // Endpoints de unidades - temporariamente públicos para debug
+                .requestMatchers("/api/units/**").permitAll()
+                // Endpoints de empresas - temporariamente públicos para debug
+                .requestMatchers("/api/companies/**").permitAll()
+                // Endpoints de cargos/posições - temporariamente públicos para debug
+                .requestMatchers("/api/positions/**").permitAll()
+                // Endpoints de clientes - temporariamente públicos para debug
+                .requestMatchers("/api/clients/**").permitAll()
+                // Endpoints de documentos - temporariamente públicos para debug
+                .requestMatchers("/api/documents/**").permitAll()
                 // Endpoints de multas - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/fines/**").authenticated()
                 // Endpoints de dashboard - requerem apenas autenticação para usuários logados

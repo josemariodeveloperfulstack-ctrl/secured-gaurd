@@ -42,7 +42,6 @@ public class UnitController {
     private UnitService unitService;
     
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('HR_READ','ADMIN','SUPER_ADMIN','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @Operation(summary = "Listar todas as unidades", description = "Retorna uma lista de todas as unidades")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de unidades retornada com sucesso"),

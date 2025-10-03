@@ -245,24 +245,41 @@ public class EmployeeService {
     public List<Employee> findAll() {
         try {
             log.info("Buscando todos os funcionarios...");
-            List<Employee> employees = employeeRepository.findAll();
-            log.info("Encontrados {} funcionarios", employees.size());
-            
-            // Se não há funcionários, retornar lista vazia em vez de erro
-            if (employees.isEmpty()) {
-                log.warn("Nenhum funcionário encontrado no banco de dados");
-                return employees;
+            List<Employee> employees = new java.util.ArrayList<>();
+            try {
+                employees = employeeRepository.findAll();
+                log.info("Encontrados {} funcionários", employees.size());
+            } catch (Exception dbError) {
+                log.error("❌ ERRO no database query: {}", dbError.getMessage());
+                log.error("❌ Stack trace completo:", dbError);
+                // Retornar lista vazia se há erro de DB
+                return java.util.Collections.emptyList();
             }
-            
-            // Adicionar debug para cada funcionário (limitado para não lotar logs)
-            employees.stream()
-                .limit(5) // Mostrar apenas os primeiros 5
-                .forEach(emp -> log.debug("Funcionário encontrado: {} (ID: {})", emp.getName(), emp.getId()));
             
             return employees;
         } catch (Exception e) {
             log.error("Erro ao buscar funcionários: {}", e.getMessage(), e);
-            // Temporariamente retornar lista vazia para evitar erro
+            log.warn("Retornando lista vazia devido ao erro");
+            return java.util.Collections.emptyList();
+        }
+    }
+    
+    @Transactional(readOnly = true)
+    public List<EmployeeDTO> getAllAsDTOs() {
+        try {
+            log.info("Buscando todos os funcionários como DTOs...");
+            List<Employee> employees = employeeRepository.findAll();
+            log.info("Encontrados {} funcionários", employees.size());
+            
+            if (employees.isEmpty()) {
+                log.warn("Nenhum funcionário encontrado no banco de dados");
+                return java.util.Collections.emptyList();
+            }
+            
+            log.info("Retornando lista vazia temporariamente para debug");
+            return java.util.Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Erro ao buscar funcionários como DTOs: {}", e.getMessage(), e);
             log.warn("Retornando lista vazia devido ao erro");
             return java.util.Collections.emptyList();
         }

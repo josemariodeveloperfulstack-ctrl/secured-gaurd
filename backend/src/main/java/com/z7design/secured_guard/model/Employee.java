@@ -47,12 +47,10 @@ public class Employee {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Position position;
     
-    @NotBlank(message = "Registration number is required")
-    @Column(nullable = false)
+    @Column
     private String registrationNumber;
     
-    @NotNull(message = "Hire date is required")
-    @Column(nullable = false)
+    @Column
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate hireDate;
     
@@ -72,12 +70,10 @@ public class Employee {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
     
-    @NotBlank(message = "Name is required")
-    @Column(nullable = false)
+    @Column
     private String name;
     
-    @NotBlank(message = "Document is required")
-    @Column(nullable = false, unique = true)
+    @Column(nullable = true)
     private String document;
     
     @Column(name = "birth_date")
@@ -90,15 +86,12 @@ public class Employee {
     @JsonIgnoreProperties("employees")
     private Unit unit;
     
-    @NotBlank(message = "Address is required")
     @Column
     private String address;
     
-    @NotBlank(message = "Phone is required")
     @Column
     private String phone;
     
-    @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     @Column
     private String email;

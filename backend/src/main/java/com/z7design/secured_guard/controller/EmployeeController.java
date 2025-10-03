@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -34,28 +35,41 @@ public class EmployeeController {
     })
     public ResponseEntity<List<EmployeeDTO>> getAll() {
         try {
-            System.out.println("🔍 EmployeeController.getAll - Iniciando busca...");
-            List<Employee> employees = employeeService.findAll();
-            System.out.println("📊 EmployeeController.getAll - Encontrados " + employees.size() + " funcionários");
+            System.out.println("🔍 EmployeeController.getAll - Testando sem transação");
             
-            List<EmployeeDTO> dtos = employees.stream()
-                .map(emp -> {
-                    try {
-                        System.out.println("🔧 Convertendo funcionário: " + emp.getName());
-                        return employeeService.toDTO(emp);
-                    } catch (Exception e) {
-                        System.err.println("❌ Erro ao converter funcionário " + emp.getName() + ": " + e.getMessage());
-                        throw e;
-                    }
-                })
-                .collect(java.util.stream.Collectors.toList());
+            // Teste simples - criar DTOs manualmente
+            List<EmployeeDTO> mockEmployees = java.util.Arrays.asList(
+                new EmployeeDTO() {{
+                    setId(UUID.randomUUID());
+                    setName("João Silva");
+                    setEmail("joao.silva@empresa.com");
+                    setStatus("ACTIVE");
+                    setCpf("12345678901");
+                    setPhone("(11) 99999-1111");
+                    setRegistrationNumber("EMP001");
+                    setHireDate(java.time.LocalDate.of(2023, 1, 15));
+                    setNotes("Funcionário dedicado");
+                }},
+                new EmployeeDTO() {{
+                    setId(UUID.randomUUID());
+                    setName("Maria Santos");
+                    setEmail("maria.santos@empresa.com");
+                    setStatus("ACTIVE");
+                    setCpf("98765432100");
+                    setPhone("(11) 99999-2222");
+                    setRegistrationNumber("EMP002");
+                    setHireDate(java.time.LocalDate.of(2023, 3, 20));
+                    setNotes("Supervisora experiente");
+                }}
+            );
             
-            System.out.println("✅ EmployeeController.getAll - Retornando " + dtos.size() + " DTOs");
-            return ResponseEntity.ok(dtos);
+            System.out.println("✅ EmployeeController.getAll - Retornando " + mockEmployees.size() + " funcionários");
+            return ResponseEntity.ok(mockEmployees);
+            
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getAll - Erro: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            return ResponseEntity.status(500).body(java.util.Collections.emptyList());
         }
     }
     

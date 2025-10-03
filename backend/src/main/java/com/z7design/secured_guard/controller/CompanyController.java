@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.CompanyDTO;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.service.CompanyService;
 
 import io.swagger.v3.oas.annotations.Operation;
