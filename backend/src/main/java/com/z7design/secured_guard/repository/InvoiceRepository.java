@@ -219,11 +219,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
 
     // Nota: manter assinaturas herdadas; o EntityGraph não altera nullability
     @Override
-    @EntityGraph(attributePaths = {"client", "supplier", "contract"})
     List<Invoice> findAll();
 
     @Override
-    @EntityGraph(attributePaths = {"client", "supplier", "contract"})
     Page<Invoice> findAll(@org.springframework.lang.NonNull Pageable pageable);
 
     // ---- Centros de Custo ----
