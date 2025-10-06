@@ -267,7 +267,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 onChange={(date) => handleInputChange('dataEmissao', date)}
                 dateFormat="dd/MM/yyyy"
                 locale={ptBR}
-                  className="w-full px-3 py-2 border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                className="w-full px-3 py-2 border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white !text-black !placeholder:text-black font-medium"
                 {...DEFAULT_DATE_PICKER_PROPS}
                 required
               />
@@ -284,7 +284,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 onChange={(date) => handleInputChange('vencimento', date)}
                 dateFormat="dd/MM/yyyy"
                 locale={ptBR}
-                  className="w-full px-3 py-2 border border-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                className="w-full px-3 py-2 border border-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent bg-white !text-black !placeholder:text-black font-medium"
                 {...DEFAULT_DATE_PICKER_PROPS}
                 required
               />
