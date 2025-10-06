@@ -50,9 +50,14 @@ public class InvoiceController {
     })
     public ResponseEntity<Page<InvoiceDTO>> getAll(
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
-        Page<Invoice> invoices = invoiceService.findAll(pageable);
-        Page<InvoiceDTO> dtos = invoices.map(InvoiceDTO::fromEntity);
-        return ResponseEntity.ok(dtos);
+        try {
+            Page<Invoice> invoices = invoiceService.findAll(pageable);
+            Page<InvoiceDTO> dtos = invoices.map(InvoiceDTO::fromEntity);
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Erro em GET /api/invoices", e);
+            return ResponseEntity.ok(Page.empty());
+        }
     }
     
     @GetMapping("/all")
@@ -124,17 +129,27 @@ public class InvoiceController {
     @GetMapping("/overdue")
     @Operation(summary = "Buscar faturas vencidas", description = "Retorna faturas que estão vencidas")
     public ResponseEntity<List<InvoiceDTO>> getOverdueInvoices() {
-        List<Invoice> invoices = invoiceService.findOverdueInvoices();
-        List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        try {
+            List<Invoice> invoices = invoiceService.findOverdueInvoices();
+            List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Erro em GET /api/invoices/overdue", e);
+            return ResponseEntity.ok(List.of());
+        }
     }
     
     @GetMapping("/due-soon/{days}")
     @Operation(summary = "Buscar faturas vencendo em breve", description = "Retorna faturas que vencem nos próximos X dias")
     public ResponseEntity<List<InvoiceDTO>> getInvoicesDueSoon(@PathVariable int days) {
-        List<Invoice> invoices = invoiceService.findInvoicesDueSoon(days);
-        List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        try {
+            List<Invoice> invoices = invoiceService.findInvoicesDueSoon(days);
+            List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Erro em GET /api/invoices/due-soon/{}", days, e);
+            return ResponseEntity.ok(List.of());
+        }
     }
     
     @GetMapping("/paid-in-period")
@@ -336,13 +351,24 @@ public class InvoiceController {
     @GetMapping("/reports/summary")
     @Operation(summary = "Resumo financeiro", description = "Retorna um resumo completo das faturas (pendentes, vencidas, pagas)")
     public ResponseEntity<Map<String, Object>> getFinancialSummary() {
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("totalPending", invoiceService.getTotalPending());
-        summary.put("totalOverdue", invoiceService.getTotalOverdue());
-        summary.put("totalPaid", invoiceService.getTotalPaidInPeriod(LocalDate.now().minusMonths(1), LocalDate.now()));
-        summary.put("countPending", invoiceService.findByStatus(ExpenseStatus.PENDENTE).size());
-        summary.put("countOverdue", invoiceService.findOverdueInvoices().size());
-        return ResponseEntity.ok(summary);
+        try {
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalPending", invoiceService.getTotalPending());
+            summary.put("totalOverdue", invoiceService.getTotalOverdue());
+            summary.put("totalPaid", invoiceService.getTotalPaidInPeriod(LocalDate.now().minusMonths(1), LocalDate.now()));
+            summary.put("countPending", invoiceService.findByStatus(ExpenseStatus.PENDENTE).size());
+            summary.put("countOverdue", invoiceService.findOverdueInvoices().size());
+            return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            log.error("Erro em GET /api/invoices/reports/summary", e);
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalPending", java.math.BigDecimal.ZERO);
+            summary.put("totalOverdue", java.math.BigDecimal.ZERO);
+            summary.put("totalPaid", java.math.BigDecimal.ZERO);
+            summary.put("countPending", 0);
+            summary.put("countOverdue", 0);
+            return ResponseEntity.ok(summary);
+        }
     }
     
     // ---- Relatórios por Centro de Custo ----
