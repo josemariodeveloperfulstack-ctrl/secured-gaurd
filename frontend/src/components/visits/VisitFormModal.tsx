@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CreateVisitRequest, VisitStatus, Visit } from '@/types/visit';
 import { visitService } from '@/services/visitService';
+import { facialRecognitionService } from '@/services/facialRecognitionService';
+import MapWithPin from '@/components/ui/MapWithPin';
 import api from '@/lib/axios';
 
 interface VisitFormModalProps {
@@ -79,6 +81,8 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
   // Reconhecimento facial
   const [showFacialRecognition, setShowFacialRecognition] = useState(false);
   const [capturedFace, setCapturedFace] = useState<string | null>(null);
+  const [isRecognizing, setIsRecognizing] = useState(false);
+  const [recognitionResult, setRecognitionResult] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -221,25 +225,65 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     }
     setShowFacialRecognition(false);
     setCapturedFace(null);
+    setRecognitionResult(null);
+    setIsRecognizing(false);
   };
 
-  const captureFace = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      
-      if (context) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const captureFace = async () => {
+    if (videoRef.current) {
+      try {
+        setIsRecognizing(true);
         
-        const imageData = canvas.toDataURL('image/jpeg');
-        setCapturedFace(imageData);
+        // Capturar imagem da câmera
+        const imageFile = await facialRecognitionService.captureFromCamera(videoRef.current);
         
-        // Simular reconhecimento facial
-        // Em produção, aqui seria feita a chamada para uma API de reconhecimento facial
-        processFacialRecognition(imageData);
+        if (!imageFile) {
+          throw new Error('Falha ao capturar imagem');
+        }
+        
+        // Validar arquivo
+        const validation = facialRecognitionService.validateImageFile(imageFile);
+        if (!validation.valid) {
+          throw new Error(validation.error);
+        }
+        
+        // Converter para base64 para exibição
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setCapturedFace(e.target?.result as string);
+        };
+        reader.readAsDataURL(imageFile);
+        
+        // Realizar reconhecimento facial
+        const result = await facialRecognitionService.recognizeFace(imageFile);
+        setRecognitionResult(result);
+        
+        if (result.success) {
+          // Preencher dados do supervisor automaticamente
+          setSupervisorCpf(result.cpf || '');
+          setSupervisorName(result.employee?.name || '');
+          
+          toast({
+            title: "Reconhecimento facial realizado com sucesso!",
+            description: `Supervisor identificado: ${result.employee?.name} (CPF: ${result.cpf})`,
+          });
+        } else {
+          toast({
+            title: "Face não reconhecida",
+            description: result.error || "Não foi possível identificar o supervisor",
+            variant: "destructive",
+          });
+        }
+        
+      } catch (error: any) {
+        console.error('Erro no reconhecimento facial:', error);
+        toast({
+          title: "Erro no reconhecimento facial",
+          description: error.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+      } finally {
+        setIsRecognizing(false);
       }
     }
   };
@@ -401,6 +445,20 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     );
   };
 
+  const handleMapLocationSelect = (lat: number, lng: number) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+      locationAddress: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+    }));
+
+    toast({
+      title: "Localização selecionada no mapa",
+      description: `Lat: ${lat.toFixed(6)}, Long: ${lng.toFixed(6)}`,
+    });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setUploadedFiles(prev => [...prev, ...files]);
@@ -533,14 +591,16 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                       <div className="flex gap-3 justify-center">
                         <Button
                           onClick={captureFace}
+                          disabled={isRecognizing}
                           className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-600"
                         >
                           <Camera size={16} className="mr-2" />
-                          Capturar Foto
+                          {isRecognizing ? 'Reconhecendo...' : 'Capturar e Reconhecer'}
                         </Button>
                         <Button
                           variant="outline"
                           onClick={stopFacialRecognition}
+                          disabled={isRecognizing}
                         >
                           Cancelar
                         </Button>
@@ -557,7 +617,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                         />
                       </div>
                       
-                      {loadingSupervisor && (
+                      {isRecognizing && (
                         <div className="text-center space-y-2">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-yellow mx-auto"></div>
                           <p className="text-seguranca-lightgray">
@@ -566,10 +626,45 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                         </div>
                       )}
                       
-                      {!loadingSupervisor && (
+                      {recognitionResult && (
+                        <div className="space-y-3">
+                          {recognitionResult.success ? (
+                            <div className="p-4 bg-green-900/20 border border-green-600 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle className="w-5 h-5 text-green-500" />
+                                <span className="text-green-400 font-medium">Reconhecimento bem-sucedido!</span>
+                              </div>
+                              <div className="text-sm text-green-300">
+                                <p><strong>Nome:</strong> {recognitionResult.employee?.name}</p>
+                                <p><strong>CPF:</strong> {recognitionResult.cpf}</p>
+                                <p><strong>Confiança:</strong> {recognitionResult.confidence?.toFixed(1)}%</p>
+                                <p><strong>Qualidade:</strong> {recognitionResult.quality?.toFixed(1)}%</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-red-900/20 border border-red-600 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <XCircle className="w-5 h-5 text-red-500" />
+                                <span className="text-red-400 font-medium">Face não reconhecida</span>
+                              </div>
+                              <div className="text-sm text-red-300">
+                                <p>{recognitionResult.error}</p>
+                                {recognitionResult.quality && (
+                                  <p><strong>Qualidade da imagem:</strong> {recognitionResult.quality.toFixed(1)}%</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {!isRecognizing && (
                         <div className="flex gap-3 justify-center">
                           <Button
-                            onClick={retryCapture}
+                            onClick={() => {
+                              setCapturedFace(null);
+                              setRecognitionResult(null);
+                            }}
                             variant="outline"
                           >
                             Tirar Outra Foto
@@ -778,6 +873,26 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                 <div className="text-sm text-seguranca-lightgray">
                   <p>Latitude: {formData.latitude.toFixed(6)}</p>
                   <p>Longitude: {formData.longitude.toFixed(6)}</p>
+                </div>
+              )}
+              
+              {/* Mapa Interativo */}
+              {formData.latitude && formData.longitude && (
+                <div className="mt-4">
+                  <Label className="text-seguranca-lightgray mb-2 block">
+                    Mapa da Localização
+                  </Label>
+                  <MapWithPin
+                    latitude={formData.latitude}
+                    longitude={formData.longitude}
+                    onLocationSelect={handleMapLocationSelect}
+                    height="300px"
+                    className="rounded-lg"
+                    showControls={true}
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    💡 Clique no mapa para ajustar a localização
+                  </p>
                 </div>
               )}
             </CardContent>

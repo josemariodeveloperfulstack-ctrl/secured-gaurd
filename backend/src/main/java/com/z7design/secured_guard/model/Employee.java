@@ -14,8 +14,6 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.NotFound;
 import org.hibernate.annotations.NotFoundAction;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -322,6 +320,27 @@ public class Employee {
 
     @Column(name = "nome_conjuge_estrangeiro", length = 100)
     private String nomeConjugeEstrangeiro;
+
+    // Dados do cônjuge
+    @Column(name = "spouse_name", length = 100)
+    private String spouseName;
+
+    @Column(name = "spouse_cpf", length = 14)
+    private String spouseCpf;
+
+    @Column(name = "spouse_rg", length = 20)
+    private String spouseRg;
+
+    @Column(name = "spouse_birth_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate spouseBirthDate;
+
+    @Column(name = "spouse_phone", length = 20)
+    private String spousePhone;
+
+    @Column(name = "spouse_email", length = 100)
+    @Email
+    private String spouseEmail;
 
     @Column(name = "tem_filhos_brasileiros")
     private Boolean temFilhosBrasileiros;

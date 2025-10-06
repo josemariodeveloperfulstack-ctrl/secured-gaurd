@@ -41,6 +41,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { payslipService } from '@/services/payslipService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
+import MergeDocumentsModal from '@/components/holerites/MergeDocumentsModal';
+import { PdfMergeResult } from '@/services/pdfMergeService';
 import api from '@/lib/axios';
 
 const Holerites: React.FC = () => {
@@ -75,6 +77,20 @@ const Holerites: React.FC = () => {
   // Estados para template de recibo
   const [showReceiptTemplateModal, setShowReceiptTemplateModal] = useState(false);
   const [selectedReceiptForTemplate, setSelectedReceiptForTemplate] = useState<any>(null);
+
+  // Estados para união de documentos
+  const [showMergeDocumentsModal, setShowMergeDocumentsModal] = useState(false);
+
+  // Função para lidar com sucesso da união de documentos
+  const handleMergeSuccess = (result: PdfMergeResult) => {
+    toast({
+      title: "Sucesso",
+      description: `Documentos unidos com sucesso! Arquivo: ${result.fileName}`,
+    });
+    
+    // Opcionalmente, adicionar o resultado à lista de documentos unificados
+    // ou atualizar alguma lista existente
+  };
 
   // Estados para unificação individual
   const [individualUnifications, setIndividualUnifications] = useState<any[]>([]);
@@ -2123,13 +2139,13 @@ const Holerites: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Botão de Upload Melhorado */}
-                <div className="flex justify-center">
-                <Button 
-                    onClick={() => setShowUploadModal(true)}
-                    disabled={loading}
-                    className="group relative bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 px-10 py-4 rounded-2xl shadow-2xl hover:shadow-red-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-red-400/20"
-                  >
+                {/* Botões de Ação */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button 
+                      onClick={() => setShowUploadModal(true)}
+                      disabled={loading}
+                      className="group relative bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 px-8 py-4 rounded-2xl shadow-2xl hover:shadow-red-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-red-400/20"
+                    >
                     <div className="absolute inset-0 bg-gradient-to-r from-red-400/20 to-pink-400/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                     <div className="relative flex items-center space-x-3">
                       {loading ? (
@@ -2143,7 +2159,22 @@ const Holerites: React.FC = () => {
                         {loading ? 'Processando...' : 'Importar Holerites'}
                       </span>
                     </div>
-                </Button>
+                  </Button>
+
+                  <Button 
+                      onClick={() => setShowMergeDocumentsModal(true)}
+                      className="group relative bg-gradient-to-r from-blue-500 via-purple-600 to-blue-700 hover:from-blue-600 hover:via-purple-700 hover:to-blue-800 px-8 py-4 rounded-2xl shadow-2xl hover:shadow-blue-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-blue-400/20"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                      <div className="relative flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors duration-300">
+                          <FileText size={20} />
+                        </div>
+                        <span className="text-lg font-semibold">
+                          Unir Documentos
+                        </span>
+                      </div>
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -3662,6 +3693,13 @@ const Holerites: React.FC = () => {
            onOpenChange={setShowReceiptTemplateModal}
            receiptId={selectedReceiptForTemplate?.id || ''}
            receiptData={selectedReceiptForTemplate}
+         />
+
+         {/* Modal de União de Documentos */}
+         <MergeDocumentsModal
+           isOpen={showMergeDocumentsModal}
+           onClose={() => setShowMergeDocumentsModal(false)}
+           onSuccess={handleMergeSuccess}
          />
 
          {/* Modal de visualização de comprovante de pagamento */}

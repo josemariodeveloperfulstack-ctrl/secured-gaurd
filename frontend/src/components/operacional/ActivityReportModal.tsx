@@ -60,6 +60,13 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   const [photos, setPhotos] = useState<File[]>([]);
   const [documents, setDocuments] = useState<File[]>([]);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  
+  // Estados para dados dos dropdowns
+  const [employees, setEmployees] = useState<{id: string, name: string}[]>([]);
+  const [clients, setClients] = useState<{id: string, name: string}[]>([]);
+  const [workPosts, setWorkPosts] = useState<{id: string, name: string, clientId: string}[]>([]);
+  const [filteredWorkPosts, setFilteredWorkPosts] = useState<{id: string, name: string}[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   useEffect(() => {
     if (report) {
@@ -93,11 +100,64 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
     setDocuments([]);
   }, [report, open]);
 
+  // Carregar dados quando modal abrir
+  useEffect(() => {
+    if (open) {
+      loadDropdownData();
+    }
+  }, [open]);
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    
+    // Filtrar postos de trabalho quando cliente for selecionado
+    if (field === 'clientId') {
+      const filtered = workPosts.filter(wp => wp.clientId === value);
+      setFilteredWorkPosts(filtered);
+      // Limpar posto selecionado
+      setFormData(prev => ({ ...prev, workPostId: '' }));
+    }
+  };
+
+  // Carregar dados dos dropdowns
+  const loadDropdownData = async () => {
+    try {
+      setLoadingData(true);
+      
+      // Carregar funcionários
+      const employeesResponse = await fetch('/api/employees/basic');
+      if (employeesResponse.ok) {
+        const employeesData = await employeesResponse.json();
+        setEmployees(employeesData.employees || []);
+      }
+      
+      // Carregar clientes
+      const clientsResponse = await fetch('/api/clients/select');
+      if (clientsResponse.ok) {
+        const clientsData = await clientsResponse.json();
+        setClients(clientsData || []);
+      }
+      
+      // Carregar postos de trabalho
+      const workPostsResponse = await fetch('/api/work-posts/all');
+      if (workPostsResponse.ok) {
+        const workPostsData = await workPostsResponse.json();
+        setWorkPosts(workPostsData || []);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados dos dropdowns:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao carregar dados. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingData(false);
+    }
   };
 
   const handleNestedInputChange = (parent: string, field: string, value: any) => {
@@ -252,44 +312,65 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="employeeId" className="text-sm font-medium">Funcionário *</Label>
-                <Select value={formData.employeeId} onValueChange={(value) => handleInputChange('employeeId', value)}>
+                <Select value={formData.employeeId} onValueChange={(value) => handleInputChange('employeeId', value)} disabled={loadingData}>
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione o funcionário" />
+                    <SelectValue placeholder={loadingData ? "Carregando funcionários..." : "Selecione o funcionário"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="emp-001">João Silva</SelectItem>
-                    <SelectItem value="emp-002">Carlos Lima</SelectItem>
-                    <SelectItem value="emp-003">Ana Santos</SelectItem>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="clientId" className="text-sm font-medium">Cliente *</Label>
-                <Select value={formData.clientId} onValueChange={(value) => handleInputChange('clientId', value)}>
+                <Select value={formData.clientId} onValueChange={(value) => handleInputChange('clientId', value)} disabled={loadingData}>
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione o cliente" />
+                    <SelectValue placeholder={loadingData ? "Carregando clientes..." : "Selecione o cliente"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="client-001">Empresa ABC Ltda</SelectItem>
-                    <SelectItem value="client-002">Indústria XYZ S.A.</SelectItem>
-                    <SelectItem value="client-003">Comércio 123 ME</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="workPostId" className="text-sm font-medium">Posto de Trabalho *</Label>
-                <Select value={formData.workPostId} onValueChange={(value) => handleInputChange('workPostId', value)}>
+                <Select 
+                  value={formData.workPostId} 
+                  onValueChange={(value) => handleInputChange('workPostId', value)}
+                  disabled={!formData.clientId || loadingData}
+                >
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione o posto" />
+                    <SelectValue placeholder={
+                      !formData.clientId 
+                        ? "Selecione um cliente primeiro" 
+                        : loadingData 
+                          ? "Carregando postos..." 
+                          : "Selecione o posto"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="post-001">Portaria Principal</SelectItem>
-                    <SelectItem value="post-002">Ronda Noturna</SelectItem>
-                    <SelectItem value="post-003">Recepção</SelectItem>
+                    {filteredWorkPosts.map((workPost) => (
+                      <SelectItem key={workPost.id} value={workPost.id}>
+                        {workPost.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {formData.clientId && filteredWorkPosts.length === 0 && !loadingData && (
+                  <p className="text-xs text-yellow-500">
+                    Nenhum posto de trabalho encontrado para este cliente
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

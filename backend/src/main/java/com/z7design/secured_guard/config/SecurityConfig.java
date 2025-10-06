@@ -82,10 +82,21 @@ public class SecurityConfig {
                 .requestMatchers("/api/fuel-stations/**").authenticated()
                 // Endpoints de veículos - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/vehicles/**").authenticated()
-                // Endpoints de work-posts - requerem apenas autenticação (temporário para debug)
-                .requestMatchers("/api/work-posts/test-create").permitAll()
-                .requestMatchers("/api/work-posts/test-clients").permitAll()
-                .requestMatchers("/api/work-posts/**").authenticated()
+                // Endpoints de work-posts - temporariamente públicos para debug
+                .requestMatchers("/api/work-posts/**").permitAll()
+                // Endpoints de reconhecimento facial - requerem apenas autenticação
+                .requestMatchers("/api/facial-recognition/recognize").authenticated()
+                .requestMatchers("/api/facial-recognition/test").permitAll()
+                .requestMatchers("/api/facial-recognition/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "HR_READ", "HR_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                // Endpoints de autenticação de supervisores - públicos para login
+                .requestMatchers("/api/supervisor-auth/**").permitAll()
+                // Endpoints de supervisores - requerem permissões administrativas
+                .requestMatchers("/api/supervisors/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                // Endpoints de consentimento LGPD - públicos para verificação e aceitação
+                .requestMatchers("/api/user-terms-consent/check/**").permitAll()
+                .requestMatchers("/api/user-terms-consent/accept").permitAll()
+                .requestMatchers("/api/user-terms-consent/versions").permitAll()
+                .requestMatchers("/api/user-terms-consent/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de contratos - requerem permissões específicas
                 .requestMatchers("/api/contracts/**").hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE", "CONTRACTS_CREATE", "CONTRACTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR")
                 // Endpoints financeiros - requerem permissões específicas
@@ -125,6 +136,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/clients/**").permitAll()
                 // Endpoints de documentos - temporariamente públicos para debug
                 .requestMatchers("/api/documents/**").permitAll()
+                // Endpoints de certificações de funcionários - temporariamente públicos para debug
+                .requestMatchers("/api/employee-certifications/**").permitAll()
                 // Endpoints de multas - requerem apenas autenticação (temporário para desenvolvimento)
                 .requestMatchers("/api/fines/**").authenticated()
                 // Endpoints de dashboard - requerem apenas autenticação para usuários logados
@@ -135,6 +148,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/orders-of-service/**").permitAll()
                 .requestMatchers("/api/operational/**").permitAll()
                 .requestMatchers("/api/occurrences/**").permitAll()
+                // Endpoints de dados de teste - públicos para desenvolvimento
+                .requestMatchers("/api/test-data/**").permitAll()
                 // Endpoints de controle de visitas - temporariamente públicos para desenvolvimento
                 .requestMatchers("/api/visits/**").permitAll()
                 // Endpoints de medições - liberar GET autenticado e manter POST/PUT/DELETE restritos

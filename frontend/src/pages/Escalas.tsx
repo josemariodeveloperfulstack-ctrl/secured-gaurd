@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/components/ui/use-toast';
 import { scheduleService, Schedule, ScheduleFilters, CreateScheduleRequest } from '@/services/scheduleService';
+import { dashboardService, ScheduleSummary } from '@/services/dashboardService';
 import {
   Popover,
   PopoverContent,
@@ -45,6 +46,8 @@ const Escalas = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedEscala, setSelectedEscala] = useState<Schedule | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   // Gere dias da semana começando da segunda-feira
   const startDate = startOfWeek(date, { weekStartsOn: 1 });
@@ -73,8 +76,23 @@ const Escalas = () => {
     }
   };
 
+  // Carregar resumo das escalas
+  const loadScheduleSummary = async () => {
+    try {
+      setLoadingSummary(true);
+      const summary = await dashboardService.getScheduleSummary();
+      setScheduleSummary(summary);
+    } catch (err) {
+      console.error('Erro ao carregar resumo das escalas:', err);
+      // Não mostrar erro para o usuário, apenas log
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   useEffect(() => {
     loadSchedules();
+    loadScheduleSummary();
     // eslint-disable-next-line
   }, [date]);
 
@@ -384,26 +402,44 @@ const Escalas = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Funcionários escalados:</span>
-                    <span className="font-medium text-seguranca-lightgray">42</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Turnos diurnos:</span>
-                    <span className="font-medium text-seguranca-lightgray">28</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Turnos noturnos:</span>
-                    <span className="font-medium text-seguranca-lightgray">24</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Postos de trabalho:</span>
-                    <span className="font-medium text-seguranca-lightgray">18</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Faltas previstas:</span>
-                    <span className="font-medium text-seguranca-red">3</span>
-                  </div>
+                  {loadingSummary ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Funcionários escalados:</span>
+                        <span className="font-medium text-seguranca-lightgray">
+                          {scheduleSummary?.totalEmployees || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Turnos diurnos:</span>
+                        <span className="font-medium text-seguranca-lightgray">
+                          {scheduleSummary?.dayShifts || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Turnos noturnos:</span>
+                        <span className="font-medium text-seguranca-lightgray">
+                          {scheduleSummary?.nightShifts || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Postos de trabalho:</span>
+                        <span className="font-medium text-seguranca-lightgray">
+                          {scheduleSummary?.totalLocations || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Faltas previstas:</span>
+                        <span className="font-medium text-seguranca-red">
+                          {scheduleSummary?.expectedAbsences || 0}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

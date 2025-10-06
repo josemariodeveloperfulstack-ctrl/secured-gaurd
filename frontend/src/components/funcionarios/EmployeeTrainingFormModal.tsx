@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { ExternalLink, User, AlertCircle } from 'lucide-react';
 
 import { employeeService } from '@/services/employeeService';
+import { positionService, type Position } from '@/services/positionService';
 import { trainingService, Training, Unit } from '@/services/trainingService';
 import { useToast } from '@/hooks/use-toast';
+import FuncionarioEditModal from './FuncionarioEditModal';
+import { Employee } from '@/types/employee';
 
 // Fallback enquanto carrega
 const mockEmployees = [] as Array<{ id: string; name: string; cpf?: string; position?: string }>;
@@ -35,8 +39,12 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
     id: undefined,
   });
   const [employees, setEmployees] = useState(mockEmployees);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [saving, setSaving] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [showEditEmployeeModal, setShowEditEmployeeModal] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,11 +61,27 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
     const loadEmployees = async () => {
       try {
         const list = await employeeService.getAllEmployees();
-        setEmployees(list.map((e: any) => ({ id: e.id, name: e.name, cpf: e.cpf, position: e.positionName })));
+        setEmployees(list.map((e: any) => ({ 
+          id: e.id, 
+          name: e.name, 
+          document: e.document, 
+          position: e.position?.name || e.positionName,
+          positionId: e.position?.id
+        })));
       } catch (_) {
         setEmployees([]);
       }
     };
+    
+    const loadPositions = async () => {
+      try {
+        const positionsList = await positionService.getAllPositions();
+        setPositions(positionsList);
+      } catch (_) {
+        setPositions([]);
+      }
+    };
+    
     const loadUnits = async () => {
       try {
         const unitsList = await trainingService.getUnits();
@@ -66,8 +90,10 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         setUnits([]);
       }
     };
+    
     if (open) { 
       loadEmployees(); 
+      loadPositions();
       loadUnits(); 
     }
   }, [open]);
@@ -75,19 +101,21 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
   // Ao selecionar funcionário, preenche CPF e Cargo
   const handleEmployeeChange = (val) => {
     const emp = employees.find(e => String(e.id) === val);
-    if (emp && !emp.cpf) {
+    setSelectedEmployee(emp);
+    
+    if (emp && !emp.document) {
       toast({
         title: 'Atenção',
         description: 'Este funcionário não possui CPF cadastrado no sistema. É necessário cadastrar o CPF antes de registrar treinamentos.',
         variant: 'destructive'
       });
-      return;
     }
+    
     setForm(f => ({
       ...f,
       employeeId: val,
       employee: emp?.name || '',
-      cpf: emp?.cpf || '',
+      cpf: emp?.document || '',
       position: emp?.position || '',
       asoDate: emp?.position === 'Vigilante' ? f.asoDate : '',
       psicotecnicoDate: emp?.position === 'Vigilante' ? f.psicotecnicoDate : '',
@@ -105,6 +133,68 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
     }
   }, [form.position]);
 
+  // Função para abrir modal de edição de funcionário
+  const handleEditEmployee = async () => {
+    if (!selectedEmployee) return;
+    
+    try {
+      // Buscar dados completos do funcionário
+      const employeeData = await employeeService.getEmployeeById(selectedEmployee.id);
+      setEmployeeToEdit(employeeData);
+      setShowEditEmployeeModal(true);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados do funcionário.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Função chamada quando o funcionário é editado com sucesso
+  const handleEmployeeEditSuccess = async () => {
+    // Recarregar lista de funcionários para obter dados atualizados
+    try {
+      const list = await employeeService.getAllEmployees();
+      setEmployees(list.map((e: any) => ({ 
+        id: e.id, 
+        name: e.name, 
+        document: e.document, 
+        position: e.position?.name || e.positionName,
+        positionId: e.position?.id
+      })));
+      
+      // Atualizar o funcionário selecionado
+      const updatedEmployee = list.find((e: any) => e.id === selectedEmployee.id);
+      if (updatedEmployee) {
+        setSelectedEmployee({
+          ...selectedEmployee,
+          document: updatedEmployee.document,
+          position: updatedEmployee.position?.name || updatedEmployee.positionName,
+          positionId: updatedEmployee.position?.id
+        });
+        
+        // Atualizar o formulário com os novos dados
+        setForm(f => ({
+          ...f,
+          cpf: updatedEmployee.document || '',
+          position: updatedEmployee.position?.name || updatedEmployee.positionName || ''
+        }));
+      }
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Funcionário atualizado com sucesso!'
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao recarregar dados do funcionário.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (!form.employeeId || !form.validUntil) return;
     
@@ -112,7 +202,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
     if (!form.cpf) {
       toast({
         title: 'Erro',
-        description: 'Funcionário deve ter CPF cadastrado para registrar treinamento.',
+        description: 'Funcionário deve ter CPF cadastrado para registrar treinamento. Clique no link para editar o funcionário.',
         variant: 'destructive'
       });
       return;
@@ -146,12 +236,16 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-md mx-auto p-4 sm:p-6 rounded-md max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
         <DialogHeader className="mb-4">
           <DialogTitle className="text-lg sm:text-xl font-semibold text-center sm:text-left text-seguranca-lightgray">
             {form.id ? 'Editar Treinamento' : 'Novo Treinamento'}
           </DialogTitle>
+          <DialogDescription className="text-sm text-gray-400 text-center sm:text-left">
+            {form.id ? 'Atualize as informações do treinamento' : 'Preencha os dados para cadastrar um novo treinamento'}
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 sm:space-y-5">
@@ -175,11 +269,84 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium text-seguranca-lightgray">CPF</Label>
-              <Input value={form.cpf} disabled className="w-full h-10 sm:h-11 text-sm" />
+              <div className="relative">
+                <Input 
+                  value={form.cpf} 
+                  disabled 
+                  className="w-full h-10 sm:h-11 text-sm pr-10" 
+                />
+                {selectedEmployee && !selectedEmployee.document && (
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <button
+                      onClick={handleEditEmployee}
+                      className="text-seguranca-yellow hover:text-seguranca-yellow/80"
+                      title="Editar funcionário para cadastrar CPF"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              {selectedEmployee && !selectedEmployee.document && (
+                <div className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 p-2 rounded">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>CPF não cadastrado. </span>
+                  <button
+                    onClick={handleEditEmployee}
+                    className="text-seguranca-yellow hover:underline flex items-center gap-1"
+                  >
+                    <User className="h-3 w-3" />
+                    Editar funcionário
+                  </button>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-seguranca-lightgray">Cargo</Label>
-              <Input value={form.position} disabled className="w-full h-10 sm:h-11 text-sm" />
+              <div className="relative">
+                <Select 
+                  value={selectedEmployee?.positionId || ''} 
+                  onValueChange={(value) => {
+                    const position = positions.find(p => p.id === value);
+                    setForm(f => ({ ...f, position: position?.name || '' }));
+                  }}
+                >
+                  <SelectTrigger className="w-full h-10 sm:h-11 text-sm">
+                    <SelectValue placeholder={form.position || "Selecione o cargo"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {positions.map(position => (
+                      <SelectItem key={position.id} value={position.id}>
+                        {position.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedEmployee && !selectedEmployee.position && (
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <button
+                      onClick={handleEditEmployee}
+                      className="text-seguranca-yellow hover:text-seguranca-yellow/80"
+                      title="Editar funcionário para cadastrar cargo"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              {selectedEmployee && !selectedEmployee.position && (
+                <div className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 p-2 rounded">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>Cargo não cadastrado. </span>
+                  <button
+                    onClick={handleEditEmployee}
+                    className="text-seguranca-yellow hover:underline flex items-center gap-1"
+                  >
+                    <User className="h-3 w-3" />
+                    Editar funcionário
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -261,6 +428,15 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Modal de Edição de Funcionário */}
+    <FuncionarioEditModal
+      open={showEditEmployeeModal}
+      onOpenChange={setShowEditEmployeeModal}
+      funcionario={employeeToEdit}
+      onSuccess={handleEmployeeEditSuccess}
+    />
+    </>
   );
 };
 

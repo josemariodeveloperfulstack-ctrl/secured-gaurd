@@ -17,398 +17,99 @@ import {
   Plus,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-interface VacationCoverage {
-  id: string;
-  employeeName: string;
-  substituteName: string;
-  startDate: string;
-  endDate: string;
-  status: 'PENDING' | 'CONFIRMED' | 'NO_COVERAGE';
-  location: string;
-}
-
-interface Absence {
-  id: string;
-  employeeName: string;
-  date: string;
-  type: string;
-  reason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  isJustified: boolean;
-}
-
-interface WorkAssignment {
-  id: string;
-  employeeName: string;
-  location: string;
-  shift: string;
-  startTime: string;
-  endTime: string;
-  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-}
-
-interface SpecificActivity {
-  id: string;
-  employeeName: string;
-  type: string;
-  date: string;
-  time: string;
-  location: string;
-  status: 'SCHEDULED' | 'COMPLETED' | 'OVERDUE';
-}
+import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity } from '@/services/operationalService';
 
 const OperationalDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('vacations');
   const [vacationCoverages, setVacationCoverages] = useState<VacationCoverage[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
-  const [workAssignments, setWorkAssignments] = useState<WorkAssignment[]>([]);
+  const [workPostAssignments, setWorkPostAssignments] = useState<WorkPostAssignment[]>([]);
   const [specificActivities, setSpecificActivities] = useState<SpecificActivity[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Dados de exemplo baseados nas imagens
   useEffect(() => {
-    loadOperationalData();
+    loadAllData();
   }, []);
 
-  const loadOperationalData = () => {
-    setIsLoading(true);
-    
-    // Simular carregamento de dados
-    setTimeout(() => {
-      setVacationCoverages([
-        {
-          id: '1',
-          employeeName: 'ROGERIO CESAR',
-          substituteName: 'FREDIANO',
-          startDate: '30/07/2024',
-          endDate: '28/08/2024',
-          status: 'CONFIRMED',
-          location: 'Posto Principal'
-        },
-        {
-          id: '2',
-          employeeName: 'FABIO WAGNER',
-          substituteName: 'TIAGO',
-          startDate: '30/07/2024',
-          endDate: '28/08/2024',
-          status: 'CONFIRMED',
-          location: 'Portaria'
-        },
-        {
-          id: '3',
-          employeeName: 'TARCISIO',
-          substituteName: 'ALEX E BRUNO (MVC)',
-          startDate: '01/08/2024',
-          endDate: '31/08/2024',
-          status: 'NO_COVERAGE',
-          location: 'MVC'
-        }
+  const loadAllData = async () => {
+    try {
+      setLoading(true);
+      const [coverages, absenceList, assignments, activities] = await Promise.all([
+        operationalService.getAllVacationCoverages(),
+        operationalService.getAllAbsences(),
+        operationalService.getAllWorkPostAssignments(),
+        operationalService.getAllSpecificActivities()
       ]);
 
-      setAbsences([
-        {
-          id: '1',
-          employeeName: 'Paulo',
-          date: '23/08/2024',
-          type: 'FALTA',
-          reason: 'Atestado médico',
-          status: 'APPROVED',
-          isJustified: true
-        },
-        {
-          id: '2',
-          employeeName: 'Viviana',
-          date: '17/08/2024',
-          type: 'FALTA',
-          reason: 'Pessoal',
-          status: 'PENDING',
-          isJustified: false
-        }
-      ]);
-
-      setWorkAssignments([
-        {
-          id: '1',
-          employeeName: 'GIDELVAN',
-          location: 'NOTURNO',
-          shift: 'Noturno',
-          startTime: '22:00',
-          endTime: '06:00',
-          status: 'ACTIVE'
-        },
-        {
-          id: '2',
-          employeeName: 'ALEX',
-          location: 'ITATIAIA',
-          shift: 'Diurno',
-          startTime: '06:00',
-          endTime: '18:00',
-          status: 'ACTIVE'
-        }
-      ]);
-
-      setSpecificActivities([
-        {
-          id: '1',
-          employeeName: 'Edison',
-          type: 'PODA DA GRAMA',
-          date: '28/08/2024',
-          time: 'Quinta-feira',
-          location: 'Trans des MTZ',
-          status: 'SCHEDULED'
-        },
-        {
-          id: '2',
-          employeeName: 'Equipe Limpeza',
-          type: 'LIMPEZA VIDROS',
-          date: '30/08/2024',
-          time: 'Sábado',
-          location: 'Shopping',
-          status: 'SCHEDULED'
-        }
-      ]);
-
-      setIsLoading(false);
-    }, 1000);
+      setVacationCoverages(coverages);
+      setAbsences(absenceList);
+      setWorkPostAssignments(assignments);
+      setSpecificActivities(activities);
+    } catch (error) {
+      console.error('Erro ao carregar dados operacionais:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados operacionais.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      PENDING: { variant: 'secondary' as const, text: 'Pendente' },
-      CONFIRMED: { variant: 'default' as const, text: 'Confirmado' },
-      NO_COVERAGE: { variant: 'destructive' as const, text: 'Sem Cobertura' },
-      ACTIVE: { variant: 'default' as const, text: 'Ativo' },
-      COMPLETED: { variant: 'default' as const, text: 'Concluído' },
-      APPROVED: { variant: 'default' as const, text: 'Aprovado' },
-      REJECTED: { variant: 'destructive' as const, text: 'Rejeitado' },
-      SCHEDULED: { variant: 'secondary' as const, text: 'Agendado' },
-      OVERDUE: { variant: 'destructive' as const, text: 'Atrasado' }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.PENDING;
-    return <Badge variant={config.variant}>{config.text}</Badge>;
+    switch (status) {
+      case 'CONFIRMED':
+      case 'APPROVED':
+      case 'COMPLETED':
+        return <Badge variant="default" className="bg-green-500 text-white">Confirmado</Badge>;
+      case 'PENDING':
+      case 'SCHEDULED':
+        return <Badge variant="default" className="bg-yellow-500 text-white">Pendente</Badge>;
+      case 'NO_COVERAGE':
+      case 'REJECTED':
+      case 'CANCELLED':
+        return <Badge variant="destructive" className="bg-red-500 text-white">Problema</Badge>;
+      case 'IN_PROGRESS':
+        return <Badge variant="default" className="bg-blue-500 text-white">Em Andamento</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
   };
 
-  const renderVacationCoverages = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Coberturas de Férias</h3>
-        <Button size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Cobertura
-        </Button>
-      </div>
-      
-      <div className="grid gap-4">
-        {vacationCoverages.map((coverage) => (
-          <Card key={coverage.id}>
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium">{coverage.employeeName}</span>
-                    <span className="text-muted-foreground">→</span>
-                    <span className="font-medium text-green-600">{coverage.substituteName}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {coverage.startDate} - {coverage.endDate}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3 inline mr-1" />
-                    {coverage.location}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(coverage.status)}
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="outline">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  };
 
-  const renderAbsences = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Controle de Faltas</h3>
-        <Button size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Falta
-        </Button>
-      </div>
-      
-      <div className="grid gap-4">
-        {absences.map((absence) => (
-          <Card key={absence.id}>
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {absence.isJustified ? (
-                      <UserCheck className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <UserX className="h-4 w-4 text-red-600" />
-                    )}
-                    <span className="font-medium">{absence.employeeName}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3 inline mr-1" />
-                    {absence.date} - {absence.type}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {absence.reason}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(absence.status)}
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="outline">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+  const formatTime = (timeString?: string) => {
+    if (!timeString) return '';
+    return timeString.substring(0, 5); // HH:MM
+  };
 
-  const renderWorkAssignments = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Atribuições de Posto</h3>
-        <Button size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Atribuição
-        </Button>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Carregando dados operacionais...</span>
       </div>
-      
-      <div className="grid gap-4">
-        {workAssignments.map((assignment) => (
-          <Card key={assignment.id}>
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium">{assignment.employeeName}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3 inline mr-1" />
-                    {assignment.location}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <Clock className="h-3 w-3 inline mr-1" />
-                    {assignment.startTime} - {assignment.endTime} ({assignment.shift})
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(assignment.status)}
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="outline">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderSpecificActivities = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Atividades Específicas</h3>
-        <Button size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Atividade
-        </Button>
-      </div>
-      
-      <div className="grid gap-4">
-        {specificActivities.map((activity) => (
-          <Card key={activity.id}>
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-purple-600" />
-                    <span className="font-medium">{activity.employeeName}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3 inline mr-1" />
-                    {activity.date} ({activity.time})
-                  </div>
-                  <div className="text-sm font-medium text-purple-600">
-                    {activity.type}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3 inline mr-1" />
-                    {activity.location}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(activity.status)}
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="outline">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Gestão Operacional</h2>
-          <p className="text-muted-foreground">
-            Controle completo das operações baseado nos quadros manuais
-          </p>
-        </div>
-        <Button onClick={loadOperationalData} disabled={isLoading}>
-          {isLoading ? 'Carregando...' : 'Atualizar'}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Gestão Operacional Detalhada</h2>
+        <Button onClick={loadAllData} variant="outline" size="sm">
+          <Clock className="h-4 w-4 mr-2" />
+          Atualizar
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="vacations" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="vacations" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -419,7 +120,7 @@ const OperationalDashboard: React.FC = () => {
             Faltas
           </TabsTrigger>
           <TabsTrigger value="assignments" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
+            <MapPin className="h-4 w-4" />
             Postos
           </TabsTrigger>
           <TabsTrigger value="activities" className="flex items-center gap-2">
@@ -428,20 +129,203 @@ const OperationalDashboard: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="vacations" className="mt-6">
-          {renderVacationCoverages()}
+        {/* Aba de Cobertura de Férias */}
+        <TabsContent value="vacations" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Cobertura de Férias ({vacationCoverages.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {vacationCoverages.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Nenhuma cobertura de férias encontrada.
+                  </p>
+                ) : (
+                  vacationCoverages.map(coverage => (
+                    <div key={coverage.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {coverage.employee.name} ({formatDate(coverage.startDate)} - {formatDate(coverage.endDate)})
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Substituto: {coverage.substituteEmployee?.name || 'Não definido'} | 
+                          Local: {coverage.location?.name || 'Não definido'} | 
+                          Turno: {coverage.shift}
+                        </p>
+                        {coverage.observations && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Obs: {coverage.observations}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(coverage.status)}
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="absences" className="mt-6">
-          {renderAbsences()}
+        {/* Aba de Controle de Faltas */}
+        <TabsContent value="absences" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserX className="h-5 w-5" />
+                Controle de Faltas ({absences.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {absences.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Nenhuma falta registrada.
+                  </p>
+                ) : (
+                  absences.map(absence => (
+                    <div key={absence.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {absence.employee.name} ({formatDate(absence.absenceDate)})
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Tipo: {absence.absenceType.replace('_', ' ')} | 
+                          Motivo: {absence.reason}
+                          {absence.medicalCertificateDays && ` | Dias: ${absence.medicalCertificateDays}`}
+                        </p>
+                        {absence.coverageNotes && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Observações: {absence.coverageNotes}
+                          </p>
+                        )}
+                        {absence.coverageEmployee && (
+                          <p className="text-xs text-muted-foreground">
+                            Coberto por: {absence.coverageEmployee.name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(absence.status)}
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="assignments" className="mt-6">
-          {renderWorkAssignments()}
+        {/* Aba de Atribuições de Posto */}
+        <TabsContent value="assignments" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Atribuições de Posto ({workPostAssignments.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {workPostAssignments.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Nenhuma atribuição de posto encontrada.
+                  </p>
+                ) : (
+                  workPostAssignments.map(assignment => (
+                    <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {assignment.employee.name} em {assignment.workPost.name} ({formatDate(assignment.assignmentDate)})
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Turno: {assignment.shift} | 
+                          {assignment.startTime && assignment.endTime && (
+                            <>Horário: {formatTime(assignment.startTime)} - {formatTime(assignment.endTime)}</>
+                          )}
+                        </p>
+                        {assignment.observations && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Obs: {assignment.observations}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(assignment.status)}
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="activities" className="mt-6">
-          {renderSpecificActivities()}
+        {/* Aba de Atividades Específicas */}
+        <TabsContent value="activities" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Atividades Específicas ({specificActivities.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {specificActivities.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Nenhuma atividade específica encontrada.
+                  </p>
+                ) : (
+                  specificActivities.map(activity => (
+                    <div key={activity.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {activity.description || activity.activityType.replace('_', ' ')} ({formatDate(activity.activityDate)} {activity.startTime && formatTime(activity.startTime)})
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Funcionário: {activity.employee.name} | 
+                          Local: {activity.location?.name || 'Não definido'}
+                          {activity.endTime && ` | Até: ${formatTime(activity.endTime)}`}
+                        </p>
+                        {activity.observations && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Obs: {activity.observations}
+                          </p>
+                        )}
+                        {activity.completionNotes && (
+                          <p className="text-xs text-muted-foreground">
+                            Conclusão: {activity.completionNotes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(activity.status)}
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

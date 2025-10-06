@@ -45,7 +45,64 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     notes: '',
     position: { id: '' },
     unit: { id: '' },
-    user: { id: '' }
+    user: { id: '' },
+    // Campos do cônjuge
+    spouseName: '',
+    spouseCpf: '',
+    spouseRg: '',
+    spouseBirthDate: '',
+    spousePhone: '',
+    spouseEmail: '',
+    
+    // Campos da ficha de registro
+    empresaNome: '',
+    empresaEndereco: '',
+    empresaCnpj: '',
+    tituloEleitor: '',
+    tituloEleitorZona: '',
+    tituloEleitorSecao: '',
+    carteiraIdentidadeOrgaoEmissor: '',
+    carteiraIdentidadeDataEmissao: '',
+    certificadoMilitar: '',
+    nomePai: '',
+    nomeMae: '',
+    localNascimento: '',
+    grauInstrucao: '',
+    cbo: '',
+    salario: 0,
+    salarioPorExtenso: '',
+    periodoPagamento: '',
+    horarioTrabalho: '',
+    folgaSemanal: '',
+    fgtsOptante: false,
+    fgtsDataOpcao: '',
+    fgtsBancoDepositario: '',
+    fgtsDataRetratacao: '',
+    pisDataCadastro: '',
+    pisBancoDepositario: '',
+    pisEnderecoBanco: '',
+    pisCodigoBanco: '',
+    pisCodigoAgencia: '',
+    cnhNumber: '',
+    cnhExpirationDate: '',
+    cnhCategory: '',
+    ctps: '',
+    ctpsRural: '',
+    ctpsSeries: '',
+    ctpsIssueDate: '',
+    ctpsIssuingAgency: '',
+    carteiraModelo19: '',
+    registroGeralEstrangeiro: '',
+    casadoBrasileiro: false,
+    nomeConjugeEstrangeiro: '',
+    temFilhosBrasileiros: false,
+    quantidadeFilhosBrasileiros: 0,
+    dataChegadaBrasil: '',
+    naturalizado: false,
+    decretoNaturalizacao: '',
+    vistoFiscalizacao: '',
+    assinaturaFuncionario: '',
+    dataRescisao: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +160,64 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         notes: funcionario.notes || '',
         position: { id: funcionario.position?.id || '' },
         unit: { id: funcionario.unit?.id || '' },
-        user: { id: funcionario.user?.id || '' }
+        user: { id: funcionario.user?.id || '' },
+        // Campos do cônjuge
+        spouseName: funcionario.spouseName || '',
+        spouseCpf: funcionario.spouseCpf || '',
+        spouseRg: funcionario.spouseRg || '',
+        spouseBirthDate: funcionario.spouseBirthDate || '',
+        spousePhone: funcionario.spousePhone || '',
+        spouseEmail: funcionario.spouseEmail || '',
+        
+        // Campos da ficha de registro
+        empresaNome: funcionario.empresaNome || '',
+        empresaEndereco: funcionario.empresaEndereco || '',
+        empresaCnpj: funcionario.empresaCnpj || '',
+        tituloEleitor: funcionario.tituloEleitor || '',
+        tituloEleitorZona: funcionario.tituloEleitorZona || '',
+        tituloEleitorSecao: funcionario.tituloEleitorSecao || '',
+        carteiraIdentidadeOrgaoEmissor: funcionario.carteiraIdentidadeOrgaoEmissor || '',
+        carteiraIdentidadeDataEmissao: funcionario.carteiraIdentidadeDataEmissao || '',
+        certificadoMilitar: funcionario.certificadoMilitar || '',
+        nomePai: funcionario.nomePai || '',
+        nomeMae: funcionario.nomeMae || '',
+        localNascimento: funcionario.localNascimento || '',
+        grauInstrucao: funcionario.grauInstrucao || '',
+        cbo: funcionario.cbo || '',
+        salario: funcionario.salario || 0,
+        salarioPorExtenso: funcionario.salarioPorExtenso || '',
+        periodoPagamento: funcionario.periodoPagamento || '',
+        horarioTrabalho: funcionario.horarioTrabalho || '',
+        folgaSemanal: funcionario.folgaSemanal || '',
+        fgtsOptante: funcionario.fgtsOptante || false,
+        fgtsDataOpcao: funcionario.fgtsDataOpcao || '',
+        fgtsBancoDepositario: funcionario.fgtsBancoDepositario || '',
+        fgtsDataRetratacao: funcionario.fgtsDataRetratacao || '',
+        pisDataCadastro: funcionario.pisDataCadastro || '',
+        pisBancoDepositario: funcionario.pisBancoDepositario || '',
+        pisEnderecoBanco: funcionario.pisEnderecoBanco || '',
+        pisCodigoBanco: funcionario.pisCodigoBanco || '',
+        pisCodigoAgencia: funcionario.pisCodigoAgencia || '',
+        cnhNumber: funcionario.cnhNumber || '',
+        cnhExpirationDate: funcionario.cnhExpirationDate || '',
+        cnhCategory: funcionario.cnhCategory || '',
+        ctps: funcionario.ctps || '',
+        ctpsRural: funcionario.ctpsRural || '',
+        ctpsSeries: funcionario.ctpsSeries || '',
+        ctpsIssueDate: funcionario.ctpsIssueDate || '',
+        ctpsIssuingAgency: funcionario.ctpsIssuingAgency || '',
+        carteiraModelo19: funcionario.carteiraModelo19 || '',
+        registroGeralEstrangeiro: funcionario.registroGeralEstrangeiro || '',
+        casadoBrasileiro: funcionario.casadoBrasileiro || false,
+        nomeConjugeEstrangeiro: funcionario.nomeConjugeEstrangeiro || '',
+        temFilhosBrasileiros: funcionario.temFilhosBrasileiros || false,
+        quantidadeFilhosBrasileiros: funcionario.quantidadeFilhosBrasileiros || 0,
+        dataChegadaBrasil: funcionario.dataChegadaBrasil || '',
+        naturalizado: funcionario.naturalizado || false,
+        decretoNaturalizacao: funcionario.decretoNaturalizacao || '',
+        vistoFiscalizacao: funcionario.vistoFiscalizacao || '',
+        assinaturaFuncionario: funcionario.assinaturaFuncionario || '',
+        dataRescisao: funcionario.dataRescisao || ''
       });
     }
   }, [funcionario, open]);
@@ -421,6 +535,75 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             </div>
           </div>
 
+          {/* Seção: Informações do Cônjuge - Exibida apenas quando estado civil for "Casado" */}
+          {form.maritalStatus === 'MARRIED' && (
+            <div className="space-y-4 bg-[#363636] p-4 rounded-lg border-l-4 border-yellow-500">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <UserIcon className="h-5 w-5 text-yellow-500" />
+                Informações do Cônjuge
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Nome Completo do Cônjuge *</Label>
+                  <Input 
+                    name="spouseName" 
+                    value={form.spouseName} 
+                    onChange={handleChange} 
+                    placeholder="Digite o nome completo do cônjuge"
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">CPF do Cônjuge *</Label>
+                  <Input 
+                    name="spouseCpf" 
+                    value={form.spouseCpf} 
+                    onChange={handleChange} 
+                    placeholder="000.000.000-00"
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">RG do Cônjuge</Label>
+                  <Input 
+                    name="spouseRg" 
+                    value={form.spouseRg} 
+                    onChange={handleChange} 
+                    placeholder="Digite o RG do cônjuge"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Data de Nascimento do Cônjuge</Label>
+                  <Input 
+                    name="spouseBirthDate" 
+                    type="date" 
+                    value={form.spouseBirthDate} 
+                    onChange={handleChange} 
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Telefone do Cônjuge</Label>
+                  <Input 
+                    name="spousePhone" 
+                    value={form.spousePhone} 
+                    onChange={handleChange} 
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Email do Cônjuge</Label>
+                  <Input 
+                    name="spouseEmail" 
+                    type="email" 
+                    value={form.spouseEmail} 
+                    onChange={handleChange} 
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Seção: Informações de Contato */}
           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-white">Informações de Contato</h3>
@@ -458,6 +641,171 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             </div>
           </div>
 
+          {/* Seção: Informações da Empresa */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg border-l-4 border-blue-500">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Building className="h-5 w-5 text-blue-500" />
+              Informações da Empresa
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Nome da Empresa</Label>
+                <Input 
+                  name="empresaNome" 
+                  value={form.empresaNome} 
+                  onChange={handleChange} 
+                  placeholder="Nome da empresa contratante"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">CNPJ/CEI</Label>
+                <Input 
+                  name="empresaCnpj" 
+                  value={form.empresaCnpj} 
+                  onChange={handleChange} 
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Endereço da Empresa</Label>
+                <Input 
+                  name="empresaEndereco" 
+                  value={form.empresaEndereco} 
+                  onChange={handleChange} 
+                  placeholder="Endereço completo da empresa"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Documentos Pessoais */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg border-l-4 border-green-500">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <UserIcon className="h-5 w-5 text-green-500" />
+              Documentos Pessoais
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">CTPS</Label>
+                <Input 
+                  name="ctps" 
+                  value={form.ctps} 
+                  onChange={handleChange} 
+                  placeholder="Número da CTPS"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Série CTPS</Label>
+                <Input 
+                  name="ctpsSeries" 
+                  value={form.ctpsSeries} 
+                  onChange={handleChange} 
+                  placeholder="Série da CTPS"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Título de Eleitor</Label>
+                <Input 
+                  name="tituloEleitor" 
+                  value={form.tituloEleitor} 
+                  onChange={handleChange} 
+                  placeholder="Número do título de eleitor"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Zona Eleitoral</Label>
+                <Input 
+                  name="tituloEleitorZona" 
+                  value={form.tituloEleitorZona} 
+                  onChange={handleChange} 
+                  placeholder="Zona eleitoral"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Órgão Emissor RG</Label>
+                <Input 
+                  name="carteiraIdentidadeOrgaoEmissor" 
+                  value={form.carteiraIdentidadeOrgaoEmissor} 
+                  onChange={handleChange} 
+                  placeholder="SSP, IFP, etc."
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data Emissão RG</Label>
+                <Input 
+                  name="carteiraIdentidadeDataEmissao" 
+                  type="date" 
+                  value={form.carteiraIdentidadeDataEmissao} 
+                  onChange={handleChange} 
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Certificado Militar</Label>
+                <Input 
+                  name="certificadoMilitar" 
+                  value={form.certificadoMilitar} 
+                  onChange={handleChange} 
+                  placeholder="Número do certificado militar"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">CNH</Label>
+                <Input 
+                  name="cnhNumber" 
+                  value={form.cnhNumber} 
+                  onChange={handleChange} 
+                  placeholder="Número da CNH"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Informações Familiares */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg border-l-4 border-purple-500">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <UserIcon className="h-5 w-5 text-purple-500" />
+              Informações Familiares
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Nome do Pai</Label>
+                <Input 
+                  name="nomePai" 
+                  value={form.nomePai} 
+                  onChange={handleChange} 
+                  placeholder="Nome completo do pai"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Nome da Mãe</Label>
+                <Input 
+                  name="nomeMae" 
+                  value={form.nomeMae} 
+                  onChange={handleChange} 
+                  placeholder="Nome completo da mãe"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Local de Nascimento</Label>
+                <Input 
+                  name="localNascimento" 
+                  value={form.localNascimento} 
+                  onChange={handleChange} 
+                  placeholder="Cidade, Estado"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Grau de Instrução</Label>
+                <Input 
+                  name="grauInstrucao" 
+                  value={form.grauInstrucao} 
+                  onChange={handleChange} 
+                  placeholder="Ensino médio completo, etc."
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Seção: Informações Profissionais */}
           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
             <h3 className="text-lg font-semibold flex items-center text-white">
@@ -486,6 +834,35 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
+                <Label className="text-sm font-medium text-gray-200">CBO</Label>
+                <Input 
+                  name="cbo" 
+                  value={form.cbo} 
+                  onChange={handleChange} 
+                  placeholder="Código Brasileiro de Ocupações"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Salário</Label>
+                <Input 
+                  name="salario" 
+                  type="number" 
+                  step="0.01"
+                  value={form.salario} 
+                  onChange={handleChange} 
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Período de Pagamento</Label>
+                <Input 
+                  name="periodoPagamento" 
+                  value={form.periodoPagamento} 
+                  onChange={handleChange} 
+                  placeholder="Mensal, Quinzenal, etc."
+                />
+              </div>
+              <div>
                 <Label className="text-sm font-medium text-gray-200">Status *</Label>
                 <Select 
                   value={form.status} 
@@ -501,6 +878,24 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     <SelectItem value="TERMINATED">Demitido</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Horário de Trabalho</Label>
+                <Input 
+                  name="horarioTrabalho" 
+                  value={form.horarioTrabalho} 
+                  onChange={handleChange} 
+                  placeholder="Ex: 08h às 17h"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Folga Semanal</Label>
+                <Input 
+                  name="folgaSemanal" 
+                  value={form.folgaSemanal} 
+                  onChange={handleChange} 
+                  placeholder="Ex: Domingo"
+                />
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-200">Unidade (Opcional)</Label>
@@ -522,6 +917,58 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: FGTS e PIS */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg border-l-4 border-orange-500">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Building className="h-5 w-5 text-orange-500" />
+              FGTS e PIS
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">É Optante do FGTS?</Label>
+                <Select 
+                  value={form.fgtsOptante ? 'true' : 'false'} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, fgtsOptante: value === 'true' }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Sim</SelectItem>
+                    <SelectItem value="false">Não</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data da Opção FGTS</Label>
+                <Input 
+                  name="fgtsDataOpcao" 
+                  type="date" 
+                  value={form.fgtsDataOpcao} 
+                  onChange={handleChange} 
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Banco Depositário FGTS</Label>
+                <Input 
+                  name="fgtsBancoDepositario" 
+                  value={form.fgtsBancoDepositario} 
+                  onChange={handleChange} 
+                  placeholder="Nome do banco"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">PIS</Label>
+                <Input 
+                  name="pis" 
+                  value={form.pis} 
+                  onChange={handleChange} 
+                  placeholder="Número do PIS"
+                />
               </div>
             </div>
           </div>

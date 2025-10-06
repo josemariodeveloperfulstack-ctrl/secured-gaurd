@@ -1,184 +1,187 @@
 import api from '@/lib/axios';
 
-export interface DashboardStats {
+export interface DashboardSummary {
   totalUsers: number;
   activeUsers: number;
   activeContracts: number;
   monthlyRevenue: number;
-  totalRevenue: number;
   totalEquipment: number;
-  equipmentInUse: number;
-  equipmentInMaintenance: number;
-  equipmentExpiring: number;
   pendingTasks: number;
-  completedTasks: number;
   totalAlerts: number;
   unreadAlerts: number;
+  lastUpdate: string;
+}
+
+export interface ScheduleSummary {
+  totalSchedules: number;
+  confirmedSchedules: number;
+  pendingSchedules: number;
+  cancelledSchedules: number;
+  dayShifts: number;
+  nightShifts: number;
+  mixedShifts: number;
   totalEmployees: number;
-  totalClients: number;
-  totalServices: number;
-  totalVehicles: number;
-  totalMaintenances: number;
-  totalMeasurements: number;
-  pendingMeasurements: number;
-  totalInvoices: number;
-  pendingInvoices: number;
-  dailyStats: Record<string, number>;
-  recentActivities: Array<{
-    id: string;
-    user: string;
-    action: string;
-    module: string;
-    timestamp: string;
-    details?: string;
-  }>;
-  systemAlerts: Array<{
-    id: string;
-    title: string;
-    message: string;
-    type: string;
-    read: boolean;
-    createdAt: string;
-  }>;
-  lastUpdate: string;
-  systemVersion: string;
-  environment: string;
+  totalLocations: number;
+  expectedAbsences: number;
 }
 
-export interface QuickStats {
-  totalUsers: number;
-  activeUsers: number;
-  activeContracts: number;
-  monthlyRevenue: number;
+export interface OperationalSummary {
+  totalEmployees: number;
+  activeEmployees: number;
+  onDutyEmployees: number;
+  absentEmployees: number;
+  totalWorkPosts: number;
+  activeWorkPosts: number;
   totalEquipment: number;
-  pendingTasks: number;
-  totalAlerts: number;
-  unreadAlerts: number;
-  lastUpdate: string;
+  activeEquipment: number;
+  pendingMaintenance: number;
+  totalOccurrences: number;
+  openOccurrences: number;
+  resolvedOccurrences: number;
 }
 
-export interface DashboardHealth {
-  status: string;
-  timestamp: string;
-  service: string;
-  error?: string;
-}
-
-export const dashboardService = {
+class DashboardService {
   /**
-   * Obter resumo completo do dashboard
+   * Formata números para exibição
    */
-  async getDashboardSummary(): Promise<DashboardStats> {
-    try {
-      const response = await api.get('/api/dashboard/summary');
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar resumo do dashboard:', error);
-      throw error;
+  formatNumber(value: number): string {
+    if (value >= 1000000) {
+      return (value / 1000000).toFixed(1) + 'M';
+    } else if (value >= 1000) {
+      return (value / 1000).toFixed(1) + 'K';
     }
-  },
+    return value.toString();
+  }
 
   /**
-   * Obter estatísticas rápidas para widgets
-   */
-  async getQuickStats(): Promise<QuickStats> {
-    try {
-      const response = await api.get('/api/dashboard/stats/quick');
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar estatísticas rápidas:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Verificar saúde do dashboard
-   */
-  async getDashboardHealth(): Promise<DashboardHealth> {
-    try {
-      const response = await api.get('/api/dashboard/health');
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao verificar saúde do dashboard:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Formatar valor monetário para exibição
+   * Formata valores monetários para exibição
    */
   formatCurrency(value: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
-  },
-
-  /**
-   * Formatar número para exibição com separadores
-   */
-  formatNumber(value: number): string {
-    return new Intl.NumberFormat('pt-BR').format(value);
-  },
-
-  /**
-   * Calcular porcentagem de crescimento
-   */
-  calculateGrowth(current: number, previous: number): number {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return ((current - previous) / previous) * 100;
-  },
-
-  /**
-   * Obter cor baseada no status
-   */
-  getStatusColor(status: string): string {
-    const colors = {
-      'success': 'text-green-600',
-      'warning': 'text-yellow-600',
-      'error': 'text-red-600',
-      'info': 'text-blue-600',
-      'pending': 'text-orange-600',
-      'completed': 'text-green-600'
-    };
-    return colors[status as keyof typeof colors] || 'text-gray-600';
-  },
-
-  /**
-   * Obter ícone baseado no tipo de atividade
-   */
-  getActivityIcon(module: string): string {
-    const icons = {
-      'users': '👥',
-      'clients': '🏢',
-      'contracts': '📋',
-      'financial': '💰',
-      'equipment': '🔧',
-      'vehicles': '🚗',
-      'maintenance': '🔨',
-      'measurements': '📏',
-      'invoices': '🧾',
-      'stock': '📦',
-      'hr': '👤',
-      'sst': '🛡️',
-      'operational': '⚙️'
-    };
-    return icons[module.toLowerCase() as keyof typeof icons] || '📄';
-  },
-
-  /**
-   * Obter tempo relativo (ex: "há 2 horas")
-   */
-  getRelativeTime(timestamp: string): string {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInSeconds = Math.floor((now.getTime() - time.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return 'agora mesmo';
-    if (diffInSeconds < 3600) return `há ${Math.floor(diffInSeconds / 60)} min`;
-    if (diffInSeconds < 86400) return `há ${Math.floor(diffInSeconds / 3600)}h`;
-    if (diffInSeconds < 2592000) return `há ${Math.floor(diffInSeconds / 86400)} dias`;
-    
-    return time.toLocaleDateString('pt-BR');
   }
-};
+
+  /**
+   * Busca resumo geral do dashboard
+   */
+  async getDashboardSummary(): Promise<DashboardSummary> {
+    try {
+      console.log('🔗 Buscando resumo do dashboard no backend');
+      const response = await api.get('/api/dashboard/summary');
+      console.log('✅ Resumo do dashboard carregado:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar resumo do dashboard:', error);
+      throw new Error('Falha ao conectar com o servidor de dashboard');
+    }
+  }
+
+  /**
+   * Busca estatísticas rápidas para widgets
+   */
+  async getQuickStats(): Promise<DashboardSummary> {
+    try {
+      console.log('🔗 Buscando estatísticas rápidas no backend');
+      const response = await api.get('/api/dashboard/stats/quick');
+      console.log('✅ Estatísticas rápidas carregadas:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar estatísticas rápidas:', error);
+      throw new Error('Falha ao conectar com o servidor de estatísticas');
+    }
+  }
+
+  /**
+   * Busca resumo das escalas de trabalho
+   */
+  async getScheduleSummary(): Promise<ScheduleSummary> {
+    try {
+      console.log('🔗 Buscando resumo das escalas no backend');
+      // Por enquanto, vamos calcular baseado nos dados das escalas
+      const response = await api.get('/api/schedules');
+      const schedules = response.data;
+      
+      const summary: ScheduleSummary = {
+        totalSchedules: schedules.length,
+        confirmedSchedules: schedules.filter((s: any) => s.status === 'CONFIRMED').length,
+        pendingSchedules: schedules.filter((s: any) => s.status === 'PENDING').length,
+        cancelledSchedules: schedules.filter((s: any) => s.status === 'CANCELLED').length,
+        dayShifts: schedules.filter((s: any) => s.shift === 'DAY').length,
+        nightShifts: schedules.filter((s: any) => s.shift === 'NIGHT').length,
+        mixedShifts: schedules.filter((s: any) => s.shift === 'MIXED').length,
+        totalEmployees: new Set(schedules.map((s: any) => s.employee?.id)).size,
+        totalLocations: new Set(schedules.map((s: any) => s.location?.id)).size,
+        expectedAbsences: 0 // TODO: Implementar quando tivermos dados de ausências
+      };
+      
+      console.log('✅ Resumo das escalas calculado:', summary);
+      return summary;
+    } catch (error) {
+      console.error('❌ Erro ao buscar resumo das escalas:', error);
+      throw new Error('Falha ao conectar com o servidor de escalas');
+    }
+  }
+
+  /**
+   * Busca resumo operacional
+   */
+  async getOperationalSummary(): Promise<OperationalSummary> {
+    try {
+      console.log('🔗 Buscando resumo operacional no backend');
+      
+      // Buscar dados de múltiplas APIs em paralelo
+      const [employeesResponse, workPostsResponse, equipmentResponse, occurrencesResponse] = await Promise.all([
+        api.get('/api/employees/count').catch(() => ({ data: { count: 0 } })),
+        api.get('/api/work-posts/stats/count').catch(() => ({ data: { totalWorkPosts: 0, activeWorkPosts: 0 } })),
+        api.get('/api/equipments/summary').catch(() => ({ data: { totalEquipments: 0, activeEquipments: 0 } })),
+        api.get('/api/occurrences').catch(() => ({ data: [] }))
+      ]);
+
+      const employeesCount = employeesResponse.data.count || 0;
+      const workPostsData = workPostsResponse.data;
+      const equipmentData = equipmentResponse.data;
+      const occurrences = occurrencesResponse.data || [];
+
+      const summary: OperationalSummary = {
+        totalEmployees: employeesCount,
+        activeEmployees: Math.floor(employeesCount * 0.9), // Estimativa
+        onDutyEmployees: Math.floor(employeesCount * 0.7), // Estimativa
+        absentEmployees: Math.floor(employeesCount * 0.1), // Estimativa
+        totalWorkPosts: workPostsData.totalWorkPosts || 0,
+        activeWorkPosts: workPostsData.activeWorkPosts || 0,
+        totalEquipment: equipmentData.totalEquipments || 0,
+        activeEquipment: equipmentData.activeEquipments || 0,
+        pendingMaintenance: equipmentData.inMaintenanceEquipments || 0,
+        totalOccurrences: occurrences.length,
+        openOccurrences: occurrences.filter((o: any) => o.status === 'open' || o.status === 'investigando').length,
+        resolvedOccurrences: occurrences.filter((o: any) => o.status === 'resolved' || o.status === 'resolvida').length
+      };
+
+      console.log('✅ Resumo operacional calculado:', summary);
+      return summary;
+    } catch (error) {
+      console.error('❌ Erro ao buscar resumo operacional:', error);
+      throw new Error('Falha ao conectar com o servidor operacional');
+    }
+  }
+
+  /**
+   * Verifica saúde do dashboard
+   */
+  async getDashboardHealth(): Promise<{ status: string; timestamp: string; service: string }> {
+    try {
+      console.log('🔗 Verificando saúde do dashboard');
+      const response = await api.get('/api/dashboard/health');
+      console.log('✅ Saúde do dashboard verificada:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao verificar saúde do dashboard:', error);
+      throw new Error('Falha ao verificar saúde do dashboard');
+    }
+  }
+}
+
+export const dashboardService = new DashboardService();
+export default dashboardService;

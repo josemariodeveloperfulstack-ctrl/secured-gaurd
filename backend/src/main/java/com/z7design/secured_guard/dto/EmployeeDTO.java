@@ -73,6 +73,73 @@ public class EmployeeDTO {
     // private String anoReferencia;
     private String notes;
     private String status;
+    
+    // Dados do cônjuge
+    private String spouseName;
+    private String spouseCpf;
+    private String spouseRg;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate spouseBirthDate;
+    private String spousePhone;
+    private String spouseEmail;
+    
+    // Campos da ficha de registro
+    private String empresaNome;
+    private String empresaEndereco;
+    private String empresaCnpj;
+    private String tituloEleitor;
+    private String tituloEleitorZona;
+    private String tituloEleitorSecao;
+    private String carteiraIdentidadeOrgaoEmissor;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate carteiraIdentidadeDataEmissao;
+    private String certificadoMilitar;
+    private String nomePai;
+    private String nomeMae;
+    private String localNascimento;
+    private String grauInstrucao;
+    private String cbo;
+    private BigDecimal salario;
+    private String salarioPorExtenso;
+    private String periodoPagamento;
+    private String horarioTrabalho;
+    private String folgaSemanal;
+    private Boolean fgtsOptante;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate fgtsDataOpcao;
+    private String fgtsBancoDepositario;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate fgtsDataRetratacao;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate pisDataCadastro;
+    private String pisBancoDepositario;
+    private String pisEnderecoBanco;
+    private String pisCodigoBanco;
+    private String pisCodigoAgencia;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate cnhExpirationDate;
+    private String cnhCategory;
+    private String ctps;
+    private String ctpsRural;
+    private String ctpsSeries;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate ctpsIssueDate;
+    private String ctpsIssuingAgency;
+    private String carteiraModelo19;
+    private String registroGeralEstrangeiro;
+    private Boolean casadoBrasileiro;
+    private String nomeConjugeEstrangeiro;
+    private Boolean temFilhosBrasileiros;
+    private Integer quantidadeFilhosBrasileiros;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate dataChegadaBrasil;
+    private Boolean naturalizado;
+    private String decretoNaturalizacao;
+    private String vistoFiscalizacao;
+    private String assinaturaFuncionario;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate dataRescisao;
+    
     /**
      * Usuário do sistema vinculado ao funcionário (opcional).
      * Só deve ser preenchido se o funcionário também for usuário do sistema.

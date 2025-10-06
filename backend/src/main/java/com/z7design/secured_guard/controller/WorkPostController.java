@@ -55,7 +55,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/all")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
     @Operation(summary = "Listar todos os postos de trabalho (sem paginação)", description = "Retorna uma lista completa de todos os postos de trabalho")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -175,7 +175,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/client/{clientId}")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
     @Operation(summary = "Listar postos por cliente", description = "Retorna postos de um cliente específico")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),

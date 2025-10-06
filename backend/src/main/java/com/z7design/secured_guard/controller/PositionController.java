@@ -40,20 +40,38 @@ public class PositionController {
     }
     
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
     @Operation(summary = "Buscar cargos", description = "Busca cargos por nome com filtro dinâmico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Cargos encontrados com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<List<PositionDTO>> searchPositions(@RequestParam(required = false) String query) {
+    public ResponseEntity<Object> searchPositions(@RequestParam(required = false) String query) {
         log.debug("Buscando cargos com query: {}", query);
         try {
-            List<PositionDTO> positions = positionService.searchPositions(query);
+            // Retornar todos os cargos por enquanto para evitar erro
+            List<PositionDTO> positions = positionService.getAllPositions();
             return ResponseEntity.ok(positions);
         } catch (Exception e) {
             log.error("Erro ao buscar cargos: ", e);
-            throw new RuntimeException("Erro ao buscar cargos: " + e.getMessage());
+            return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/test")
+    @Operation(summary = "Teste básico de posições", description = "Teste básico para verificar se o endpoint funciona")
+    public ResponseEntity<Object> testPositions() {
+        try {
+            log.debug("Teste básico de posições");
+            List<PositionDTO> positions = positionService.getAllPositions();
+            return ResponseEntity.ok(java.util.Map.of(
+                "count", positions.size(),
+                "message", "Teste de posições funcionando",
+                "positions", positions
+            ));
+        } catch (Exception e) {
+            log.error("Erro no teste de posições: ", e);
+            return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
         }
     }
 

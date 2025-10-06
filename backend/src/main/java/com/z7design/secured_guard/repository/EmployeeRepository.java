@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.z7design.secured_guard.model.Employee;
@@ -35,6 +36,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     
     // Busca por nome ou documento (case insensitive)
     List<Employee> findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(String name, String document);
+    
+    // Buscar apenas IDs
+    @Query("SELECT e.id FROM Employee e")
+    List<UUID> findAllIds();
+    
+    // Buscar dados básicos sem relacionamentos
+    @Query(value = "SELECT id, name, document, birth_date, registration_number, hire_date, termination_date, status, notes, address, phone, email, cnh_number, ctps, cbo, pis, salario, created_at, updated_at FROM employees", nativeQuery = true)
+    List<Object[]> findBasicData();
     
     // List<Employee> findByPossuiWhatsappTrue();
 } 

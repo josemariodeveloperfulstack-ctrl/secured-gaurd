@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -244,23 +246,60 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public List<Employee> findAll() {
         try {
-            log.info("Buscando todos os funcionarios...");
-            List<Employee> employees = new java.util.ArrayList<>();
+            System.out.println("🔍 EmployeeService.findAll - Iniciando busca no banco...");
+            
+            // Primeiro, vamos tentar buscar apenas os IDs
             try {
-                employees = employeeRepository.findAll();
-                log.info("Encontrados {} funcionários", employees.size());
-            } catch (Exception dbError) {
-                log.error("❌ ERRO no database query: {}", dbError.getMessage());
-                log.error("❌ Stack trace completo:", dbError);
-                // Retornar lista vazia se há erro de DB
-                return java.util.Collections.emptyList();
+                List<Employee> employees = employeeRepository.findAll();
+                System.out.println("✅ EmployeeService.findAll - Encontrados " + employees.size() + " funcionários no banco");
+                
+                // Log dos primeiros funcionários para debug
+                if (!employees.isEmpty()) {
+                    for (int i = 0; i < Math.min(3, employees.size()); i++) {
+                        Employee emp = employees.get(i);
+                        System.out.println("📋 Funcionário " + (i+1) + ": " + emp.getName() + " (ID: " + emp.getId() + ")");
+                    }
+                }
+                
+                return employees;
+            } catch (Exception repoError) {
+                System.err.println("❌ EmployeeService.findAll - Erro no repository: " + repoError.getMessage());
+                repoError.printStackTrace();
+                throw repoError;
             }
             
-            return employees;
         } catch (Exception e) {
-            log.error("Erro ao buscar funcionários: {}", e.getMessage(), e);
-            log.warn("Retornando lista vazia devido ao erro");
-            return java.util.Collections.emptyList();
+            System.err.println("❌ EmployeeService.findAll - Erro ao buscar funcionários: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar funcionários: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<UUID> findAllIds() {
+        try {
+            System.out.println("🔍 EmployeeService.findAllIds - Buscando apenas IDs");
+            List<UUID> ids = employeeRepository.findAllIds();
+            System.out.println("✅ EmployeeService.findAllIds - Encontrados " + ids.size() + " IDs");
+            return ids;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeService.findAllIds - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar IDs: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicData() {
+        try {
+            System.out.println("🔍 EmployeeService.findBasicData - Buscando dados básicos");
+            List<Object[]> data = employeeRepository.findBasicData();
+            System.out.println("✅ EmployeeService.findBasicData - Encontrados " + data.size() + " registros");
+            return data;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeService.findBasicData - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar dados básicos: " + e.getMessage(), e);
         }
     }
     
@@ -368,6 +407,64 @@ public class EmployeeService {
             e.setPhone(dto.getPhone());
             e.setEmail(dto.getEmail());
             
+            // Mapear dados do cônjuge
+            e.setSpouseName(dto.getSpouseName());
+            e.setSpouseCpf(dto.getSpouseCpf());
+            e.setSpouseRg(dto.getSpouseRg());
+            e.setSpouseBirthDate(dto.getSpouseBirthDate());
+            e.setSpousePhone(dto.getSpousePhone());
+            e.setSpouseEmail(dto.getSpouseEmail());
+            
+            // Mapear campos da ficha de registro
+            e.setEmpresaNome(dto.getEmpresaNome());
+            e.setEmpresaEndereco(dto.getEmpresaEndereco());
+            e.setEmpresaCnpj(dto.getEmpresaCnpj());
+            // e.setTituloEleitor(dto.getTituloEleitor()); // Campo não existe no modelo
+            e.setTituloEleitorZona(dto.getTituloEleitorZona());
+            e.setTituloEleitorSecao(dto.getTituloEleitorSecao());
+            e.setCarteiraIdentidadeOrgaoEmissor(dto.getCarteiraIdentidadeOrgaoEmissor());
+            e.setCarteiraIdentidadeDataEmissao(dto.getCarteiraIdentidadeDataEmissao());
+            e.setCertificadoMilitar(dto.getCertificadoMilitar());
+            e.setNomePai(dto.getNomePai());
+            e.setNomeMae(dto.getNomeMae());
+            e.setLocalNascimento(dto.getLocalNascimento());
+            e.setGrauInstrucao(dto.getGrauInstrucao());
+            e.setCbo(dto.getCbo());
+            e.setSalario(dto.getSalario());
+            e.setSalarioPorExtenso(dto.getSalarioPorExtenso());
+            e.setPeriodoPagamento(dto.getPeriodoPagamento());
+            e.setHorarioTrabalho(dto.getHorarioTrabalho());
+            e.setFolgaSemanal(dto.getFolgaSemanal());
+            e.setFgtsOptante(dto.getFgtsOptante());
+            e.setFgtsDataOpcao(dto.getFgtsDataOpcao());
+            e.setFgtsBancoDepositario(dto.getFgtsBancoDepositario());
+            e.setFgtsDataRetratacao(dto.getFgtsDataRetratacao());
+            e.setPisDataCadastro(dto.getPisDataCadastro());
+            e.setPisBancoDepositario(dto.getPisBancoDepositario());
+            e.setPisEnderecoBanco(dto.getPisEnderecoBanco());
+            e.setPisCodigoBanco(dto.getPisCodigoBanco());
+            e.setPisCodigoAgencia(dto.getPisCodigoAgencia());
+            // e.setCnhNumber(dto.getCnhNumber()); // Campo já existe no modelo
+            e.setCnhExpirationDate(dto.getCnhExpirationDate());
+            e.setCnhCategory(dto.getCnhCategory());
+            e.setCtps(dto.getCtps());
+            e.setCtpsRural(dto.getCtpsRural());
+            e.setCtpsSeries(dto.getCtpsSeries());
+            e.setCtpsIssueDate(dto.getCtpsIssueDate());
+            e.setCtpsIssuingAgency(dto.getCtpsIssuingAgency());
+            e.setCarteiraModelo19(dto.getCarteiraModelo19());
+            e.setRegistroGeralEstrangeiro(dto.getRegistroGeralEstrangeiro());
+            e.setCasadoBrasileiro(dto.getCasadoBrasileiro());
+            e.setNomeConjugeEstrangeiro(dto.getNomeConjugeEstrangeiro());
+            e.setTemFilhosBrasileiros(dto.getTemFilhosBrasileiros());
+            e.setQuantidadeFilhosBrasileiros(dto.getQuantidadeFilhosBrasileiros());
+            e.setDataChegadaBrasil(dto.getDataChegadaBrasil());
+            e.setNaturalizado(dto.getNaturalizado());
+            e.setDecretoNaturalizacao(dto.getDecretoNaturalizacao());
+            e.setVistoFiscalizacao(dto.getVistoFiscalizacao());
+            e.setAssinaturaFuncionario(dto.getAssinaturaFuncionario());
+            e.setDataRescisao(dto.getDataRescisao());
+            
             // Setar entidades relacionais obrigatórias
             if (dto.getUser() == null || dto.getUser().getId() == null) {
                 throw new RuntimeException("O campo user.id é obrigatório.");
@@ -419,89 +516,142 @@ public class EmployeeService {
             System.out.println("[DEBUG] Iniciando conversão Entity -> DTO para funcionário: " + e.getName());
             
             EmployeeDTO dto = new EmployeeDTO();
-            dto.setId(e.getId()); // Adicionado para mapear o ID
+            
+            // Campos básicos essenciais
+            dto.setId(e.getId());
             dto.setName(e.getName());
             dto.setCpf(e.getDocument());
-            // dto.setCarteiraIdentidade(e.getCarteiraIdentidade());
-            // dto.setTituloEleitor(e.getTituloEleitor());
-            // dto.setGrauInstrucao(e.getGrauInstrucao());
-            // dto.setPai(e.getPai());
-            // dto.setMae(e.getMae());
-            // dto.setNaturalidade(e.getNaturalidade());
-            // dto.setCep(e.getCep());
-            // dto.setCtps(e.getCtps());
-            // dto.setCbo(e.getCbo());
-            // dto.setPis(e.getPis());
-            // dto.setSalario(e.getSalario());
-            // dto.setFgtsOptante(e.getFgtsOptante());
-            // dto.setFgtsDataOpcao(e.getFgtsDataOpcao());
-            // dto.setFgtsBancoDepositario(e.getFgtsBancoDepositario());
-            // dto.setEmpresaNome(e.getEmpresaNome());
-            // dto.setEmpresaEndereco(e.getEmpresaEndereco());
-            // dto.setEmpresaCnpj(e.getEmpresaCnpj());
-            dto.setBirthDate(e.getBirthDate());
-            // dto.setMaritalStatus(e.getMaritalStatus());
-            // dto.setNationality(e.getNationality());
-            // dto.setPhotoUrl(e.getPhotoUrl());
-            // dto.setCurrentScale(e.getCurrentScale());
-            dto.setRegistrationNumber(e.getRegistrationNumber());
-            dto.setHireDate(e.getHireDate());
-            dto.setTerminationDate(e.getTerminationDate());
+            dto.setEmail(e.getEmail());
+            dto.setPhone(e.getPhone());
             dto.setStatus(e.getStatus() != null ? e.getStatus().name() : null);
-            // dto.setPossuiWhatsapp(e.getPossuiWhatsapp());
-            // dto.setCaminhoPdf(e.getCaminhoPdf());
-            // dto.setMesReferencia(e.getMesReferencia());
-            // dto.setAnoReferencia(e.getAnoReferencia());
             dto.setNotes(e.getNotes());
             dto.setCreatedAt(e.getCreatedAt());
             dto.setUpdatedAt(e.getUpdatedAt());
             
-            // Address simplificado - usar apenas o campo street
+            // Campos opcionais com verificação de null
+            if (e.getBirthDate() != null) {
+                dto.setBirthDate(e.getBirthDate());
+            }
+            if (e.getRegistrationNumber() != null) {
+                dto.setRegistrationNumber(e.getRegistrationNumber());
+            }
+            if (e.getHireDate() != null) {
+                dto.setHireDate(e.getHireDate());
+            }
+            if (e.getTerminationDate() != null) {
+                dto.setTerminationDate(e.getTerminationDate());
+            }
+            
+            // Address simplificado
             if (e.getAddress() != null && !e.getAddress().trim().isEmpty()) {
                 EmployeeDTO.AddressDTO address = new EmployeeDTO.AddressDTO();
                 address.setStreet(e.getAddress());
                 dto.setAddress(address);
-                System.out.println("[DEBUG] Address mapeado: " + e.getAddress());
-            } else {
-                dto.setAddress(null);
-                System.out.println("[DEBUG] Address não fornecido ou vazio");
             }
-            dto.setPhone(e.getPhone());
-            dto.setEmail(e.getEmail());
             
-            // Mapear entidades relacionais
+            // Mapear dados do cônjuge
+            dto.setSpouseName(e.getSpouseName());
+            dto.setSpouseCpf(e.getSpouseCpf());
+            dto.setSpouseRg(e.getSpouseRg());
+            dto.setSpouseBirthDate(e.getSpouseBirthDate());
+            dto.setSpousePhone(e.getSpousePhone());
+            dto.setSpouseEmail(e.getSpouseEmail());
+            
+            // Mapear campos da ficha de registro
+            dto.setEmpresaNome(e.getEmpresaNome());
+            dto.setEmpresaEndereco(e.getEmpresaEndereco());
+            dto.setEmpresaCnpj(e.getEmpresaCnpj());
+            // dto.setTituloEleitor(e.getTituloEleitor()); // Campo não existe no modelo
+            dto.setTituloEleitorZona(e.getTituloEleitorZona());
+            dto.setTituloEleitorSecao(e.getTituloEleitorSecao());
+            dto.setCarteiraIdentidadeOrgaoEmissor(e.getCarteiraIdentidadeOrgaoEmissor());
+            dto.setCarteiraIdentidadeDataEmissao(e.getCarteiraIdentidadeDataEmissao());
+            dto.setCertificadoMilitar(e.getCertificadoMilitar());
+            dto.setNomePai(e.getNomePai());
+            dto.setNomeMae(e.getNomeMae());
+            dto.setLocalNascimento(e.getLocalNascimento());
+            dto.setGrauInstrucao(e.getGrauInstrucao());
+            dto.setCbo(e.getCbo());
+            dto.setSalario(e.getSalario());
+            dto.setSalarioPorExtenso(e.getSalarioPorExtenso());
+            dto.setPeriodoPagamento(e.getPeriodoPagamento());
+            dto.setHorarioTrabalho(e.getHorarioTrabalho());
+            dto.setFolgaSemanal(e.getFolgaSemanal());
+            dto.setFgtsOptante(e.getFgtsOptante());
+            dto.setFgtsDataOpcao(e.getFgtsDataOpcao());
+            dto.setFgtsBancoDepositario(e.getFgtsBancoDepositario());
+            dto.setFgtsDataRetratacao(e.getFgtsDataRetratacao());
+            dto.setPisDataCadastro(e.getPisDataCadastro());
+            dto.setPisBancoDepositario(e.getPisBancoDepositario());
+            dto.setPisEnderecoBanco(e.getPisEnderecoBanco());
+            dto.setPisCodigoBanco(e.getPisCodigoBanco());
+            dto.setPisCodigoAgencia(e.getPisCodigoAgencia());
+            // dto.setCnhNumber(e.getCnhNumber()); // Campo já existe no modelo
+            dto.setCnhExpirationDate(e.getCnhExpirationDate());
+            dto.setCnhCategory(e.getCnhCategory());
+            dto.setCtps(e.getCtps());
+            dto.setCtpsRural(e.getCtpsRural());
+            dto.setCtpsSeries(e.getCtpsSeries());
+            dto.setCtpsIssueDate(e.getCtpsIssueDate());
+            dto.setCtpsIssuingAgency(e.getCtpsIssuingAgency());
+            dto.setCarteiraModelo19(e.getCarteiraModelo19());
+            dto.setRegistroGeralEstrangeiro(e.getRegistroGeralEstrangeiro());
+            dto.setCasadoBrasileiro(e.getCasadoBrasileiro());
+            dto.setNomeConjugeEstrangeiro(e.getNomeConjugeEstrangeiro());
+            dto.setTemFilhosBrasileiros(e.getTemFilhosBrasileiros());
+            dto.setQuantidadeFilhosBrasileiros(e.getQuantidadeFilhosBrasileiros());
+            dto.setDataChegadaBrasil(e.getDataChegadaBrasil());
+            dto.setNaturalizado(e.getNaturalizado());
+            dto.setDecretoNaturalizacao(e.getDecretoNaturalizacao());
+            dto.setVistoFiscalizacao(e.getVistoFiscalizacao());
+            dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
+            dto.setDataRescisao(e.getDataRescisao());
+            
+            // Mapear entidades relacionais com verificação de null
             if (e.getUser() != null) {
-                EmployeeDTO.IdOnlyDTO userDTO = new EmployeeDTO.IdOnlyDTO();
-                userDTO.setId(e.getUser().getId());
-                dto.setUser(userDTO);
-                System.out.println("[DEBUG] User mapeado: " + e.getUser().getId());
+                try {
+                    EmployeeDTO.IdOnlyDTO userDTO = new EmployeeDTO.IdOnlyDTO();
+                    userDTO.setId(e.getUser().getId());
+                    dto.setUser(userDTO);
+                } catch (Exception userEx) {
+                    System.err.println("[WARNING] Erro ao mapear user: " + userEx.getMessage());
+                    dto.setUser(null);
+                }
             }
+            
             if (e.getPosition() != null) {
-                EmployeeDTO.PositionDTO positionDTO = new EmployeeDTO.PositionDTO();
-                positionDTO.setId(e.getPosition().getId());
-                positionDTO.setName(e.getPosition().getName());
-                positionDTO.setDescription(e.getPosition().getDescription());
-                dto.setPosition(positionDTO);
-                System.out.println("[DEBUG] Position mapeada: " + e.getPosition().getName() + " (ID: " + e.getPosition().getId() + ")");
+                try {
+                    EmployeeDTO.PositionDTO positionDTO = new EmployeeDTO.PositionDTO();
+                    positionDTO.setId(e.getPosition().getId());
+                    positionDTO.setName(e.getPosition().getName());
+                    if (e.getPosition().getDescription() != null) {
+                        positionDTO.setDescription(e.getPosition().getDescription());
+                    }
+                    dto.setPosition(positionDTO);
+                } catch (Exception positionEx) {
+                    System.err.println("[WARNING] Erro ao mapear position: " + positionEx.getMessage());
+                    dto.setPosition(null);
+                }
             }
+            
             if (e.getUnit() != null) {
-                EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
-                unitDTO.setId(e.getUnit().getId());
-                unitDTO.setName(e.getUnit().getName());
-                unitDTO.setDescription(e.getUnit().getDescription());
-                dto.setUnit(unitDTO);
-                System.out.println("[DEBUG] Unit mapeada: " + e.getUnit().getName() + " (ID: " + e.getUnit().getId() + ")");
+                try {
+                    EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
+                    unitDTO.setId(e.getUnit().getId());
+                    unitDTO.setName(e.getUnit().getName());
+                    if (e.getUnit().getDescription() != null) {
+                        unitDTO.setDescription(e.getUnit().getDescription());
+                    }
+                    dto.setUnit(unitDTO);
+                } catch (Exception unitEx) {
+                    System.err.println("[WARNING] Erro ao mapear unit: " + unitEx.getMessage());
+                    dto.setUnit(null);
+                }
             }
             
-            System.out.println("[DEBUG] DTO final criado com campos principais:");
-            System.out.println("[DEBUG] - Nome: " + dto.getName());
-            System.out.println("[DEBUG] - CPF: " + dto.getCpf());
-            System.out.println("[DEBUG] - Status: " + dto.getStatus());
-            System.out.println("[DEBUG] - Email: " + dto.getEmail());
-            System.out.println("[DEBUG] - Phone: " + dto.getPhone());
-            System.out.println("[DEBUG] - Address: " + (dto.getAddress() != null ? dto.getAddress().getStreet() : "null"));
-            
+            System.out.println("[DEBUG] DTO criado com sucesso para: " + dto.getName());
             return dto;
+            
         } catch (Exception ex) {
             System.err.println("[ERROR] Erro na conversão Entity -> DTO: " + ex.getMessage());
             ex.printStackTrace();
@@ -527,5 +677,41 @@ public class EmployeeService {
                 .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
                 .build())
             .collect(java.util.stream.Collectors.toList());
+    }
+    
+    /**
+     * Busca dados básicos do funcionário por CPF
+     */
+    public Map<String, Object> getEmployeeBasicDataByCpf(String cpf) {
+        log.debug("Buscando dados básicos do funcionário por CPF: {}", cpf);
+        
+        Optional<Employee> employeeOpt = employeeRepository.findByDocument(cpf);
+        if (employeeOpt.isEmpty()) {
+            log.warn("Funcionário não encontrado para CPF: {}", cpf);
+            return new HashMap<>();
+        }
+        
+        Employee employee = employeeOpt.get();
+        Map<String, Object> data = new HashMap<>();
+        
+        data.put("id", employee.getId());
+        data.put("name", employee.getName());
+        data.put("cpf", employee.getDocument());
+        data.put("email", employee.getEmail());
+        data.put("phone", employee.getPhone());
+        data.put("status", employee.getStatus());
+        
+        if (employee.getPosition() != null) {
+            data.put("position", employee.getPosition().getName());
+            data.put("positionId", employee.getPosition().getId());
+        }
+        
+        if (employee.getUnit() != null) {
+            data.put("unit", employee.getUnit().getName());
+            data.put("unitId", employee.getUnit().getId());
+        }
+        
+        log.debug("Dados básicos encontrados para funcionário: {}", employee.getName());
+        return data;
     }
 } 

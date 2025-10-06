@@ -143,6 +143,57 @@ export interface Employee {
   spouseBirthDate?: string;
   spouseProfession?: string;
   spousePhone?: string;
+  spouseEmail?: string;
+  
+  // Campos da ficha de registro
+  empresaNome?: string;
+  empresaEndereco?: string;
+  empresaCnpj?: string;
+  tituloEleitor?: string;
+  tituloEleitorZona?: string;
+  tituloEleitorSecao?: string;
+  carteiraIdentidadeOrgaoEmissor?: string;
+  carteiraIdentidadeDataEmissao?: string;
+  certificadoMilitar?: string;
+  nomePai?: string;
+  nomeMae?: string;
+  localNascimento?: string;
+  grauInstrucao?: string;
+  cbo?: string;
+  salario?: number;
+  salarioPorExtenso?: string;
+  periodoPagamento?: string;
+  horarioTrabalho?: string;
+  folgaSemanal?: string;
+  fgtsOptante?: boolean;
+  fgtsDataOpcao?: string;
+  fgtsBancoDepositario?: string;
+  fgtsDataRetratacao?: string;
+  pisDataCadastro?: string;
+  pisBancoDepositario?: string;
+  pisEnderecoBanco?: string;
+  pisCodigoBanco?: string;
+  pisCodigoAgencia?: string;
+  cnhNumber?: string;
+  cnhExpirationDate?: string;
+  cnhCategory?: string;
+  ctps?: string;
+  ctpsRural?: string;
+  ctpsSeries?: string;
+  ctpsIssueDate?: string;
+  ctpsIssuingAgency?: string;
+  carteiraModelo19?: string;
+  registroGeralEstrangeiro?: string;
+  casadoBrasileiro?: boolean;
+  nomeConjugeEstrangeiro?: string;
+  temFilhosBrasileiros?: boolean;
+  quantidadeFilhosBrasileiros?: number;
+  dataChegadaBrasil?: string;
+  naturalizado?: boolean;
+  decretoNaturalizacao?: string;
+  vistoFiscalizacao?: string;
+  assinaturaFuncionario?: string;
+  dataRescisao?: string;
   
   // Relacionamentos (apenas IDs como no backend)
   position?: { 
@@ -288,6 +339,57 @@ export interface CreateEmployeeDTO {
   spouseBirthDate?: string;
   spouseProfession?: string;
   spousePhone?: string;
+  spouseEmail?: string;
+  
+  // Campos da ficha de registro
+  empresaNome?: string;
+  empresaEndereco?: string;
+  empresaCnpj?: string;
+  tituloEleitor?: string;
+  tituloEleitorZona?: string;
+  tituloEleitorSecao?: string;
+  carteiraIdentidadeOrgaoEmissor?: string;
+  carteiraIdentidadeDataEmissao?: string;
+  certificadoMilitar?: string;
+  nomePai?: string;
+  nomeMae?: string;
+  localNascimento?: string;
+  grauInstrucao?: string;
+  cbo?: string;
+  salario?: number;
+  salarioPorExtenso?: string;
+  periodoPagamento?: string;
+  horarioTrabalho?: string;
+  folgaSemanal?: string;
+  fgtsOptante?: boolean;
+  fgtsDataOpcao?: string;
+  fgtsBancoDepositario?: string;
+  fgtsDataRetratacao?: string;
+  pisDataCadastro?: string;
+  pisBancoDepositario?: string;
+  pisEnderecoBanco?: string;
+  pisCodigoBanco?: string;
+  pisCodigoAgencia?: string;
+  cnhNumber?: string;
+  cnhExpirationDate?: string;
+  cnhCategory?: string;
+  ctps?: string;
+  ctpsRural?: string;
+  ctpsSeries?: string;
+  ctpsIssueDate?: string;
+  ctpsIssuingAgency?: string;
+  carteiraModelo19?: string;
+  registroGeralEstrangeiro?: string;
+  casadoBrasileiro?: boolean;
+  nomeConjugeEstrangeiro?: string;
+  temFilhosBrasileiros?: boolean;
+  quantidadeFilhosBrasileiros?: number;
+  dataChegadaBrasil?: string;
+  naturalizado?: boolean;
+  decretoNaturalizacao?: string;
+  vistoFiscalizacao?: string;
+  assinaturaFuncionario?: string;
+  dataRescisao?: string;
   
   // Relacionamentos
   position?: { 
