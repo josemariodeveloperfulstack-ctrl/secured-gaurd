@@ -20,6 +20,7 @@ export interface ContaAPagar {
   fornecedorId?: string;
   empresa?: string;
   empresaId?: string;
+  companySigla?: string;
   descricao: string;
   tipo: 'FIXA' | 'VARIAVEL';
   valor: number;
@@ -53,6 +54,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [fornecedores, setFornecedores] = useState<Supplier[]>([]);
   const [empresas, setEmpresas] = useState<any[]>([]);
+  const [siglas, setSiglas] = useState<string[]>([]);
   
   const [formData, setFormData] = useState<ContaAPagar>({
     dataEmissao: new Date(),
@@ -98,13 +100,17 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
         .then(data => {
           const empresasArray = Array.isArray(data) ? data : [];
           setEmpresas(empresasArray);
+          const siglasList = empresasArray.map((e: any) => e.sigla || e.name || '').filter((s: string) => !!s);
+          setSiglas(siglasList.length ? siglasList : ['ADM','TERC','VIG']);
         })
         .catch(error => {
           console.error('Erro ao carregar empresas:', error);
-          setEmpresas([
+          const fallback = [
             { id: '1', name: 'Empresa Exemplo 1' },
             { id: '2', name: 'Empresa Exemplo 2' }
-          ]);
+          ];
+          setEmpresas(fallback);
+          setSiglas(['ADM','TERC','VIG']);
         });
 
       // Carregar categorias
@@ -327,13 +333,14 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
             {/* Empresa */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Empresa *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">Empresa (SIGLA) *</label>
               <Select
                 value={formData.empresaId}
                 onValueChange={(value) => {
                   const empresa = empresas.find(e => e.id === value);
                   handleInputChange('empresaId', value);
                   handleInputChange('empresa', empresa?.name || '');
+                  handleInputChange('companySigla', empresa?.sigla || empresa?.name || '');
                 }}
                 required
               >
@@ -347,7 +354,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                       value={empresa.id}
                       className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                     >
-                      {empresa.name}
+                      {(empresa.sigla ? empresa.sigla : empresa.name)}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -397,6 +397,7 @@ public class InvoiceService {
             invoice.setComprovanteUrl(dto.getComprovanteUrl());
             invoice.setBarcode(dto.getBarcode());
             invoice.setNotes(dto.getNotes());
+            invoice.setCompanySigla(dto.getCompanySigla());
             
             log.debug("Campos básicos definidos");
             

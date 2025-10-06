@@ -17,6 +17,7 @@ export interface CreateContaAPagarRequest {
   category?: string;
   notes?: string;
   centroCusto?: string;
+  companySigla?: string;
 }
 
 export interface UpdateContaAPagarRequest extends Partial<CreateContaAPagarRequest> {
@@ -289,7 +290,8 @@ export const contasAPagarService = {
       barcode: conta.codigoBarras,
       category: conta.categoria === 'NENHUMA' ? undefined : conta.categoria,
       notes: conta.observacoes,
-      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto
+      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto,
+      companySigla: conta.companySigla
     };
 
 
@@ -322,6 +324,7 @@ export const contasAPagarService = {
     if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
     if (conta.observacoes) requestData.notes = conta.observacoes;
     if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
+    if (conta.companySigla !== undefined) requestData.companySigla = conta.companySigla;
     
     // Se não há unitId, buscar uma unidade padrão
     if (!requestData.unitId) {

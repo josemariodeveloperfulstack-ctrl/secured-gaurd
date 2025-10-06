@@ -81,6 +81,10 @@ public class Invoice {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Size(max = 10, message = "Sigla da empresa deve ter no máximo 10 caracteres")
+    @Column(name = "company_sigla", length = 10)
+    private String companySigla;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;

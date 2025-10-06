@@ -75,6 +75,9 @@ public class InvoiceDTO {
     @Size(max = 1000, message = "Observações deve ter no máximo 1000 caracteres")
     private String notes;
     
+    @Schema(description = "Sigla da empresa associada", example = "ADM")
+    private String companySigla;
+
     private java.util.UUID supplierId;
     private java.util.UUID clientId;
     private java.util.UUID contractId;
@@ -139,6 +142,7 @@ public class InvoiceDTO {
         dto.setComprovanteUrl(invoice.getComprovanteUrl());
         dto.setBarcode(invoice.getBarcode());
         dto.setNotes(invoice.getNotes());
+        dto.setCompanySigla(invoice.getCompanySigla());
         dto.setSupplierId(invoice.getSupplier() != null ? invoice.getSupplier().getId() : null);
         dto.setSupplierName(invoice.getSupplier() != null ? invoice.getSupplier().getName() : null);
         dto.setClientId(invoice.getClient() != null ? invoice.getClient().getId() : null);
