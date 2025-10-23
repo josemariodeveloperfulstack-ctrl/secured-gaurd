@@ -74,8 +74,8 @@ jobs:
       - name: 🐳 Build Docker images
         run: |
           echo "🐳 Construindo imagens Docker..."
-          docker build -t zemarioramos/secured-guard-backend:ci -f backend/Dockerfile.prod ./backend
-          docker build -t zemarioramos/secured-guard-frontend:ci -f frontend/Dockerfile.prod ./frontend
+          docker build -t z7design/secured-guard-backend:ci -f backend/Dockerfile.prod ./backend
+          docker build -t z7design/secured-guard-frontend:ci -f frontend/Dockerfile.prod ./frontend
           echo "✅ Imagens construídas!"
 
       # ============================================
@@ -90,19 +90,20 @@ jobs:
       - name: 📤 Push images
         run: |
           echo "📤 Enviando imagens..."
-          docker push zemarioramos/secured-guard-backend:ci
-          docker push zemarioramos/secured-guard-frontend:ci
+          docker push z7design/secured-guard-backend:ci
+          docker push z7design/secured-guard-frontend:ci
           echo "✅ Imagens enviadas!"
 
       # ============================================
-      # 8️⃣ CONFIGURAR SSH
+      # 8️⃣ INSTALAR SSH PASS E CONFIGURAR SSH
       # ============================================
-      - name: 🔑 Configure SSH
+      - name: 🔑 Install sshpass and configure SSH
         run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_HOST }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          echo "✅ SSH configurado para usar senha"
 
       # ============================================
       # 9️⃣ TRANSFERIR ARQUIVOS PARA VPS
@@ -112,14 +113,14 @@ jobs:
           echo "📤 Transferindo arquivos para VPS..."
           
           # Criar estrutura de diretórios
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             mkdir -p /var/www/secured-guard/ci
             mkdir -p /var/www/secured-guard/ci/uploads
             mkdir -p /var/www/secured-guard/ci/logs
           EOF
           
           # Transferir docker-compose.ci.yml
-          scp docker-compose.ci.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured-guard/ci/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.ci.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured-guard/ci/
           
           echo "✅ Arquivos transferidos!"
 
@@ -128,7 +129,7 @@ jobs:
       # ============================================
       - name: ⚙️ Create .env file
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "⚙️ Criando arquivo .env..."
             
             cat > /var/www/secured-guard/ci/.env << 'ENVEOF'
@@ -155,7 +156,7 @@ ENVEOF
       # ============================================
       - name: 💾 Backup and stop old containers
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "💾 Fazendo backup e parando containers antigos..."
             
             cd /var/www/secured-guard/ci
@@ -178,7 +179,7 @@ ENVEOF
       # ============================================
       - name: 📥 Pull new images
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "📥 Fazendo pull das novas imagens..."
             
             cd /var/www/secured-guard/ci
@@ -187,8 +188,8 @@ ENVEOF
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
             # Pull das imagens
-            docker pull zemarioramos/secured-guard-backend:ci
-            docker pull zemarioramos/secured-guard-frontend:ci
+            docker pull z7design/secured-guard-backend:ci
+            docker pull z7design/secured-guard-frontend:ci
             
             echo "✅ Imagens atualizadas!"
           EOF
@@ -198,7 +199,7 @@ ENVEOF
       # ============================================
       - name: 🚀 Start CI containers
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "🚀 Iniciando containers CI..."
             
             cd /var/www/secured-guard/ci

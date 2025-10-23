@@ -52,7 +52,7 @@ services:
   # BACKEND API CI
   # ========================================
   backend-ci:
-    image: zemarioramos/secured-guard-backend:ci
+    image: z7design/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     environment:
       SPRING_PROFILES_ACTIVE: ci
@@ -90,7 +90,7 @@ services:
   # FRONTEND CI
   # ========================================
   frontend-ci:
-    image: zemarioramos/secured-guard-frontend:ci
+    image: z7design/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     environment:
       VITE_API_URL: https://ci.z7botsolutions.com.br/api
