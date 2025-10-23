@@ -1,66 +1,67 @@
 # ========================================
-# STAGE 1: Build
+# DOCKERFILE PARA BACKEND (PRODUÇÃO)
 # ========================================
-FROM maven:3.9.9-amazoncorretto-17 AS builder
 
+# Multi-stage build para otimizar tamanho da imagem
+FROM amazoncorretto:17-alpine AS builder
+
+# Instalar Maven
+RUN apk add --no-cache maven
+
+# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar pom.xml e baixar dependências (cache layer)
-COPY pom.xml .
+# Copiar arquivos de configuração do Maven
+COPY backend/pom.xml .
+COPY backend/mvnw .
+COPY backend/.mvn .mvn
+
+# Baixar dependências (cache layer)
 RUN mvn dependency:go-offline -B
 
 # Copiar código fonte
-COPY src ./src
+COPY backend/src ./src
 
-# Build do projeto
-RUN mvn clean package -DskipTests -B
+# Compilar aplicação
+RUN mvn clean package -DskipTests -Dspring.profiles.active=ci
 
 # ========================================
-# STAGE 2: Runtime
+# IMAGEM FINAL (RUNTIME)
 # ========================================
 FROM amazoncorretto:17-alpine
 
-LABEL maintainer="Z7 Design <contato@z7design.com>"
-LABEL description="Secured Guard Backend - Production"
-LABEL version="1.0.0"
+# Instalar curl para health checks
+RUN apk add --no-cache curl
 
-# Instalar dependências necessárias
-RUN apk add --no-cache \
-    curl \
-    fontconfig \
-    ttf-dejavu \
-    && rm -rf /var/cache/apk/*
+# Criar usuário não-root para segurança
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
-# Criar usuário não-root
-RUN addgroup -S spring && adduser -S spring -G spring
-
-# Criar diretórios necessários
-RUN mkdir -p /app/logs /app/uploads /app/temp && \
-    chown -R spring:spring /app
-
+# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar JAR do stage de build
+# Copiar JAR compilado
 COPY --from=builder /app/target/*.jar app.jar
 
-# Mudar ownership
-RUN chown spring:spring app.jar
+# Criar diretórios necessários
+RUN mkdir -p /app/logs /app/uploads && \
+    chown -R appuser:appgroup /app
 
-# Usar usuário não-root
-USER spring:spring
-
-# Variáveis de ambiente padrão
-ENV SPRING_PROFILES_ACTIVE=prod \
-    JAVA_OPTS="-Xms512m -Xmx2048m -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
-    TZ=America/Sao_Paulo
+# Mudar para usuário não-root
+USER appuser
 
 # Expor porta
-EXPOSE 8080
+EXPOSE 8082
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/actuator/health || exit 1
+  CMD curl -f http://localhost:8082/actuator/health || exit 1
 
-# Comando de inicialização
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
-
+# Comando para iniciar a aplicação
+ENTRYPOINT ["java", \
+  "-Xms512m", \
+  "-Xmx1024m", \
+  "-Dspring.profiles.active=ci", \
+  "-Dserver.port=8082", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]
