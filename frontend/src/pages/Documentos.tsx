@@ -50,6 +50,7 @@ import { documentService } from '@/services/documentService';
 import { Document, DocumentType } from '@/services/documentService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { formatDateSafe } from '@/utils/dateUtils';
 
 const Documentos: React.FC = () => {
   const { toast } = useToast();
@@ -221,41 +222,53 @@ const Documentos: React.FC = () => {
 
   // Funções auxiliares
   const formatDate = (dateString?: string): string => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    return formatDateSafe(dateString);
   };
 
   const getDocumentStatus = (doc: Document) => {
-    if (!doc.expirationDate) return { status: 'valid', label: 'Válido', icon: <CheckCircle className="h-4 w-4 text-green-600" />, badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> };
-    
-    const today = new Date();
-    const expDate = new Date(doc.expirationDate);
-    const daysUntilExpiry = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysUntilExpiry < 0) {
-      return { 
-        status: 'expired', 
-        label: 'Expirado', 
-        icon: <FileX className="h-4 w-4 text-red-600" />, 
-        badge: <Badge className="bg-red-100 text-red-800">Expirado</Badge> 
-      };
+    if (!doc.expirationDate || doc.expirationDate === 'null' || doc.expirationDate === 'undefined' || doc.expirationDate === '0') {
+      return { status: 'valid', label: 'Válido', icon: <CheckCircle className="h-4 w-4 text-green-600" />, badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> };
     }
     
-    if (daysUntilExpiry <= 30) {
+    try {
+      const today = new Date();
+      const expDate = new Date(doc.expirationDate);
+      
+      // Verificar se a data é válida
+      if (isNaN(expDate.getTime()) || expDate.getFullYear() < 1900) {
+        return { status: 'valid', label: 'Válido', icon: <CheckCircle className="h-4 w-4 text-green-600" />, badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> };
+      }
+      
+      const daysUntilExpiry = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilExpiry < 0) {
+        return { 
+          status: 'expired', 
+          label: 'Expirado', 
+          icon: <FileX className="h-4 w-4 text-red-600" />, 
+          badge: <Badge className="bg-red-100 text-red-800">Expirado</Badge> 
+        };
+      }
+      
+      if (daysUntilExpiry <= 30) {
+        return { 
+          status: 'expiring', 
+          label: `Expira em ${daysUntilExpiry} dias`, 
+          icon: <FileClock className="h-4 w-4 text-yellow-600" />, 
+          badge: <Badge className="bg-yellow-100 text-yellow-800">Expirando</Badge> 
+        };
+      }
+      
       return { 
-        status: 'expiring', 
-        label: `Expira em ${daysUntilExpiry} dias`, 
-        icon: <FileClock className="h-4 w-4 text-yellow-600" />, 
-        badge: <Badge className="bg-yellow-100 text-yellow-800">Expirando</Badge> 
+        status: 'valid', 
+        label: 'Válido', 
+        icon: <FileCheck className="h-4 w-4 text-green-600" />, 
+        badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> 
       };
+    } catch (error) {
+      console.error('Erro ao calcular status do documento:', error);
+      return { status: 'valid', label: 'Válido', icon: <CheckCircle className="h-4 w-4 text-green-600" />, badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> };
     }
-    
-    return { 
-      status: 'valid', 
-      label: 'Válido', 
-      icon: <FileCheck className="h-4 w-4 text-green-600" />, 
-      badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> 
-    };
   };
 
   const getTypeIcon = (type: DocumentType) => {
