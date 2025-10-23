@@ -714,6 +714,11 @@ function App() {
                         <Relatorios />
                       </ProtectedRoute>
                     } />
+                    <Route path="/rh/documentos" element={
+                      <ProtectedRoute>
+                        <Documentos />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/rh/gestao-documentos" element={
                       <ProtectedRoute>
                         <GestaoDocumentos />
