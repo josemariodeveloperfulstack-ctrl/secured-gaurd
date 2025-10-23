@@ -58,6 +58,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/files/**").permitAll()
                 .requestMatchers("/api/test/**").permitAll()
+                .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/payslips/test-download/**").permitAll()
                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
