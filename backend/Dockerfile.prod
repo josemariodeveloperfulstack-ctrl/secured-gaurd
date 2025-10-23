@@ -12,15 +12,15 @@ RUN apk add --no-cache maven
 WORKDIR /app
 
 # Copiar arquivos de configuração do Maven
-COPY backend/pom.xml .
-COPY backend/mvnw .
-COPY backend/.mvn .mvn
+COPY pom.xml .
+COPY mvnw .
+COPY .mvn .mvn
 
 # Baixar dependências (cache layer)
 RUN mvn dependency:go-offline -B
 
 # Copiar código fonte
-COPY backend/src ./src
+COPY src ./src
 
 # Compilar aplicação
 RUN mvn clean package -DskipTests -Dspring.profiles.active=ci
