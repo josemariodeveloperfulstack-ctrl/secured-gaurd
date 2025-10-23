@@ -45,7 +45,7 @@ const Dependentes: React.FC = () => {
   // Load employees for selection
   const loadEmployees = async () => {
     try {
-      const response = await employeeService.getEmployees({ page: 0, size: 1000 });
+      const response = await employeeService.getAllEmployees();
       setEmployees(response.content);
     } catch (error: any) {
       console.error('Erro ao carregar funcionários:', error);

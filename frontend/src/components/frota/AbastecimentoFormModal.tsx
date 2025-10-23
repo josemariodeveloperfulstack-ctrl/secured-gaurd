@@ -258,8 +258,8 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
     queryKey: ['employees'],
     queryFn: async () => {
       try {
-        console.log('🔍 Fazendo chamada para employeeService.getEmployees()...');
-        const response = await employeeService.getEmployees();
+        console.log('🔍 Fazendo chamada para employeeService.getAllEmployees()...');
+        const response = await employeeService.getAllEmployees();
         console.log('🔍 Resposta do backend para funcionários:', response);
         
         // Verificar se é um array

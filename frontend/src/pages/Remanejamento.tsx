@@ -35,7 +35,7 @@ const RemanejamentoPage: React.FC = () => {
   const [units, setUnits] = useState<Unit[]>([]);
 
   React.useEffect(() => {
-    employeeService.getEmployees().then(setEmployees);
+    employeeService.getAllEmployees().then(setEmployees);
     unitService.getAllUnits().then(setUnits);
   }, []);
 

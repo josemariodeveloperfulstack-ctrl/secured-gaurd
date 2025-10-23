@@ -69,7 +69,7 @@ const GestaoFuncionarios: React.FC = () => {
 
   useEffect(() => {
     if (cadastroModalOpen === false) {
-      employeeService.getEmployees().then(setEmployees);
+      employeeService.getAllEmployees().then(setEmployees);
     }
   }, [cadastroModalOpen]);
 

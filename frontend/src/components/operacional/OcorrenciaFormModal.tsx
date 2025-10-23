@@ -93,7 +93,7 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
       if (open) {
         setLoadingEmployees(true);
         try {
-          const data = await employeeService.getEmployees();
+          const data = await employeeService.getAllEmployees();
           setEmployees(data);
         } catch (error) {
           toast({

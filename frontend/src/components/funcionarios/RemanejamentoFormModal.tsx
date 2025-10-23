@@ -85,7 +85,7 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
   const loadEmployees = async () => {
     setLoadingEmployees(true);
     try {
-      const data = await employeeService.getEmployees({ status: 'ACTIVE' });
+      const data = await employeeService.getAllEmployees();
       setEmployees(data);
     } catch (error) {
       console.warn('Erro ao carregar funcionários, usando dados estáticos:', error);

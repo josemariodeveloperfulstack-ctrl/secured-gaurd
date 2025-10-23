@@ -71,7 +71,7 @@ const Funcionarios: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const data = await employeeService.getEmployees(filters);
+      const data = await employeeService.getAllEmployees();
       setEmployees(data);
     } catch (err) {
       console.error('Erro ao carregar funcionários:', err);

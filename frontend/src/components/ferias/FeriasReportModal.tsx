@@ -47,7 +47,7 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
   // Buscar funcionários para filtros
   const { data: employees } = useQuery<Employee[]>({
     queryKey: ['employees'],
-    queryFn: () => employeeService.getEmployees(),
+    queryFn: () => employeeService.getAllEmployees(),
   });
 
   // Buscar estatísticas

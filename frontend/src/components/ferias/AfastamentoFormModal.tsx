@@ -38,7 +38,7 @@ const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialData
       setForm(initialData);
     }
     // Buscar funcionários
-    employeeService.getEmployees().then(setEmployees);
+    employeeService.getAllEmployees().then(setEmployees);
   }, [initialData]);
 
   // Fechar com ESC

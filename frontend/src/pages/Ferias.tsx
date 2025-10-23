@@ -91,7 +91,7 @@ const FeriasPage: React.FC = () => {
   // Buscar funcionários para filtros
   const { data: employees } = useQuery<Employee[]>({
     queryKey: ['employees'],
-    queryFn: () => employeeService.getEmployees(),
+    queryFn: () => employeeService.getAllEmployees(),
   });
 
   // Calcular estatísticas dos dados carregados
