@@ -133,19 +133,19 @@ jobs:
             echo "⚙️ Criando arquivo .env..."
             
             cat > /var/www/secured-guard/ci/.env << 'ENVEOF'
-# ===== AMBIENTE CI =====
-ENVIRONMENT=ci
-APP_URL=https://ci.z7botsolutions.com.br
-
-# ===== BANCO DE DADOS =====
-POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}
-
-# ===== REDIS =====
-REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-
-# ===== JWT =====
-JWT_SECRET=${{ secrets.JWT_SECRET }}
-ENVEOF
+          # ===== AMBIENTE CI =====
+          ENVIRONMENT=ci
+          APP_URL=https://ci.z7botsolutions.com.br
+          
+          # ===== BANCO DE DADOS =====
+          POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}
+          
+          # ===== REDIS =====
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          
+          # ===== JWT =====
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ENVEOF
             
             chmod 600 /var/www/secured-guard/ci/.env
             echo "✅ Arquivo .env criado!"
