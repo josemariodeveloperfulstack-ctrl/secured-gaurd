@@ -115,13 +115,15 @@ jobs:
           
           # Criar estrutura de diretórios
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            mkdir -p /var/www/secured-guard/ci
-            mkdir -p /var/www/secured-guard/ci/uploads
-            mkdir -p /var/www/secured-guard/ci/logs
+            mkdir -p /var/www/secured_guard/ci
+            mkdir -p /var/www/secured_guard/ci/uploads
+            mkdir -p /var/www/secured_guard/ci/logs
+            mkdir -p /var/www/secured_guard/ci/postgres_data
+            mkdir -p /var/www/secured_guard/ci/redis_data
           EOF
           
           # Transferir docker-compose.ci.yml
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.ci.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured-guard/ci/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.ci.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/
           
           echo "✅ Arquivos transferidos!"
 
@@ -133,7 +135,7 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "⚙️ Criando arquivo .env..."
             
-            cat > /var/www/secured-guard/ci/.env << 'ENVEOF'
+            cat > /var/www/secured_guard/ci/.env << 'ENVEOF'
           # ===== AMBIENTE CI =====
           ENVIRONMENT=ci
           APP_URL=https://ci.z7botsolutions.com.br
@@ -148,7 +150,7 @@ jobs:
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           ENVEOF
             
-            chmod 600 /var/www/secured-guard/ci/.env
+            chmod 600 /var/www/secured_guard/ci/.env
             echo "✅ Arquivo .env criado!"
           EOF
 
@@ -160,11 +162,11 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "💾 Fazendo backup e parando containers antigos..."
             
-            cd /var/www/secured-guard/ci
+            cd /var/www/secured_guard/ci
             
             # Fazer backup dos volumes se existirem
             if [ -d "postgres_ci_data" ]; then
-              BACKUP_DIR="/var/www/secured-guard/ci/backups/$(date +'%Y%m%d_%H%M%S')"
+              BACKUP_DIR="/var/www/secured_guard/ci/backups/$(date +'%Y%m%d_%H%M%S')"
               mkdir -p "$BACKUP_DIR"
               cp -r postgres_ci_data "$BACKUP_DIR/" 2>/dev/null || true
               echo "✅ Backup criado em: $BACKUP_DIR"
@@ -183,7 +185,7 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "📥 Fazendo pull das novas imagens..."
             
-            cd /var/www/secured-guard/ci
+            cd /var/www/secured_guard/ci
             
             # Login no Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -203,7 +205,7 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "🚀 Iniciando containers CI..."
             
-            cd /var/www/secured-guard/ci
+            cd /var/www/secured_guard/ci
             
             # Iniciar containers
             docker-compose -f docker-compose.ci.yml up -d

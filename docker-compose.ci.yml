@@ -18,7 +18,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_ci_data:/var/lib/postgresql/data
+      - /var/www/secured_guard/ci/postgres_data:/var/lib/postgresql/data
     networks:
       - secured-guard-ci-network
     healthcheck:
@@ -37,7 +37,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_ci_data:/data
+      - /var/www/secured_guard/ci/redis_data:/data
     networks:
       - secured-guard-ci-network
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_ci_2025}
@@ -65,13 +65,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-jwt_secret_ci_2025}
       JWT_EXPIRATION: 604800000
       JWT_REFRESH_EXPIRATION: 2592000000
-      UPLOAD_DIR: /var/www/secured-guard/ci/uploads
-      LOGGING_FILE_PATH: /var/www/secured-guard/ci/logs/application.log
+      UPLOAD_DIR: /var/www/secured_guard/ci/uploads
+      LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
     ports:
       - "8082:8082"
     volumes:
-      - ./uploads:/var/www/secured-guard/ci/uploads
-      - ./logs:/var/www/secured-guard/ci/logs
+      - /var/www/secured_guard/ci/uploads:/var/www/secured_guard/ci/uploads
+      - /var/www/secured_guard/ci/logs:/var/www/secured_guard/ci/logs
     depends_on:
       postgres-ci:
         condition: service_healthy
@@ -109,13 +109,9 @@ services:
     restart: unless-stopped
 
 # ========================================
-# VOLUMES CI
+# VOLUMES CI (usando bind mounts)
 # ========================================
-volumes:
-  postgres_ci_data:
-    driver: local
-  redis_ci_data:
-    driver: local
+# Os volumes são mapeados diretamente para /var/www/secured_guard/ci/
 
 # ========================================
 # NETWORKS CI
