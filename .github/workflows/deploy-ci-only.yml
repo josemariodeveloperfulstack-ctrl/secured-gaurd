@@ -51,6 +51,7 @@ jobs:
         working-directory: ./backend
         run: |
           echo "🔨 Compilando backend para CI..."
+          chmod +x ./mvnw
           ./mvnw clean package -DskipTests -Dspring.profiles.active=ci
           echo "✅ Backend compilado!"
 
