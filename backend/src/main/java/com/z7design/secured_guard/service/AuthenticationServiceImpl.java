@@ -39,6 +39,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
+    private final UserCustomPermissionService customPermissionService;
 
     @Override
     @Transactional
@@ -98,6 +99,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         String jwtToken = jwtService.generateToken(savedUser);
         String refreshToken = jwtService.generateRefreshToken(savedUser);
         
+        // Buscar permissões customizadas
+        java.util.List<String> customPermissions = customPermissionService.getActivePermissions(savedUser.getId());
+        
         log.info("Registration completed successfully for user: {}", savedUser.getUsername());
         
         return AuthenticationResponse.builder()
@@ -108,6 +112,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .email(savedUser.getEmail())
                         .fullName(savedUser.getName())
                         .roles(savedUser.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                        .customPermissions(customPermissions)
                         .build())
                 .build();
     }
@@ -123,6 +128,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         String jwtToken = jwtService.generateToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
         
+        // Buscar permissões customizadas
+        java.util.List<String> customPermissions = customPermissionService.getActivePermissions(user.getId());
+        
         return AuthenticationResponse.builder()
                 .token(jwtToken)
                 .refreshToken(refreshToken)
@@ -131,6 +139,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .email(user.getEmail())
                         .fullName(user.getName())
                         .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                        .customPermissions(customPermissions)
                         .build())
                 .build();
     }
@@ -147,6 +156,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 String accessToken = jwtService.generateToken(user);
                 String newRefreshToken = jwtService.generateRefreshToken(user);
 
+                // Buscar permissões customizadas
+                java.util.List<String> customPermissions = customPermissionService.getActivePermissions(user.getId());
+
                 return AuthenticationResponse.builder()
                         .token(accessToken)
                         .refreshToken(newRefreshToken)
@@ -155,6 +167,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                 .email(user.getEmail())
                                 .fullName(user.getName())
                                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                                .customPermissions(customPermissions)
                                 .build())
                         .build();
             }

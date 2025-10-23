@@ -255,10 +255,32 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     setIsProfileModalOpen(true);
   };
 
-  // Função para verificar se usuário tem permissão (TEMPORÁRIO - SEMPRE TRUE PARA TESTE)
+  // Função para verificar se usuário tem permissão
   const hasPermission = useCallback((permission: string): boolean => {
-    return true; // TEMPORÁRIO: sempre retorna true para teste
-  }, []);
+    // SUPER_ADMIN tem acesso a tudo
+    if (user?.role === 'SUPER_ADMIN' || user?.role === 'ROLE_SUPER_ADMIN') {
+      return true;
+    }
+    
+    // Se for COLABORADOR, verifica permissões customizadas concedidas pelo SUPER_ADMIN
+    if (user?.role === 'ROLE_COLABORADOR' || user?.role === 'COLABORADOR') {
+      // Sempre tem acesso à comunicação interna
+      if (permission === 'MESSAGES_READ') {
+        return true;
+      }
+      
+      // Verificar se tem permissão customizada
+      if (user?.customPermissions && user.customPermissions.includes(permission)) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // Para outros roles, verificar permissões específicas
+    if (!user?.permissions) return false;
+    return user.permissions.includes(permission);
+  }, [user]);
 
   // Função para verificar se módulo deve ser exibido
   const shouldShowModule = useCallback((requiredPermission?: string): boolean => {
@@ -374,7 +396,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               </div>
             )}
             <nav className="space-y-1 px-4">
-                              {mainMenuItems.map((item) => (
+              {mainMenuItems
+                .filter(item => {
+                  // Se for COLABORADOR, mostra apenas Dashboard
+                  if (user?.role === 'ROLE_COLABORADOR' || user?.role === 'COLABORADOR') {
+                    return item.id === 'dashboard';
+                  }
+                  return true;
+                })
+                .map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}

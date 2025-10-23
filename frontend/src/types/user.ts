@@ -155,6 +155,7 @@ export interface User {
   groups: UserGroupData[];
   permissions: UserPermissions;
   individualPermissions?: PermissionDTO[];
+  customPermissions?: string[]; // Permissões customizadas concedidas pelo SUPER_ADMIN (para COLABORADOR)
   avatar?: string;
   department?: string;
   position?: string;

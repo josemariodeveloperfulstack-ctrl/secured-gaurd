@@ -16,4 +16,5 @@ public class UserResponse {
     private String email;
     private String fullName;
     private List<String> roles;
+    private List<String> customPermissions; // Permissões customizadas concedidas pelo SUPER_ADMIN
 } 
