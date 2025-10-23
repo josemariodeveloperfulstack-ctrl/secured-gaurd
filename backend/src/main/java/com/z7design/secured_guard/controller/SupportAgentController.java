@@ -1,0 +1,155 @@
+package com.z7design.secured_guard.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import com.z7design.secured_guard.dto.CreateAgentRequest;
+import com.z7design.secured_guard.dto.SupportAgentDTO;
+import com.z7design.secured_guard.model.enums.AgentStatus;
+import com.z7design.secured_guard.service.SupportAgentService;
+
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+
+@RestController
+@RequestMapping("/v1/support/agents")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080", "http://localhost:5173"}, 
+             allowedHeaders = "*", 
+             methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
+@Slf4j
+public class SupportAgentController {
+    
+    @Autowired
+    private SupportAgentService agentService;
+    
+    /**
+     * Listar todos os agentes
+     */
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<List<SupportAgentDTO>> getAllAgents() {
+        log.info("GET /v1/support/agents - Listando todos os agentes");
+        List<SupportAgentDTO> agents = agentService.getAllAgents();
+        return ResponseEntity.ok(agents);
+    }
+    
+    /**
+     * Listar agentes ativos
+     */
+    @GetMapping("/active")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<List<SupportAgentDTO>> getActiveAgents() {
+        log.info("GET /v1/support/agents/active - Listando agentes ativos");
+        List<SupportAgentDTO> agents = agentService.getActiveAgents();
+        return ResponseEntity.ok(agents);
+    }
+    
+    /**
+     * Buscar agente por ID
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> getAgentById(@PathVariable UUID id) {
+        log.info("GET /v1/support/agents/{} - Buscando agente por ID", id);
+        SupportAgentDTO agent = agentService.getAgentById(id);
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Buscar agente por ID do usuário
+     */
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> getAgentByUserId(@PathVariable UUID userId) {
+        log.info("GET /v1/support/agents/user/{} - Buscando agente por ID do usuário", userId);
+        SupportAgentDTO agent = agentService.getAgentByUserId(userId);
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Buscar agentes por status
+     */
+    @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<List<SupportAgentDTO>> getAgentsByStatus(@PathVariable AgentStatus status) {
+        log.info("GET /v1/support/agents/status/{} - Buscando agentes por status", status);
+        List<SupportAgentDTO> agents = agentService.getAgentsByStatus(status);
+        return ResponseEntity.ok(agents);
+    }
+    
+    /**
+     * Buscar agente disponível
+     */
+    @GetMapping("/available")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> getAvailableAgent() {
+        log.info("GET /v1/support/agents/available - Buscando agente disponível");
+        SupportAgentDTO agent = agentService.getAvailableAgent();
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Criar novo agente
+     */
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('SUPPORT_CREATE', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> createAgent(@Valid @RequestBody CreateAgentRequest request) {
+        log.info("POST /v1/support/agents - Criando novo agente");
+        SupportAgentDTO agent = agentService.createAgent(request);
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Atualizar status do agente
+     */
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> updateAgentStatus(
+            @PathVariable UUID id, 
+            @RequestParam AgentStatus status) {
+        log.info("PUT /v1/support/agents/{}/status - Atualizando status para {}", id, status);
+        SupportAgentDTO agent = agentService.updateAgentStatus(id, status);
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Atualizar departamento do agente
+     */
+    @PutMapping("/{id}/department")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> updateAgentDepartment(
+            @PathVariable UUID id, 
+            @RequestParam String department) {
+        log.info("PUT /v1/support/agents/{}/department - Atualizando departamento", id);
+        SupportAgentDTO agent = agentService.updateAgentDepartment(id, department);
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Ativar/desativar agente
+     */
+    @PutMapping("/{id}/toggle-active")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<SupportAgentDTO> toggleAgentActive(@PathVariable UUID id) {
+        log.info("PUT /v1/support/agents/{}/toggle-active - Alternando status ativo", id);
+        SupportAgentDTO agent = agentService.toggleAgentActive(id);
+        return ResponseEntity.ok(agent);
+    }
+    
+    /**
+     * Deletar agente
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_DELETE', 'SUPPORT_MANAGE', 'ADMIN')")
+    public ResponseEntity<Void> deleteAgent(@PathVariable UUID id) {
+        log.info("DELETE /v1/support/agents/{} - Deletando agente", id);
+        agentService.deleteAgent(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+

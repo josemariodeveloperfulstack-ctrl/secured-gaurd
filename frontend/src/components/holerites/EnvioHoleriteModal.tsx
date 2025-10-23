@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, MessageSquare, Send, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Funcionario, EnvioRequest, EnvioResponse } from '@/types/funcionario';
 import { envioService } from '@/services/funcionarioService';
+import holeriteService from '@/services/holeriteService';
 
 interface EnvioHoleriteModalProps {
   open: boolean;
@@ -352,7 +353,7 @@ Obrigado!`
               </div>
             </div>
 
-            {/* Detalhes */}
+            {/* Detalhes + ações de reenvio */}
             {resultado.detalhes.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-seguranca-lightgray text-sm sm:text-base">Detalhes do Envio</Label>
@@ -371,9 +372,39 @@ Obrigado!`
                           {detalhe.nome} - {detalhe.cpf}
                         </p>
                         {!detalhe.enviado && detalhe.erro && (
-                          <p className="text-red-400 text-xs break-words">{detalhe.erro}</p>
+                          <p className="text-red-400 text-xs break-words">{detalhe.erro} {' '} 
+                            <button
+                              className="underline text-seguranca-yellow ml-1"
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent('open-logs-tab', { detail: { cpf: detalhe.cpf } }));
+                              }}
+                            >
+                              Ver logs deste CPF
+                            </button>
+                          </p>
                         )}
                       </div>
+                      {!detalhe.enviado && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-gray-600 text-seguranca-lightgray hover:bg-gray-700"
+                          onClick={async () => {
+                            try {
+                              const logs = await holeriteService.listSendLogs(detalhe.cpf);
+                              const lastLog = logs?.[logs.length - 1];
+                              if (lastLog?.id) {
+                                await holeriteService.resendByLog(lastLog.id);
+                                toast({ title: 'Reenvio solicitado', description: 'Tentando reenviar para ' + detalhe.nome });
+                              }
+                            } catch (e) {
+                              toast({ title: 'Erro', description: 'Falha ao solicitar reenvio', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Reenviar
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

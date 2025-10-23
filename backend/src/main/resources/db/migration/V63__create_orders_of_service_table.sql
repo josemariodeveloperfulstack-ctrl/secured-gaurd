@@ -1,6 +1,6 @@
 CREATE TABLE orders_of_service (
-    id BIGSERIAL PRIMARY KEY,
-    employee_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL,
     employee_name VARCHAR(255) NOT NULL,
     employee_cpf VARCHAR(14) NOT NULL,
     role VARCHAR(255) NOT NULL,

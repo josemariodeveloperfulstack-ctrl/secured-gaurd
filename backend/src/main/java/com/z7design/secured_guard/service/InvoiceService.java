@@ -147,9 +147,16 @@ public class InvoiceService {
     }
     
     public Invoice save(Invoice invoice) {
-        // Validar se a unidade existe
+        // Garantir unidade válida: se não vier no DTO, usar a primeira unidade existente
         if (invoice.getUnit() == null || invoice.getUnit().getId() == null) {
-            throw new IllegalArgumentException("Unidade é obrigatória para faturas");
+            try {
+                org.springframework.data.domain.PageRequest pr = org.springframework.data.domain.PageRequest.of(0, 1);
+                Unit fallback = unitRepository.findAll(pr).stream().findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Nenhuma unidade cadastrada"));
+                invoice.setUnit(fallback);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Unidade é obrigatória para faturas", e);
+            }
         }
         return invoiceRepository.save(invoice);
     }

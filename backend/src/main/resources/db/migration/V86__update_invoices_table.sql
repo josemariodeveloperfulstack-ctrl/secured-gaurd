@@ -4,7 +4,7 @@ ADD COLUMN type VARCHAR(20) DEFAULT 'VARIAVEL',
 ADD COLUMN category VARCHAR(100),
 ADD COLUMN barcode VARCHAR(255),
 ADD COLUMN baixa VARCHAR(255),
-ADD COLUMN supplier_id BIGINT;
+ADD COLUMN supplier_id UUID;
 
 -- Adicionar foreign keys
 ALTER TABLE invoices 

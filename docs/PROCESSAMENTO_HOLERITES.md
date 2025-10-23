@@ -26,7 +26,7 @@ O sistema extrai automaticamente:
 #### Tabela `payslips`
 ```sql
 CREATE TABLE payslips (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     employee_name VARCHAR(255) NOT NULL,
     cpf VARCHAR(11) NOT NULL,
     month VARCHAR(50) NOT NULL,

@@ -15,11 +15,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.z7design.secured_guard.model.Vacation;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.service.VacationService;
+import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.dto.ErrorResponse;
+import com.z7design.secured_guard.dto.VacationDTO;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -41,6 +45,7 @@ import lombok.RequiredArgsConstructor;
 public class VacationController {
     
     private final VacationService vacationService;
+    private final EmployeeService employeeService;
     
     @Operation(summary = "Cria uma nova solicitação de férias",
                description = "Adiciona uma nova solicitação de férias ao sistema. Requer o papel de ADMIN, GESTOR ou o próprio funcionário.")
@@ -57,8 +62,13 @@ public class VacationController {
                     schema = @Schema(implementation = Vacation.class),
                     examples = @ExampleObject(value = "{\"employee\":{\"id\":\"UUID_DO_FUNCIONARIO\"}, \"startDate\":\"2024-08-01\", \"endDate\":\"2024-08-30\", \"status\":\"PENDING\"}")))
     @PostMapping
-    public ResponseEntity<Vacation> create(@RequestBody Vacation vacation) {
-        return ResponseEntity.ok(vacationService.create(vacation));
+    public ResponseEntity<VacationDTO> create(@RequestBody VacationDTO vacationDTO) {
+        // Buscar o funcionário pelo ID
+        Employee employee = employeeService.findById(vacationDTO.getEmployeeId());
+        Vacation vacation = vacationDTO.toEntity();
+        vacation.setEmployee(employee);
+        vacation = vacationService.create(vacation);
+        return ResponseEntity.ok(VacationDTO.fromEntity(vacation));
     }
     
     @Operation(summary = "Atualiza uma solicitação de férias existente",
@@ -82,40 +92,7 @@ public class VacationController {
         return ResponseEntity.ok(vacationService.update(id, vacation));
     }
     
-    @Operation(summary = "Aprova uma solicitação de férias",
-               description = "Altera o status de uma solicitação de férias para APROVADA. Requer o papel de ADMIN ou GESTOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Solicitação de férias aprovada com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = Vacation.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida ou transição de status não permitida",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Solicitação de férias não encontrada",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @Parameter(description = "ID do usuário que aprovou a solicitação", required = true)
-    @PutMapping("/{id}/approve")
-    public ResponseEntity<Vacation> approve(@PathVariable UUID id, @RequestParam UUID approvedBy) {
-        return ResponseEntity.ok(vacationService.approve(id, approvedBy));
-    }
     
-    @Operation(summary = "Rejeita uma solicitação de férias",
-               description = "Altera o status de uma solicitação de férias para REJEITADA. Requer o papel de ADMIN ou GESTOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Solicitação de férias rejeitada com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = Vacation.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida ou transição de status não permitida",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Solicitação de férias não encontrada",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @PutMapping("/{id}/reject")
-    public ResponseEntity<Vacation> reject(@PathVariable UUID id) {
-        return ResponseEntity.ok(vacationService.reject(id));
-    }
     
     @Operation(summary = "Cancela uma solicitação de férias",
                description = "Altera o status de uma solicitação de férias para CANCELADA. Requer o papel de ADMIN ou GESTOR.")
@@ -160,8 +137,9 @@ public class VacationController {
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<Vacation> findById(@PathVariable UUID id) {
-        return ResponseEntity.ok(vacationService.findById(id));
+    public ResponseEntity<VacationDTO> findById(@PathVariable UUID id) {
+        Vacation vacation = vacationService.findById(id);
+        return ResponseEntity.ok(VacationDTO.fromEntity(vacation));
     }
     
     @Operation(summary = "Busca solicitações de férias por ID de funcionário",
@@ -173,8 +151,12 @@ public class VacationController {
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<Vacation>> findByEmployeeId(@PathVariable UUID employeeId) {
-        return ResponseEntity.ok(vacationService.findByEmployeeId(employeeId));
+    public ResponseEntity<List<VacationDTO>> findByEmployeeId(@PathVariable UUID employeeId) {
+        List<Vacation> vacations = vacationService.findByEmployeeId(employeeId);
+        List<VacationDTO> vacationDTOs = vacations.stream()
+            .map(VacationDTO::fromEntity)
+            .toList();
+        return ResponseEntity.ok(vacationDTOs);
     }
     
     @Operation(summary = "Busca solicitações de férias por ID de funcionário e status",
@@ -189,10 +171,14 @@ public class VacationController {
     })
     @Parameter(description = "Status da solicitação de férias (PENDING, APPROVED, REJECTED, CANCELLED)", required = true)
     @GetMapping("/employee/{employeeId}/status/{status}")
-    public ResponseEntity<List<Vacation>> findByEmployeeIdAndStatus(
+    public ResponseEntity<List<VacationDTO>> findByEmployeeIdAndStatus(
             @PathVariable UUID employeeId,
             @PathVariable VacationStatus status) {
-        return ResponseEntity.ok(vacationService.findByEmployeeIdAndStatus(employeeId, status));
+        List<Vacation> vacations = vacationService.findByEmployeeIdAndStatus(employeeId, status);
+        List<VacationDTO> vacationDTOs = vacations.stream()
+            .map(VacationDTO::fromEntity)
+            .toList();
+        return ResponseEntity.ok(vacationDTOs);
     }
     
     @Operation(summary = "Busca solicitações de férias por intervalo de datas de início",
@@ -208,10 +194,14 @@ public class VacationController {
     @Parameter(description = "Data de início do período (formato YYYY-MM-DD)", example = "2023-01-01", required = true)
     @Parameter(description = "Data de fim do período (formato YYYY-MM-DD)", example = "2023-12-31", required = true)
     @GetMapping("/date-range")
-    public ResponseEntity<List<Vacation>> findByStartDateBetween(
+    public ResponseEntity<List<VacationDTO>> findByStartDateBetween(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(vacationService.findByStartDateBetween(startDate, endDate));
+        List<Vacation> vacations = vacationService.findByStartDateBetween(startDate, endDate);
+        List<VacationDTO> vacationDTOs = vacations.stream()
+            .map(VacationDTO::fromEntity)
+            .toList();
+        return ResponseEntity.ok(vacationDTOs);
     }
     
     @Operation(summary = "Retorna todas as solicitações de férias",
@@ -223,7 +213,84 @@ public class VacationController {
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping
-    public ResponseEntity<List<Vacation>> findAll() {
-        return ResponseEntity.ok(vacationService.findAll());
+    public ResponseEntity<List<VacationDTO>> findAll() {
+        List<Vacation> vacations = vacationService.findAll();
+        List<VacationDTO> vacationDTOs = vacations.stream()
+            .map(VacationDTO::fromEntity)
+            .toList();
+        return ResponseEntity.ok(vacationDTOs);
+    }
+
+    @Operation(summary = "Aprova uma solicitação de férias",
+               description = "Aprova uma solicitação de férias pendente. Apenas usuários com roles de RH podem aprovar.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Férias aprovada com sucesso",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = VacationDTO.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado - permissões insuficientes",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = ErrorResponse.class),
+                                      examples = @ExampleObject(value = "{\"error\": \"Acesso negado\", \"message\": \"Você não tem permissão para aprovar férias\"}"))),
+        @ApiResponse(responseCode = "404", description = "Solicitação de férias não encontrada",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Solicitação já foi processada ou dados inválidos",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PutMapping("/{id}/approve")
+    @PreAuthorize("hasAnyAuthority('HR_APPROVE', 'HR_READ', 'HR_WRITE', 'HR_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL')")
+    public ResponseEntity<VacationDTO> approveVacation(
+            @Parameter(description = "ID da solicitação de férias a ser aprovada") @PathVariable UUID id,
+            @RequestBody(required = false) ApprovalRequest request) {
+        try {
+            Vacation vacation = vacationService.approveVacation(id, request != null ? request.getObservacoes() : null);
+            return ResponseEntity.ok(VacationDTO.fromEntity(vacation));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @Operation(summary = "Rejeita uma solicitação de férias",
+               description = "Rejeita uma solicitação de férias pendente. Apenas usuários com roles de RH podem rejeitar.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Férias rejeitada com sucesso",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = VacationDTO.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado - permissões insuficientes",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = ErrorResponse.class),
+                                      examples = @ExampleObject(value = "{\"error\": \"Acesso negado\", \"message\": \"Você não tem permissão para rejeitar férias\"}"))),
+        @ApiResponse(responseCode = "404", description = "Solicitação de férias não encontrada",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Solicitação já foi processada ou dados inválidos",
+                     content = @Content(mediaType = "application/json",
+                                      schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PutMapping("/{id}/reject")
+    @PreAuthorize("hasAnyAuthority('HR_APPROVE', 'HR_READ', 'HR_WRITE', 'HR_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL')")
+    public ResponseEntity<VacationDTO> rejectVacation(
+            @Parameter(description = "ID da solicitação de férias a ser rejeitada") @PathVariable UUID id,
+            @RequestBody ApprovalRequest request) {
+        try {
+            Vacation vacation = vacationService.rejectVacation(id, request.getObservacoes());
+            return ResponseEntity.ok(VacationDTO.fromEntity(vacation));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Classe interna para requests de aprovação
+    public static class ApprovalRequest {
+        private String observacoes;
+
+        public String getObservacoes() {
+            return observacoes;
+        }
+
+        public void setObservacoes(String observacoes) {
+            this.observacoes = observacoes;
+        }
     }
 } 

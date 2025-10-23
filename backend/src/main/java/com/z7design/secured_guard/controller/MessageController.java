@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -16,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import com.z7design.secured_guard.dto.MessageRequestDTO;
 import com.z7design.secured_guard.dto.MessageResponseDTO;
 import com.z7design.secured_guard.model.enums.MessageType;
+import com.z7design.secured_guard.model.enums.MessageStatus;
 import com.z7design.secured_guard.service.MessageService;
 import com.z7design.secured_guard.service.UserService;
 import com.z7design.secured_guard.model.User;
@@ -173,6 +173,158 @@ public class MessageController {
         List<MessageResponseDTO> messages = messageService.getMessagesByType(type);
         
         return ResponseEntity.ok(messages);
+    }
+    
+    /**
+     * Busca mensagens por status
+     */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<Page<MessageResponseDTO>> getMessagesByStatus(
+            @PathVariable MessageStatus status,
+            Authentication authentication,
+            Pageable pageable) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            Page<MessageResponseDTO> messages = messageService.getMessagesByStatus(userId, status, pageable);
+            return ResponseEntity.ok(messages);
+        } catch (Exception e) {
+            log.error("Erro ao buscar mensagens por status: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Busca mensagens não lidas
+     */
+    @GetMapping("/unread")
+    public ResponseEntity<List<MessageResponseDTO>> getUnreadMessages(Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            List<MessageResponseDTO> messages = messageService.getUnreadMessages(userId);
+            return ResponseEntity.ok(messages);
+        } catch (Exception e) {
+            log.error("Erro ao buscar mensagens não lidas: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Marca todas as mensagens como lidas
+     */
+    @PutMapping("/mark-all-read")
+    public ResponseEntity<Void> markAllAsRead(Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            messageService.markAllAsRead(userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Erro ao marcar todas as mensagens como lidas: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Arquiva mensagem
+     */
+    @PutMapping("/{messageId}/archive")
+    public ResponseEntity<Void> archiveMessage(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            messageService.archiveMessage(messageId, userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Erro ao arquivar mensagem: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Restaura mensagem arquivada
+     */
+    @PutMapping("/{messageId}/restore")
+    public ResponseEntity<Void> restoreMessage(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            messageService.restoreMessage(messageId, userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Erro ao restaurar mensagem: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Deleta mensagem com motivo
+     */
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<Void> deleteMessage(
+            @PathVariable UUID messageId,
+            @RequestParam String reason,
+            Authentication authentication,
+            @RequestHeader(value = "X-Forwarded-For", required = false) String ipAddress) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (reason == null || reason.trim().isEmpty()) {
+                log.error("Motivo da exclusão é obrigatório");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            messageService.deleteMessage(messageId, userId, reason, ipAddress);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Erro ao deletar mensagem: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
     
     /**

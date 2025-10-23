@@ -92,21 +92,17 @@ public class SpecificActivityService {
         SpecificActivity existingActivity = specificActivityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atividade específica não encontrada"));
 
-        // Atualizar campos permitidos
+        // Atualizar campos permitidos conforme modelo atual
         existingActivity.setDescription(updatedActivity.getDescription());
         existingActivity.setActivityType(updatedActivity.getActivityType());
-        existingActivity.setScheduledDate(updatedActivity.getScheduledDate());
-        existingActivity.setScheduledTime(updatedActivity.getScheduledTime());
+        existingActivity.setActivityDate(updatedActivity.getActivityDate());
+        existingActivity.setStartTime(updatedActivity.getStartTime());
+        existingActivity.setEndTime(updatedActivity.getEndTime());
         existingActivity.setStatus(updatedActivity.getStatus());
         existingActivity.setObservations(updatedActivity.getObservations());
         existingActivity.setUpdatedAt(java.time.LocalDateTime.now());
 
-        // Validar e atualizar funcionário responsável se fornecido
-        if (updatedActivity.getResponsibleEmployee() != null) {
-            Employee responsibleEmployee = employeeRepository.findById(updatedActivity.getResponsibleEmployee().getId())
-                    .orElseThrow(() -> new RuntimeException("Funcionário responsável não encontrado"));
-            existingActivity.setResponsibleEmployee(responsibleEmployee);
-        }
+        // O modelo atual não possui campo responsibleEmployee; removido
 
         // Validar e atualizar local se fornecido
         if (updatedActivity.getLocation() != null) {
@@ -160,11 +156,11 @@ public class SpecificActivityService {
     }
 
     public List<SpecificActivity> getTodayActivities() {
-        return specificActivityRepository.findByScheduledDate(LocalDate.now());
+        return specificActivityRepository.findByActivityDate(LocalDate.now());
     }
 
     public List<SpecificActivity> getPendingActivities() {
-        return specificActivityRepository.findByStatus(SpecificActivity.ActivityStatus.PENDING);
+        return specificActivityRepository.findByStatus(SpecificActivity.ActivityStatus.SCHEDULED);
     }
 
     public List<SpecificActivity> getPendingActivitiesByDate(LocalDate date) {

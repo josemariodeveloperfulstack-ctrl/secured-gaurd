@@ -1,134 +1,231 @@
 package com.z7design.secured_guard.controller;
 
-import com.z7design.secured_guard.dto.*;
 import com.z7design.secured_guard.service.EquipmentReportService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/equipment-reports")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Relatórios de Equipamentos", description = "Endpoints para geração de relatórios e filtros avançados")
-@SecurityRequirement(name = "bearerAuth")
 public class EquipmentReportController {
-    
-    private final EquipmentReportService reportService;
-    
-    @PostMapping("/generate")
-    @Operation(summary = "Gerar relatório", description = "Gera relatório de equipamentos com filtros avançados")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Filtros inválidos"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<EquipmentReportDTO> generateReport(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Recebida solicitação para gerar relatório: {}", filters.getReportType());
-        EquipmentReportDTO report = reportService.generateReport(filters);
-        return ResponseEntity.ok(report);
+
+    private final EquipmentReportService equipmentReportService;
+
+    @GetMapping("/equipment-by-employee")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getEquipmentByEmployeeReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String equipmentType) {
+        try {
+            log.info("Gerando relatório de equipamentos por funcionário");
+            List<Map<String, Object>> report = equipmentReportService.generateEquipmentByEmployeeReport(
+                    startDate, endDate, status, equipmentType);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de equipamentos por funcionário", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
-    @PostMapping("/equipment-by-employee")
-    @Operation(summary = "Relatório por funcionário", description = "Gera relatório de equipamentos agrupados por funcionário")
-    @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso")
-    public ResponseEntity<EquipmentReportDTO> generateEquipmentByEmployeeReport(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Gerando relatório de equipamentos por funcionário");
-        filters.setReportType("equipment_by_employee");
-        EquipmentReportDTO report = reportService.generateReport(filters);
-        return ResponseEntity.ok(report);
+
+    @GetMapping("/weapon-validity")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getWeaponValidityReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            log.info("Gerando relatório de validade de armas");
+            List<Map<String, Object>> report = equipmentReportService.generateWeaponValidityReport(startDate, endDate);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de validade de armas", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
-    @PostMapping("/weapon-validity")
-    @Operation(summary = "Relatório de validade de armas", description = "Gera relatório específico para validade de registros de armas")
-    @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso")
-    public ResponseEntity<EquipmentReportDTO> generateWeaponValidityReport(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Gerando relatório de validade de armas");
-        filters.setReportType("weapon_validity");
-        filters.setIsDangerous(true); // Forçar filtro para equipamentos perigosos
-        EquipmentReportDTO report = reportService.generateReport(filters);
-        return ResponseEntity.ok(report);
+
+    @GetMapping("/usage-report")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getUsageReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            log.info("Gerando relatório de uso de equipamentos");
+            List<Map<String, Object>> report = equipmentReportService.generateUsageReport(startDate, endDate);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de uso de equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
-    @PostMapping("/usage-report")
-    @Operation(summary = "Relatório de uso", description = "Gera relatório de uso e movimentações de equipamentos")
-    @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso")
-    public ResponseEntity<EquipmentReportDTO> generateUsageReport(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Gerando relatório de uso de equipamentos");
-        filters.setReportType("usage_report");
-        filters.setIncludeMovements(true);
-        EquipmentReportDTO report = reportService.generateReport(filters);
-        return ResponseEntity.ok(report);
+
+    @GetMapping("/expiration-report")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getExpirationReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            log.info("Gerando relatório de vencimento de equipamentos");
+            List<Map<String, Object>> report = equipmentReportService.generateExpirationReport(startDate, endDate);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de vencimento de equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
-    @PostMapping("/expiry-report")
-    @Operation(summary = "Relatório de vencimento", description = "Gera relatório de equipamentos vencidos ou vencendo em breve")
-    @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso")
-    public ResponseEntity<EquipmentReportDTO> generateExpiryReport(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Gerando relatório de vencimento de equipamentos");
-        filters.setReportType("expiry_report");
-        EquipmentReportDTO report = reportService.generateReport(filters);
-        return ResponseEntity.ok(report);
+
+    @GetMapping("/general-report")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getGeneralReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String equipmentType) {
+        try {
+            log.info("Gerando relatório geral de equipamentos");
+            List<Map<String, Object>> report = equipmentReportService.generateGeneralReport(
+                    startDate, endDate, status, equipmentType);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório geral de equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
     @PostMapping("/export/pdf")
-    @Operation(summary = "Exportar PDF", description = "Gera e exporta relatório em formato PDF")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Erro na geração do PDF"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<byte[]> exportToPdf(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Exportando relatório para PDF: {}", filters.getReportType());
-        filters.setExportFormat("pdf");
-        
-        // TODO: Implementar geração de PDF
-        // Por enquanto, retorna um placeholder
-        String placeholder = "PDF do relatório será implementado";
-        return ResponseEntity.ok()
-                .header("Content-Type", "application/pdf")
-                .header("Content-Disposition", "attachment; filename=\"relatorio_equipamentos.pdf\"")
-                .body(placeholder.getBytes());
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<byte[]> exportToPdf(@RequestBody Map<String, Object> requestBody) {
+        try {
+            String reportType = (String) requestBody.get("reportType");
+            String startDateStr = (String) requestBody.get("startDate");
+            String endDateStr = (String) requestBody.get("endDate");
+            String status = (String) requestBody.get("status");
+            String equipmentType = (String) requestBody.get("equipmentType");
+            
+            log.info("Exportando relatório para PDF: {}", reportType);
+            
+            // Criar DTO simples inline
+            var reportRequest = new Object() {
+                public String getReportType() { return reportType; }
+                public LocalDate getStartDate() { 
+                    return startDateStr != null ? LocalDate.parse(startDateStr) : null; 
+                }
+                public LocalDate getEndDate() { 
+                    return endDateStr != null ? LocalDate.parse(endDateStr) : null; 
+                }
+                public String getStatus() { return status; }
+                public String getEquipmentType() { return equipmentType; }
+            };
+            
+            byte[] pdfBytes = equipmentReportService.exportToPdf(reportRequest);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", 
+                "equipment_report_" + reportType + "_" + LocalDate.now() + ".pdf");
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao exportar relatório para PDF", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
     @PostMapping("/export/excel")
-    @Operation(summary = "Exportar Excel", description = "Gera e exporta relatório em formato Excel")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Excel gerado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Erro na geração do Excel"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<byte[]> exportToExcel(@RequestBody EquipmentReportFiltersDTO filters) {
-        log.info("Exportando relatório para Excel: {}", filters.getReportType());
-        filters.setExportFormat("excel");
-        
-        // TODO: Implementar geração de Excel
-        // Por enquanto, retorna um placeholder
-        String placeholder = "Excel do relatório será implementado";
-        return ResponseEntity.ok()
-                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .header("Content-Disposition", "attachment; filename=\"relatorio_equipamentos.xlsx\"")
-                .body(placeholder.getBytes());
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<byte[]> exportToExcel(@RequestBody Map<String, Object> requestBody) {
+        try {
+            String reportType = (String) requestBody.get("reportType");
+            String startDateStr = (String) requestBody.get("startDate");
+            String endDateStr = (String) requestBody.get("endDate");
+            String status = (String) requestBody.get("status");
+            String equipmentType = (String) requestBody.get("equipmentType");
+
+            log.info("Exportando relatório para Excel: {}", reportType);
+
+            // Criar DTO simples inline
+            var reportRequest = new Object() {
+                public String getReportType() { return reportType; }
+                public LocalDate getStartDate() { 
+                    return startDateStr != null ? LocalDate.parse(startDateStr) : null; 
+                }
+                public LocalDate getEndDate() { 
+                    return endDateStr != null ? LocalDate.parse(endDateStr) : null; 
+                }
+                public String getStatus() { return status; }
+                public String getEquipmentType() { return equipmentType; }
+            };
+
+            byte[] excelBytes = equipmentReportService.exportToExcel(reportRequest);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", 
+                "equipment_report_" + reportType + "_" + LocalDate.now() + ".xlsx");
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            log.error("Erro ao exportar relatório para Excel", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
-    @GetMapping("/filters/options")
-    @Operation(summary = "Opções de filtros", description = "Retorna opções disponíveis para filtros")
-    @ApiResponse(responseCode = "200", description = "Opções retornadas com sucesso")
-    public ResponseEntity<Object> getFilterOptions() {
-        log.info("Retornando opções de filtros");
-        
-        // TODO: Implementar retorno das opções de filtros
-        // Por enquanto, retorna um objeto vazio
-        return ResponseEntity.ok(new Object());
+
+    @PostMapping("/export/csv")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<byte[]> exportToCsv(@RequestBody Map<String, Object> requestBody) {
+        try {
+            String reportType = (String) requestBody.get("reportType");
+            String startDateStr = (String) requestBody.get("startDate");
+            String endDateStr = (String) requestBody.get("endDate");
+            String status = (String) requestBody.get("status");
+            String equipmentType = (String) requestBody.get("equipmentType");
+
+            log.info("Exportando relatório para CSV: {}", reportType);
+
+            // Criar DTO simples inline
+            var reportRequest = new Object() {
+                public String getReportType() { return reportType; }
+                public LocalDate getStartDate() { 
+                    return startDateStr != null ? LocalDate.parse(startDateStr) : null; 
+                }
+                public LocalDate getEndDate() { 
+                    return endDateStr != null ? LocalDate.parse(endDateStr) : null; 
+                }
+                public String getStatus() { return status; }
+                public String getEquipmentType() { return equipmentType; }
+            };
+
+            byte[] csvBytes = equipmentReportService.exportToCsv(reportRequest);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.TEXT_PLAIN);
+            headers.setContentDispositionFormData("attachment", 
+                "equipment_report_" + reportType + "_" + LocalDate.now() + ".csv");
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(csvBytes);
+        } catch (Exception e) {
+            log.error("Erro ao exportar relatório para CSV", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-} 
+
+}

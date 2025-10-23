@@ -1,11 +1,14 @@
 package com.z7design.secured_guard.model;
 
-import com.z7design.secured_guard.model.enums.*;
+import com.z7design.secured_guard.model.enums.EquipmentSize;
+import com.z7design.secured_guard.model.enums.EquipmentStatus;
+import com.z7design.secured_guard.model.enums.EquipmentUsage;
+import com.z7design.secured_guard.model.enums.ProtectionLevel;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,12 +16,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidade para gestão de equipamentos de segurança
+ * Mapeia a tabela 'equipments' criada pela V154
+ */
 @Entity
 @Table(name = "equipments")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Equipment {
     
     @Id
@@ -26,10 +33,10 @@ public class Equipment {
     private UUID id;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(nullable = false)
     private EquipmentStatus status;
     
-    @Column(name = "ballistic_plate", length = 100)
+    @Column(name = "ballistic_plate")
     private String ballisticPlate;
     
     @Column(name = "manufacturing_date", nullable = false)
@@ -45,20 +52,20 @@ public class Equipment {
     @Column(name = "usage_type")
     private EquipmentUsage usageType;
     
-    @Column(name = "serial_number", unique = true, nullable = false, length = 100)
+    @Column(name = "serial_number", nullable = false, unique = true)
     private String serialNumber;
     
-    @Column(name = "ca_number", length = 50)
+    @Column(name = "ca_number")
     private String caNumber;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "protection_level")
     private ProtectionLevel protectionLevel;
     
-    @Column(name = "batch", length = 100)
+    @Column(name = "batch")
     private String batch;
     
-    @Column(name = "model", length = 100)
+    @Column(name = "model")
     private String model;
     
     @Enumerated(EnumType.STRING)
@@ -69,22 +76,20 @@ public class Equipment {
     private LocalDate validityDate;
     
     @Column(name = "is_dangerous", nullable = false)
-    @Builder.Default
     private Boolean isDangerous = false;
     
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String notes;
     
     @Column(name = "qr_code")
     private String qrCode;
     
-    // Comentando temporariamente para resolver problema de inicialização
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "current_user_id")
-    // private Employee currentUser;
-    
     @Column(name = "current_user_id")
-    private UUID currentUserId; // Usando apenas o ID por enquanto
+    private UUID currentUserId;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_user_id", insertable = false, updatable = false)
+    private Employee currentUser;
     
     @Column(name = "last_maintenance_date")
     private LocalDate lastMaintenanceDate;
@@ -97,31 +102,22 @@ public class Equipment {
     private LocalDateTime createdAt;
     
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
     
-    @PrePersist
-    protected void onCreate() {
-        if (sixYearExpiry == null && manufacturingDate != null) {
-            sixYearExpiry = manufacturingDate.plusYears(6);
-        }
-        if (validityDate == null && manufacturingDate != null) {
-            validityDate = manufacturingDate.plusYears(5); // Validade padrão de 5 anos
-        }
+    // Métodos auxiliares
+    public boolean isExpired() {
+        return validityDate != null && validityDate.isBefore(LocalDate.now());
     }
     
-    @PreUpdate
-    protected void onUpdate() {
-        if (sixYearExpiry == null && manufacturingDate != null) {
-            sixYearExpiry = manufacturingDate.plusYears(6);
-        }
-    }
-    
-    // Métodos auxiliares para verificar vencimentos
     public boolean isExpiringSoon(int days) {
         if (validityDate == null) return false;
         LocalDate alertDate = LocalDate.now().plusDays(days);
         return validityDate.isBefore(alertDate);
+    }
+    
+    public boolean isWeaponRegistrationExpired() {
+        return weaponRegistrationValidity != null && weaponRegistrationValidity.isBefore(LocalDate.now());
     }
     
     public boolean isWeaponRegistrationExpiringSoon(int days) {
@@ -130,13 +126,8 @@ public class Equipment {
         return weaponRegistrationValidity.isBefore(alertDate);
     }
     
-    public boolean isExpired() {
-        if (validityDate == null) return false;
-        return validityDate.isBefore(LocalDate.now());
+    public Boolean getIsDangerous() {
+        return isDangerous;
     }
-    
-    public boolean isWeaponRegistrationExpired() {
-        if (weaponRegistrationValidity == null) return false;
-        return weaponRegistrationValidity.isBefore(LocalDate.now());
-    }
-} 
+}
+

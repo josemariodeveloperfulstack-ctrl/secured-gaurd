@@ -67,8 +67,10 @@ public class User implements UserDetails {
     
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
-    @Pattern(regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$",
-             message = "Password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character")
+    @Pattern(
+        regexp = "^(?:(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*|\\d{11}@2025)$",
+        message = "Password must be strong (upper, lower, digit, special) or match CPF@2025"
+    )
     @Column(nullable = false)
     private String password;
     

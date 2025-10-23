@@ -103,7 +103,7 @@ public class WorkPostAssignmentService {
 
         // Atualizar campos permitidos
         existingAssignment.setAssignmentDate(updatedAssignment.getAssignmentDate());
-        existingAssignment.setShift(updatedAssignment.getShift());
+        existingAssignment.setShiftType(updatedAssignment.getShiftType());
         existingAssignment.setStartTime(updatedAssignment.getStartTime());
         existingAssignment.setEndTime(updatedAssignment.getEndTime());
         existingAssignment.setStatus(updatedAssignment.getStatus());
@@ -169,7 +169,7 @@ public class WorkPostAssignmentService {
     }
 
     public List<WorkPostAssignment> getPendingAssignments() {
-        return workPostAssignmentRepository.findByStatus(WorkPostAssignment.AssignmentStatus.SCHEDULED);
+        return workPostAssignmentRepository.findByStatus(WorkPostAssignment.AssignmentStatus.PENDING);
     }
 
     public List<WorkPostAssignment> getActiveAssignments() {

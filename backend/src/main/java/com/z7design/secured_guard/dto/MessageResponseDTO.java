@@ -8,6 +8,7 @@ import lombok.Data;
 
 import com.z7design.secured_guard.model.enums.MessageType;
 import com.z7design.secured_guard.model.enums.MessagePriority;
+import com.z7design.secured_guard.model.enums.MessageStatus;
 
 @Data
 public class MessageResponseDTO {
@@ -21,6 +22,8 @@ public class MessageResponseDTO {
     private MessageType type;
     
     private MessagePriority priority;
+    
+    private MessageStatus status;
     
     private UserResponseDTO sender;
     

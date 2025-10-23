@@ -1,5 +1,5 @@
 -- Migration para criar tabela de escalas de visitas
-CREATE TABLE visit_schedules (
+CREATE TABLE IF NOT EXISTS visit_schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     schedule_date DATE NOT NULL,
     supervisor_id UUID NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE visit_schedules (
 );
 
 -- Índices para performance
-CREATE INDEX idx_visit_schedules_supervisor_date ON visit_schedules(supervisor_id, schedule_date);
-CREATE INDEX idx_visit_schedules_client_date ON visit_schedules(client_id, schedule_date);
-CREATE INDEX idx_visit_schedules_status ON visit_schedules(status);
-CREATE INDEX idx_visit_schedules_date_range ON visit_schedules(schedule_date);
+CREATE INDEX IF NOT EXISTS idx_visit_schedules_supervisor_date ON visit_schedules(supervisor_id, schedule_date);
+CREATE INDEX IF NOT EXISTS idx_visit_schedules_client_date ON visit_schedules(client_id, schedule_date);
+CREATE INDEX IF NOT EXISTS idx_visit_schedules_status ON visit_schedules(status);
+CREATE INDEX IF NOT EXISTS idx_visit_schedules_date_range ON visit_schedules(schedule_date);

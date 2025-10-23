@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -339,23 +339,23 @@ const EstoqueSimplificado: React.FC = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="dashboard" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <BarChart3 className="h-4 w-4 mr-2" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="items" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="items" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <Package className="h-4 w-4 mr-2" />
               Itens ({stockItems.length})
             </TabsTrigger>
-            <TabsTrigger value="movements" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="movements" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <TrendingUp className="h-4 w-4 mr-2" />
               Movimentações
             </TabsTrigger>
-            <TabsTrigger value="alerts" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="alerts" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <Bell className="h-4 w-4 mr-2" />
               Alertas ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
             </TabsTrigger>
-            <TabsTrigger value="reports" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="reports" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <FileText className="h-4 w-4 mr-2" />
               Relatórios
             </TabsTrigger>

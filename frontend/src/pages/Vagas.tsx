@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -524,14 +524,14 @@ const Vagas: React.FC = () => {
           <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border border-gray-600">
             <TabsTrigger 
               value="vagas" 
-              className="data-[state=active]:bg-seguranca-red data-[state=active]:text-white text-seguranca-lightgray"
+              className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-seguranca-lightgray"
             >
               <FileText className="h-4 w-4 mr-2" />
               Vagas
             </TabsTrigger>
             <TabsTrigger 
               value="candidatos" 
-              className="data-[state=active]:bg-seguranca-red data-[state=active]:text-white text-seguranca-lightgray"
+              className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-seguranca-lightgray"
             >
               <Users className="h-4 w-4 mr-2" />
               Candidatos

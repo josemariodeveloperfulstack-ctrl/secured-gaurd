@@ -1,5 +1,5 @@
 CREATE TABLE shift_change_forms (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     date_of_request DATE NOT NULL,
     requester_full_name VARCHAR(255) NOT NULL,
     requester_sector VARCHAR(255) NOT NULL,

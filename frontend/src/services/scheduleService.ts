@@ -14,6 +14,13 @@ export interface ScheduleLocation {
   name: string;
 }
 
+// Representa um posto de trabalho simplificado
+export interface ScheduleWorkPost {
+  id: string;
+  name: string;
+  postCode: string;
+}
+
 // Enum para os turnos (Shift)
 export type Shift = 'DAY' | 'NIGHT' | 'MIXED';
 
@@ -27,6 +34,7 @@ export interface Schedule {
   scheduleDate: string; // Formato YYYY-MM-DD
   shift: Shift;
   location: ScheduleLocation;
+  workPost?: ScheduleWorkPost;
   status: ScheduleStatus;
   observations?: string;
   createdAt: string;

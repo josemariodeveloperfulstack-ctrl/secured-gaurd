@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -746,77 +746,77 @@ const Operacional: React.FC = () => {
               <TabsList className="inline-flex h-auto p-1 bg-gray-100 dark:bg-gray-800 rounded-lg min-w-max gap-1">
                 <TabsTrigger 
                   value="dashboard" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <BarChart3 className="h-4 w-4" />
                   <span>Dashboard</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="equipamentos" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <Shield className="h-4 w-4" />
                   <span>Equipamentos</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="escalas" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <Clock className="h-4 w-4" />
                   <span>Escalas</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="notificacoes" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <AlertTriangle className="h-4 w-4" />
                   <span>Notificações</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="ocorrencias" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <Eye className="h-4 w-4" />
                   <span>Ocorrências</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="atividades" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <Activity className="h-4 w-4" />
                   <span>Atividades</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="servicos" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <Settings className="h-4 w-4" />
                   <span>Serviços</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="controle-visitas" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <MapPin className="h-4 w-4" />
                   <span>Controle de Visitas</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="gestao-operacional" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <BarChart3 className="h-4 w-4" />
                   <span>Gestão</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="troca-plantao" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <Clock className="h-4 w-4" />
                   <span>Plantão</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="guia-transporte" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
                 >
                   <FileText className="h-4 w-4" />
                   <span>Transporte</span>

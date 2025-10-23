@@ -170,6 +170,11 @@ public class ReceiptProcessingService {
             log.info("Nome do arquivo gerado: {}", fileName);
 
             // Criar objeto PaymentReceipt com validação e todos os dados bancários
+            // Normalizar data da transferência: preferir formato DD/MM/AAAA;
+            // se não extraída do PDF, usar a data derivada da pasta (01/MM/AAAA)
+            // Definir a data do comprovante como MM/AAAA (mês/ano)
+            String normalizedTransferDate = String.format("%02d/%04d", receiptData.month, receiptData.year);
+
             PaymentReceipt receipt = PaymentReceipt.builder()
                     .employeeName(receiptData.employeeName != null ? receiptData.employeeName.trim() : "Nome não extraído")
                     .month(receiptData.month)
@@ -189,8 +194,8 @@ public class ReceiptProcessingService {
                     .creditedName(receiptData.employeeName != null ? receiptData.employeeName.trim().toUpperCase() : "FUNCIONARIO")
                     .controlNumber(receiptData.controlNumber != null ? receiptData.controlNumber : String.valueOf(System.currentTimeMillis()).substring(0, 15))
                     .authenticationCode(receiptData.authentication != null ? receiptData.authentication : java.util.UUID.randomUUID().toString().replace("-", "").toUpperCase())
-                    .transferDate(receiptData.transferDate != null ? receiptData.transferDate : java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")))
-                    .transferTime(receiptData.transferDate != null ? "19:10:47" : java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")))
+                    .transferDate(normalizedTransferDate)
+                    .transferTime(null)
                     .bankName(receiptData.bankName != null ? receiptData.bankName : "Itaú")
                     .transactionType("Transferência de Conta Corrente para Conta Corrente")
                     .statementIdentification("SISPAG SALARIOS")

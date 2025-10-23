@@ -55,7 +55,7 @@ const Usuarios: React.FC = () => {
   const loadUsers = async () => {
     try {
       setIsLoading(true);
-      const usersData = await userService.getUsers();
+      const usersData = await userService.getAllUsers();
       setUsers(usersData);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);

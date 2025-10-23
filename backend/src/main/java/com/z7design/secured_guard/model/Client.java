@@ -27,12 +27,10 @@ public class Client {
     private String name;
     
     @NotBlank(message = "CNPJ é obrigatório")
-    @Size(min = 14, max = 18, message = "CNPJ deve ter entre 14 e 18 caracteres")
+    @Size(min = 11, max = 18, message = "CNPJ deve ter entre 11 e 18 caracteres")
     @Column(name = "cnpj", nullable = false, unique = true)
     private String cnpj;
     
-    @Email(message = "Email deve ser válido")
-    @Size(max = 255, message = "Email deve ter no máximo 255 caracteres")
     @Column(name = "email")
     private String email;
     
@@ -64,8 +62,6 @@ public class Client {
     @Column(name = "contact_name")
     private String contactName;
     
-    @Email(message = "Email do contato deve ser válido")
-    @Size(max = 255, message = "Email do contato deve ter no máximo 255 caracteres")
     @Column(name = "contact_email")
     private String contactEmail;
     

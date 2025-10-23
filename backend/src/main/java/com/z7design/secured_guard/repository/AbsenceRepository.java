@@ -47,4 +47,6 @@ public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
     Long countApprovedAbsencesByEmployeeAndDateRange(@Param("employeeId") UUID employeeId,
                                                     @Param("startDate") LocalDate startDate,
                                                     @Param("endDate") LocalDate endDate);
+    
+    long countByStatus(Absence.AbsenceStatus status);
 }

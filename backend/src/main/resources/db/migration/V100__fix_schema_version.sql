@@ -29,48 +29,51 @@ CREATE TABLE IF NOT EXISTS visit_schedules (
     CONSTRAINT fk_visit_schedules_client FOREIGN KEY (client_id) REFERENCES clients(id)
 );
 
--- Adicionar colunas à tabela visits se não existirem
+-- Adicionar colunas à tabela visits se não existirem (apenas se a tabela existir)
 DO $$ 
 BEGIN
-    -- visit_schedule_id
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='visit_schedule_id') THEN
-        ALTER TABLE visits ADD COLUMN visit_schedule_id UUID;
-        ALTER TABLE visits ADD CONSTRAINT fk_visits_visit_schedule FOREIGN KEY (visit_schedule_id) REFERENCES visit_schedules(id);
-    END IF;
-    
-    -- estimated_duration_minutes
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='estimated_duration_minutes') THEN
-        ALTER TABLE visits ADD COLUMN estimated_duration_minutes INTEGER DEFAULT 30;
-    END IF;
-    
-    -- priority_level
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='priority_level') THEN
-        ALTER TABLE visits ADD COLUMN priority_level INTEGER DEFAULT 1;
-    END IF;
-    
-    -- preferred_time_start
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='preferred_time_start') THEN
-        ALTER TABLE visits ADD COLUMN preferred_time_start TIMESTAMP;
-    END IF;
-    
-    -- preferred_time_end
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='preferred_time_end') THEN
-        ALTER TABLE visits ADD COLUMN preferred_time_end TIMESTAMP;
-    END IF;
-    
-    -- route_order
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='route_order') THEN
-        ALTER TABLE visits ADD COLUMN route_order INTEGER;
-    END IF;
-    
-    -- travel_time_to_next_minutes
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='travel_time_to_next_minutes') THEN
-        ALTER TABLE visits ADD COLUMN travel_time_to_next_minutes INTEGER;
-    END IF;
-    
-    -- travel_distance_to_next_km
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='travel_distance_to_next_km') THEN
-        ALTER TABLE visits ADD COLUMN travel_distance_to_next_km DOUBLE PRECISION;
+    -- Verificar se a tabela visits existe antes de tentar alterá-la
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='visits') THEN
+        -- visit_schedule_id
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='visit_schedule_id') THEN
+            ALTER TABLE visits ADD COLUMN visit_schedule_id UUID;
+            ALTER TABLE visits ADD CONSTRAINT fk_visits_visit_schedule FOREIGN KEY (visit_schedule_id) REFERENCES visit_schedules(id);
+        END IF;
+        
+        -- estimated_duration_minutes
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='estimated_duration_minutes') THEN
+            ALTER TABLE visits ADD COLUMN estimated_duration_minutes INTEGER DEFAULT 30;
+        END IF;
+        
+        -- priority_level
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='priority_level') THEN
+            ALTER TABLE visits ADD COLUMN priority_level INTEGER DEFAULT 1;
+        END IF;
+        
+        -- preferred_time_start
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='preferred_time_start') THEN
+            ALTER TABLE visits ADD COLUMN preferred_time_start TIMESTAMP;
+        END IF;
+        
+        -- preferred_time_end
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='preferred_time_end') THEN
+            ALTER TABLE visits ADD COLUMN preferred_time_end TIMESTAMP;
+        END IF;
+        
+        -- route_order
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='route_order') THEN
+            ALTER TABLE visits ADD COLUMN route_order INTEGER;
+        END IF;
+        
+        -- travel_time_to_next_minutes
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='travel_time_to_next_minutes') THEN
+            ALTER TABLE visits ADD COLUMN travel_time_to_next_minutes INTEGER;
+        END IF;
+        
+        -- travel_distance_to_next_km
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='travel_distance_to_next_km') THEN
+            ALTER TABLE visits ADD COLUMN travel_distance_to_next_km DOUBLE PRECISION;
+        END IF;
     END IF;
 END $$;
 
@@ -109,8 +112,14 @@ CREATE INDEX IF NOT EXISTS idx_visit_schedules_client_date ON visit_schedules(cl
 CREATE INDEX IF NOT EXISTS idx_visit_schedules_status ON visit_schedules(status);
 CREATE INDEX IF NOT EXISTS idx_visit_schedules_date_range ON visit_schedules(schedule_date);
 
-CREATE INDEX IF NOT EXISTS idx_visits_schedule ON visits(visit_schedule_id);
-CREATE INDEX IF NOT EXISTS idx_visits_route_order ON visits(route_order);
-CREATE INDEX IF NOT EXISTS idx_visits_priority ON visits(priority_level);
+-- Criar índices para visits apenas se a tabela existir
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='visits') THEN
+        CREATE INDEX IF NOT EXISTS idx_visits_schedule ON visits(visit_schedule_id);
+        CREATE INDEX IF NOT EXISTS idx_visits_route_order ON visits(route_order);
+        CREATE INDEX IF NOT EXISTS idx_visits_priority ON visits(priority_level);
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_units_coordinates ON units(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_units_address_city ON units(address_city);

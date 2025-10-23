@@ -37,7 +37,8 @@ public class VacationCoverageService {
     }
 
     public List<VacationCoverage> getVacationCoveragesByEmployee(UUID employeeId) {
-        return vacationCoverageRepository.findByEmployeeId(employeeId);
+        // Busca por employee via entidade Vacation (employee em Vacation)
+        return vacationCoverageRepository.findByVacationEmployeeId(employeeId);
     }
 
     public List<VacationCoverage> getVacationCoveragesBySubstitute(UUID substituteEmployeeId) {
@@ -54,7 +55,8 @@ public class VacationCoverageService {
 
     public VacationCoverage createVacationCoverage(VacationCoverage vacationCoverage) {
         // Validar se o funcionário existe
-        Employee employee = employeeRepository.findById(vacationCoverage.getEmployee().getId())
+        // Employee está em Vacation
+        Employee employee = employeeRepository.findById(vacationCoverage.getVacation().getEmployee().getId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
         // Validar se o substituto existe (se fornecido)
@@ -71,7 +73,8 @@ public class VacationCoverageService {
             vacationCoverage.setLocation(location);
         }
 
-        vacationCoverage.setEmployee(employee);
+        // garantir coerência do vacation vinculado ao employee
+        vacationCoverage.getVacation().setEmployee(employee);
         vacationCoverage.setCreatedAt(java.time.LocalDateTime.now());
         vacationCoverage.setUpdatedAt(java.time.LocalDateTime.now());
 
@@ -83,8 +86,8 @@ public class VacationCoverageService {
                 .orElseThrow(() -> new RuntimeException("Cobertura de férias não encontrada"));
 
         // Atualizar campos permitidos
-        existingCoverage.setStartDate(updatedVacationCoverage.getStartDate());
-        existingCoverage.setEndDate(updatedVacationCoverage.getEndDate());
+        existingCoverage.setCoverageStartDate(updatedVacationCoverage.getCoverageStartDate());
+        existingCoverage.setCoverageEndDate(updatedVacationCoverage.getCoverageEndDate());
         existingCoverage.setStatus(updatedVacationCoverage.getStatus());
         existingCoverage.setShift(updatedVacationCoverage.getShift());
         existingCoverage.setObservations(updatedVacationCoverage.getObservations());

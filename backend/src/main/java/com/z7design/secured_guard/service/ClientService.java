@@ -7,6 +7,7 @@ import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.enums.ClientStatus;
 import com.z7design.secured_guard.repository.ClientRepository;
 import org.springframework.beans.BeanUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,31 +20,80 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@Slf4j
 public class ClientService {
     
     @Autowired
     private ClientRepository clientRepository;
     
     public ClientDTO createClient(ClientDTO clientDTO) {
-        // Verificar se já existe um cliente com o mesmo CNPJ
-        if (clientRepository.existsByCnpj(clientDTO.getCnpj())) {
-            throw new BusinessException("Já existe um cliente cadastrado com este CNPJ: " + clientDTO.getCnpj());
+        try {
+            log.info("[DEBUG] ClientService.createClient - Iniciando criação de cliente");
+            log.info("[DEBUG] Nome: {}", clientDTO.getName());
+            log.info("[DEBUG] CNPJ (original): {}", clientDTO.getCnpj());
+            log.info("[DEBUG] Email: {}", clientDTO.getEmail());
+            
+            // Normalizar CNPJ para apenas dígitos
+            String normalizedCnpj = clientDTO.getCnpj() != null ? clientDTO.getCnpj().replaceAll("\\D", "") : null;
+            if (normalizedCnpj == null || normalizedCnpj.isBlank()) {
+                throw new BusinessException("CNPJ é obrigatório");
+            }
+            log.info("[DEBUG] CNPJ (normalizado): {}", normalizedCnpj);
+
+            log.info("[DEBUG] Verificando se CNPJ já existe: {}", clientDTO.getCnpj());
+            boolean cnpjExists = clientRepository.existsByCnpj(normalizedCnpj);
+            log.info("[DEBUG] CNPJ existe: {}", cnpjExists);
+            
+            if (cnpjExists) {
+                log.error("[ERROR] CNPJ já existe: {}", normalizedCnpj);
+                throw new BusinessException("Já existe um cliente cadastrado com este CNPJ: " + normalizedCnpj);
+            }
+            
+            log.info("[DEBUG] CNPJ válido, criando cliente");
+            Client client = new Client();
+            BeanUtils.copyProperties(clientDTO, client);
+
+            // Forçar salvar CNPJ normalizado
+            client.setCnpj(normalizedCnpj);
+            
+            // Limpar campos vazios para evitar problemas de validação
+            if (client.getEmail() != null && client.getEmail().trim().isEmpty()) {
+                client.setEmail(null);
+            }
+            if (client.getContactEmail() != null && client.getContactEmail().trim().isEmpty()) {
+                client.setContactEmail(null);
+            }
+            
+            // Validar formato de email se fornecido
+            if (client.getEmail() != null && !client.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                log.error("[ERROR] Email inválido: {}", client.getEmail());
+                throw new BusinessException("Formato de email inválido: " + client.getEmail());
+            }
+            if (client.getContactEmail() != null && !client.getContactEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                log.error("[ERROR] Email de contato inválido: {}", client.getContactEmail());
+                throw new BusinessException("Formato de email de contato inválido: " + client.getContactEmail());
+            }
+            
+            // Definir status padrão se não fornecido
+            if (client.getStatus() == null) {
+                client.setStatus(ClientStatus.ACTIVE);
+                log.info("[DEBUG] Status definido como ACTIVE");
+            }
+            
+            log.info("[DEBUG] Salvando cliente no banco");
+            Client savedClient = clientRepository.save(client);
+            log.info("[DEBUG] Cliente salvo com ID: {}", savedClient.getId());
+            
+            ClientDTO savedClientDTO = new ClientDTO();
+            BeanUtils.copyProperties(savedClient, savedClientDTO);
+            
+            log.info("[DEBUG] Cliente criado com sucesso: {}", savedClientDTO.getId());
+            return savedClientDTO;
+        } catch (Exception e) {
+            log.error("[ERROR] Erro ao criar cliente: {}", e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
-        
-        Client client = new Client();
-        BeanUtils.copyProperties(clientDTO, client);
-        
-        // Definir status padrão se não fornecido
-        if (client.getStatus() == null) {
-            client.setStatus(ClientStatus.ACTIVE);
-        }
-        
-        Client savedClient = clientRepository.save(client);
-        
-        ClientDTO savedClientDTO = new ClientDTO();
-        BeanUtils.copyProperties(savedClient, savedClientDTO);
-        
-        return savedClientDTO;
     }
     
     public ClientDTO updateClient(UUID id, ClientDTO clientDTO) {
@@ -97,6 +147,15 @@ public class ClientService {
     
     public Page<ClientDTO> searchClients(String searchTerm, Pageable pageable) {
         Page<Client> clients = clientRepository.findBySearchTerm(searchTerm, pageable);
+        return clients.map(client -> {
+            ClientDTO clientDTO = new ClientDTO();
+            BeanUtils.copyProperties(client, clientDTO);
+            return clientDTO;
+        });
+    }
+    
+    public Page<ClientDTO> getClientsByStatus(ClientStatus status, Pageable pageable) {
+        Page<Client> clients = clientRepository.findByStatus(status, pageable);
         return clients.map(client -> {
             ClientDTO clientDTO = new ClientDTO();
             BeanUtils.copyProperties(client, clientDTO);

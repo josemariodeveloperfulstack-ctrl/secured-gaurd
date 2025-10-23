@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -20,13 +21,26 @@ public class BenefitService {
     
     @Transactional
     public Benefit create(Benefit benefit) {
+        if (benefit.getStartDate() == null) {
+            benefit.setStartDate(LocalDate.now());
+        }
+        if (benefit.getIsActive() == null) {
+            benefit.setIsActive(Boolean.TRUE);
+        }
         return benefitRepository.save(benefit);
     }
     
     @Transactional
     public Benefit update(UUID id, Benefit benefit) {
-        Benefit existingBenefit = findById(id);
+        // Ensure exists; then merge id and defaults
+        findById(id);
         benefit.setId(id);
+        if (benefit.getStartDate() == null) {
+            benefit.setStartDate(java.time.LocalDate.now());
+        }
+        if (benefit.getIsActive() == null) {
+            benefit.setIsActive(Boolean.TRUE);
+        }
         return benefitRepository.save(benefit);
     }
     

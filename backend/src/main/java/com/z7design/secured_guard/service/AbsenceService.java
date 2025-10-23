@@ -113,28 +113,6 @@ public class AbsenceService {
         return absenceRepository.save(absence);
     }
 
-    public Absence approveAbsence(UUID id, UUID approvedByEmployeeId) {
-        Absence absence = absenceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Falta não encontrada"));
-        
-        Employee approvedBy = employeeRepository.findById(approvedByEmployeeId)
-                .orElseThrow(() -> new RuntimeException("Funcionário aprovador não encontrado"));
-        
-        absence.setStatus(Absence.AbsenceStatus.APPROVED);
-        absence.setUpdatedAt(java.time.LocalDateTime.now());
-        
-        return absenceRepository.save(absence);
-    }
-
-    public Absence rejectAbsence(UUID id, String reason) {
-        Absence absence = absenceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Falta não encontrada"));
-        
-        absence.setStatus(Absence.AbsenceStatus.REJECTED);
-        absence.setCoverageNotes((absence.getCoverageNotes() != null ? absence.getCoverageNotes() + " | " : "") + "Rejeitado: " + reason);
-        
-        return absenceRepository.save(absence);
-    }
 
     public List<Absence> getPendingAbsences() {
         return absenceRepository.findByStatus(Absence.AbsenceStatus.PENDING);
@@ -146,5 +124,35 @@ public class AbsenceService {
 
     public Long getEmployeeAbsenceCount(UUID employeeId, LocalDate startDate, LocalDate endDate) {
         return absenceRepository.countApprovedAbsencesByEmployeeAndDateRange(employeeId, startDate, endDate);
+    }
+
+    @Transactional
+    public Absence approveAbsence(UUID absenceId, String observacoes) {
+        Absence absence = absenceRepository.findById(absenceId)
+            .orElseThrow(() -> new RuntimeException("Afastamento não encontrado"));
+        
+        if (absence.getStatus() != Absence.AbsenceStatus.PENDING) {
+            throw new IllegalArgumentException("Apenas afastamentos pendentes podem ser aprovados");
+        }
+        
+        absence.setStatus(Absence.AbsenceStatus.APPROVED);
+        // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
+        
+        return absenceRepository.save(absence);
+    }
+
+    @Transactional
+    public Absence rejectAbsence(UUID absenceId, String motivo) {
+        Absence absence = absenceRepository.findById(absenceId)
+            .orElseThrow(() -> new RuntimeException("Afastamento não encontrado"));
+        
+        if (absence.getStatus() != Absence.AbsenceStatus.PENDING) {
+            throw new IllegalArgumentException("Apenas afastamentos pendentes podem ser rejeitados");
+        }
+        
+        absence.setStatus(Absence.AbsenceStatus.REJECTED);
+        // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
+        
+        return absenceRepository.save(absence);
     }
 }

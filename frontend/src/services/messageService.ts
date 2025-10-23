@@ -1,5 +1,6 @@
 import api from '@/lib/axios';
 import { SystemMessage, ChatMessage, User, Conversation } from '../stores/messageStore';
+import { adaptPaginatedResponse, MessageResponseDTO, adaptMessageResponse, adaptMessageList } from '@/utils/messageAdapter';
 
 // Classe de erro customizada para mensagens
 export class MessageServiceError extends Error {
@@ -60,11 +61,8 @@ export const messageService = {
         params: { page, size, sort: 'createdAt,desc' }
       });
 
-      return {
-        messages: response.data.content || [],
-        totalPages: response.data.totalPages || 0,
-        hasNext: !response.data.last
-      };
+      // Usar o adaptador para converter a resposta do backend
+      return adaptPaginatedResponse(response.data);
     } catch (error) {
       console.warn('[MessageService] Backend indisponível, usando dados de demonstração');
       // Retornar dados de demonstração para mostrar como funcionaria
@@ -145,7 +143,7 @@ export const messageService = {
       });
 
       console.log('[MessageService] Resposta do backend:', response.data);
-      return response.data;
+      return adaptMessageResponse(response.data);
     } catch (error) {
       console.error('[MessageService] Erro detalhado:', error);
       handleApiError(error, 'sendSystemMessage');
@@ -347,6 +345,17 @@ export const messageService = {
     }
   },
 
+  async deleteSystemMessage(messageId: string, reason: string): Promise<void> {
+    try {
+      await api.delete(`/v1/messages/${messageId}`, {
+        headers: getAuthHeaders(),
+        params: { reason }
+      });
+    } catch (error) {
+      handleApiError(error, 'deleteSystemMessage');
+    }
+  },
+
   // ===== BUSCA E FILTROS =====
 
   async searchMessages(query: string, type: 'system' | 'chat' = 'system'): Promise<SystemMessage[] | ChatMessage[]> {
@@ -356,6 +365,11 @@ export const messageService = {
         headers: getAuthHeaders(),
         params: { q: query }
       });
+      
+      if (type === 'system') {
+        return adaptMessageList(response.data || []);
+      }
+      
       return response.data || [];
     } catch (error) {
       console.warn('[MessageService] Erro na busca:', error);

@@ -125,7 +125,7 @@ export const contasAReceberService = {
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
       cliente: account.clientName || 'Não informado',
       clienteId: account.clientId,
-      empresa: account.unitName || 'Não informado',
+      empresa: account.unitSigla || account.unitName || 'Não informado',
       empresaId: account.unitId,
       descricao: account.description,
       tipo: mapBackendTypeToFrontend(account.type),
@@ -152,7 +152,7 @@ export const contasAReceberService = {
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
       cliente: account.clientName || 'Não informado',
       clienteId: account.clientId,
-      empresa: account.unitName || 'Não informado',
+      empresa: account.unitSigla || account.unitName || 'Não informado',
       empresaId: account.unitId,
       descricao: account.description,
       tipo: mapBackendTypeToFrontend(account.type),
@@ -344,8 +344,8 @@ export const contasAReceberService = {
 
   // Buscar todas as empresas
   async getEmpresas(): Promise<any[]> {
-    const response = await api.get('/api/units');
-    console.log('🔍 DEBUG: Resposta da API /api/units:', response.data);
+    const response = await api.get('/api/companies');
+    console.log('🔍 DEBUG: Resposta da API /api/companies:', response.data);
     const data = response.data;
     return Array.isArray(data) ? data : [];
   },
@@ -433,7 +433,7 @@ export const contasAReceberService = {
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
       cliente: account.clientName || 'Não informado',
       clienteId: account.clientId,
-      empresa: account.unitName || 'Não informado',
+      empresa: account.unitSigla || account.unitName || 'Não informado',
       empresaId: account.unitId,
       descricao: account.description,
       tipo: mapBackendTypeToFrontend(account.type),

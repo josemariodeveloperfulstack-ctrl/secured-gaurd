@@ -63,31 +63,46 @@ BEGIN
     CREATE INDEX IF NOT EXISTS idx_invoices_unit_id ON invoices(unit_id);
     CREATE INDEX IF NOT EXISTS idx_invoices_company_sigla ON invoices(company_sigla);
 
-    -- Recreate foreign keys as UUID
-    DO $$
-    BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'suppliers') THEN
-            ALTER TABLE invoices
-            ADD CONSTRAINT fk_invoices_supplier_uuid
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
-        END IF;
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'clients') THEN
-            ALTER TABLE invoices
-            ADD CONSTRAINT fk_invoices_client_uuid
-            FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL;
-        END IF;
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'contracts') THEN
-            ALTER TABLE invoices
-            ADD CONSTRAINT fk_invoices_contract_uuid
-            FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE SET NULL;
-        END IF;
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'units') THEN
-            ALTER TABLE invoices
-            ADD CONSTRAINT fk_invoices_unit_uuid
-            FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE RESTRICT;
-        END IF;
-    END;
-    $$;
+    -- Recreate foreign keys as UUID (guarded and idempotent)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'suppliers')
+       AND NOT EXISTS (
+           SELECT 1 FROM information_schema.table_constraints
+           WHERE table_name = 'invoices' AND constraint_name = 'fk_invoices_supplier_uuid'
+       ) THEN
+        ALTER TABLE invoices
+        ADD CONSTRAINT fk_invoices_supplier_uuid
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'clients')
+       AND NOT EXISTS (
+           SELECT 1 FROM information_schema.table_constraints
+           WHERE table_name = 'invoices' AND constraint_name = 'fk_invoices_client_uuid'
+       ) THEN
+        ALTER TABLE invoices
+        ADD CONSTRAINT fk_invoices_client_uuid
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'contracts')
+       AND NOT EXISTS (
+           SELECT 1 FROM information_schema.table_constraints
+           WHERE table_name = 'invoices' AND constraint_name = 'fk_invoices_contract_uuid'
+       ) THEN
+        ALTER TABLE invoices
+        ADD CONSTRAINT fk_invoices_contract_uuid
+        FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE SET NULL;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'units')
+       AND NOT EXISTS (
+           SELECT 1 FROM information_schema.table_constraints
+           WHERE table_name = 'invoices' AND constraint_name = 'fk_invoices_unit_uuid'
+       ) THEN
+        ALTER TABLE invoices
+        ADD CONSTRAINT fk_invoices_unit_uuid
+        FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE RESTRICT;
+    END IF;
 END;
 $$;
 

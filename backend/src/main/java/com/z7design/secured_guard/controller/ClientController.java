@@ -3,6 +3,7 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.ClientDTO;
 import com.z7design.secured_guard.dto.ClientSelectDTO;
 import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.enums.ClientStatus;
 import com.z7design.secured_guard.service.ClientService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,8 +39,32 @@ public class ClientController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<Page<ClientDTO>> getAll(
+            @Parameter(description = "Termo de busca") @RequestParam(required = false) String searchTerm,
+            @Parameter(description = "Status do cliente") @RequestParam(required = false) ClientStatus status,
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
-        return ResponseEntity.ok(clientService.getAllClients(pageable));
+        
+        try {
+            log.info("GET /api/clients - searchTerm: {}, status: {}, page: {}, size: {}", 
+                    searchTerm, status, pageable.getPageNumber(), pageable.getPageSize());
+            
+            Page<ClientDTO> result;
+            if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                log.info("Executando busca por termo: {}", searchTerm);
+                result = clientService.searchClients(searchTerm, pageable);
+            } else if (status != null) {
+                log.info("Executando busca por status: {}", status);
+                result = clientService.getClientsByStatus(status, pageable);
+            } else {
+                log.info("Executando busca geral");
+                result = clientService.getAllClients(pageable);
+            }
+            
+            log.info("Resultado: {} clientes encontrados", result.getTotalElements());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Erro ao buscar clientes: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
     
     @GetMapping("/all")
@@ -73,7 +98,14 @@ public class ClientController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<ClientDTO> create(@Valid @RequestBody ClientDTO clientDTO) {
+        log.info("[DEBUG] ClientController.create - Iniciando criação de cliente");
+        log.info("[DEBUG] Dados recebidos: {}", clientDTO.getName());
+        log.info("[DEBUG] CNPJ: {}", clientDTO.getCnpj());
+        log.info("[DEBUG] Email: {}", clientDTO.getEmail());
+
+        // Deixar exceções de validação/negócio propagarem para o GlobalExceptionHandler
         ClientDTO saved = clientService.createClient(clientDTO);
+        log.info("[DEBUG] Cliente criado com sucesso: {}", saved.getId());
         return ResponseEntity.status(201).body(saved);
     }
     

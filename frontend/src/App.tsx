@@ -26,6 +26,8 @@ import CookieConsent from '@/components/CookieConsent';
 const Login = lazy(() => import('@/pages/Login').catch(() => ({ default: () => <div>Erro ao carregar Login</div> })));
 const Index = lazy(() => import('@/pages/Index').catch(() => ({ default: () => <div>Erro ao carregar Index</div> })));
 const Dashboard = lazy(() => import('@/pages/Dashboard').catch(() => ({ default: () => <div>Erro ao carregar Dashboard</div> })));
+const DashboardColaborador = lazy(() => import('@/pages/DashboardColaborador'));
+const DashboardVigilante = lazy(() => import('@/pages/DashboardVigilante'));
 const Funcionarios = lazy(() => import('@/pages/Funcionarios'));
 const Usuarios = lazy(() => import('@/pages/Usuarios'));
 const Roles = lazy(() => import('@/pages/Roles'));
@@ -48,6 +50,7 @@ const DocumentosUnificados = lazy(() => import('@/pages/DocumentosUnificados'));
 const EPIs = lazy(() => import('@/pages/EPIs'));
 const Certificacoes = lazy(() => import('@/pages/Certificacoes'));
 const RH = lazy(() => import('@/pages/RH'));
+const Departamentos = lazy(() => import('@/pages/RH/Departamentos'));
 const SST = lazy(() => import('@/pages/RH/SST'));
 const SSTEPIs = lazy(() => import('@/pages/RH/SST/EPIs'));
 const SSTExamesMedicos = lazy(() => import('@/pages/RH/SST/ExamesMedicos'));
@@ -55,6 +58,8 @@ const SSTRelatorios = lazy(() => import('@/pages/RH/SST/Relatorios'));
 const SSTRiscosOcupacionais = lazy(() => import('@/pages/RH/SST/RiscosOcupacionais'));
 const SSTTemplates = lazy(() => import('@/pages/RH/SST/Templates'));
 const SSTCIPA = lazy(() => import('@/pages/RH/SST/CIPA'));
+const SSTTreinamentos = lazy(() => import('@/pages/RH/SST/Treinamentos'));
+const Treinamentos = lazy(() => import('@/pages/RH/Treinamentos'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
@@ -79,21 +84,20 @@ const EstoqueSimplificado = lazy(() => import('@/pages/EstoqueSimplificado'));
 const Estoque = lazy(() => import('@/pages/Estoque'));
 const Produtos = lazy(() => import('@/pages/Produtos'));
 const Movimentacoes = lazy(() => import('@/pages/Movimentacoes'));
-const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
+ const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
+ const Empresas = lazy(() => import('@/pages/Empresas'));
 const Compras = lazy(() => import('@/pages/Compras'));
 const CotacoesCompras = lazy(() => import('@/pages/CotacoesCompras'));
-const Suporte = lazy(() => import('@/pages/Suporte'));
+// const Suporte = lazy(() => import('@/pages/Suporte')); // REMOVIDO - substituído por Gestão de Atendimento
 const Postos = lazy(() => import('@/pages/Postos'));
 const RemanejamentoPage = lazy(() => import('@/pages/Remanejamento'));
 const FeriasPage = lazy(() => import('@/pages/Ferias'));
 const Beneficios = lazy(() => import('@/pages/Beneficios'));
 const AdmissaoDemissao = lazy(() => import('@/pages/AdmissaoDemissao'));
-const Empresas = lazy(() => import('@/pages/Empresas'));
 const CentrosDeCusto = lazy(() => import('@/pages/CentrosDeCusto'));
 
 // Páginas adicionais
 const Filiais = lazy(() => import('@/pages/Filiais'));
-const Servicos = lazy(() => import('@/pages/Servicos'));
 const GestaoServicos = lazy(() => import('@/pages/GestaoServicos'));
 const Operacional = lazy(() => import('@/pages/Operacional'));
 const ControleRondas = lazy(() => import('@/pages/ControleRondas'));
@@ -202,6 +206,13 @@ function App() {
                     
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
+                    <Route path="/sistema" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Index />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
                     <Route path="/login" element={
                       <Suspense fallback={
                         <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4">
@@ -225,6 +236,20 @@ function App() {
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Dashboard />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/dashboard-colaborador" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <DashboardColaborador />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/dashboard-vigilante" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <DashboardVigilante />
                         </Suspense>
                       </ProtectedRoute>
                     } />
@@ -283,6 +308,11 @@ function App() {
                     <Route path="/funcionarios" element={
                       <ProtectedRoute>
                         <Funcionarios />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/postos" element={
+                      <ProtectedRoute>
+                        <Postos />
                       </ProtectedRoute>
                     } />
                     <Route path="/operacional" element={
@@ -461,6 +491,16 @@ function App() {
                         <EstoqueRelatorios />
                       </ProtectedRoute>
                     } />
+                    <Route path="/comercial/empresas" element={
+                      <ProtectedRoute>
+                        <Empresas />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/estoque/fornecedores" element={
+                      <ProtectedRoute>
+                        <Fornecedores />
+                      </ProtectedRoute>
+                    } />
                     
                     {/* Estoque Simplificado */}
                     <Route path="/estoque-simplificado" element={
@@ -486,8 +526,8 @@ function App() {
                       </ProtectedRoute>
                     } />
                     
-                    {/* Suporte */}
-                    <Route path="/suporte" element={
+                    {/* Suporte - REMOVIDO (substituído por Gestão de Atendimento) */}
+                    {/* <Route path="/suporte" element={
                       <ProtectedRoute>
                         <Suporte />
                       </ProtectedRoute>
@@ -496,7 +536,7 @@ function App() {
                       <ProtectedRoute>
                         <Suporte />
                       </ProtectedRoute>
-                    } />
+                    } /> */}
                     
                     {/* Documentos */}
                     <Route path="/documents" element={
@@ -572,9 +612,24 @@ function App() {
                         <SSTCIPA />
                       </ProtectedRoute>
                     } />
+                    <Route path="/rh/sst/treinamentos" element={
+                      <ProtectedRoute>
+                        <SSTTreinamentos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/treinamentos" element={
+                      <ProtectedRoute>
+                        <Treinamentos />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/rh/funcionarios" element={
                       <ProtectedRoute>
                         <Funcionarios />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/departamentos" element={
+                      <ProtectedRoute>
+                        <Departamentos />
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/funcionarios/novo" element={

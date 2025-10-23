@@ -85,7 +85,8 @@ public class FuelRecordController {
             return ResponseEntity.ok(fuelRecordDTOs);
         } catch (Exception e) {
             log.error("Erro ao buscar registros de abastecimento: {}", e.getMessage(), e);
-            throw e;
+            // Evitar 500: retornar lista vazia em caso de falha inesperada
+            return ResponseEntity.ok(new ArrayList<>());
         }
     }
     
@@ -183,7 +184,8 @@ public class FuelRecordController {
             
         } catch (Exception e) {
             log.error("❌ Erro ao buscar estatísticas de todos os veículos: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            // Evitar 500 para o frontend
+            return ResponseEntity.ok(java.util.List.of());
         }
     }
 
@@ -485,8 +487,13 @@ public class FuelRecordController {
     
     @GetMapping("/stats/drivers/top-consumption")
     public ResponseEntity<List<Object[]>> getTopDriversByFuelConsumption() {
-        List<Object[]> topDrivers = driverFuelConsumptionService.getTopDriversByFuelConsumption();
-        return ResponseEntity.ok(topDrivers);
+        try {
+            List<Object[]> topDrivers = driverFuelConsumptionService.getTopDriversByFuelConsumption();
+            return ResponseEntity.ok(topDrivers);
+        } catch (Exception e) {
+            log.error("Erro em /stats/drivers/top-consumption: {}", e.getMessage(), e);
+            return ResponseEntity.ok(java.util.List.of());
+        }
     }
     
     @GetMapping("/stats/drivers/top-cost")

@@ -228,7 +228,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       const [positionsData, unitsData, usersData] = await Promise.all([
         positionService.getPositions(),
         unitService.getAllUnits(),
-        userService.getUsers()
+        userService.getAllUsers()
       ]);
       setPositions(positionsData);
       setUnits(unitsData);

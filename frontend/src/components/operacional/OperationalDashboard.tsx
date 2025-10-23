@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity } from '@/services/operationalService';
+import OperationalStatsCards from './OperationalStatsCards';
 
 const OperationalDashboard: React.FC = () => {
   const [vacationCoverages, setVacationCoverages] = useState<VacationCoverage[]>([]);
@@ -101,6 +102,9 @@ const OperationalDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Estatísticas Operacionais */}
+      <OperationalStatsCards />
+
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Gestão Operacional Detalhada</h2>
         <Button onClick={loadAllData} variant="outline" size="sm">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Clock, User, Building, Camera, Upload, QrCode, Map } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -278,11 +278,11 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-seguranca-graphite border-gray-700">
-          <TabsTrigger value="calendar" className="text-gray-300 data-[state=active]:text-white">
+          <TabsTrigger value="calendar" className="text-gray-300 data-[state='active']:text-white">
             <Calendar className="w-4 h-4 mr-2" />
             Calendário
           </TabsTrigger>
-          <TabsTrigger value="list" className="text-gray-300 data-[state=active]:text-white">
+          <TabsTrigger value="list" className="text-gray-300 data-[state='active']:text-white">
             <User className="w-4 h-4 mr-2" />
             Lista
           </TabsTrigger>

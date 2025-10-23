@@ -38,20 +38,34 @@ public class EmployeeService {
     private PositionRepository positionRepository;
     @Autowired
     private UnitRepository unitRepository;
+    @Autowired
+    private com.z7design.secured_guard.repository.CompanyRepository companyRepository;
     
     @Transactional
     public EmployeeDTO create(EmployeeDTO dto) {
-        if (employeeRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("Email já cadastrado");
+        try {
+            System.out.println("[DEBUG] EmployeeService.create - Iniciando criação de funcionário");
+            System.out.println("[DEBUG] DTO recebido: " + dto.getName() + " - " + dto.getCpf());
+            
+            if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty() && employeeRepository.existsByEmail(dto.getEmail())) {
+                throw new RuntimeException("Email já cadastrado");
+            }
+            
+            if (dto.getCpf() != null && employeeRepository.existsByDocument(dto.getCpf())) {
+                throw new RuntimeException("CPF já cadastrado para outro funcionário");
+            }
+            
+            System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
+            Employee employee = toEntity(dto);
+            System.out.println("[DEBUG] Entity criada, salvando no banco");
+            Employee saved = employeeRepository.save(employee);
+            System.out.println("[DEBUG] Funcionário salvo com ID: " + saved.getId());
+            return toDTO(saved);
+        } catch (Exception e) {
+            System.err.println("[ERROR] Erro ao criar funcionário: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao criar funcionário: " + e.getMessage(), e);
         }
-        
-        if (dto.getCpf() != null && employeeRepository.existsByDocument(dto.getCpf())) {
-            throw new RuntimeException("CPF já cadastrado para outro funcionário");
-        }
-        
-        Employee employee = toEntity(dto);
-        Employee saved = employeeRepository.save(employee);
-        return toDTO(saved);
     }
     
     @Transactional
@@ -131,6 +145,9 @@ public class EmployeeService {
             }
             if (dto.getUnit() != null && dto.getUnit().getId() != null) {
                 existingEmployee.setUnit(unitRepository.findById(dto.getUnit().getId()).orElse(null));
+            }
+            if (dto.getCompany() != null && dto.getCompany().getId() != null) {
+                existingEmployee.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
             
             // Atualizar timestamp
@@ -368,8 +385,8 @@ public class EmployeeService {
             // e.setEmpresaEndereco(dto.getEmpresaEndereco());
             // e.setEmpresaCnpj(dto.getEmpresaCnpj());
             e.setBirthDate(dto.getBirthDate());
-            // e.setMaritalStatus(dto.getMaritalStatus());
-            // e.setNationality(dto.getNationality());
+            e.setMaritalStatus(dto.getMaritalStatus());
+            e.setNationality(dto.getNationality());
             // e.setPhotoUrl(dto.getPhotoUrl());
             // e.setCurrentScale(dto.getCurrentScale());
             e.setRegistrationNumber(dto.getRegistrationNumber());
@@ -398,10 +415,11 @@ public class EmployeeService {
             e.setNotes(dto.getNotes());
             
             // Garantir que address nunca seja null
-            if (dto.getAddress() == null || dto.getAddress().getStreet() == null || dto.getAddress().getStreet().isEmpty()) {
-                throw new RuntimeException("O campo address.street é obrigatório e não pode ser vazio.");
+            if (dto.getAddress() != null && dto.getAddress().getStreet() != null && !dto.getAddress().getStreet().isEmpty()) {
+                e.setAddress(dto.getAddress().getStreet());
+            } else {
+                e.setAddress(""); // Definir como string vazia se não fornecido
             }
-            e.setAddress(dto.getAddress().getStreet());
             System.out.println("[DEBUG] Address salvo: " + e.getAddress());
             
             e.setPhone(dto.getPhone());
@@ -419,7 +437,7 @@ public class EmployeeService {
             e.setEmpresaNome(dto.getEmpresaNome());
             e.setEmpresaEndereco(dto.getEmpresaEndereco());
             e.setEmpresaCnpj(dto.getEmpresaCnpj());
-            // e.setTituloEleitor(dto.getTituloEleitor()); // Campo não existe no modelo
+            e.setTituloEleitor(dto.getTituloEleitor());
             e.setTituloEleitorZona(dto.getTituloEleitorZona());
             e.setTituloEleitorSecao(dto.getTituloEleitorSecao());
             e.setCarteiraIdentidadeOrgaoEmissor(dto.getCarteiraIdentidadeOrgaoEmissor());
@@ -430,6 +448,7 @@ public class EmployeeService {
             e.setLocalNascimento(dto.getLocalNascimento());
             e.setGrauInstrucao(dto.getGrauInstrucao());
             e.setCbo(dto.getCbo());
+            e.setPis(dto.getPis());
             e.setSalario(dto.getSalario());
             e.setSalarioPorExtenso(dto.getSalarioPorExtenso());
             e.setPeriodoPagamento(dto.getPeriodoPagamento());
@@ -465,21 +484,23 @@ public class EmployeeService {
             e.setAssinaturaFuncionario(dto.getAssinaturaFuncionario());
             e.setDataRescisao(dto.getDataRescisao());
             
-            // Setar entidades relacionais obrigatórias
-            if (dto.getUser() == null || dto.getUser().getId() == null) {
-                throw new RuntimeException("O campo user.id é obrigatório.");
+            // Setar entidades relacionais (agora opcionais)
+            if (dto.getUser() != null && dto.getUser().getId() != null) {
+                e.setUser(userRepository.findById(dto.getUser().getId())
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o id informado.")));
             }
-            e.setUser(userRepository.findById(dto.getUser().getId())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o id informado.")));
                 
-            if (dto.getPosition() == null || dto.getPosition().getId() == null) {
-                throw new RuntimeException("O campo position.id é obrigatório.");
+            if (dto.getPosition() != null && dto.getPosition().getId() != null) {
+                e.setPosition(positionRepository.findById(dto.getPosition().getId())
+                    .orElseThrow(() -> new RuntimeException("Cargo não encontrado para o id informado.")));
             }
-            e.setPosition(positionRepository.findById(dto.getPosition().getId())
-                .orElseThrow(() -> new RuntimeException("Cargo não encontrado para o id informado.")));
                 
             if (dto.getUnit() != null && dto.getUnit().getId() != null) {
                 e.setUnit(unitRepository.findById(dto.getUnit().getId()).orElse(null));
+            }
+            
+            if (dto.getCompany() != null && dto.getCompany().getId() != null) {
+                e.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
             
             // Mapear documentos se fornecidos
@@ -521,6 +542,8 @@ public class EmployeeService {
             dto.setId(e.getId());
             dto.setName(e.getName());
             dto.setCpf(e.getDocument());
+            // dto.setRg(e.getRg()); // Campo RG não existe na entidade
+            // dto.setGender(e.getGender()); // Campo Gender não existe na entidade
             dto.setEmail(e.getEmail());
             dto.setPhone(e.getPhone());
             dto.setStatus(e.getStatus() != null ? e.getStatus().name() : null);
@@ -531,6 +554,12 @@ public class EmployeeService {
             // Campos opcionais com verificação de null
             if (e.getBirthDate() != null) {
                 dto.setBirthDate(e.getBirthDate());
+            }
+            if (e.getMaritalStatus() != null) {
+                dto.setMaritalStatus(e.getMaritalStatus());
+            }
+            if (e.getNationality() != null) {
+                dto.setNationality(e.getNationality());
             }
             if (e.getRegistrationNumber() != null) {
                 dto.setRegistrationNumber(e.getRegistrationNumber());
@@ -561,7 +590,7 @@ public class EmployeeService {
             dto.setEmpresaNome(e.getEmpresaNome());
             dto.setEmpresaEndereco(e.getEmpresaEndereco());
             dto.setEmpresaCnpj(e.getEmpresaCnpj());
-            // dto.setTituloEleitor(e.getTituloEleitor()); // Campo não existe no modelo
+            dto.setTituloEleitor(e.getTituloEleitor());
             dto.setTituloEleitorZona(e.getTituloEleitorZona());
             dto.setTituloEleitorSecao(e.getTituloEleitorSecao());
             dto.setCarteiraIdentidadeOrgaoEmissor(e.getCarteiraIdentidadeOrgaoEmissor());
@@ -572,6 +601,7 @@ public class EmployeeService {
             dto.setLocalNascimento(e.getLocalNascimento());
             dto.setGrauInstrucao(e.getGrauInstrucao());
             dto.setCbo(e.getCbo());
+            dto.setPis(e.getPis());
             dto.setSalario(e.getSalario());
             dto.setSalarioPorExtenso(e.getSalarioPorExtenso());
             dto.setPeriodoPagamento(e.getPeriodoPagamento());
@@ -607,11 +637,18 @@ public class EmployeeService {
             dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
             dto.setDataRescisao(e.getDataRescisao());
             
+            // Campos adicionais - comentados pois não existem na entidade
+            // dto.setWorkPostId(e.getWorkPostId()); // Campo workPostId não existe na entidade
+            // dto.setDepartmentId(e.getDepartmentId()); // Campo departmentId não existe na entidade
+            
             // Mapear entidades relacionais com verificação de null
             if (e.getUser() != null) {
                 try {
                     EmployeeDTO.IdOnlyDTO userDTO = new EmployeeDTO.IdOnlyDTO();
                     userDTO.setId(e.getUser().getId());
+                    userDTO.setName(e.getUser().getName());
+                    userDTO.setUsername(e.getUser().getUsername());
+                    userDTO.setEmail(e.getUser().getEmail());
                     dto.setUser(userDTO);
                 } catch (Exception userEx) {
                     System.err.println("[WARNING] Erro ao mapear user: " + userEx.getMessage());
@@ -646,6 +683,18 @@ public class EmployeeService {
                 } catch (Exception unitEx) {
                     System.err.println("[WARNING] Erro ao mapear unit: " + unitEx.getMessage());
                     dto.setUnit(null);
+                }
+            }
+            
+            // Mapear Company
+            if (e.getCompany() != null) {
+                try {
+                    EmployeeDTO.IdOnlyDTO companyDTO = new EmployeeDTO.IdOnlyDTO();
+                    companyDTO.setId(e.getCompany().getId());
+                    dto.setCompany(companyDTO);
+                } catch (Exception companyEx) {
+                    System.err.println("[WARNING] Erro ao mapear company: " + companyEx.getMessage());
+                    dto.setCompany(null);
                 }
             }
             

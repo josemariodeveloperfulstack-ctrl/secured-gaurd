@@ -48,6 +48,38 @@ export interface ProcessingResult {
 }
 
 class HoleriteService {
+  // Envio individual
+  async sendIndividual(funcionarioId: string, tipo: 'email' | 'whatsapp', mensagem?: string, assunto?: string): Promise<any> {
+    const payload: any = { tipo, funcionarioId };
+    if (mensagem) payload.mensagem = mensagem;
+    if (assunto) payload.assunto = assunto;
+    const response = await api.post('/api/envio/individual', payload);
+    return response.data;
+  }
+
+  // Envio em massa
+  async sendBatch(funcionarioIds: string[], tipo: 'email' | 'whatsapp', mensagem?: string, assunto?: string): Promise<any> {
+    const payload: any = { tipo, funcionarioIds };
+    if (mensagem) payload.mensagem = mensagem;
+    if (assunto) payload.assunto = assunto;
+    const response = await api.post('/api/envio/massa', payload);
+    return response.data;
+  }
+
+  // Reenvio por log
+  async resendByLog(logId: string): Promise<any> {
+    const response = await api.post(`/api/envio/resend/${logId}`);
+    return response.data;
+  }
+
+  // Listar logs
+  async listSendLogs(cpf: string, month?: number, year?: number): Promise<any[]> {
+    const params: any = { cpf };
+    if (month) params.month = month;
+    if (year) params.year = year;
+    const response = await api.get('/envio/logs', { params });
+    return response.data || [];
+  }
   // Buscar todos os holerites
   async getAllHolerites(): Promise<Holerite[]> {
     try {

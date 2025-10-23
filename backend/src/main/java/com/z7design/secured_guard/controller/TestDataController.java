@@ -49,7 +49,7 @@ public class TestDataController {
             testClient.setCity("São Paulo");
             testClient.setState("SP");
             testClient.setZipCode("01234-567");
-            testClient.setStatus("ACTIVE");
+            testClient.setStatus(com.z7design.secured_guard.model.enums.ClientStatus.ACTIVE);
             
             Client savedClient = clientRepository.save(testClient);
             log.info("Cliente criado: {}", savedClient.getName());
@@ -58,26 +58,24 @@ public class TestDataController {
             Employee emp1 = new Employee();
             emp1.setId(UUID.randomUUID());
             emp1.setName("João Silva");
-            emp1.setCpf("123.456.789-01");
-            emp1.setRg("12.345.678-9");
+            emp1.setDocument("123.456.789-01");
             emp1.setBirthDate(LocalDate.of(1985, 3, 15));
             emp1.setAddress("Rua A, 100");
             emp1.setPhone("(11) 99999-9999");
             emp1.setEmail("joao@teste.com");
             emp1.setHireDate(LocalDate.of(2024, 1, 15));
-            emp1.setStatus("ACTIVE");
+            emp1.setStatus(com.z7design.secured_guard.model.enums.EmploymentStatus.ACTIVE);
             
             Employee emp2 = new Employee();
             emp2.setId(UUID.randomUUID());
             emp2.setName("Maria Santos");
-            emp2.setCpf("987.654.321-09");
-            emp2.setRg("98.765.432-1");
+            emp2.setDocument("987.654.321-09");
             emp2.setBirthDate(LocalDate.of(1990, 7, 22));
             emp2.setAddress("Av. B, 200");
             emp2.setPhone("(11) 88888-8888");
             emp2.setEmail("maria@teste.com");
             emp2.setHireDate(LocalDate.of(2023, 8, 10));
-            emp2.setStatus("ACTIVE");
+            emp2.setStatus(com.z7design.secured_guard.model.enums.EmploymentStatus.ACTIVE);
             
             Employee savedEmp1 = employeeRepository.save(emp1);
             Employee savedEmp2 = employeeRepository.save(emp2);

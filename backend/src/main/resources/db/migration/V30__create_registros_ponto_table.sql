@@ -1,5 +1,5 @@
 CREATE TABLE registros_ponto (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     data_hora TIMESTAMP NOT NULL,
     tipo VARCHAR(20) NOT NULL,

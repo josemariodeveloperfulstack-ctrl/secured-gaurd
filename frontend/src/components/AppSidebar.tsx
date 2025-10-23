@@ -199,6 +199,8 @@ const gestaoMensagensInternasMenuItems = [
 const rhMenuItems = [
   { icon: Users, text: 'RH Principal', to: '/rh', id: 'rh' },
   { icon: User2, text: 'Funcionários', to: '/rh/funcionarios', id: 'rh-funcionarios' },
+  { icon: Settings, text: 'Departamentos', to: '/rh/departamentos', id: 'rh-departamentos' },
+  { icon: MapPin, text: 'Postos de Trabalho', to: '/rh/postos', id: 'rh-postos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
   { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
@@ -214,7 +216,7 @@ const sstMenuItems = [
   { icon: HardHat, text: 'EPIs', to: '/rh/sst/epis', id: 'rh-sst-epis' },
   { icon: AlertTriangle, text: 'Acidentes', to: '/rh/sst/acidentes', id: 'rh-sst-acidentes' },
   { icon: GraduationCap, text: 'Treinamentos SST', to: '/rh/sst/treinamentos', id: 'rh-sst-treinamentos' },
-  { icon: FileCheck, text: 'Inspeções', to: '/rh/sst/inspecoes', id: 'rh-sst-inspecoes' },
+  // { icon: FileCheck, text: 'Inspeções', to: '/rh/sst/inspecoes', id: 'rh-sst-inspecoes' }, // TODO: Implementar página de inspeções
   { icon: Users, text: 'CIPA', to: '/rh/sst/cipa', id: 'rh-sst-cipa' },
   { icon: BarChart3Icon, text: 'Relatórios SST', to: '/rh/sst/relatorios', id: 'rh-sst-relatorios' },
 ];
@@ -294,6 +296,7 @@ const estoqueMenuItems = [
   { icon: Package, text: 'Produtos', to: '/estoque/produtos', id: 'estoque-produtos' },
   { icon: Package, text: 'Movimentações', to: '/estoque/movimentacoes', id: 'estoque-movimentacoes' },
   { icon: Package, text: 'Relatórios', to: '/estoque/relatorios', id: 'estoque-relatorios' },
+  { icon: Handshake, text: 'Fornecedores', to: '/estoque/fornecedores', id: 'estoque-fornecedores' },
 ];
 
 // Módulo de Estoque Simplificado
@@ -571,7 +574,7 @@ export function AppSidebar() {
           Departamento Pessoal
         </div>
         {departamentoPessoalMenuItems.map(item => (
-          <div className="mb-2 ml-8" key={item.id}>
+          <div className="mb-2 ml-4" key={item.id}>
             <a 
               href={item.to} 
               className={`flex items-center p-3 rounded-lg transition-colors ${

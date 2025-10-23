@@ -9,47 +9,41 @@ export default defineConfig(({ mode }) => {
   const plugins = [
     react(),
     // ...(mode === 'development' ? [componentTagger()] : []),
-    // VitePWA temporariamente desabilitado para resolver problemas de build
-    // VitePWA({
-    //   registerType: 'autoUpdate',
-    //   devOptions: {
-    //     enabled: false, // Desabilitado em desenvolvimento para evitar erros
-    //     type: 'module',
-    //   },
-    //   manifest: {
-    //     name: 'Promover Vigilância',
-    //     short_name: 'Promover',
-    //     description: 'Portal de Conteúdo da Promover Vigilância Patrimonial',
-    //     theme_color: '#2563eb',
-    //     background_color: '#ffffff',
-    //     display: 'standalone',
-    //     start_url: '/',
-    //     icons: [
-    //       {
-    //         src: '/icons/icon-192x192.svg',
-    //         sizes: '192x192',
-    //         type: 'image/svg+xml',
-    //       },
-    //       {
-    //         src: '/icons/icon-192x192.svg',
-    //         sizes: '512x512',
-    //         type: 'image/svg+xml',
-    //       },
-    //       {
-    //         src: '/icons/icon-192x192.svg',
-    //         sizes: '512x512',
-    //         type: 'image/svg+xml',
-    //         purpose: 'any maskable',
-    //       },
-    //     ],
-    //   },
-    //   workbox: {
-    //     globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-    //     skipWaiting: true,
-    //     clientsClaim: true,
-    //     maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
-    //   },
-    // }),
+    VitePWA({
+      registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
+      manifest: {
+        name: 'Secured Guard - Sistema de Segurança',
+        short_name: 'Secured Guard',
+        description: 'Sistema completo de gestão de segurança patrimonial',
+        theme_color: '#dc2626',
+        background_color: '#1f2937',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          {
+            src: '/icons/icon-192x192.svg',
+            sizes: '192x192',
+            type: 'image/svg+xml',
+            purpose: 'any'
+          },
+          {
+            src: '/icons/icon-512x512.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml',
+            purpose: 'any'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        skipWaiting: true,
+        clientsClaim: true
+      }
+    }),
   ];
 
   return {

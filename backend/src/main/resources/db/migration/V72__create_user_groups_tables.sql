@@ -1,6 +1,6 @@
 -- Criar tabela de grupos de usuários
 CREATE TABLE user_groups (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_name VARCHAR(50) NOT NULL UNIQUE,
     display_name VARCHAR(100) NOT NULL,
     description TEXT,
@@ -10,7 +10,7 @@ CREATE TABLE user_groups (
 
 -- Criar tabela de permissões dos grupos
 CREATE TABLE user_group_permissions (
-    group_id BIGINT NOT NULL,
+    group_id UUID NOT NULL,
     permission VARCHAR(100) NOT NULL,
     PRIMARY KEY (group_id, permission),
     FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
@@ -19,7 +19,7 @@ CREATE TABLE user_group_permissions (
 -- Criar tabela de associação usuário-grupo
 CREATE TABLE user_group_membership (
     user_id UUID NOT NULL,
-    group_id BIGINT NOT NULL,
+    group_id UUID NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, group_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -39,104 +39,104 @@ INSERT INTO user_groups (group_name, display_name, description) VALUES
 
 -- Inserir permissões para GRUPO_SUPER_ADMIN
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(1, 'VIEW_PAYSLIP'),
-(1, 'DOWNLOAD_PAYSLIP'),
-(1, 'EDIT_PROFILE'),
-(1, 'VIEW_EMPLOYEES'),
-(1, 'MANAGE_EMPLOYEES'),
-(1, 'VIEW_REPORTS'),
-(1, 'MANAGE_SYSTEM'),
-(1, 'VIEW_CLIENTS'),
-(1, 'MANAGE_CLIENTS'),
-(1, 'VIEW_CONTRACTS'),
-(1, 'MANAGE_CONTRACTS'),
-(1, 'VIEW_FINANCIAL'),
-(1, 'MANAGE_FINANCIAL'),
-(1, 'VIEW_FLEET'),
-(1, 'MANAGE_FLEET'),
-(1, 'VIEW_DOCUMENTS'),
-(1, 'MANAGE_DOCUMENTS');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'EDIT_PROFILE'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_REPORTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_SYSTEM'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'VIEW_DOCUMENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPER_ADMIN'), 'MANAGE_DOCUMENTS');
 
 -- Inserir permissões para GRUPO_ADMIN
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(2, 'VIEW_PAYSLIP'),
-(2, 'DOWNLOAD_PAYSLIP'),
-(2, 'EDIT_PROFILE'),
-(2, 'VIEW_EMPLOYEES'),
-(2, 'MANAGE_EMPLOYEES'),
-(2, 'VIEW_REPORTS'),
-(2, 'VIEW_CLIENTS'),
-(2, 'MANAGE_CLIENTS'),
-(2, 'VIEW_CONTRACTS'),
-(2, 'MANAGE_CONTRACTS'),
-(2, 'VIEW_FINANCIAL'),
-(2, 'MANAGE_FINANCIAL'),
-(2, 'VIEW_FLEET'),
-(2, 'MANAGE_FLEET'),
-(2, 'VIEW_DOCUMENTS'),
-(2, 'MANAGE_DOCUMENTS');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'EDIT_PROFILE'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'MANAGE_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_REPORTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'MANAGE_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'MANAGE_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'MANAGE_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'MANAGE_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'VIEW_DOCUMENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_ADMIN'), 'MANAGE_DOCUMENTS');
 
 -- Inserir permissões para GRUPO_GESTOR
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(3, 'VIEW_PAYSLIP'),
-(3, 'DOWNLOAD_PAYSLIP'),
-(3, 'EDIT_PROFILE'),
-(3, 'VIEW_EMPLOYEES'),
-(3, 'MANAGE_EMPLOYEES'),
-(3, 'VIEW_REPORTS'),
-(3, 'VIEW_CLIENTS'),
-(3, 'MANAGE_CLIENTS'),
-(3, 'VIEW_CONTRACTS'),
-(3, 'MANAGE_CONTRACTS'),
-(3, 'VIEW_FINANCIAL'),
-(3, 'VIEW_FLEET'),
-(3, 'VIEW_DOCUMENTS');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'EDIT_PROFILE'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'MANAGE_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_REPORTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'MANAGE_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'MANAGE_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_GESTOR'), 'VIEW_DOCUMENTS');
 
 -- Inserir permissões para GRUPO_RH
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(4, 'VIEW_PAYSLIP'),
-(4, 'DOWNLOAD_PAYSLIP'),
-(4, 'EDIT_PROFILE'),
-(4, 'VIEW_EMPLOYEES'),
-(4, 'MANAGE_EMPLOYEES'),
-(4, 'VIEW_REPORTS'),
-(4, 'VIEW_CLIENTS'),
-(4, 'VIEW_CONTRACTS'),
-(4, 'VIEW_FINANCIAL'),
-(4, 'VIEW_FLEET'),
-(4, 'VIEW_DOCUMENTS');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'EDIT_PROFILE'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'MANAGE_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_REPORTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_RH'), 'VIEW_DOCUMENTS');
 
 -- Inserir permissões para GRUPO_DPE
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(5, 'VIEW_PAYSLIP'),
-(5, 'DOWNLOAD_PAYSLIP'),
-(5, 'EDIT_PROFILE'),
-(5, 'VIEW_EMPLOYEES'),
-(5, 'MANAGE_EMPLOYEES'),
-(5, 'VIEW_REPORTS'),
-(5, 'VIEW_CLIENTS'),
-(5, 'VIEW_CONTRACTS'),
-(5, 'VIEW_FINANCIAL'),
-(5, 'VIEW_FLEET'),
-(5, 'VIEW_DOCUMENTS');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'EDIT_PROFILE'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'MANAGE_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_REPORTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_CLIENTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_CONTRACTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_FINANCIAL'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_FLEET'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_DPE'), 'VIEW_DOCUMENTS');
 
 -- Inserir permissões para GRUPO_SUPERVISOR
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(6, 'VIEW_PAYSLIP'),
-(6, 'DOWNLOAD_PAYSLIP'),
-(6, 'EDIT_PROFILE'),
-(6, 'VIEW_EMPLOYEES'),
-(6, 'VIEW_REPORTS'),
-(6, 'VIEW_FLEET');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPERVISOR'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPERVISOR'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPERVISOR'), 'EDIT_PROFILE'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPERVISOR'), 'VIEW_EMPLOYEES'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPERVISOR'), 'VIEW_REPORTS'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_SUPERVISOR'), 'VIEW_FLEET');
 
 -- Inserir permissões para GRUPO_COLABORADORES
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(7, 'VIEW_PAYSLIP'),
-(7, 'DOWNLOAD_PAYSLIP'),
-(7, 'EDIT_PROFILE');
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_COLABORADORES'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_COLABORADORES'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_COLABORADORES'), 'EDIT_PROFILE');
 
 -- Inserir permissões para GRUPO_VIGILANTES
 INSERT INTO user_group_permissions (group_id, permission) VALUES
-(8, 'VIEW_PAYSLIP'),
-(8, 'DOWNLOAD_PAYSLIP'),
-(8, 'EDIT_PROFILE'); 
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_VIGILANTES'), 'VIEW_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_VIGILANTES'), 'DOWNLOAD_PAYSLIP'),
+((SELECT id FROM user_groups WHERE group_name = 'GRUPO_VIGILANTES'), 'EDIT_PROFILE'); 

@@ -156,6 +156,19 @@ public class PaymentReceiptService {
             Path filePath = uploadPath.resolve(uniqueFileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
             
+            // Derivar mês/ano da pasta do caminho quando não fornecido corretamente
+            if (month == null || year == null) {
+                try {
+                    // uploads/payment-receipts/{year}/{month}
+                    String[] parts = uploadDir.replace('\\', '/').split("/");
+                    int len = parts.length;
+                    int derivedYear = Integer.parseInt(parts[len - 2]);
+                    int derivedMonth = Integer.parseInt(parts[len - 1]);
+                    month = derivedMonth;
+                    year = derivedYear;
+                } catch (Exception ignored) {}
+            }
+
             // Criar registro no banco
             PaymentReceipt paymentReceipt = new PaymentReceipt();
             paymentReceipt.setEmployeeName(employeeName);
@@ -165,6 +178,16 @@ public class PaymentReceiptService {
             paymentReceipt.setFilePath(filePath.toString());
             paymentReceipt.setFileSize(file.getSize());
             paymentReceipt.setStatus(PaymentReceiptStatus.PENDING);
+
+            // Ajustar datas: usar primeiro dia do mês/ano da pasta
+            try {
+                // Armazenar apenas MM/AAAA
+                String normalizedTransferDate = String.format("%02d/%04d", month, year);
+                paymentReceipt.setTransferDate(normalizedTransferDate);
+                paymentReceipt.setTransferTime(null);
+            } catch (Exception e) {
+                // ignore e deixe para etapa de processamento
+            }
             
             // Salvar no banco
             PaymentReceipt savedReceipt = paymentReceiptRepository.save(paymentReceipt);

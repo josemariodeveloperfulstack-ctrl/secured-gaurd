@@ -2,6 +2,7 @@ package com.z7design.secured_guard.security;
 
 import java.io.IOException;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,7 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.z7design.secured_guard.config.JwtConfig;
-import com.z7design.secured_guard.security.JwtService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    @Lazy
     private final UserDetailsService userDetailsService;
     private final JwtConfig jwtConfig;
 

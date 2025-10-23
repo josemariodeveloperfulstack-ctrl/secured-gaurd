@@ -38,6 +38,7 @@ interface EscalaFormModalProps {
   onOpenChange: (open: boolean) => void;
   onSave: (data: EscalaFormData) => void;
   initialData?: EscalaFormData;
+  mode?: 'create' | 'edit' | 'view';
 }
 
 interface EscalaFormData {
@@ -63,7 +64,8 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   open,
   onOpenChange,
   onSave,
-  initialData
+  initialData,
+  mode = 'create'
 }) => {
   const [formData, setFormData] = useState<EscalaFormData>(
     initialData || {
@@ -87,7 +89,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     const loadUsers = async () => {
       try {
         const { userService } = await import('@/services/userService');
-        const users = await userService.getUsers();
+        const users = await userService.getAllUsers();
         setUsuarios(users.map(u => ({ id: u.id, name: u.name || u.nome || 'Usuário sem nome' })));
       } catch (error) {
         console.error('Erro ao carregar usuários:', error);
@@ -303,10 +305,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             </div>
             <div>
               <DialogTitle className="text-xl font-semibold">
-                {initialData ? 'Editar Escala' : 'Nova Escala'}
+                {mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala'}
               </DialogTitle>
               <DialogDescription className="text-gray-400 mt-1">
-                {initialData ? 'Atualize as informações da escala' : 'Preencha os dados para criar uma nova escala de trabalho'}
+                {mode === 'view' ? 'Visualize as informações da escala' : mode === 'edit' ? 'Atualize as informações da escala' : 'Preencha os dados para criar uma nova escala de trabalho'}
               </DialogDescription>
             </div>
           </div>
@@ -324,11 +326,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             <Select
               value={formData.employeeId}
               onValueChange={(value) => handleInputChange('employeeId', value)}
+              disabled={mode === 'view'}
             >
               <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.employeeId
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                }`}>
+                } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder="Selecione um funcionário" />
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600">
@@ -361,11 +364,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             <Select
               value={formData.locationId}
               onValueChange={(value) => handleInputChange('locationId', value)}
+              disabled={mode === 'view'}
             >
               <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.locationId
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                }`}>
+                } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder="Selecione um cliente" />
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600">
@@ -479,11 +483,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
               <Select
                 value={formData.shift}
                 onValueChange={(value) => handleInputChange('shift', value)}
+                disabled={mode === 'view'}
               >
                 <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.shift
                   ? 'border-red-500 focus:border-red-500'
                   : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                  }`}>
+                  } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <SelectValue placeholder="Selecione o turno" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-graphite border-gray-600">
@@ -528,10 +533,11 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                   type="time"
                   value={formData.startTime}
                   onChange={(e) => handleInputChange('startTime', e.target.value)}
+                  disabled={mode === 'view'}
                   className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.startTime
                     ? 'border-red-500 focus:border-red-500'
                     : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                    }`}
+                    } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 {errors.startTime && (
                   <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -550,10 +556,11 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                   type="time"
                   value={formData.endTime}
                   onChange={(e) => handleInputChange('endTime', e.target.value)}
+                  disabled={mode === 'view'}
                   className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.endTime
                     ? 'border-red-500 focus:border-red-500'
                     : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                    }`}
+                    } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 {errors.endTime && (
                   <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -585,7 +592,8 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
               value={formData.observations}
               onChange={(e) => handleInputChange('observations', e.target.value)}
               placeholder="Adicione observações sobre esta escala (opcional)"
-              className="bg-seguranca-black border-2 border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow transition-colors resize-none"
+              disabled={mode === 'view'}
+              className={`bg-seguranca-black border-2 border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow transition-colors resize-none ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}
               rows={3}
             />
           </div>
@@ -599,25 +607,27 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 disabled={isSubmitting}
                 className="bg-seguranca-black border-gray-600 hover:bg-seguranca-graphite hover:border-gray-500 transition-colors"
               >
-                Cancelar
+                {mode === 'view' ? 'Fechar' : 'Cancelar'}
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-seguranca-red hover:bg-seguranca-red/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Salvando...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {initialData ? 'Atualizar Escala' : 'Criar Escala'}
-                  </div>
-                )}
-              </Button>
+              {mode !== 'view' && (
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-seguranca-red hover:bg-seguranca-red/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Salvando...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {mode === 'edit' ? 'Atualizar Escala' : 'Criar Escala'}
+                    </div>
+                  )}
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </form>

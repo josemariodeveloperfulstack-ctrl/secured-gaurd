@@ -2,6 +2,7 @@ package com.z7design.secured_guard.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -20,6 +21,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.z7design.secured_guard.security.JwtAuthenticationFilter;
+import com.z7design.secured_guard.service.CustomUserDetailsService;
 
 import java.util.Arrays;
 
@@ -27,12 +29,18 @@ import java.util.Arrays;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final UserDetailsService userDetailsService;
+    private final CustomUserDetailsService customUserDetailsService;
+    @Lazy
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(UserDetailsService userDetailsService, JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.userDetailsService = userDetailsService;
+    public SecurityConfig(CustomUserDetailsService customUserDetailsService, @Lazy JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.customUserDetailsService = customUserDetailsService;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return customUserDetailsService;
     }
 
     @Bean
@@ -42,7 +50,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(headers -> headers
-                .frameOptions(frame -> frame.sameOrigin())
+                .frameOptions(frame -> frame.disable())
                 .contentTypeOptions(contentType -> {})
             )
             .authorizeHttpRequests(auth -> auth
@@ -61,9 +69,9 @@ public class SecurityConfig {
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/files/**").permitAll()
                 // Endpoints HR - requerem permissões específicas
-                .requestMatchers("/api/hr/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/hr/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR", "ROLE_RH")
                 // Endpoints SST - requerem permissões específicas
-                .requestMatchers("/api/sst/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/sst/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR", "ROLE_RH")
                 // Endpoints de usuários - requerem permissões específicas
                 .requestMatchers("/api/users/**").hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE", "USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de grupos - requerem permissões específicas
@@ -118,12 +126,21 @@ public class SecurityConfig {
                 .requestMatchers("/api/payslips/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
                 // Endpoints de recibos - requerem permissões específicas
                 .requestMatchers("/api/receipts/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
+                // Endpoints de documentos unificados - arquivos públicos para download/visualização
+                .requestMatchers("/api/unified-documents/public/**").permitAll()
+                .requestMatchers("/api/unified-documents/download/**").permitAll()
+                // Endpoints de documentos unificados - operações requerem permissões
+                .requestMatchers("/api/unified-documents/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
                 // Endpoints de relatórios - requerem permissões específicas
                 .requestMatchers("/api/reports/**").hasAnyAuthority("REPORTS_READ", "REPORTS_GENERATE", "REPORTS_EXPORT", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Endpoints de chat - requerem permissões específicas
                 .requestMatchers("/api/v1/chat/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
                 // Endpoints de mensagens - requerem permissões específicas
                 .requestMatchers("/api/v1/messages/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
+                // Endpoints de suporte e atendimento - requerem permissões específicas
+                .requestMatchers("/api/v1/support/**").hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE", "SUPPORT_DELETE", "SUPPORT_MANAGE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                // Endpoints de suporte (sem /api prefix) - temporariamente públicos para debug
+                .requestMatchers("/v1/support/**").permitAll()
                 // Endpoints de funcionários - temporariamente públicos para debug
                 .requestMatchers("/api/employees/**").permitAll()
                 // Endpoints de unidades - temporariamente públicos para debug
@@ -148,6 +165,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/orders-of-service/**").permitAll()
                 .requestMatchers("/api/operational/**").permitAll()
                 .requestMatchers("/api/occurrences/**").permitAll()
+                .requestMatchers("/api/vacation-coverages/**").permitAll()
+                .requestMatchers("/api/work-post-assignments/**").permitAll()
+                .requestMatchers("/api/specific-activities/**").permitAll()
+                .requestMatchers("/api/absences/**").permitAll()
+                // Endpoints operacionais - temporariamente públicos para debug
+                .requestMatchers("/api/equipment/**").permitAll()
+                .requestMatchers("/api/alerts/**").permitAll()
+                .requestMatchers("/api/visit-controls/**").permitAll()
                 // Endpoints de dados de teste - públicos para desenvolvimento
                 .requestMatchers("/api/test-data/**").permitAll()
                 // Endpoints de controle de visitas - temporariamente públicos para desenvolvimento
@@ -188,7 +213,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setUserDetailsService(customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }

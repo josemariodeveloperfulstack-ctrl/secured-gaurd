@@ -28,7 +28,9 @@ public class VacationService {
     public Vacation create(Vacation vacation) {
         validateVacationDates(vacation);
         calculateVacationDays(vacation);
-        vacation.setStatus(VacationStatus.PENDING);
+        if (vacation.getStatus() == null) {
+            vacation.setStatus(VacationStatus.PENDING);
+        }
         return vacationRepository.save(vacation);
     }
     
@@ -114,6 +116,39 @@ public class VacationService {
         long days = ChronoUnit.DAYS.between(vacation.getStartDate(), vacation.getEndDate()) + 1;
         vacation.setDaysTaken((int) days);
         // TODO: Implementar cálculo de dias restantes baseado no histórico do funcionário
-        vacation.setRemainingDays(30 - (int) days);
+        // Definir um valor padrão de 30 dias de férias disponíveis
+        vacation.setRemainingDays(Math.max(1, 30 - (int) days));
+    }
+
+    @Transactional
+    public Vacation approveVacation(UUID vacationId, String observacoes) {
+        Vacation vacation = vacationRepository.findById(vacationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Solicitação de férias não encontrada"));
+        
+        if (vacation.getStatus() != VacationStatus.PENDING) {
+            throw new IllegalArgumentException("Apenas solicitações pendentes podem ser aprovadas");
+        }
+        
+        vacation.setStatus(VacationStatus.APPROVED);
+        vacation.setApprovalDate(LocalDate.now());
+        // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
+        
+        return vacationRepository.save(vacation);
+    }
+
+    @Transactional
+    public Vacation rejectVacation(UUID vacationId, String motivo) {
+        Vacation vacation = vacationRepository.findById(vacationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Solicitação de férias não encontrada"));
+        
+        if (vacation.getStatus() != VacationStatus.PENDING) {
+            throw new IllegalArgumentException("Apenas solicitações pendentes podem ser rejeitadas");
+        }
+        
+        vacation.setStatus(VacationStatus.REJECTED);
+        vacation.setApprovalDate(LocalDate.now());
+        // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
+        
+        return vacationRepository.save(vacation);
     }
 } 

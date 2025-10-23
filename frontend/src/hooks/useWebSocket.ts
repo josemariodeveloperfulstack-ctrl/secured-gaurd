@@ -259,14 +259,8 @@ export const useWebSocket = (config: WebSocketConfig) => {
     return () => {
       disconnect();
     };
-  }, [config.token, config.username, connect, disconnect]);
-
-  // Cleanup na desmontagem
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.token, config.username]); // Removido connect e disconnect para evitar loop
 
   return {
     isConnected: clientRef.current?.connected || false,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 // import { useResponsive } from '@/hooks/useResponsive';
@@ -527,28 +527,28 @@ const InteractiveDashboard: React.FC = () => {
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 bg-seguranca-graphite border border-gray-600">
           <TabsTrigger 
             value="overview" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <BarChart3 className="h-4 w-4 mr-2" />
             Visão Geral
           </TabsTrigger>
           <TabsTrigger 
             value="modules" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <Package className="h-4 w-4 mr-2" />
             Módulos
           </TabsTrigger>
           <TabsTrigger 
             value="profile" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <User className="h-4 w-4 mr-2" />
             Perfil
           </TabsTrigger>
           <TabsTrigger 
             value="activity" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <Activity className="h-4 w-4 mr-2" />
             Atividade

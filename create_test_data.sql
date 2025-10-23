@@ -1,66 +1,109 @@
--- Script simplificado para inserir dados de teste básicos
--- Execute este script no DBeaver ou pgAdmin
+-- Script para criar dados de teste para o sistema de envio de holerites
+-- Execute este script no banco de dados PostgreSQL
 
--- 1. Inserir cliente básico
-INSERT INTO clients (id, name, cnpj, email, phone, address, city, state, zip_code, status, created_at, updated_at) 
-VALUES (gen_random_uuid(), 'Cliente Teste ABC', '12.345.678/0001-90', 'teste@abc.com', '(11) 3333-3333', 'Rua das Flores, 123', 'São Paulo', 'SP', '01234-567', 'ACTIVE', NOW(), NOW())
-ON CONFLICT (cnpj) DO NOTHING;
+-- 1. Inserir funcionário de teste
+INSERT INTO employees (id, name, document, email, phone, status, created_at, updated_at)
+VALUES (
+    gen_random_uuid(),
+    'João Silva Teste',
+    '12345678901',
+    'joao.teste@empresa.com',
+    '31999999999',
+    'ACTIVE',
+    NOW(),
+    NOW()
+) ON CONFLICT (document) DO NOTHING;
 
--- 2. Inserir funcionários básicos (sem dependências complexas)
-INSERT INTO employees (id, name, cpf, rg, birth_date, address, phone, email, hire_date, status, created_at, updated_at)
+-- 2. Inserir usuário correspondente para WhatsApp
+INSERT INTO users (id, username, email, name, password, whatsapp, status, active, created_at, updated_at)
+VALUES (
+    gen_random_uuid(),
+    '12345678901',
+    'colaborador.12345678901@promovervigilancia.com.br',
+    'João Silva Teste',
+    '$2a$10$dummy.hash.for.testing.purposes.only',
+    '5531999999999',
+    'ACTIVE',
+    true,
+    NOW(),
+    NOW()
+) ON CONFLICT (username) DO NOTHING;
+
+-- 3. Inserir holerite de teste
+INSERT INTO payslips (id, employee_name, cpf, month, year, file_name, status, processed_at, created_at, updated_at)
+VALUES (
+    gen_random_uuid(),
+    'João Silva Teste',
+    '12345678901',
+    10,
+    2025,
+    'joao_silva_teste_12345678901_10_2025.pdf',
+    'PROCESSED',
+    NOW(),
+    NOW(),
+    NOW()
+) ON CONFLICT DO NOTHING;
+
+-- 4. Inserir logs de envio de teste
+INSERT INTO payslip_delivery_logs (id, cpf, month, year, channel, success, attempts, error_message, created_at, updated_at)
 VALUES 
-    (gen_random_uuid(), 'João Silva', '123.456.789-01', '12.345.678-9', '1985-03-15', 'Rua A, 100', '(11) 99999-9999', 'joao@teste.com', '2024-01-15', 'ACTIVE', NOW(), NOW()),
-    (gen_random_uuid(), 'Maria Santos', '987.654.321-09', '98.765.432-1', '1990-07-22', 'Av. B, 200', '(11) 88888-8888', 'maria@teste.com', '2023-08-10', 'ACTIVE', NOW(), NOW()),
-    (gen_random_uuid(), 'Pedro Costa', '456.789.123-45', '45.678.912-3', '1988-12-10', 'Rua C, 300', '(11) 77777-7777', 'pedro@teste.com', '2024-02-01', 'ACTIVE', NOW(), NOW())
-ON CONFLICT (cpf) DO NOTHING;
+    (gen_random_uuid(), '12345678901', 10, 2025, 'WHATSAPP', true, 1, null, NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
+    (gen_random_uuid(), '12345678901', 10, 2025, 'EMAIL', false, 1, 'Email não cadastrado', NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '30 minutes'),
+    (gen_random_uuid(), '12345678901', 9, 2025, 'WHATSAPP', true, 1, null, NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours');
 
--- 3. Inserir postos básicos
-INSERT INTO work_posts (id, post_code, name, description, type, status, address, city, state, zip_code, client_id, required_vigilantes, work_schedule, shift_start, shift_end, created_at, updated_at)
-SELECT 
-    gen_random_uuid(),
-    'POST-001',
-    'Posto Shopping Center',
-    'Posto de segurança no shopping',
-    'POSTO_24H',
-    'ATIVO',
-    'Av. Paulista, 1000',
-    'São Paulo',
-    'SP',
-    '01310-100',
-    c.id,
-    3,
-    '24 horas',
-    '00:00:00',
-    '23:59:59',
-    NOW(),
-    NOW()
-FROM clients c WHERE c.name = 'Cliente Teste ABC'
-
+-- 5. Verificar dados inseridos
+SELECT 'Funcionários inseridos:' as info, COUNT(*) as count FROM employees WHERE document = '12345678901'
 UNION ALL
+SELECT 'Usuários inseridos:', COUNT(*) FROM users WHERE username = '12345678901'
+UNION ALL
+SELECT 'Holerites inseridos:', COUNT(*) FROM payslips WHERE cpf = '12345678901'
+UNION ALL
+SELECT 'Logs inseridos:', COUNT(*) FROM payslip_delivery_logs WHERE cpf = '12345678901';
+
+-- 6. Mostrar dados de teste
+SELECT 
+    'DADOS DE TESTE CRIADOS:' as titulo,
+    '' as separador;
 
 SELECT 
-    gen_random_uuid(),
-    'POST-002',
-    'Posto Banco Central',
-    'Posto de segurança bancário',
-    'POSTO_12H_DIURNO',
-    'ATIVO',
-    'Rua Augusta, 500',
-    'São Paulo',
-    'SP',
-    '01305-000',
-    c.id,
-    2,
-    '12h diurno',
-    '06:00:00',
-    '18:00:00',
-    NOW(),
-    NOW()
-FROM clients c WHERE c.name = 'Cliente Teste ABC';
+    'FUNCIONÁRIO' as tipo,
+    e.name as nome,
+    e.document as cpf,
+    e.email,
+    e.phone as telefone
+FROM employees e 
+WHERE e.document = '12345678901'
 
--- Verificar dados inseridos
-SELECT 'Clientes:' as tipo, COUNT(*) as total FROM clients
 UNION ALL
-SELECT 'Funcionários:', COUNT(*) FROM employees  
+
+SELECT 
+    'USUÁRIO' as tipo,
+    u.name as nome,
+    u.username as cpf,
+    u.email,
+    u.whatsapp as telefone
+FROM users u 
+WHERE u.username = '12345678901'
+
 UNION ALL
-SELECT 'Postos:', COUNT(*) FROM work_posts;
+
+SELECT 
+    'HOLERITE' as tipo,
+    p.employee_name as nome,
+    p.cpf,
+    p.file_name as email,
+    CONCAT(p.month, '/', p.year) as telefone
+FROM payslips p 
+WHERE p.cpf = '12345678901'
+
+UNION ALL
+
+SELECT 
+    'LOG' as tipo,
+    CONCAT(pdl.channel, ' - ', CASE WHEN pdl.success THEN 'Sucesso' ELSE 'Falha' END) as nome,
+    pdl.cpf,
+    pdl.error_message as email,
+    CONCAT(pdl.month, '/', pdl.year) as telefone
+FROM payslip_delivery_logs pdl 
+WHERE pdl.cpf = '12345678901'
+ORDER BY tipo, nome;

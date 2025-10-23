@@ -1,162 +1,308 @@
 package com.z7design.secured_guard.controller;
 
-import com.z7design.secured_guard.dto.EquipmentDTO;
 import com.z7design.secured_guard.dto.CreateEquipmentRequest;
+import com.z7design.secured_guard.dto.EquipmentDTO;
 import com.z7design.secured_guard.model.enums.EquipmentStatus;
 import com.z7design.secured_guard.service.EquipmentService;
-import com.z7design.secured_guard.exception.ResourceNotFoundException;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/equipments")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
-@Tag(name = "Equipamentos", description = "Endpoints para gestão de equipamentos")
+@Slf4j
 public class EquipmentController {
-    
+
     private final EquipmentService equipmentService;
-    
+
+    /**
+     * Busca todos os equipamentos com paginação
+     */
     @GetMapping
-    @Operation(summary = "Listar todos os equipamentos", description = "Retorna uma lista paginada de todos os equipamentos")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de equipamentos retornada com sucesso"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<Page<EquipmentDTO>> getAll(
-            @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
-        Page<EquipmentDTO> equipments = equipmentService.findAll(pageable);
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<Page<EquipmentDTO>> getAllEquipments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+        try {
+            log.info("Buscando equipamentos - página: {}, tamanho: {}, ordenação: {} {}", 
+                    page, size, sortBy, sortDirection);
+            
+            Sort.Direction direction = sortDirection.equalsIgnoreCase("ASC") 
+                    ? Sort.Direction.ASC 
+                    : Sort.Direction.DESC;
+            
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+            Page<EquipmentDTO> equipments = equipmentService.findAll(pageable);
+            
+            log.info("Equipamentos encontrados: {}", equipments.getTotalElements());
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Busca todos os equipamentos sem paginação
+     */
     @GetMapping("/all")
-    @Operation(summary = "Listar todos os equipamentos (sem paginação)", description = "Retorna uma lista completa de todos os equipamentos")
-    public ResponseEntity<List<EquipmentDTO>> getAllWithoutPagination() {
-        List<EquipmentDTO> equipments = equipmentService.findAll();
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<EquipmentDTO>> getAllEquipmentsNoPagination() {
+        try {
+            log.info("Buscando todos os equipamentos sem paginação");
+            List<EquipmentDTO> equipments = equipmentService.findAll();
+            log.info("Total de equipamentos encontrados: {}", equipments.size());
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar todos os equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Busca equipamento por ID
+     */
     @GetMapping("/{id}")
-    @Operation(summary = "Buscar equipamento por ID", description = "Retorna um equipamento específico pelo seu ID")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Equipamento encontrado"),
-            @ApiResponse(responseCode = "404", description = "Equipamento não encontrado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<EquipmentDTO> getById(@PathVariable String id) {
-        EquipmentDTO equipment = equipmentService.findById(UUID.fromString(id));
-        return ResponseEntity.ok(equipment);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<EquipmentDTO> getEquipmentById(@PathVariable UUID id) {
+        try {
+            log.info("Buscando equipamento por ID: {}", id);
+            EquipmentDTO equipment = equipmentService.findById(id);
+            return ResponseEntity.ok(equipment);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamento por ID: {}", id, e);
+            return ResponseEntity.notFound().build();
+        }
     }
-    
+
+    /**
+     * Busca equipamento por número de série
+     */
     @GetMapping("/serial/{serialNumber}")
-    @Operation(summary = "Buscar equipamento por número de série", description = "Retorna um equipamento específico pelo número de série")
-    public ResponseEntity<EquipmentDTO> getBySerialNumber(@PathVariable String serialNumber) {
-        EquipmentDTO equipment = equipmentService.findBySerialNumber(serialNumber);
-        return ResponseEntity.ok(equipment);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<EquipmentDTO> getEquipmentBySerialNumber(@PathVariable String serialNumber) {
+        try {
+            log.info("Buscando equipamento por número de série: {}", serialNumber);
+            EquipmentDTO equipment = equipmentService.findBySerialNumber(serialNumber);
+            return ResponseEntity.ok(equipment);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamento por número de série: {}", serialNumber, e);
+            return ResponseEntity.notFound().build();
+        }
     }
-    
+
+    /**
+     * Busca equipamentos por status
+     */
     @GetMapping("/status/{status}")
-    @Operation(summary = "Buscar equipamentos por status", description = "Retorna equipamentos com um status específico")
-    public ResponseEntity<List<EquipmentDTO>> getByStatus(@PathVariable EquipmentStatus status) {
-        List<EquipmentDTO> equipments = equipmentService.findByStatus(status);
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<EquipmentDTO>> getEquipmentsByStatus(@PathVariable EquipmentStatus status) {
+        try {
+            log.info("Buscando equipamentos por status: {}", status);
+            List<EquipmentDTO> equipments = equipmentService.findByStatus(status);
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamentos por status: {}", status, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Busca equipamentos por usuário
+     */
     @GetMapping("/user/{userId}")
-    @Operation(summary = "Buscar equipamentos por usuário", description = "Retorna equipamentos atribuídos a um usuário específico")
-    public ResponseEntity<List<EquipmentDTO>> getByUser(@PathVariable String userId) {
-        List<EquipmentDTO> equipments = equipmentService.findByCurrentUser(UUID.fromString(userId));
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<EquipmentDTO>> getEquipmentsByUser(@PathVariable UUID userId) {
+        try {
+            log.info("Buscando equipamentos do usuário: {}", userId);
+            List<EquipmentDTO> equipments = equipmentService.findByCurrentUser(userId);
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamentos do usuário: {}", userId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Busca equipamentos expirando em X dias
+     */
     @GetMapping("/expiring/{days}")
-    @Operation(summary = "Buscar equipamentos expirando", description = "Retorna equipamentos que expiram nos próximos X dias")
-    public ResponseEntity<List<EquipmentDTO>> getExpiring(@PathVariable int days) {
-        List<EquipmentDTO> equipments = equipmentService.findExpiring(days);
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<EquipmentDTO>> getExpiringEquipments(@PathVariable int days) {
+        try {
+            log.info("Buscando equipamentos expirando em {} dias", days);
+            List<EquipmentDTO> equipments = equipmentService.findExpiring(days);
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamentos expirando", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Busca equipamentos expirados
+     */
     @GetMapping("/expired")
-    @Operation(summary = "Buscar equipamentos expirados", description = "Retorna equipamentos que já expiraram")
-    public ResponseEntity<List<EquipmentDTO>> getExpired() {
-        List<EquipmentDTO> equipments = equipmentService.findExpired();
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<EquipmentDTO>> getExpiredEquipments() {
+        try {
+            log.info("Buscando equipamentos expirados");
+            List<EquipmentDTO> equipments = equipmentService.findExpired();
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamentos expirados", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Busca equipamentos perigosos
+     */
     @GetMapping("/dangerous")
-    @Operation(summary = "Buscar equipamentos perigosos", description = "Retorna equipamentos marcados como perigosos")
-    public ResponseEntity<List<EquipmentDTO>> getDangerous() {
-        List<EquipmentDTO> equipments = equipmentService.findDangerous();
-        return ResponseEntity.ok(equipments);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<EquipmentDTO>> getDangerousEquipments() {
+        try {
+            log.info("Buscando equipamentos perigosos");
+            List<EquipmentDTO> equipments = equipmentService.findDangerous();
+            return ResponseEntity.ok(equipments);
+        } catch (Exception e) {
+            log.error("Erro ao buscar equipamentos perigosos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Obtém resumo de equipamentos
+     */
     @GetMapping("/summary")
-    @Operation(summary = "Resumo estatístico", description = "Retorna um resumo estatístico dos equipamentos")
-    public ResponseEntity<java.util.Map<String, Object>> getSummary() {
-        java.util.Map<String, Object> summary = equipmentService.getSummary();
-        return ResponseEntity.ok(summary);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<Map<String, Object>> getEquipmentSummary() {
+        try {
+            log.info("Buscando resumo de equipamentos");
+            Map<String, Object> summary = equipmentService.getSummary();
+            return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            log.error("Erro ao buscar resumo de equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Cria novo equipamento
+     */
     @PostMapping
-    @Operation(summary = "Criar novo equipamento", description = "Cria um novo equipamento no sistema")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Equipamento criado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<EquipmentDTO> create(@Valid @RequestBody CreateEquipmentRequest request) {
-        EquipmentDTO createdEquipment = equipmentService.create(request);
-        return ResponseEntity.status(201).body(createdEquipment);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_CREATE', 'EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    public ResponseEntity<EquipmentDTO> createEquipment(@Valid @RequestBody CreateEquipmentRequest request) {
+        try {
+            log.info("Criando novo equipamento: {}", request.getSerialNumber());
+            EquipmentDTO created = equipmentService.create(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (Exception e) {
+            log.error("Erro ao criar equipamento", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Atualiza equipamento
+     */
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar equipamento", description = "Atualiza os dados de um equipamento existente")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Equipamento atualizado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
-            @ApiResponse(responseCode = "404", description = "Equipamento não encontrado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<EquipmentDTO> update(@PathVariable String id, @Valid @RequestBody CreateEquipmentRequest request) {
-        EquipmentDTO updatedEquipment = equipmentService.update(UUID.fromString(id), request);
-        return ResponseEntity.ok(updatedEquipment);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    public ResponseEntity<EquipmentDTO> updateEquipment(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateEquipmentRequest request) {
+        try {
+            log.info("Atualizando equipamento: {}", id);
+            EquipmentDTO updated = equipmentService.update(id, request);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            log.error("Erro ao atualizar equipamento: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
-    @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir equipamento", description = "Exclui um equipamento do sistema")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Equipamento excluído com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Equipamento não encontrado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<Void> delete(@PathVariable String id) {
-        equipmentService.delete(UUID.fromString(id));
-        return ResponseEntity.noContent().build();
-    }
-    
+
+    /**
+     * Atualiza status do equipamento
+     */
     @PatchMapping("/{id}/status")
-    @Operation(summary = "Atualizar status do equipamento", description = "Atualiza apenas o status de um equipamento")
-    public ResponseEntity<EquipmentDTO> updateStatus(@PathVariable String id, @RequestParam EquipmentStatus status) {
-        EquipmentDTO equipment = equipmentService.updateStatus(UUID.fromString(id), status);
-        return ResponseEntity.ok(equipment);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    public ResponseEntity<EquipmentDTO> updateEquipmentStatus(
+            @PathVariable UUID id,
+            @RequestParam EquipmentStatus status) {
+        try {
+            log.info("Atualizando status do equipamento {} para {}", id, status);
+            EquipmentDTO updated = equipmentService.updateStatus(id, status);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            log.error("Erro ao atualizar status do equipamento: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-    
+
+    /**
+     * Atribui equipamento a um usuário
+     */
     @PatchMapping("/{equipmentId}/assign/{userId}")
-    @Operation(summary = "Atribuir equipamento a usuário", description = "Atribui um equipamento a um usuário específico")
-    public ResponseEntity<EquipmentDTO> assignToUser(@PathVariable String equipmentId, @PathVariable String userId) {
-        EquipmentDTO equipment = equipmentService.assignToUser(UUID.fromString(equipmentId), UUID.fromString(userId));
-        return ResponseEntity.ok(equipment);
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_ASSIGN', 'EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    public ResponseEntity<EquipmentDTO> assignEquipmentToUser(
+            @PathVariable UUID equipmentId,
+            @PathVariable UUID userId) {
+        try {
+            log.info("Atribuindo equipamento {} ao usuário {}", equipmentId, userId);
+            EquipmentDTO updated = equipmentService.assignToUser(equipmentId, userId);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            log.error("Erro ao atribuir equipamento {} ao usuário {}", equipmentId, userId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
-} 
+
+    /**
+     * Remove atribuição de equipamento (torna disponível)
+     */
+    @PatchMapping("/{equipmentId}/unassign")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_ASSIGN', 'EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    public ResponseEntity<EquipmentDTO> unassignEquipment(@PathVariable UUID equipmentId) {
+        try {
+            log.info("Removendo atribuição do equipamento {}", equipmentId);
+            EquipmentDTO updated = equipmentService.assignToUser(equipmentId, null);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            log.error("Erro ao remover atribuição do equipamento {}", equipmentId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Exclui equipamento
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_DELETE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
+    public ResponseEntity<Void> deleteEquipment(@PathVariable UUID id) {
+        try {
+            log.info("Excluindo equipamento: {}", id);
+            equipmentService.delete(id);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            log.error("Erro ao excluir equipamento: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+}
+

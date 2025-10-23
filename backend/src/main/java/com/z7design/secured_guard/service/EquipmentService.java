@@ -5,7 +5,6 @@ import com.z7design.secured_guard.dto.EquipmentDTO;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Equipment;
-import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.enums.EquipmentStatus;
 import com.z7design.secured_guard.repository.EquipmentRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
@@ -13,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -197,8 +195,10 @@ public class EquipmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Equipamento não encontrado com ID: " + equipmentId));
 
         if (userId != null) {
-            Employee employee = employeeRepository.findById(userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado com ID: " + userId));
+            boolean exists = employeeRepository.existsById(userId);
+            if (!exists) {
+                throw new ResourceNotFoundException("Funcionário não encontrado com ID: " + userId);
+            }
         }
 
         equipment.setCurrentUserId(userId);
@@ -248,8 +248,8 @@ public class EquipmentService {
     private EquipmentDTO toDTO(Equipment equipment) {
         String currentUserName = null;
         if (equipment.getCurrentUserId() != null) {
-            currentUserName = employeeRepository.findById(equipment.getCurrentUserId())
-                    .map(Employee::getName)
+            // Buscar apenas o nome para evitar carregar toda a entidade e possíveis colunas inexistentes
+            currentUserName = employeeRepository.findNameById(equipment.getCurrentUserId())
                     .orElse(null);
         }
 

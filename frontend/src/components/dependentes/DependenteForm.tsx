@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Dependent, CreateDependentDTO, UpdateDependentDTO, RELATIONSHIP_TYPES } from '@/types/dependent';
-import { dependentService } from '@/services/dependentService';
+import { Dependent, DependentCreateRequest, DependentUpdateRequest, RELATIONSHIP_OPTIONS } from '@/types/dependent';
+import dependentService from '@/services/dependentService';
 
 interface DependenteFormProps {
   employeeId: string;
@@ -15,7 +15,7 @@ const DependenteForm: React.FC<DependenteFormProps> = ({
   onSuccess,
   onCancel
 }) => {
-  const [formData, setFormData] = useState<CreateDependentDTO | UpdateDependentDTO>({
+  const [formData, setFormData] = useState<DependentCreateRequest | DependentUpdateRequest>({
     employeeId,
     name: '',
     relationship: '',
@@ -96,7 +96,7 @@ const DependenteForm: React.FC<DependenteFormProps> = ({
         await dependentService.updateDependent(formData.id, formData);
       } else {
         // Criar novo dependente
-        await dependentService.createDependent(formData as CreateDependentDTO);
+        await dependentService.createDependent(formData as DependentCreateRequest);
       }
       
       onSuccess();
@@ -180,9 +180,9 @@ const DependenteForm: React.FC<DependenteFormProps> = ({
             className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${errors.relationship ? 'border-red-500' : ''}`}
           >
             <option value="">Selecione...</option>
-            {Object.entries(RELATIONSHIP_TYPES).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            {RELATIONSHIP_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>

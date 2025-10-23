@@ -51,4 +51,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))) " +
            "ORDER BY u.name ASC")
     List<User> searchUsers(@Param("query") String query);
+    
+    /**
+     * Busca usuário através do CPF do funcionário associado
+     */
+    @Query("SELECT u FROM User u " +
+           "JOIN Employee e ON e.user.id = u.id " +
+           "WHERE e.document = :cpf")
+    Optional<User> findByEmployeeCpf(@Param("cpf") String cpf);
 } 

@@ -38,6 +38,15 @@ public class Benefit {
     @JoinColumn(name = "position_id")
     private Position position;
     
+    // Tipo do benefício (ex.: TRANSPORT, MEAL, HEALTH, DENTAL, LIFE_INSURANCE, OTHER)
+    @Size(max = 30)
+    @Column(name = "type", length = 30)
+    private String type;
+
+    // Indicador se o benefício está ativo
+    @Column(name = "is_active")
+    private Boolean isActive;
+
     @NotBlank(message = "Benefit name is required")
     @Size(min = 3, max = 100, message = "Benefit name must be between 3 and 100 characters")
     @Column(nullable = false)

@@ -51,12 +51,17 @@ public class InvoiceController {
     public ResponseEntity<Page<InvoiceDTO>> getAll(
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
         try {
+            // Corrigir chamadas sem page/size: definir defaults seguros
+            if (pageable == null || pageable.isUnpaged() || pageable.getPageSize() <= 0) {
+                pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+            }
             Page<Invoice> invoices = invoiceService.findAll(pageable);
             Page<InvoiceDTO> dtos = invoices.map(InvoiceDTO::fromEntity);
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
             log.error("Erro em GET /api/invoices", e);
-            return ResponseEntity.ok(Page.empty());
+            // Avoid Page.empty() serialization issue with Unpaged and avoid size=0
+            return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(java.util.List.of(), org.springframework.data.domain.PageRequest.of(0, 1), 0));
         }
     }
     

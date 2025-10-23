@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.core.JsonParser;
@@ -29,7 +30,13 @@ public class EmployeeDTO {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
     private String gender;
-    // private String maritalStatus;
+    private String maritalStatus;
+    private String nationality;
+    
+    // Lista de dependentes (usado apenas para visualização, não para criação/atualização)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private java.util.List<com.z7design.secured_guard.dto.DependentDTO> dependents;
+    
     // private String photoUrl;
     // private String currentScale;
     private String email;
@@ -55,6 +62,7 @@ public class EmployeeDTO {
     private LocalDate hireDate;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate terminationDate;
+    // Campos já implementados abaixo (linhas 87-141) - mantidos comentados para evitar duplicação
     // private String cep;
     // private String ctps;
     // private String cbo;
@@ -99,6 +107,7 @@ public class EmployeeDTO {
     private String localNascimento;
     private String grauInstrucao;
     private String cbo;
+    private String pis;
     private BigDecimal salario;
     private String salarioPorExtenso;
     private String periodoPagamento;
@@ -118,6 +127,12 @@ public class EmployeeDTO {
     private String pisCodigoAgencia;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate cnhExpirationDate;
+    
+    // Campo para Posto de Trabalho
+    private String workPostId;
+    
+    // Campo para Departamento
+    private String departmentId;
     private String cnhCategory;
     private String ctps;
     private String ctpsRural;
@@ -147,6 +162,7 @@ public class EmployeeDTO {
     private IdOnlyDTO user;
     private PositionDTO position;
     private UnitDTO unit;
+    private IdOnlyDTO company;
 
     @Data
     @NoArgsConstructor
@@ -219,6 +235,9 @@ public class EmployeeDTO {
     @Builder
     public static class IdOnlyDTO {
         private java.util.UUID id;
+        private String name;
+        private String username;
+        private String email;
     }
 
     @Data

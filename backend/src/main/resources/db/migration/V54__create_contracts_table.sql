@@ -1,5 +1,5 @@
 CREATE TABLE contracts (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     contract_number VARCHAR(50) NOT NULL UNIQUE,
     description VARCHAR(500) NOT NULL,
     start_date DATE NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE contracts (
     value DECIMAL(15,2) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     notes TEXT,
-    client_id BIGINT NOT NULL,
+    client_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE

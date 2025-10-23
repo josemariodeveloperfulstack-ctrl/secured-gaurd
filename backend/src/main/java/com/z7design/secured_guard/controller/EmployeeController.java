@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/employees")
@@ -37,6 +38,19 @@ public class EmployeeController {
             return ResponseEntity.ok(java.util.Map.of("count", count, "message", "Acesso ao banco funcionando"));
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getCount - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/status/test")
+    @Operation(summary = "Teste simples de status", description = "Endpoint de teste para verificar funcionamento")
+    public ResponseEntity<Object> testStatus() {
+        try {
+            System.out.println("🔍 EmployeeController.testStatus - Testando endpoint");
+            return ResponseEntity.ok(java.util.Map.of("message", "Endpoint funcionando", "timestamp", System.currentTimeMillis()));
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeController.testStatus - Erro: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
         }
@@ -408,16 +422,41 @@ public class EmployeeController {
             System.out.println("[DEBUG] EmployeeController.getByStatus - Status convertido: " + employmentStatus);
             List<Employee> employees = employeeService.findByStatus(employmentStatus);
             System.out.println("[DEBUG] EmployeeController.getByStatus - Funcionários encontrados: " + employees.size());
-            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO).collect(java.util.stream.Collectors.toList());
+            // Converter um por um para identificar qual está causando problema
+            List<EmployeeDTO> dtos = new ArrayList<>();
+            for (int i = 0; i < employees.size(); i++) {
+                Employee employee = employees.get(i);
+                try {
+                    System.out.println("[DEBUG] Convertendo funcionário " + (i+1) + "/" + employees.size() + ": " + employee.getName());
+                    
+                    // Teste básico - apenas dados essenciais
+                    EmployeeDTO dto = new EmployeeDTO();
+                    dto.setId(employee.getId());
+                    dto.setName(employee.getName());
+                    dto.setEmail(employee.getEmail());
+                    dto.setStatus(employee.getStatus() != null ? employee.getStatus().name() : null);
+                    dto.setCreatedAt(employee.getCreatedAt());
+                    dto.setUpdatedAt(employee.getUpdatedAt());
+                    
+                    dtos.add(dto);
+                    System.out.println("[DEBUG] Funcionário " + (i+1) + " convertido com sucesso");
+                    
+                } catch (Exception ex) {
+                    System.err.println("[ERROR] Erro ao converter funcionário " + (i+1) + " (" + employee.getName() + "): " + ex.getMessage());
+                    ex.printStackTrace();
+                    // Continuar com os outros funcionários
+                }
+            }
+            
             System.out.println("[DEBUG] EmployeeController.getByStatus - DTOs criados: " + dtos.size());
             return ResponseEntity.ok(dtos);
         } catch (IllegalArgumentException e) {
             System.err.println("[ERROR] EmployeeController.getByStatus - Status inválido: " + status);
-            throw new IllegalArgumentException("Status inválido: " + status);
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.getByStatus - Erro geral: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            return ResponseEntity.status(500).build();
         }
     }
     

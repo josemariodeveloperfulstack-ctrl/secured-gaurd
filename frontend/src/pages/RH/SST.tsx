@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -260,16 +260,16 @@ const SST: React.FC = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="overview" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="overview" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="compliance" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="compliance" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Conformidade
             </TabsTrigger>
-            <TabsTrigger value="risks" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="risks" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Riscos
             </TabsTrigger>
-            <TabsTrigger value="actions" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="actions" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Ações
             </TabsTrigger>
           </TabsList>
@@ -547,6 +547,7 @@ const SST: React.FC = () => {
                 </CardContent>
               </Card>
 
+              {/* TODO: Implementar página de Inspeções
               <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/sst/inspecoes')}>
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
@@ -560,6 +561,7 @@ const SST: React.FC = () => {
                   </p>
                 </CardContent>
               </Card>
+              */}
 
               <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/sst/cipa')}>
                 <CardHeader>

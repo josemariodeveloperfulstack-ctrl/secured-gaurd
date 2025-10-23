@@ -60,9 +60,17 @@ export const ContasAPagar: React.FC = () => {
     }
   };
 
-  const handleEdit = (conta: ContaAPagar) => {
-    setEditingConta(conta);
-    setShowFormModal(true);
+  const handleEdit = async (conta: ContaAPagar) => {
+    try {
+      // Buscar a conta completa para garantir campos como companySigla e datas corretas
+      const full = await contasAPagarService.getContaAPagarById(conta.id!);
+      setEditingConta(full);
+    } catch (e) {
+      // fallback com o objeto atual
+      setEditingConta(conta);
+    } finally {
+      setShowFormModal(true);
+    }
   };
 
   const handleView = (conta: ContaAPagar) => {
@@ -361,6 +369,7 @@ export const ContasAPagar: React.FC = () => {
         open={showFormModal}
         onOpenChange={setShowFormModal}
         onSuccess={handleFormSuccess}
+        editMode={!!editingConta}
         initialData={editingConta}
       />
 

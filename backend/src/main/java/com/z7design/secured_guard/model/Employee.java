@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.ArrayList;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -119,17 +120,15 @@ public class Employee {
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "company_id")
-    @JsonIgnoreProperties("employees")
+    @JsonBackReference("company-employees")
     private Company company;
     
     // Dados Pessoais
-    // @NotBlank(message = "O estado civil é obrigatório")
-    // @Column(name = "marital_status")
-    // private String maritalStatus;
+    @Column(name = "marital_status")
+    private String maritalStatus;
     
-    // @NotBlank(message = "A nacionalidade é obrigatória")
-    // @Column
-    // private String nationality;
+    @Column(name = "nationality", length = 50)
+    private String nationality;
     
     // @Column(name = "photo_url")
     // private String photoUrl;
@@ -173,6 +172,11 @@ public class Employee {
     @JsonManagedReference("employee-time-records")
     private List<TimeRecord> timeRecords = new ArrayList<>();
 
+    // Dependentes
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
+    @JsonManagedReference("employee-dependents")
+    private List<Dependent> dependents = new ArrayList<>();
+
     // @Column(name = "caminho_pdf")
     // private String caminhoPdf;
 
@@ -186,8 +190,8 @@ public class Employee {
     // private Boolean possuiWhatsapp;
 
     // Campos adicionais para admissão completa
-    // @Column(name = "titulo_eleitor")
-    // private String tituloEleitor;
+    @Column(name = "titulo_eleitor", length = 20)
+    private String tituloEleitor;
 
     // @Column(name = "carteira_identidade")
     // private String carteiraIdentidade;

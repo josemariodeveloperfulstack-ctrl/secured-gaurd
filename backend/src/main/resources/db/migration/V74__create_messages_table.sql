@@ -2,12 +2,12 @@
 -- V203__create_messages_table.sql
 
 CREATE TABLE messages (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     sender_id UUID NOT NULL,
     recipient_id UUID,
-    recipient_group_id BIGINT,
+    recipient_group_id UUID,
     type VARCHAR(20) NOT NULL DEFAULT 'INDIVIDUAL',
     status VARCHAR(20) NOT NULL DEFAULT 'UNREAD',
     priority VARCHAR(20) NOT NULL DEFAULT 'NORMAL',

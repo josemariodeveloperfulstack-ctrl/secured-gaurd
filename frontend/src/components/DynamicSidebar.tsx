@@ -328,13 +328,13 @@ export function DynamicSidebar() {
       id: 'rh-sst-treinamentos',
       requiredPermission: 'EMPLOYEES_READ'
     },
-    {
-      icon: FileCheck,
-      text: 'Inspeções',
-      to: '/rh/sst/inspecoes',
-      id: 'rh-sst-inspecoes',
-      requiredPermission: 'EMPLOYEES_READ'
-    },
+    // {
+    //   icon: FileCheck,
+    //   text: 'Inspeções',
+    //   to: '/rh/sst/inspecoes', // TODO: Implementar
+    //   id: 'rh-sst-inspecoes',
+    //   requiredPermission: 'EMPLOYEES_READ'
+    // },
     {
       icon: Users,
       text: 'CIPA',

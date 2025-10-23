@@ -40,11 +40,28 @@ export interface OperationalSummary {
   resolvedOccurrences: number;
 }
 
+export interface SystemAlert {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | string;
+  createdAt: string;
+}
+
+export interface RecentActivity {
+  id: string;
+  user: string;
+  action: string;
+  module: string;
+  timestamp: string;
+}
+
 class DashboardService {
   /**
    * Formata números para exibição
    */
-  formatNumber(value: number): string {
+  formatNumber(value: number | null | undefined): string {
+    if (value == null || isNaN(Number(value))) return '0';
     if (value >= 1000000) {
       return (value / 1000000).toFixed(1) + 'M';
     } else if (value >= 1000) {
@@ -56,7 +73,8 @@ class DashboardService {
   /**
    * Formata valores monetários para exibição
    */
-  formatCurrency(value: number): string {
+  formatCurrency(value: number | null | undefined): string {
+    if (value == null || isNaN(Number(value))) value = 0;
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -179,6 +197,32 @@ class DashboardService {
     } catch (error) {
       console.error('❌ Erro ao verificar saúde do dashboard:', error);
       throw new Error('Falha ao verificar saúde do dashboard');
+    }
+  }
+
+  /**
+   * Busca notificações do sistema (deferido/assíncrono)
+   */
+  async getSystemAlerts(): Promise<SystemAlert[]> {
+    try {
+      const response = await api.get('/api/dashboard/alerts');
+      return response.data || [];
+    } catch (error) {
+      console.warn('⚠️ Falha ao buscar alerts, retornando vazio:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Busca atividades recentes (deferido/assíncrono)
+   */
+  async getRecentActivities(): Promise<RecentActivity[]> {
+    try {
+      const response = await api.get('/api/dashboard/activities');
+      return response.data || [];
+    } catch (error) {
+      console.warn('⚠️ Falha ao buscar atividades, retornando vazio:', error);
+      return [];
     }
   }
 }

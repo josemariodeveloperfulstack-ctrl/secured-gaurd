@@ -61,6 +61,19 @@ public class JwtService {
         return generateToken(extraClaims, user, jwtConfig.getExpiration());
     }
 
+    // Overloads to support generating tokens without a User entity (e.g., supervisors)
+    public String generateToken(String subject) {
+        return generateToken(new HashMap<>(), subject, jwtConfig.getExpiration());
+    }
+
+    public String generateToken(String subject, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        if (role != null) {
+            claims.put("role", role);
+        }
+        return generateToken(claims, subject, jwtConfig.getExpiration());
+    }
+
     public String generateRefreshToken(User user) {
         return generateToken(new HashMap<>(), user, jwtConfig.getRefreshTokenExpiration());
     }
@@ -88,6 +101,34 @@ public class JwtService {
             return token;
         } catch (Exception e) {
             log.error("Erro ao gerar token: {}", e.getMessage());
+            throw new RuntimeException("Erro ao gerar token: " + e.getMessage());
+        }
+    }
+
+    // Internal generator allowing raw subject (no User object)
+    private String generateToken(
+            Map<String, Object> extraClaims,
+            String subject,
+            long expirationTime
+    ) {
+        try {
+            Date now = new Date();
+            Date expiryDate = new Date(now.getTime() + expirationTime);
+
+            log.info("Gerando token para subject: {}, expira em: {} ({} ms)", subject, expiryDate, expirationTime);
+
+            String token = Jwts.builder()
+                    .setClaims(extraClaims)
+                    .setSubject(subject)
+                    .setIssuedAt(now)
+                    .setExpiration(expiryDate)
+                    .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                    .compact();
+
+            log.info("Token gerado com sucesso para subject: {}", subject);
+            return token;
+        } catch (Exception e) {
+            log.error("Erro ao gerar token (subject): {}", e.getMessage());
             throw new RuntimeException("Erro ao gerar token: " + e.getMessage());
         }
     }

@@ -86,8 +86,9 @@ public class UserService {
             throw new IllegalArgumentException("Senha deve ter pelo menos 6 caracteres");
         }
         
-        // Validar se a senha contém pelo menos uma maiúscula, uma minúscula, um número e um caractere especial
-        if (!user.getPassword().matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+        // Permitir exceção para padrão cpf@2025 usado em criação automática de COLABORADOR
+        boolean isCpfDefault = user.getPassword().matches("^\\d{11}@2025$");
+        if (!isCpfDefault && !user.getPassword().matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
             throw new IllegalArgumentException("Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial");
         }
         
@@ -143,6 +144,10 @@ public class UserService {
 
     public List<User> searchUsers(String query) {
         return userRepository.searchUsers(query);
+    }
+    
+    public Optional<User> findByEmployeeCpf(String cpf) {
+        return userRepository.findByEmployeeCpf(cpf);
     }
 
     public RoleRepository getRoleRepository() {

@@ -71,7 +71,9 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   const filteredEscalas = safeEscalas.filter(escala => {
     const matchesSearch = 
       (escala.employee?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (escala.location?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      (escala.location?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (escala.workPost?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (escala.workPost?.postCode?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || escala.status === statusFilter;
     
@@ -137,7 +139,7 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <Input
-                placeholder="Buscar por funcionário ou local..."
+                placeholder="Buscar por funcionário, local ou posto de trabalho..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-red"
@@ -182,6 +184,7 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
             <TableRow className="border-b-gray-700">
               <TableHead className="text-gray-400">Funcionário</TableHead>
               <TableHead className="text-gray-400">Localização</TableHead>
+              <TableHead className="text-gray-400">Posto de Trabalho</TableHead>
               <TableHead className="text-gray-400">Data</TableHead>
               <TableHead className="text-gray-400">Turno</TableHead>
               <TableHead className="text-gray-400">Status</TableHead>
@@ -210,6 +213,19 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                       <span className="text-gray-300">{escala.location?.name || '-'}</span>
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 bg-green-500/20 rounded-full flex items-center justify-center">
+                        <Building className="text-green-400" size={18} />
+                      </div>
+                      <div>
+                        <div className="text-gray-300 font-medium">{escala.workPost?.name || '-'}</div>
+                        {escala.workPost?.postCode && (
+                          <div className="text-xs text-gray-400">{escala.workPost.postCode}</div>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-gray-300">{formatDate(escala.scheduleDate)}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">
@@ -222,13 +238,43 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => onView(escala)} title="Visualizar">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('🔍 Botão Visualizar clicado para escala:', escala.id);
+                          onView(escala);
+                        }} 
+                        title="Visualizar"
+                      >
                         <Eye className="h-5 w-5 text-gray-400 hover:text-blue-400" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => onEdit(escala)} title="Editar">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('✏️ Botão Editar clicado para escala:', escala.id);
+                          onEdit(escala);
+                        }} 
+                        title="Editar"
+                      >
                         <Edit className="h-5 w-5 text-gray-400 hover:text-green-400" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => onDelete(escala)} title="Excluir">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('🗑️ Botão Excluir clicado para escala:', escala.id);
+                          onDelete(escala);
+                        }} 
+                        title="Excluir"
+                      >
                         <Trash2 className="h-5 w-5 text-gray-400 hover:text-red-400" />
                       </Button>
                     </div>

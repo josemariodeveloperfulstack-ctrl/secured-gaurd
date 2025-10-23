@@ -20,10 +20,13 @@ import com.z7design.secured_guard.model.Department;
 import com.z7design.secured_guard.model.Message;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.MessageType;
+import com.z7design.secured_guard.model.enums.MessageStatus;
+import com.z7design.secured_guard.model.MessageDeletionLog;
 import com.z7design.secured_guard.repository.DepartmentRepository;
 import com.z7design.secured_guard.repository.MessageRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.UserGroupRepository;
+import com.z7design.secured_guard.repository.MessageDeletionLogRepository;
 
 import lombok.extern.slf4j.Slf4j;
 import com.z7design.secured_guard.dto.UserResponseDTO;
@@ -48,6 +51,9 @@ public class MessageService {
     
     @Autowired
     private EmailService emailService;
+    
+    @Autowired
+    private MessageDeletionLogRepository messageDeletionLogRepository;
     
     @Autowired
     private NotificationService notificationService;
@@ -167,6 +173,7 @@ public class MessageService {
         }
         
         message.setReadAt(LocalDateTime.now());
+        message.setStatus(MessageStatus.READ);
         messageRepository.save(message);
     }
     
@@ -292,6 +299,122 @@ public class MessageService {
     }
     
     /**
+     * Busca mensagens por status
+     */
+    public Page<MessageResponseDTO> getMessagesByStatus(UUID userId, MessageStatus status, Pageable pageable) {
+        log.info("Buscando mensagens com status {} para usuário: {}", status, userId);
+        
+        Page<Message> messages = messageRepository.findByRecipientIdAndStatus(userId, status, pageable);
+        return messages.map(this::convertToDTO);
+    }
+    
+    /**
+     * Busca mensagens não lidas
+     */
+    public List<MessageResponseDTO> getUnreadMessages(UUID userId) {
+        log.info("Buscando mensagens não lidas para usuário: {}", userId);
+        
+        List<Message> messages = messageRepository.findUnreadByUserId(userId);
+        return messages.stream().map(this::convertToDTO).collect(Collectors.toList());
+    }
+    
+    /**
+     * Marca todas as mensagens não lidas como lidas
+     */
+    public void markAllAsRead(UUID userId) {
+        log.info("Marcando todas as mensagens como lidas para usuário: {}", userId);
+        
+        List<Message> unreadMessages = messageRepository.findUnreadByUserId(userId);
+        
+        for (Message message : unreadMessages) {
+            message.setStatus(MessageStatus.READ);
+            message.setReadAt(LocalDateTime.now());
+        }
+        
+        messageRepository.saveAll(unreadMessages);
+        log.info("{} mensagens marcadas como lidas", unreadMessages.size());
+    }
+    
+    /**
+     * Arquiva mensagem
+     */
+    public void archiveMessage(UUID messageId, UUID userId) {
+        log.info("Arquivando mensagem {} para usuário {}", messageId, userId);
+        
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
+        
+        // Verificar se o usuário é destinatário
+        boolean isRecipient = message.getRecipients().stream()
+            .anyMatch(user -> user.getId().equals(userId));
+        
+        if (!isRecipient) {
+            throw new BusinessException("Usuário não é destinatário desta mensagem");
+        }
+        
+        message.setStatus(MessageStatus.ARCHIVED);
+        messageRepository.save(message);
+    }
+    
+    /**
+     * Restaura mensagem arquivada
+     */
+    public void restoreMessage(UUID messageId, UUID userId) {
+        log.info("Restaurando mensagem {} para usuário {}", messageId, userId);
+        
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
+        
+        // Verificar se o usuário é destinatário
+        boolean isRecipient = message.getRecipients().stream()
+            .anyMatch(user -> user.getId().equals(userId));
+        
+        if (!isRecipient) {
+            throw new BusinessException("Usuário não é destinatário desta mensagem");
+        }
+        
+        message.setStatus(MessageStatus.READ);
+        messageRepository.save(message);
+    }
+    
+    /**
+     * Deleta mensagem com registro de motivo
+     */
+    public void deleteMessage(UUID messageId, UUID userId, String deletionReason, String ipAddress) {
+        log.info("Deletando mensagem {} pelo usuário {}", messageId, userId);
+        
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+        
+        // Criar log de exclusão
+        MessageDeletionLog deletionLog = MessageDeletionLog.builder()
+            .messageId(messageId)
+            .messageTitle(message.getTitle())
+            .deletedBy(user)
+            .deletionReason(deletionReason)
+            .ipAddress(ipAddress)
+            .build();
+        
+        messageDeletionLogRepository.save(deletionLog);
+        
+        // Deletar mensagem
+        messageRepository.delete(message);
+        
+        log.info("Mensagem {} deletada com sucesso. Motivo: {}", messageId, deletionReason);
+    }
+    
+    /**
+     * Busca logs de exclusão de mensagens
+     */
+    public List<MessageDeletionLog> getDeletionLogs(UUID userId) {
+        log.info("Buscando logs de exclusão para usuário: {}", userId);
+        return messageDeletionLogRepository.findAll();
+    }
+
+    /**
      * Converte entidade para DTO
      */
     private MessageResponseDTO convertToDTO(Message message) {
@@ -301,6 +424,7 @@ public class MessageService {
         dto.setContent(message.getContent());
         dto.setType(message.getType());
         dto.setPriority(message.getPriority());
+        dto.setStatus(message.getStatus());
         dto.setSendEmail(message.getSendEmail());
         dto.setSendNotification(message.getSendNotification());
         dto.setScheduledAt(message.getScheduledAt());

@@ -7,7 +7,6 @@ import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -136,6 +135,11 @@ public class ScheduleController {
                             "id", "loc-001",
                             "name", "NOTURNO"
                         ),
+                        "workPost", Map.of(
+                            "id", "wp-001",
+                            "name", "Posto Central",
+                            "postCode", "PC-001"
+                        ),
                         "status", "PENDING",
                         "observations", "Escala noturna - 22:00 às 06:00",
                         "createdAt", "2025-01-29T10:00:00Z",
@@ -152,6 +156,11 @@ public class ScheduleController {
                         "location", Map.of(
                             "id", "loc-002",
                             "name", "ITATIAIA"
+                        ),
+                        "workPost", Map.of(
+                            "id", "wp-002",
+                            "name", "Posto Secundário",
+                            "postCode", "PS-002"
                         ),
                         "status", "PENDING",
                         "observations", "Escala diurna - 06:00 às 18:00",

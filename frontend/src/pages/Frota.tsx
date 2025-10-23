@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1330,25 +1330,25 @@ const Frota: React.FC = () => {
         {/* Tabs */}
         <Tabs defaultValue="veiculos" className="w-full">
           <TabsList className="grid w-full grid-cols-7 bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="veiculos" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="veiculos" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Veículos
             </TabsTrigger>
-            <TabsTrigger value="abastecimentos" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="abastecimentos" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Abastecimentos
             </TabsTrigger>
-            <TabsTrigger value="manutencoes" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="manutencoes" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Manutenções
             </TabsTrigger>
-            <TabsTrigger value="controle-km" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="controle-km" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Controle de KM
             </TabsTrigger>
-            <TabsTrigger value="estatisticas" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="estatisticas" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Estatísticas
             </TabsTrigger>
-            <TabsTrigger value="motoristas" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="motoristas" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Motoristas
             </TabsTrigger>
-            <TabsTrigger value="multas" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="multas" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Multas
             </TabsTrigger>
           </TabsList>

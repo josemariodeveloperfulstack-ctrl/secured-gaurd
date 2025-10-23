@@ -1,186 +1,125 @@
 import api from '@/lib/axios';
-import { Employee } from '@/types/employee';
 
-export interface EmployeeFilters {
+export interface Employee {
+  id: string;
+  name: string;
+  document?: string;
+  birthDate?: string;
+  registrationNumber?: string;
+  hireDate?: string;
+  terminationDate?: string;
   status?: string;
-  unitId?: string;
-  positionId?: string;
-  searchTerm?: string;
-  sortBy?: string;
-  sortDir?: 'ASC' | 'DESC';
+  notes?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  cnhNumber?: string;
+  ctps?: string;
+  cbo?: string;
+  pis?: string;
+  salario?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SimpleEmployee {
   id: string;
   name: string;
-  cpf: string;
-  email: string;
-  phone: string;
-  registrationNumber: string;
-  positionName?: string;
-  unitName?: string;
+  email?: string;
+  phone?: string;
+  document?: string;
 }
 
 export const employeeService = {
-  // Buscar todos os funcionários com filtros
-  async getEmployees(filters: EmployeeFilters = {}): Promise<Employee[]> {
-    try {
-      // Se há filtro de status específico, usar endpoint dedicado
-      if (filters.status && filters.status !== 'all') {
-        return await this.getEmployeesByStatus(filters.status);
-      }
-
-      // Se há filtro de unidade, usar endpoint dedicado
-      if (filters.unitId) {
-        return await this.getEmployeesByUnit(filters.unitId);
-      }
-
-      // Se há filtro de posição, usar endpoint dedicado
-      if (filters.positionId) {
-        return await this.getEmployeesByPosition(filters.positionId);
-      }
-
-      // Se há termo de busca, usar endpoint de busca (se existir) ou filtrar localmente
-      if (filters.searchTerm) {
-        // Por enquanto, buscar todos e filtrar localmente
-        const allEmployees = await this.getAllEmployees();
-        return allEmployees.filter(emp =>
-          emp.name.toLowerCase().includes(filters.searchTerm!.toLowerCase()) ||
-          (emp.email && emp.email.toLowerCase().includes(filters.searchTerm!.toLowerCase())) ||
-          (emp.cpf && emp.cpf.includes(filters.searchTerm!)) ||
-          (emp.registrationNumber && emp.registrationNumber.toLowerCase().includes(filters.searchTerm!.toLowerCase()))
-        );
-      }
-
-      // Caso padrão: buscar todos os funcionários
-      return await this.getAllEmployees();
-    } catch (error) {
-      console.error('Erro ao buscar funcionários:', error);
-      throw new Error('Falha ao buscar funcionários');
-    }
-  },
-
-  // Buscar todos os funcionários (sem filtros)
+  /**
+   * Buscar todos os funcionários
+   */
   async getAllEmployees(): Promise<Employee[]> {
     try {
-      const response = await api.get('/employees');
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar todos os funcionários:', error);
-      throw new Error('Falha ao buscar funcionários');
-    }
-  },
-
-  // Buscar funcionários por status
-  async getEmployeesByStatus(status: string): Promise<Employee[]> {
-    try {
-      const response = await api.get(`/employees/status/${status}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar funcionários por status:', error);
-      throw new Error('Falha ao buscar funcionários por status');
-    }
-  },
-
-  // Buscar funcionários por unidade
-  async getEmployeesByUnit(unitId: string): Promise<Employee[]> {
-    try {
-      const response = await api.get(`/hr/employees/by-unit/${unitId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar funcionários por unidade:', error);
-      throw new Error('Falha ao buscar funcionários por unidade');
-    }
-  },
-
-  // Buscar funcionários por posição
-  async getEmployeesByPosition(positionId: string): Promise<Employee[]> {
-    try {
-      const response = await api.get(`/hr/employees/by-position/${positionId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar funcionários por posição:', error);
-      throw new Error('Falha ao buscar funcionários por posição');
-    }
-  },
-
-  // Buscar funcionário por ID
-  async getEmployeeById(id: string): Promise<Employee> {
-    try {
-      const response = await api.get(`/employees/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar funcionário por ID:', error);
-      throw new Error('Falha ao buscar funcionário');
-    }
-  },
-
-  // Criar novo funcionário
-  async createEmployee(employee: Partial<Employee>): Promise<Employee> {
-    try {
-      const response = await api.post('/employees', employee);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao criar funcionário:', error);
-      throw new Error('Falha ao criar funcionário');
-    }
-  },
-
-  // Atualizar funcionário
-  async updateEmployee(id: string, employee: Partial<Employee>): Promise<Employee> {
-    try {
-      const response = await api.put(`/employees/${id}`, employee);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao atualizar funcionário:', error);
-      throw new Error('Falha ao atualizar funcionário');
-    }
-  },
-
-  // Excluir funcionário
-  async deleteEmployee(id: string): Promise<void> {
-    try {
-      await api.delete(`/employees/${id}`);
-    } catch (error) {
-      console.error('Erro ao excluir funcionário:', error);
-      throw new Error('Falha ao excluir funcionário');
-    }
-  },
-
-  // Verificar se email já existe
-  async checkEmailExists(email: string): Promise<boolean> {
-    try {
-      await api.get(`/employees/email/${email}`);
-      return true; // Se não lançar erro, o email existe
-    } catch (error) {
-      return false;
-    }
-  },
-
-  // Buscar funcionários com filtros avançados
-  async searchEmployees(query: string): Promise<Employee[]> {
-    try {
-      const response = await api.get(`/employees/search?q=${encodeURIComponent(query)}`);
+      const response = await api.get('/api/employees');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
-      throw new Error('Falha ao buscar funcionários');
+      return [];
     }
   },
 
-  // Buscar funcionários simplificados para seleção em formulários
+  /**
+   * Buscar funcionários simplificados para seleção
+   */
+  async getSimpleEmployees(): Promise<SimpleEmployee[]> {
+    try {
+      const response = await api.get('/api/employees/basic');
+      const data = response.data;
+      
+      if (data && data.employees) {
+        return data.employees.map((emp: any) => ({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          phone: emp.phone,
+          document: emp.document
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Erro ao buscar funcionários simplificados:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Buscar funcionário por ID
+   */
+  async getEmployeeById(id: string): Promise<Employee | null> {
+    try {
+      const response = await api.get(`/api/employees/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar funcionário:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Buscar funcionários por nome
+   */
+  async searchEmployeesByName(name: string): Promise<Employee[]> {
+    try {
+      const response = await api.get(`/api/employees/search/name?name=${encodeURIComponent(name)}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar funcionários por nome:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Buscar funcionários por termo (nome ou documento)
+   */
+  async searchEmployees(query: string): Promise<Employee[]> {
+    try {
+      const response = await api.get(`/api/employees/search?q=${encodeURIComponent(query)}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar funcionários:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Buscar funcionários simplificados por termo
+   */
   async searchSimpleEmployees(query: string): Promise<SimpleEmployee[]> {
     try {
-      const response = await api.get(`/employees/search/simple?q=${encodeURIComponent(query)}`);
+      const response = await api.get(`/api/employees/search/simple?q=${encodeURIComponent(query)}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
-      throw new Error('Falha ao buscar funcionários');
+      return [];
     }
-  },
-
-  // Buscar funcionários ativos
-  async getActiveEmployees(): Promise<Employee[]> {
-    return this.getEmployeesByStatus('ACTIVE');
   }
-}; 
+};
+
+export default employeeService;

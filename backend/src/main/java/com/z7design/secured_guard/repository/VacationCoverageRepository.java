@@ -15,6 +15,9 @@ public interface VacationCoverageRepository extends JpaRepository<VacationCovera
     
     List<VacationCoverage> findBySubstituteEmployeeId(UUID substituteEmployeeId);
     
+    // VacationCoverage não tem campo employee direto; employee está em Vacation
+    List<VacationCoverage> findByVacationEmployeeId(UUID employeeId);
+    
     List<VacationCoverage> findByStatus(VacationCoverage.CoverageStatus status);
     
     @Query("SELECT vc FROM VacationCoverage vc WHERE " +

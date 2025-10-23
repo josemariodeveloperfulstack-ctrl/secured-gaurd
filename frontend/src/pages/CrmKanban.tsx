@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import KanbanBoard from '../components/comercial/KanbanBoard';
 import CrmDashboard from '../components/comercial/CrmDashboard';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -75,14 +75,14 @@ export default function CrmKanban() {
           <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border border-gray-600">
             <TabsTrigger 
               value="kanban" 
-              className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+              className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
             >
               <Trello className="h-4 w-4 mr-2" />
               Kanban Board
             </TabsTrigger>
             <TabsTrigger 
               value="dashboard" 
-              className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+              className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
             >
               <BarChart3 className="h-4 w-4 mr-2" />
               Dashboard

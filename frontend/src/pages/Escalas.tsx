@@ -208,6 +208,7 @@ const Escalas = () => {
 
   // Função para editar escala
   const handleEditEscala = (escala: Schedule) => {
+    console.log('✏️ handleEditEscala chamado para:', escala);
     setSelectedEscala(escala);
     setModalMode('edit');
     setIsModalOpen(true);
@@ -215,6 +216,7 @@ const Escalas = () => {
 
   // Função para visualizar escala
   const handleViewEscala = (escala: Schedule) => {
+    console.log('🔍 handleViewEscala chamado para:', escala);
     setSelectedEscala(escala);
     setModalMode('view');
     setIsModalOpen(true);

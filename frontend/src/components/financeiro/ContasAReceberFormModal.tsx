@@ -66,7 +66,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     descricao: '',
     tipo: 'FATURA',
     valor: 0,
-    codigoBarras: '',
     status: 'ABERTA',
     baixa: false,
     dataPagamento: undefined,
@@ -96,13 +95,16 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
         });
 
       // Carregar empresas
+      console.log('🔍 DEBUG: Carregando empresas...');
       contasAReceberService.getEmpresas()
         .then(data => {
+          console.log('🔍 DEBUG: Empresas recebidas:', data);
           const empresasArray = Array.isArray(data) ? data : [];
+          console.log('🔍 DEBUG: Empresas processadas:', empresasArray);
           setEmpresas(empresasArray);
         })
         .catch(error => {
-          console.error('Erro ao carregar empresas:', error);
+          console.error('❌ Erro ao carregar empresas:', error);
           setEmpresas([
             { id: '1', name: 'Empresa Exemplo 1' },
             { id: '2', name: 'Empresa Exemplo 2' }
@@ -178,7 +180,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           descricao: '',
           tipo: 'FATURA',
           valor: 0,
-          codigoBarras: '',
           status: 'ABERTA',
           baixa: false,
           dataPagamento: undefined,
@@ -306,11 +307,11 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                 </label>
                 <DatePicker
                   selected={formData.dataEmissao}
-                  onChange={(date) => handleInputChange('dataEmissao', date)}
+                  onChange={(date: Date | null) => handleInputChange('dataEmissao', date)}
                   dateFormat="dd/MM/yyyy"
                   locale={ptBR}
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
-                  {...DEFAULT_DATE_PICKER_PROPS}
+                  placeholderText="dd/mm/aaaa"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
                   required
                 />
               </div>
@@ -323,11 +324,11 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                 </label>
                 <DatePicker
                   selected={formData.vencimento}
-                  onChange={(date) => handleInputChange('vencimento', date)}
+                  onChange={(date: Date | null) => handleInputChange('vencimento', date)}
                   dateFormat="dd/MM/yyyy"
                   locale={ptBR}
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
-                  {...DEFAULT_DATE_PICKER_PROPS}
+                  placeholderText="dd/mm/aaaa"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
                   required
                 />
               </div>
@@ -384,7 +385,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   onValueChange={(value) => {
                     const empresa = empresas.find(e => e.id === value);
                     handleInputChange('empresaId', value);
-                    handleInputChange('empresa', empresa?.name || '');
+                    handleInputChange('empresa', empresa?.sigla || empresa?.name || '');
                   }}
                   required
                 >
@@ -392,15 +393,21 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <SelectValue placeholder="Selecione uma empresa" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    {empresas.map((empresa) => (
-                      <SelectItem 
-                        key={empresa.id} 
-                        value={empresa.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {empresa.name}
+                    {empresas.length === 0 ? (
+                      <SelectItem value="no-data" disabled className="text-gray-500">
+                        Carregando empresas...
                       </SelectItem>
-                    ))}
+                    ) : (
+                      empresas.map((empresa) => (
+                        <SelectItem 
+                          key={empresa.id} 
+                          value={empresa.id}
+                          className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        >
+                          {empresa.sigla || empresa.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -546,21 +553,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
               <FileText size={18} />
               Informações Adicionais
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Código de Barras */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
-                  <FileText size={14} />
-                  Código de Barras
-                </label>
-                <Input
-                  value={formData.codigoBarras}
-                  onChange={(e) => handleInputChange('codigoBarras', e.target.value)}
-                  placeholder="Código de barras (opcional)"
-                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                />
-              </div>
-
+            <div className="grid grid-cols-1 gap-6">
               {/* Observações */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">

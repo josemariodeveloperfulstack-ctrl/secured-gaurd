@@ -32,6 +32,9 @@ public class VehicleDTO {
     private String assignedDriver;
     private UUID responsibleEmployeeId;
     private String department;
+    private UUID departmentId;
+    private UUID companyId;
+    private UUID workPostId;
     private String location;
     private LocalDate acquisitionDate;
     private BigDecimal acquisitionValue;
@@ -74,6 +77,9 @@ public class VehicleDTO {
             dto.setAssignedDriver(vehicle.getAssignedDriver());
             dto.setResponsibleEmployeeId(vehicle.getResponsibleEmployeeId());
             dto.setDepartment(vehicle.getDepartment());
+            dto.setDepartmentId(vehicle.getDepartmentId());
+            dto.setCompanyId(vehicle.getCompanyId());
+            dto.setWorkPostId(vehicle.getWorkPostId());
             dto.setLocation(vehicle.getLocation());
             dto.setAcquisitionDate(vehicle.getAcquisitionDate());
             dto.setAcquisitionValue(vehicle.getAcquisitionValue());
@@ -124,6 +130,9 @@ public class VehicleDTO {
         vehicle.setAssignedDriver(this.assignedDriver);
         vehicle.setResponsibleEmployeeId(this.responsibleEmployeeId);
         vehicle.setDepartment(this.department);
+        vehicle.setDepartmentId(this.departmentId);
+        vehicle.setCompanyId(this.companyId);
+        vehicle.setWorkPostId(this.workPostId);
         vehicle.setLocation(this.location);
         vehicle.setAcquisitionDate(this.acquisitionDate);
         vehicle.setAcquisitionValue(this.acquisitionValue);

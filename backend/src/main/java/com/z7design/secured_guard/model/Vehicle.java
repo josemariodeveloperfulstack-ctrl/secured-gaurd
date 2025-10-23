@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -67,6 +68,17 @@ public class Vehicle {
     @Column
     private String department;
     
+    @Column(name = "department_id")
+    private UUID departmentId;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", insertable = false, updatable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Department departmentEntity;
+    
+    @Column(name = "work_post_id")
+    private UUID workPostId;
+    
     @Column
     private String location;
     
@@ -104,6 +116,16 @@ public class Vehicle {
     
     @Column
     private String photos; // URLs das fotos do veículo (separadas por vírgula)
+    
+    // Campo company_id
+    @Column(name = "company_id")
+    private UUID companyId;
+    
+    // Relacionamento com Company (opcional)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", insertable = false, updatable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Company company;
     
     @Column(nullable = false)
     private LocalDateTime createdAt;

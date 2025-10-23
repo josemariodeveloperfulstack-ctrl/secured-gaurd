@@ -222,7 +222,7 @@ public class SeetaFace2Service {
     
     // Métodos auxiliares
     
-    private byte[] extractFaceTemplate(MultipartFile imageFile) throws IOException {
+    public byte[] extractFaceTemplate(MultipartFile imageFile) throws IOException {
         log.debug("Extraindo template facial da imagem: {}", imageFile.getOriginalFilename());
         
         if (seetaFace2Enabled && !modelPath.isEmpty()) {
@@ -241,7 +241,7 @@ public class SeetaFace2Service {
         return imageFile.getBytes();
     }
     
-    private double calculateFaceQuality(MultipartFile imageFile) throws IOException {
+    public double calculateFaceQuality(MultipartFile imageFile) throws IOException {
         log.debug("Calculando qualidade da face da imagem: {}", imageFile.getOriginalFilename());
         
         if (seetaFace2Enabled && !modelPath.isEmpty()) {
@@ -391,7 +391,7 @@ public class SeetaFace2Service {
             
             logFacialRecognition(null, null, FacialRecognitionLog.RecognitionType.LOGIN, 
                 null, BigDecimal.valueOf(0.0), 
-                FacialRecognitionLog.RecognitionStatus.ERROR, "Erro interno: " + e.getMessage());
+                FacialRecognitionLog.RecognitionStatus.FAILED, "Erro interno: " + e.getMessage());
             
             throw e;
         }

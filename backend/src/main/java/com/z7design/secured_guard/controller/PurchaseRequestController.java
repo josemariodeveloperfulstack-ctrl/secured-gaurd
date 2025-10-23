@@ -20,6 +20,7 @@ public class PurchaseRequestController {
     private final PurchaseRequestService purchaseRequestService;
     
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO')")
     public ResponseEntity<List<PurchaseRequestDTO>> getAllPurchaseRequests() {
         log.info("Buscando todas as requisições de compra");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getAllPurchaseRequests();
@@ -27,6 +28,7 @@ public class PurchaseRequestController {
     }
     
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> getPurchaseRequestById(@PathVariable UUID id) {
         log.info("Buscando requisição de compra com ID: {}", id);
         return purchaseRequestService.getPurchaseRequestById(id)
@@ -35,6 +37,7 @@ public class PurchaseRequestController {
     }
     
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS')")
     public ResponseEntity<PurchaseRequestDTO> createPurchaseRequest(@RequestBody PurchaseRequestDTO requestDTO) {
         log.info("Criando nova requisição de compra: {}", requestDTO.getTitle());
         PurchaseRequestDTO createdRequest = purchaseRequestService.createPurchaseRequest(requestDTO);
@@ -42,6 +45,7 @@ public class PurchaseRequestController {
     }
     
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS')")
     public ResponseEntity<PurchaseRequestDTO> updatePurchaseRequest(@PathVariable UUID id, @RequestBody PurchaseRequestDTO requestDTO) {
         log.info("Atualizando requisição de compra com ID: {}", id);
         try {
@@ -53,6 +57,7 @@ public class PurchaseRequestController {
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<Void> deletePurchaseRequest(@PathVariable UUID id) {
         log.info("Deletando requisição de compra com ID: {}", id);
         purchaseRequestService.deletePurchaseRequest(id);
@@ -60,6 +65,7 @@ public class PurchaseRequestController {
     }
     
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> approveRequest(
             @PathVariable UUID id,
             @RequestParam String approverName,
@@ -74,6 +80,7 @@ public class PurchaseRequestController {
     }
     
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> rejectRequest(
             @PathVariable UUID id,
             @RequestParam String rejectorName,

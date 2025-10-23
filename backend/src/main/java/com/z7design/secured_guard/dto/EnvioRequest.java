@@ -17,8 +17,8 @@ public class EnvioRequest {
     private String tipo; // "email" ou "whatsapp"
     
     private String funcionarioId; // Para envio individual
+    private String cpf; // Para envio individual por CPF
     
-    @NotEmpty(message = "Lista de funcionários é obrigatória para envio em massa")
     private List<String> funcionarioIds; // Para envio em massa
     
     private String mensagem; // Mensagem personalizada

@@ -222,6 +222,9 @@ export const contasAPagarService = {
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
       fornecedorId: invoice.supplierId,
+      empresa: invoice.companyName || (invoice.company && invoice.company.name) || undefined,
+      empresaId: invoice.companyId || (invoice.company && invoice.company.id) || undefined,
+      companySigla: invoice.companySigla || (invoice.company && invoice.company.sigla) || undefined,
       descricao: invoice.description,
       tipo: invoice.type || 'VARIAVEL',
       valor: parseFloat(invoice.amount),
@@ -237,7 +240,7 @@ export const contasAPagarService = {
 
   // Buscar conta por ID
   async getContaAPagarById(id: string): Promise<ContaAPagar> {
-    const response = await api.get(`/api/invoices/${id}`);
+      const response = await api.get(`/api/invoices/${id}`);
     const invoice = response.data;
     
     return {
@@ -246,6 +249,9 @@ export const contasAPagarService = {
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: invoice.supplierName || 'Não informado',
       fornecedorId: invoice.supplierId,
+      empresa: invoice.companyName || (invoice.company && invoice.company.name) || undefined,
+      empresaId: invoice.companyId || (invoice.company && invoice.company.id) || undefined,
+      companySigla: invoice.companySigla || (invoice.company && invoice.company.sigla) || undefined,
       cliente: invoice.clientName,
       clienteId: invoice.clientId,
       contrato: invoice.contractNumber,
@@ -269,7 +275,7 @@ export const contasAPagarService = {
     let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
     
     try {
-      const unitsResponse = await api.get('/units');
+      const unitsResponse = await api.get('/api/units');
       if (unitsResponse.data && unitsResponse.data.length > 0) {
         unitId = unitsResponse.data[0].id;
       }
@@ -448,10 +454,12 @@ export const contasAPagarService = {
 
   // Buscar todas as empresas
   async getEmpresas(): Promise<any[]> {
-    const response = await api.get('/api/units');
-    console.log('🔍 DEBUG: Resposta da API /api/units:', response.data);
-    const data = response.data;
-    return Array.isArray(data) ? data : [];
+    // Buscar diretamente da tabela de empresas para obter a sigla correta
+    const response = await api.get('/api/companies');
+    console.log('🔍 DEBUG: Resposta da API /api/companies:', response.data);
+    const data = Array.isArray(response.data) ? response.data : (response.data?.content ?? []);
+    // Normalizar para sempre conter id, name e sigla
+    return data.map((c: any) => ({ id: c.id, name: c.name, sigla: c.sigla }));
   },
 
   // Criar fornecedor

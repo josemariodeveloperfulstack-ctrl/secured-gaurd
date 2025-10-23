@@ -108,6 +108,7 @@ const mainMenuItems = [
 const rhMenuItems = [
   { icon: Users, text: 'RH Principal', to: '/rh', id: 'rh' },
   { icon: User2, text: 'Funcionários', to: '/rh/funcionarios', id: 'rh-funcionarios' },
+  { icon: MapPin, text: 'Postos de Trabalho', to: '/rh/postos', id: 'rh-postos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
   { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
@@ -123,7 +124,7 @@ const sstMenuItems = [
   { icon: HardHat, text: 'EPIs', to: '/rh/sst/epis', id: 'rh-sst-epis' },
   { icon: AlertTriangle, text: 'Acidentes', to: '/rh/sst/acidentes', id: 'rh-sst-acidentes' },
   { icon: GraduationCap, text: 'Treinamentos SST', to: '/rh/sst/treinamentos', id: 'rh-sst-treinamentos' },
-  { icon: FileCheck, text: 'Inspeções', to: '/rh/sst/inspecoes', id: 'rh-sst-inspecoes' },
+  // { icon: FileCheck, text: 'Inspeções', to: '/rh/sst/inspecoes', id: 'rh-sst-inspecoes' }, // TODO: Implementar página de inspeções
   { icon: Users, text: 'CIPA', to: '/rh/sst/cipa', id: 'rh-sst-cipa' },
   { icon: BarChart3, text: 'Relatórios SST', to: '/rh/sst/relatorios', id: 'rh-sst-relatorios' },
 ];
@@ -167,6 +168,7 @@ const departamentoPessoalMenuItems = [
 // Módulo Comercial
 const comercialMenuItems = [
   { icon: Target, text: 'Leads', to: '/leads', id: 'leads' },
+  { icon: Building, text: 'Empresas', to: '/comercial/empresas', id: 'empresas' },
   { icon: Building2, text: 'Clientes', to: '/clientes', id: 'clientes' },
   { icon: FileCheck, text: 'Propostas', to: '/propostas', id: 'propostas' },
   { icon: Calculator, text: 'Orçamentos', to: '/orcamentos', id: 'orcamentos' },
@@ -179,13 +181,14 @@ const estoqueMenuItems = [
   { icon: Package, text: 'Estoque Simplificado', to: '/estoque-simplificado', id: 'estoque-simplificado' },
   { icon: BarChart3, text: 'Relatórios de Estoque', to: '/estoque/relatorios', id: 'estoque-relatorios' },
   { icon: AlertTriangle, text: 'Alertas de Estoque', to: '/estoque-simplificado?tab=alertas', id: 'estoque-alertas' },
+  { icon: Handshake, text: 'Fornecedores', to: '/estoque/fornecedores', id: 'estoque-fornecedores' },
 ];
 
-// Módulo Suporte
-const suporteMenuItems = [
-  { icon: Headphones, text: 'Central de Suporte', to: '/suporte', id: 'suporte' },
-  { icon: Send, text: 'Tickets', to: '/tickets', id: 'tickets' },
-];
+// Módulo Suporte - REMOVIDO (substituído por Gestão de Atendimento)
+// const suporteMenuItems = [
+//   { icon: Headphones, text: 'Central de Suporte', to: '/suporte', id: 'suporte' },
+//   { icon: Send, text: 'Tickets', to: '/tickets', id: 'tickets' },
+// ];
 
 // ===== MÓDULO DE COMUNICAÇÃO INTERNA (SIMPLIFICADO) =====
 const comunicacaoInternaMenuItems = [
@@ -277,7 +280,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       ...comercialMenuItems,
       ...estoqueMenuItems,
       ...comprasMenuItems,
-      ...suporteMenuItems,
+      // ...suporteMenuItems, // REMOVIDO - substituído por Gestão de Atendimento
       ...comunicacaoInternaMenuItems,
       ...atendimentoMenuItems,
       ...sistemaMenuItems
@@ -551,7 +554,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     to={item.to}
                     preserveScroll={true}
                     className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ml-4
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
                         ? 'bg-seguranca-black text-seguranca-yellow' 
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
@@ -670,8 +673,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             </nav>
           </div>
 
-          {/* Grupo Suporte */}
-          {shouldShowModule('SUPPORT_READ') && (
+          {/* Grupo Suporte - REMOVIDO (substituído por Gestão de Atendimento) */}
+          {/* {shouldShowModule('SUPPORT_READ') && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -703,7 +706,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 ))}
               </nav>
             </div>
-          )}
+          )} */}
 
           {/* Grupo Comunicação Interna (Unificado) */}
           {shouldShowModule('MESSAGES_READ') && (

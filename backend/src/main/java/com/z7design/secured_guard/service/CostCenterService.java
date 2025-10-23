@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.*;
 import com.z7design.secured_guard.model.CostCenter;
 import com.z7design.secured_guard.repository.CostCenterRepository;
+import com.z7design.secured_guard.repository.InvoiceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -22,21 +23,27 @@ import java.util.stream.Collectors;
 public class CostCenterService {
     
     private final CostCenterRepository costCenterRepository;
+    private final InvoiceRepository invoiceRepository;
     
     @Transactional(readOnly = true)
     public List<CostCenterDTO> findAll() {
         log.info("Buscando todos os centros de custo");
         List<CostCenter> costCenters = costCenterRepository.findAll();
-        return costCenters.stream()
+        List<CostCenterDTO> dtos = costCenters.stream()
                 .map(CostCenterDTO::fromEntity)
                 .collect(Collectors.toList());
+        enrichWithComputedSpent(dtos);
+        return dtos;
     }
     
     @Transactional(readOnly = true)
     public Page<CostCenterDTO> findAll(Pageable pageable) {
         log.info("Buscando centros de custo paginados");
         Page<CostCenter> costCenters = costCenterRepository.findAllOrderByName(pageable);
-        return costCenters.map(CostCenterDTO::fromEntity);
+        Page<CostCenterDTO> page = costCenters.map(CostCenterDTO::fromEntity);
+        // Enriquecer valores computados
+        enrichWithComputedSpent(page.getContent());
+        return page;
     }
     
     @Transactional(readOnly = true)
@@ -48,9 +55,11 @@ public class CostCenterService {
                 status, department, searchTerm);
         
         List<CostCenter> costCenters = costCenterRepository.findByFiltersList(status, department, searchTerm);
-        return costCenters.stream()
+        List<CostCenterDTO> dtos = costCenters.stream()
                 .map(CostCenterDTO::fromEntity)
                 .collect(Collectors.toList());
+        enrichWithComputedSpent(dtos);
+        return dtos;
     }
     
     @Transactional(readOnly = true)
@@ -63,7 +72,9 @@ public class CostCenterService {
                 status, department, searchTerm);
         
         Page<CostCenter> costCenters = costCenterRepository.findByFilters(status, department, searchTerm, pageable);
-        return costCenters.map(CostCenterDTO::fromEntity);
+        Page<CostCenterDTO> page = costCenters.map(CostCenterDTO::fromEntity);
+        enrichWithComputedSpent(page.getContent());
+        return page;
     }
     
     @Transactional(readOnly = true)
@@ -71,7 +82,9 @@ public class CostCenterService {
         log.info("Buscando centro de custo por ID: {}", id);
         CostCenter costCenter = costCenterRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Centro de custo não encontrado com ID: " + id));
-        return CostCenterDTO.fromEntity(costCenter);
+        CostCenterDTO dto = CostCenterDTO.fromEntity(costCenter);
+        enrichWithComputedSpent(java.util.List.of(dto));
+        return dto;
     }
     
     @Transactional(readOnly = true)
@@ -79,7 +92,9 @@ public class CostCenterService {
         log.info("Buscando centro de custo por código: {}", code);
         CostCenter costCenter = costCenterRepository.findByCode(code)
                 .orElseThrow(() -> new RuntimeException("Centro de custo não encontrado com código: " + code));
-        return CostCenterDTO.fromEntity(costCenter);
+        CostCenterDTO dto = CostCenterDTO.fromEntity(costCenter);
+        enrichWithComputedSpent(java.util.List.of(dto));
+        return dto;
     }
     
     public CostCenterDTO create(CreateCostCenterDTO dto) {
@@ -235,9 +250,11 @@ public class CostCenterService {
     public List<CostCenterDTO> getActiveCenters() {
         log.info("Buscando centros de custo ativos");
         List<CostCenter> activeCenters = costCenterRepository.findActiveCentersOrderByName();
-        return activeCenters.stream()
+        List<CostCenterDTO> dtos = activeCenters.stream()
                 .map(CostCenterDTO::fromEntity)
                 .collect(Collectors.toList());
+        enrichWithComputedSpent(dtos);
+        return dtos;
     }
     
     public CostCenterDTO updateSpentAmount(UUID id, BigDecimal amount) {
@@ -251,6 +268,33 @@ public class CostCenterService {
         CostCenter savedCostCenter = costCenterRepository.save(costCenter);
         log.info("Valor gasto atualizado com sucesso: {}", savedCostCenter.getId());
         
-        return CostCenterDTO.fromEntity(savedCostCenter);
+        CostCenterDTO dto = CostCenterDTO.fromEntity(savedCostCenter);
+        enrichWithComputedSpent(java.util.List.of(dto));
+        return dto;
+
+    }
+
+    private void enrichWithComputedSpent(List<CostCenterDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) return;
+        for (CostCenterDTO dto : dtos) {
+            try {
+                java.math.BigDecimal computed = invoiceRepository.sumByCentroCustoAndPeriod(dto.getName(), null, null);
+                if (computed == null) computed = java.math.BigDecimal.ZERO;
+                dto.setCurrentSpent(computed);
+                java.math.BigDecimal budget = dto.getBudget() != null ? dto.getBudget() : java.math.BigDecimal.ZERO;
+                dto.setAvailableBudget(budget.subtract(computed));
+                if (budget.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    dto.setUtilizationPercentage(computed.divide(budget, 4, java.math.RoundingMode.HALF_UP)
+                            .multiply(java.math.BigDecimal.valueOf(100)));
+                } else {
+                    dto.setUtilizationPercentage(java.math.BigDecimal.ZERO);
+                }
+                dto.setIsOverBudget(budget.compareTo(java.math.BigDecimal.ZERO) > 0 && computed.compareTo(budget) > 0);
+                dto.setIsNearBudgetLimit(budget.compareTo(java.math.BigDecimal.ZERO) > 0 &&
+                        dto.getUtilizationPercentage().compareTo(java.math.BigDecimal.valueOf(90)) >= 0);
+            } catch (Exception e) {
+                // Mantém valores originais se houver falha
+            }
+        }
     }
 }

@@ -21,7 +21,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -54,12 +54,12 @@ public class Vacation {
     private LocalDate endDate;
     
     @NotNull(message = "Days taken is required")
-    @PositiveOrZero(message = "Days taken must be a positive value or zero")
+    @Min(value = 0, message = "Days taken must be a positive value or zero")
     @Column(name = "days_taken", nullable = false)
     private Integer daysTaken;
     
     @NotNull(message = "Remaining days is required")
-    @PositiveOrZero(message = "Remaining days must be a positive value or zero")
+    @Min(value = 0, message = "Remaining days must be a positive value or zero")
     @Column(name = "remaining_days", nullable = false)
     private Integer remainingDays;
     

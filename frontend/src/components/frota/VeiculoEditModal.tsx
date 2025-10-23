@@ -13,6 +13,8 @@ import { Vehicle } from '@/types/fleet';
 import { workPostService, WorkPost } from '@/services/workPostService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import { employeeService } from '@/services/employeeService';
+import { companyService } from '@/services/companyService';
+import { departmentService, Department } from '@/services/departmentService';
 
 // Definindo o tipo VeiculoComponent localmente para evitar import circular
 interface VeiculoComponent {
@@ -58,6 +60,9 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
     capacidade: 5,
     postoDeTrabalho: '',
     departamento: '',
+    departmentId: '',
+    empresa: '',
+    empresaId: '',
     dataManutencao: '',
     proximaManutencao: '',
     vencimentoSeguro: '',
@@ -97,6 +102,22 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
   const { data: employees, isLoading: employeesLoading, error: employeesError } = useQuery({
     queryKey: ['employees'],
     queryFn: () => employeeService.getEmployeesByStatus('ACTIVE'),
+    retry: 2,
+    retryDelay: 1000
+  });
+
+  // Buscar empresas
+  const { data: companies, isLoading: companiesLoading, error: companiesError } = useQuery({
+    queryKey: ['companies'],
+    queryFn: () => companyService.getAllCompanies(),
+    retry: 2,
+    retryDelay: 1000
+  });
+
+  // Buscar departamentos
+  const { data: departments, isLoading: departmentsLoading, error: departmentsError } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentService.listActive(),
     retry: 2,
     retryDelay: 1000
   });
@@ -169,6 +190,9 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
         capacidade: veiculo.capacidade || 5,
         postoDeTrabalho: '', // Campo não existe no VeiculoComponent
         departamento: '', // Campo não existe no VeiculoComponent
+        departmentId: '',
+        empresa: '',
+        empresaId: '',
         dataManutencao: '', // Será preenchido pela função fetchLastMaintenanceDate
         proximaManutencao: '', // Campo não existe no VeiculoComponent
         vencimentoSeguro: '', // Campo não existe no VeiculoComponent
@@ -286,6 +310,8 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
         })(),
         capacity: Number(formData.capacidade) || 5,
         department: formData.departamento || undefined,
+        departmentId: formData.departmentId || undefined,
+        companyId: formData.empresaId || undefined,
         lastMaintenanceDate: formData.dataManutencao ? new Date(formData.dataManutencao).toISOString().split('T')[0] : undefined,
         nextMaintenanceDate: formData.proximaManutencao ? new Date(formData.proximaManutencao).toISOString().split('T')[0] : undefined,
         insuranceExpiryDate: formData.vencimentoSeguro ? new Date(formData.vencimentoSeguro).toISOString().split('T')[0] : undefined,
@@ -522,26 +548,80 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <Label htmlFor="empresa">Empresa</Label>
+              <div className="relative">
+                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Select
+                  value={formData.empresaId}
+                  onValueChange={(value) => {
+                    const selectedCompany = companies?.find(c => c.id === value);
+                    handleInputChange('empresaId', value);
+                    handleInputChange('empresa', selectedCompany?.name || '');
+                  }}
+                  disabled={companiesLoading || !!companiesError || !companies || companies.length === 0}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray pl-10">
+                    <SelectValue placeholder="Selecione uma empresa" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {companiesLoading ? (
+                      <SelectItem value="loading" disabled>Carregando empresas...</SelectItem>
+                    ) : companiesError ? (
+                      <SelectItem value="error" disabled>Erro ao carregar empresas</SelectItem>
+                    ) : companies && companies.length > 0 ? (
+                      companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          <div className="flex items-center gap-2">
+                            <Building className="h-3 w-3 text-purple-400" />
+                            <span className="font-medium">{company.name}</span>
+                            {company.sigla && (
+                              <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+                                {company.sigla}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-data" disabled>Nenhuma empresa encontrada.</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
               <Label htmlFor="departamento">Departamento</Label>
               <div className="relative">
                 <Settings className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Select
-                  value={formData.departamento}
-                  onValueChange={(value) => handleInputChange('departamento', value)}
-                  disabled={costCentersLoading || !!costCentersError || !costCenters || costCenters.length === 0}
+                  value={formData.departmentId}
+                  onValueChange={(value) => {
+                    const selectedDepartment = departments?.find(d => d.id === value);
+                    handleInputChange('departmentId', value);
+                    handleInputChange('departamento', selectedDepartment?.name || '');
+                  }}
+                  disabled={departmentsLoading || !!departmentsError || !departments || departments.length === 0}
                 >
                   <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray pl-10">
                     <SelectValue placeholder="Selecione um departamento" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    {costCentersLoading ? (
+                    {departmentsLoading ? (
                       <SelectItem value="loading" disabled>Carregando departamentos...</SelectItem>
-                    ) : costCentersError ? (
+                    ) : departmentsError ? (
                       <SelectItem value="error" disabled>Erro ao carregar departamentos</SelectItem>
-                    ) : costCenters && costCenters.length > 0 ? (
-                      costCenters.map((costCenter: CostCenterDTO) => (
-                        <SelectItem key={costCenter.id} value={costCenter.id}>
-                          {costCenter.name}
+                    ) : departments && departments.length > 0 ? (
+                      departments.map((department: Department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          <div className="flex items-center gap-2">
+                            <Settings className="h-3 w-3 text-purple-400" />
+                            <span className="font-medium">{department.name}</span>
+                            {department.description && (
+                              <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+                                {department.description}
+                              </span>
+                            )}
+                          </div>
                         </SelectItem>
                       ))
                     ) : (

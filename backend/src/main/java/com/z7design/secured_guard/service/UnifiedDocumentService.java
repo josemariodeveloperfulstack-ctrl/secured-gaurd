@@ -365,25 +365,201 @@ public class UnifiedDocumentService {
      * Busca holerite e recibo por funcionário e mês/ano
      */
     public String createUnifiedDocumentForEmployee(String employeeName, int month, int year) throws IOException {
-        log.info("🔍 Buscando documentos para: {} - {}/{}", employeeName, month, year);
-        
-        // Limpar nome do funcionário (remover caracteres especiais)
-        String cleanEmployeeName = cleanText(employeeName);
-        log.info("🧹 Nome limpo: '{}' -> '{}'", employeeName, cleanEmployeeName);
-        
-        // TODO: Implementar busca no banco de dados
-        // Payslip payslip = payslipRepository.findByEmployeeNameAndMonthAndYear(cleanEmployeeName, month, year);
-        // PaymentReceipt receipt = receiptRepository.findByEmployeeNameAndMonthAndYear(cleanEmployeeName, month, year);
-        
-        // Por enquanto, vamos simular com dados mock
-        Payslip mockPayslip = createMockPayslip(cleanEmployeeName, month, year);
-        PaymentReceipt mockReceipt = createMockReceipt(cleanEmployeeName, month, year);
-        
-        if (mockPayslip == null || mockReceipt == null) {
-            throw new IOException("Erro ao criar dados mock para funcionário: " + cleanEmployeeName);
+        log.info("🔍 Unificação por nome/mês/ano: {} - {}/{}", employeeName, month, year);
+
+        final String cleanEmployeeName = cleanText(employeeName);
+        log.info("🧹 Nome normalizado: '{}' -> '{}'", employeeName, cleanEmployeeName);
+
+        // 1) Localizar PDF original do holerite
+        String holeritePath = findHoleriteOriginalFileByNameAndPeriod(cleanEmployeeName, month, year);
+        if (holeritePath == null || !Files.exists(Paths.get(holeritePath))) {
+            log.error("❌ Holerite não encontrado para {} {}/{}", cleanEmployeeName, month, year);
+            throw new IOException("Holerite original não encontrado para o período informado");
         }
+        log.info("📄 Holerite encontrado: {}", holeritePath);
+
+        // 2) Localizar PDF original do comprovante (REGRA: mês seguinte ao holerite)
+        int receiptMonth = month == 12 ? 1 : month + 1;
+        int receiptYear = month == 12 ? year + 1 : year;
         
-        return createUnifiedDocument(mockPayslip, mockReceipt);
+        log.info("🔍 Buscando comprovante para holerite {}/{} -> comprovante {}/{}", 
+            month, year, receiptMonth, receiptYear);
+            
+        String receiptPath = findReceiptOriginalFileByNameAndPeriod(cleanEmployeeName, receiptMonth, receiptYear);
+        if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
+            log.error("❌ Comprovante não encontrado para {} {}/{} (holerite {}/{})", 
+                cleanEmployeeName, receiptMonth, receiptYear, month, year);
+            throw new IOException("Comprovante original não encontrado para o período informado");
+        }
+        log.info("📄 Comprovante encontrado: {}", receiptPath);
+
+        // 3) Verificar nomes (flexível) antes de unificar
+        boolean namesOk = verifyEmployeeNames(cleanEmployeeName, cleanEmployeeName);
+        if (!namesOk) {
+            log.warn("⚠️ Nomes não coincidem (verificação flexível) - prosseguindo mesmo assim");
+        }
+
+        // 4) Unificar mantendo holerite na página 1 e comprovante na página 2
+        log.info("🔄 Criando documento unificado individual");
+        List<String> receiptPaths = new ArrayList<>();
+        receiptPaths.add(receiptPath);
+        
+        String unifiedPath = createUnifiedPdfUsingMerger(
+            holeritePath, 
+            receiptPaths, 
+            cleanEmployeeName, 
+            month, 
+            year
+        );
+
+        log.info("✅ Documento unificado criado: {}", unifiedPath);
+        return unifiedPath;
+    }
+
+    /**
+     * Procura o arquivo PDF do holerite por nome e período em locais conhecidos
+     */
+    private String findHoleriteOriginalFileByNameAndPeriod(String employeeName, int month, int year) {
+        try {
+            log.info("🔍 Procurando holerite para: {} - {}/{}", employeeName, month, year);
+            
+            // Candidatos de diretórios conhecidos (baseado em PayslipService OUTPUT_DIR)
+            java.util.List<Path> candidates = java.util.List.of(
+                Paths.get("backend", "holerites", month + "-" + year),              // Padrão principal
+                Paths.get("backend", "holerites", String.format("%d-%d", month, year)),
+                Paths.get("uploads", "holerites", String.format("%02d_%d", month, year)),
+                Paths.get("uploads", "holerites_processados", String.format("%02d_%d", month, year)),
+                Paths.get("uploads", "payslips"),
+                Paths.get("backend", "payslips_output")
+            );
+
+            // Normalizar nome para busca - remover caracteres especiais e underscores
+            String nameToken = employeeName
+                .replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "")
+                .replaceAll("\\s+", "_")
+                .toUpperCase();
+            
+            log.info("🔍 Token de busca do nome: {}", nameToken);
+
+            for (Path base : candidates) {
+                if (!Files.exists(base)) {
+                    log.debug("⏭️ Diretório não existe: {}", base);
+                    continue;
+                }
+                
+                log.info("📂 Procurando em: {}", base.toAbsolutePath());
+                
+                try (var stream = Files.walk(base, 2)) {  // Limitar profundidade para performance
+                    var match = stream
+                        .filter(Files::isRegularFile)
+                        .filter(p -> p.toString().toLowerCase().endsWith(".pdf"))
+                        .filter(p -> {
+                            String fileName = p.getFileName().toString().toUpperCase();
+                            boolean nameMatch = fileName.contains(nameToken);
+                            // Aceitar tanto formato "_9_2025" quanto "9_2025" e variações
+                            boolean periodMatch = fileName.contains("_" + month + "_" + year) ||
+                                                fileName.contains(month + "_" + year) ||
+                                                fileName.contains("_" + month + "_" + year + ".PDF") ||
+                                                fileName.contains(month + "_" + year + ".PDF");
+                            
+                            if (nameMatch && periodMatch) {
+                                log.info("✅ Arquivo encontrado: {}", p);
+                            }
+                            
+                            return nameMatch && periodMatch;
+                        })
+                        .map(Path::toString)
+                        .findFirst();
+                    
+                    if (match.isPresent()) {
+                        log.info("✅ Holerite encontrado: {}", match.get());
+                        return match.get();
+                    }
+                }
+            }
+            
+            log.warn("❌ Holerite não encontrado para {} - {}/{}", employeeName, month, year);
+        } catch (Exception e) {
+            log.error("💥 Erro ao procurar holerite: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
+    /**
+     * Procura o arquivo PDF do comprovante por nome e período em locais conhecidos
+     */
+    private String findReceiptOriginalFileByNameAndPeriod(String employeeName, int month, int year) {
+        try {
+            log.info("🔍 Procurando comprovante para: {} - {}/{}", employeeName, month, year);
+            
+            // Candidatos de diretórios conhecidos (baseado em ReceiptProcessingService UPLOAD_DIR)
+            java.util.List<Path> candidates = java.util.List.of(
+                Paths.get("uploads", "receipts", String.format("%02d_%04d", month, year)),  // Padrão principal
+                Paths.get("uploads", "payment-receipts", String.valueOf(year), String.valueOf(month)),
+                Paths.get("uploads", "receipts", String.format("%d_%d", month, year)),
+                Paths.get("uploads", "receipts")
+            );
+
+            // Normalizar nome para busca - lowercase com underscores
+            String nameTokenLower = employeeName
+                .replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "")
+                .replaceAll("\\s+", "_")
+                .toLowerCase();
+            
+            String nameTokenUpper = nameTokenLower.toUpperCase();
+            
+            log.info("🔍 Tokens de busca: lower='{}', upper='{}'", nameTokenLower, nameTokenUpper);
+
+            for (Path base : candidates) {
+                if (!Files.exists(base)) {
+                    log.debug("⏭️ Diretório não existe: {}", base);
+                    continue;
+                }
+                
+                log.info("📂 Procurando em: {}", base.toAbsolutePath());
+                
+                try (var stream = Files.walk(base, 2)) {  // Limitar profundidade
+                    var match = stream
+                        .filter(Files::isRegularFile)
+                        .filter(p -> p.toString().toLowerCase().endsWith(".pdf"))
+                        .filter(p -> {
+                            String fileName = p.getFileName().toString();
+                            String fileNameLower = fileName.toLowerCase();
+                            String fileNameUpper = fileName.toUpperCase();
+                            
+                            // Buscar por nome (case insensitive) e período
+                            boolean nameMatch = fileNameLower.contains(nameTokenLower) || 
+                                              fileNameUpper.contains(nameTokenUpper);
+                            
+                            // Aceitar diferentes formatos de período: _9_2025, _09_2025, 9_2025, etc
+                            boolean periodMatch = fileNameLower.contains("_" + month + "_" + year) ||
+                                                fileNameLower.contains("_" + String.format("%02d", month) + "_" + year) ||
+                                                fileNameLower.contains(month + "_" + year) ||
+                                                fileNameLower.contains(String.format("%02d", month) + "_" + year) ||
+                                                fileNameLower.contains("_" + year + "_" + month) ||
+                                                fileNameLower.contains("_" + year + "_" + String.format("%02d", month));
+                            
+                            if (nameMatch && periodMatch) {
+                                log.info("✅ Arquivo encontrado: {}", p);
+                            }
+                            
+                            return nameMatch && periodMatch;
+                        })
+                        .map(Path::toString)
+                        .findFirst();
+                    
+                    if (match.isPresent()) {
+                        log.info("✅ Comprovante encontrado: {}", match.get());
+                        return match.get();
+                    }
+                }
+            }
+            
+            log.warn("❌ Comprovante não encontrado para {} - {}/{}", employeeName, month, year);
+        } catch (Exception e) {
+            log.error("💥 Erro ao procurar comprovante: {}", e.getMessage(), e);
+        }
+        return null;
     }
 
     /**
@@ -440,46 +616,60 @@ public class UnifiedDocumentService {
         List<Map<String, Object>> documents = new ArrayList<>();
         
         try {
-            // Listar arquivos da pasta unificada
+            // Listar arquivos da pasta unificada principal
             Path unifiedPath = Paths.get(UNIFIED_DIR).toAbsolutePath();
             if (!Files.exists(unifiedPath)) {
                 log.warn("⚠️ Pasta unificada não existe: {}", unifiedPath);
+                Files.createDirectories(unifiedPath);
                 return documents;
             }
             
-            // Listar arquivos de holerites
-            Path holeritesPath = unifiedPath.resolve("holerites");
-            if (Files.exists(holeritesPath)) {
-                Files.list(holeritesPath)
-                    .filter(path -> path.toString().endsWith(".pdf"))
-                    .forEach(path -> {
-                        Map<String, Object> doc = new HashMap<>();
-                        doc.put("type", "HOLERITE");
-                        doc.put("fileName", path.getFileName().toString());
-                        doc.put("filePath", path.toString());
-                        doc.put("fileSize", getFileSize(path));
-                        doc.put("createdAt", getFileCreationTime(path));
-                        doc.put("employeeName", extractEmployeeNameFromFileName(path.getFileName().toString()));
-                        documents.add(doc);
-                    });
-            }
+            log.info("📂 Buscando em: {}", unifiedPath);
             
-            // Listar arquivos de recibos
-            Path receiptsPath = unifiedPath.resolve("receipts");
-            if (Files.exists(receiptsPath)) {
-                Files.list(receiptsPath)
-                    .filter(path -> path.toString().endsWith(".pdf"))
-                    .forEach(path -> {
+            // Buscar recursivamente em todos os subdiretórios
+            Files.walk(unifiedPath, 3)  // Profundidade máxima de 3 níveis
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().toLowerCase().endsWith(".pdf"))
+                .forEach(path -> {
+                    try {
+                        String fileName = path.getFileName().toString();
                         Map<String, Object> doc = new HashMap<>();
-                        doc.put("type", "RECIBO");
-                        doc.put("fileName", path.getFileName().toString());
+                        
+                        // Determinar tipo baseado no nome do arquivo ou diretório pai
+                        String parentDir = path.getParent().getFileName().toString().toLowerCase();
+                        String type = "UNIFICADO";
+                        if (fileName.toLowerCase().contains("holerite") || parentDir.contains("holerite")) {
+                            type = "HOLERITE";
+                        } else if (fileName.toLowerCase().contains("recibo") || parentDir.contains("recibo") || parentDir.contains("receipt")) {
+                            type = "RECIBO";
+                        } else if (fileName.toLowerCase().contains("unificado") || fileName.toLowerCase().contains("unified")) {
+                            type = "UNIFICADO";
+                        }
+                        
+                        doc.put("type", type);
+                        doc.put("fileName", fileName);
                         doc.put("filePath", path.toString());
                         doc.put("fileSize", getFileSize(path));
                         doc.put("createdAt", getFileCreationTime(path));
-                        doc.put("employeeName", extractEmployeeNameFromFileName(path.getFileName().toString()));
+                        
+                        // Extrair informações do nome do arquivo
+                        String employeeName = extractEmployeeNameFromFileName(fileName);
+                        doc.put("employeeName", employeeName);
+                        
+                        // Tentar extrair mês e ano do nome do arquivo
+                        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("_(\\d{1,2})_(\\d{4})");
+                        java.util.regex.Matcher matcher = pattern.matcher(fileName);
+                        if (matcher.find()) {
+                            doc.put("month", Integer.parseInt(matcher.group(1)));
+                            doc.put("year", Integer.parseInt(matcher.group(2)));
+                        }
+                        
                         documents.add(doc);
-                    });
-            }
+                        log.debug("📄 Adicionado: {} - {}", type, fileName);
+                    } catch (Exception e) {
+                        log.warn("⚠️ Erro ao processar arquivo {}: {}", path, e.getMessage());
+                    }
+                });
             
             log.info("✅ Encontrados {} documentos unificados", documents.size());
             return documents;
@@ -841,6 +1031,13 @@ public class UnifiedDocumentService {
                 log.info("🔍 Processando funcionário: '{}' - {}/{}", employeeName, month, year);
                 
                 try {
+                    // REGRA DE NEGÓCIO: O comprovante de pagamento é do mês SEGUINTE ao holerite
+                    int receiptMonth = month == 12 ? 1 : month + 1;
+                    int receiptYear = month == 12 ? year + 1 : year;
+                    
+                    log.info("🔍 Buscando comprovante para holerite {}/{} -> comprovante {}/{}", 
+                        month, year, receiptMonth, receiptYear);
+                    
                     // Buscar recibos por nome do funcionário (busca mais flexível)
                     log.info("🔍 Buscando recibos para funcionário: '{}'", employeeName);
                     List<PaymentReceipt> allReceipts = receiptRepository.findByEmployeeNameContainingIgnoreCase(employeeName);
@@ -858,21 +1055,21 @@ public class UnifiedDocumentService {
                         }
                     }
                     
-                    // Filtrar por mês, ano E NOME EXATO
+                    // Filtrar por mês do PAGAMENTO (mês seguinte), ano E NOME EXATO
                     List<PaymentReceipt> matchingReceipts = allReceipts.stream()
                         .filter(receipt -> {
-                            boolean monthMatch = receipt.getMonth() != null && receipt.getMonth().equals(month);
-                            boolean yearMatch = receipt.getYear() != null && receipt.getYear().equals(year);
+                            boolean monthMatch = receipt.getMonth() != null && receipt.getMonth().equals(receiptMonth);
+                            boolean yearMatch = receipt.getYear() != null && receipt.getYear().equals(receiptYear);
                             boolean nameMatch = isExactNameMatch(employeeName, receipt.getEmployeeName());
                             
                             log.info("🔍 Filtro para recibo {}: Mês={} ({}), Ano={} ({}), Nome={} ({})", 
-                                receipt.getId(), monthMatch, month, yearMatch, year, nameMatch, receipt.getEmployeeName());
+                                receipt.getId(), monthMatch, receiptMonth, yearMatch, receiptYear, nameMatch, receipt.getEmployeeName());
                             
                             return monthMatch && yearMatch && nameMatch;
                         })
                         .collect(Collectors.toList());
                     
-                    log.info("📄 Recibos filtrados por período {}/{} e nome exato: {}", month, year, matchingReceipts.size());
+                    log.info("📄 Recibos filtrados por período {}/{} (pagamento) e nome exato: {}", receiptMonth, receiptYear, matchingReceipts.size());
                     
                     if (!matchingReceipts.isEmpty()) {
                         log.info("✅ Encontrados {} recibos com nome EXATO para {} - {}/{}", matchingReceipts.size(), employeeName, month, year);
@@ -883,13 +1080,14 @@ public class UnifiedDocumentService {
                         
                         log.info("✅ Holerite expandido criado: {}", expandedPath);
                     } else {
-                        log.warn("⚠️ Nenhum recibo com nome EXATO encontrado para {} - {}/{}", employeeName, month, year);
-                        log.info("ℹ️ Nomes de recibos encontrados para este período:");
+                        log.warn("⚠️ Nenhum recibo com nome EXATO encontrado para {} - holerite {}/{} (procurando comprovante {}/{})", 
+                            employeeName, month, year, receiptMonth, receiptYear);
+                        log.info("ℹ️ Nomes de recibos encontrados para o período de pagamento {}/{}:", receiptMonth, receiptYear);
                         allReceipts.stream()
                             .filter(receipt -> receipt.getMonth() != null && 
-                                             receipt.getMonth().equals(month) &&
+                                             receipt.getMonth().equals(receiptMonth) &&
                                              receipt.getYear() != null && 
-                                             receipt.getYear().equals(year))
+                                             receipt.getYear().equals(receiptYear))
                             .forEach(receipt -> log.info("  - Recibo: '{}' vs Holerite: '{}'", 
                                 receipt.getEmployeeName(), employeeName));
                     }
@@ -1065,39 +1263,15 @@ public class UnifiedDocumentService {
     }
 
     /**
-     * Tenta encontrar o arquivo PDF original do holerite
+     * Tenta encontrar o arquivo PDF original do holerite usando o Payslip do banco
      */
     private String findHoleriteOriginalFile(Payslip payslip) {
-        try {
-            // Procurar na pasta de holerites processados
-            Path holeritesPath = Paths.get("uploads", "holerites");
-            if (Files.exists(holeritesPath)) {
-                // Buscar por arquivo que contenha o nome do funcionário e período
-                String searchPattern = String.format("*%s*%d_%d*.pdf", 
-                    payslip.getEmployeeName().replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "").replaceAll("\\s+", "_"),
-                    payslip.getMonth(), payslip.getYear());
-                
-                log.info("🔍 Procurando arquivo com padrão: {}", searchPattern);
-                
-                // Buscar recursivamente
-                try (var stream = Files.walk(holeritesPath)) {
-                    return stream
-                        .filter(Files::isRegularFile)
-                        .filter(path -> path.toString().toLowerCase().endsWith(".pdf"))
-                        .filter(path -> path.getFileName().toString().toLowerCase().contains(
-                            payslip.getEmployeeName().toLowerCase().replaceAll("\\s+", "_")))
-                        .filter(path -> path.getFileName().toString().contains(
-                            String.format("_%d_%d", payslip.getMonth(), payslip.getYear())))
-                        .map(Path::toString)
-                        .findFirst()
-                        .orElse(null);
-                }
-            }
-        } catch (Exception e) {
-            log.error("💥 Erro ao procurar arquivo original do holerite: {}", e.getMessage());
-        }
-        
-        return null;
+        // Usar o método já existente e atualizado
+        return findHoleriteOriginalFileByNameAndPeriod(
+            payslip.getEmployeeName(), 
+            payslip.getMonth(), 
+            payslip.getYear()
+        );
     }
 
     /**
@@ -1206,6 +1380,250 @@ public class UnifiedDocumentService {
             
         } finally {
             contentStream.close();
+        }
+    }
+
+    /**
+     * Cria documentos unificados em lote para múltiplos funcionários
+     * Verifica rigorosamente se os nomes no Holerite e Comprovante coincidem
+     */
+    public com.z7design.secured_guard.dto.BatchUnificationResult createBatchUnifiedDocuments(
+            com.z7design.secured_guard.dto.BatchUnificationRequest request) {
+        
+        long startTime = System.currentTimeMillis();
+        log.info("=== 🎯 INICIANDO UNIFICAÇÃO EM LOTE ===");
+        log.info("Filtros: Mês={}, Ano={}, ForceUnification={}", 
+            request.getMonth(), request.getYear(), request.getForceUnification());
+        
+        com.z7design.secured_guard.dto.BatchUnificationResult result = com.z7design.secured_guard.dto.BatchUnificationResult.builder()
+            .successList(new ArrayList<>())
+            .failureList(new ArrayList<>())
+            .build();
+        
+        try {
+            // 1. Buscar todos os holerites
+            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            log.info("📊 Total de holerites no banco: {}", allPayslips.size());
+            
+            // 2. Filtrar por período se especificado
+            List<Payslip> filteredPayslips = allPayslips.stream()
+                .filter(p -> request.getMonth() == null || p.getMonth().equals(request.getMonth()))
+                .filter(p -> request.getYear() == null || p.getYear().equals(request.getYear()))
+                .filter(p -> p.getEmployeeName() != null && p.getMonth() != null && p.getYear() != null)
+                .toList();
+            
+            log.info("📊 Holerites após filtro: {}", filteredPayslips.size());
+            result.setTotalProcessed(filteredPayslips.size());
+            
+            // 3. Agrupar por funcionário e período (um documento por funcionário/mês/ano)
+            Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
+                .collect(Collectors.toMap(
+                    p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
+                    p -> p,
+                    (existing, replacement) -> existing  // Manter o primeiro se houver duplicatas
+                ));
+            
+            log.info("👥 Funcionários únicos a processar: {}", uniquePayslips.size());
+            
+            // 4. Processar cada funcionário
+            for (Payslip payslip : uniquePayslips.values()) {
+                String employeeName = payslip.getEmployeeName();
+                Integer month = payslip.getMonth();
+                Integer year = payslip.getYear();
+                
+                log.info("🔄 Processando: {} - {}/{}", employeeName, month, year);
+                
+                com.z7design.secured_guard.dto.BatchUnificationResult.UnificationDetail detail = 
+                    com.z7design.secured_guard.dto.BatchUnificationResult.UnificationDetail.builder()
+                        .employeeName(employeeName)
+                        .month(month)
+                        .year(year)
+                        .build();
+                
+                try {
+                    // 4.1. Buscar arquivo do holerite
+                    String holeritePath = findHoleriteOriginalFileByNameAndPeriod(employeeName, month, year);
+                    detail.setHoleriteFound(holeritePath != null ? "✅ Sim" : "❌ Não");
+                    
+                    if (holeritePath == null || !Files.exists(Paths.get(holeritePath))) {
+                        detail.setStatus("FALHA");
+                        detail.setMessage("Arquivo PDF do holerite não encontrado");
+                        result.getFailureList().add(detail);
+                        result.setTotalFailed(result.getTotalFailed() + 1);
+                        log.warn("❌ Holerite não encontrado para {} - {}/{}", employeeName, month, year);
+                        continue;
+                    }
+                    
+                    // 4.2. Buscar comprovantes para o funcionário
+                    List<PaymentReceipt> allReceipts = receiptRepository
+                        .findByEmployeeNameContainingIgnoreCase(employeeName);
+                    
+                    // REGRA DE NEGÓCIO: O comprovante de pagamento é do mês SEGUINTE ao holerite
+                    // Ex: Holerite de setembro (mês trabalhado) -> Comprovante de outubro (mês do pagamento)
+                    int receiptMonth = month == 12 ? 1 : month + 1;
+                    int receiptYear = month == 12 ? year + 1 : year;
+                    
+                    log.info("🔍 Buscando comprovante para holerite {}/{} -> comprovante {}/{}", 
+                        month, year, receiptMonth, receiptYear);
+                    
+                    // Filtrar por mês e ano do PAGAMENTO (mês seguinte)
+                    List<PaymentReceipt> matchingReceipts = allReceipts.stream()
+                        .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptMonth))
+                        .filter(r -> r.getYear() != null && r.getYear().equals(receiptYear))
+                        .toList();
+                    
+                    detail.setReceiptFound(matchingReceipts.isEmpty() ? "❌ Não" : "✅ Sim (" + matchingReceipts.size() + ")");
+                    
+                    if (matchingReceipts.isEmpty()) {
+                        detail.setStatus("FALHA");
+                        detail.setMessage("Nenhum comprovante encontrado para o período");
+                        result.getFailureList().add(detail);
+                        result.setTotalFailed(result.getTotalFailed() + 1);
+                        log.warn("❌ Nenhum comprovante encontrado para {} - {}/{}", employeeName, month, year);
+                        continue;
+                    }
+                    
+                    // 4.3. Verificar se os nomes coincidem (VALIDAÇÃO CRÍTICA)
+                    boolean allNamesMatch = matchingReceipts.stream()
+                        .allMatch(receipt -> isExactNameMatch(employeeName, receipt.getEmployeeName()));
+                    
+                    detail.setNamesMatch(allNamesMatch);
+                    
+                    if (!allNamesMatch && (request.getForceUnification() == null || !request.getForceUnification())) {
+                        detail.setStatus("FALHA");
+                        detail.setMessage("Nomes não coincidem - Holerite: '" + employeeName + "' vs Comprovante(s): " + 
+                            matchingReceipts.stream()
+                                .map(PaymentReceipt::getEmployeeName)
+                                .distinct()
+                                .collect(Collectors.joining(", ", "'", "'")));
+                        result.getFailureList().add(detail);
+                        result.setTotalFailed(result.getTotalFailed() + 1);
+                        log.warn("❌ NOMES NÃO COINCIDEM para {} - {}/{}", employeeName, month, year);
+                        continue;
+                    }
+                    
+                    // 4.4. Buscar arquivos PDF dos comprovantes (usando o mês do pagamento)
+                    List<String> receiptPaths = new ArrayList<>();
+                    
+                    for (PaymentReceipt receipt : matchingReceipts) {
+                        String receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                            receipt.getEmployeeName(), 
+                            receiptMonth,  // Usar o mês do pagamento (mês seguinte)
+                            receiptYear    // Usar o ano do pagamento
+                        );
+                        
+                        if (receiptPath != null && Files.exists(Paths.get(receiptPath))) {
+                            receiptPaths.add(receiptPath);
+                        } else {
+                            log.warn("⚠️ Comprovante PDF não encontrado: {}", receipt.getFileName());
+                        }
+                    }
+                    
+                    if (receiptPaths.isEmpty()) {
+                        detail.setStatus("FALHA");
+                        detail.setMessage("Arquivos PDF dos comprovantes não encontrados no sistema");
+                        result.getFailureList().add(detail);
+                        result.setTotalFailed(result.getTotalFailed() + 1);
+                        log.warn("❌ PDFs dos comprovantes não encontrados para {} - {}/{}", employeeName, month, year);
+                        continue;
+                    }
+                    
+                    // 4.5. Criar documento unificado usando PDFMergerUtility
+                    String unifiedPath = createUnifiedPdfUsingMerger(
+                        holeritePath, 
+                        receiptPaths, 
+                        employeeName, 
+                        month, 
+                        year
+                    );
+                    
+                    detail.setStatus("SUCESSO");
+                    detail.setMessage(allNamesMatch ? 
+                        "Documento unificado criado com sucesso" : 
+                        "Documento criado com AVISO: nomes não coincidem exatamente");
+                    detail.setFilePath(unifiedPath);
+                    result.getSuccessList().add(detail);
+                    result.setTotalSuccess(result.getTotalSuccess() + 1);
+                    
+                    log.info("✅ Documento unificado criado: {}", unifiedPath);
+                    
+                } catch (Exception e) {
+                    detail.setStatus("ERRO");
+                    detail.setMessage("Erro ao processar: " + e.getMessage());
+                    result.getFailureList().add(detail);
+                    result.setTotalFailed(result.getTotalFailed() + 1);
+                    log.error("💥 Erro ao processar {} - {}/{}: {}", employeeName, month, year, e.getMessage(), e);
+                }
+            }
+            
+            long endTime = System.currentTimeMillis();
+            result.setProcessingTimeMs(endTime - startTime);
+            
+            log.info("=== ✅ UNIFICAÇÃO EM LOTE CONCLUÍDA ===");
+            log.info("Total processado: {}", result.getTotalProcessed());
+            log.info("Total sucesso: {}", result.getTotalSuccess());
+            log.info("Total falhas: {}", result.getTotalFailed());
+            log.info("Tempo de processamento: {} ms", result.getProcessingTimeMs());
+            
+        } catch (Exception e) {
+            log.error("💥 Erro crítico na unificação em lote: {}", e.getMessage(), e);
+            result.setTotalFailed(result.getTotalProcessed());
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Cria PDF unificado usando PDFMergerUtility para preservar layout original
+     */
+    private String createUnifiedPdfUsingMerger(String holeritePath, List<String> receiptPaths, 
+                                               String employeeName, int month, int year) throws IOException {
+        // Criar diretório se não existir
+        Path unifiedDir = Paths.get(UNIFIED_DIR, "expanded").toAbsolutePath();
+        if (!Files.exists(unifiedDir)) {
+            Files.createDirectories(unifiedDir);
+        }
+        
+        // Nome do arquivo unificado
+        String cleanName = employeeName.replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "").replaceAll("\\s+", "_");
+        String fileName = String.format("UNIFICADO_%s_%d_%d.pdf", cleanName.toUpperCase(), month, year);
+        String outputPath = unifiedDir.resolve(fileName).toString();
+        
+        log.info("🔄 Criando PDF unificado: {}", outputPath);
+        log.info("📄 Holerite: {}", holeritePath);
+        log.info("📄 Comprovantes: {}", receiptPaths.size());
+        
+        try {
+            // Usar PDFMergerUtility para manter layout original
+            org.apache.pdfbox.multipdf.PDFMergerUtility merger = new org.apache.pdfbox.multipdf.PDFMergerUtility();
+            merger.setDestinationFileName(outputPath);
+            
+            // Adicionar holerite primeiro
+            merger.addSource(new File(holeritePath));
+            log.info("✅ Holerite adicionado ao merge");
+            
+            // Adicionar todos os comprovantes
+            for (String receiptPath : receiptPaths) {
+                merger.addSource(new File(receiptPath));
+                log.info("✅ Comprovante adicionado: {}", Paths.get(receiptPath).getFileName());
+            }
+            
+            // Executar merge
+            merger.mergeDocuments(null);
+            log.info("✅ Merge concluído: {}", outputPath);
+            
+            // Verificar se foi criado
+            File outputFile = new File(outputPath);
+            if (outputFile.exists()) {
+                log.info("✅ Arquivo verificado: {} bytes", outputFile.length());
+                return outputPath;
+            } else {
+                throw new IOException("Arquivo unificado não foi criado");
+            }
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao criar PDF unificado: {}", e.getMessage(), e);
+            throw new IOException("Erro ao unificar PDFs: " + e.getMessage(), e);
         }
     }
 

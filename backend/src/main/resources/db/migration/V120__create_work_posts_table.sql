@@ -25,7 +25,7 @@ CREATE TYPE work_post_status AS ENUM (
 
 -- Create work_posts table
 CREATE TABLE work_posts (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_code VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(200) NOT NULL,
     description TEXT,
@@ -39,8 +39,8 @@ CREATE TABLE work_posts (
     zip_code VARCHAR(10),
     
     -- Relationships
-    client_id BIGINT NOT NULL REFERENCES clients(id),
-    contract_id BIGINT REFERENCES contracts(id),
+    client_id UUID NOT NULL REFERENCES clients(id),
+    contract_id UUID REFERENCES contracts(id),
     responsible_id UUID REFERENCES users(id),
     
     -- Personnel Configuration
@@ -83,21 +83,21 @@ CREATE TABLE work_posts (
 
 -- Create collection tables for ElementCollection
 CREATE TABLE work_post_nrs (
-    work_post_id BIGINT NOT NULL,
+    work_post_id UUID NOT NULL,
     nr VARCHAR(100) NOT NULL,
     PRIMARY KEY (work_post_id, nr),
     FOREIGN KEY (work_post_id) REFERENCES work_posts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE work_post_epis (
-    work_post_id BIGINT NOT NULL,
+    work_post_id UUID NOT NULL,
     epi VARCHAR(100) NOT NULL,
     PRIMARY KEY (work_post_id, epi),
     FOREIGN KEY (work_post_id) REFERENCES work_posts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE work_post_trainings (
-    work_post_id BIGINT NOT NULL,
+    work_post_id UUID NOT NULL,
     training VARCHAR(100) NOT NULL,
     PRIMARY KEY (work_post_id, training),
     FOREIGN KEY (work_post_id) REFERENCES work_posts(id) ON DELETE CASCADE

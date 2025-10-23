@@ -1,6 +1,6 @@
 -- Criação da tabela de veículos
 CREATE TABLE vehicles (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     plate VARCHAR(10) NOT NULL UNIQUE,
     model VARCHAR(100) NOT NULL,
     brand VARCHAR(100) NOT NULL,
@@ -20,8 +20,8 @@ CREATE TABLE vehicles (
 
 -- Criação da tabela de registros de abastecimento
 CREATE TABLE fuel_records (
-    id BIGSERIAL PRIMARY KEY,
-    vehicle_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY,
+    vehicle_id UUID NOT NULL,
     date DATE NOT NULL,
     fuel_type VARCHAR(20) NOT NULL,
     quantity DECIMAL(10,2) NOT NULL,
@@ -35,8 +35,8 @@ CREATE TABLE fuel_records (
 
 -- Criação da tabela de multas
 CREATE TABLE fines (
-    id BIGSERIAL PRIMARY KEY,
-    vehicle_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY,
+    vehicle_id UUID NOT NULL,
     date DATE NOT NULL,
     description TEXT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
@@ -70,14 +70,14 @@ INSERT INTO vehicles (plate, model, brand, year, color, status, fuel_type, capac
 ('JKL3456', 'Ranger', 'Ford', 2020, 'Branco', 'MAINTENANCE', 'DIESEL', 5, 55000);
 
 -- Inserção de registros de abastecimento de exemplo
-INSERT INTO fuel_records (vehicle_id, date, fuel_type, quantity, cost, mileage, station, notes) VALUES
-(1, '2024-01-15', 'GASOLINE', 45.5, 250.25, 45000, 'Posto Shell', 'Abastecimento completo'),
-(1, '2024-01-20', 'ETHANOL', 50.0, 200.00, 45500, 'Posto Ipiranga', 'Abastecimento parcial'),
-(2, '2024-01-18', 'GASOLINE', 40.0, 220.00, 38000, 'Posto Petrobras', 'Abastecimento completo'),
-(3, '2024-01-22', 'DIESEL', 60.0, 300.00, 25000, 'Posto Shell', 'Abastecimento completo');
+INSERT INTO fuel_records (id, vehicle_id, date, fuel_type, quantity, cost, mileage, station, notes) VALUES
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'ABC1234'), '2024-01-15', 'GASOLINE', 45.5, 250.25, 45000, 'Posto Shell', 'Abastecimento completo'),
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'ABC1234'), '2024-01-20', 'ETHANOL', 50.0, 200.00, 45500, 'Posto Ipiranga', 'Abastecimento parcial'),
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'DEF5678'), '2024-01-18', 'GASOLINE', 40.0, 220.00, 38000, 'Posto Petrobras', 'Abastecimento completo'),
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'GHI9012'), '2024-01-22', 'DIESEL', 60.0, 300.00, 25000, 'Posto Shell', 'Abastecimento completo');
 
 -- Inserção de multas de exemplo
-INSERT INTO fines (vehicle_id, date, description, amount, location, status, due_date) VALUES
-(1, '2024-01-10', 'Excesso de velocidade', 293.47, 'Av. Paulista, São Paulo - SP', 'PENDING', '2024-02-10'),
-(2, '2024-01-12', 'Estacionamento irregular', 88.38, 'Rua Augusta, São Paulo - SP', 'PAID', '2024-02-12'),
-(3, '2024-01-15', 'Sinal vermelho', 293.47, 'Av. Brigadeiro Faria Lima, São Paulo - SP', 'PENDING', '2024-02-15'); 
+INSERT INTO fines (id, vehicle_id, date, description, amount, location, status, due_date) VALUES
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'ABC1234'), '2024-01-10', 'Excesso de velocidade', 293.47, 'Av. Paulista, São Paulo - SP', 'PENDING', '2024-02-10'),
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'DEF5678'), '2024-01-12', 'Estacionamento irregular', 88.38, 'Rua Augusta, São Paulo - SP', 'PAID', '2024-02-12'),
+(gen_random_uuid(), (SELECT id FROM vehicles WHERE plate = 'GHI9012'), '2024-01-15', 'Sinal vermelho', 293.47, 'Av. Brigadeiro Faria Lima, São Paulo - SP', 'PENDING', '2024-02-15'); 

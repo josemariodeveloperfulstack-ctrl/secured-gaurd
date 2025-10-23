@@ -209,7 +209,25 @@ class EquipmentService {
       console.log('🔗 Buscando resumo de equipamentos no backend');
       const response = await axios.get(`${this.baseUrl}/summary`);
       console.log('✅ Resumo recebido do backend:', response.data);
-      return response.data;
+
+      // Mapear resposta do backend (que usa chaves diferentes) para EquipmentSummary do frontend
+      const raw = response.data || {};
+      const mapped: EquipmentSummary = {
+        totalEquipments: raw.total ?? raw.totalEquipments ?? 0,
+        activeEquipments: raw.inUse ?? raw.activeEquipments ?? 0,
+        inMaintenanceEquipments: raw.inMaintenance ?? raw.inMaintenanceEquipments ?? 0,
+        inStockEquipments: raw.inStock ?? raw.inStockEquipments ?? 0,
+        expiredEquipments: raw.expired ?? raw.expiredEquipments ?? 0,
+        expiringSoon30Days: raw.expiringSoon ?? raw.expiringSoon30Days ?? 0,
+        expiringSoon60Days: raw.expiringSoon60Days ?? 0,
+        weaponRegistrationExpired: raw.weaponRegistrationExpired ?? 0,
+        weaponRegistrationExpiringSoon30Days: raw.weaponRegistrationExpiringSoon30Days ?? 0,
+        weaponRegistrationExpiringSoon60Days: raw.weaponRegistrationExpiringSoon60Days ?? 0,
+        dangerousEquipments: raw.dangerous ?? raw.dangerousEquipments ?? 0,
+        equipmentsWithUsers: raw.equipmentsWithUsers ?? raw.assigned ?? raw.assignedEquipments ?? 0,
+      };
+
+      return mapped;
     } catch (error) {
       console.error('❌ Erro ao buscar resumo de equipamentos:', error);
       throw new Error('Falha ao buscar resumo de equipamentos no servidor');

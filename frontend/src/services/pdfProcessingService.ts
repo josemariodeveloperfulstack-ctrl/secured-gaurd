@@ -13,10 +13,47 @@ export interface EmployeeDataFromPDF {
   address?: string;
   position?: string;
   admissionDate?: string;
+  hireDate?: string;
   salary?: string;
   contractType?: string;
-  workHours?: string;
-  observations?: string;
+  workHours?: string; // horário de trabalho
+  observations?: string; // observações
+  notes?: string;
+  nationality?: string;
+  maritalStatus?: string;
+  city?: string;
+  cep?: string;
+  tituloEleitor?: string;
+  tituloEleitorZona?: string;
+  carteiraIdentidadeOrgaoEmissor?: string;
+  cnhNumber?: string;
+  certificadoMilitar?: string;
+  nomePai?: string;
+  nomeMae?: string;
+  localNascimento?: string;
+  grauInstrucao?: string;
+  cbo?: string;
+  salarioPorExtenso?: string;
+  periodoPagamento?: string;
+  horarioTrabalho?: string;
+  folgaSemanal?: string;
+  fgtsOptante?: boolean;
+  fgtsDataOpcao?: string;
+  fgtsBancoDepositario?: string;
+  pis?: string;
+  pisDataCadastro?: string;
+  pisBancoDepositario?: string;
+  empresaNome?: string;
+  empresaEndereco?: string;
+  empresaCnpj?: string;
+  vistoFiscalizacao?: string;
+  spouseName?: string;
+  spouseCpf?: string;
+  spouseRg?: string;
+  spouseBirthDate?: string;
+  spouseProfession?: string;
+  spousePhone?: string;
+  dependents?: Array<{ name: string; relationship: string; birthDate: string; cpf?: string; rg?: string }>; 
   extractedFields: Record<string, any>;
 }
 
@@ -40,6 +77,10 @@ class PDFProcessingService {
       // Simular processamento de PDF (implementação real usaria bibliotecas como pdf-parse ou Tesseract.js)
       const extractedData = await this.extractTextFromPDF(file);
       const employeeData = this.parseEmployeeData(extractedData);
+      // Normalizações adicionais esperadas pelo formulário
+      employeeData.hireDate = employeeData.admissionDate || employeeData.hireDate;
+      employeeData.notes = employeeData.observations || employeeData.notes;
+      employeeData.horarioTrabalho = employeeData.workHours || employeeData.horarioTrabalho;
       
       const processingTime = Date.now() - startTime;
       
@@ -61,6 +102,14 @@ class PDFProcessingService {
   }
 
   /**
+   * Compat: usado pelo modal de Novo Funcionário
+   * Mantém a mesma assinatura esperada e reaproveita o processamento base
+   */
+  async processEmployeeRegistrationPDF(file: File): Promise<PDFProcessingResult> {
+    return this.processEmployeePDF(file);
+  }
+
+  /**
    * Extrai texto do PDF (simulação)
    */
   private async extractTextFromPDF(file: File): Promise<string> {
@@ -74,22 +123,49 @@ class PDFProcessingService {
       setTimeout(() => {
         // Texto simulado baseado em documentos típicos
         const simulatedText = `
-        CARTA DE TRABALHO E PREVIDÊNCIA SOCIAL
+        FICHA DE REGISTRO DOS EMPREGADOS - Frente
+        Da firma: PROMOVER TERCEIRIZACAO & SERVICOS LTDA
+        Endereço: Rua Pelegrino de Paula Ferreira, 77
+        CNPJ / CEI : 36.888.521/0001-01
+        VISTO DA FISCALIZAÇÃO: ----
         
         Nome: João Silva Santos
-        CPF: 123.456.789-00
-        RG: 12.345.678-9
-        Data de Nascimento: 15/03/1985
-        Endereço: Rua das Flores, 123, Centro, São Paulo/SP
-        Telefone: (11) 99999-9999
-        Email: joao.silva@email.com
+        C.T.P.S. n.: 70055848 00082
+        C.T.P.S (Rural) n.: 
+        C.P.F. / C.I.C n.: 123.456.789-00
+        Título de Eleitor n.: 2211936552030 zona: 319 seção: 020
+        C. Identidade n.: MG21178043 Órgão Emissor: SSP  Data: 01/01/2003
+        foi admitido em: 16 de maio de 2025 para exercer a função de: Porteiro
+        CBO: 517410
+        com o salário de: R$ 2.134,80 (Dois Mil, Cento e Trinta e Quatro Reais e Oitenta Centavos)
+        Por: Mês  no seguinte horário de trabalho: 44 horas semanais
+        FOLGA SEMANAL: Domingo
         
-        Cargo: Vigilante
-        Data de Admissão: 01/09/2024
-        Salário: R$ 2.500,00
-        Jornada de Trabalho: 44 horas semanais
-        Tipo de Contrato: CLT
+        SITUAÇÃO PERANTE O FGTS
+        É optante? Sim  Data da opção: 16/05/2025  Data da retratação:  
+        Banco depositário: Banco do Brasil
         
+        Nacionalidade: Brasil
+        Filho de: JOAO BATISTA PEREIRA RODRIGUES e de: SHIRLEY FERREIRA GONCALVES
+        nascido em: Betim  a 13/12/1998  Estado civil: Solteiro
+        Residência: BECO CRISTIALIA, 98 - SANTO ANTONIO  CEP: 32684-102
+        Cart. Nac. Habilitação n.º: 00000000000  Cat.: B  Validade: 10/10/2030
+        
+        PROGRAMA DE INTEGRAÇÃO SOCIAL (PIS)
+        Cadastrado em: 10/01/2020  sob n°: 154474923339  dep. no Banco: 001
+        Nome do Banco: Banco do Brasil
+        Endereço: Av. Brasil, 1000
+        Código Banco: 001  Código agência: 1234
+        
+        Carteira modelo 19 n.º:  
+        Nº Registro Geral:  
+        Casado(a) c/ bras.?  
+        Nome do Cônjuge:  
+        Tem filhos brasileiros?  
+        Quantos:  
+        Data de chegada ao Brasil:  
+        Naturalizado:  
+        Decreto:  
         Observações: Funcionário contratado para reforço da equipe de segurança.
         `;
         resolve(simulatedText);
@@ -111,20 +187,47 @@ class PDFProcessingService {
       email: /Email[:\s]+([^\n\r\s]+@[^\n\r\s]+)/i,
       phone: /Telefone[:\s]+([^\n\r]+)/i,
       birthDate: /Data de Nascimento[:\s]+([^\n\r]+)/i,
-      address: /Endereço[:\s]+([^\n\r]+)/i,
+      address: /Endere[çc]o[:\s]+([^\n\r]+)/i,
       position: /Cargo[:\s]+([^\n\r]+)/i,
-      admissionDate: /Data de Admissão[:\s]+([^\n\r]+)/i,
-      salary: /Salário[:\s]+([^\n\r]+)/i,
+      admissionDate: /Data de Admiss[aã]o[:\s]+([^\n\r]+)/i,
+      salary: /Sal[aá]rio[:\s]+([^\n\r]+)/i,
       contractType: /Tipo de Contrato[:\s]+([^\n\r]+)/i,
-      workHours: /Jornada de Trabalho[:\s]+([^\n\r]+)/i,
-      observations: /Observações[:\s]+([^\n\r]+)/i
-    };
+      workHours: /(Jornada de Trabalho|hor[áa]rio de trabalho)[:\s]+([^\n\r]+)/i,
+      observations: /Observa[çc][õo]es[:\s]+([^\n\r]+)/i,
+      cbo: /CBO[:\s]+([\d.]+)/i,
+      fgtsOptante: /[ÉE]\s*optante\?\s*(Sim|N[aã]o)/i,
+      fgtsDataOpcao: /Data da op[cç][aã]o[:\s]+([^\n\r]+)/i,
+      fgtsDataRetratacao: /Data da retrata[cç][aã]o[:\s]+([^\n\r]+)/i,
+      fgtsBancoDepositario: /Banco deposit[aá]rio[:\s]+([^\n\r]+)/i,
+      empresaNome: /Da firma[:\s]+([^\n\r]+)/i,
+      empresaEndereco: /Endere[çc]o[:\s]+([^\n\r]+)/i,
+      empresaCnpj: /CNPJ\s*\/\s*CEI\s*[:\s]+([^\n\r]+)/i,
+      tituloEleitor: /T[íi]tulo de Eleitor n\.?[:\s]+([^\n\r]+)/i,
+      tituloEleitorZona: /zona\s*[:\s]+([^\n\r]+)/i,
+      tituloEleitorSecao: /se[cç][aã]o\s*[:\s]+([^\n\r]+)/i,
+      carteiraIdentidade: /C\.\s*Identidade\s*n\.?[:\s]+([^\n\r]+)/i,
+      carteiraIdentidadeOrgaoEmissor: /[ÓO]rg[ãa]o\s*Emissor[:\s]+([^\n\r]+)/i,
+      carteiraIdentidadeDataEmissao: /C\.\s*Identidade.*?Data[:\s]+([^\n\r]+)/i,
+      cnhNumber: /Cart\.\s*Nac\.\s*Habilita[çc][aã]o.*?n[ºo]\.?:\s*([^\n\r]+)/i,
+      cnhCategory: /Cat\.?:\s*([^\n\r]+)/i,
+      cnhExpirationDate: /Validade[:\s]+([^\n\r]+)/i,
+      folgaSemanal: /FOLGA\s+SEMANAL[:\s]+([^\n\r]+)/i,
+      cep: /CEP[:\s]+([^\n\r]+)/i,
+      pisDataCadastro: /Cadastrado\s*em[:\s]+([^\n\r]+)/i,
+      pis: /sob\s*n[ºo]\s*[:\s]+([^\n\r]+)/i,
+      pisBancoDepositario: /dep\.\s*no\s*Banco[:\s]+([^\n\r]+)/i,
+      pisEnderecoBanco: /Endere[çc]o[:\s]+([^\n\r]+)/i,
+      pisCodigoBanco: /C[óo]digo\s*Banco[:\s]+([^\n\r]+)/i,
+      pisCodigoAgencia: /C[óo]digo\s*ag[êe]ncia[:\s]+([^\n\r]+)/i,
+    } as const;
 
     // Extrair cada campo
     Object.entries(patterns).forEach(([field, pattern]) => {
-      const match = text.match(pattern);
+      const match = text.match(pattern as RegExp);
       if (match && match[1]) {
-        extractedFields[field] = match[1].trim();
+        // workHours usa grupo 2 quando a regex tem duas alternativas
+        const value = match[2] ? match[2] : match[1];
+        extractedFields[field] = value.trim();
       }
     });
 
@@ -138,10 +241,43 @@ class PDFProcessingService {
       address: extractedFields.address,
       position: extractedFields.position,
       admissionDate: extractedFields.admissionDate,
+      hireDate: extractedFields.admissionDate,
       salary: extractedFields.salary,
       contractType: extractedFields.contractType,
       workHours: extractedFields.workHours,
+      horarioTrabalho: extractedFields.workHours,
       observations: extractedFields.observations,
+      notes: extractedFields.observations,
+      // Campos adicionais mapeados
+      cbo: extractedFields.cbo,
+      fgtsOptante: ((): boolean | undefined => {
+        if (!extractedFields.fgtsOptante) return undefined;
+        const v = String(extractedFields.fgtsOptante).toLowerCase();
+        return v.includes('sim') ? true : v.includes('n') ? false : undefined;
+      })(),
+      fgtsDataOpcao: extractedFields.fgtsDataOpcao,
+      fgtsDataRetratacao: extractedFields.fgtsDataRetratacao,
+      fgtsBancoDepositario: extractedFields.fgtsBancoDepositario,
+      empresaNome: extractedFields.empresaNome,
+      empresaEndereco: extractedFields.empresaEndereco,
+      empresaCnpj: extractedFields.empresaCnpj,
+      tituloEleitor: extractedFields.tituloEleitor,
+      tituloEleitorZona: extractedFields.tituloEleitorZona,
+      tituloEleitorSecao: extractedFields.tituloEleitorSecao,
+      carteiraIdentidade: extractedFields.carteiraIdentidade,
+      carteiraIdentidadeOrgaoEmissor: extractedFields.carteiraIdentidadeOrgaoEmissor,
+      carteiraIdentidadeDataEmissao: extractedFields.carteiraIdentidadeDataEmissao,
+      cnhNumber: extractedFields.cnhNumber,
+      cnhCategory: extractedFields.cnhCategory,
+      cnhExpirationDate: extractedFields.cnhExpirationDate,
+      folgaSemanal: extractedFields.folgaSemanal,
+      cep: extractedFields.cep,
+      pisDataCadastro: extractedFields.pisDataCadastro,
+      pis: extractedFields.pis,
+      pisBancoDepositario: extractedFields.pisBancoDepositario,
+      pisEnderecoBanco: extractedFields.pisEnderecoBanco,
+      pisCodigoBanco: extractedFields.pisCodigoBanco,
+      pisCodigoAgencia: extractedFields.pisCodigoAgencia,
       extractedFields
     };
   }

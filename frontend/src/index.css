@@ -167,7 +167,35 @@
   }
   
   .react-datepicker__input-container input {
-    @apply bg-seguranca-black border border-gray-600 text-seguranca-lightgray rounded w-full h-10 px-3 focus:ring-2 focus:ring-seguranca-yellow focus:outline-none;
+    @apply bg-seguranca-black border border-gray-600 text-seguranca-lightgray rounded w-full h-10 px-3 focus:ring-2 focus:ring-seguranca-yellow focus:outline-none placeholder-gray-400;
+  }
+  
+  /* DatePicker com fundo branco (para modais) */
+  .react-datepicker__input-container .bg-white {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .react-datepicker__input-container .bg-white::placeholder {
+    color: rgb(107 114 128) !important;
+    opacity: 1 !important;
+  }
+  
+  /* Garantir que o placeholder seja sempre visível */
+  .react-datepicker__input-container input::placeholder {
+    color: rgb(107 114 128) !important;
+    opacity: 1 !important;
+  }
+  
+  /* Placeholder específico para fundo branco */
+  .react-datepicker__input-container input.bg-white::placeholder {
+    color: rgb(107 114 128) !important;
+    opacity: 1 !important;
+  }
+  
+  /* Forçar placeholder em todos os inputs do DatePicker */
+  .react-datepicker__input-container input:not(:focus):placeholder-shown {
+    color: rgb(107 114 128) !important;
   }
   
   .react-datepicker {

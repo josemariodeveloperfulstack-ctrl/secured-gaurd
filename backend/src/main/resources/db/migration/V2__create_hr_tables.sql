@@ -17,39 +17,129 @@ CREATE TABLE positions (
     id UUID PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
+    base_salary NUMERIC(10,2),
     unit_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (unit_id) REFERENCES units(id)
 );
 
--- Tabela de funcionários
+-- Tabela de funcionários (COMPLETA com todas as colunas)
 CREATE TABLE employees (
     id UUID PRIMARY KEY,
-    user_id UUID NOT NULL,
-    position_id UUID NOT NULL,
+    user_id UUID,
+    position_id UUID,
     registration_number VARCHAR(50) NOT NULL,
     name VARCHAR(100) NOT NULL,
-    cpf VARCHAR(14) NOT NULL UNIQUE,
-    rg VARCHAR(20) NOT NULL UNIQUE,
+    document VARCHAR(14),
+    cpf VARCHAR(14),
+    rg VARCHAR(20),
     birth_date DATE,
-    marital_status VARCHAR(20),
+    gender VARCHAR(1),
+    marital_status VARCHAR(50),
     nationality VARCHAR(50),
     address VARCHAR(255),
     phone VARCHAR(20),
     email VARCHAR(100),
     unit_id UUID,
+    company_id UUID,
     hire_date DATE NOT NULL,
     termination_date DATE,
     status VARCHAR(20) NOT NULL,
     notes TEXT,
     photo_url VARCHAR(255),
+    
+    -- Documentos pessoais
+    cnh_number VARCHAR(20),
+    cnh_expiration_date DATE,
+    cnh_category VARCHAR(5),
+    ctps VARCHAR(30),
+    ctps_series VARCHAR(10),
+    ctps_issue_date DATE,
+    ctps_issuing_agency VARCHAR(100),
+    ctps_rural VARCHAR(30),
+    titulo_eleitor VARCHAR(20),
+    titulo_eleitor_zona VARCHAR(10),
+    titulo_eleitor_secao VARCHAR(10),
+    carteira_identidade_orgao_emissor VARCHAR(50),
+    carteira_identidade_data_emissao DATE,
+    certificado_militar VARCHAR(30),
+    
+    -- Dados profissionais
+    cbo VARCHAR(20),
+    pis VARCHAR(20),
+    salario NUMERIC(10,2),
+    salario_por_extenso TEXT,
+    periodo_pagamento VARCHAR(50),
+    horario_trabalho TEXT,
+    folga_semanal VARCHAR(50),
+    fgts_optante BOOLEAN,
+    fgts_data_opcao DATE,
+    fgts_banco_depositario VARCHAR(100),
+    fgts_data_retratacao DATE,
+    pis_data_cadastro DATE,
+    pis_banco_depositario VARCHAR(100),
+    pis_endereco_banco VARCHAR(255),
+    pis_codigo_banco VARCHAR(10),
+    pis_codigo_agencia VARCHAR(10),
+    
+    -- Visto de fiscalização
+    visto_fiscalizacao TEXT,
+    
+    -- Dados familiares e pessoais
+    nome_pai VARCHAR(100),
+    nome_mae VARCHAR(100),
+    local_nascimento VARCHAR(100),
+    grau_instrucao VARCHAR(50),
+    
+    -- Documentos especiais
+    carteira_modelo_19 VARCHAR(30),
+    registro_geral_estrangeiro VARCHAR(30),
+    
+    -- Dados do cônjuge
+    casado_brasileiro BOOLEAN,
+    nome_conjuge_estrangeiro VARCHAR(100),
+    spouse_name VARCHAR(100),
+    spouse_cpf VARCHAR(14),
+    spouse_rg VARCHAR(20),
+    spouse_birth_date DATE,
+    spouse_phone VARCHAR(20),
+    spouse_email VARCHAR(100),
+    
+    -- Dados de filhos
+    tem_filhos_brasileiros BOOLEAN,
+    quantidade_filhos_brasileiros INTEGER,
+    
+    -- Dados de naturalização
+    data_chegada_brasil DATE,
+    naturalizado BOOLEAN,
+    decreto_naturalizacao VARCHAR(50),
+    
+    -- Assinatura e rescisão
+    assinatura_funcionario TEXT,
+    data_rescisao DATE,
+    
+    -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Keys
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (position_id) REFERENCES positions(id),
     FOREIGN KEY (unit_id) REFERENCES units(id)
+    -- A foreign key para company_id será adicionada em uma migration posterior (V127+)
 );
+
+-- Índices para a tabela employees
+CREATE INDEX idx_employees_user_id ON employees(user_id);
+CREATE INDEX idx_employees_position_id ON employees(position_id);
+CREATE INDEX idx_employees_unit_id ON employees(unit_id);
+CREATE INDEX idx_employees_company_id ON employees(company_id);
+CREATE INDEX idx_employees_cpf ON employees(cpf);
+CREATE INDEX idx_employees_rg ON employees(rg);
+CREATE INDEX idx_employees_email ON employees(email);
+CREATE INDEX idx_employees_status ON employees(status);
+CREATE INDEX idx_employees_registration_number ON employees(registration_number);
 
 -- Tabela de documentos
 CREATE TABLE documents (

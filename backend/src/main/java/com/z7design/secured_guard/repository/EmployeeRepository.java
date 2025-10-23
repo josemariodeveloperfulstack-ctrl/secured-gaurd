@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.z7design.secured_guard.model.Employee;
@@ -44,6 +45,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     // Buscar dados básicos sem relacionamentos
     @Query(value = "SELECT id, name, document, birth_date, registration_number, hire_date, termination_date, status, notes, address, phone, email, cnh_number, ctps, cbo, pis, salario, created_at, updated_at FROM employees", nativeQuery = true)
     List<Object[]> findBasicData();
+
+    // Buscar apenas o nome por ID para evitar carregar toda a entidade (e colunas inexistentes em alguns ambientes)
+    @Query("SELECT e.name FROM Employee e WHERE e.id = :id")
+    Optional<String> findNameById(@Param("id") UUID id);
     
     // List<Employee> findByPossuiWhatsappTrue();
 } 

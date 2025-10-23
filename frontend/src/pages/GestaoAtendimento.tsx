@@ -18,48 +18,24 @@ import {
   MessageCircle,
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Loader2,
+  Hash,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MainLayout } from '@/components/MainLayout';
-
-interface Agent {
-  id: string;
-  name: string;
-  email: string;
-  status: 'ONLINE' | 'OFFLINE' | 'BUSY' | 'AWAY';
-  department: string;
-  lastActivity: string;
-  totalTickets: number;
-  resolvedTickets: number;
-}
-
-interface Ticket {
-  id: string;
-  title: string;
-  description: string;
-  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
-  category: string;
-  assignedTo?: Agent;
-  customer: {
-    name: string;
-    email: string;
-    phone?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  resolvedAt?: string;
-}
-
-interface Metric {
-  name: string;
-  value: number;
-  change: number;
-  trend: 'up' | 'down' | 'stable';
-}
+import supportService, {
+  Agent,
+  Ticket,
+  TicketMetrics,
+  CreateTicketRequest,
+  TicketPriority,
+  TicketCategory
+} from '@/services/supportService';
+import employeeService, { SimpleEmployee } from '@/services/employeeService'; // Mudança: usar employeeService
 
 const GestaoAtendimento: React.FC = () => {
   const location = useLocation();
@@ -71,22 +47,25 @@ const GestaoAtendimento: React.FC = () => {
   
   const [agents, setAgents] = useState<Agent[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [metrics, setMetrics] = useState<TicketMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [users, setUsers] = useState<SimpleEmployee[]>([]); // Mudança: usar SimpleEmployee
+  const [protocol, setProtocol] = useState<string>(''); // Novo: campo protocolo
   
   const { toast } = useToast();
 
   // Form state para novo ticket
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateTicketRequest>({
     title: '',
     description: '',
-    priority: 'NORMAL' as Ticket['priority'],
-    category: '',
-    customerName: '',
-    customerEmail: '',
-    customerPhone: ''
+    priority: 'NORMAL' as TicketPriority,
+    category: 'GENERAL_INQUIRY' as TicketCategory,
+    customerName: '', // Mudança: removido obrigatoriedade
+    customerEmail: '', // Mudança: removido obrigatoriedade
+    customerPhone: '',
+    customerUserId: undefined
   });
 
   useEffect(() => {
@@ -103,136 +82,107 @@ const GestaoAtendimento: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock data para demonstração
-      const mockAgents: Agent[] = [
-        {
-          id: '1',
-          name: 'João Silva',
-          email: 'joao.silva@empresa.com',
-          status: 'ONLINE',
-          department: 'Suporte Técnico',
-          lastActivity: new Date().toISOString(),
-          totalTickets: 45,
-          resolvedTickets: 42
-        },
-        {
-          id: '2',
-          name: 'Maria Santos',
-          email: 'maria.santos@empresa.com',
-          status: 'BUSY',
-          department: 'Atendimento ao Cliente',
-          lastActivity: new Date(Date.now() - 300000).toISOString(),
-          totalTickets: 38,
-          resolvedTickets: 35
-        },
-        {
-          id: '3',
-          name: 'Pedro Costa',
-          email: 'pedro.costa@empresa.com',
-          status: 'OFFLINE',
-          department: 'Suporte Técnico',
-          lastActivity: new Date(Date.now() - 3600000).toISOString(),
-          totalTickets: 52,
-          resolvedTickets: 48
-        }
-      ];
-
-      const mockTickets: Ticket[] = [
-        {
-          id: '1',
-          title: 'Problema com login no sistema',
-          description: 'Usuário não consegue acessar o sistema com suas credenciais',
-          priority: 'HIGH',
-          status: 'IN_PROGRESS',
-          category: 'Acesso ao Sistema',
-          assignedTo: mockAgents[0],
-          customer: {
-            name: 'Carlos Oliveira',
-            email: 'carlos.oliveira@cliente.com',
-            phone: '(11) 99999-9999'
-          },
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          id: '2',
-          title: 'Dúvida sobre relatórios',
-          description: 'Cliente precisa de ajuda para gerar relatórios mensais',
-          priority: 'NORMAL',
-          status: 'OPEN',
-          category: 'Relatórios',
-          customer: {
-            name: 'Ana Paula',
-            email: 'ana.paula@cliente.com'
-          },
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-          updatedAt: new Date(Date.now() - 7200000).toISOString()
-        }
-      ];
-
-      const mockMetrics: Metric[] = [
-        { name: 'Tickets Abertos', value: 15, change: 2, trend: 'up' },
-        { name: 'Tempo Médio de Resposta', value: 2.5, change: -0.5, trend: 'down' },
-        { name: 'Taxa de Resolução', value: 94, change: 3, trend: 'up' },
-        { name: 'Satisfação do Cliente', value: 4.8, change: 0.2, trend: 'up' }
-      ];
-
-      setAgents(mockAgents);
-      setTickets(mockTickets);
-      setMetrics(mockMetrics);
+      // Carregar dados reais do backend
+      const [agentsData, ticketsData, metricsData, employeesData] = await Promise.all([
+        supportService.getAllAgents(),
+        supportService.getAllTickets(0, 50),
+        supportService.getTicketMetrics(),
+        employeeService.getSimpleEmployees() // Mudança: usar employeeService
+      ]);
+      
+      setAgents(agentsData);
+      setTickets(ticketsData.content);
+      setMetrics(metricsData);
+      setUsers(employeesData); // Mudança: usar employeesData
+      
+      console.log('✅ Dados carregados do backend:', {
+        agents: agentsData.length,
+        tickets: ticketsData.content.length,
+        metrics: metricsData,
+        employees: employeesData.length // Mudança: usar employees
+      });
+      
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('❌ Erro ao carregar dados:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os dados de atendimento",
+        description: "Não foi possível carregar os dados de atendimento. Usando dados de demonstração.",
         variant: "destructive"
+      });
+      
+      // Fallback para dados de demonstração se o backend não estiver disponível
+      setAgents([]);
+      setTickets([]);
+      setUsers([]); // Clear employees on error
+      setMetrics({
+        totalTickets: 0,
+        openTickets: 0,
+        inProgressTickets: 0,
+        resolvedTickets: 0,
+        closedTickets: 0,
+        averageResolutionTimeHours: 0,
+        resolutionRatePercentage: 0
       });
     } finally {
       setLoading(false);
     }
   };
 
+  // Função para gerar protocolo baseado no título e data
+  const generateProtocol = () => {
+    const now = new Date();
+    const dateStr = format(now, 'yyyyMMdd');
+    const timeStr = format(now, 'HHmmss');
+    
+    // Criar protocolo baseado no título (primeiras letras) + data + hora
+    const titleWords = formData.title.split(' ').filter(word => word.length > 0);
+    const titlePrefix = titleWords.map(word => word.charAt(0).toUpperCase()).join('').substring(0, 3);
+    
+    const newProtocol = `${titlePrefix}-${dateStr}-${timeStr}`;
+    setProtocol(newProtocol);
+    
+    toast({
+      title: "Protocolo gerado",
+      description: `Protocolo: ${newProtocol}`,
+      variant: "default"
+    });
+  };
+
   const handleCreateTicket = async () => {
-    if (!formData.title || !formData.description || !formData.customerName || !formData.customerEmail) {
+    if (!formData.title || !formData.description) { // Mudança: removido obrigatoriedade de customerName e customerEmail
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios",
+        description: "Preencha pelo menos o título e descrição",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      // Mock: criar novo ticket
-      const newTicket: Ticket = {
-        id: Date.now().toString(),
-        title: formData.title,
-        description: formData.description,
-        priority: formData.priority,
-        status: 'OPEN',
-        category: formData.category,
-        customer: {
-          name: formData.customerName,
-          email: formData.customerEmail,
-          phone: formData.customerPhone
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
+      setLoading(true);
+      const newTicket = await supportService.createTicket(formData);
+      
       setTickets([newTicket, ...tickets]);
       resetForm();
+      
       toast({
         title: "Sucesso",
         description: "Ticket criado com sucesso",
       });
+      
+      // Recarregar métricas
+      const metricsData = await supportService.getTicketMetrics();
+      setMetrics(metricsData);
+      
     } catch (error) {
-      console.error('Erro ao criar ticket:', error);
+      console.error('❌ Erro ao criar ticket:', error);
       toast({
         title: "Erro",
         description: "Não foi possível criar o ticket",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -241,11 +191,13 @@ const GestaoAtendimento: React.FC = () => {
       title: '',
       description: '',
       priority: 'NORMAL',
-      category: '',
+      category: 'GENERAL_INQUIRY',
       customerName: '',
       customerEmail: '',
-      customerPhone: ''
+      customerPhone: '',
+      customerUserId: undefined
     });
+    setProtocol(''); // Novo: limpar protocolo
   };
 
   const getStatusColor = (status: string) => {
@@ -274,6 +226,7 @@ const GestaoAtendimento: React.FC = () => {
       case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800';
       case 'RESOLVED': return 'bg-green-100 text-green-800';
       case 'CLOSED': return 'bg-gray-100 text-gray-800';
+      case 'CANCELLED': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -282,6 +235,17 @@ const GestaoAtendimento: React.FC = () => {
   const navigateToPage = (page: string) => {
     navigate(`/gestao-atendimento/${page}`);
   };
+
+  if (loading && tickets.length === 0) {
+    return (
+      <MainLayout title="Gestão de Atendimento" subtitle="Gerencie tickets, agentes e métricas de atendimento">
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-600">Carregando dados...</span>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout title="Gestão de Atendimento" subtitle="Gerencie tickets, agentes e métricas de atendimento">
@@ -342,34 +306,61 @@ const GestaoAtendimento: React.FC = () => {
           </Button>
         </div>
 
-        {/* Componentes das páginas */}
         {/* Dashboard */}
         {currentPage === 'dashboard' && (
           <div className="space-y-6">
             {/* Métricas principais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {metrics.map((metric) => (
-                <Card key={metric.name}>
+            {metrics && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">{metric.name}</p>
-                        <p className="text-2xl font-bold">{metric.value}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Total de Tickets</p>
+                        <p className="text-2xl font-bold">{metrics.totalTickets}</p>
                       </div>
-                      <div className={`flex items-center text-sm ${
-                        metric.trend === 'up' ? 'text-green-600' : 
-                        metric.trend === 'down' ? 'text-red-600' : 'text-gray-600'
-                      }`}>
-                        {metric.trend === 'up' && <CheckCircle className="w-4 h-4 mr-1" />}
-                        {metric.trend === 'down' && <XCircle className="w-4 h-4 mr-1" />}
-                        {metric.trend === 'stable' && <AlertCircle className="w-4 h-4 mr-1" />}
-                        {metric.change > 0 ? '+' : ''}{metric.change}%
-                      </div>
+                      <MessageCircle className="w-8 h-8 text-blue-500" />
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Tickets Abertos</p>
+                        <p className="text-2xl font-bold text-orange-600">{metrics.openTickets}</p>
+                      </div>
+                      <AlertCircle className="w-8 h-8 text-orange-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Tempo Médio Resolução</p>
+                        <p className="text-2xl font-bold">{metrics.averageResolutionTimeHours.toFixed(1)}h</p>
+                      </div>
+                      <Clock className="w-8 h-8 text-purple-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Taxa de Resolução</p>
+                        <p className="text-2xl font-bold text-green-600">{metrics.resolutionRatePercentage.toFixed(1)}%</p>
+                      </div>
+                      <CheckCircle className="w-8 h-8 text-green-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Agentes online */}
             <Card>
@@ -377,22 +368,26 @@ const GestaoAtendimento: React.FC = () => {
                 <CardTitle>Agentes Online</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {agents.filter(agent => agent.status === 'ONLINE').map((agent) => (
-                    <div key={agent.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-green-600" />
+                {agents.filter(agent => agent.status === 'ONLINE').length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {agents.filter(agent => agent.status === 'ONLINE').map((agent) => (
+                      <div key={agent.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <Users className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{agent.name}</p>
+                          <p className="text-sm text-muted-foreground">{agent.department || 'Sem departamento'}</p>
+                        </div>
+                        <Badge className={getStatusColor(agent.status)}>
+                          {supportService.getAgentStatusLabel(agent.status)}
+                        </Badge>
                       </div>
-                      <div>
-                        <p className="font-medium">{agent.name}</p>
-                        <p className="text-sm text-muted-foreground">{agent.department}</p>
-                      </div>
-                      <Badge className={getStatusColor(agent.status)}>
-                        {agent.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-4">Nenhum agente online no momento</p>
+                )}
               </CardContent>
             </Card>
 
@@ -402,26 +397,37 @@ const GestaoAtendimento: React.FC = () => {
                 <CardTitle>Tickets Recentes</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {tickets.slice(0, 5).map((ticket) => (
-                    <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{ticket.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {ticket.customer.name} • {ticket.category}
-                        </p>
+                {tickets.length > 0 ? (
+                  <div className="space-y-3">
+                    {tickets.slice(0, 5).map((ticket) => (
+                      <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                           onClick={() => {
+                             setSelectedTicket(ticket);
+                             setShowTicketModal(true);
+                           }}>
+                        <div>
+                          <p className="font-medium">{ticket.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {ticket.customer.name} • {supportService.getCategoryLabel(ticket.category)}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getPriorityColor(ticket.priority)}>
+                            {supportService.getPriorityLabel(ticket.priority)}
+                          </Badge>
+                          <Badge className={getTicketStatusColor(ticket.status)}>
+                            {supportService.getStatusLabel(ticket.status)}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(ticket.createdAt), 'dd/MM HH:mm', { locale: ptBR })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getPriorityColor(ticket.priority)}>
-                          {ticket.priority}
-                        </Badge>
-                        <Badge className={getTicketStatusColor(ticket.status)}>
-                          {ticket.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-4">Nenhum ticket encontrado</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -447,13 +453,28 @@ const GestaoAtendimento: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="category">Categoria</Label>
-                      <Input
-                        id="category"
-                        value={formData.category}
-                        onChange={(e) => setFormData({...formData, category: e.target.value})}
-                        placeholder="Ex: Suporte Técnico"
-                      />
+                      <Label htmlFor="protocol">Protocolo</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="protocol"
+                          value={protocol}
+                          onChange={(e) => setProtocol(e.target.value)}
+                          placeholder="Protocolo será gerado automaticamente"
+                          readOnly
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={generateProtocol}
+                          disabled={!formData.title}
+                          className="px-3"
+                        >
+                          <Hash className="w-4 h-4 mr-1" />
+                          Gerar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   
@@ -468,10 +489,29 @@ const GestaoAtendimento: React.FC = () => {
                     />
                   </div>
 
+                  <div>
+                    <Label htmlFor="category">Categoria *</Label>
+                    <Select value={formData.category} onValueChange={(value: TicketCategory) => setFormData({...formData, category: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SYSTEM_ACCESS">Acesso ao Sistema</SelectItem>
+                        <SelectItem value="TECHNICAL_SUPPORT">Suporte Técnico</SelectItem>
+                        <SelectItem value="BILLING">Financeiro</SelectItem>
+                        <SelectItem value="REPORTS">Relatórios</SelectItem>
+                        <SelectItem value="GENERAL_INQUIRY">Dúvida Geral</SelectItem>
+                        <SelectItem value="BUG_REPORT">Relato de Bug</SelectItem>
+                        <SelectItem value="FEATURE_REQUEST">Solicitação de Funcionalidade</SelectItem>
+                        <SelectItem value="OTHER">Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="priority">Prioridade</Label>
-                      <Select value={formData.priority} onValueChange={(value: Ticket['priority']) => setFormData({...formData, priority: value})}>
+                      <Select value={formData.priority} onValueChange={(value: TicketPriority) => setFormData({...formData, priority: value})}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -484,38 +524,75 @@ const GestaoAtendimento: React.FC = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="customerName">Nome do Cliente *</Label>
+                      <Label htmlFor="customerName">Nome do Cliente</Label>
                       <Input
                         id="customerName"
                         value={formData.customerName}
                         onChange={(e) => setFormData({...formData, customerName: e.target.value})}
-                        placeholder="Nome completo"
+                        placeholder="Nome completo (opcional)"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="customerEmail">Email *</Label>
+                      <Label htmlFor="customerEmail">Email</Label>
                       <Input
                         id="customerEmail"
+                        type="email"
                         value={formData.customerEmail}
                         onChange={(e) => setFormData({...formData, customerEmail: e.target.value})}
-                        placeholder="email@exemplo.com"
+                        placeholder="email@exemplo.com (opcional)"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="customerPhone">Telefone</Label>
-                    <Input
-                      id="customerPhone"
-                      value={formData.customerPhone}
-                      onChange={(e) => setFormData({...formData, customerPhone: e.target.value})}
-                      placeholder="(11) 99999-9999"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="customerUserId">Funcionário</Label>
+                      <div className="flex gap-2">
+                        <Select 
+                          value={formData.customerUserId || undefined} 
+                          onValueChange={(value) => setFormData({...formData, customerUserId: value || undefined})}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Selecione um funcionário (opcional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {users.map((employee) => (
+                              <SelectItem key={employee.id} value={employee.id}>
+                                {employee.name} - {employee.email || employee.phone || 'Sem contato'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {formData.customerUserId && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFormData({...formData, customerUserId: undefined})}
+                            className="px-2"
+                          >
+                            ✕
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="customerPhone">Telefone</Label>
+                      <Input
+                        id="customerPhone"
+                        value={formData.customerPhone || ''}
+                        onChange={(e) => setFormData({...formData, customerPhone: e.target.value})}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex justify-end space-x-2">
                     <Button variant="outline" onClick={resetForm}>Limpar</Button>
-                    <Button onClick={handleCreateTicket}>Criar Ticket</Button>
+                    <Button onClick={handleCreateTicket} disabled={loading}>
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Criar Ticket
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -527,33 +604,37 @@ const GestaoAtendimento: React.FC = () => {
                 <CardTitle>Todos os Tickets</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {tickets.map((ticket) => (
-                    <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                         onClick={() => {
-                           setSelectedTicket(ticket);
-                           setShowTicketModal(true);
-                         }}>
-                      <div>
-                        <p className="font-medium">{ticket.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {ticket.customer.name} • {ticket.category}
-                        </p>
+                {tickets.length > 0 ? (
+                  <div className="space-y-3">
+                    {tickets.map((ticket) => (
+                      <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                           onClick={() => {
+                             setSelectedTicket(ticket);
+                             setShowTicketModal(true);
+                           }}>
+                        <div>
+                          <p className="font-medium">{ticket.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {ticket.customer.name} • {supportService.getCategoryLabel(ticket.category)}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getPriorityColor(ticket.priority)}>
+                            {supportService.getPriorityLabel(ticket.priority)}
+                          </Badge>
+                          <Badge className={getTicketStatusColor(ticket.status)}>
+                            {supportService.getStatusLabel(ticket.status)}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(ticket.createdAt), 'dd/MM HH:mm', { locale: ptBR })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getPriorityColor(ticket.priority)}>
-                          {ticket.priority}
-                        </Badge>
-                        <Badge className={getTicketStatusColor(ticket.status)}>
-                          {ticket.status}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(ticket.createdAt), 'dd/MM HH:mm', { locale: ptBR })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Nenhum ticket encontrado</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -567,56 +648,91 @@ const GestaoAtendimento: React.FC = () => {
                 <CardTitle>Gerenciar Agentes</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {agents.map((agent) => (
-                    <div key={agent.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Users className="w-6 h-6 text-blue-600" />
+                {agents.length > 0 ? (
+                  <div className="space-y-4">
+                    {agents.map((agent) => (
+                      <div key={agent.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Users className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{agent.name}</p>
+                            <p className="text-sm text-muted-foreground">{agent.email}</p>
+                            <p className="text-sm text-muted-foreground">{agent.department || 'Sem departamento'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{agent.name}</p>
-                          <p className="text-sm text-muted-foreground">{agent.email}</p>
-                          <p className="text-sm text-muted-foreground">{agent.department}</p>
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Total de Tickets</p>
+                            <p className="font-medium">{agent.totalTickets}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Resolvidos</p>
+                            <p className="font-medium">{agent.resolvedTickets}</p>
+                          </div>
+                          <Badge className={getStatusColor(agent.status)}>
+                            {supportService.getAgentStatusLabel(agent.status)}
+                          </Badge>
+                          <Button variant="outline" size="sm">
+                            <UserCog className="w-4 h-4 mr-2" />
+                            Configurar
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Total de Tickets</p>
-                          <p className="font-medium">{agent.totalTickets}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Resolvidos</p>
-                          <p className="font-medium">{agent.resolvedTickets}</p>
-                        </div>
-                        <Badge className={getStatusColor(agent.status)}>
-                          {agent.status}
-                        </Badge>
-                        <Button variant="outline" size="sm">
-                          <UserCog className="w-4 h-4 mr-2" />
-                          Configurar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Nenhum agente cadastrado</p>
+                )}
               </CardContent>
             </Card>
           </div>
         )}
 
         {/* Página de Métricas */}
-        {currentPage === 'metricas' && (
+        {currentPage === 'metricas' && metrics && (
           <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Métricas de Atendimento</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
-                  <p>Funcionalidade em desenvolvimento</p>
-                  <p className="text-sm">Em breve você poderá visualizar métricas detalhadas</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Total de Tickets</p>
+                    <p className="text-3xl font-bold">{metrics.totalTickets}</p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Tickets Abertos</p>
+                    <p className="text-3xl font-bold text-orange-600">{metrics.openTickets}</p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Em Andamento</p>
+                    <p className="text-3xl font-bold text-blue-600">{metrics.inProgressTickets}</p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Resolvidos</p>
+                    <p className="text-3xl font-bold text-green-600">{metrics.resolvedTickets}</p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Fechados</p>
+                    <p className="text-3xl font-bold text-gray-600">{metrics.closedTickets}</p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Taxa de Resolução</p>
+                    <p className="text-3xl font-bold text-green-600">{metrics.resolutionRatePercentage.toFixed(1)}%</p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg col-span-full">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Tempo Médio de Resolução</p>
+                    <p className="text-3xl font-bold text-purple-600">{metrics.averageResolutionTimeHours.toFixed(2)} horas</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -663,14 +779,14 @@ const GestaoAtendimento: React.FC = () => {
                   <div>
                     <Label className="text-sm font-medium">Prioridade</Label>
                     <Badge className={getPriorityColor(selectedTicket.priority)}>
-                      {selectedTicket.priority}
+                      {supportService.getPriorityLabel(selectedTicket.priority)}
                     </Badge>
                   </div>
                   
                   <div>
                     <Label className="text-sm font-medium">Status</Label>
                     <Badge className={getTicketStatusColor(selectedTicket.status)}>
-                      {selectedTicket.status}
+                      {supportService.getStatusLabel(selectedTicket.status)}
                     </Badge>
                   </div>
                 </div>
@@ -685,7 +801,7 @@ const GestaoAtendimento: React.FC = () => {
 
                 <div>
                   <Label className="text-sm font-medium">Categoria</Label>
-                  <p>{selectedTicket.category}</p>
+                  <p>{supportService.getCategoryLabel(selectedTicket.category)}</p>
                 </div>
 
                 <div>
@@ -696,7 +812,7 @@ const GestaoAtendimento: React.FC = () => {
                 {selectedTicket.assignedTo && (
                   <div>
                     <Label className="text-sm font-medium">Atendente</Label>
-                    <p>{selectedTicket.assignedTo.name} ({selectedTicket.assignedTo.department})</p>
+                    <p>{selectedTicket.assignedTo.name} ({selectedTicket.assignedTo.department || 'Sem departamento'})</p>
                   </div>
                 )}
 

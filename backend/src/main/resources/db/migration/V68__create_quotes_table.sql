@@ -1,9 +1,9 @@
 CREATE TABLE quotes (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(500) NOT NULL,
     quote_number VARCHAR(100) UNIQUE NOT NULL,
-    client_id BIGINT,
-    lead_id BIGINT,
+    client_id UUID,
+    lead_id UUID,
     status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
     total_value DECIMAL(15,2) NOT NULL,
     valid_until DATE,

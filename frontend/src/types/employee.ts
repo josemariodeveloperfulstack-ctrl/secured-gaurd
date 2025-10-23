@@ -409,6 +409,13 @@ export interface CreateEmployeeDTO {
     cnpj?: string;
   };
   
+  // Campo para Posto de Trabalho
+  workPostId?: string;
+  
+  // Campo para Departamento
+  departmentId?: string;
+  };
+  
   // Dados aninhados
   bankData?: EmployeeBankData;
   documents?: { type: string; number: string; file?: File }[];

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -285,13 +285,13 @@ const Medicao: React.FC = () => {
         {/* Tabs */}
         <Tabs defaultValue="dashboard" className="space-y-4">
           <TabsList className="bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="dashboard" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="completa" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="completa" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Completa
             </TabsTrigger>
-            <TabsTrigger value="simplificada" className="data-[state=active]:bg-seguranca-black data-[state=active]:text-seguranca-yellow">
+            <TabsTrigger value="simplificada" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               Simplificada
             </TabsTrigger>
           </TabsList>

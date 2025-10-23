@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import com.z7design.secured_guard.model.Message;
 import com.z7design.secured_guard.model.enums.MessageType;
+import com.z7design.secured_guard.model.enums.MessageStatus;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, UUID> {
@@ -36,7 +37,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     /**
      * Busca mensagens não lidas por usuário
      */
-    @Query("SELECT m FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.readAt IS NULL ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.status = 'UNREAD' ORDER BY m.createdAt DESC")
     List<Message> findUnreadByUserId(@Param("userId") UUID userId);
     
     /**
@@ -54,7 +55,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     /**
      * Conta mensagens não lidas por usuário
      */
-    @Query("SELECT COUNT(m) FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.readAt IS NULL")
+    @Query("SELECT COUNT(m) FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.status = 'UNREAD'")
     Long countUnreadByUserId(@Param("userId") UUID userId);
     
     /**
@@ -77,12 +78,30 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     /**
      * Conta mensagens não lidas por usuário e tipo
      */
-    @Query("SELECT COUNT(m) FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.type = :type AND m.readAt IS NULL")
-    Long countByRecipientsIdAndTypeAndReadAtIsNull(@Param("userId") UUID userId, @Param("type") MessageType type);
+    @Query("SELECT COUNT(m) FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.type = :type AND m.status = 'UNREAD'")
+    Long countByRecipientsIdAndTypeAndStatusUnread(@Param("userId") UUID userId, @Param("type") MessageType type);
     
     /**
      * Busca mensagens por tipo e prioridade
      */
     @Query("SELECT m FROM Message m WHERE m.type = :type AND m.priority = :priority ORDER BY m.createdAt DESC")
     List<Message> findByTypeAndPriorityOrderByCreatedAtDesc(@Param("type") MessageType type, @Param("priority") com.z7design.secured_guard.model.enums.MessagePriority priority);
+    
+    /**
+     * Busca mensagens por status
+     */
+    @Query("SELECT m FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.status = :status ORDER BY m.createdAt DESC")
+    List<Message> findByRecipientIdAndStatus(@Param("userId") UUID userId, @Param("status") MessageStatus status);
+    
+    /**
+     * Busca mensagens por status com paginação
+     */
+    @Query("SELECT m FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.status = :status ORDER BY m.createdAt DESC")
+    Page<Message> findByRecipientIdAndStatus(@Param("userId") UUID userId, @Param("status") MessageStatus status, Pageable pageable);
+    
+    /**
+     * Busca mensagens por status e tipo
+     */
+    @Query("SELECT m FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.status = :status AND m.type = :type ORDER BY m.createdAt DESC")
+    List<Message> findByRecipientIdAndStatusAndType(@Param("userId") UUID userId, @Param("status") MessageStatus status, @Param("type") MessageType type);
 }

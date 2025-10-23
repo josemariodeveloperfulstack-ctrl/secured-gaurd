@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -55,46 +56,75 @@ const Index: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Carregar dados do dashboard
+  // Staged fetching: quick stats first, then full summary
+  const quickStatsQuery = useQuery({
+    queryKey: ['dashboard', 'quick'],
+    queryFn: () => dashboardService.getQuickStats() as unknown as Promise<DashboardStats>,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const summaryQuery = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: () => dashboardService.getDashboardSummary() as unknown as Promise<DashboardStats>,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Reagir aos dados das queries e definir estado de exibição
+  useEffect(() => {
+    // Preferir resumo completo; senão, usar quick stats
+    const data = (summaryQuery.data as DashboardStats) || (quickStatsQuery.data as DashboardStats) || null;
+    if (data) {
+      setStats(data);
+      setLoading(false);
+    } else if (quickStatsQuery.isLoading && summaryQuery.isLoading) {
+      setLoading(true);
+    }
+  }, [quickStatsQuery.data, quickStatsQuery.isLoading, summaryQuery.data, summaryQuery.isLoading]);
+
+  // Atualização manual (botão Atualizar)
   const loadDashboardData = async (showToast = false) => {
     try {
       setRefreshing(true);
-      const dashboardData = await dashboardService.getDashboardSummary();
-      setStats(dashboardData);
-      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['dashboard', 'quick'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] }),
+      ]);
       if (showToast) {
-        toast({
-          title: "Dashboard atualizado",
-          description: "Dados atualizados com sucesso",
-        });
+        toast({ title: 'Dashboard atualizado', description: 'Dados atualizados com sucesso' });
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados do dashboard",
-        variant: "destructive",
-      });
+      console.error('Erro ao atualizar dashboard:', error);
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o dashboard', variant: 'destructive' });
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Carregar dados iniciais
+  // Redirecionar colaboradores e vigilantes para dashboards exclusivos
   useEffect(() => {
-    loadDashboardData();
+    if (user?.role === 'COLABORADOR') {
+      navigate('/dashboard-colaborador', { replace: true });
+    } else if (user?.role === 'VIGILANTE') {
+      navigate('/dashboard-vigilante', { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Carregar dados iniciais (queries já disparam automaticamente)
+  useEffect(() => {
+    // Nada aqui: useQuery dispara no mount
   }, []);
 
   // Atualizar dados automaticamente a cada 5 minutos
   useEffect(() => {
     const interval = setInterval(() => {
-      loadDashboardData();
-    }, 300000); // 5 minutos
-
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] });
+    }, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [queryClient]);
 
   if (!user) {
     return (
@@ -204,9 +234,22 @@ const Index: React.FC = () => {
   };
 
   // Renderizar notificações e alertas
-  const renderNotifications = () => {
-    if (!stats) return null;
+  // Queries deferidas para notificações e atividades
+  const alertsQuery = useQuery({
+    queryKey: ['dashboard', 'alerts'],
+    queryFn: () => dashboardService.getSystemAlerts(),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
+  const activitiesQuery = useQuery({
+    queryKey: ['dashboard', 'activities'],
+    queryFn: () => dashboardService.getRecentActivities(),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const renderNotifications = () => {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-seguranca-black border-gray-700">
@@ -218,10 +261,15 @@ const Index: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats.systemAlerts && stats.systemAlerts.length > 0 ? (
-                stats.systemAlerts.slice(0, 5).map((alert) => (
+              {alertsQuery.isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-yellow mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Carregando notificações...</p>
+                </div>
+              ) : alertsQuery.data && alertsQuery.data.length > 0 ? (
+                alertsQuery.data.slice(0, 5).map((alert: any) => (
                   <div key={alert.id} className="flex items-start gap-3 p-3 bg-seguranca-graphite rounded-lg hover:bg-gray-700 transition-colors">
-                    <AlertTriangle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${dashboardService.getStatusColor(alert.type)}`} />
+                    <AlertTriangle className={`h-5 w-5 mt-0.5 flex-shrink-0`} />
                     <div className="flex-1">
                       <p className="text-seguranca-lightgray text-sm font-medium">
                         {alert.title}
@@ -230,7 +278,7 @@ const Index: React.FC = () => {
                         {alert.message}
                       </p>
                       <p className="text-gray-500 text-xs mt-1">
-                        {dashboardService.getRelativeTime(alert.createdAt)}
+                        {alert.createdAt}
                       </p>
                     </div>
                   </div>
@@ -254,11 +302,16 @@ const Index: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats.recentActivities && stats.recentActivities.length > 0 ? (
-                stats.recentActivities.slice(0, 5).map((activity) => (
+              {activitiesQuery.isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-yellow mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Carregando atividades...</p>
+                </div>
+              ) : activitiesQuery.data && activitiesQuery.data.length > 0 ? (
+                activitiesQuery.data.slice(0, 5).map((activity: any) => (
                   <div key={activity.id} className="flex items-center gap-3 p-3 bg-seguranca-graphite rounded-lg">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{dashboardService.getActivityIcon(activity.module)}</span>
+                      <span className="text-lg">•</span>
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     </div>
                     <div className="flex-1">
@@ -266,7 +319,7 @@ const Index: React.FC = () => {
                         {activity.user}: {activity.action}
                       </p>
                       <p className="text-gray-400 text-xs">
-                        {activity.module} • {dashboardService.getRelativeTime(activity.timestamp)}
+                        {activity.module} • {activity.timestamp}
                       </p>
                     </div>
                   </div>
@@ -319,25 +372,25 @@ const Index: React.FC = () => {
         <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite border border-gray-700">
           <TabsTrigger 
             value="overview" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Visão Geral
           </TabsTrigger>
           <TabsTrigger 
             value="modules" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Módulos
           </TabsTrigger>
           <TabsTrigger 
             value="activity" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Atividade
           </TabsTrigger>
           <TabsTrigger 
             value="profile" 
-            className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-seguranca-lightgray"
+            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Perfil
           </TabsTrigger>
@@ -410,7 +463,7 @@ const Index: React.FC = () => {
               iconColor="text-seguranca-yellow"
               action={{
                 label: "Configurar",
-                onClick: () => navigate('/sistema'),
+                onClick: () => navigate('/configuracoes'),
                 variant: 'default'
               }}
             />
@@ -636,7 +689,7 @@ const Index: React.FC = () => {
               iconColor="text-seguranca-yellow"
               action={{
                 label: "Gerenciar",
-                onClick: () => navigate('/gestao-financeira/contas-pagar'),
+                onClick: () => navigate('/contas-a-pagar'),
                 variant: 'default'
               }}
             />
@@ -649,7 +702,7 @@ const Index: React.FC = () => {
               iconColor="text-seguranca-yellow"
               action={{
                 label: "Gerenciar",
-                onClick: () => navigate('/gestao-financeira/contas-receber'),
+                onClick: () => navigate('/financeiro/contas-receber'),
                 variant: 'default'
               }}
             />
@@ -662,7 +715,7 @@ const Index: React.FC = () => {
               iconColor="text-seguranca-yellow"
               action={{
                 label: "Acessar",
-                onClick: () => navigate('/gestao-financeira/fluxo-caixa'),
+                onClick: () => navigate('/financeiro/fluxo-caixa'),
                 variant: 'default'
               }}
             />
@@ -675,7 +728,7 @@ const Index: React.FC = () => {
               iconColor="text-seguranca-yellow"
               action={{
                 label: "Acessar",
-                onClick: () => navigate('/gestao-financeira/conciliacao'),
+                onClick: () => navigate('/financeiro/conciliacao-bancaria'),
                 variant: 'default'
               }}
             />

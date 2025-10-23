@@ -13,6 +13,7 @@ import lombok.AllArgsConstructor;
 
 import com.z7design.secured_guard.model.enums.MessageType;
 import com.z7design.secured_guard.model.enums.MessagePriority;
+import com.z7design.secured_guard.model.enums.MessageStatus;
 
 @Entity
 @Table(name = "messages")
@@ -42,6 +43,11 @@ public class Message {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MessagePriority priority = MessagePriority.NORMAL;
+    
+    @NotNull(message = "Status é obrigatório")
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MessageStatus status = MessageStatus.UNREAD;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)

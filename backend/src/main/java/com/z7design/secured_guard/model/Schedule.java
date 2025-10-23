@@ -61,6 +61,10 @@ public class Schedule {
     @JoinColumn(name = "location_id", nullable = false)
     private Location location;
     
+    @ManyToOne
+    @JoinColumn(name = "work_post_id")
+    private WorkPost workPost;
+    
     @NotNull(message = "Schedule status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

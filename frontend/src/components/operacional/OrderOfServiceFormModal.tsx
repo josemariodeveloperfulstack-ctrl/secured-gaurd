@@ -600,7 +600,7 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                   onChange={(date: Date | null) => setStartDate(date)}
                   dateFormat="dd/MM/yyyy"
                   locale={ptBR}
-                  className="w-full px-3 py-2 border border-seguranca-yellow rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                  className="w-full px-3 py-2 border border-seguranca-yellow rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white"
                   {...DEFAULT_DATE_PICKER_PROPS}
                 />
                 {errors.startDate && (
@@ -622,7 +622,7 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                   onChange={(date: Date | null) => setEndDate(date)}
                   dateFormat="dd/MM/yyyy"
                   locale={ptBR}
-                  className="w-full px-3 py-2 border border-seguranca-yellow rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent bg-white text-black font-medium [&>input]:text-black [&>input]:bg-white"
+                  className="w-full px-3 py-2 border border-seguranca-yellow rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white"
                   {...DEFAULT_DATE_PICKER_PROPS}
                 />
               </div>

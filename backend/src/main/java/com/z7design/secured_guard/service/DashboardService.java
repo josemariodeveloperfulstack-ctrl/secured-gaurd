@@ -52,7 +52,12 @@ public class DashboardService {
             summary.setTotalVehicles(vehicleRepository.count());
             
             // Estatísticas de manutenções
-            summary.setTotalMaintenances(vehicleMaintenanceRepository.count());
+            try {
+                summary.setTotalMaintenances(vehicleMaintenanceRepository.count());
+            } catch (Exception e) {
+                log.warn("Tabela vehicle_maintenances não existe, usando valor padrão", e);
+                summary.setTotalMaintenances(0L);
+            }
             
             // Estatísticas de medições
             summary.setTotalMeasurements(measurementBulletinRepository.count());

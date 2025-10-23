@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,14 +25,17 @@ import {
   FileWarning,
   Shuffle,
   Settings,
-  UserPlus
+  UserPlus,
+  CheckCircle2,
+  Clock,
+  UserMinus,
+  XCircle
 } from 'lucide-react';
 import { useAOS } from '@/hooks/use-aos';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
-import FuncionarioEditModal from '@/components/funcionarios/FuncionarioEditModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
 import { useLocation, useNavigate } from 'react-router-dom';
 import EmployeeTrainingTab from '@/components/funcionarios/EmployeeTrainingTab';
@@ -40,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmployeeDocumentsPanel from '@/components/funcionarios/EmployeeDocumentsPanel';
 import DocumentosGerarTab from '@/components/funcionarios/DocumentosGerarTab';
 import DependenteModal from '@/components/dependentes/DependenteModal';
+import { FuncionariosTable } from '@/components/funcionarios/FuncionariosTable';
 
 const Funcionarios: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -124,16 +128,30 @@ const Funcionarios: React.FC = () => {
   };
 
   // Abrir modal de edição
-  const handleEditEmployee = (employee: Employee) => {
+  const handleEditEmployee = async (employee: Employee) => {
     console.log('🔍 handleEditEmployee chamado com:', employee);
     console.log('🔍 Estado atual editModalOpen:', editModalOpen);
     console.log('🔍 Estado atual employeeToEdit:', employeeToEdit);
     
-    setEmployeeToEdit(employee);
-    setEditModalOpen(true);
-    
-    console.log('🔍 Estado após setEmployeeToEdit:', employee);
-    console.log('🔍 Estado após setEditModalOpen:', true);
+    try {
+      // Buscar dados completos do funcionário do backend
+      console.log('🔍 Buscando dados completos do funcionário:', employee.id);
+      const fullEmployeeData = await employeeService.getEmployeeById(employee.id);
+      console.log('🔍 Dados completos recebidos:', fullEmployeeData);
+      
+      setEmployeeToEdit(fullEmployeeData);
+      setEditModalOpen(true);
+      
+      console.log('🔍 Estado após setEmployeeToEdit:', fullEmployeeData);
+      console.log('🔍 Estado após setEditModalOpen:', true);
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados do funcionário:', error);
+      toast({
+        title: 'Erro ao carregar dados do funcionário',
+        description: 'Não foi possível carregar os dados completos do funcionário.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Fechar modal de edição
@@ -341,18 +359,43 @@ Confirma a exclusão?`)) {
     );
   }
 
+  // Calculate statistics
+  const stats = {
+    total: employees.length,
+    active: employees.filter(e => e.status === 'ACTIVE').length,
+    vacation: employees.filter(e => e.status === 'VACATION').length,
+    medicalCertificate: employees.filter(e => e.status === 'MEDICAL_CERTIFICATE').length,
+    terminated: employees.filter(e => e.status === 'TERMINATED').length,
+    suspended: employees.filter(e => e.status === 'SUSPENDED').length,
+  };
+
   return (
     <StandardLayout 
-      title="Funcionários"
-      subtitle={`${filteredEmployees.length} funcionário${filteredEmployees.length !== 1 ? 's' : ''} encontrado${filteredEmployees.length !== 1 ? 's' : ''}`}
+      title="Gestão de Funcionários"
+      subtitle={`${filteredEmployees.length} funcionário${filteredEmployees.length !== 1 ? 's' : ''} no sistema`}
     >
       <Tabs defaultValue="lista" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="lista">Lista de Funcionários</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
-          <TabsTrigger value="treinamento">Controle de Treinamento</TabsTrigger>
-          <TabsTrigger value="gerar">Gerar Documentos</TabsTrigger>
+        <TabsList className="mb-4 bg-seguranca-black/50 border border-gray-600/30 p-1">
+          <TabsTrigger value="lista" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white">
+            <Users className="h-4 w-4 mr-2" />
+            Lista de Funcionários
+          </TabsTrigger>
+          <TabsTrigger value="documentos" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white">
+            <FileText className="h-4 w-4 mr-2" />
+            Documentos
+          </TabsTrigger>
+          <TabsTrigger value="dependentes" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Dependentes
+          </TabsTrigger>
+          <TabsTrigger value="treinamento" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white">
+            <Award className="h-4 w-4 mr-2" />
+            Treinamento
+          </TabsTrigger>
+          <TabsTrigger value="gerar" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white">
+            <FileText className="h-4 w-4 mr-2" />
+            Gerar Documentos
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="dependentes">
           <Card className="bg-seguranca-graphite border-gray-700">
@@ -393,16 +436,99 @@ Confirma a exclusão?`)) {
         
         <TabsContent value="lista">
           <div className="space-y-6">
-            {/* Notificação sobre regras de exclusão */}
-            <Card className="bg-blue-900/20 border-blue-600" data-aos={aos.fadeUp}>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">ℹ️</span>
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-aos={aos.fadeDown}>
+              <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 group">
+                <div className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Total de Funcionários</p>
+                      <p className="text-3xl font-bold text-white mt-2">{stats.total}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-blue-500/20 border border-blue-500/30 group-hover:bg-blue-500/30 transition-colors">
+                      <Users className="h-6 w-6 text-blue-400" />
+                    </div>
                   </div>
+                </div>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-green-500/50 transition-all duration-300 group">
+                <div className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Funcionários Ativos</p>
+                      <p className="text-3xl font-bold text-green-400 mt-2">{stats.active}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-green-500/20 border border-green-500/30 group-hover:bg-green-500/30 transition-colors">
+                      <CheckCircle2 className="h-6 w-6 text-green-400" />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-purple-500/50 transition-all duration-300 group">
+                <div className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Em Férias / Atestado</p>
+                      <p className="text-3xl font-bold text-purple-400 mt-2">{stats.vacation + stats.medicalCertificate}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 group-hover:bg-purple-500/30 transition-colors">
+                      <Clock className="h-6 w-6 text-purple-400" />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-red-500/50 transition-all duration-300 group">
+                <div className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Demitidos / Suspensos</p>
+                      <p className="text-3xl font-bold text-red-400 mt-2">{stats.terminated + stats.suspended}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 group-hover:bg-red-500/30 transition-colors">
+                      <AlertCircle className="h-6 w-6 text-red-400" />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-aos={aos.fadeDown}>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setRefreshing(true);
+                    loadEmployees();
+                    setTimeout(() => setRefreshing(false), 1000);
+                  }}
+                  disabled={refreshing}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50"
+                >
+                  <RefreshCw size={20} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+                <Button 
+                  className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20"
+                  onClick={handleOpenModal}
+                >
+                  <Plus size={20} className="mr-2" />
+                  Novo Funcionário
+                </Button>
+              </div>
+            </div>
+
+            {/* Notificação sobre regras de exclusão */}
+            <Card className="bg-blue-900/20 border-blue-600/50" data-aos={aos.fadeUp}>
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-blue-400 font-semibold">Regras de Exclusão de Funcionários</h4>
-                    <p className="text-blue-300 text-sm">
+                    <p className="text-blue-300 text-sm mt-1">
                       <strong>⚠️ Importante:</strong> Apenas funcionários com status "Demitido" podem ser excluídos do sistema. 
                       Para excluir um funcionário ativo, primeiro altere seu status para "Demitido" usando o botão "Demitir".
                     </p>
@@ -411,389 +537,99 @@ Confirma a exclusão?`)) {
               </CardContent>
             </Card>
 
-            {/* Dashboard RH Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-              <div
-                className="bg-seguranca-graphite rounded-xl p-4 sm:p-6 flex flex-col gap-2 shadow hover:shadow-lg transition cursor-pointer border border-gray-700 min-h-[120px]"
-                data-aos={aos.fadeUp}
-                onClick={() => {
-                  setStatusFilter('ACTIVE');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários ativos",
-                  });
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') {
-                  setStatusFilter('ACTIVE');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários ativos",
-                  });
-                }}}
-                aria-label="Filtrar funcionários ativos"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                  <Users className="text-seguranca-yellow" size={24} />
-                  <span className="text-base sm:text-lg font-bold text-seguranca-lightgray">Funcionários Ativos</span>
-                </div>
-                <span className="text-seguranca-lightgray text-xs sm:text-sm">Clique para filtrar apenas funcionários com status ativo</span>
-              </div>
-              <div 
-                className="bg-seguranca-graphite rounded-xl p-4 sm:p-6 flex flex-col gap-2 shadow hover:shadow-lg transition cursor-pointer border border-gray-700 min-h-[120px]" 
-                data-aos={aos.fadeUp} 
-                data-aos-delay="100"
-                onClick={() => {
-                  setStatusFilter('TERMINATED');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários demitidos",
-                  });
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') {
-                  setStatusFilter('TERMINATED');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários demitidos",
-                  });
-                }}}
-                aria-label="Filtrar funcionários demitidos"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                  <Shuffle className="text-blue-400" size={24} />
-                  <span className="text-base sm:text-lg font-bold text-seguranca-lightgray">Funcionários Demitidos</span>
-                </div>
-                <span className="text-seguranca-lightgray text-xs sm:text-sm">Clique para filtrar apenas funcionários demitidos</span>
-              </div>
-              <div 
-                className="bg-seguranca-graphite rounded-xl p-4 sm:p-6 flex flex-col gap-2 shadow hover:shadow-lg transition cursor-pointer border border-gray-700 min-h-[120px]" 
-                data-aos={aos.fadeUp} 
-                data-aos-delay="200"
-                onClick={() => {
-                  setStatusFilter('VACATION');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários de férias",
-                  });
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') {
-                  setStatusFilter('VACATION');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários de férias",
-                  });
-                }}}
-                aria-label="Filtrar funcionários de férias"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                  <Calendar className="text-green-400" size={24} />
-                  <span className="text-base sm:text-lg font-bold text-seguranca-lightgray">Funcionários de Férias</span>
-                </div>
-                <span className="text-seguranca-lightgray text-xs sm:text-sm">Clique para filtrar apenas funcionários de férias</span>
-              </div>
-              <div 
-                className="bg-seguranca-graphite rounded-xl p-4 sm:p-6 flex flex-col gap-2 shadow hover:shadow-lg transition cursor-pointer border border-gray-700 min-h-[120px]" 
-                data-aos={aos.fadeUp} 
-                data-aos-delay="300"
-                onClick={() => {
-                  setStatusFilter('MEDICAL_CERTIFICATE');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários com atestado",
-                  });
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') {
-                  setStatusFilter('MEDICAL_CERTIFICATE');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários com atestado",
-                  });
-                }}}
-                aria-label="Filtrar funcionários com atestado"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                  <FileWarning className="text-purple-400" size={24} />
-                  <span className="text-base sm:text-lg font-bold text-seguranca-lightgray">Funcionários com Atestado</span>
-                </div>
-                <span className="text-seguranca-lightgray text-xs sm:text-sm">Clique para filtrar apenas funcionários com atestado médico</span>
-              </div>
-              <div 
-                className="bg-seguranca-graphite rounded-xl p-4 sm:p-6 flex flex-col gap-2 shadow hover:shadow-lg transition cursor-pointer border border-gray-700 min-h-[120px]" 
-                data-aos={aos.fadeUp} 
-                data-aos-delay="400"
-                onClick={() => {
-                  setStatusFilter('SUSPENDED');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários suspensos",
-                  });
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') {
-                  setStatusFilter('SUSPENDED');
-                  toast({
-                    title: "Filtro aplicado",
-                    description: "Mostrando apenas funcionários suspensos",
-                  });
-                }}}
-                aria-label="Filtrar funcionários suspensos"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                  <Award className="text-orange-400" size={24} />
-                  <span className="text-base sm:text-lg font-bold text-seguranca-lightgray">Funcionários Suspensos</span>
-                </div>
-                <span className="text-seguranca-lightgray text-xs sm:text-sm">Clique para filtrar apenas funcionários suspensos</span>
-              </div>
-              <div 
-                className="bg-seguranca-graphite rounded-xl p-4 sm:p-6 flex flex-col gap-2 shadow hover:shadow-lg transition cursor-pointer border border-gray-700 min-h-[120px]" 
-                data-aos={aos.fadeUp} 
-                data-aos-delay="500"
-                onClick={() => {
-                  setStatusFilter('all');
-                  toast({
-                    title: "Filtros limpos",
-                    description: "Mostrando todos os funcionários",
-                  });
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') {
-                  setStatusFilter('all');
-                  toast({
-                    title: "Filtros limpos",
-                    description: "Mostrando todos os funcionários",
-                  });
-                }}}
-                aria-label="Limpar filtros e mostrar todos os funcionários"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                  <Settings className="text-cyan-400" size={24} />
-                  <span className="text-base sm:text-lg font-bold text-seguranca-lightgray">Todos os Funcionários</span>
-                </div>
-                <span className="text-seguranca-lightgray text-xs sm:text-sm">Clique para limpar filtros e mostrar todos os funcionários</span>
-              </div>
-            </div>
 
-            {/* Filtros */}
-            <Card className="bg-seguranca-graphite border-gray-600" data-aos={aos.fadeUp}>
-              <CardHeader>
-                <CardTitle className="text-seguranca-lightgray flex items-center justify-between">
-                  Filtros
-                  <Button 
-                    className="bg-seguranca-red hover:bg-seguranca-darkred"
-                    onClick={() => {
-                      setRefreshing(true);
-                      clearFilters();
-                      setTimeout(() => setRefreshing(false), 1000);
-                    }}
-                    disabled={refreshing}
-                  >
-                    {refreshing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw size={20} className="mr-2" />
-                    )}
-                    {refreshing ? 'Atualizando...' : 'Limpar Filtros'}
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="relative sm:col-span-2 lg:col-span-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                    <Input
-                      placeholder="Buscar funcionários..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    />
+            {/* Filtros Modernos */}
+            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-aos={aos.fadeUp}>
+              {/* Search Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
+                    <Search className="h-5 w-5 text-seguranca-red" />
                   </div>
-                  
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
-                    className="bg-seguranca-black border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray"
-                  >
-                    <option value="all">Todos os status</option>
-                    <option value="ACTIVE">Ativo</option>
-                    <option value="INACTIVE">Inativo</option>
-                    <option value="VACATION">Férias</option>
-                    <option value="MATERNITY_LEAVE">Licença Maternidade</option>
-                    <option value="MEDICAL_CERTIFICATE">Atestado</option>
-                    <option value="TERMINATED">Demitido</option>
-                    <option value="SUSPENDED">Suspenso</option>
-                  </select>
-                  
-                  <select
-                    value={departmentFilter}
-                    onChange={(e) => setDepartmentFilter(e.target.value)}
-                    className="bg-seguranca-black border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray"
-                  >
-                    <option value="all">Todos os departamentos</option>
-                    {departments.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                  
-                  <Button 
-                    className="bg-seguranca-yellow hover:bg-yellow-600 text-black sm:col-span-2 lg:col-span-1"
-                    onClick={handleOpenModal}
-                  >
-                    <Plus size={20} className="mr-2" />
-                    Novo Funcionário
-                  </Button>
+                  <div>
+                    <h3 className="font-semibold text-white">Pesquisar Funcionários</h3>
+                    <p className="text-sm text-gray-400">Filtre e encontre funcionários rapidamente</p>
+                  </div>
                 </div>
-              </CardContent>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRefreshing(true);
+                    clearFilters();
+                    setTimeout(() => setRefreshing(false), 1000);
+                  }}
+                  disabled={refreshing}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite"
+                >
+                  {refreshing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw size={16} className="mr-2" />
+                  )}
+                  Limpar
+                </Button>
+              </div>
+
+              {/* Search Filters */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="relative sm:col-span-2 lg:col-span-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <Input
+                    placeholder="Digite o nome, CPF ou email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20"
+                  />
+                </div>
+                
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
+                >
+                  <option value="all">📋 Todos os status</option>
+                  <option value="ACTIVE">✅ Ativo</option>
+                  <option value="INACTIVE">⭕ Inativo</option>
+                  <option value="VACATION">🏖️ Férias</option>
+                  <option value="MATERNITY_LEAVE">👶 Licença Maternidade</option>
+                  <option value="MEDICAL_CERTIFICATE">🏥 Atestado</option>
+                  <option value="TERMINATED">❌ Demitido</option>
+                  <option value="SUSPENDED">⏸️ Suspenso</option>
+                </select>
+                
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
+                >
+                  <option value="all">🏢 Todos os departamentos</option>
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
             </Card>
 
-            {/* Lista de Funcionários */}
-            <div className="grid gap-4">
-              {filteredEmployees.map((employee, index) => (
-                <Card 
-                  key={employee.id} 
-                  className="bg-seguranca-graphite border-gray-600 hover:shadow-lg transition-shadow"
-                  data-aos={aos.fadeUp}
-                  data-aos-delay={index * 100}
-                >
-                  <CardContent className="p-4">
-                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 overflow-hidden">
-                       {/* Seção Esquerda: Avatar, Nome e Cargo */}
-                       <div className="flex items-center space-x-4 flex-shrink-0">
-                         <div className="w-12 h-12 bg-seguranca-red rounded-full flex items-center justify-center">
-                           <User className="text-white" size={24} />
-                         </div>
-                         <div>
-                           <h3 className="text-lg font-semibold text-seguranca-lightgray">{employee.name}</h3>
-                           <p className="text-seguranca-lightgray">Cargo: {employee.position?.name || 'Cargo não definido'}</p>
-                         </div>
-                       </div>
-
-                       {/* Seção Central: Informações de Contato e Localização - ALINHADAS À ESQUERDA */}
-                       <div className="flex flex-col space-y-2 flex-1 lg:ml-8 min-w-0">
-                         <div className="flex items-center space-x-2 text-sm text-seguranca-lightgray">
-                           <Mail size={16} className="w-5 flex-shrink-0" />
-                           <span className="truncate">{employee.email || 'Email não informado'}</span>
-                         </div>
-                         <div className="flex items-center space-x-2 text-sm text-seguranca-lightgray">
-                           <Phone size={16} className="w-5 flex-shrink-0" />
-                           <span>{employee.phone || 'Telefone não informado'}</span>
-                         </div>
-                         <div className="flex items-center space-x-2 text-sm text-seguranca-lightgray">
-                           <Building size={16} className="w-5 flex-shrink-0" />
-                           <span>Unidade: {employee.unit?.name || 'Departamento não definido'}</span>
-                         </div>
-                         <div className="flex items-center space-x-2 text-sm text-seguranca-lightgray">
-                           <MapPin size={16} className="w-5 flex-shrink-0" />
-                           <span className="truncate">{typeof employee.address === 'string' ? employee.address : employee.address?.street || 'Endereço não informado'}</span>
-                         </div>
-                         <div className="flex items-center space-x-2 text-sm text-seguranca-lightgray">
-                           <Calendar size={16} className="w-5 flex-shrink-0" />
-                           <span>Admissão: {employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('pt-BR') : 'Não informado'}</span>
-                         </div>
-                       </div>
-
-                       {/* Seção Direita: Status e Botões de Ação */}
-                       <div className="flex flex-col items-start gap-3 flex-shrink-0 min-w-0">
-                         <Badge className={getStatusColor(employee.status)}>
-                           {getStatusText(employee.status)}
-                         </Badge>
-                         <div className="flex flex-wrap gap-2 w-full">
-                           <Button 
-                             variant="outline" 
-                             size="sm" 
-                             className="border-blue-600 text-blue-400 hover:bg-blue-900"
-                             onClick={() => handleViewDocuments(employee)}
-                           >
-                             <FileText size={16} className="mr-1" />
-                             Documentos
-                           </Button>
-                           <Button 
-                             variant="outline" 
-                             size="sm" 
-                             className="border-green-600 text-green-400 hover:bg-green-900"
-                             onClick={() => {
-                               setSelectedEmployee(employee);
-                               const tabsList = document.querySelector('[role="tablist"]');
-                               const dependentesTab = tabsList?.querySelector('[value="dependentes"]');
-                               if (dependentesTab) {
-                                 (dependentesTab as HTMLElement).click();
-                               }
-                             }}
-                           >
-                             <UserPlus size={16} className="mr-1" />
-                             Dependentes
-                           </Button>
-                           <Button 
-                             variant="outline" 
-                             size="sm" 
-                             className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                             onClick={() => handleEditEmployee(employee)}
-                           >
-                             Editar
-                           </Button>
-                           {employee.status !== 'TERMINATED' && (
-                             <Button 
-                               variant="outline" 
-                               size="sm" 
-                               className="border-orange-600 text-orange-400 hover:bg-orange-900"
-                               onClick={() => handleTerminateEmployee(employee)}
-                               title="Alterar status para Demitido"
-                             >
-                               Demitir
-                             </Button>
-                           )}
-                           {employee.status === 'TERMINATED' && (
-                             <Button 
-                               variant="outline" 
-                               size="sm" 
-                               className="border-red-600 text-red-400 hover:bg-red-900"
-                               onClick={() => deleteEmployee(employee.id)}
-                               title="Excluir funcionário (apenas para demitidos)"
-                             >
-                               Excluir
-                             </Button>
-                           )}
-                         </div>
-                       </div>
-                     </div>
-
-                     {/* Mensagem de Aviso para Funcionários Ativos */}
-                     {employee.status !== 'TERMINATED' && (
-                       <div className="mt-3 p-2 bg-orange-900/20 border border-orange-600/30 rounded-md">
-                         <span className="text-xs text-orange-400 flex items-center">
-                           ⚠️ Demitir primeiro para excluir
-                         </span>
-                       </div>
-                     )}
-                     {employee.status === 'TERMINATED' && (
-                       <div className="mt-3 p-2 bg-green-900/20 border border-green-600/30 rounded-md">
-                         <span className="text-xs text-green-400 flex items-center">
-                           ✅ Pode ser excluído
-                         </span>
-                       </div>
-                     )}
-                   </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {filteredEmployees.length === 0 && !loading && (
-              <Card className="bg-seguranca-graphite border-gray-600" data-aos={aos.fadeUp}>
-                <CardContent className="p-8 text-center">
-                  <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">Nenhum funcionário encontrado</h3>
-                  <p className="text-seguranca-lightgray">Tente ajustar os filtros de busca.</p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Lista de Funcionários Moderna */}
+            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-aos={aos.fadeUp}>
+              <FuncionariosTable
+                employees={filteredEmployees}
+                onEdit={handleEditEmployee}
+                onDelete={deleteEmployee}
+                onTerminate={handleTerminateEmployee}
+                onViewDocuments={handleViewDocuments}
+                onViewDependents={(employee) => {
+                  setSelectedEmployee(employee);
+                  const tabsList = document.querySelector('[role="tablist"]');
+                  const dependentesTab = tabsList?.querySelector('[value="dependentes"]');
+                  if (dependentesTab) {
+                    (dependentesTab as HTMLElement).click();
+                  }
+                }}
+                isLoading={loading}
+              />
+            </Card>
           </div>
         </TabsContent>
         <TabsContent value="documentos">
@@ -825,14 +661,24 @@ Confirma a exclusão?`)) {
         </DialogContent>
       </Dialog>
 
-      <FuncionarioNovoModal open={modalOpen} onClose={handleCloseModal} onCreated={loadEmployeesWithFilters} />
-      
-      {/* Modal de Edição de Funcionário */}
-      <FuncionarioEditModal
-        open={editModalOpen}
-        onOpenChange={setEditModalOpen}
-        funcionario={employeeToEdit}
-        onSuccess={handleEmployeeEdited}
+      {/* Modal de Criação/Edição de Funcionário */}
+      <FuncionarioNovoModal 
+        open={modalOpen || editModalOpen} 
+        onClose={() => {
+          if (editModalOpen) {
+            handleCloseEditModal();
+          } else {
+            handleCloseModal();
+          }
+        }} 
+        onCreated={() => {
+          if (editModalOpen) {
+            handleEmployeeEdited();
+          } else {
+            loadEmployeesWithFilters();
+          }
+        }}
+        employeeToEdit={editModalOpen ? employeeToEdit : null}
       />
     </StandardLayout>
   );

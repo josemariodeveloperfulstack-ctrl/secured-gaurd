@@ -50,8 +50,17 @@ public class UserController {
     @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Buscar usuário por ID", description = "Retorna um usuário específico pelo ID")
     public ResponseEntity<UserListResponseDTO> getUserById(@PathVariable String id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isColaborador = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+        
         User user = userService.findById(UUID.fromString(id))
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        
+        // Colaborador só pode ver seu próprio perfil
+        if (isColaborador && !auth.getName().equals(user.getUsername())) {
+            return ResponseEntity.status(403).build();
+        }
         
         UserListResponseDTO dto = new UserListResponseDTO();
         dto.setId(user.getId().toString());
@@ -68,6 +77,15 @@ public class UserController {
     @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Buscar usuário por username", description = "Retorna um usuário específico pelo username")
     public ResponseEntity<UserListResponseDTO> getUserByUsername(@PathVariable String username) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isColaborador = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+        
+        // Colaborador só pode buscar seu próprio username
+        if (isColaborador && !auth.getName().equals(username)) {
+            return ResponseEntity.status(403).build();
+        }
+        
         User user = userService.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         
@@ -126,6 +144,29 @@ public class UserController {
         return ResponseEntity.ok(dtos);
     }
     
+    @GetMapping("/cpf/{cpf}")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @Operation(summary = "Buscar usuário por CPF", description = "Busca usuário através do CPF do funcionário associado")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<UserListResponseDTO> getUserByCpf(@PathVariable String cpf) {
+        User user = userService.findByEmployeeCpf(cpf)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o CPF informado"));
+        
+        UserListResponseDTO dto = new UserListResponseDTO();
+        dto.setId(user.getId().toString());
+        dto.setName(user.getName());
+        dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
+        dto.setActive(user.isActive());
+        dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
+        
+        return ResponseEntity.ok(dto);
+    }
+    
     @PostMapping
     @PreAuthorize("hasAuthority('USERS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Criar usuário", description = "Cria um novo usuário no sistema")
@@ -135,17 +176,27 @@ public class UserController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<UserListResponseDTO> create(@Valid @RequestBody User user) {
-        User createdUser = userService.create(user);
-        
-        UserListResponseDTO dto = new UserListResponseDTO();
-        dto.setId(createdUser.getId().toString());
-        dto.setName(createdUser.getName());
-        dto.setUsername(createdUser.getUsername());
-        dto.setEmail(createdUser.getEmail());
-        dto.setActive(createdUser.isActive());
-        dto.setRoles(createdUser.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-        
-        return ResponseEntity.status(201).body(dto);
+        try {
+            System.out.println("[DEBUG] UserController.create - Iniciando criação de usuário");
+            System.out.println("[DEBUG] Dados recebidos: " + user.getName() + " - " + user.getEmail() + " - " + user.getUsername());
+            
+            User createdUser = userService.create(user);
+            System.out.println("[DEBUG] Usuário criado com sucesso: " + createdUser.getId());
+            
+            UserListResponseDTO dto = new UserListResponseDTO();
+            dto.setId(createdUser.getId().toString());
+            dto.setName(createdUser.getName());
+            dto.setUsername(createdUser.getUsername());
+            dto.setEmail(createdUser.getEmail());
+            dto.setActive(createdUser.isActive());
+            dto.setRoles(createdUser.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
+            
+            return ResponseEntity.status(201).body(dto);
+        } catch (Exception e) {
+            System.err.println("[ERROR] Erro ao criar usuário: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao criar usuário: " + e.getMessage(), e);
+        }
     }
     
     @PutMapping("/{id}")

@@ -4,12 +4,14 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.z7design.secured_guard.model.Benefit;
 import com.z7design.secured_guard.service.BenefitService;
 import com.z7design.secured_guard.dto.ErrorResponse;
+import com.z7design.secured_guard.dto.BenefitCreateDTO;
+import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.PositionRepository;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,6 +32,8 @@ import lombok.RequiredArgsConstructor;
 public class BenefitController {
     
     private final BenefitService benefitService;
+    private final EmployeeRepository employeeRepository;
+    private final PositionRepository positionRepository;
     
     @Operation(summary = "Cria um novo benefício",
                description = "Adiciona um novo benefício ao sistema. Requer o papel de ADMIN ou GESTOR.")
@@ -46,7 +50,21 @@ public class BenefitController {
                     schema = @Schema(implementation = Benefit.class),
                     examples = @ExampleObject(value = "{\"name\": \"Plano de Saúde\", \"description\": \"Plano Amil\", \"value\": 500.00, \"startDate\": \"2023-01-01\"}")))
     @PostMapping
-    public ResponseEntity<Benefit> create(@RequestBody Benefit benefit) {
+    public ResponseEntity<Benefit> create(@RequestBody BenefitCreateDTO dto) {
+        Benefit benefit = new Benefit();
+        benefit.setName(dto.getName());
+        benefit.setDescription(dto.getDescription());
+        benefit.setType(dto.getType());
+        benefit.setIsActive(dto.getIsActive());
+        benefit.setValue(dto.getValue());
+        benefit.setStartDate(dto.getStartDate());
+        benefit.setEndDate(dto.getEndDate());
+        if (dto.getEmployeeId() != null) {
+            employeeRepository.findById(dto.getEmployeeId()).ifPresent(benefit::setEmployee);
+        }
+        if (dto.getPositionId() != null) {
+            positionRepository.findById(dto.getPositionId()).ifPresent(benefit::setPosition);
+        }
         return ResponseEntity.ok(benefitService.create(benefit));
     }
     

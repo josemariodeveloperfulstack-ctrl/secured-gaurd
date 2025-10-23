@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,10 +31,12 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import hrService from '@/services/hrService';
 import { useNavigate } from 'react-router-dom';
+import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 
 const RH: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
+  const [novoFuncionarioOpen, setNovoFuncionarioOpen] = useState(false);
 
   // Buscar estatísticas de RH
   const { 
@@ -114,7 +116,7 @@ const RH: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <Button 
-              onClick={() => navigate('/rh/funcionarios/novo')}
+              onClick={() => setNovoFuncionarioOpen(true)}
               className="bg-seguranca-red hover:bg-seguranca-darkred"
             >
               <UserPlus size={16} className="mr-2" />
@@ -134,16 +136,16 @@ const RH: React.FC = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="overview" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="overview" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="employees" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="employees" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Funcionários
             </TabsTrigger>
-            <TabsTrigger value="operations" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="operations" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Operações
             </TabsTrigger>
-            <TabsTrigger value="compliance" className="text-seguranca-lightgray data-[state=active]:bg-seguranca-red">
+            <TabsTrigger value="compliance" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Compliance
             </TabsTrigger>
           </TabsList>
@@ -556,6 +558,17 @@ const RH: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal de Novo Funcionário unificado */}
+      <FuncionarioNovoModal 
+        open={novoFuncionarioOpen}
+        onClose={() => setNovoFuncionarioOpen(false)}
+        onCreated={() => {
+          setNovoFuncionarioOpen(false);
+          navigate('/rh/funcionarios');
+        }}
+        employeeToEdit={null}
+      />
     </StandardLayout>
   );
 };

@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { ClientPage, ClientSearchParams } from '@/types/client';
 
 export interface Client {
   id: string;
@@ -11,10 +12,36 @@ export interface Client {
 }
 
 export const clientService = {
+  // Listar clientes paginados (com filtros opcionais)
+  async getClients(params: ClientSearchParams = {}): Promise<ClientPage> {
+    const query = new URLSearchParams();
+    if (params.searchTerm) query.append('searchTerm', params.searchTerm);
+    if (params.status) query.append('status', params.status);
+    if (params.page !== undefined) query.append('page', String(params.page));
+    if (params.size !== undefined) query.append('size', String(params.size));
+    if (params.sortBy) query.append('sortBy', params.sortBy);
+    if (params.sortDir) query.append('sortDir', params.sortDir);
+
+    const response = await api.get(`/api/clients?${query.toString()}`);
+    const data = response.data;
+    // Normalizar resposta (Page do backend ou array)
+    if (Array.isArray(data)) {
+      return {
+        content: data,
+        totalElements: data.length,
+        totalPages: 1,
+        size: data.length,
+        number: 0,
+        first: true,
+        last: true,
+      } as ClientPage;
+    }
+    return data as ClientPage;
+  },
   // Buscar todos os clientes
   async getAllClients(): Promise<Client[]> {
     try {
-      const response = await api.get('/clients/all');
+      const response = await api.get('/api/clients/all');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
@@ -25,7 +52,7 @@ export const clientService = {
   // Buscar clientes para seleção
   async getClientsForSelect(): Promise<Client[]> {
     try {
-      const response = await api.get('/clients/select');
+      const response = await api.get('/api/clients/select');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar clientes para seleção:', error);
@@ -36,12 +63,36 @@ export const clientService = {
   // Buscar cliente por ID
   async getClientById(id: string): Promise<Client> {
     try {
-      const response = await api.get(`/clients/${id}`);
+      const response = await api.get(`/api/clients/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);
       throw new Error('Falha ao buscar cliente');
     }
+  },
+
+  // Criar cliente
+  async createClient(data: any): Promise<Client> {
+    console.log('[DEBUG] clientService.createClient - Dados recebidos:', data);
+    try {
+      const response = await api.post('/api/clients', data);
+      console.log('[DEBUG] clientService.createClient - Resposta:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[ERROR] clientService.createClient - Erro:', error);
+      throw error;
+    }
+  },
+
+  // Atualizar cliente
+  async updateClient(id: string, data: any): Promise<Client> {
+    const response = await api.put(`/api/clients/${id}`, data);
+    return response.data;
+  },
+
+  // Excluir cliente
+  async deleteClient(id: string): Promise<void> {
+    await api.delete(`/api/clients/${id}`);
   }
 };
 

@@ -16,10 +16,9 @@ public class ClientDTO {
     private String name;
     
     @NotBlank(message = "CNPJ é obrigatório")
-    @Size(min = 14, max = 18, message = "CNPJ deve ter entre 14 e 18 caracteres")
+    @Size(min = 11, max = 18, message = "CNPJ deve ter entre 11 e 18 caracteres")
     private String cnpj;
     
-    @Email(message = "Email deve ser válido")
     @Size(max = 255, message = "Email deve ter no máximo 255 caracteres")
     private String email;
     
@@ -44,7 +43,6 @@ public class ClientDTO {
     @Size(max = 255, message = "Nome do contato deve ter no máximo 255 caracteres")
     private String contactName;
     
-    @Email(message = "Email do contato deve ser válido")
     @Size(max = 255, message = "Email do contato deve ter no máximo 255 caracteres")
     private String contactEmail;
     

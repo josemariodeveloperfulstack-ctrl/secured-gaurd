@@ -1,6 +1,6 @@
 CREATE TABLE proposal_items (
-    id BIGSERIAL PRIMARY KEY,
-    proposal_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    proposal_id UUID NOT NULL,
     description TEXT,
     quantity INTEGER NOT NULL,
     unit_price DECIMAL(15,2) NOT NULL,

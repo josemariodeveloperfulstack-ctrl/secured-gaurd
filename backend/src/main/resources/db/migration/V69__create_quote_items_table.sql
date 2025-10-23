@@ -1,6 +1,6 @@
 CREATE TABLE quote_items (
-    id BIGSERIAL PRIMARY KEY,
-    quote_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    quote_id UUID NOT NULL,
     description TEXT,
     quantity INTEGER NOT NULL,
     unit_price DECIMAL(15,2) NOT NULL,

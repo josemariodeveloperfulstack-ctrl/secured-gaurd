@@ -1,5 +1,5 @@
 -- Adicionar coluna client_id na tabela units
-ALTER TABLE units ADD COLUMN client_id BIGINT;
+ALTER TABLE units ADD COLUMN client_id UUID;
 
 -- Adicionar índice para melhorar performance
 CREATE INDEX idx_units_client_id ON units(client_id);

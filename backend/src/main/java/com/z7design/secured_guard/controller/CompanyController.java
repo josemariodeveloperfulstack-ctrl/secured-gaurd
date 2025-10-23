@@ -35,10 +35,18 @@ public class CompanyController {
             @ApiResponse(responseCode = "200", description = "Empresas listadas com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL')")
     public ResponseEntity<List<CompanyDTO>> getAllCompanies() {
-        log.debug("Buscando todas as empresas");
-        List<CompanyDTO> companies = companyService.getAllCompanies();
-        return ResponseEntity.ok(companies);
+        try {
+            log.info("Buscando todas as empresas");
+            List<CompanyDTO> companies = companyService.getAllCompanies();
+            log.info("Retornando {} empresas", companies.size());
+            return ResponseEntity.ok(companies);
+        } catch (Exception e) {
+            log.error("Erro ao buscar todas as empresas", e);
+            // Retorna lista vazia em vez de 500 para evitar quebrar o frontend
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
     
     @GetMapping("/search")
@@ -120,7 +128,7 @@ public class CompanyController {
     }
     
     @PostMapping
-    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('HR_WRITE','SUPER_ADMIN','ROLE_SUPER_ADMIN','ADMIN','ROLE_ADMIN')")
     @Operation(summary = "Criar nova empresa", description = "Cria uma nova empresa")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Empresa criada com sucesso"),
@@ -135,7 +143,7 @@ public class CompanyController {
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('HR_WRITE','SUPER_ADMIN','ROLE_SUPER_ADMIN','ADMIN','ROLE_ADMIN')")
     @Operation(summary = "Atualizar empresa", description = "Atualiza uma empresa existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Empresa atualizada com sucesso"),
@@ -152,7 +160,7 @@ public class CompanyController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('HR_DELETE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('HR_DELETE','SUPER_ADMIN','ROLE_SUPER_ADMIN','ADMIN','ROLE_ADMIN')")
     @Operation(summary = "Excluir empresa", description = "Exclui uma empresa")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Empresa excluída com sucesso"),

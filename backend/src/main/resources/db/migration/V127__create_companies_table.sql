@@ -72,4 +72,19 @@ COMMENT ON COLUMN companies.notes IS 'Observações';
 COMMENT ON COLUMN companies.created_at IS 'Data de criação';
 COMMENT ON COLUMN companies.updated_at IS 'Data de atualização';
 COMMENT ON COLUMN companies.created_by IS 'ID do usuário que criou';
-COMMENT ON COLUMN companies.updated_by IS 'ID do usuário que atualizou'; 
+COMMENT ON COLUMN companies.updated_by IS 'ID do usuário que atualizou';
+
+-- Adicionar foreign key para company_id na tabela employees (se a coluna já existir)
+DO $$
+BEGIN
+    -- Verifica se a coluna company_id existe na tabela employees
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'employees' AND column_name = 'company_id') THEN
+        -- Adiciona a foreign key se não existir
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_employees_company') THEN
+            ALTER TABLE employees 
+            ADD CONSTRAINT fk_employees_company 
+            FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+END $$; 

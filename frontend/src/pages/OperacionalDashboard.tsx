@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -181,23 +181,23 @@ const OperacionalDashboard: React.FC = () => {
         {/* Tabs com Informações Detalhadas */}
         <Tabs defaultValue="postos" className="space-y-4">
           <TabsList className="bg-seguranca-graphite border-gray-700">
-            <TabsTrigger value="postos" className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black">
+            <TabsTrigger value="postos" className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-seguranca-black">
               <Building2 className="h-4 w-4 mr-2" />
               Postos
             </TabsTrigger>
-            <TabsTrigger value="funcionarios" className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black">
+            <TabsTrigger value="funcionarios" className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-seguranca-black">
               <Users className="h-4 w-4 mr-2" />
               Funcionários
             </TabsTrigger>
-            <TabsTrigger value="ferias" className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black">
+            <TabsTrigger value="ferias" className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-seguranca-black">
               <Calendar className="h-4 w-4 mr-2" />
               Férias
             </TabsTrigger>
-            <TabsTrigger value="tarefas" className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black">
+            <TabsTrigger value="tarefas" className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-seguranca-black">
               <CheckSquare className="h-4 w-4 mr-2" />
               Tarefas
             </TabsTrigger>
-            <TabsTrigger value="coberturas" className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black">
+            <TabsTrigger value="coberturas" className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-seguranca-black">
               <UserCheck className="h-4 w-4 mr-2" />
               Coberturas
             </TabsTrigger>

@@ -99,4 +99,24 @@ public class EnvioController {
         public boolean isTemWhatsApp() { return temWhatsApp; }
         public String getNumeroWhatsApp() { return numeroWhatsApp; }
     }
+
+    /**
+     * 🔁 Reenvio manual por ID de log
+     */
+    @PostMapping("/resend/{logId}")
+    public ResponseEntity<EnvioResponse> resend(@PathVariable String logId) {
+        EnvioResponse resp = envioService.reenviarPorLogId(logId);
+        return resp.isSucesso() ? ResponseEntity.ok(resp) : ResponseEntity.badRequest().body(resp);
+    }
+
+    /**
+     * 📜 Listar logs de envio por cpf/mês/ano
+     */
+    @GetMapping("/logs")
+    public ResponseEntity<java.util.List<com.z7design.secured_guard.model.PayslipDeliveryLog>> listarLogs(
+            @RequestParam String cpf,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        return ResponseEntity.ok(envioService.listarLogs(cpf, month, year));
+    }
 } 

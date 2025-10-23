@@ -460,7 +460,7 @@ public class PayslipService {
     private void createUserFromPayslip(Payslip payslip) {
         String username = payslip.getCpf();
         String email = generateUniqueEmail(payslip.getCpf(), payslip.getEmployeeName());
-        String password = "Colaboradores@2025"; // Ajustado para passar na validação (maiúscula obrigatória)
+        String password = payslip.getCpf() + "@2025"; // Senha padrão exigida: cpf@2025
         String name = payslip.getEmployeeName();
 
         log.info("🔐 INÍCIO - Verificando se usuário existe para funcionário: {} (CPF: {})", name, username);

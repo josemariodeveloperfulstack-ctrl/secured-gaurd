@@ -1,7 +1,7 @@
 -- Migration para criar tabela de histórico de remanejamentos
 -- V200__create_remanejamentos_historico_table.sql
 
-CREATE TABLE remanejamentos_historico (
+CREATE TABLE IF NOT EXISTS remanejamentos_historico (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     remanejamento_id UUID NOT NULL,
     employee_id UUID NOT NULL,

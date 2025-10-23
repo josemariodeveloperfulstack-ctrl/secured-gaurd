@@ -16,4 +16,5 @@ public interface VacationRepository extends JpaRepository<Vacation, UUID> {
     List<Vacation> findByEmployeeIdAndStatus(UUID employeeId, VacationStatus status);
     List<Vacation> findByStartDateBetween(LocalDate startDate, LocalDate endDate);
     List<Vacation> findByStatus(VacationStatus status);
+    long countByStatus(VacationStatus status);
 } 

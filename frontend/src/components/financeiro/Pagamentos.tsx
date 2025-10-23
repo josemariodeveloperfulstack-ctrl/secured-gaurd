@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { pagamentosService, Pagamento, Cliente, AgendamentoPagamento } from '@/services/pagamentosService';
+import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 import { 
   CreditCard, 
   Plus, 
@@ -106,6 +107,7 @@ export const Pagamentos: React.FC = () => {
   const { toast } = useToast();
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [fornecedores, setFornecedores] = useState<Supplier[]>([]);
   const [agendamentos, setAgendamentos] = useState<AgendamentoPagamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -130,14 +132,16 @@ export const Pagamentos: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [pagamentosData, clientesData, agendamentosData] = await Promise.all([
+      const [pagamentosData, clientesData, fornecedoresData, agendamentosData] = await Promise.all([
         pagamentosService.getPagamentos(),
         pagamentosService.getClientes(),
+        contasAPagarService.getFornecedores(),
         pagamentosService.getAgendamentos()
       ]);
       
       setPagamentos(Array.isArray(pagamentosData) ? pagamentosData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
+      setFornecedores(Array.isArray(fornecedoresData) ? fornecedoresData : []);
       setAgendamentos(Array.isArray(agendamentosData) ? agendamentosData : []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -1167,7 +1171,7 @@ export const Pagamentos: React.FC = () => {
             setSelectedPagamento(null);
           }}
           onSuccess={handleFormSuccess}
-          clientes={clientes}
+          fornecedores={fornecedores}
         />
 
         <PagamentoFormModal
@@ -1178,7 +1182,7 @@ export const Pagamentos: React.FC = () => {
           }}
           onSuccess={handleFormSuccess}
           pagamento={selectedPagamento}
-          clientes={clientes}
+          fornecedores={fornecedores}
         />
 
         <PagamentoViewModal

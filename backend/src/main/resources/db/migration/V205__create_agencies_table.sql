@@ -27,9 +27,13 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_name = 'banks'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_agencies_bank'
+        AND table_name = 'agencies'
     ) THEN
         ALTER TABLE agencies
-        ADD CONSTRAINT IF NOT EXISTS fk_agencies_bank
+        ADD CONSTRAINT fk_agencies_bank
         FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE SET NULL;
     END IF;
 END $$;

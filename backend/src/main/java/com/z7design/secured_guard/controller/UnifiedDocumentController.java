@@ -3,6 +3,10 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.service.UnifiedDocumentService;
 import com.z7design.secured_guard.service.EmailService;
 import com.z7design.secured_guard.service.WhatsAppService;
+import com.z7design.secured_guard.service.PayslipService;
+import com.z7design.secured_guard.model.Payslip;
+import com.z7design.secured_guard.model.PaymentReceipt;
+import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +16,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.Set;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.FileSystemResource;
 import java.nio.file.Paths;
@@ -28,6 +35,8 @@ public class UnifiedDocumentController {
     private final UnifiedDocumentService unifiedDocumentService;
     private final EmailService emailService;
     private final WhatsAppService whatsAppService;
+    private final PayslipService payslipService;
+    private final PaymentReceiptRepository paymentReceiptRepository;
 
     /**
      * Cria documento unificado para um funcionário específico
@@ -64,30 +73,200 @@ public class UnifiedDocumentController {
     }
 
     /**
-     * Testa criação de documento unificado
+     * Debug: Lista todos os holerites e comprovantes para diagnóstico
+     */
+    @GetMapping("/debug-data")
+    public ResponseEntity<Map<String, Object>> debugUnificationData(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("🔍 DEBUG: Listando dados para diagnóstico - Mês: {}, Ano: {}", month, year);
+            
+            // 1. Listar todos os holerites
+            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            log.info("📊 Total de holerites: {}", allPayslips.size());
+            
+            // 2. Listar todos os comprovantes
+            List<PaymentReceipt> allReceipts = paymentReceiptRepository.findAll();
+            log.info("📊 Total de comprovantes: {}", allReceipts.size());
+            
+            // 3. Filtrar por período se especificado
+            List<Payslip> filteredPayslips = allPayslips;
+            List<PaymentReceipt> filteredReceipts = allReceipts;
+            
+            if (month != null || year != null) {
+                filteredPayslips = allPayslips.stream()
+                    .filter(p -> month == null || p.getMonth().equals(month))
+                    .filter(p -> year == null || p.getYear().equals(year))
+                    .collect(Collectors.toList());
+                    
+                filteredReceipts = allReceipts.stream()
+                    .filter(r -> month == null || r.getMonth() != null && r.getMonth().equals(month))
+                    .filter(r -> year == null || r.getYear() != null && r.getYear().equals(year))
+                    .collect(Collectors.toList());
+            }
+            
+            // 4. Preparar resposta
+            response.put("sucesso", true);
+            response.put("totalHolerites", allPayslips.size());
+            response.put("totalReceipts", allReceipts.size());
+            response.put("filteredHolerites", filteredPayslips.size());
+            response.put("filteredReceipts", filteredReceipts.size());
+            
+            // 5. Listar nomes únicos para comparação
+            Set<String> payslipNames = filteredPayslips.stream()
+                .map(Payslip::getEmployeeName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+                
+            Set<String> receiptNames = filteredReceipts.stream()
+                .map(PaymentReceipt::getEmployeeName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+            
+            response.put("payslipNames", payslipNames);
+            response.put("receiptNames", receiptNames);
+            
+            // 6. Encontrar nomes que existem em ambos
+            Set<String> commonNames = payslipNames.stream()
+                .filter(receiptNames::contains)
+                .collect(Collectors.toSet());
+                
+            response.put("commonNames", commonNames);
+            response.put("commonNamesCount", commonNames.size());
+            
+            // 7. Listar detalhes dos primeiros 10 de cada
+            List<Map<String, Object>> payslipDetails = filteredPayslips.stream()
+                .limit(10)
+                .map(p -> {
+                    Map<String, Object> detail = new HashMap<>();
+                    detail.put("id", p.getId());
+                    detail.put("employeeName", p.getEmployeeName());
+                    detail.put("month", p.getMonth());
+                    detail.put("year", p.getYear());
+                    detail.put("fileName", p.getFileName());
+                    return detail;
+                })
+                .collect(Collectors.toList());
+                
+            List<Map<String, Object>> receiptDetails = filteredReceipts.stream()
+                .limit(10)
+                .map(r -> {
+                    Map<String, Object> detail = new HashMap<>();
+                    detail.put("id", r.getId());
+                    detail.put("employeeName", r.getEmployeeName());
+                    detail.put("month", r.getMonth());
+                    detail.put("year", r.getYear());
+                    detail.put("fileName", r.getFileName());
+                    return detail;
+                })
+                .collect(Collectors.toList());
+            
+            response.put("samplePayslips", payslipDetails);
+            response.put("sampleReceipts", receiptDetails);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro no debug de dados: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao obter dados de debug: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Testa conexão e status do serviço
      */
     @GetMapping("/test")
     public ResponseEntity<Map<String, Object>> testUnifiedDocument() {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            log.info("🧪 Testando criação de documento unificado...");
+            log.info("🧪 Testando conexão do serviço de documentos unificados...");
             
-            // Teste com dados mock
-            String unifiedPdfPath = unifiedDocumentService.createUnifiedDocumentForEmployee("RICARDO XAVIER DE ANDRADE", 7, 2025);
-            
+            // Teste simples de conectividade
             response.put("sucesso", true);
-            response.put("mensagem", "Teste de documento unificado realizado com sucesso");
-            response.put("filePath", unifiedPdfPath);
+            response.put("mensagem", "Serviço de documentos unificados está funcionando");
+            response.put("timestamp", System.currentTimeMillis());
+            response.put("status", "OK");
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            log.error("💥 Erro no teste de documento unificado: {}", e.getMessage(), e);
+            log.error("💥 Erro no teste de conectividade: {}", e.getMessage(), e);
             response.put("sucesso", false);
             response.put("mensagem", "Erro no teste: " + e.getMessage());
             response.put("erro", e.getClass().getSimpleName());
             return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Testa criação real de documento unificado usando dados existentes
+     */
+    @PostMapping("/test-create")
+    public ResponseEntity<Map<String, Object>> testCreateUnifiedDocument(
+            @RequestParam(required = false) String employeeName,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("🧪 Testando criação de documento unificado...");
+            
+            // Se não foram fornecidos parâmetros, buscar um holerite existente
+            if (employeeName == null || month == null || year == null) {
+                log.info("🔍 Buscando holerite existente para teste...");
+                
+                // Buscar um holerite existente
+                List<Payslip> existingPayslips = payslipService.getAllPayslips();
+                
+                if (existingPayslips.isEmpty()) {
+                    response.put("sucesso", false);
+                    response.put("mensagem", "Nenhum holerite encontrado no sistema para teste");
+                    response.put("sugestao", "Importe alguns holerites primeiro");
+                    return ResponseEntity.ok(response);
+                }
+                
+                // Usar o primeiro holerite encontrado
+                Payslip firstPayslip = existingPayslips.get(0);
+                employeeName = firstPayslip.getEmployeeName();
+                month = firstPayslip.getMonth();
+                year = firstPayslip.getYear();
+                
+                log.info("📋 Usando holerite existente para teste: {} - {}/{}", employeeName, month, year);
+            }
+            
+            log.info("🧪 Testando criação de documento unificado para: {} - {}/{}", employeeName, month, year);
+            
+            String unifiedPdfPath = unifiedDocumentService.createUnifiedDocumentForEmployee(employeeName, month, year);
+            
+            response.put("sucesso", true);
+            response.put("mensagem", "Teste de documento unificado realizado com sucesso");
+            response.put("filePath", unifiedPdfPath);
+            response.put("employeeName", employeeName);
+            response.put("month", month);
+            response.put("year", year);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro no teste de criação de documento unificado: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro no teste: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            
+            // Se for erro de dados não encontrados, sugerir usar dados existentes
+            if (e.getMessage().contains("não encontrado")) {
+                response.put("sugestao", "Use o botão 'Analisar Dados' para ver quais holerites existem no sistema");
+            }
+            
+            return ResponseEntity.ok(response); // Retornar 200 com erro para mostrar a mensagem
         }
     }
 
@@ -114,6 +293,35 @@ public class UnifiedDocumentController {
             log.error("💥 Erro no teste público: {}", e.getMessage(), e);
             response.put("sucesso", false);
             response.put("mensagem", "Erro no teste público: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Lista documentos unificados - endpoint público para debug
+     */
+    @GetMapping("/public/list")
+    public ResponseEntity<Map<String, Object>> listUnifiedDocumentsPublic() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("📋 Listando documentos unificados (público)...");
+            
+            List<Map<String, Object>> documents = unifiedDocumentService.listAllUnifiedDocuments();
+            
+            response.put("sucesso", true);
+            response.put("mensagem", "Documentos unificados listados com sucesso");
+            response.put("documents", documents);
+            response.put("total", documents.size());
+            
+            log.info("✅ Encontrados {} documentos unificados", documents.size());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao listar documentos unificados: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao listar documentos unificados: " + e.getMessage());
             response.put("erro", e.getClass().getSimpleName());
             return ResponseEntity.internalServerError().body(response);
         }
@@ -151,10 +359,63 @@ public class UnifiedDocumentController {
             return ResponseEntity.ok()
                 .header("Content-Type", "application/pdf")
                 .header("Content-Disposition", "inline; filename=\"" + fileName + "\"")
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "*")
+                .header("X-Frame-Options", "ALLOWALL")
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
+                .header("Expires", "0")
                 .body(resource);
                 
         } catch (Exception e) {
             log.error("💥 Erro ao servir arquivo: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Endpoint alternativo para download de arquivos unificados
+     */
+    @GetMapping("/download/{fileName:.+}")
+    public ResponseEntity<Resource> downloadUnifiedDocument(@PathVariable String fileName) {
+        try {
+            log.info("📥 Download de arquivo: {}", fileName);
+            
+            // Procurar o arquivo recursivamente nas subpastas
+            Path basePath = Paths.get("uploads", "unified");
+            Path filePath = findFileRecursively(basePath, fileName);
+            
+            if (filePath == null) {
+                log.warn("⚠️ Arquivo não encontrado para download: {}", fileName);
+                return ResponseEntity.notFound().build();
+            }
+            
+            log.info("✅ Arquivo encontrado para download em: {}", filePath);
+            
+            // Verificar se é um arquivo PDF
+            if (!fileName.toLowerCase().endsWith(".pdf")) {
+                log.warn("⚠️ Tipo de arquivo não permitido para download: {}", fileName);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Criar recurso do arquivo
+            Resource resource = new FileSystemResource(filePath.toFile());
+            
+            // Configurar headers para download forçado
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "*")
+                .header("X-Frame-Options", "ALLOWALL")
+                .header("X-Content-Type-Options", "nosniff")
+                .body(resource);
+                
+        } catch (Exception e) {
+            log.error("💥 Erro ao fazer download do arquivo: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -368,12 +629,213 @@ public class UnifiedDocumentController {
             response.put("documents", documents);
             response.put("total", documents.size());
             
+            log.info("✅ Encontrados {} documentos unificados", documents.size());
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             log.error("💥 Erro ao listar documentos unificados: {}", e.getMessage(), e);
             response.put("sucesso", false);
             response.put("mensagem", "Erro ao listar documentos unificados: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Lista todos os documentos unificados com informações detalhadas
+     */
+    @GetMapping("/list-all-detailed")
+    public ResponseEntity<Map<String, Object>> listAllUnifiedDocumentsDetailed() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("📋 Listando todos os documentos unificados com detalhes...");
+            
+            List<Map<String, Object>> documents = unifiedDocumentService.listAllUnifiedDocuments();
+            
+            // Adicionar informações sobre tipo de unificação
+            List<Map<String, Object>> detailedDocuments = new ArrayList<>();
+            int individualCount = 0;
+            int batchCount = 0;
+            
+            for (Map<String, Object> doc : documents) {
+                Map<String, Object> detailedDoc = new HashMap<>(doc);
+                
+                // Determinar tipo de unificação baseado no nome do arquivo
+                String fileName = (String) doc.get("fileName");
+                String employeeName = (String) doc.get("employeeName");
+                
+                if (fileName != null && fileName.contains("UNIFICADO_")) {
+                    // Documento unificado individual
+                    detailedDoc.put("unificationType", "INDIVIDUAL");
+                    detailedDoc.put("unificationTypeLabel", "Unificação Individual");
+                    individualCount++;
+                } else if (fileName != null && fileName.contains("BATCH_")) {
+                    // Documento unificado em lote
+                    detailedDoc.put("unificationType", "BATCH");
+                    detailedDoc.put("unificationTypeLabel", "Unificação em Lote");
+                    batchCount++;
+                } else {
+                    // Tipo não identificado
+                    detailedDoc.put("unificationType", "UNKNOWN");
+                    detailedDoc.put("unificationTypeLabel", "Tipo Não Identificado");
+                }
+                
+                // Adicionar informações de data formatada
+                String createdAt = (String) doc.get("createdAt");
+                if (createdAt != null) {
+                    try {
+                        java.time.Instant instant = java.time.Instant.parse(createdAt);
+                        java.time.LocalDateTime localDateTime = java.time.LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault());
+                        detailedDoc.put("createdAtFormatted", localDateTime.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
+                    } catch (Exception e) {
+                        detailedDoc.put("createdAtFormatted", createdAt);
+                    }
+                }
+                
+                detailedDocuments.add(detailedDoc);
+            }
+            
+            response.put("sucesso", true);
+            response.put("mensagem", "Documentos unificados listados com sucesso");
+            response.put("documents", detailedDocuments);
+            response.put("total", documents.size());
+            response.put("individualCount", individualCount);
+            response.put("batchCount", batchCount);
+            response.put("unknownCount", documents.size() - individualCount - batchCount);
+            
+            log.info("✅ Encontrados {} documentos unificados: {} individuais, {} em lote, {} desconhecidos", 
+                documents.size(), individualCount, batchCount, documents.size() - individualCount - batchCount);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao listar documentos unificados detalhados: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao listar documentos unificados: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Lista todos os documentos unificados com informações detalhadas - endpoint público
+     */
+    @GetMapping("/public/list-detailed")
+    public ResponseEntity<Map<String, Object>> listAllUnifiedDocumentsDetailedPublic() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("📋 Listando todos os documentos unificados com detalhes (público)...");
+            
+            List<Map<String, Object>> documents = unifiedDocumentService.listAllUnifiedDocuments();
+            
+            // Adicionar informações sobre tipo de unificação
+            List<Map<String, Object>> detailedDocuments = new ArrayList<>();
+            int individualCount = 0;
+            int batchCount = 0;
+            
+            for (Map<String, Object> doc : documents) {
+                Map<String, Object> detailedDoc = new HashMap<>(doc);
+                
+                // Determinar tipo de unificação baseado no nome do arquivo
+                String fileName = (String) doc.get("fileName");
+                String employeeName = (String) doc.get("employeeName");
+                
+                if (fileName != null && fileName.contains("UNIFICADO_")) {
+                    // Documento unificado individual
+                    detailedDoc.put("unificationType", "INDIVIDUAL");
+                    detailedDoc.put("unificationTypeLabel", "Unificação Individual");
+                    individualCount++;
+                } else if (fileName != null && fileName.contains("BATCH_")) {
+                    // Documento unificado em lote
+                    detailedDoc.put("unificationType", "BATCH");
+                    detailedDoc.put("unificationTypeLabel", "Unificação em Lote");
+                    batchCount++;
+                } else {
+                    // Tipo não identificado
+                    detailedDoc.put("unificationType", "UNKNOWN");
+                    detailedDoc.put("unificationTypeLabel", "Tipo Não Identificado");
+                }
+                
+                // Adicionar informações de data formatada
+                String createdAt = (String) doc.get("createdAt");
+                if (createdAt != null) {
+                    try {
+                        java.time.Instant instant = java.time.Instant.parse(createdAt);
+                        java.time.LocalDateTime localDateTime = java.time.LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault());
+                        detailedDoc.put("createdAtFormatted", localDateTime.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
+                    } catch (Exception e) {
+                        detailedDoc.put("createdAtFormatted", createdAt);
+                    }
+                }
+                
+                detailedDocuments.add(detailedDoc);
+            }
+            
+            response.put("sucesso", true);
+            response.put("mensagem", "Documentos unificados listados com sucesso");
+            response.put("documents", detailedDocuments);
+            response.put("total", documents.size());
+            response.put("individualCount", individualCount);
+            response.put("batchCount", batchCount);
+            response.put("unknownCount", documents.size() - individualCount - batchCount);
+            
+            log.info("✅ Encontrados {} documentos unificados: {} individuais, {} em lote, {} desconhecidos", 
+                documents.size(), individualCount, batchCount, documents.size() - individualCount - batchCount);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao listar documentos unificados detalhados (público): {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao listar documentos unificados: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Cria documentos unificados em lote para um período - endpoint público para testes
+     */
+    @PostMapping("/public/batch-create")
+    public ResponseEntity<Map<String, Object>> createBatchUnifiedDocumentsPublic(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("📦 PÚBLICO: Criando documentos unificados em lote para {}/{}", month, year);
+            
+            // Criar request DTO
+            com.z7design.secured_guard.dto.BatchUnificationRequest request = 
+                com.z7design.secured_guard.dto.BatchUnificationRequest.builder()
+                    .month(month)
+                    .year(year)
+                    .forceUnification(true)
+                    .build();
+            
+            com.z7design.secured_guard.dto.BatchUnificationResult result = 
+                unifiedDocumentService.createBatchUnifiedDocuments(request);
+            
+            response.put("sucesso", true);
+            response.put("mensagem", "Documentos unificados criados em lote com sucesso");
+            response.put("totalProcessed", result.getTotalProcessed());
+            response.put("totalSuccess", result.getTotalSuccess());
+            response.put("totalFailed", result.getTotalFailed());
+            response.put("successList", result.getSuccessList());
+            response.put("failureList", result.getFailureList());
+            response.put("processingTimeMs", result.getProcessingTimeMs());
+            response.put("month", month);
+            response.put("year", year);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao criar documentos em lote (público): {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao criar documentos em lote: " + e.getMessage());
             response.put("erro", e.getClass().getSimpleName());
             return ResponseEntity.internalServerError().body(response);
         }
@@ -576,6 +1038,155 @@ public class UnifiedDocumentController {
             log.error("💥 Erro ao criar holerites expandidos: {}", e.getMessage(), e);
             response.put("sucesso", false);
             response.put("mensagem", "Erro ao criar holerites expandidos: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Cria documentos unificados em lote/massa com verificação rigorosa de nomes
+     */
+    @PostMapping("/create-batch")
+    public ResponseEntity<Map<String, Object>> createBatchUnifiedDocuments(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false, defaultValue = "false") Boolean forceUnification) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("🎯 Iniciando unificação em lote: Mês={}, Ano={}, Force={}", month, year, forceUnification);
+            
+            com.z7design.secured_guard.dto.BatchUnificationRequest request = 
+                com.z7design.secured_guard.dto.BatchUnificationRequest.builder()
+                    .month(month)
+                    .year(year)
+                    .forceUnification(forceUnification)
+                    .build();
+            
+            com.z7design.secured_guard.dto.BatchUnificationResult result = 
+                unifiedDocumentService.createBatchUnifiedDocuments(request);
+            
+            response.put("sucesso", result.getTotalSuccess() > 0);
+            response.put("mensagem", String.format(
+                "Processamento concluído: %d sucesso, %d falhas de %d total",
+                result.getTotalSuccess(), 
+                result.getTotalFailed(), 
+                result.getTotalProcessed()
+            ));
+            response.put("totalProcessed", result.getTotalProcessed());
+            response.put("totalSuccess", result.getTotalSuccess());
+            response.put("totalFailed", result.getTotalFailed());
+            response.put("processingTimeMs", result.getProcessingTimeMs());
+            response.put("successList", result.getSuccessList());
+            response.put("failureList", result.getFailureList());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro na unificação em lote: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro na unificação em lote: " + e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Analisa falhas na unificação de documentos
+     */
+    @GetMapping("/analyze-failures")
+    public ResponseEntity<Map<String, Object>> analyzeFailures() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            log.info("🔍 Analisando falhas na unificação...");
+            
+            // Obter todos os holerites
+            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            List<PaymentReceipt> allReceipts = paymentReceiptRepository.findAll();
+            
+            List<Map<String, Object>> failedUnifications = new ArrayList<>();
+            
+            // Analisar cada holerite para verificar se tem comprovante correspondente
+            for (Payslip payslip : allPayslips) {
+                String employeeName = payslip.getEmployeeName();
+                int month = payslip.getMonth();
+                int year = payslip.getYear();
+                
+                // REGRA: O comprovante de pagamento é do mês SEGUINTE ao holerite
+                int receiptMonth = month == 12 ? 1 : month + 1;
+                int receiptYear = month == 12 ? year + 1 : year;
+                
+                // Procurar comprovante correspondente
+                boolean receiptFound = allReceipts.stream()
+                    .anyMatch(r -> r.getEmployeeName() != null && 
+                                  r.getEmployeeName().equalsIgnoreCase(employeeName) &&
+                                  r.getMonth() != null && r.getMonth().equals(receiptMonth) &&
+                                  r.getYear() != null && r.getYear().equals(receiptYear));
+                
+                if (!receiptFound) {
+                    Map<String, Object> failure = new HashMap<>();
+                    failure.put("employeeName", employeeName);
+                    failure.put("month", month);
+                    failure.put("year", year);
+                    failure.put("reason", "Comprovante de pagamento não encontrado para o mês " + receiptMonth + "/" + receiptYear);
+                    failure.put("status", "FALHA");
+                    failure.put("holeriteFound", true);
+                    failure.put("holeriteFileName", payslip.getFileName());
+                    failure.put("receiptFound", false);
+                    failure.put("receiptFileName", null);
+                    
+                    failedUnifications.add(failure);
+                }
+            }
+            
+            // Analisar comprovantes órfãos (sem holerite correspondente)
+            for (PaymentReceipt receipt : allReceipts) {
+                String employeeName = receipt.getEmployeeName();
+                int month = receipt.getMonth();
+                int year = receipt.getYear();
+                
+                // REGRA: O holerite é do mês ANTERIOR ao comprovante
+                int payslipMonth = month == 1 ? 12 : month - 1;
+                int payslipYear = month == 1 ? year - 1 : year;
+                
+                // Procurar holerite correspondente
+                boolean payslipFound = allPayslips.stream()
+                    .anyMatch(p -> p.getEmployeeName() != null && 
+                                  p.getEmployeeName().equalsIgnoreCase(employeeName) &&
+                                  p.getMonth() == payslipMonth &&
+                                  p.getYear() == payslipYear);
+                
+                if (!payslipFound) {
+                    Map<String, Object> failure = new HashMap<>();
+                    failure.put("employeeName", employeeName);
+                    failure.put("month", payslipMonth);
+                    failure.put("year", payslipYear);
+                    failure.put("reason", "Holerite não encontrado para o mês " + payslipMonth + "/" + payslipYear);
+                    failure.put("status", "FALHA");
+                    failure.put("holeriteFound", false);
+                    failure.put("holeriteFileName", null);
+                    failure.put("receiptFound", true);
+                    failure.put("receiptFileName", receipt.getFileName());
+                    
+                    failedUnifications.add(failure);
+                }
+            }
+            
+            response.put("sucesso", true);
+            response.put("mensagem", "Análise de falhas concluída");
+            response.put("failedUnifications", failedUnifications);
+            response.put("totalFailures", failedUnifications.size());
+            response.put("totalPayslips", allPayslips.size());
+            response.put("totalReceipts", allReceipts.size());
+            
+            log.info("✅ Análise concluída: {} falhas encontradas", failedUnifications.size());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao analisar falhas: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao analisar falhas: " + e.getMessage());
             response.put("erro", e.getClass().getSimpleName());
             return ResponseEntity.internalServerError().body(response);
         }
