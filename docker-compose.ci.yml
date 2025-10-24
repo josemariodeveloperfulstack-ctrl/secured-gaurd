@@ -80,7 +80,7 @@ services:
     networks:
       - secured-guard-ci-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
