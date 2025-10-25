@@ -64,7 +64,7 @@ services:
       SPRING_REDIS_HOST: redis-ci
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_ci_2025}
-      JWT_SECRET: ${JWT_SECRET:-jwt_secret_ci_2025}
+      JWT_SECRET: ${JWT_SECRET:-jwt_secret_ci_2025_secure_key_256bits_minimum_required_by_hmac_sha}
       JWT_EXPIRATION: 604800000
       JWT_REFRESH_EXPIRATION: 2592000000
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
