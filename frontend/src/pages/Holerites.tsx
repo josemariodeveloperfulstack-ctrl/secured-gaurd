@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import paymentReceiptService, { type PaymentReceipt } from '@/services/paymentReceiptService';
 import holeriteService, { Holerite } from '@/services/holeriteService';
+import { getApiUrl } from '@/config/environment';
 import { PaymentReceiptViewModal } from '@/components/paymentReceipts/PaymentReceiptViewModal';
 import { 
   Plus, 
@@ -716,7 +717,8 @@ const Holerites: React.FC = () => {
 
   // AÃ§Ãµes de visualizaÃ§Ã£o/baixa/envio por item
   const openUnifiedViewer = (doc: any, index: number) => {
-    const url = `${api.defaults.baseURL}/unified-documents/public/file/${encodeURIComponent(doc.fileName)}`;
+    const apiUrl = getApiUrl().replace('/api', '');
+    const url = `${apiUrl}/api/unified-documents/public/file/${encodeURIComponent(doc.fileName)}`;
     setViewerDocumentIndex(index);
     setViewerDocument(doc);
     setViewerUrl(url);
@@ -724,7 +726,8 @@ const Holerites: React.FC = () => {
   };
 
   const downloadUnifiedDocument = (doc: any) => {
-    const url = `${api.defaults.baseURL}/unified-documents/download/${encodeURIComponent(doc.fileName)}`;
+    const apiUrl = getApiUrl().replace('/api', '');
+    const url = `${apiUrl}/api/unified-documents/download/${encodeURIComponent(doc.fileName)}`;
     const link = document.createElement('a');
     link.href = url;
     link.download = doc.fileName;
@@ -1774,8 +1777,9 @@ const Holerites: React.FC = () => {
       // Por enquanto, vamos tentar carregar os PDFs individuais para demonstraÃ§Ã£o
       
       // Tentar carregar o holerite primeiro
-      const holeriteUrl = `http://localhost:8081/api/files/holerites/${encodeURIComponent(unification.holerite.fileName)}`;
-      const reciboUrl = `http://localhost:8081/api/files/receipts/${encodeURIComponent(unification.recibo.fileName)}`;
+      const apiUrl = getApiUrl().replace('/api', '');
+      const holeriteUrl = `${apiUrl}/api/files/holerites/${encodeURIComponent(unification.holerite.fileName)}`;
+      const reciboUrl = `${apiUrl}/api/files/receipts/${encodeURIComponent(unification.recibo.fileName)}`;
       
       // Retorna a URL do holerite como exemplo (primeira pÃ¡gina)
       return holeriteUrl;
@@ -4496,7 +4500,8 @@ const Holerites: React.FC = () => {
                                               onClick={() => {
                                                   setViewerDocumentIndex(index);
                                                   setViewerDocument(doc);
-                                                  setViewerUrl(`http://localhost:8081/api/unified-documents/public/file/${encodeURIComponent(doc.fileName)}`);
+                                                  const apiUrl = getApiUrl().replace('/api', '');
+                                                  setViewerUrl(`${apiUrl}/api/unified-documents/public/file/${encodeURIComponent(doc.fileName)}`);
                                                   setShowUnifiedViewerModal(true);
                                               }}
                                               size="sm"
@@ -4508,7 +4513,8 @@ const Holerites: React.FC = () => {
                                           <Button
                                               onClick={() => {
                                                   const link = document.createElement('a');
-                                                  link.href = `http://localhost:8081/api/unified-documents/download/${encodeURIComponent(doc.fileName)}`;
+                                                  const apiUrl = getApiUrl().replace('/api', '');
+                                                  link.href = `${apiUrl}/api/unified-documents/download/${encodeURIComponent(doc.fileName)}`;
                                                   link.download = doc.fileName;
                                                   link.target = '_blank';
                                                   document.body.appendChild(link);

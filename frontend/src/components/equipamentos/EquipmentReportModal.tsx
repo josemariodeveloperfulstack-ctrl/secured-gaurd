@@ -72,9 +72,9 @@ const reportTypes: ReportTypeConfig[] = [
   }
 ];
 
-const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({ 
+const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
   isOpen = false, 
-  onClose, 
+  onClose,
   onReportGenerated 
 }) => {
   const [open, setOpen] = useState(false);
@@ -119,8 +119,8 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
   };
 
   const handleGenerateReport = async () => {
-    setLoading(true);
-    
+      setLoading(true);
+      
     try {
       console.log('🔗 Gerando relatório:', selectedReportType);
       
@@ -534,20 +534,20 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
               </Button>
             )}
           </div>
-          
+              
           <div className="flex gap-3">
-            <Button
-              variant="outline"
+              <Button 
+                variant="outline"
               onClick={() => setOpen(false)}
               className="bg-seguranca-black border-gray-600 hover:bg-seguranca-graphite hover:border-gray-500"
             >
-              Cancelar
-              </Button>
+          Cancelar
+        </Button>
               
             {currentStep === 'export' ? (
-              <Button 
-                onClick={handleGenerateReport}
-                disabled={loading}
+        <Button 
+          onClick={handleGenerateReport} 
+          disabled={loading}
                 className="bg-seguranca-red hover:bg-seguranca-red/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
@@ -558,7 +558,7 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                 ) : (
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
-                    Gerar Relatório
+          Gerar Relatório
                   </div>
                 )}
               </Button>
@@ -568,7 +568,7 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                 className="bg-seguranca-red hover:bg-seguranca-red/80 transition-colors"
               >
                 Próximo
-              </Button>
+        </Button>
             )}
           </div>
       </div>

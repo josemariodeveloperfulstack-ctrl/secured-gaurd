@@ -478,4 +478,4 @@ public class EquipmentReportService {
         return csv.toString();
     }
 
-}
+} 

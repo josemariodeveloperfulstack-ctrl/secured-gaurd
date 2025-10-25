@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../lib/axios';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../config/environment';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -265,13 +266,13 @@ const DocumentosUnificados: React.FC = () => {
 
     const handleViewDocument = (document: UnifiedDocument) => {
         // Abrir PDF em nova aba
-        const baseUrl = import.meta.env.VITE_API_URL || 'https://ci.z7botsolutions.com.br/api';
+        const baseUrl = import.meta.env.VITE_API_URL || getApiUrl();
         window.open(`${baseUrl.replace('/api', '')}/${document.filePath}`, '_blank');
     };
 
     const handleDownloadDocument = (document: UnifiedDocument) => {
         // Download do arquivo
-        const baseUrl = import.meta.env.VITE_API_URL || 'https://ci.z7botsolutions.com.br/api';
+        const baseUrl = import.meta.env.VITE_API_URL || getApiUrl();
         const link = document.createElement('a');
         link.href = `${baseUrl.replace('/api', '')}/${document.filePath}`;
         link.download = document.fileName;

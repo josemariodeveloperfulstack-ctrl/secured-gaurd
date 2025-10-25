@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { Dependent, DependentCreateRequest, DependentUpdateRequest, DependentFilters } from '@/types/dependent';
+import { getApiUrl } from '@/config/environment';
 
-const API_BASE_URL = 'http://localhost:8081/api';
+const API_BASE_URL = getApiUrl();
 
 const dependentService = {
   // Buscar todos os dependentes
