@@ -35,11 +35,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       if (isDebugMode()) {
-        console.log('🔗 Token adicionado ao header');
+        console.log('🔗 Token adicionado ao header:', token.substring(0, 50) + '...');
       }
     } else {
       if (isDebugMode()) {
-        console.log('🔗 Nenhum token encontrado');
+        console.log('🔗 Nenhum token encontrado no localStorage');
+        console.log('🔗 Chaves disponíveis:', Object.keys(localStorage));
       }
     }
     

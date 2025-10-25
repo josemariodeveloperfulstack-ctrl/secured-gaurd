@@ -177,7 +177,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
       // Salvar token e dados do usuário
-      localStorage.setItem('token', response.data.token || 'fake-token');
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        console.log('✅ Token salvo no localStorage:', response.data.token.substring(0, 50) + '...');
+      } else {
+        console.error('❌ Token não encontrado na resposta do login!');
+        throw new Error('Token não encontrado na resposta do login');
+      }
       localStorage.setItem('user', JSON.stringify(userData));
 
       setUser(userData);
