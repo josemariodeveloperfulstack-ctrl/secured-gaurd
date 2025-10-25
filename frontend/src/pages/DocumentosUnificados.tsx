@@ -265,13 +265,15 @@ const DocumentosUnificados: React.FC = () => {
 
     const handleViewDocument = (document: UnifiedDocument) => {
         // Abrir PDF em nova aba
-        window.open(`http://localhost:8081/${document.filePath}`, '_blank');
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://ci.z7botsolutions.com.br/api';
+        window.open(`${baseUrl.replace('/api', '')}/${document.filePath}`, '_blank');
     };
 
     const handleDownloadDocument = (document: UnifiedDocument) => {
         // Download do arquivo
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://ci.z7botsolutions.com.br/api';
         const link = document.createElement('a');
-        link.href = `http://localhost:8081/${document.filePath}`;
+        link.href = `${baseUrl.replace('/api', '')}/${document.filePath}`;
         link.download = document.fileName;
         document.body.appendChild(link);
         link.click();

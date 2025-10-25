@@ -2,7 +2,7 @@ import axios from 'axios';
 import { config } from '../../env.config';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://ci.z7botsolutions.com.br/api',
 });
 
 // Request interceptor
