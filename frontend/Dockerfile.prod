@@ -17,8 +17,16 @@ RUN npm ci --only=production
 # Copiar código fonte
 COPY . ./
 
+# Definir variáveis de ambiente para o build
+ARG VITE_API_URL=https://ci.z7botsolutions.com.br/api
+ARG VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws
+ARG VITE_ENVIRONMENT=ci
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+ENV VITE_ENVIRONMENT=$VITE_ENVIRONMENT
+
 # Build da aplicação
-RUN npm run build
+RUN npm run build:ci
 
 # ========================================
 # IMAGEM FINAL (NGINX)
