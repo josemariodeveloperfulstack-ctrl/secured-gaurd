@@ -21,6 +21,7 @@ import PoliticasPrivacidade from '@/pages/PoliticasPrivacidade';
 import TermosCondicoes from '@/pages/TermosCondicoes';
 import Contato from '@/pages/Contato';
 import CookieConsent from '@/components/CookieConsent';
+import EnvironmentIndicator from '@/components/EnvironmentIndicator';
 
 // Sistema Administrativo - Lazy loading para páginas administrativas
 const Login = lazy(() => import('@/pages/Login').catch(() => ({ default: () => <div>Erro ao carregar Login</div> })));
@@ -998,6 +999,7 @@ function App() {
                   </Routes>
                   <Toaster />
                   <CookieConsent />
+                  <EnvironmentIndicator />
                 </AuthProvider>
               </BrowserRouter>
             </NotificationProvider>

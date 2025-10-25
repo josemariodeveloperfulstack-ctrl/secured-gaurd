@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { config } from '../../env.config';
+import { getApiUrl, isDebugMode } from '../config/environment';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://ci.z7botsolutions.com.br/api',
+  baseURL: getApiUrl(),
 });
 
 // Request interceptor
@@ -25,16 +25,22 @@ api.interceptors.request.use(
       }
     } catch (_) {}
 
-    console.log('🔗 Axios Request:', config.method?.toUpperCase(), config.url);
-    console.log('🔗 Base URL:', config.baseURL);
-    console.log('🔗 Full URL:', config.baseURL + config.url);
+    if (isDebugMode()) {
+      console.log('🔗 Axios Request:', config.method?.toUpperCase(), config.url);
+      console.log('🔗 Base URL:', config.baseURL);
+      console.log('🔗 Full URL:', config.baseURL + config.url);
+    }
     
     const token = localStorage.getItem(import.meta.env.VITE_TOKEN_KEY || 'token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('🔗 Token adicionado ao header');
+      if (isDebugMode()) {
+        console.log('🔗 Token adicionado ao header');
+      }
     } else {
-      console.log('🔗 Nenhum token encontrado');
+      if (isDebugMode()) {
+        console.log('🔗 Nenhum token encontrado');
+      }
     }
     
     return config;
@@ -48,12 +54,16 @@ api.interceptors.request.use(
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ Axios Response:', response.status, response.config.url);
+    if (isDebugMode()) {
+      console.log('✅ Axios Response:', response.status, response.config.url);
+    }
     return response;
   },
   async (error) => {
-    console.error('❌ Axios Response Error:', error.response?.status, error.config?.url);
-    console.error('❌ Error details:', error.response?.data);
+    if (isDebugMode()) {
+      console.error('❌ Axios Response Error:', error.response?.status, error.config?.url);
+      console.error('❌ Error details:', error.response?.data);
+    }
     const originalRequest = error.config;
 
     // Se o erro for 401 e não for uma tentativa de refresh
