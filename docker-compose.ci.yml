@@ -21,6 +21,7 @@ services:
       - /var/www/secured_guard/ci/postgres_data:/var/lib/postgresql/data
     networks:
       - secured-guard-ci-network
+      - z7network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U secured_guard_ci"]
       interval: 10s
@@ -40,6 +41,7 @@ services:
       - /var/www/secured_guard/ci/redis_data:/data
     networks:
       - secured-guard-ci-network
+      - z7network
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_ci_2025}
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_ci_2025}", "ping"]
@@ -79,12 +81,19 @@ services:
         condition: service_healthy
     networks:
       - secured-guard-ci-network
+      - z7network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8082/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend-ci.rule=Host(`ci.z7botsolutions.com.br`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-ci.entrypoints=websecure"
+      - "traefik.http.routers.backend-ci.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.backend-ci.loadbalancer.server.port=8082"
 
   # ========================================
   # FRONTEND CI
@@ -101,12 +110,19 @@ services:
       - backend-ci
     networks:
       - secured-guard-ci-network
+      - z7network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-ci.rule=Host(`ci.z7botsolutions.com.br`)"
+      - "traefik.http.routers.frontend-ci.entrypoints=websecure"
+      - "traefik.http.routers.frontend-ci.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.frontend-ci.loadbalancer.server.port=80"
 
 # ========================================
 # VOLUMES CI (usando bind mounts)
@@ -120,3 +136,6 @@ networks:
   secured-guard-ci-network:
     driver: bridge
     name: secured-guard-ci
+  z7network:
+    external: true
+    name: z7network
