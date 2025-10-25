@@ -19,8 +19,23 @@ export const unifiedDocumentService = {
    */
   async getAllUnifiedDocuments(): Promise<UnifiedDocument[]> {
     try {
-      const response = await api.get('/unified-documents/list');
-      return response.data;
+      // Tentar primeiro o endpoint protegido (quando as permissões estiverem funcionando)
+      try {
+        const response = await api.get('/unified-documents/list');
+        if (response.data && response.data.documents) {
+          return response.data.documents;
+        }
+        return response.data || [];
+      } catch (protectedError) {
+        console.warn('Endpoint protegido falhou, tentando público:', protectedError);
+        
+        // Fallback para endpoint público
+        const publicResponse = await api.get('/unified-documents/public/list');
+        if (publicResponse.data && publicResponse.data.documents) {
+          return publicResponse.data.documents;
+        }
+        return publicResponse.data || [];
+      }
     } catch (error) {
       console.error('Erro ao buscar documentos unificados:', error);
       return [];
