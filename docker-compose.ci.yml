@@ -70,7 +70,7 @@ services:
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
     ports:
-      - "8082:8082"
+      - "8081:8081"
     volumes:
       - /var/www/secured_guard/ci/uploads:/var/www/secured_guard/ci/uploads
       - /var/www/secured_guard/ci/logs:/var/www/secured_guard/ci/logs
@@ -83,7 +83,7 @@ services:
       - secured-guard-ci-network
       - z7network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -93,7 +93,7 @@ services:
       - "traefik.http.routers.backend-ci.rule=Host(`ci.z7botsolutions.com.br`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend-ci.entrypoints=websecure"
       - "traefik.http.routers.backend-ci.tls.certresolver=letsencryptresolver"
-      - "traefik.http.services.backend-ci.loadbalancer.server.port=8082"
+      - "traefik.http.services.backend-ci.loadbalancer.server.port=8081"
 
   # ========================================
   # FRONTEND CI
