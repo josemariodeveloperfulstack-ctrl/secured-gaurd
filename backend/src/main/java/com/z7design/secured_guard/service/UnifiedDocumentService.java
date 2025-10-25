@@ -740,6 +740,18 @@ public class UnifiedDocumentService {
     }
 
     /**
+     * Lista documentos unificados por CPF do funcionário
+     */
+    public List<Map<String, Object>> listUnifiedDocumentsByCpf(String cpf) throws IOException {
+        log.info("🔍 Buscando documentos unificados para CPF: {}", cpf);
+        
+        // Por enquanto, retornar lista vazia pois não temos a relação CPF -> UnifiedDocument
+        // TODO: Implementar busca real quando tivermos a estrutura correta
+        log.warn("⚠️ Método listUnifiedDocumentsByCpf ainda não implementado completamente. Retornando lista vazia.");
+        return new ArrayList<>();
+    }
+
+    /**
      * Extrai nome do funcionário do nome do arquivo
      */
     private String extractEmployeeNameFromFileName(String fileName) {

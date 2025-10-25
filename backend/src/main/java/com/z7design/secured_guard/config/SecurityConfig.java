@@ -124,14 +124,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/banks/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 .requestMatchers("/api/agencies/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "SUPER_ADMIN", "ADMIN", "FINANCEIRO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de holerites - requerem permissões específicas
-                .requestMatchers("/api/payslips/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
+                .requestMatchers("/api/payslips/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO", "ROLE_COLABORADOR")
                 // Endpoints de recibos - requerem permissões específicas
-                .requestMatchers("/api/receipts/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
+                .requestMatchers("/api/receipts/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO", "ROLE_COLABORADOR")
                 // Endpoints de documentos unificados - arquivos públicos para download/visualização
                 .requestMatchers("/api/unified-documents/public/**").permitAll()
                 .requestMatchers("/api/unified-documents/download/**").permitAll()
                 // Endpoints de documentos unificados - operações requerem permissões
-                .requestMatchers("/api/unified-documents/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO")
+                .requestMatchers("/api/unified-documents/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO", "ROLE_COLABORADOR")
                 // Endpoints de relatórios - requerem permissões específicas
                 .requestMatchers("/api/reports/**").hasAnyAuthority("REPORTS_READ", "REPORTS_GENERATE", "REPORTS_EXPORT", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Endpoints de chat - requerem permissões específicas

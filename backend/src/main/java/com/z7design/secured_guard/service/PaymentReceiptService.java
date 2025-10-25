@@ -84,6 +84,16 @@ public class PaymentReceiptService {
     }
     
     @Transactional(readOnly = true)
+    public List<PaymentReceiptDTO> findByUserCpf(String cpf) {
+        log.info("🔍 Buscando comprovantes para CPF: {}", cpf);
+        
+        // Por enquanto, retornar lista vazia pois não temos a relação CPF -> PaymentReceipt
+        // TODO: Implementar busca real quando tivermos a estrutura correta
+        log.warn("⚠️ Método findByUserCpf ainda não implementado completamente. Retornando lista vazia.");
+        return List.of();
+    }
+    
+    @Transactional(readOnly = true)
     public List<PaymentReceiptDTO> findByYearAndMonth(Integer year, Integer month) {
         return paymentReceiptRepository.findByYearAndMonth(year, month)
                 .stream()

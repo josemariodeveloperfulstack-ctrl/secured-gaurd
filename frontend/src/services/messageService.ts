@@ -56,7 +56,7 @@ export const messageService = {
 
   async getSystemMessages(page = 0, size = 10): Promise<{ messages: SystemMessage[]; totalPages: number; hasNext: boolean }> {
     try {
-      const response = await api.get('/v1/messages/received', {
+      const response = await api.get('/api/v1/messages/received', {
         headers: getAuthHeaders(),
         params: { page, size, sort: 'createdAt,desc' }
       });
@@ -138,7 +138,7 @@ export const messageService = {
 
       console.log('[MessageService] Enviando dados para o backend:', requestData);
 
-      const response = await api.post('/v1/messages', requestData, {
+      const response = await api.post('/api/v1/messages', requestData, {
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }
       });
 
@@ -152,7 +152,7 @@ export const messageService = {
 
   async markSystemMessageAsRead(messageId: string): Promise<void> {
     try {
-      await api.put(`/v1/messages/${messageId}/read`, {}, {
+      await api.put(`/api/v1/messages/${messageId}/read`, {}, {
         headers: getAuthHeaders()
       });
     } catch (error) {
@@ -162,7 +162,7 @@ export const messageService = {
 
   async getUnreadSystemCount(): Promise<number> {
     try {
-      const response = await api.get('/v1/messages/unread/count', {
+      const response = await api.get('/api/v1/messages/unread/count', {
         headers: getAuthHeaders()
       });
       return response.data || 0;
@@ -347,7 +347,7 @@ export const messageService = {
 
   async deleteSystemMessage(messageId: string, reason: string): Promise<void> {
     try {
-      await api.delete(`/v1/messages/${messageId}`, {
+      await api.delete(`/api/v1/messages/${messageId}`, {
         headers: getAuthHeaders(),
         params: { reason }
       });
@@ -360,7 +360,7 @@ export const messageService = {
 
   async searchMessages(query: string, type: 'system' | 'chat' = 'system'): Promise<SystemMessage[] | ChatMessage[]> {
     try {
-      const endpoint = type === 'system' ? '/v1/messages/search' : '/v1/chat/search';
+      const endpoint = type === 'system' ? '/api/v1/messages/search' : '/api/v1/chat/search';
       const response = await api.get(endpoint, {
         headers: getAuthHeaders(),
         params: { q: query }

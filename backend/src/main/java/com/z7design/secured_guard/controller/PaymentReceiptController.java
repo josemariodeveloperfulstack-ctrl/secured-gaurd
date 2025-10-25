@@ -15,10 +15,14 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/receipts")
 @CrossOrigin(origins = "*")
+@Slf4j
 public class PaymentReceiptController {
     
     @Autowired
@@ -42,9 +46,25 @@ public class PaymentReceiptController {
     @GetMapping
     public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts() {
         try {
-            List<PaymentReceiptDTO> receipts = paymentReceiptService.findAll();
+            log.info("🔍 Iniciando busca de todos os comprovantes...");
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            
+            List<PaymentReceiptDTO> receipts;
+            if (isColaborador) {
+                String cpf = auth.getName(); // username é o CPF
+                log.info("👤 Usuário colaborador, buscando comprovantes por CPF: {}", cpf);
+                // Por enquanto, buscar todos e filtrar no service
+                receipts = paymentReceiptService.findByUserCpf(cpf);
+            } else {
+                log.info("👑 Usuário admin, buscando todos os comprovantes");
+                receipts = paymentReceiptService.findAll();
+            }
+            
+            log.info("✅ Comprovantes encontrados: {} registros", receipts.size());
             return ResponseEntity.ok(receipts);
         } catch (Exception e) {
+            log.error("❌ Erro ao buscar comprovantes: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

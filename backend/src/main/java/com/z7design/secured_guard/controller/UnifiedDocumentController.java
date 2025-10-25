@@ -25,6 +25,8 @@ import java.nio.file.Paths;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping("/api/unified-documents")
@@ -621,8 +623,18 @@ public class UnifiedDocumentController {
         
         try {
             log.info("📋 Listando documentos unificados...");
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
             
-            List<Map<String, Object>> documents = unifiedDocumentService.listAllUnifiedDocuments();
+            List<Map<String, Object>> documents;
+            if (isColaborador) {
+                String cpf = auth.getName(); // username é o CPF
+                log.info("👤 Usuário colaborador, buscando documentos unificados por CPF: {}", cpf);
+                documents = unifiedDocumentService.listUnifiedDocumentsByCpf(cpf);
+            } else {
+                log.info("👑 Usuário admin, buscando todos os documentos unificados");
+                documents = unifiedDocumentService.listAllUnifiedDocuments();
+            }
             
             response.put("sucesso", true);
             response.put("mensagem", "Documentos unificados listados com sucesso");
