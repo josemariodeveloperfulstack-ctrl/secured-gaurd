@@ -12,12 +12,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping("/api/debug")
 public class DebugController {
 
     @GetMapping("/auth")
-    public ResponseEntity<Map<String, Object>> debugAuth() {
+    public ResponseEntity<Map<String, Object>> debugAuth(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         
         Map<String, Object> response = new HashMap<>();
@@ -29,6 +31,12 @@ public class DebugController {
                 .collect(Collectors.toList()) : 
             "null");
         response.put("principal", auth != null ? auth.getPrincipal().getClass().getSimpleName() : "null");
+        
+        // Debug adicional
+        String authHeader = request.getHeader("Authorization");
+        response.put("authHeader", authHeader != null ? authHeader.substring(0, Math.min(50, authHeader.length())) + "..." : "null");
+        response.put("hasAuthHeader", authHeader != null);
+        response.put("authHeaderStartsWithBearer", authHeader != null && authHeader.startsWith("Bearer "));
         
         return ResponseEntity.ok(response);
     }
