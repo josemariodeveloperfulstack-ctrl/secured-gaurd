@@ -330,6 +330,39 @@ public class UnifiedDocumentController {
     }
 
     /**
+     * Endpoint de debug para listar arquivos disponíveis
+     */
+    @GetMapping("/public/debug/list-files")
+    public ResponseEntity<Map<String, Object>> listAvailableFiles() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Path basePath = Paths.get("uploads", "unified");
+            log.info("📁 Listando arquivos em: {}", basePath.toAbsolutePath());
+            
+            response.put("basePath", basePath.toAbsolutePath().toString());
+            response.put("exists", Files.exists(basePath));
+            
+            if (Files.exists(basePath)) {
+                List<String> files = Files.walk(basePath)
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .collect(java.util.stream.Collectors.toList());
+                response.put("files", files);
+                response.put("totalFiles", files.size());
+            } else {
+                response.put("files", new ArrayList<>());
+                response.put("totalFiles", 0);
+                response.put("error", "Diretório não existe");
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+    
+    /**
      * Endpoint público para servir arquivos PDF de documentos unificados
      */
     @GetMapping("/public/file/{fileName:.+}")
