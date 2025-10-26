@@ -60,41 +60,43 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       }`}>
         {/* Header com botão de toggle */}
         <header className="bg-seguranca-black shadow-lg border-b border-gray-700 sticky top-0 z-40">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-2 md:px-4 py-2 md:py-3">
             {/* Lado esquerdo - Botão toggle e título */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 md:space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleSidebar}
-                className="text-seguranca-lightgray hover:text-seguranca-yellow hover:bg-seguranca-graphite"
+                className="text-seguranca-lightgray hover:text-seguranca-yellow hover:bg-seguranca-graphite p-1 md:p-2"
               >
-                {collapsed ? (
+                {isMobile ? (
+                  <Menu className="h-5 w-5" />
+                ) : collapsed ? (
                   <ChevronRight className="h-5 w-5" />
                 ) : (
                   <ChevronLeft className="h-5 w-5" />
                 )}
               </Button>
               
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="h-6 w-6 text-seguranca-yellow" />
-                <span className="text-lg font-bold text-seguranca-lightgray">
+              <div className="flex items-center space-x-1 md:space-x-2">
+                <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-seguranca-yellow" />
+                <span className="text-sm md:text-lg font-bold text-seguranca-lightgray">
                   Secure Guard
                 </span>
               </div>
             </div>
 
             {/* Lado direito - Informações do usuário */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 md:space-x-4">
               <div 
-                className="flex items-center space-x-2 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors"
+                className="flex items-center space-x-1 md:space-x-2 cursor-pointer hover:bg-seguranca-black p-1 md:p-2 rounded-lg transition-colors"
                 onClick={handleProfileClick}
               >
                 <User className="h-4 w-4 text-seguranca-lightgray" />
-                <span className="text-seguranca-lightgray text-sm hidden sm:block hover:text-seguranca-yellow transition-colors">
+                <span className="text-seguranca-lightgray text-sm hidden md:block hover:text-seguranca-yellow transition-colors">
                   {user.name}
                 </span>
-                <Badge className={`${getRoleColor(user.role)} text-xs`}>
+                <Badge className={`${getRoleColor(user.role)} text-xs hidden sm:flex`}>
                   {getRoleDisplayName(user.role)}
                   {user.role === 'SUPER_ADMIN' && ' 🟥'}
                 </Badge>
@@ -107,10 +109,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={logout}
-                className="flex items-center space-x-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
+                className="flex items-center space-x-1 md:space-x-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow p-1 md:p-2"
               >
                 <LogOut className="h-4 w-4" />
-                <span className="hidden sm:block">Sair</span>
+                <span className="hidden md:block text-xs md:text-sm">Sair</span>
               </Button>
             </div>
           </div>
