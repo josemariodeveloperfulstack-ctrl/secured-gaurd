@@ -679,6 +679,11 @@ const Holerites: React.FC = () => {
     }
   };
 
+  // useEffect para carregar documentos unificados ao montar o componente
+  useEffect(() => {
+    fetchUnifiedDocuments();
+  }, []);
+
   // Função para filtrar documentos unificados
   const getFilteredUnifiedDocuments = () => {
     if (!unifiedSearchTerm) return unifiedDocuments;
