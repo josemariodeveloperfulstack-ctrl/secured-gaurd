@@ -372,10 +372,25 @@ public class UnifiedDocumentController {
             
             // Procurar o arquivo recursivamente nas subpastas
             Path basePath = Paths.get("uploads", "unified");
+            log.info("🔍 Procurando arquivo em: {}", basePath.toAbsolutePath());
+            log.info("🔍 Nome do arquivo: {}", fileName);
+            
             Path filePath = findFileRecursively(basePath, fileName);
             
             if (filePath == null) {
-                log.warn("⚠️ Arquivo não encontrado: {}", fileName);
+                log.error("❌ Arquivo não encontrado: {} no diretório: {}", fileName, basePath.toAbsolutePath());
+                
+                // Tentar listar arquivos disponíveis para debug
+                try {
+                    List<String> availableFiles = Files.walk(basePath)
+                        .filter(Files::isRegularFile)
+                        .map(p -> p.getFileName().toString())
+                        .collect(java.util.stream.Collectors.toList());
+                    log.error("📁 Arquivos disponíveis: {}", availableFiles);
+                } catch (IOException e) {
+                    log.error("💥 Erro ao listar arquivos: {}", e.getMessage());
+                }
+                
                 return ResponseEntity.notFound().build();
             }
             

@@ -1847,6 +1847,9 @@ const Holerites: React.FC = () => {
         description: `Documento unificado criado com sucesso!`,
       });
       
+      // Atualizar lista de documentos unificados
+      await fetchUnifiedDocuments(true);
+      
       return unifiedPdfUrl;
     } catch (error: any) {
       console.error('âŒ Erro ao gerar PDF unificado (backend):', error);
