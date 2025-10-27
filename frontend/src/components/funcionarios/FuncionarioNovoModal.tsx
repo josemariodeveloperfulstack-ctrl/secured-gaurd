@@ -22,6 +22,7 @@ import { DependentFormModal } from '@/components/dependentes/DependentFormModal'
 import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
+import { AccountingFormButton } from '@/components/funcionarios/AccountingFormButton';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -2042,6 +2043,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
            )}
           
           <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            {/* Botão de Ficha Contabilidade - apenas em modo de edição */}
+            {isEditMode && employeeToEdit?.id && (
+              <div className="w-full sm:w-auto">
+                <AccountingFormButton
+                  employeeId={employeeToEdit.id}
+                  employeeName={employeeToEdit.name || 'Funcionário'}
+                  variant="outline"
+                  className="border-red-500 text-red-400 hover:bg-red-500/10 w-full sm:w-auto"
+                />
+              </div>
+            )}
+            
             <Button 
               type="button" 
               variant="outline" 
