@@ -158,6 +158,16 @@ const Holerites: React.FC = () => {
   const [logsYear, setLogsYear] = useState<string>('');
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // Callback após validação: aqui chamaremos envio real na Fase 3
+  const handleValidated = async (validatedIds: string[]) => {
+    if (!validatedIds || validatedIds.length === 0) {
+      toast({ title: 'Sem destinatários prontos', description: 'Nenhum funcionário pronto para envio.', variant: 'destructive' });
+      return;
+    }
+    const title = validationSendType === 'both' ? 'Email + WhatsApp' : (validationSendType === 'email' ? 'Email' : 'WhatsApp');
+    toast({ title: `Enviar ${title}`, description: `Iniciando envio para ${validatedIds.length} funcionário(s).` });
+  };
+
   const loadLogs = async () => {
     if (!logsCpf) return;
     setLoadingLogs(true);
@@ -3384,21 +3394,73 @@ const Holerites: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setRefreshing(true);
-                          clearFilters();
-                          setTimeout(() => setRefreshing(false), 1000);
+                        onClick={async () => {
+                          if (selectedHolerites.length === 0) return;
+                          const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
+                          const ids: string[] = [];
+                          for (const h of selected) {
+                            if (h.cpf) {
+                              try {
+                                const byCpf = await employeeService.searchEmployees(h.cpf);
+                                if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                              } catch {}
+                            }
+                            try {
+                              const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                              if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                            } catch {}
+                          }
+                          const uniqueIds = Array.from(new Set(ids));
+                          if (uniqueIds.length === 0) {
+                            toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                            return;
+                          }
+                          setResolvedEmployeeIds(uniqueIds);
+                          setValidationSendType('email');
+                          setShowValidationModal(true);
                         }}
-                        disabled={refreshing}
-                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black shadow-lg hover:shadow-gray-500/25 transition-all text-xs"
+                        disabled={selectedHolerites.length === 0}
+                        className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                       >
-                        {refreshing ? (
-                          <Loader2 size={14} className="mr-1 animate-spin" />
-                        ) : (
-                          <RefreshCw size={14} className="mr-1" />
-                        )}
-                        <span className="hidden sm:inline">Limpar Filtros</span>
-                        <span className="sm:hidden">Limpar</span>
+                        <Mail size={14} className="mr-1" />
+                        <span className="hidden sm:inline">Enviar Email</span>
+                        <span className="sm:hidden">Email</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          if (selectedHolerites.length === 0) return;
+                          const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
+                          const ids: string[] = [];
+                          for (const h of selected) {
+                            if (h.cpf) {
+                              try {
+                                const byCpf = await employeeService.searchEmployees(h.cpf);
+                                if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                              } catch {}
+                            }
+                            try {
+                              const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                              if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                            } catch {}
+                          }
+                          const uniqueIds = Array.from(new Set(ids));
+                          if (uniqueIds.length === 0) {
+                            toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                            return;
+                          }
+                          setResolvedEmployeeIds(uniqueIds);
+                          setValidationSendType('both');
+                          setShowValidationModal(true);
+                        }}
+                        disabled={selectedHolerites.length === 0}
+                        className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                      >
+                        <Mail size={14} className="mr-1" /> + <MessageSquare size={14} className="ml-1" />
+                        <span className="hidden sm:inline">Enviar Ambos</span>
+                        <span className="sm:hidden">Ambos</span>
                       </Button>
                       
                       <Button
@@ -5205,6 +5267,16 @@ const Holerites: React.FC = () => {
            receipt={selectedPaymentReceiptForView}
            onDownload={handleDownloadPaymentReceipt}
          />
+
+        {/* Modal de Validação para envio (Holerites/Comprovantes) */}
+        <ContactValidationModal
+          open={showValidationModal}
+          onClose={() => setShowValidationModal(false)}
+          employeeIds={resolvedEmployeeIds}
+          sendType={validationSendType}
+          documentType="holerite"
+          onValidated={handleValidated}
+        />
      </StandardLayout>
    );
  };
