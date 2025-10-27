@@ -27,8 +27,9 @@
     max-width: fit-content;
   }
 
-  /* Tabs should scroll horizontally if needed */
+  /* Tabs should be visible and scroll horizontally if needed */
   [role="tablist"] {
+    display: flex !important;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
@@ -37,6 +38,12 @@
   
   [role="tablist"]::-webkit-scrollbar {
     display: none; /* Chrome/Safari */
+  }
+
+  /* Ensure tab triggers are visible */
+  [role="tab"] {
+    flex-shrink: 0;
+    min-width: fit-content;
   }
 
   /* Buttons should not wrap */
@@ -97,6 +104,18 @@
 /* ========================================
    SPECIFIC COMPONENTS
    ======================================== */
+
+/* Login page tabs - ensure both tabs are visible */
+.login-tabs [role="tablist"],
+.login-tabs .grid-cols-2 {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+}
+
+.login-tabs [role="tab"] {
+  display: flex !important;
+  visibility: visible !important;
+}
 
 /* Dashboard cards */
 @media (max-width: 640px) {

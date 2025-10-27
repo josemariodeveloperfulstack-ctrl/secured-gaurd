@@ -215,7 +215,7 @@ const Login = () => {
         <div className="bg-seguranca-graphite rounded-xl shadow-lg w-full max-w-md p-6 md:p-8" data-aos={aos.zoomIn}>
           <h2 className="text-2xl font-bold text-center mb-6" data-aos={aos.fadeUp}>Acesso ao Sistema</h2>
 
-          <Tabs defaultValue="funcionario" className="w-full">
+          <Tabs defaultValue="funcionario" className="w-full login-tabs">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="funcionario" className="flex items-center gap-2">
                 <User size={16} />
