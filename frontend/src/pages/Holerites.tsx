@@ -50,6 +50,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
 import { PdfMergeResult } from '@/services/pdfMergeService';
 import api from '@/lib/axios';
+import { ContactValidationModal } from '@/components/contact-validation/ContactValidationModal';
+import { employeeService } from '@/services/employeeService';
 
 const Holerites: React.FC = () => {
   const { user } = useAuth();
@@ -123,6 +125,11 @@ const Holerites: React.FC = () => {
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendType, setSendType] = useState<'email' | 'whatsapp'>('email');
   const [sendingDocuments, setSendingDocuments] = useState(false);
+
+  // Validação de contatos para envio em lote (holerites)
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationSendType, setValidationSendType] = useState<'email' | 'whatsapp' | 'both'>('whatsapp');
+  const [resolvedEmployeeIds, setResolvedEmployeeIds] = useState<string[]>([]);
 
   // Visualização de PDF unificado
   const [showUnifiedViewerModal, setShowUnifiedViewerModal] = useState(false);
@@ -3330,7 +3337,42 @@ const Holerites: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setShowWhatsAppModal(true)}
+                        onClick={async () => {
+                          // Resolver IDs dos funcionários a partir dos holerites selecionados
+                          if (selectedHolerites.length === 0) return;
+                          const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
+                          const ids: string[] = [];
+
+                          for (const h of selected) {
+                            // 1) Tenta via CPF direto do holerite
+                            if (h.cpf) {
+                              try {
+                                const byCpf = await employeeService.searchEmployees(h.cpf);
+                                if (byCpf && byCpf.length === 1) {
+                                  ids.push(byCpf[0].id);
+                                  continue;
+                                }
+                              } catch {}
+                            }
+                            // 2) Fallback por nome
+                            try {
+                              const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                              if (byName && byName.length === 1) {
+                                ids.push(byName[0].id);
+                                continue;
+                              }
+                            } catch {}
+                          }
+
+                          const uniqueIds = Array.from(new Set(ids));
+                          if (uniqueIds.length === 0) {
+                            toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique se os PDFs possuem CPF no nome ou se o cadastro está consistente.', variant: 'destructive' });
+                            return;
+                          }
+                          setResolvedEmployeeIds(uniqueIds);
+                          setValidationSendType('whatsapp');
+                          setShowValidationModal(true);
+                        }}
                         disabled={selectedHolerites.length === 0}
                         className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                       >

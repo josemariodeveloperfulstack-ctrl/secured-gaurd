@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../lib/axios';
+import { useToast } from '@/hooks/use-toast';
+import { ContactValidationModal } from '@/components/contact-validation/ContactValidationModal';
+import { employeeService } from '@/services/employeeService';
 import { useAuth } from '../contexts/AuthContext';
 import { getApiUrl } from '../config/environment';
 import { Button } from '../components/ui/button';
@@ -99,6 +102,13 @@ const DocumentosUnificados: React.FC = () => {
     const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
     const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Estados para validação de contatos e envio
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [validationSendType, setValidationSendType] = useState<'email' | 'whatsapp' | 'both'>('whatsapp');
+    const [resolvedEmployeeIds, setResolvedEmployeeIds] = useState<string[]>([]);
+
+    const { toast } = useToast();
 
     // Estados para filtros
     const [unificationTypeFilter, setUnificationTypeFilter] = useState<'all' | 'INDIVIDUAL' | 'BATCH' | 'UNKNOWN'>('all');
@@ -364,6 +374,18 @@ const DocumentosUnificados: React.FC = () => {
         }
     };
 
+    // Callback após a validação: enviar para IDs prontos
+    const handleValidated = async (validatedIds: string[]) => {
+        // Aqui, chamaremos os endpoints reais de envio (fase 3)
+        // Por enquanto, apenas feedback visual
+        if (validatedIds.length === 0) {
+            toast({ title: 'Sem destinatários prontos', description: 'Nenhum funcionário pronto para envio.', variant: 'destructive' });
+            return;
+        }
+        const title = validationSendType === 'both' ? 'Email + WhatsApp' : (validationSendType === 'email' ? 'Email' : 'WhatsApp');
+        toast({ title: `Enviar ${title}`, description: `Iniciando envio para ${validatedIds.length} funcionário(s).` });
+    };
+
     // Funções para seleção e exclusão em lote
     const handleSelectDocument = (documentId: string) => {
         setSelectedDocuments(prev =>
@@ -379,6 +401,66 @@ const DocumentosUnificados: React.FC = () => {
         } else {
             setSelectedDocuments(documents.map(doc => doc.id));
         }
+    };
+
+    // Resolver IDs de funcionários para os documentos selecionados
+    const resolveEmployeeIdsForSelected = async (): Promise<string[]> => {
+        const selected = documents.filter(doc => selectedDocuments.includes(doc.id));
+        const ids: string[] = [];
+
+        for (const doc of selected) {
+            // 1) Tentar por CPF no fileName
+            let cpfMatch: string | null = null;
+            try {
+                const match = doc.fileName?.match(/(\d{11})/);
+                cpfMatch = match ? match[1] : null;
+            } catch {}
+
+            if (cpfMatch) {
+                try {
+                    const byCpf = await employeeService.searchEmployees(cpfMatch);
+                    if (byCpf && byCpf.length === 1) {
+                        ids.push(byCpf[0].id);
+                        continue;
+                    }
+                } catch {}
+            }
+
+            // 2) Fallback: buscar por nome
+            try {
+                const byName = await employeeService.searchEmployeesByName(doc.employeeName);
+                if (byName && byName.length === 1) {
+                    ids.push(byName[0].id);
+                    continue;
+                }
+            } catch {}
+        }
+
+        return Array.from(new Set(ids));
+    };
+
+    const handleSendSelected = async (type: 'email' | 'whatsapp' | 'both') => {
+        if (selectedDocuments.length === 0) {
+            toast({ title: 'Selecione documentos', description: 'Nenhum documento selecionado.', variant: 'destructive' });
+            return;
+        }
+
+        const ids = await resolveEmployeeIdsForSelected();
+        if (ids.length === 0) {
+            toast({ title: 'Não foi possível identificar funcionários', description: 'Tente selecionar por CPF no nome do arquivo ou ajuste os nomes.', variant: 'destructive' });
+            return;
+        }
+
+        const totalSelected = selectedDocuments.length;
+        const msg = ids.length < totalSelected
+            ? `Identificados ${ids.length} de ${totalSelected} funcionário(s) a partir dos documentos selecionados.`
+            : `Identificados ${ids.length} funcionário(s) a partir dos documentos selecionados.`;
+
+        toast({ title: 'Validação de contatos', description: msg });
+
+        setResolvedEmployeeIds(ids);
+        setValidationSendType(type);
+        setShowValidationModal(true);
     };
 
     const handleBatchDelete = () => {
@@ -739,6 +821,35 @@ const DocumentosUnificados: React.FC = () => {
                                                 <Badge variant="secondary" className="text-sm">
                                                     {selectedDocuments.length} documento(s) selecionado(s)
                                                 </Badge>
+                                                {/* Envio Rápido com Validação */}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleSendSelected('whatsapp')}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <MessageCircle className="h-4 w-4" />
+                                                    Enviar WhatsApp
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleSendSelected('email')}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Mail className="h-4 w-4" />
+                                                    Enviar Email
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleSendSelected('both')}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Mail className="h-4 w-4" />
+                                                    +
+                                                    <MessageCircle className="h-4 w-4" />
+                                                </Button>
                                                 <Button
                                                     variant="destructive"
                                                     size="sm"
@@ -1224,6 +1335,16 @@ const DocumentosUnificados: React.FC = () => {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* MODAL: Validação de Contatos para envio */}
+            <ContactValidationModal
+                open={showValidationModal}
+                onClose={() => setShowValidationModal(false)}
+                employeeIds={resolvedEmployeeIds}
+                sendType={validationSendType}
+                documentType="unificado"
+                onValidated={handleValidated}
+            />
 
             {/* MODAL CUSTOMIZADO: Exclusão em Lote */}
             {showBatchDeleteModal && (
