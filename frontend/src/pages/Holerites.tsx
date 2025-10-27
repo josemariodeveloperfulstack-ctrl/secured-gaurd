@@ -2714,12 +2714,12 @@ const Holerites: React.FC = () => {
                 <div className="p-3 bg-seguranca-red rounded-xl shadow-lg">
                   <FileText className="w-8 h-8 text-white" />
                 </div>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-seguranca-lightgray">
-                    Gestão de Holerites e Comprovantes
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray truncate">
+                    <span className="hidden sm:inline">Gestão de </span>Holerites<span className="hidden md:inline"> e Comprovantes</span>
                   </h1>
-                  <p className="text-seguranca-yellow font-medium text-sm sm:text-base mt-1">
-                    Sistema completo de gestão de documentos financeiros
+                  <p className="text-seguranca-yellow font-medium text-xs sm:text-sm mt-1 truncate">
+                    <span className="hidden sm:inline">Sistema completo de </span>Gestão<span className="hidden sm:inline"> de documentos financeiros</span>
                   </p>
                 </div>
               </div>
@@ -3493,11 +3493,11 @@ const Holerites: React.FC = () => {
                       <CheckCircle size={12} className="text-white" />
                     </div>
                   </div>
-                  <h3 className="text-3xl font-bold bg-gradient-to-r from-seguranca-lightgray via-white to-seguranca-lightgray bg-clip-text text-transparent mb-4">
-                    Comprovantes de Pagamento de Salário
+                  <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-seguranca-lightgray via-white to-seguranca-lightgray bg-clip-text text-transparent mb-4">
+                    Comprovantes<span className="hidden sm:inline"> de Pagamento</span><span className="hidden md:inline"> de Salário</span>
                   </h3>
-                  <p className="text-gray-400 text-lg max-w-3xl mx-auto leading-relaxed">
-                    Importe e processe comprovantes de transferência de pagamento de salário de funcionários com tecnologia avançada de OCR e organização automática.
+                  <p className="text-gray-400 text-sm sm:text-base lg:text-lg max-w-3xl mx-auto leading-relaxed">
+                    Importe e processe comprovantes<span className="hidden sm:inline"> de transferência de pagamento de salário</span><span className="hidden md:inline"> de funcionários com tecnologia avançada de OCR e organização automática</span>.
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-4">
                     <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>

@@ -10,6 +10,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
+import '@/styles/mobile-fixes.css';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 // Portal Público - Carregamento imediato (página inicial)
