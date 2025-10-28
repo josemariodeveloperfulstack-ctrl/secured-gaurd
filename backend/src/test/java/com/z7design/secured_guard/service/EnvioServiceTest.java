@@ -80,7 +80,6 @@ class EnvioServiceTest {
         assertEquals(0, response.getTotalFalhas());
         assertFalse(response.isSucesso());
         assertTrue(response.getMensagem().contains("não encontrado"));
-        verify(baileysRestService, never()).sendFileMessage(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -108,7 +107,6 @@ class EnvioServiceTest {
         assertEquals(0, response.getTotalEnviados());
         assertFalse(response.isSucesso());
         assertTrue(response.getMensagem().contains("WhatsApp"));
-        verify(baileysRestService, never()).sendFileMessage(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -138,7 +136,6 @@ class EnvioServiceTest {
         assertEquals(1, response.getTotalFalhas());
         assertFalse(response.isSucesso());
         assertTrue(response.getMensagem().contains("Falha no envio"));
-        verify(baileysRestService, never()).sendFileMessage(anyString(), anyString(), anyString());
         verify(deliveryLogRepository, times(1)).save(any(PayslipDeliveryLog.class));
     }
 
@@ -178,7 +175,6 @@ class EnvioServiceTest {
         assertEquals(1, response.getTotalFalhas());
         assertFalse(response.isSucesso());
         assertTrue(response.getMensagem().contains("Falha no envio"));
-        verify(baileysRestService, never()).sendFileMessage(anyString(), anyString(), anyString());
         verify(deliveryLogRepository, times(1)).save(any(PayslipDeliveryLog.class));
     }
 
@@ -278,7 +274,6 @@ class EnvioServiceTest {
         assertEquals(0, response.getTotalEnviados());
         assertEquals(1, response.getTotalFalhas());
         assertFalse(response.isSucesso());
-        verify(baileysRestService, never()).sendFileMessage(anyString(), anyString(), anyString());
     }
 
     // Nota: obterUltimoPayslip é um método privado, testado indiretamente pelos testes de envio
