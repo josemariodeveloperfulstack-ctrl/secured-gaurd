@@ -36,9 +36,6 @@ class EnvioServiceTest {
     private WhatsAppService whatsAppService;
 
     @Mock
-    private BaileysRestService baileysRestService;
-
-    @Mock
     private PayslipRepository payslipRepository;
 
     @Mock
@@ -57,7 +54,6 @@ class EnvioServiceTest {
             userRepository,
             emailService,
             whatsAppService,
-            baileysRestService,
             payslipRepository,
             deliveryLogRepository,
             payslipService

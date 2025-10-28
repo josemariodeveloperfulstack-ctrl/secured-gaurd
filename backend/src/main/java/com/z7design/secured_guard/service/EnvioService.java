@@ -11,8 +11,8 @@ import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.PayslipDeliveryLogRepository;
 import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EnvioService {
     
@@ -37,16 +36,42 @@ public class EnvioService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final WhatsAppService whatsAppService;
-    private final EvolutionApiService evolutionApiService; // Evolution API (Baileys)
-    private final MetaWhatsAppService metaWhatsAppService; // Meta Cloud API (Oficial)
     private final PayslipRepository payslipRepository;
     private final PayslipDeliveryLogRepository deliveryLogRepository;
     private final PayslipService payslipService;
     
+    // WhatsApp providers (opcionais)
+    @Autowired(required = false)
+    private BaileysRestService baileysRestService;
+    
+    @Autowired(required = false)
+    private EvolutionApiService evolutionApiService;
+    
+    @Autowired(required = false)
+    private MetaWhatsAppService metaWhatsAppService;
+    
     @Value("${whatsapp.provider:evolution}")
-    private String whatsappProvider; // "evolution" ou "meta"
+    private String whatsappProvider; // "baileys", "evolution" ou "meta"
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    
+    // Construtor
+    public EnvioService(
+            EmployeeRepository employeeRepository,
+            UserRepository userRepository,
+            EmailService emailService,
+            WhatsAppService whatsAppService,
+            PayslipRepository payslipRepository,
+            PayslipDeliveryLogRepository deliveryLogRepository,
+            PayslipService payslipService) {
+        this.employeeRepository = employeeRepository;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
+        this.whatsAppService = whatsAppService;
+        this.payslipRepository = payslipRepository;
+        this.deliveryLogRepository = deliveryLogRepository;
+        this.payslipService = payslipService;
+    }
     
     public EnvioResponse enviarIndividual(EnvioRequest request) {
         log.info("🚀 Iniciando envio individual - Tipo: {}, FuncionarioId: {}, CPF: {}", 
@@ -492,7 +517,7 @@ public class EnvioService {
     }
 
     /**
-     * Envia mensagem via WhatsApp usando o provider configurado (Evolution ou Meta)
+     * Envia mensagem via WhatsApp usando o provider configurado (Baileys, Evolution ou Meta)
      */
     private boolean sendWhatsAppMessage(String phoneNumber, String message, String filePath) {
         log.info("🔧 Provider WhatsApp ativo: {}", whatsappProvider);
@@ -500,6 +525,9 @@ public class EnvioService {
         if ("meta".equalsIgnoreCase(whatsappProvider)) {
             log.info("📤 Usando Meta Cloud API");
             return metaWhatsAppService.sendFileMessage(phoneNumber, message, filePath);
+        } else if ("baileys".equalsIgnoreCase(whatsappProvider)) {
+            log.info("📤 Usando Baileys Original (porta 3333)");
+            return baileysRestService.sendFileMessage(phoneNumber, message, filePath);
         } else {
             log.info("📤 Usando Evolution API");
             return evolutionApiService.sendFileMessage(phoneNumber, message, filePath);
