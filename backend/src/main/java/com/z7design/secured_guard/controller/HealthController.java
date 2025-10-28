@@ -6,28 +6,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Controller para health check simples
+ * Endpoint público sem autenticação
+ */
 @RestController
 @RequestMapping("/api")
 public class HealthController {
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
-        try {
-            return ResponseEntity.ok(Map.of(
-                "status", "UP",
-                "timestamp", LocalDateTime.now(),
-                "service", "secured-guard",
-                "version", "1.0.0"
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
-                "status", "DOWN",
-                "timestamp", LocalDateTime.now(),
-                "service", "secured-guard",
-                "error", e.getMessage()
-            ));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "UP");
+        response.put("application", "secured-guard");
+        response.put("timestamp", LocalDateTime.now().toString());
+        response.put("version", "1.0.0");
+        
+        return ResponseEntity.ok(response);
     }
 }
