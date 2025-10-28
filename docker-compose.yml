@@ -67,22 +67,20 @@ services:
       APP_WHATSAPP_BAILEYS_URL: http://baileys:3000
     ports:
       - "8081:8081"
+  whatsapp:
+    build:
+      context: ./whatsapp-service
+    container_name: whatsapp-service
+    environment:
+      - PORT=3333
+      - INSTANCE_KEY=securedguard
+      - SESSION_DIR=/sessions
     volumes:
-      - ./backend:/app
-      - backend_logs:/app/logs
-      - backend_uploads:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - whatsapp_sessions:/sessions
+      - ./uploads:/app/uploads
+    ports:
+      - "3333:3333"
+    restart: unless-stopped
 
   # ========================================
   # FRONTEND
@@ -287,6 +285,7 @@ volumes:
   prometheus_data:
   grafana_data:
   elasticsearch_data:
+  whatsapp_sessions:
 
 # ========================================
 # NETWORKS

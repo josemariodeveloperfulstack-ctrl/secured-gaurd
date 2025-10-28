@@ -60,6 +60,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/test/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/debug/**").permitAll()
+                // WhatsApp controller - público para pareamento/health em dev
+                .requestMatchers("/api/whatsapp/**").permitAll()
                 .requestMatchers("/api/payslips/test-download/**").permitAll()
                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()

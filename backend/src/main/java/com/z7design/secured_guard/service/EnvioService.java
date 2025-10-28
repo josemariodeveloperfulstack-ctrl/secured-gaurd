@@ -44,7 +44,8 @@ public class EnvioService {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
     public EnvioResponse enviarIndividual(EnvioRequest request) {
-        log.info("🚀 Iniciando envio individual para funcionário ID: {}", request.getFuncionarioId());
+        log.info("🚀 Iniciando envio individual - Tipo: {}, FuncionarioId: {}, CPF: {}", 
+                request.getTipo(), request.getFuncionarioId(), request.getCpf());
         
         EnvioResponse response = EnvioResponse.builder()
                 .sucesso(false)
@@ -56,24 +57,115 @@ public class EnvioService {
                 .build();
         
         try {
-            Optional<Employee> employeeOpt;
+            Employee employee = null;
+            User user = null;
             
-            // Buscar funcionário por ID ou CPF
-            if (request.getFuncionarioId() != null && !request.getFuncionarioId().trim().isEmpty()) {
-                employeeOpt = employeeRepository.findById(UUID.fromString(request.getFuncionarioId()));
-            } else if (request.getCpf() != null && !request.getCpf().trim().isEmpty()) {
-                employeeOpt = employeeRepository.findByDocument(request.getCpf());
+            // NOVA LÓGICA: Buscar primeiro na tabela USERS por CPF
+            if (request.getCpf() != null && !request.getCpf().trim().isEmpty()) {
+                String cpfBusca = request.getCpf();
+                String cpfNormalizado = cpfBusca.replaceAll("[^0-9]", "");
+                
+                log.info("🔍 PASSO 1: Buscando USER por CPF: {}", cpfBusca);
+                
+                // Buscar user por username (que é o CPF)
+                Optional<User> userOpt = userRepository.findByUsername(cpfNormalizado);
+                
+                if (userOpt.isEmpty()) {
+                    // Tentar com CPF formatado
+                    userOpt = userRepository.findByUsername(cpfBusca);
+                }
+                
+                if (userOpt.isPresent()) {
+                    user = userOpt.get();
+                    log.info("✅ USER encontrado: {} (username: {})", user.getName(), user.getUsername());
+                    log.info("📋 Dados do USER: ID={}, Email={}, WhatsApp='{}'", 
+                            user.getId(), user.getEmail(), user.getWhatsapp());
+                    
+                    // Verificar se tem WhatsApp
+                    if (user.getWhatsapp() == null) {
+                        log.warn("⚠️ Campo WhatsApp é NULL!");
+                        response.setMensagem("WhatsApp não cadastrado na tabela users para CPF: " + cpfBusca);
+                        return response;
+                    }
+                    
+                    if (user.getWhatsapp().trim().isEmpty()) {
+                        log.warn("⚠️ Campo WhatsApp está vazio (string vazia)!");
+                        response.setMensagem("WhatsApp não cadastrado na tabela users para CPF: " + cpfBusca);
+                        return response;
+                    }
+                    
+                    log.info("✅ WhatsApp encontrado: '{}' (tamanho: {} caracteres)", 
+                            user.getWhatsapp(), user.getWhatsapp().length());
+                    
+                    // Agora buscar Employee correspondente (opcional, para pegar dados adicionais)
+                    log.info("🔍 PASSO 2: Buscando EMPLOYEE correspondente...");
+                    Optional<Employee> employeeOpt = employeeRepository.findByDocument(cpfNormalizado);
+                    
+                    if (employeeOpt.isEmpty()) {
+                        // Tentar buscar todos e normalizar
+                        List<Employee> allEmployees = employeeRepository.findAll();
+                        employeeOpt = allEmployees.stream()
+                            .filter(e -> e.getDocument() != null)
+                            .filter(e -> e.getDocument().replaceAll("[^0-9]", "").equals(cpfNormalizado))
+                            .findFirst();
+                    }
+                    
+                    if (employeeOpt.isPresent()) {
+                        employee = employeeOpt.get();
+                        log.info("✅ EMPLOYEE encontrado: {}", employee.getName());
+                    } else {
+                        log.warn("⚠️ EMPLOYEE não encontrado, usando dados do USER");
+                        // Criar Employee temporário com dados do User
+                        employee = new Employee();
+                        employee.setId(UUID.randomUUID());
+                        employee.setName(user.getName());
+                        employee.setDocument(cpfNormalizado);
+                        employee.setEmail(user.getEmail());
+                    }
+                    
+                } else {
+                    log.error("❌ USER não encontrado com CPF: {}", cpfBusca);
+                    response.setMensagem("Usuário não encontrado na tabela users para CPF: " + cpfBusca);
+                    return response;
+                }
+                
+            } else if (request.getFuncionarioId() != null && !request.getFuncionarioId().trim().isEmpty()) {
+                // Busca por ID (mantém lógica antiga)
+                log.info("🔍 Buscando funcionário por ID: {}", request.getFuncionarioId());
+                Optional<Employee> employeeOpt = employeeRepository.findById(UUID.fromString(request.getFuncionarioId()));
+                
+                if (employeeOpt.isEmpty()) {
+                    log.error("❌ Funcionário não encontrado por ID");
+                    response.setMensagem("Funcionário não encontrado");
+                    return response;
+                }
+                
+                employee = employeeOpt.get();
+                log.info("✅ EMPLOYEE encontrado: {}", employee.getName());
+                
+                // Buscar User correspondente
+                Optional<User> userOpt = userRepository.findByUsername(employee.getDocument());
+                if (userOpt.isEmpty()) {
+                    log.error("❌ USER não encontrado para o funcionário");
+                    response.setMensagem("Usuário não encontrado na tabela users para CPF: " + employee.getDocument());
+                    return response;
+                }
+                
+                user = userOpt.get();
+                
+                if (user.getWhatsapp() == null || user.getWhatsapp().trim().isEmpty()) {
+                    log.warn("⚠️ USER não tem WhatsApp cadastrado!");
+                    response.setMensagem("WhatsApp não cadastrado na tabela users para CPF: " + employee.getDocument());
+                    return response;
+                }
+                
             } else {
+                log.error("❌ Nenhum ID ou CPF fornecido!");
                 response.setMensagem("ID do funcionário ou CPF é obrigatório");
                 return response;
             }
             
-            if (employeeOpt.isEmpty()) {
-                response.setMensagem("Funcionário não encontrado");
-                return response;
-            }
-            
-            Employee employee = employeeOpt.get();
+            // Processar envio com Employee e User
             EnvioResponse.DetalheEnvio detalhe = processarEnvio(employee, request);
             
             response.getDetalhes().add(detalhe);

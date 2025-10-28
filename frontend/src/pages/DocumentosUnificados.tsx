@@ -376,14 +376,24 @@ const DocumentosUnificados: React.FC = () => {
 
     // Callback após a validação: enviar para IDs prontos
     const handleValidated = async (validatedIds: string[]) => {
-        // Aqui, chamaremos os endpoints reais de envio (fase 3)
-        // Por enquanto, apenas feedback visual
         if (validatedIds.length === 0) {
             toast({ title: 'Sem destinatários prontos', description: 'Nenhum funcionário pronto para envio.', variant: 'destructive' });
             return;
         }
-        const title = validationSendType === 'both' ? 'Email + WhatsApp' : (validationSendType === 'email' ? 'Email' : 'WhatsApp');
-        toast({ title: `Enviar ${title}`, description: `Iniciando envio para ${validatedIds.length} funcionário(s).` });
+        try {
+            if (validationSendType === 'both') {
+                await axios.post('/api/envio/massa', { tipo: 'email', funcionarioIds: validatedIds });
+                await axios.post('/api/envio/massa', { tipo: 'whatsapp', funcionarioIds: validatedIds });
+                toast({ title: 'Envio iniciado', description: `Email e WhatsApp para ${validatedIds.length} funcionário(s).` });
+            } else {
+                await axios.post('/api/envio/massa', { tipo: validationSendType, funcionarioIds: validatedIds });
+                const label = validationSendType === 'email' ? 'Email' : 'WhatsApp';
+                toast({ title: 'Envio iniciado', description: `${label} para ${validatedIds.length} funcionário(s).` });
+            }
+        } catch (e: any) {
+            console.error('Erro ao iniciar envio em massa:', e);
+            toast({ title: 'Erro no envio', description: e?.response?.data?.mensagem || 'Falha ao iniciar envio.', variant: 'destructive' });
+        }
     };
 
     // Funções para seleção e exclusão em lote

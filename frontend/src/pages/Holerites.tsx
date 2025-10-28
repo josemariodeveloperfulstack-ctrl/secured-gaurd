@@ -50,6 +50,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ReceiptTemplateModal from '@/components/receipts/ReceiptTemplateModal';
 import { PdfMergeResult } from '@/services/pdfMergeService';
 import api from '@/lib/axios';
+import { contactValidationService, type ContactValidationDetail } from '@/services/contactValidationService';
+import { QuickUserFormModal } from '@/components/contact-validation/QuickUserFormModal';
+import { WhatsAppUpdateModal } from '@/components/contact-validation/WhatsAppUpdateModal';
 import { ContactValidationModal } from '@/components/contact-validation/ContactValidationModal';
 import { employeeService } from '@/services/employeeService';
 
@@ -148,6 +151,11 @@ const Holerites: React.FC = () => {
     failed: number;
     current: string;
   }>({ total: 0, completed: 0, failed: 0, current: '' });
+
+  // Modais de ação individual (criar usuário / atualizar WhatsApp)
+  const [selectedValidationDetail, setSelectedValidationDetail] = useState<ContactValidationDetail | null>(null);
+  const [showSingleUserModal, setShowSingleUserModal] = useState(false);
+  const [showSingleWhatsappModal, setShowSingleWhatsappModal] = useState(false);
   
   // Logs de envio
   const [logs, setLogs] = useState<any[]>([]);
@@ -164,8 +172,52 @@ const Holerites: React.FC = () => {
       toast({ title: 'Sem destinatários prontos', description: 'Nenhum funcionário pronto para envio.', variant: 'destructive' });
       return;
     }
-    const title = validationSendType === 'both' ? 'Email + WhatsApp' : (validationSendType === 'email' ? 'Email' : 'WhatsApp');
-    toast({ title: `Enviar ${title}`, description: `Iniciando envio para ${validatedIds.length} funcionário(s).` });
+    try {
+      // Dispara envio via backend. Se 'both', faz duas chamadas sequenciais
+      if (validationSendType === 'both') {
+        await api.post('/api/envio/massa', { tipo: 'email', funcionarioIds: validatedIds });
+        await api.post('/api/envio/massa', { tipo: 'whatsapp', funcionarioIds: validatedIds, mensagem: whatsAppMessage });
+        toast({ title: 'Envio iniciado', description: `Email e WhatsApp para ${validatedIds.length} funcionário(s).` });
+      } else {
+        await api.post('/api/envio/massa', { tipo: validationSendType, funcionarioIds: validatedIds, mensagem: validationSendType === 'whatsapp' ? whatsAppMessage : undefined });
+        const label = validationSendType === 'email' ? 'Email' : 'WhatsApp';
+        toast({ title: 'Envio iniciado', description: `${label} para ${validatedIds.length} funcionário(s).` });
+      }
+    } catch (e: any) {
+      console.error('Erro ao iniciar envio em massa:', e);
+      toast({ title: 'Erro no envio', description: e?.response?.data?.mensagem || 'Falha ao iniciar envio.', variant: 'destructive' });
+    }
+  };
+
+  // Download em massa dos holerites selecionados
+  const handleDownloadSelectedHolerites = async () => {
+    if (selectedHolerites.length === 0) {
+      toast({ title: 'Nenhum selecionado', description: 'Selecione ao menos um holerite.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
+      for (const h of selected) {
+        if (!h.fileName) { continue; }
+        try {
+          const blob = await holeriteService.downloadHolerite(h.fileName);
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = h.fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error('Falha ao baixar holerite:', h.fileName, e);
+        }
+      }
+      toast({ title: 'Downloads iniciados', description: `${selected.length} arquivo(s) solicitado(s).` });
+    } catch (e) {
+      console.error('Erro no download em massa:', e);
+      toast({ title: 'Erro', description: 'Falha ao iniciar downloads.', variant: 'destructive' });
+    }
   };
 
   const loadLogs = async () => {
@@ -2132,20 +2184,133 @@ const Holerites: React.FC = () => {
   // Envio individual via WhatsApp
   const handleSendWhatsAppIndividual = async (payslip: Holerite) => {
     try {
-      const response = await api.post('/api/envio/individual', {
+      console.log('🚀 Iniciando envio WhatsApp individual para:', payslip);
+      
+      // Normaliza CPF e tenta resolver employeeId antes de enviar
+      const rawCpf = (payslip.cpf || '').toString();
+      const cpf = rawCpf.replace(/\D/g, '');
+      
+      console.log('📋 CPF normalizado:', cpf);
+
+      let funcionarioId: string | undefined;
+      try {
+        const matches = await employeeService.searchEmployees(cpf);
+        console.log('🔍 Busca por CPF retornou:', matches);
+        const exact = matches?.find((e: any) => (e.document || e.cpf || '').replace(/\D/g, '') === cpf);
+        if (exact) {
+          funcionarioId = exact.id;
+          console.log('✅ Funcionário encontrado, ID:', funcionarioId);
+        } else {
+          console.log('⚠️ Nenhum funcionário encontrado com CPF exato');
+        }
+      } catch (err) {
+        console.error('❌ Erro ao buscar funcionário:', err);
+      }
+
+      // Pré-validação de contatos (se tiver ID)
+      if (funcionarioId) {
+        console.log('🔍 Validando contatos para funcionário ID:', funcionarioId);
+        const validation = await contactValidationService.validateContacts({
+          employeeIds: [funcionarioId],
+          type: 'whatsapp'
+        });
+        console.log('📊 Resultado da validação:', validation);
+        
+        const detail = validation?.details?.[0];
+        if (detail) {
+          console.log('📋 Detalhe da validação:', detail);
+          
+          if (detail.status === 'ready') {
+            // Pode enviar agora
+            console.log('✅ Status READY - Enviando para backend...');
+            const payload = {
+              tipo: 'whatsapp',
+              funcionarioId,
+              mensagem: 'Olá! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.'
+            };
+            console.log('📤 Payload:', payload);
+            
+            const response = await api.post('/api/envio/individual', payload);
+            const data = response.data;
+            console.log('📥 Resposta do backend:', data);
+            
+            if (data.sucesso) {
+              toast({ title: 'Sucesso', description: data.mensagem });
+              return;
+            } else {
+              toast({ title: 'Erro no envio', description: data.mensagem, variant: 'destructive' });
+              return;
+            }
+          }
+          // Necessita ação: abrir modal adequado
+          console.log('⚠️ Status não é READY, abrindo modal apropriado...');
+          setSelectedValidationDetail(detail);
+          if (detail.needsUserCreation) {
+            console.log('👤 Abrindo modal de criação de usuário');
+            setShowSingleUserModal(true);
+            return;
+          }
+          if (detail.needsWhatsAppUpdate && detail.hasUser) {
+            console.log('📱 Abrindo modal de atualização de WhatsApp');
+            setShowSingleWhatsappModal(true);
+            return;
+          }
+        }
+      }
+
+      // Sem ID resolvido ou sem detail: tentar por CPF mesmo (backend validará novamente)
+      console.log('⚠️ Tentando envio por CPF (sem ID ou validação)');
+      const payload = {
         tipo: 'whatsapp',
-        cpf: payslip.cpf,
-        mensagem: 'OlÃ¡! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.'
-      });
+        cpf,
+        mensagem: 'Olá! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.'
+      };
+      console.log('📤 Payload (por CPF):', payload);
+      
+      const response = await api.post('/api/envio/individual', payload);
       const data = response.data;
+      console.log('📥 Resposta do backend:', data);
+      
       if (data.sucesso) {
         toast({ title: 'Sucesso', description: data.mensagem });
       } else {
         toast({ title: 'Erro no envio', description: data.mensagem, variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Exibe a mensagem detalhada retornada pelo backend, se existir
+      const backendMsg = error?.response?.data?.mensagem || error?.response?.data?.message;
+      const msg = backendMsg || 'Erro ao enviar via WhatsApp.';
       console.error('Erro ao enviar WhatsApp individual:', error);
-      toast({ title: 'Erro', description: 'Erro ao enviar via WhatsApp.', variant: 'destructive' });
+      console.error('Mensagem do backend:', backendMsg);
+      
+      // Exibir toast com a mensagem específica do backend
+      toast({ title: 'Validação necessária', description: msg, variant: 'destructive' });
+
+      // Tentar abrir automaticamente o modal correto baseado na mensagem do backend
+      try {
+        // Reutiliza cpf/funcionarioId calculados acima
+        let employeeIdToValidate = funcionarioId;
+        if (!employeeIdToValidate) {
+          const matches = await employeeService.searchEmployees(cpf);
+          const exact = matches?.find((e: any) => (e.document || e.cpf || '').replace(/\D/g, '') === cpf);
+          if (exact) employeeIdToValidate = exact.id;
+        }
+        if (employeeIdToValidate) {
+          const validation = await contactValidationService.validateContacts({ employeeIds: [employeeIdToValidate], type: 'whatsapp' });
+          const detail = validation?.details?.[0];
+          if (detail) {
+            setSelectedValidationDetail(detail);
+            if (msg?.toLowerCase().includes('usuário não encontrado') || detail.needsUserCreation) {
+              setShowSingleUserModal(true);
+              return;
+            }
+            if (msg?.toLowerCase().includes('whatsapp') || detail.needsWhatsAppUpdate) {
+              setShowSingleWhatsappModal(true);
+              return;
+            }
+          }
+        }
+      } catch (_) {}
     }
   };
 
@@ -3042,9 +3207,9 @@ const Holerites: React.FC = () => {
                         {selectedMonth ? `Holerites de ${getMonthName(parseInt(selectedMonth))} ${selectedYear}` : `Todos os holerites de ${selectedYear}`}
                       </h5>
                       
-                      {/* Barra de Ações */}
-                      <div className="flex items-center justify-between mb-6 p-4 bg-seguranca-black/30 rounded-lg border border-gray-600/30">
-                        <div className="flex items-center space-x-4">
+                      {/* Barra de Ações do Mês */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 p-4 bg-seguranca-black/30 rounded-lg border border-gray-600/30">
+                        <div className="flex items-center gap-3">
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id="select-all-holerites"
@@ -3064,19 +3229,96 @@ const Holerites: React.FC = () => {
                           </div>
                           
                           {selectedHolerites.length > 0 && (
-                            <Button
-                              onClick={handleBatchDeleteHolerites}
-                              variant="outline"
-                              size="sm"
-                              className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400"
-                            >
-                              <Trash2 size={14} className="mr-1" />
-                              Excluir Selecionados
-                          </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                onClick={async () => {
+                                  if (selectedHolerites.length === 0) return;
+                                  const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
+                                  const ids: string[] = [];
+                                  for (const h of selected) {
+                                    if (h.cpf) {
+                                      try {
+                                        const byCpf = await employeeService.searchEmployees(h.cpf);
+                                        if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                      } catch {}
+                                    }
+                                    try {
+                                      const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                                      if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                    } catch {}
+                                  }
+                                  const uniqueIds = Array.from(new Set(ids));
+                                  if (uniqueIds.length === 0) {
+                                    toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                    return;
+                                  }
+                                  setResolvedEmployeeIds(uniqueIds);
+                                  setValidationSendType('email');
+                                  setShowValidationModal(true);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400"
+                              >
+                                <Mail size={14} className="mr-1" />
+                                Email
+                              </Button>
+                              <Button
+                                onClick={async () => {
+                                  if (selectedHolerites.length === 0) return;
+                                  const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
+                                  const ids: string[] = [];
+                                  for (const h of selected) {
+                                    if (h.cpf) {
+                                      try {
+                                        const byCpf = await employeeService.searchEmployees(h.cpf);
+                                        if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                      } catch {}
+                                    }
+                                    try {
+                                      const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                                      if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                    } catch {}
+                                  }
+                                  const uniqueIds = Array.from(new Set(ids));
+                                  if (uniqueIds.length === 0) {
+                                    toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                    return;
+                                  }
+                                  setResolvedEmployeeIds(uniqueIds);
+                                  setValidationSendType('whatsapp');
+                                  setShowValidationModal(true);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400"
+                              >
+                                <MessageSquare size={14} className="mr-1" />
+                                WhatsApp
+                              </Button>
+                              <Button
+                                onClick={handleDownloadSelectedHolerites}
+                                variant="outline"
+                                size="sm"
+                                className="border-gray-500/50 text-gray-300 hover:bg-gray-700/50"
+                              >
+                                <Download size={14} className="mr-1" />
+                                Baixar
+                              </Button>
+                              <Button
+                                onClick={handleBatchDeleteHolerites}
+                                variant="outline"
+                                size="sm"
+                                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400"
+                              >
+                                <Trash2 size={14} className="mr-1" />
+                                Excluir
+                              </Button>
+                            </div>
                           )}
                         </div>
                         
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-2">
                           <Button
                             onClick={() => setActivePeriodTab('ano')}
                             variant="outline"
@@ -3217,372 +3459,6 @@ const Holerites: React.FC = () => {
               </div>
             </Card>
 
-            {/* Sistema de Abas Hierárquico para Comprovantes */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
-              <div className="space-y-8">
-                <div className="text-center">
-                  <h4 className="text-2xl font-bold text-white mb-2">Comprovantes por Período</h4>
-                  <p className="text-gray-400">Navegue pelos anos e meses para visualizar os comprovantes</p>
-                </div>
-                <div className="space-y-6">
-                  {/* Controles de seleção em lote */}
-                  {getFilteredHolerites().length > 0 && (
-                        <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="select-all-holerites"
-                              checked={areAllHoleritesSelected()}
-                              onCheckedChange={handleSelectAllHolerites}
-                              className="border-red-400 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
-                            />
-                            <label htmlFor="select-all-holerites" className="text-white text-sm font-medium">
-                              Selecionar Todos
-                            </label>
-                </div>
-                          
-                          {hasSelectedHolerites() && (
-                            <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-3 py-1">
-                              {selectedHolerites.length} selecionado{selectedHolerites.length !== 1 ? 's' : ''}
-                            </Badge>
-                          )}
-                          
-                          {hasSelectedHolerites() && (
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                onClick={handleBatchEmailHolerites}
-                                variant="outline"
-                                size="sm"
-                                className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm"
-                              >
-                                <Mail size={14} className="mr-1" />
-                                Email ({selectedHolerites.length})
-                              </Button>
-                              <Button
-                                onClick={handleBatchWhatsAppHolerites}
-                                variant="outline"
-                                size="sm"
-                                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400 px-3 py-1 text-sm"
-                              >
-                                <MessageSquare size={14} className="mr-1" />
-                                WhatsApp ({selectedHolerites.length})
-                              </Button>
-                              <Button
-                                onClick={handleBatchDeleteHolerites}
-                                variant="outline"
-                                size="sm"
-                                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400 px-3 py-1 text-sm"
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                Excluir ({selectedHolerites.length})
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-              {/* Lista de holerites */}
-              {loading ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 size={32} className="animate-spin text-seguranca-yellow" />
-                  <span className="ml-2 text-seguranca-lightgray text-sm sm:text-base">Carregando holerites...</span>
-                </div>
-              ) : filteredHolerites.length === 0 ? (
-                <div className="text-center py-12 px-4">
-                  <div className="inline-flex items-center justify-center w-24 h-24 bg-seguranca-red/10 rounded-full mb-6">
-                    <FileText size={48} className="text-seguranca-red" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-seguranca-lightgray mb-3">
-                    {searchTerm ? 'Nenhum holerite encontrado' : 'Nenhum holerite processado ainda'}
-                  </h3>
-                  <p className="text-gray-400 mb-6 text-base max-w-md mx-auto">
-                    {searchTerm 
-                      ? 'Tente ajustar os termos de busca ou verificar a ortografia.'
-                      : 'Comece fazendo o upload do primeiro arquivo PDF para processar os holerites.'
-                    }
-                  </p>
-                  {!searchTerm && (
-                    <Button 
-                      onClick={() => setShowUploadModal(true)}
-                      className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red px-8 py-3 rounded-xl shadow-lg hover:shadow-red-500/25 transition-all duration-300 transform hover:scale-105"
-                    >
-                      <Plus size={18} className="mr-2" />
-                      Fazer Primeiro Upload
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Header da tabela com seleção e botÃµes de aÃ§Ã£o */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-seguranca-black rounded-lg border border-gray-600 gap-2">
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        checked={isAllSelected}
-                        onCheckedChange={handleSelectAll}
-                        className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
-                      />
-                      <span className="text-seguranca-lightgray font-medium text-xs sm:text-sm">
-                        {selectedHolerites.length > 0 
-                          ? `${selectedHolerites.length} selecionado${selectedHolerites.length > 1 ? 's' : ''}`
-                          : 'Selecionar todos'
-                        }
-                      </span>
-                    </div>
-                    
-                    {/* BotÃµes de aÃ§Ã£o principais - movidos para cÃ¡ conforme indicado pela seta */}
-                    <div className="flex flex-col sm:flex-row items-center gap-2">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleDeleteSelected}
-                        disabled={selectedHolerites.length === 0}
-                        className="bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                      >
-                        <Trash2 size={14} className="mr-1" />
-                        <span className="hidden sm:inline">Excluir Selecionados</span>
-                        <span className="sm:hidden">Excluir</span>
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          // Resolver IDs dos funcionários a partir dos holerites selecionados
-                          if (selectedHolerites.length === 0) return;
-                          const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
-                          const ids: string[] = [];
-
-                          for (const h of selected) {
-                            // 1) Tenta via CPF direto do holerite
-                            if (h.cpf) {
-                              try {
-                                const byCpf = await employeeService.searchEmployees(h.cpf);
-                                if (byCpf && byCpf.length === 1) {
-                                  ids.push(byCpf[0].id);
-                                  continue;
-                                }
-                              } catch {}
-                            }
-                            // 2) Fallback por nome
-                            try {
-                              const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                              if (byName && byName.length === 1) {
-                                ids.push(byName[0].id);
-                                continue;
-                              }
-                            } catch {}
-                          }
-
-                          const uniqueIds = Array.from(new Set(ids));
-                          if (uniqueIds.length === 0) {
-                            toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique se os PDFs possuem CPF no nome ou se o cadastro está consistente.', variant: 'destructive' });
-                            return;
-                          }
-                          setResolvedEmployeeIds(uniqueIds);
-                          setValidationSendType('whatsapp');
-                          setShowValidationModal(true);
-                        }}
-                        disabled={selectedHolerites.length === 0}
-                        className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                      >
-                        <MessageSquare size={14} className="mr-1" />
-                        <span className="hidden sm:inline">Enviar WhatsApp</span>
-                        <span className="sm:hidden">WhatsApp</span>
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          if (selectedHolerites.length === 0) return;
-                          const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
-                          const ids: string[] = [];
-                          for (const h of selected) {
-                            if (h.cpf) {
-                              try {
-                                const byCpf = await employeeService.searchEmployees(h.cpf);
-                                if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                              } catch {}
-                            }
-                            try {
-                              const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                              if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                            } catch {}
-                          }
-                          const uniqueIds = Array.from(new Set(ids));
-                          if (uniqueIds.length === 0) {
-                            toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                            return;
-                          }
-                          setResolvedEmployeeIds(uniqueIds);
-                          setValidationSendType('email');
-                          setShowValidationModal(true);
-                        }}
-                        disabled={selectedHolerites.length === 0}
-                        className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                      >
-                        <Mail size={14} className="mr-1" />
-                        <span className="hidden sm:inline">Enviar Email</span>
-                        <span className="sm:hidden">Email</span>
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          if (selectedHolerites.length === 0) return;
-                          const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
-                          const ids: string[] = [];
-                          for (const h of selected) {
-                            if (h.cpf) {
-                              try {
-                                const byCpf = await employeeService.searchEmployees(h.cpf);
-                                if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                              } catch {}
-                            }
-                            try {
-                              const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                              if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                            } catch {}
-                          }
-                          const uniqueIds = Array.from(new Set(ids));
-                          if (uniqueIds.length === 0) {
-                            toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                            return;
-                          }
-                          setResolvedEmployeeIds(uniqueIds);
-                          setValidationSendType('both');
-                          setShowValidationModal(true);
-                        }}
-                        disabled={selectedHolerites.length === 0}
-                        className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                      >
-                        <Mail size={14} className="mr-1" /> + <MessageSquare size={14} className="ml-1" />
-                        <span className="hidden sm:inline">Enviar Ambos</span>
-                        <span className="sm:hidden">Ambos</span>
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={refreshHolerites}
-                        disabled={refreshing}
-                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black shadow-lg hover:shadow-gray-500/25 transition-all text-xs"
-                      >
-                        {refreshing ? (
-                          <Loader2 size={14} className="mr-1 animate-spin" />
-                        ) : (
-                          <RefreshCw size={14} className="mr-1" />
-                        )}
-                        <span className="hidden sm:inline">Atualizar</span>
-                        <span className="sm:hidden">Atualizar</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Lista de holerites */}
-                  {filteredHolerites.map((holerite) => (
-                    <div
-                      key={holerite.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, holerite, 'holerite')}
-                      className={`flex flex-col lg:flex-row lg:items-center lg:justify-between p-3 sm:p-4 bg-seguranca-black rounded-lg border transition-colors gap-3 cursor-move hover:shadow-lg ${
-                        selectedHolerites.includes(holerite.id)
-                          ? 'border-seguranca-yellow bg-seguranca-yellow/10'
-                          : 'border-gray-600 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
-                        <Checkbox
-                          checked={selectedHolerites.includes(holerite.id)}
-                          onCheckedChange={(checked) => handleSelectHolerite(holerite.id, !!checked)}
-                          className="data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow flex-shrink-0 mt-1 sm:mt-0"
-                        />
-                        
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-seguranca-red rounded-full flex items-center justify-center flex-shrink-0">
-                          <FileText className="text-white" size={14} />
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                            <h3 className="font-medium text-seguranca-lightgray text-sm break-words">
-                              {holerite.employeeName}
-                            </h3>
-                            <Badge variant="outline" className="text-xs w-fit">
-                              {holerite.month}/{holerite.year}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-400">
-                            <span className="flex items-center">
-                              <User size={12} className="mr-1 flex-shrink-0" />
-                              CPF: {holerite.cpf}
-                            </span>
-                            <span className="flex items-center">
-                              <Calendar size={12} className="mr-1 flex-shrink-0" />
-                              {formatDate(holerite.processedAt)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-1 sm:gap-2 justify-start lg:justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewHolerite(holerite)}
-                          className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
-                        >
-                          <Eye size={14} className="mr-1" />
-                          <span className="hidden sm:inline">Visualizar</span>
-                          <span className="sm:hidden">Ver</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEmailHolerite(holerite)}
-                          className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white text-xs"
-                        >
-                          <Mail size={14} className="mr-1" />
-                          <span className="hidden sm:inline">Email</span>
-                          <span className="sm:hidden">Email</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSendWhatsAppIndividual(holerite)}
-                          className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white text-xs"
-                        >
-                          <MessageSquare size={14} className="mr-1" />
-                          <span className="hidden sm:inline">WhatsApp</span>
-                          <span className="sm:hidden">WApp</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadHolerite(holerite)}
-                          className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs"
-                        >
-                          <Download size={14} className="mr-1" />
-                          <span className="hidden sm:inline">Baixar</span>
-                          <span className="sm:hidden">Baixar</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteHolerite(holerite)}
-                          className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white text-xs"
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          <span className="hidden sm:inline">Excluir</span>
-                          <span className="sm:hidden">Excluir</span>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
           </TabsContent>
 
           <TabsContent value="recibos">
@@ -3700,8 +3576,8 @@ const Holerites: React.FC = () => {
                     </div>
                   </Card>
 
-              {/* Abas por Ano e Mês */}
-              <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+            {/* Abas por Ano e Mês */}
+            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
                 <div className="space-y-8">
                   <div className="text-center">
                     <h4 className="text-2xl font-bold text-white mb-2">Comprovantes por Período</h4>
@@ -3821,7 +3697,38 @@ const Holerites: React.FC = () => {
                             {hasSelectedPaymentReceipts() && (
                               <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
                                 <Button
-                                  onClick={() => setShowSendModal(true)}
+                                  onClick={async () => {
+                                    // Resolver IDs de funcionários a partir dos comprovantes selecionados
+                                    const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
+                                    const ids: string[] = [];
+                                    for (const r of selected) {
+                                      // tentamos por CPF no nome do arquivo ou campo document, se existir
+                                      let cpf: string | null = null;
+                                      if ((r as any).cpf) cpf = (r as any).cpf;
+                                      if (!cpf && r.fileName) {
+                                        const m = r.fileName.match(/(\d{11})/);
+                                        if (m) cpf = m[1];
+                                      }
+                                      if (cpf) {
+                                        try {
+                                          const byCpf = await employeeService.searchEmployees(cpf);
+                                          if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                        } catch {}
+                                      }
+                                      try {
+                                        const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
+                                        if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                      } catch {}
+                                    }
+                                    const uniqueIds = Array.from(new Set(ids));
+                                    if (uniqueIds.length === 0) {
+                                      toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                      return;
+                                    }
+                                    setResolvedEmployeeIds(uniqueIds);
+                                    setValidationSendType('email');
+                                    setShowValidationModal(true);
+                                  }}
                                   variant="outline"
                                   size="sm"
                                   className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
@@ -3833,10 +3740,39 @@ const Holerites: React.FC = () => {
                                 </Button>
                                 
                                 <Button
-                                  onClick={() => setShowSendModal(true)}
+                                  onClick={async () => {
+                                    const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
+                                    const ids: string[] = [];
+                                    for (const r of selected) {
+                                      let cpf: string | null = null;
+                                      if ((r as any).cpf) cpf = (r as any).cpf;
+                                      if (!cpf && r.fileName) {
+                                        const m = r.fileName.match(/(\d{11})/);
+                                        if (m) cpf = m[1];
+                                      }
+                                      if (cpf) {
+                                        try {
+                                          const byCpf = await employeeService.searchEmployees(cpf);
+                                          if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                        } catch {}
+                                      }
+                                      try {
+                                        const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
+                                        if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                      } catch {}
+                                    }
+                                    const uniqueIds = Array.from(new Set(ids));
+                                    if (uniqueIds.length === 0) {
+                                      toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                      return;
+                                    }
+                                    setResolvedEmployeeIds(uniqueIds);
+                                    setValidationSendType('whatsapp');
+                                    setShowValidationModal(true);
+                                  }}
                                   variant="outline"
                                   size="sm"
-                                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
+                                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
                                 >
                                   <MessageSquare size={14} className="mr-1" />
                                   <span className="hidden sm:inline">WhatsApp</span>
@@ -5268,7 +5204,7 @@ const Holerites: React.FC = () => {
            onDownload={handleDownloadPaymentReceipt}
          />
 
-        {/* Modal de Validação para envio (Holerites/Comprovantes) */}
+      {/* Modal de Validação para envio (Holerites/Comprovantes) */}
         <ContactValidationModal
           open={showValidationModal}
           onClose={() => setShowValidationModal(false)}
@@ -5277,6 +5213,30 @@ const Holerites: React.FC = () => {
           documentType="holerite"
           onValidated={handleValidated}
         />
+
+      {/* Modais de ação individual (criar usuário / atualizar WhatsApp) */}
+      {selectedValidationDetail && (
+        <>
+          <QuickUserFormModal
+            open={showSingleUserModal}
+            onClose={() => setShowSingleUserModal(false)}
+            employeeDetail={selectedValidationDetail}
+            onSuccess={() => {
+              setShowSingleUserModal(false);
+              toast({ title: 'Usuário criado', description: 'Tente enviar novamente via WhatsApp.' });
+            }}
+          />
+          <WhatsAppUpdateModal
+            open={showSingleWhatsappModal}
+            onClose={() => setShowSingleWhatsappModal(false)}
+            employeeDetail={selectedValidationDetail}
+            onSuccess={() => {
+              setShowSingleWhatsappModal(false);
+              toast({ title: 'WhatsApp atualizado', description: 'Tente enviar novamente via WhatsApp.' });
+            }}
+          />
+        </>
+      )}
      </StandardLayout>
    );
  };
