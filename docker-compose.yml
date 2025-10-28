@@ -67,6 +67,12 @@ services:
       - "3333:3333"
     networks:
       - secured-guard-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "raw.githubusercontent.com:185.199.108.133"
+      - "github.com:140.82.121.4"
     restart: unless-stopped
 
 # ========================================

@@ -107,6 +107,8 @@ services:
       - "traefik.http.middlewares.backend-ci-cors.headers.addvaryheader=true"
       # Aplicar middlewares
       - "traefik.http.routers.backend-ci.middlewares=backend-ci-headers,backend-ci-cors"
+      # Permitir todos os métodos HTTP (incluindo OPTIONS para CORS preflight)
+      - "traefik.http.routers.backend-ci.priority=100"
 
   # ========================================
   # EVOLUTION API (WhatsApp)

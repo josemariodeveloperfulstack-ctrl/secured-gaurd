@@ -28,21 +28,22 @@ async function connectToWhatsApp() {
   if (!fs.existsSync(authPath)) fs.mkdirSync(authPath, { recursive: true });
   
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
+  
+  // Usar versão fixa pois Docker não consegue acessar GitHub
+  const version = [2, 3000, 1015901307];
 
   sock = makeWASocket({
+    version,
     logger,
     printQRInTerminal: false,
     auth: state,
     defaultQueryTimeoutMs: undefined,
-    connectTimeoutMs: 60000,
-    keepAliveIntervalMs: 30000,
-    emitOwnEvents: true,
-    fireInitQueries: true,
-    markOnlineOnConnect: true,
   });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
+    
+    console.log('Connection update:', JSON.stringify({ connection, qr: qr ? 'QR_AVAILABLE' : null, error: lastDisconnect?.error?.message }));
     
     if (qr) {
       qrString = qr;
@@ -51,12 +52,14 @@ async function connectToWhatsApp() {
     }
     
     if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Connection closed. Reconnect?', shouldReconnect);
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      console.log('Connection closed. Status:', statusCode, 'Reconnect?', shouldReconnect);
+      console.log('Error details:', lastDisconnect?.error);
       ready = false;
       qrString = null;
       if (shouldReconnect) {
-        setTimeout(() => connectToWhatsApp(), 3000);
+        setTimeout(() => connectToWhatsApp(), 5000);
       }
     } else if (connection === 'open') {
       ready = true;
