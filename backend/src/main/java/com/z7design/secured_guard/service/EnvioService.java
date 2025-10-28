@@ -13,6 +13,7 @@ import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -36,10 +37,14 @@ public class EnvioService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final WhatsAppService whatsAppService;
-    private final BaileysRestService baileysRestService;
+    private final EvolutionApiService evolutionApiService; // Evolution API (Baileys)
+    private final MetaWhatsAppService metaWhatsAppService; // Meta Cloud API (Oficial)
     private final PayslipRepository payslipRepository;
     private final PayslipDeliveryLogRepository deliveryLogRepository;
     private final PayslipService payslipService;
+    
+    @Value("${whatsapp.provider:evolution}")
+    private String whatsappProvider; // "evolution" ou "meta"
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
@@ -229,7 +234,7 @@ public class EnvioService {
     }
     
     public EnvioResponse enviarTodosPorTipo(EnvioRequest request) {
-        log.info("🚀 Iniciando envio para todos os funcionários com {}", request.getTipo());
+        log.info("🚀 Iniciando envio em lote via {}", request.getTipo());
         
         EnvioResponse response = EnvioResponse.builder()
                 .sucesso(false)
@@ -241,45 +246,75 @@ public class EnvioService {
                 .build();
         
         try {
-            List<Employee> employees;
+            List<String> cpfsParaEnvio = new ArrayList<>();
             
             if ("email".equals(request.getTipo())) {
-                employees = employeeRepository.findByEmailIsNotNullAndEmailNot("");
-            } else if ("whatsapp".equals(request.getTipo())) {
-                // 🔍 Para WhatsApp, buscar funcionários que têm User correspondente com WhatsApp cadastrado
-                employees = employeeRepository.findAll().stream()
-                    .filter(employee -> {
-                        String cpf = employee.getDocument();
-                        Optional<User> userOpt = userRepository.findByUsername(cpf);
-                        return userOpt.isPresent() && 
-                               userOpt.get().getWhatsapp() != null && 
-                               !userOpt.get().getWhatsapp().trim().isEmpty();
-                    })
+                // Para email, buscar users com email cadastrado
+                log.info("📧 Buscando users com EMAIL cadastrado...");
+                List<User> usersComEmail = userRepository.findAll().stream()
+                    .filter(user -> user.getEmail() != null && !user.getEmail().trim().isEmpty())
                     .toList();
+                cpfsParaEnvio = usersComEmail.stream()
+                    .map(User::getUsername)  // username = CPF
+                    .toList();
+                log.info("✅ Encontrados {} users com email", cpfsParaEnvio.size());
+                
+            } else if ("whatsapp".equals(request.getTipo())) {
+                // Para WhatsApp, buscar APENAS na tabela USERS
+                log.info("📱 Buscando users com WHATSAPP cadastrado...");
+                List<User> usersComWhatsApp = userRepository.findAll().stream()
+                    .filter(user -> user.getWhatsapp() != null && !user.getWhatsapp().trim().isEmpty())
+                    .toList();
+                cpfsParaEnvio = usersComWhatsApp.stream()
+                    .map(User::getUsername)  // username = CPF
+                    .toList();
+                log.info("✅ Encontrados {} users com WhatsApp", cpfsParaEnvio.size());
+                
             } else {
                 response.setMensagem("Tipo de envio inválido");
                 return response;
             }
             
-            log.info("📋 Encontrados {} funcionários para envio via {}", employees.size(), request.getTipo());
+            if (cpfsParaEnvio.isEmpty()) {
+                response.setMensagem("Nenhum destinatário encontrado para envio via " + request.getTipo());
+                return response;
+            }
             
-            for (Employee employee : employees) {
-                EnvioResponse.DetalheEnvio detalhe = processarEnvio(employee, request);
-                response.getDetalhes().add(detalhe);
+            log.info("📋 Processando {} envios...", cpfsParaEnvio.size());
+            
+            // Processar cada CPF
+            for (String cpf : cpfsParaEnvio) {
+                log.info("📤 Processando envio para CPF: {}", cpf);
                 
-                if (detalhe.isEnviado()) {
-                    response.setTotalEnviados(response.getTotalEnviados() + 1);
-                } else {
-                    response.setTotalFalhas(response.getTotalFalhas() + 1);
+                // Criar request individual por CPF
+                EnvioRequest individualRequest = new EnvioRequest();
+                individualRequest.setTipo(request.getTipo());
+                individualRequest.setCpf(cpf);
+                individualRequest.setMensagem(request.getMensagem());
+                individualRequest.setAssunto(request.getAssunto());
+                
+                // Processar envio individual (já vai buscar na tabela users)
+                EnvioResponse individualResponse = enviarIndividual(individualRequest);
+                
+                // Adicionar detalhes à resposta
+                if (individualResponse.getDetalhes() != null && !individualResponse.getDetalhes().isEmpty()) {
+                    EnvioResponse.DetalheEnvio detalhe = individualResponse.getDetalhes().get(0);
+                    response.getDetalhes().add(detalhe);
+                    
+                    if (detalhe.isEnviado()) {
+                        response.setTotalEnviados(response.getTotalEnviados() + 1);
+                    } else {
+                        response.setTotalFalhas(response.getTotalFalhas() + 1);
+                    }
                 }
             }
             
-            response.setSucesso(response.getTotalFalhas() == 0);
-            response.setMensagem(String.format("Envio para todos concluído. Enviados: %d, Falhas: %d", 
+            response.setSucesso(response.getTotalEnviados() > 0);
+            response.setMensagem(String.format("✅ Envio em lote concluído. Enviados: %d, Falhas: %d", 
                     response.getTotalEnviados(), response.getTotalFalhas()));
             
         } catch (Exception e) {
-            log.error("❌ Erro no envio para todos: {}", e.getMessage());
+            log.error("❌ Erro no envio em lote: {}", e.getMessage(), e);
             response.setMensagem("Erro interno: " + e.getMessage());
         }
         
@@ -353,40 +388,72 @@ public class EnvioService {
                 
                 // Atualizar o telefone no detalhe para mostrar o número do WhatsApp
                 detalhe.setTelefone(whatsappNumber);
-                // Normalizar número para formato 55...
-                String tmp = whatsappNumber.replaceAll("[^0-9]", "");
-                if (!tmp.startsWith("55")) {
-                    tmp = "55" + tmp;
-                }
-                final String normalized = tmp;
-                if (normalized.length() < 12 || normalized.length() > 13) {
-                    detalhe.setErro("Número de WhatsApp em formato inválido");
+                
+                // Limpar número (remover caracteres não numéricos)
+                final String normalized = whatsappNumber.replaceAll("[^0-9]", "");
+                
+                // Validar tamanho (11 dígitos = DDD + 9 dígitos, ou 13 dígitos = 55 + DDD + 9 dígitos)
+                if (normalized.length() != 11 && normalized.length() != 13) {
+                    detalhe.setErro("Número de WhatsApp em formato inválido (deve ter 11 ou 13 dígitos)");
                     registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     return detalhe;
                 }
 
                 var ultimoRegistro = obterUltimoPayslip(cpf);
-                Optional<String> resolvedPathOpt = ultimoRegistro.map(p ->
-                        payslipService.resolvePayslipPathByCpfMonthYear(p.getCpf(), p.getMonth(), p.getYear()).orElse(null)
-                );
-                String filePath = resolvedPathOpt.orElse(null);
-                if (filePath == null || !Files.exists(Path.of(filePath))) {
-                    detalhe.setErro("Arquivo de holerite não encontrado para envio via WhatsApp");
-                    registrarLog(cpf, ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
+                
+                if (ultimoRegistro.isEmpty()) {
+                    log.warn("⚠️ Nenhum holerite encontrado para CPF: {}", cpf);
+                    detalhe.setErro("Nenhum holerite encontrado para este funcionário");
+                    registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     return detalhe;
                 }
+                
+                Payslip payslip = ultimoRegistro.get();
+                log.info("📋 Holerite encontrado: CPF={}, Mês={}, Ano={}, Arquivo={}", 
+                        payslip.getCpf(), payslip.getMonth(), payslip.getYear(), payslip.getFileName());
+                
+                Optional<String> resolvedPathOpt = payslipService.resolvePayslipPathByCpfMonthYear(
+                        payslip.getCpf(), payslip.getMonth(), payslip.getYear());
+                
+                String filePath = resolvedPathOpt.orElse(null);
+                
+                if (filePath == null) {
+                    log.error("❌ Caminho do arquivo não pôde ser resolvido para: {}", payslip.getFileName());
+                    detalhe.setErro("Caminho do arquivo não pôde ser determinado");
+                    registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+                
+                log.info("🔍 Verificando arquivo em: {}", filePath);
+                Path arquivoPath = Path.of(filePath);
+                
+                if (!Files.exists(arquivoPath)) {
+                    log.error("❌ Arquivo não existe: {}", filePath);
+                    log.info("📂 Diretório pai existe? {}", Files.exists(arquivoPath.getParent()));
+                    detalhe.setErro("Arquivo de holerite não encontrado: " + arquivoPath.getFileName());
+                    registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+                
+                // Obter caminho absoluto para enviar ao Baileys
+                String absolutePath = arquivoPath.toAbsolutePath().toString();
+                log.info("✅ Arquivo existe! Caminho absoluto: {}", absolutePath);
+                log.info("📊 Tamanho do arquivo: {} bytes", Files.size(arquivoPath));
 
                 String message = request.getMensagem() != null ? request.getMensagem() :
                         "Olá, segue seu holerite do mês. Em caso de dúvidas, contate o RH.";
-                boolean sent = baileysRestService.sendFileMessage(normalized, message, filePath);
+                
+                log.info("📤 Enviando via {}: phone={}, path={}", whatsappProvider, normalized, absolutePath);
+                boolean sent = sendWhatsAppMessage(normalized, message, absolutePath);
                 detalhe.setEnviado(sent);
                 if (!sent) {
                     detalhe.setErro("Falha no envio via WhatsApp");
-                    registrarLog(cpf, ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
+                    registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     // Retry em 5 minutos, apenas 1 vez
-                    scheduler.schedule(() -> retryWhatsApp(normalized, message, filePath, cpf, ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null)), 5, TimeUnit.MINUTES);
+                    scheduler.schedule(() -> retryWhatsApp(normalized, message, absolutePath, cpf, payslip.getMonth(), payslip.getYear()), 5, TimeUnit.MINUTES);
                 } else {
-                    registrarLog(cpf, ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null), DeliveryChannel.WHATSAPP, true, 1, null);
+                    log.info("✅ Holerite enviado com sucesso via WhatsApp para {}", normalized);
+                    registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, true, 1, null);
                 }
                 
             } else {
@@ -424,9 +491,24 @@ public class EnvioService {
                         .orElse(lista.get(0)));
     }
 
+    /**
+     * Envia mensagem via WhatsApp usando o provider configurado (Evolution ou Meta)
+     */
+    private boolean sendWhatsAppMessage(String phoneNumber, String message, String filePath) {
+        log.info("🔧 Provider WhatsApp ativo: {}", whatsappProvider);
+        
+        if ("meta".equalsIgnoreCase(whatsappProvider)) {
+            log.info("📤 Usando Meta Cloud API");
+            return metaWhatsAppService.sendFileMessage(phoneNumber, message, filePath);
+        } else {
+            log.info("📤 Usando Evolution API");
+            return evolutionApiService.sendFileMessage(phoneNumber, message, filePath);
+        }
+    }
+    
     private void retryWhatsApp(String phone, String message, String filePath, String cpf, Integer month, Integer year) {
         try {
-            boolean sent = baileysRestService.sendFileMessage(phone, message, filePath);
+            boolean sent = sendWhatsAppMessage(phone, message, filePath);
             registrarLog(cpf, month, year, DeliveryChannel.WHATSAPP, sent, 2, sent ? null : "Retry falhou");
         } catch (Exception e) {
             registrarLog(cpf, month, year, DeliveryChannel.WHATSAPP, false, 2, e.getMessage());

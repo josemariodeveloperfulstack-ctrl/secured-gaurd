@@ -9,6 +9,8 @@ import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+
 @Service
 public class BaileysRestService {
     
@@ -125,34 +127,82 @@ public class BaileysRestService {
     }
     
     /**
+     * Converte caminho do sistema de arquivos local para caminho do Docker
+     * Exemplo: C:\dev\secured-guard\backend\holerites\9-2025\arquivo.pdf -> /app/holerites/9-2025/arquivo.pdf
+     */
+    private String convertToDockerPath(String localPath) {
+        // Substituir backslashes por forward slashes
+        String normalizedPath = localPath.replace("\\", "/");
+        
+        // Encontrar "backend/holerites" e substituir pelo caminho do Docker
+        int index = normalizedPath.indexOf("backend/holerites");
+        if (index != -1) {
+            // Pegar a parte após "backend/"
+            String relativePath = normalizedPath.substring(index + "backend/".length());
+            String dockerPath = "/app/" + relativePath;
+            logger.info("🔄 Convertendo caminho: {} -> {}", localPath, dockerPath);
+            return dockerPath;
+        }
+        
+        // Se não encontrar, retornar o caminho original
+        logger.warn("⚠️ Não foi possível converter o caminho para Docker: {}", localPath);
+        return normalizedPath;
+    }
+    
+    /**
      * Envia arquivo via Baileys REST API
+     * MODIFICADO: Converte caminho local para caminho Docker antes de enviar
      */
     public boolean sendFileMessage(String phoneNumber, String message, String filePath) {
         try {
+            // Verificar se arquivo existe
+            File file = new File(filePath);
+            if (!file.exists()) {
+                logger.error("❌ Arquivo não existe: {}", filePath);
+                return false;
+            }
+            
+            logger.info("📤 Preparando envio do arquivo: {}", file.getName());
+            logger.info("📊 Tamanho: {} bytes", file.length());
+            
+            // Converter caminho local para caminho Docker
+            String dockerFilePath = convertToDockerPath(filePath);
+            
             String url = baileysRestUrl + "/message/document?key=" + instanceKey;
             
+            // Criar headers para JSON
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.setContentType(MediaType.APPLICATION_JSON);
             
-            String body = "id=" + phoneNumber + 
-                         "&message=" + message + 
-                         "&filepath=" + filePath;
+            // Criar JSON body com os parâmetros esperados pela API Baileys
+            ObjectNode body = objectMapper.createObjectNode();
+            body.put("id", phoneNumber);
+            body.put("filepath", dockerFilePath);
+            if (message != null && !message.isEmpty()) {
+                body.put("message", message);
+            }
             
-            HttpEntity<String> request = new HttpEntity<>(body, headers);
+            HttpEntity<String> request = new HttpEntity<>(body.toString(), headers);
             
-            logger.info("Enviando arquivo via Baileys REST para: {}", phoneNumber);
+            logger.info("📤 Enviando arquivo via Baileys REST para: {}", phoneNumber);
+            logger.info("🔗 URL: {}", url);
+            logger.info("📄 Filepath Docker: {}", dockerFilePath);
+            
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
-                logger.info("Arquivo enviado com sucesso via Baileys REST");
+                logger.info("✅ Arquivo enviado com sucesso via Baileys REST");
+                logger.info("📋 Response: {}", response.getBody());
                 return true;
             } else {
-                logger.error("Erro ao enviar arquivo. Status: {}", response.getStatusCode());
+                logger.error("❌ Erro ao enviar arquivo. Status: {}", response.getStatusCode());
+                logger.error("📋 Response body: {}", response.getBody());
                 return false;
             }
             
         } catch (Exception e) {
-            logger.error("Erro ao enviar arquivo via Baileys REST", e);
+            logger.error("❌ Erro ao enviar arquivo via Baileys REST", e);
+            logger.error("💥 Erro detalhe: {}", e.getMessage());
             return false;
         }
     }

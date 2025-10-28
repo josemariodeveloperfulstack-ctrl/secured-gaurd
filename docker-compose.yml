@@ -78,9 +78,42 @@ services:
     volumes:
       - whatsapp_sessions:/sessions
       - ./uploads:/app/uploads
+      - ./backend/holerites:/app/holerites
     ports:
       - "3333:3333"
     restart: unless-stopped
+
+  # ========================================
+  # EVOLUTION API (WhatsApp)
+  # ========================================
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution-api
+    ports:
+      - "9000:8080"
+    environment:
+      - SERVER_URL=http://localhost:9000
+      - AUTHENTICATION_API_KEY=B6D711FCDE4D4FD5936544120E713976
+      # Database Configuration
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://postgres:postgres@postgres:5432/evolution_db?schema=public
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution_api
+      # WhatsApp Configuration
+      - QRCODE_LIMIT=30
+      - WEBSOCKET_ENABLED=false
+      - WEBHOOK_GLOBAL_ENABLED=false
+      # Logs
+      - LOG_LEVEL=INFO
+      - LOG_COLOR=true
+    volumes:
+      - evolution_instances:/evolution/instances
+      - ./backend/holerites:/evolution/holerites
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - secured-guard-network
 
   # ========================================
   # FRONTEND
@@ -286,6 +319,7 @@ volumes:
   grafana_data:
   elasticsearch_data:
   whatsapp_sessions:
+  evolution_instances:
 
 # ========================================
 # NETWORKS
