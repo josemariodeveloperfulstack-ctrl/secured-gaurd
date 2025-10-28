@@ -17,7 +17,7 @@ const SESSION_DIR = process.env.SESSION_DIR || path.join(__dirname, '..', 'sessi
 
 if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
 
-const logger = P({ level: 'silent' }); // Silent pino logs, use console.log instead
+const logger = P({ level: 'silent' });
 
 let qrString = null;
 let sock = null;
@@ -28,14 +28,17 @@ async function connectToWhatsApp() {
   if (!fs.existsSync(authPath)) fs.mkdirSync(authPath, { recursive: true });
   
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
-  const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
-    version,
     logger,
     printQRInTerminal: false,
     auth: state,
     defaultQueryTimeoutMs: undefined,
+    connectTimeoutMs: 60000,
+    keepAliveIntervalMs: 30000,
+    emitOwnEvents: true,
+    fireInitQueries: true,
+    markOnlineOnConnect: true,
   });
 
   sock.ev.on('connection.update', async (update) => {
@@ -75,7 +78,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', ready });
 });
 
-// Init instance (no-op if running)
+// Init instance
 app.get('/instance/init', (req, res) => {
   res.json({ key: INSTANCE_KEY, status: 'initialized' });
 });
@@ -105,7 +108,6 @@ app.post('/instance/logout', async (req, res) => {
     }
     ready = false;
     qrString = null;
-    // Delete auth folder
     const authPath = path.join(SESSION_DIR, INSTANCE_KEY);
     if (fs.existsSync(authPath)) {
       fs.rmSync(authPath, { recursive: true, force: true });
@@ -122,8 +124,6 @@ app.post('/message/text', async (req, res) => {
     const id = (req.body.id || '').trim();
     const message = (req.body.message || '').trim();
     
-    console.log(`📱 Tentando enviar mensagem para: ${id}`);
-    
     if (!ready || !sock) {
       return res.status(503).json({ success: false, error: 'Client not ready' });
     }
@@ -132,18 +132,12 @@ app.post('/message/text', async (req, res) => {
       return res.status(400).json({ success: false, error: 'id and message required' });
     }
     
-    // Format JID (WhatsApp ID)
     const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-    
-    console.log(`📤 Enviando para JID: ${jid}`);
     
     await sock.sendMessage(jid, { text: message });
     
-    console.log(`✅ Mensagem enviada com sucesso para: ${jid}`);
-    
     res.json({ success: true });
   } catch (e) {
-    console.error(`❌ Erro ao enviar mensagem: ${e.message}`);
     res.status(500).json({ success: false, error: e.message });
   }
 });
@@ -155,9 +149,6 @@ app.post('/message/document', async (req, res) => {
     const message = (req.body.message || '').trim();
     const filepath = (req.body.filepath || '').trim();
     
-    console.log(`📄 Tentando enviar arquivo para: ${id}`);
-    console.log(`📁 Arquivo: ${filepath}`);
-    
     if (!ready || !sock) {
       return res.status(503).json({ success: false, error: 'Client not ready' });
     }
@@ -166,23 +157,14 @@ app.post('/message/document', async (req, res) => {
       return res.status(400).json({ success: false, error: 'id and filepath required' });
     }
     
-    // Format JID
     const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
     
-    console.log(`📤 Enviando arquivo para JID: ${jid}`);
-    
     if (!fs.existsSync(filepath)) {
-      console.error(`❌ Arquivo não encontrado: ${filepath}`);
       return res.status(404).json({ success: false, error: 'file not found' });
     }
     
-    console.log(`✅ Arquivo encontrado, carregando...`);
-    
-    // Read file
     const fileBuffer = fs.readFileSync(filepath);
     const fileName = path.basename(filepath);
-    
-    console.log(`📤 Enviando arquivo via WhatsApp...`);
     
     await sock.sendMessage(jid, {
       document: fileBuffer,
@@ -191,16 +173,12 @@ app.post('/message/document', async (req, res) => {
       caption: message || undefined
     });
     
-    console.log(`✅ Arquivo enviado com sucesso para: ${jid}`);
-    
     res.json({ success: true });
   } catch (e) {
-    console.error(`❌ Erro ao enviar arquivo: ${e.message}`);
-    console.error(e.stack);
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 WhatsApp service (Baileys) running on port ${PORT}`);
+  console.log(`WhatsApp service running on port ${PORT}`);
 });

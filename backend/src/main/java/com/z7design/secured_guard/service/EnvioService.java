@@ -40,18 +40,9 @@ public class EnvioService {
     private final PayslipDeliveryLogRepository deliveryLogRepository;
     private final PayslipService payslipService;
     
-    // WhatsApp providers (opcionais)
+    // WhatsApp provider: Baileys REST API
     @Autowired(required = false)
     private BaileysRestService baileysRestService;
-    
-    @Autowired(required = false)
-    private EvolutionApiService evolutionApiService;
-    
-    @Autowired(required = false)
-    private MetaWhatsAppService metaWhatsAppService;
-    
-    @Value("${whatsapp.provider:evolution}")
-    private String whatsappProvider; // "baileys", "evolution" ou "meta"
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
@@ -468,7 +459,7 @@ public class EnvioService {
                 String message = request.getMensagem() != null ? request.getMensagem() :
                         "Olá, segue seu holerite do mês. Em caso de dúvidas, contate o RH.";
                 
-                log.info("📤 Enviando via {}: phone={}, path={}", whatsappProvider, normalized, absolutePath);
+                log.info("📤 Enviando via Baileys: phone={}, path={}", normalized, absolutePath);
                 boolean sent = sendWhatsAppMessage(normalized, message, absolutePath);
                 detalhe.setEnviado(sent);
                 if (!sent) {
@@ -517,21 +508,17 @@ public class EnvioService {
     }
 
     /**
-     * Envia mensagem via WhatsApp usando o provider configurado (Baileys, Evolution ou Meta)
+     * Envia mensagem via WhatsApp usando Baileys REST API (com correção DDI 55)
      */
     private boolean sendWhatsAppMessage(String phoneNumber, String message, String filePath) {
-        log.info("🔧 Provider WhatsApp ativo: {}", whatsappProvider);
+        log.info("📤 Enviando via Baileys REST API (porta 3333)");
         
-        if ("meta".equalsIgnoreCase(whatsappProvider)) {
-            log.info("📤 Usando Meta Cloud API");
-            return metaWhatsAppService.sendFileMessage(phoneNumber, message, filePath);
-        } else if ("baileys".equalsIgnoreCase(whatsappProvider)) {
-            log.info("📤 Usando Baileys Original (porta 3333)");
-            return baileysRestService.sendFileMessage(phoneNumber, message, filePath);
-        } else {
-            log.info("📤 Usando Evolution API");
-            return evolutionApiService.sendFileMessage(phoneNumber, message, filePath);
+        if (baileysRestService == null) {
+            log.error("❌ BaileysRestService não disponível!");
+            return false;
         }
+        
+        return baileysRestService.sendFileMessage(phoneNumber, message, filePath);
     }
     
     private void retryWhatsApp(String phone, String message, String filePath, String cpf, Integer month, Integer year) {

@@ -96,20 +96,49 @@ public class BaileysRestService {
     }
     
     /**
+     * Normaliza número de telefone para formato WhatsApp com DDI
+     * Exemplo: 31971731747 -> 5531971731747
+     */
+    private String normalizePhoneNumber(String phoneNumber) {
+        // Remover caracteres especiais
+        String cleanNumber = phoneNumber.replaceAll("[^0-9]", "");
+        
+        // Se já começar com 55 (DDI Brasil), retornar como está
+        if (cleanNumber.startsWith("55")) {
+            logger.info("📞 Número já tem DDI: {}", cleanNumber);
+            return cleanNumber;
+        }
+        
+        // Se tiver 11 dígitos (celular brasileiro), adicionar DDI 55
+        if (cleanNumber.length() == 11 || cleanNumber.length() == 10) {
+            String normalized = "55" + cleanNumber;
+            logger.info("📞 Número normalizado: {} -> {}", cleanNumber, normalized);
+            return normalized;
+        }
+        
+        // Se tiver outro tamanho, assumir que já é internacional
+        logger.warn("⚠️ Número com formato não padrão: {} (tamanho: {})", cleanNumber, cleanNumber.length());
+        return cleanNumber;
+    }
+    
+    /**
      * Envia mensagem de texto via Baileys REST API
      */
     public boolean sendTextMessage(String phoneNumber, String message) {
         try {
+            // Normalizar número com DDI
+            String normalizedNumber = normalizePhoneNumber(phoneNumber);
+            
             String url = baileysRestUrl + "/message/text?key=" + instanceKey;
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
             
-            String body = "id=" + phoneNumber + "&message=" + message;
+            String body = "id=" + normalizedNumber + "&message=" + message;
             
             HttpEntity<String> request = new HttpEntity<>(body, headers);
             
-            logger.info("Enviando mensagem via Baileys REST para: {}", phoneNumber);
+            logger.info("📤 Enviando mensagem via Baileys REST para: {}", normalizedNumber);
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
@@ -152,6 +181,7 @@ public class BaileysRestService {
     /**
      * Envia arquivo via Baileys REST API
      * MODIFICADO: Converte caminho local para caminho Docker antes de enviar
+     * CORRIGIDO: Adiciona DDI 55 para evitar redirecionamento
      */
     public boolean sendFileMessage(String phoneNumber, String message, String filePath) {
         try {
@@ -165,6 +195,9 @@ public class BaileysRestService {
             logger.info("📤 Preparando envio do arquivo: {}", file.getName());
             logger.info("📊 Tamanho: {} bytes", file.length());
             
+            // CORREÇÃO: Normalizar número com DDI 55
+            String normalizedNumber = normalizePhoneNumber(phoneNumber);
+            
             // Converter caminho local para caminho Docker
             String dockerFilePath = convertToDockerPath(filePath);
             
@@ -176,7 +209,7 @@ public class BaileysRestService {
             
             // Criar JSON body com os parâmetros esperados pela API Baileys
             ObjectNode body = objectMapper.createObjectNode();
-            body.put("id", phoneNumber);
+            body.put("id", normalizedNumber);  // ← NÚMERO NORMALIZADO COM DDI
             body.put("filepath", dockerFilePath);
             if (message != null && !message.isEmpty()) {
                 body.put("message", message);
@@ -184,7 +217,7 @@ public class BaileysRestService {
             
             HttpEntity<String> request = new HttpEntity<>(body.toString(), headers);
             
-            logger.info("📤 Enviando arquivo via Baileys REST para: {}", phoneNumber);
+            logger.info("📤 Enviando arquivo via Baileys REST para: {}", normalizedNumber);
             logger.info("🔗 URL: {}", url);
             logger.info("📄 Filepath Docker: {}", dockerFilePath);
             

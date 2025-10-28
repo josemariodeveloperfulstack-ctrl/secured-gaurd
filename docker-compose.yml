@@ -1,8 +1,8 @@
 version: '3.8'
 
 # ========================================
-# DOCKER COMPOSE PARA DESENVOLVIMENTO LOCAL
-# Para produção, use: deploy/docker-compose.prod.yml
+# SECURED GUARD - DESENVOLVIMENTO LOCAL
+# APENAS BAILEYS WHATSAPP API
 # ========================================
 
 services:
@@ -20,7 +20,6 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
     networks:
       - secured-guard-network
     healthcheck:
@@ -49,292 +48,26 @@ services:
       retries: 5
 
   # ========================================
-  # BACKEND API
+  # WHATSAPP SERVICE (BAILEYS)
   # ========================================
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    container_name: secured-guard-backend-local
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      APP_WHATSAPP_WPPCONNECT_URL: http://wppconnect:8080
-      APP_WHATSAPP_BAILEYS_URL: http://baileys:3000
-    ports:
-      - "8081:8081"
-  whatsapp:
+  whatsapp-service:
     build:
       context: ./whatsapp-service
+      dockerfile: Dockerfile
+    image: secured-guard-whatsapp:latest
     container_name: whatsapp-service
     environment:
-      - PORT=3333
-      - INSTANCE_KEY=securedguard
-      - SESSION_DIR=/sessions
+      PORT: 3333
+      INSTANCE_KEY: securedguard
+      SESSION_DIR: /app/sessions
     volumes:
-      - whatsapp_sessions:/sessions
-      - ./uploads:/app/uploads
+      - whatsapp_sessions:/app/sessions
       - ./backend/holerites:/app/holerites
     ports:
       - "3333:3333"
+    networks:
+      - secured-guard-network
     restart: unless-stopped
-
-  # ========================================
-  # EVOLUTION API (WhatsApp)
-  # ========================================
-  evolution-api:
-    image: atendai/evolution-api:v2.1.0
-    container_name: evolution-api
-    ports:
-      - "9000:8080"
-    environment:
-      # URL da Evolution API
-      - SERVER_URL=http://localhost:9000
-      # Autenticação
-      - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=B6D711FCDE4D4FD5936544120E713976
-      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
-      # Configurações de Sessão
-      - LANGUAGE=pt-BR
-      - CONFIG_SESSION_PHONE_CLIENT=SecuredGuard
-      - CONFIG_SESSION_PHONE_NAME=chrome
-      - CONFIG_SESSION_PHONE_VERSION=2.2413.51
-      # QR Code
-      - QRCODE_LIMIT=1902
-      - QRCODE_COLOR=#000000
-      # Database Configuration (OBRIGATÓRIO para Evolution API)
-      - DATABASE_ENABLED=true
-      - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres:postgres@postgres:5432/evolution_db?schema=public
-      - DATABASE_CONNECTION_CLIENT_NAME=evolution
-      - DATABASE_SAVE_DATA_INSTANCE=true
-      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
-      - DATABASE_SAVE_MESSAGE_UPDATE=true
-      - DATABASE_SAVE_DATA_CONTACTS=true
-      - DATABASE_SAVE_DATA_CHATS=true
-      # S3 Storage (desabilitado)
-      - S3_ENABLED=false
-      # Cache (usando Redis do projeto)
-      - CACHE_REDIS_ENABLED=true
-      - CACHE_REDIS_URI=redis://redis:6379/2
-      - CACHE_REDIS_PREFIX_KEY=evolution
-      - CACHE_REDIS_SAVE_INSTANCES=false
-      - CACHE_LOCAL_ENABLED=false
-      # Configurações das instâncias
-      - DEL_INSTANCE=false
-      - DEL_TEMP_INSTANCES=false
-      # Typebot e Chatwoot (desabilitados)
-      - TYPEBOT_ENABLED=false
-      - CHATWOOT_ENABLED=false
-      # RabbitMQ (desabilitado)
-      - RABBITMQ_ENABLED=false
-      # Webhook
-      - WEBHOOK_GLOBAL_ENABLED=false
-      - WEBHOOK_EVENTS_QRCODE_UPDATED=true
-      - WEBHOOK_EVENTS_CONNECTION_UPDATE=true
-      # Logs
-      - LOG_LEVEL=INFO
-      - LOG_COLOR=true
-    volumes:
-      - evolution_instances:/evolution/instances
-      - ./backend/holerites:/evolution/holerites
-    depends_on:
-      - postgres
-      - redis
-    restart: unless-stopped
-    networks:
-      - secured-guard-network
-
-  # ========================================
-  # FRONTEND
-  # ========================================
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: secured-guard-frontend-local
-    environment:
-      VITE_API_URL: http://localhost:8081/api
-      VITE_WS_URL: ws://localhost:8081/ws
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5173"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ========================================
-  # WPPCONNECT (WHATSAPP)
-  # ========================================
-  wppconnect:
-    image: wppconnect/wppconnect:latest
-    container_name: envio-holerites-wppconnect
-    environment:
-      SECRET_KEY: your-secret-key-here
-      CORS_ORIGIN: "*"
-      DOMAIN: localhost
-    ports:
-      - "8081:8080"
-    volumes:
-      - wppconnect_data:/app/.wwebjs_auth
-      - wppconnect_logs:/app/logs
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ========================================
-  # BAILEYS (WHATSAPP ALTERNATIVE)
-  # ========================================
-  baileys:
-    image: baileys-whatsapp:latest
-    container_name: envio-holerites-baileys
-    build:
-      context: ./whatsapp/baileys
-      dockerfile: Dockerfile
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-    ports:
-      - "3000:3000"
-    volumes:
-      - baileys_data:/app/data
-      - baileys_logs:/app/logs
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ========================================
-  # N8N (AUTOMATION)
-  # ========================================
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: envio-holerites-n8n
-    environment:
-      N8N_BASIC_AUTH_ACTIVE: "true"
-      N8N_BASIC_AUTH_USER: admin
-      N8N_BASIC_AUTH_PASSWORD: admin123
-      N8N_HOST: localhost
-      N8N_PORT: 5678
-      N8N_PROTOCOL: http
-      WEBHOOK_URL: http://localhost:5678/
-      GENERIC_TIMEZONE: America/Sao_Paulo
-    ports:
-      - "5678:5678"
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./n8n-workflows:/home/node/.n8n/workflows
-    networks:
-      - secured-guard-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ========================================
-  # MONITORING
-  # ========================================
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: envio-holerites-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    networks:
-      - secured-guard-network
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: envio-holerites-grafana
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin123
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    ports:
-      - "3001:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
-    depends_on:
-      - prometheus
-    networks:
-      - secured-guard-network
-
-  # ========================================
-  # LOG AGGREGATION
-  # ========================================
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: envio-holerites-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ports:
-      - "9200:9200"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    networks:
-      - secured-guard-network
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: envio-holerites-kibana
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
-    networks:
-      - secured-guard-network
-
-  # ========================================
-  # REVERSE PROXY
-  # ========================================
-  nginx:
-    image: nginx:alpine
-    container_name: envio-holerites-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - secured-guard-network
 
 # ========================================
 # VOLUMES
@@ -342,18 +75,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  backend_logs:
-  backend_uploads:
-  wppconnect_data:
-  wppconnect_logs:
-  baileys_data:
-  baileys_logs:
-  n8n_data:
-  prometheus_data:
-  grafana_data:
-  elasticsearch_data:
   whatsapp_sessions:
-  evolution_instances:
 
 # ========================================
 # NETWORKS

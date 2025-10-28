@@ -143,12 +143,9 @@ services:
       - DATABASE_SAVE_DATA_CHATS=true
       # S3 Storage (desabilitado)
       - S3_ENABLED=false
-      # Cache (usando Redis CI)
-      - CACHE_REDIS_ENABLED=true
-      - CACHE_REDIS_URI=redis://:${REDIS_PASSWORD:-redis_ci_2025}@redis-ci:6379/3
-      - CACHE_REDIS_PREFIX_KEY=evolution
-      - CACHE_REDIS_SAVE_INSTANCES=false
-      - CACHE_LOCAL_ENABLED=false
+      # Cache (DESABILITAR Redis - causa de loop)
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
       # Configurações das instâncias
       - DEL_INSTANCE=false
       - DEL_TEMP_INSTANCES=false
@@ -164,17 +161,23 @@ services:
       # Logs
       - LOG_LEVEL=INFO
       - LOG_COLOR=true
+      # Puppeteer/Chromium (necessário para QR Code)
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
     volumes:
       - /var/www/secured_guard/ci/evolution_instances:/evolution/instances
       - /var/www/secured_guard/ci/holerites:/evolution/holerites
     depends_on:
       postgres-ci:
         condition: service_healthy
-      redis-ci:
-        condition: service_healthy
     networks:
       - secured-guard-ci-network
       - z7network
+    # Memória compartilhada para Chromium/Puppeteer
+    shm_size: 512mb
+    # Permitir execução do Chromium sandbox
+    security_opt:
+      - seccomp=unconfined
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
