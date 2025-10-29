@@ -29,16 +29,23 @@ async function connectToWhatsApp() {
   
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
   
-  // Usar versão hardcoded (fetchLatestBaileysVersion trava em algumas redes)
-  const version = [2, 3000, 1017155907];
-  console.log('✅ Usando versão estável do Baileys:', version);
+  // Buscar versão mais recente do Baileys
+  let version;
+  try {
+    const { version: latestVersion } = await fetchLatestBaileysVersion();
+    version = latestVersion;
+    console.log('✅ Usando versão mais recente do Baileys:', version);
+  } catch (err) {
+    version = [2, 3000, 1023204200]; // Versão atualizada
+    console.log('⚠️ Usando versão fallback do Baileys:', version);
+  }
 
   sock = makeWASocket({
     version,
     logger,
     printQRInTerminal: true,
     auth: state,
-    browser: ['Chrome (Windows)', 'Chrome', '120.0.0.0'], // Simular Chrome real
+    browser: ['Secured Guard', 'Chrome', '120.0.0.0'], // Nome personalizado
     syncFullHistory: false,
     markOnlineOnConnect: false,
     defaultQueryTimeoutMs: 60000,
