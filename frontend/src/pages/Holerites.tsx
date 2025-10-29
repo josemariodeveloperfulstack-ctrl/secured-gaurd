@@ -77,6 +77,8 @@ const Holerites: React.FC = () => {
   const [activeTab, setActiveTab] = useState('processados');
   const [showReceiptUploadModal, setShowReceiptUploadModal] = useState(false);
   const [processingReceipts, setProcessingReceipts] = useState(false);
+  const [showMassResultModal, setShowMassResultModal] = useState(false);
+  const [massResult, setMassResult] = useState<EnvioResponse | null>(null);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [loadingReceipts, setLoadingReceipts] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
@@ -175,13 +177,24 @@ const Holerites: React.FC = () => {
     try {
       // Dispara envio via backend. Se 'both', faz duas chamadas sequenciais
       if (validationSendType === 'both') {
-        await api.post('/api/envio/massa', { tipo: 'email', funcionarioIds: validatedIds });
-        await api.post('/api/envio/massa', { tipo: 'whatsapp', funcionarioIds: validatedIds, mensagem: whatsAppMessage });
-        toast({ title: 'Envio iniciado', description: `Email e WhatsApp para ${validatedIds.length} funcionário(s).` });
+        const emailRes = await api.post('/api/envio/massa', { tipo: 'email', funcionarioIds: validatedIds });
+        const waRes = await api.post('/api/envio/massa', { tipo: 'whatsapp', funcionarioIds: validatedIds, mensagem: whatsAppMessage });
+        // combinar resultados simples
+        const combined: EnvioResponse = {
+          sucesso: emailRes.data?.sucesso && waRes.data?.sucesso,
+          mensagem: 'Envio em massa concluído (Email + WhatsApp)'.trim(),
+          dataEnvio: waRes.data?.dataEnvio || emailRes.data?.dataEnvio,
+          tipoEnvio: 'both',
+          totalEnviados: (emailRes.data?.totalEnviados || 0) + (waRes.data?.totalEnviados || 0),
+          totalFalhas: (emailRes.data?.totalFalhas || 0) + (waRes.data?.totalFalhas || 0),
+          detalhes: [ ...(emailRes.data?.detalhes || []), ...(waRes.data?.detalhes || []) ],
+        } as EnvioResponse;
+        setMassResult(combined);
+        setShowMassResultModal(true);
       } else {
-        await api.post('/api/envio/massa', { tipo: validationSendType, funcionarioIds: validatedIds, mensagem: validationSendType === 'whatsapp' ? whatsAppMessage : undefined });
-        const label = validationSendType === 'email' ? 'Email' : 'WhatsApp';
-        toast({ title: 'Envio iniciado', description: `${label} para ${validatedIds.length} funcionário(s).` });
+        const { data } = await api.post('/api/envio/massa', { tipo: validationSendType, funcionarioIds: validatedIds, mensagem: validationSendType === 'whatsapp' ? whatsAppMessage : undefined });
+        setMassResult(data);
+        setShowMassResultModal(true);
       }
     } catch (e: any) {
       console.error('Erro ao iniciar envio em massa:', e);
@@ -2270,11 +2283,13 @@ const Holerites: React.FC = () => {
       const response = await api.post('/api/envio/individual', payload);
       const data = response.data;
       console.log('📥 Resposta do backend:', data);
+      const detail = Array.isArray(data?.detalhes) && data.detalhes.length > 0 ? data.detalhes[0] : undefined;
+      const destino = detail?.destinoNormalizado || detail?.telefone || 'destino não informado';
       
       if (data.sucesso) {
-        toast({ title: 'Sucesso', description: data.mensagem });
+        toast({ title: 'Sucesso', description: `${data.mensagem} (Destino: ${destino})` });
       } else {
-        toast({ title: 'Erro no envio', description: data.mensagem, variant: 'destructive' });
+        toast({ title: 'Erro no envio', description: `${data.mensagem} (Destino: ${destino})`, variant: 'destructive' });
       }
     } catch (error: any) {
       // Exibe a mensagem detalhada retornada pelo backend, se existir

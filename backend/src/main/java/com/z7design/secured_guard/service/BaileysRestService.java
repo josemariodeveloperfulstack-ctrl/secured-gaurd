@@ -103,15 +103,27 @@ public class BaileysRestService {
         // Remover caracteres especiais
         String cleanNumber = phoneNumber.replaceAll("[^0-9]", "");
         
-        // Se já começar com 55 (DDI Brasil), retornar como está
+        // Se já começar com 55 (DDI Brasil), tratar e retornar
         if (cleanNumber.startsWith("55")) {
+            // Regra BR: se for 55 + DDD + 9 + 8 dígitos (13 no total), remover o 9 extra
+            if (cleanNumber.length() == 13 && cleanNumber.charAt(4) == '9') {
+                String adjusted = cleanNumber.substring(0, 4) + cleanNumber.substring(5);
+                logger.info("📞 BR ajuste (removendo 9 extra): {} -> {}", cleanNumber, adjusted);
+                return adjusted;
+            }
             logger.info("📞 Número já tem DDI: {}", cleanNumber);
             return cleanNumber;
         }
         
-        // Se tiver 11 dígitos (celular brasileiro), adicionar DDI 55
-        if (cleanNumber.length() == 11 || cleanNumber.length() == 10) {
+        // Se tiver 10/11/12 dígitos (formatos nacionais), adicionar DDI 55
+        if (cleanNumber.length() == 10 || cleanNumber.length() == 11 || cleanNumber.length() == 12) {
             String normalized = "55" + cleanNumber;
+            // Após adicionar 55, aplicar regra do 9 extra se aplicável
+            if (normalized.length() == 13 && normalized.charAt(4) == '9') {
+                String adjusted = normalized.substring(0, 4) + normalized.substring(5);
+                logger.info("📞 BR ajuste (removendo 9 extra): {} -> {}", normalized, adjusted);
+                return adjusted;
+            }
             logger.info("📞 Número normalizado: {} -> {}", cleanNumber, normalized);
             return normalized;
         }

@@ -32,6 +32,7 @@ public class EnvioResponse {
         private String cpf;
         private String email;
         private String telefone;
+            private String destinoNormalizado;
         private boolean enviado;
         private String erro;
     }

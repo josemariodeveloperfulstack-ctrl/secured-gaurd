@@ -209,7 +209,11 @@ public class EnvioService {
     }
     
     public EnvioResponse enviarEmMassa(EnvioRequest request) {
-        log.info("🚀 Iniciando envio em massa para {} funcionários", request.getFuncionarioIds().size());
+        final int BATCH_SIZE = 20;
+        final long DELAY_BETWEEN_ITEMS_MS = 250;      // pequena pausa entre envios
+        final long DELAY_BETWEEN_BATCHES_MS = 2000;   // pausa entre lotes
+        log.info("🚀 Iniciando envio em massa para {} funcionários (batch size={})", 
+                request.getFuncionarioIds().size(), BATCH_SIZE);
         
         EnvioResponse response = EnvioResponse.builder()
                 .sucesso(false)
@@ -225,7 +229,7 @@ public class EnvioService {
                     .map(UUID::fromString)
                     .toList();
             List<Employee> employees = employeeRepository.findAllById(employeeIds);
-            
+            int index = 0;
             for (Employee employee : employees) {
                 EnvioResponse.DetalheEnvio detalhe = processarEnvio(employee, request);
                 response.getDetalhes().add(detalhe);
@@ -234,6 +238,14 @@ public class EnvioService {
                     response.setTotalEnviados(response.getTotalEnviados() + 1);
                 } else {
                     response.setTotalFalhas(response.getTotalFalhas() + 1);
+                }
+                index++;
+                // pacing entre itens
+                try { Thread.sleep(DELAY_BETWEEN_ITEMS_MS); } catch (InterruptedException ignored) {}
+                // pausa a cada BATCH_SIZE itens
+                if (index % BATCH_SIZE == 0) {
+                    log.info("⏸️ Pausa entre lotes... ({} itens processados)", index);
+                    try { Thread.sleep(DELAY_BETWEEN_BATCHES_MS); } catch (InterruptedException ignored) {}
                 }
             }
             
@@ -250,6 +262,9 @@ public class EnvioService {
     }
     
     public EnvioResponse enviarTodosPorTipo(EnvioRequest request) {
+        final int BATCH_SIZE = 20;
+        final long DELAY_BETWEEN_ITEMS_MS = 250;
+        final long DELAY_BETWEEN_BATCHES_MS = 2000;
         log.info("🚀 Iniciando envio em lote via {}", request.getTipo());
         
         EnvioResponse response = EnvioResponse.builder()
@@ -298,7 +313,8 @@ public class EnvioService {
             
             log.info("📋 Processando {} envios...", cpfsParaEnvio.size());
             
-            // Processar cada CPF
+            // Processar cada CPF em lotes
+            int index = 0;
             for (String cpf : cpfsParaEnvio) {
                 log.info("📤 Processando envio para CPF: {}", cpf);
                 
@@ -322,6 +338,12 @@ public class EnvioService {
                     } else {
                         response.setTotalFalhas(response.getTotalFalhas() + 1);
                     }
+                }
+                index++;
+                try { Thread.sleep(DELAY_BETWEEN_ITEMS_MS); } catch (InterruptedException ignored) {}
+                if (index % BATCH_SIZE == 0) {
+                    log.info("⏸️ Pausa entre lotes... ({} itens processados)", index);
+                    try { Thread.sleep(DELAY_BETWEEN_BATCHES_MS); } catch (InterruptedException ignored) {}
                 }
             }
             
@@ -406,11 +428,21 @@ public class EnvioService {
                 detalhe.setTelefone(whatsappNumber);
                 
                 // Limpar número (remover caracteres não numéricos)
-                final String normalized = whatsappNumber.replaceAll("[^0-9]", "");
+                String normalized = whatsappNumber.replaceAll("[^0-9]", "");
+                // Regra BR opcional: se vier 55 + DDD + 9 + 8 dígitos, remover o 9 extra
+                if (normalized.startsWith("55") && normalized.length() == 13) {
+                    // 55 (0-1), DDD (2-3), possivel 9 em (4)
+                    if (normalized.charAt(4) == '9') {
+                        normalized = normalized.substring(0, 4) + normalized.substring(5);
+                    }
+                }
+                detalhe.setDestinoNormalizado(normalized);
+                log.info("🎯 Destino final normalizado: {}", normalized);
                 
-                // Validar tamanho (11 dígitos = DDD + 9 dígitos, ou 13 dígitos = 55 + DDD + 9 dígitos)
-                if (normalized.length() != 11 && normalized.length() != 13) {
-                    detalhe.setErro("Número de WhatsApp em formato inválido (deve ter 11 ou 13 dígitos)");
+                // Validar tamanho (aceitar 10/11/12/13 para compatibilidade)
+                int len = normalized.length();
+                if (len != 10 && len != 11 && len != 12 && len != 13) {
+                    detalhe.setErro("Número de WhatsApp em formato inválido (tamanhos aceitos: 10, 11, 12, 13)");
                     registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     return detalhe;
                 }
@@ -459,16 +491,17 @@ public class EnvioService {
                 String message = request.getMensagem() != null ? request.getMensagem() :
                         "Olá, segue seu holerite do mês. Em caso de dúvidas, contate o RH.";
                 
-                log.info("📤 Enviando via Baileys: phone={}, path={}", normalized, absolutePath);
-                boolean sent = sendWhatsAppMessage(normalized, message, absolutePath);
+                final String normalizedFinal = normalized;
+                log.info("📤 Enviando via Baileys: phone={}, path={}", normalizedFinal, absolutePath);
+                boolean sent = sendWhatsAppMessage(normalizedFinal, message, absolutePath);
                 detalhe.setEnviado(sent);
                 if (!sent) {
                     detalhe.setErro("Falha no envio via WhatsApp");
                     registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     // Retry em 5 minutos, apenas 1 vez
-                    scheduler.schedule(() -> retryWhatsApp(normalized, message, absolutePath, cpf, payslip.getMonth(), payslip.getYear()), 5, TimeUnit.MINUTES);
+                    scheduler.schedule(() -> retryWhatsApp(normalizedFinal, message, absolutePath, cpf, payslip.getMonth(), payslip.getYear()), 5, TimeUnit.MINUTES);
                 } else {
-                    log.info("✅ Holerite enviado com sucesso via WhatsApp para {}", normalized);
+                    log.info("✅ Holerite enviado com sucesso via WhatsApp para {}", normalizedFinal);
                     registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, true, 1, null);
                 }
                 
@@ -477,8 +510,9 @@ public class EnvioService {
             }
             
         } catch (Exception e) {
-            log.error("❌ Erro ao enviar para {} ({}): {}", 
-                    employee.getName(), employee.getDocument(), e.getMessage());
+            String empName = (employee != null ? employee.getName() : "desconhecido");
+            String empDoc = (employee != null ? employee.getDocument() : (request.getCpf() != null ? request.getCpf() : "-"));
+            log.error("❌ Erro ao enviar para {} ({}): {}", empName, empDoc, e.getMessage());
             detalhe.setErro("Erro interno: " + e.getMessage());
         }
         

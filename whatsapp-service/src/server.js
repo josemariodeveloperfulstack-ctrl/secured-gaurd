@@ -14,6 +14,7 @@ app.use(bodyParser.json());
 const PORT = process.env.PORT || 3333;
 const INSTANCE_KEY = process.env.INSTANCE_KEY || 'securedguard';
 const SESSION_DIR = process.env.SESSION_DIR || path.join(__dirname, '..', 'sessions');
+const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 
 if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
 
@@ -22,6 +23,8 @@ const logger = P({ level: 'silent' });
 let qrString = null;
 let sock = null;
 let ready = false;
+const inbox = [];
+const INBOX_LIMIT = 50;
 
 async function connectToWhatsApp() {
   const authPath = path.join(SESSION_DIR, INSTANCE_KEY);
@@ -86,6 +89,33 @@ async function connectToWhatsApp() {
   });
 
   sock.ev.on('creds.update', saveCreds);
+
+  // Incoming messages
+  sock.ev.on('messages.upsert', async (m) => {
+    try {
+      if (!m || !m.messages || m.messages.length === 0) return;
+      const msg = m.messages[0];
+      const from = msg.key?.remoteJid || '';
+      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+      const fromMe = !!msg.key?.fromMe;
+      const timestamp = msg.messageTimestamp || Date.now();
+      const item = { from, text, fromMe, timestamp, type: m.type };
+      inbox.unshift(item);
+      if (inbox.length > INBOX_LIMIT) inbox.pop();
+      console.log('[INCOMING]', item);
+
+      if (WEBHOOK_URL) {
+        try {
+          const payload = JSON.stringify({ instance: INSTANCE_KEY, event: 'message', data: item });
+          await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload });
+        } catch (e) {
+          console.log('Webhook error:', e.message);
+        }
+      }
+    } catch (e) {
+      console.log('messages.upsert error:', e.message);
+    }
+  });
 }
 
 // Initialize connection
@@ -152,11 +182,12 @@ app.post('/message/text', async (req, res) => {
       return res.status(400).json({ success: false, error: 'id and message required' });
     }
     
-    const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+      const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+      console.log('[SEND TEXT] id:', id, '-> jid:', jid);
     
     await sock.sendMessage(jid, { text: message });
     
-    res.json({ success: true });
+      res.json({ success: true, jid });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -177,7 +208,8 @@ app.post('/message/document', async (req, res) => {
       return res.status(400).json({ success: false, error: 'id and filepath required' });
     }
     
-    const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+      const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+      console.log('[SEND DOC] id:', id, '-> jid:', jid, 'file:', filepath);
     
     if (!fs.existsSync(filepath)) {
       return res.status(404).json({ success: false, error: 'file not found' });
@@ -193,10 +225,23 @@ app.post('/message/document', async (req, res) => {
       caption: message || undefined
     });
     
-    res.json({ success: true });
+      res.json({ success: true, jid });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
+});
+
+// Debug endpoint to preview JID format
+app.get('/debug/jid', (req, res) => {
+  const id = (req.query.id || '').trim();
+  if (!id) return res.status(400).json({ error: 'id required' });
+  const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+  res.json({ id, jid });
+});
+
+// Fetch last incoming messages
+app.get('/debug/inbox', (req, res) => {
+  res.json({ count: inbox.length, messages: inbox });
 });
 
 app.listen(PORT, () => {
