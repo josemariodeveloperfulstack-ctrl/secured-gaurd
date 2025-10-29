@@ -29,15 +29,25 @@ async function connectToWhatsApp() {
   
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
   
-  // Usar versão fixa pois Docker não consegue acessar GitHub
-  const version = [2, 3000, 1015901307];
+  // Usar versão hardcoded (fetchLatestBaileysVersion trava em algumas redes)
+  const version = [2, 3000, 1017155907];
+  console.log('✅ Usando versão estável do Baileys:', version);
 
   sock = makeWASocket({
     version,
     logger,
-    printQRInTerminal: false,
+    printQRInTerminal: true,
     auth: state,
-    defaultQueryTimeoutMs: undefined,
+    browser: ['Chrome (Windows)', 'Chrome', '120.0.0.0'], // Simular Chrome real
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    defaultQueryTimeoutMs: 60000,
+    connectTimeoutMs: 60000,
+    keepAliveIntervalMs: 30000,
+    emitOwnEvents: true,
+    fireInitQueries: true,
+    generateHighQualityLinkPreview: false,
+    getMessage: async () => undefined,
   });
 
   sock.ev.on('connection.update', async (update) => {
