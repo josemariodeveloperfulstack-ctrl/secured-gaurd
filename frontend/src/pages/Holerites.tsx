@@ -2900,32 +2900,7 @@ const Holerites: React.FC = () => {
     }
   };
 
-  // Debounce para busca por CPF no backend
-  useEffect(() => {
-    if (cpfDebounceRef.current) clearTimeout(cpfDebounceRef.current);
-    cpfDebounceRef.current = setTimeout(async () => {
-      const onlyDigits = cpfSearch.replace(/\D/g, '');
-      try {
-        if (onlyDigits.length === 0) {
-          // Sem CPF → recarrega lista padrão
-          await loadHolerites(filters);
-          return;
-        }
-        if (onlyDigits.length < 3) return; // evita flood
-        setLoading(true);
-        const result = await holeriteService.getHoleritesByCpf(onlyDigits);
-        setHolerites(Array.isArray(result) ? result : []);
-      } catch (e) {
-        console.error('Erro ao buscar por CPF:', e);
-      } finally {
-        setLoading(false);
-      }
-    }, 400);
-    // cleanup
-    return () => {
-      if (cpfDebounceRef.current) clearTimeout(cpfDebounceRef.current);
-    };
-  }, [cpfSearch]);
+  
 
   return (
     <StandardLayout>
@@ -2981,10 +2956,6 @@ const Holerites: React.FC = () => {
                 </div>
               </div>
             </div>
-            
-            </div>
-            
-
           </div>
         </div>
 
@@ -5027,339 +4998,64 @@ const Holerites: React.FC = () => {
 
         {/* Modal de Envio de Documentos */}
         <Dialog open={showSendModal} onOpenChange={setShowSendModal}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>
-                {sendType === 'email' ? 'Enviar por Email' : 'Enviar por WhatsApp'}
+          <DialogContent className="w-[92vw] sm:w-[560px] md:w-[72vw] lg:w-[60vw] xl:w-[50vw] p-0 overflow-hidden">
+            <DialogHeader className="px-5 pt-5 pb-2 border-b border-gray-800 bg-seguranca-black/60">
+              <DialogTitle className="flex items-center gap-2 text-seguranca-lightgray">
+                {sendType === 'email' ? (
+                  <>
+                    <Mail className="h-4 w-4 text-blue-400" /> Enviar por Email
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="h-4 w-4 text-green-400" /> Enviar por WhatsApp
+                  </>
+                )}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm text-gray-400">
                 {sendType === 'email' 
-                  ? 'Os documentos selecionados serÃ£o enviados por email.'
-                  : 'Os documentos selecionados serÃ£o enviados por WhatsApp.'
-                }
+                  ? 'Os documentos selecionados serão enviados por email.'
+                  : 'Os documentos selecionados serão enviados por WhatsApp.'}
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <div className="text-sm text-gray-600 mb-4">
-                {selectedUnifiedDocuments.size} documento(s) selecionado(s) serÃ£o enviados.
-                             </div>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
+
+            <div className="px-5 py-4">
+              {/* Resumo */}
+              <div className="text-xs sm:text-sm text-gray-300 mb-3">
+                <span className="font-medium text-seguranca-yellow">{selectedUnifiedDocuments.size}</span> documento(s) selecionado(s) serão enviados.
+              </div>
+
+              {/* Lista scrollável dos itens */}
+              <div className="max-h-[45vh] overflow-y-auto rounded-md border border-gray-800 bg-seguranca-black/40 p-3 space-y-3">
                 {getSelectedDocuments().map((doc, index) => (
-                  <div key={index} className="flex items-center space-x-2 text-sm">
-                    <FileText className="w-4 h-4 text-gray-400" />
-                    <span className="truncate">{doc.employeeName} - {doc.fileName}</span>
-                           </div>
+                  <div key={index} className="flex items-start gap-3 text-xs sm:text-sm text-gray-300">
+                    <FileText className="min-w-[16px] h-4 w-4 mt-0.5 text-gray-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-seguranca-lightgray break-words whitespace-normal" title={`${doc.employeeName} - ${doc.fileName}`}>
+                        {doc.employeeName}
+                      </div>
+                      <div className="text-gray-500 break-words whitespace-normal" title={doc.fileName}>
+                        {doc.fileName}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-                         </div>
-                     </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowSendModal(false)}>
+              </div>
+            </div>
+
+            <DialogFooter className="px-5 pb-5 flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-between">
+              <Button variant="outline" onClick={() => setShowSendModal(false)} className="w-full sm:w-auto">
                 Cancelar
               </Button>
-              <Button 
-                onClick={executeSendDocuments} 
-                disabled={sendingDocuments}
-                className={sendType === 'email' ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'}
-              >
-                {sendingDocuments ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    {sendType === 'email' ? <Mail className="mr-2 h-4 w-4" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                    Enviar
-                  </>
-                )}
+              <Button onClick={() => handleSendDocuments(sendType)} className={sendType === 'email' ? 'w-full sm:w-auto bg-blue-600 hover:bg-blue-700' : 'w-full sm:w-auto bg-green-600 hover:bg-green-700'}>
+                {sendType === 'email' ? 'Enviar' : 'Enviar'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Modal de ConfirmaÃ§Ã£o de Exclusão */}
-        <Dialog open={showUnifiedDeleteModal} onOpenChange={setShowUnifiedDeleteModal}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>
-                {deleteType === 'individual' ? 'Excluir Documento' : 'Excluir Documentos em Lote'}
-              </DialogTitle>
-              <DialogDescription>
-                {deleteType === 'individual' 
-                  ? 'Tem certeza que deseja excluir este documento?'
-                  : `Tem certeza que deseja excluir ${selectedUnifiedDocuments.size} documento(s) selecionado(s)?`
-                }
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              {deleteType === 'individual' && deleteDocumentIndex !== null && (
-                <div className="flex items-center space-x-2 text-sm">
-                  <FileText className="w-4 h-4 text-gray-400" />
-                  <span>{unifiedDocuments[deleteDocumentIndex]?.employeeName} - {unifiedDocuments[deleteDocumentIndex]?.fileName}</span>
-                       </div>
-              )}
-              {deleteType === 'batch' && (
-                <div className="text-sm text-gray-600 mb-2">
-                  Documentos selecionados:
-                     </div>
-                   )}
-              {deleteType === 'batch' && (
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {getSelectedDocuments().map((doc, index) => (
-                    <div key={index} className="flex items-center space-x-2 text-sm">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                      <span className="truncate">{doc.employeeName} - {doc.fileName}</span>
-                 </div>
-                  ))}
-              </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowUnifiedDeleteModal(false)}>
-                  Cancelar
-                </Button>
-                <Button 
-                variant="destructive" 
-                onClick={executeDeleteDocuments}
-                disabled={deletingDocuments}
-              >
-                {deletingDocuments ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Excluindo...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Excluir
-                  </>
-                )}
-                </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal de Visualização de PDF */}
-        <Dialog open={showUnifiedViewerModal} onOpenChange={setShowUnifiedViewerModal}>
-          <DialogContent className="sm:max-w-[90vw] max-h-[90vh] w-full h-full">
-            <DialogHeader>
-              <DialogTitle>Visualização do Documento - {viewerDocument?.employeeName}</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 min-h-0">
-              {viewerUrl && (
-                <div className="w-full h-full min-h-[600px]">
-                  <iframe
-                    src={viewerUrl}
-                    className="w-full h-full border rounded"
-                    title="Visualização do PDF"
-                    onError={() => {
-                      // Fallback: abrir em nova aba se o iframe falhar
-                      window.open(viewerUrl, '_blank');
-                    }}
-                  />
-                  </div>
-              )}
-              </div>
-            <DialogFooter className="flex justify-between">
-                <Button 
-                  variant="outline" 
-                onClick={() => window.open(viewerUrl, '_blank')}
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Abrir em Nova Aba
-              </Button>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = viewerUrl || '';
-                    link.download = viewerDocument?.fileName || 'documento.pdf';
-                    link.target = '_blank';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Baixar
-                </Button>
-                <Button onClick={() => setShowUnifiedViewerModal(false)}>
-                  Fechar
-                </Button>
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal de Upload de Holerites */}
-        <HoleriteUpload
-          isOpen={showUploadModal}
-          onClose={() => setShowUploadModal(false)}
-          onUploadSuccess={() => {
-            setShowUploadModal(false);
-            toast({
-              title: "Sucesso",
-              description: "Holerites importados com sucesso!",
-            });
-            loadHolerites(); // Recarregar a lista
-          }}
-        />
-
-        {/* Modal de Upload de Comprovantes de Pagamento */}
-        <Dialog open={showPaymentReceiptUploadModal} onOpenChange={setShowPaymentReceiptUploadModal}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Importar Comprovantes de Pagamento
-              </DialogTitle>
-              <DialogDescription>
-                Selecione os arquivos PDF dos comprovantes de pagamento para processamento.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6">
-              {/* Upload Area */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
-                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <div className="space-y-2">
-                  <p className="text-lg font-medium">Arraste e solte os arquivos aqui</p>
-                  <p className="text-sm text-gray-500">ou clique para selecionar</p>
-                  </div>
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    if (files.length > 0) {
-                      handlePaymentReceiptUpload(files[0]);
-                    }
-                  }}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                    </div>
-                    
-              {processingPaymentReceipts && (
-                <div className="text-center space-y-2">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
-                  <p className="text-sm text-gray-600">Processando comprovantes...</p>
-                      </div>
-                    )}
-              </div>
-              
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowPaymentReceiptUploadModal(false)}>
-                  Cancelar
-                </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal de Visualização de Comprovantes de Pagamento */}
-         <PaymentReceiptViewModal
-           open={showPaymentReceiptViewModal}
-           onOpenChange={setShowPaymentReceiptViewModal}
-           receipt={selectedPaymentReceiptForView}
-           onDownload={handleDownloadPaymentReceipt}
-         />
-
-      {/* Modal de Validação para envio (Holerites/Comprovantes) */}
-        <ContactValidationModal
-          open={showValidationModal}
-          onClose={() => setShowValidationModal(false)}
-          employeeIds={resolvedEmployeeIds}
-          sendType={validationSendType}
-          documentType="holerite"
-          onValidated={handleValidated}
-        />
-
-      {/* Modais de ação individual (criar usuário / atualizar WhatsApp) */}
-      {selectedValidationDetail && (
-        <>
-          <QuickUserFormModal
-            open={showSingleUserModal}
-            onClose={() => setShowSingleUserModal(false)}
-            employeeDetail={selectedValidationDetail}
-            onSuccess={() => {
-              setShowSingleUserModal(false);
-              toast({ title: 'Usuário criado', description: 'Tente enviar novamente via WhatsApp.' });
-            }}
-          />
-          <WhatsAppUpdateModal
-            open={showSingleWhatsappModal}
-            onClose={() => setShowSingleWhatsappModal(false)}
-            employeeDetail={selectedValidationDetail}
-            onSuccess={() => {
-              setShowSingleWhatsappModal(false);
-              toast({ title: 'WhatsApp atualizado', description: 'Tente enviar novamente via WhatsApp.' });
-            }}
-          />
-        </>
-      )}
-
-      {/* Resultado do envio em massa */}
-      <Dialog open={showMassResultModal} onOpenChange={setShowMassResultModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Resumo do Envio em Massa</DialogTitle>
-            <DialogDescription>
-              {massResult ? (
-                <div className="space-y-2">
-                  <div><b>Tipo:</b> {massResult.tipoEnvio}</div>
-                  <div><b>Enviados:</b> {massResult.totalEnviados} &nbsp; <b>Falhas:</b> {massResult.totalFalhas}</div>
-                  <div><b>Status:</b> {massResult.sucesso ? 'Sucesso' : 'Concluído com falhas'}</div>
-                </div>
-              ) : '—'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-80 overflow-auto border rounded p-2">
-            {massResult && massResult.detalhes && massResult.detalhes.length > 0 ? (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left">
-                    <th className="p-1">CPF</th>
-                    <th className="p-1">Nome</th>
-                    <th className="p-1">Telefone</th>
-                    <th className="p-1">Destino</th>
-                    <th className="p-1">Status</th>
-                    <th className="p-1">Erro</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {massResult.detalhes
-                    .filter(d => !d.enviado || d.erro)
-                    .map((d, idx) => (
-                      <tr key={idx} className="border-t">
-                        <td className="p-1">{d.cpf}</td>
-                        <td className="p-1">{d.nome}</td>
-                        <td className="p-1">{d.telefone || '-'}</td>
-                        <td className="p-1">{(d as any).destinoNormalizado || '-'}</td>
-                        <td className="p-1">{d.enviado ? 'OK' : 'Falha'}</td>
-                        <td className="p-1">{d.erro || '-'}</td>
-                      </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div>Nenhum detalhe disponível.</div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowMassResultModal(false)}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-     </StandardLayout>
-   );
- };
+      </div>
+    </StandardLayout>
+  );
+};
 
 export default Holerites;
-
-
-
-
-
-
-
