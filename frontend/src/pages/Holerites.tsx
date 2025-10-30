@@ -287,6 +287,8 @@ const Holerites: React.FC = () => {
     periods: string[];
     count: number;
   } | null>(null);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const [overwritingPeriod, setOverwritingPeriod] = useState(false);
 
   // Estados para unificação em lote
   const [showBatchUnificationModal, setShowBatchUnificationModal] = useState(false);
@@ -1052,7 +1054,7 @@ const Holerites: React.FC = () => {
 
   // Função para processar upload de comprovantes - USANDO PROCESSAMENTO AUTOMÃTICO
   // Função para validar se já existem documentos do período antes de importar
-  const validatePeriodBeforeUpload = (type: 'holerite' | 'comprovante'): boolean => {
+  const validatePeriodBeforeUpload = (type: 'holerite' | 'comprovante', file?: File): boolean => {
     if (type === 'comprovante') {
       // Verificar se há comprovantes no período ativo
       const receiptsInPeriod = paymentReceipts.filter(r => 
@@ -1066,6 +1068,10 @@ const Holerites: React.FC = () => {
           periods: [periodStr],
           count: receiptsInPeriod.length
         });
+        // Armazenar o arquivo para processar depois se o usuário confirmar
+        if (file) {
+          setPendingUploadFile(file);
+        }
         setShowDuplicatePeriodModal(true);
         return false;
       }
@@ -1085,6 +1091,10 @@ const Holerites: React.FC = () => {
           periods: periods,
           count: totalCount
         });
+        // Armazenar o arquivo para processar depois se o usuário confirmar
+        if (file) {
+          setPendingUploadFile(file);
+        }
         setShowDuplicatePeriodModal(true);
         return false;
       }
@@ -3146,12 +3156,7 @@ const Holerites: React.FC = () => {
                 {/* BotÃµes de AÃ§Ã£o */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button 
-                      onClick={() => {
-                        // Validar se já existem holerites antes de abrir o modal
-                        if (validatePeriodBeforeUpload('holerite')) {
-                          setShowUploadModal(true);
-                        }
-                      }}
+                      onClick={() => setShowUploadModal(true)}
                       disabled={loading}
                       className="group relative bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 px-8 py-4 rounded-2xl shadow-2xl hover:shadow-red-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-red-400/20"
                     >
@@ -3619,12 +3624,7 @@ const Holerites: React.FC = () => {
                   {/* BotÃ£o de Upload Melhorado */}
                   <div className="flex justify-center">
                       <Button 
-                      onClick={() => {
-                        // Validar se já existem comprovantes do período antes de abrir o modal
-                        if (validatePeriodBeforeUpload('comprovante')) {
-                          setShowPaymentReceiptUploadModal(true);
-                        }
-                      }}
+                      onClick={() => setShowPaymentReceiptUploadModal(true)}
                       disabled={processingPaymentReceipts}
                       className="group relative bg-gradient-to-r from-blue-500 via-purple-600 to-blue-700 hover:from-blue-600 hover:via-purple-700 hover:to-blue-800 px-12 py-6 rounded-3xl shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 transform hover:scale-110 hover:-translate-y-2 text-white font-bold text-xl border border-blue-400/30 overflow-hidden"
                     >
@@ -3903,12 +3903,7 @@ const Holerites: React.FC = () => {
                           Não há comprovantes para {getMonthName(parseInt(activeMonth))} de {activeYear}.
                       </p>
                       <Button
-                          onClick={() => {
-                            // Validar se já existem comprovantes do período antes de abrir o modal
-                            if (validatePeriodBeforeUpload('comprovante')) {
-                              setShowPaymentReceiptUploadModal(true);
-                            }
-                          }}
+                          onClick={() => setShowPaymentReceiptUploadModal(true)}
                           className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
                         >
                           <Plus size={20} className="mr-2" />
@@ -5128,12 +5123,12 @@ const Holerites: React.FC = () => {
                       const file = e.target.files?.[0];
                       if (file) {
                         // Validar se já existem documentos do período antes de processar
-                        if (validatePeriodBeforeUpload('comprovante')) {
+                        if (validatePeriodBeforeUpload('comprovante', file)) {
                           await handlePaymentReceiptUpload(file);
-                        } else {
-                          // Limpar o input para permitir nova seleção
-                          e.target.value = '';
                         }
+                        // Se houver duplicatas, o arquivo fica pendente e será processado após confirmação
+                        // Limpar o input
+                        e.target.value = '';
                       }
                     }}
                     disabled={processingPaymentReceipts}
@@ -5180,6 +5175,17 @@ const Holerites: React.FC = () => {
             onClose={() => {
               setShowViewModal(false);
               setSelectedHolerite(null);
+            }}
+            onSendEmail={() => {
+              if (selectedHolerite) {
+                setShowViewModal(false);
+                handleEmailHolerite(selectedHolerite);
+              }
+            }}
+            onSendWhatsApp={() => {
+              if (selectedHolerite) {
+                handleSendWhatsAppIndividual(selectedHolerite);
+              }
             }}
           />
         )}
@@ -5253,13 +5259,246 @@ const Holerites: React.FC = () => {
           />
         )}
 
-        {/* Modal de Aviso de Período Duplicado */}
-        <Dialog open={showDuplicatePeriodModal} onOpenChange={setShowDuplicatePeriodModal}>
-          <DialogContent className="sm:max-w-[500px] bg-seguranca-graphite border-yellow-600">
+        {/* Modal de Exclusão de Documento Unificado */}
+        <Dialog open={showUnifiedDeleteModal} onOpenChange={setShowUnifiedDeleteModal}>
+          <DialogContent className="sm:max-w-[425px] bg-seguranca-graphite border-red-600/50">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-yellow-400">
-                <AlertTriangle size={24} className="text-yellow-400" />
-                Período Já Importado
+              <DialogTitle className="flex items-center gap-2 text-red-400">
+                <AlertTriangle size={24} className="text-red-400" />
+                Excluir Documento
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                {deleteType === 'individual' 
+                  ? 'Tem certeza que deseja excluir este documento unificado?'
+                  : `Tem certeza que deseja excluir ${selectedUnifiedDocuments.size} documento(s) unificado(s)?`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <p className="text-red-300 text-sm flex items-start gap-2">
+                  <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                  <span>
+                    Esta ação não pode ser desfeita. O documento será permanentemente removido do sistema.
+                  </span>
+                </p>
+              </div>
+
+              {deletingDocuments && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Progresso:</span>
+                    <span className="text-white font-semibold">
+                      {deleteProgress.completed + deleteProgress.failed} / {deleteProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-red-500 to-pink-600 h-2 transition-all duration-300"
+                      style={{ 
+                        width: `${((deleteProgress.completed + deleteProgress.failed) / deleteProgress.total) * 100}%` 
+                      }}
+                    />
+                  </div>
+                  {deleteProgress.current && (
+                    <p className="text-xs text-gray-400 truncate">
+                      Excluindo: {deleteProgress.current}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowUnifiedDeleteModal(false)}
+                disabled={deletingDocuments}
+                className="border-gray-600 text-seguranca-lightgray"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleDeleteDocuments}
+                disabled={deletingDocuments}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deletingDocuments ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Visualização de Documento Unificado */}
+        {showUnifiedViewerModal && viewerDocument && viewerUrl && (
+          <Dialog open={showUnifiedViewerModal} onOpenChange={setShowUnifiedViewerModal}>
+            <DialogContent className="w-[95vw] h-[95vh] sm:w-[90vw] sm:h-[90vh] lg:max-w-6xl lg:max-h-[90vh] bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-purple-600/50 rounded-2xl p-0 overflow-hidden">
+              <DialogHeader className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-b border-purple-500/20 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Eye size={20} className="sm:hidden text-white" />
+                      <Eye size={24} className="hidden sm:block text-white" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-lg sm:text-2xl font-bold text-white leading-tight">
+                        Documento Unificado
+                      </DialogTitle>
+                      <p className="text-purple-300/90 text-xs sm:text-sm font-medium mt-0 truncate max-w-[200px] sm:max-w-none">
+                        {viewerDocument.employeeName || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl border bg-purple-500/20 text-purple-300 border-purple-500/40">
+                    📄 Unificado
+                  </Badge>
+                </div>
+              </DialogHeader>
+
+              <div className="flex flex-col lg:flex-row h-full overflow-hidden">
+                {/* Informações do Documento */}
+                <div className="w-full lg:w-1/3 p-4 sm:p-6 border-b lg:border-b-0 lg:border-r border-gray-600/30 bg-seguranca-black/30 max-h-[40vh] lg:max-h-none overflow-y-auto">
+                  <div className="space-y-4 sm:space-y-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Informações do Documento</h3>
+                    
+                    {/* Nome do Funcionário */}
+                    {viewerDocument.employeeName && (
+                      <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-xl p-3 sm:p-4">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <User size={16} className="sm:hidden text-white" />
+                            <User size={18} className="hidden sm:block text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-purple-300/80 text-xs sm:text-sm font-medium">Funcionário</p>
+                            <p className="text-white font-semibold text-sm sm:text-base truncate">{viewerDocument.employeeName}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Período */}
+                    {(viewerDocument.month || viewerDocument.year) && (
+                      <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3 sm:p-4">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Calendar size={16} className="sm:hidden text-white" />
+                            <Calendar size={18} className="hidden sm:block text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-yellow-300/80 text-xs sm:text-sm font-medium">Período</p>
+                            <p className="text-white font-semibold text-sm sm:text-base">
+                              {viewerDocument.month || '?'}/{viewerDocument.year || '?'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Arquivo */}
+                    <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-3 sm:p-4">
+                      <div className="flex items-center space-x-2 sm:space-x-3">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <FileText size={16} className="sm:hidden text-white" />
+                          <FileText size={18} className="hidden sm:block text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-cyan-300/80 text-xs sm:text-sm font-medium">Arquivo</p>
+                          <p className="text-white font-semibold text-sm sm:text-base truncate" title={viewerDocument.fileName}>{viewerDocument.fileName}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tamanho do Arquivo */}
+                    {viewerDocument.fileSize && (
+                      <div className="bg-gradient-to-r from-gray-500/10 to-slate-500/10 border border-gray-500/20 rounded-xl p-3 sm:p-4">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-gray-500 to-slate-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <FileText size={16} className="sm:hidden text-white" />
+                            <FileText size={18} className="hidden sm:block text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-gray-300/80 text-xs sm:text-sm font-medium">Tamanho</p>
+                            <p className="text-white font-semibold text-sm sm:text-base">
+                              {(viewerDocument.fileSize / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Botões de Ação */}
+                    <div className="space-y-2 sm:space-y-3 pt-2 sm:pt-4">
+                      <Button
+                        onClick={() => downloadUnifiedDocument(viewerDocument)}
+                        className="w-full bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-purple-500/25 transition-all duration-300 text-sm sm:text-base"
+                      >
+                        <Download size={16} className="sm:hidden mr-1.5" />
+                        <Download size={18} className="hidden sm:block mr-2" />
+                        <span className="hidden sm:inline">Baixar Documento</span>
+                        <span className="sm:hidden">Baixar</span>
+                      </Button>
+                      
+                      <Button
+                        onClick={() => {
+                          setShowUnifiedViewerModal(false);
+                          handleEmailHolerite(viewerDocument as Holerite);
+                        }}
+                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all duration-300 text-sm sm:text-base"
+                      >
+                        <Mail size={16} className="sm:hidden mr-1.5" />
+                        <Mail size={18} className="hidden sm:block mr-2" />
+                        <span className="hidden sm:inline">Enviar Email</span>
+                        <span className="sm:hidden">Email</span>
+                      </Button>
+                      
+                      <Button
+                        onClick={() => handleSendWhatsAppIndividual(viewerDocument as Holerite)}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-green-500/25 transition-all duration-300 text-sm sm:text-base"
+                      >
+                        <MessageSquare size={16} className="sm:hidden mr-1.5" />
+                        <MessageSquare size={18} className="hidden sm:block mr-2" />
+                        <span className="hidden sm:inline">Enviar WhatsApp</span>
+                        <span className="sm:hidden">WhatsApp</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Área do PDF */}
+                <div className="w-full lg:w-2/3 p-3 sm:p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/50 flex flex-col h-[60vh] lg:h-full">
+                  {/* Visualizador PDF */}
+                  <div className="flex-1 rounded-xl overflow-hidden border border-gray-600/30 bg-white min-h-0">
+                    <iframe
+                      src={viewerUrl}
+                      className="w-full h-full border-0 rounded-xl"
+                      title={`Documento Unificado - ${viewerDocument.employeeName}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Modal de Aviso de Sobrescrita de Período */}
+        <Dialog open={showDuplicatePeriodModal} onOpenChange={setShowDuplicatePeriodModal}>
+          <DialogContent className="sm:max-w-[500px] bg-seguranca-graphite border-orange-600">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-orange-400">
+                <AlertTriangle size={24} className="text-orange-400" />
+                Sobrescrever Período Existente?
               </DialogTitle>
               <DialogDescription className="text-gray-300">
                 Já existem documentos processados para este período
@@ -5268,11 +5507,11 @@ const Holerites: React.FC = () => {
             
             {duplicatePeriodInfo && (
               <div className="space-y-4">
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-orange-400 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-yellow-300 mb-2">
+                      <h4 className="font-semibold text-orange-300 mb-2">
                         {duplicatePeriodInfo.count} {duplicatePeriodInfo.type === 'holerite' ? 'holerite(s)' : 'comprovante(s)'} já processado(s)
                       </h4>
                       <p className="text-gray-300 text-sm mb-3">
@@ -5283,7 +5522,7 @@ const Holerites: React.FC = () => {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {duplicatePeriodInfo.periods.map((period, idx) => (
-                          <Badge key={idx} variant="outline" className="border-yellow-500/50 text-yellow-300 bg-yellow-500/10">
+                          <Badge key={idx} variant="outline" className="border-orange-500/50 text-orange-300 bg-orange-500/10">
                             📅 {period}
                           </Badge>
                         ))}
@@ -5292,23 +5531,22 @@ const Holerites: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="bg-seguranca-black border border-gray-600 rounded-lg p-4">
-                  <h4 className="font-semibold text-seguranca-lightgray mb-2 flex items-center gap-2">
-                    <FileText size={16} />
-                    O que fazer?
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-red-300 mb-2 flex items-center gap-2">
+                    <AlertTriangle size={16} />
+                    Atenção: Sobrescrita de Dados
                   </h4>
-                  <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
-                    <li>Exclua todos os {duplicatePeriodInfo.type === 'holerite' ? 'holerites' : 'comprovantes'} do período desejado</li>
-                    <li>Certifique-se de que não restam documentos do período</li>
-                    <li>Realize uma nova importação com os documentos corretos</li>
-                  </ol>
+                  <p className="text-gray-300 text-sm">
+                    Se você continuar com a importação, os {duplicatePeriodInfo.count} {duplicatePeriodInfo.type === 'holerite' ? 'holerite(s)' : 'comprovante(s)'} existente(s) 
+                    <span className="text-red-300 font-semibold"> serão permanentemente substituídos</span> pelos novos documentos que você está importando.
+                  </p>
                 </div>
 
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                   <p className="text-blue-300 text-sm flex items-start gap-2">
                     <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
                     <span>
-                      Esta validação evita duplicação de dados e garante que você tenha controle total sobre os documentos importados.
+                      <strong>Recomendação:</strong> Verifique se os novos documentos estão corretos antes de continuar. Esta ação não pode ser desfeita.
                     </span>
                   </p>
                 </div>
@@ -5321,63 +5559,110 @@ const Holerites: React.FC = () => {
                 onClick={() => {
                   setShowDuplicatePeriodModal(false);
                   setDuplicatePeriodInfo(null);
+                  setPendingUploadFile(null);
                 }}
+                disabled={overwritingPeriod}
                 className="border-gray-600 text-seguranca-lightgray"
               >
-                Entendi
+                Cancelar
               </Button>
               <Button 
-                onClick={() => {
-                  if (duplicatePeriodInfo) {
-                    if (duplicatePeriodInfo.type === 'comprovante') {
-                      // Extrair mês e ano do primeiro período
-                      const firstPeriod = duplicatePeriodInfo.periods[0];
-                      const [month, year] = firstPeriod.split('/');
-                      
-                      // Configurar o ano e mês ativos
-                      setActiveYear(year);
-                      setActiveMonth(month);
-                      
-                      // Navegar para a aba de comprovantes
-                      setActiveTab('comprovantes');
-                      
-                      // Scroll suave para o topo da lista
-                      setTimeout(() => {
-                        const mainContent = document.querySelector('[role="main"]') || document.querySelector('.space-y-6');
-                        if (mainContent) {
-                          mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                      }, 100);
+                onClick={async () => {
+                  // Processar o arquivo pendente
+                  if (pendingUploadFile && duplicatePeriodInfo) {
+                    try {
+                      setOverwritingPeriod(true);
                       
                       toast({
-                        title: "Redirecionado",
-                        description: `Exibindo comprovantes de ${month}/${year}. Selecione os documentos que deseja excluir.`,
+                        title: "Processando...",
+                        description: "Excluindo documentos existentes e importando novos...",
                       });
-                    } else {
-                      // Para holerites, apenas navegar para a aba
-                      setActiveTab('processados');
                       
-                      setTimeout(() => {
-                        const mainContent = document.querySelector('[role="main"]') || document.querySelector('.space-y-6');
-                        if (mainContent) {
-                          mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      // Fechar o modal
+                      setShowDuplicatePeriodModal(false);
+                      
+                      // Excluir documentos existentes do período
+                      if (duplicatePeriodInfo.type === 'comprovante') {
+                        // Excluir todos os comprovantes do período
+                        const receiptsToDelete = paymentReceipts.filter(r => 
+                          r.year === parseInt(activeYear) && r.month === parseInt(activeMonth)
+                        );
+                        
+                        console.log(`🗑️ Excluindo ${receiptsToDelete.length} comprovante(s) do período ${activeMonth}/${activeYear}...`);
+                        
+                        for (const receipt of receiptsToDelete) {
+                          try {
+                            await paymentReceiptService.deletePaymentReceipt(receipt.id);
+                          } catch (err) {
+                            console.error('Erro ao excluir comprovante:', err);
+                          }
                         }
-                      }, 100);
+                        
+                        // Aguardar um pouco para garantir que as exclusões foram processadas
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Processar o novo arquivo
+                        await handlePaymentReceiptUpload(pendingUploadFile);
+                        
+                        toast({
+                          title: "✅ Sucesso",
+                          description: `${receiptsToDelete.length} comprovante(s) antigo(s) substituído(s) pelos novos.`,
+                        });
+                        
+                      } else if (duplicatePeriodInfo.type === 'holerite') {
+                        // Excluir todos os holerites existentes
+                        console.log(`🗑️ Excluindo ${holerites.length} holerite(s)...`);
+                        
+                        for (const holerite of holerites) {
+                          try {
+                            await holeriteService.deleteHolerite(holerite.id);
+                          } catch (err) {
+                            console.error('Erro ao excluir holerite:', err);
+                          }
+                        }
+                        
+                        // Aguardar um pouco
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Recarregar a lista
+                        await loadHolerites();
+                        
+                        // Abrir modal para continuar o upload
+                        setShowUploadModal(true);
+                      }
                       
+                      // Limpar o arquivo pendente
+                      setPendingUploadFile(null);
+                      
+                    } catch (error) {
+                      console.error('Erro no processo de sobrescrita:', error);
                       toast({
-                        title: "Redirecionado",
-                        description: `Exibindo holerites. Selecione os documentos que deseja excluir.`,
+                        title: "Erro",
+                        description: "Erro ao sobrescrever documentos. Tente novamente.",
+                        variant: "destructive"
                       });
+                    } finally {
+                      setOverwritingPeriod(false);
+                      setDuplicatePeriodInfo(null);
                     }
+                  } else {
+                    setDuplicatePeriodInfo(null);
                   }
-                  
-                  // Fechar o modal
-                  setShowDuplicatePeriodModal(false);
-                  setDuplicatePeriodInfo(null);
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                disabled={overwritingPeriod}
+                className="bg-orange-600 hover:bg-orange-700"
               >
-                Ir para Exclusão
+                {overwritingPeriod ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    Continuar e Sobrescrever
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
