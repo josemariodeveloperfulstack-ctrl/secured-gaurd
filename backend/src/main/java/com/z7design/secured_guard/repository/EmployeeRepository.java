@@ -54,5 +54,17 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     @Query(value = "SELECT * FROM employees WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = :cpf OR REPLACE(REPLACE(REPLACE(document, '.', ''), '-', ''), ' ', '') = :cpf LIMIT 1", nativeQuery = true)
     Optional<Employee> findByCpf(@Param("cpf") String cpf);
     
+    // Buscar por nome (exato, case insensitive)
+    @Query(value = "SELECT * FROM employees WHERE UPPER(TRIM(name)) = UPPER(TRIM(:name)) LIMIT 1", nativeQuery = true)
+    Optional<Employee> findByNameExact(@Param("name") String name);
+    
+    // Buscar por WhatsApp/phone normalizado (remove caracteres não numéricos)
+    // A normalização acontece no código Java, aqui busca por valores normalizados
+    @Query(value = "SELECT * FROM employees WHERE " +
+            "REGEXP_REPLACE(COALESCE(whatsapp, ''), '[^0-9]', '', 'g') = :whatsapp OR " +
+            "REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') = :whatsapp " +
+            "LIMIT 1", nativeQuery = true)
+    Optional<Employee> findByWhatsApp(@Param("whatsapp") String whatsapp);
+    
     // List<Employee> findByPossuiWhatsappTrue();
 } 

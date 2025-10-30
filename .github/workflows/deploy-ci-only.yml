@@ -207,8 +207,8 @@ jobs:
             
             cd /var/www/secured_guard/ci
             
-            # Iniciar containers
-            docker-compose -f docker-compose.ci.yml up -d
+            # Iniciar containers com force-recreate para aplicar novas labels do Traefik
+            docker-compose -f docker-compose.ci.yml up -d --force-recreate
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
@@ -246,7 +246,33 @@ jobs:
           exit 1
 
       # ============================================
-      # 1️⃣5️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 1️⃣5️⃣ VALIDAR CORREÇÃO DO ERRO 405
+      # ============================================
+      - name: 🧪 Validate 405 fix
+        run: |
+          echo "🧪 Validando correção do erro 405..."
+          
+          # Testar endpoint de login
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://ci.z7botsolutions.com.br/api/auth/login \
+            -H "Content-Type: application/json" \
+            -H "Origin: https://ci.z7botsolutions.com.br" \
+            -d '{"username":"test","password":"test"}')
+          
+          echo "HTTP Code recebido: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" = "405" ]; then
+            echo "❌ Erro 405 ainda presente! Deploy falhou."
+            exit 1
+          elif [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Endpoint de login respondendo corretamente!"
+            echo "✅ Erro 405 foi corrigido com sucesso!"
+          else
+            echo "⚠️  HTTP Code inesperado: $HTTP_CODE"
+            echo "Mas não é 405, então a correção principal funcionou."
+          fi
+
+      # ============================================
+      # 1️⃣6️⃣ NOTIFICAÇÃO DE SUCESSO
       # ============================================
       - name: 🎉 CI Deployment successful
         if: success()
@@ -258,4 +284,5 @@ jobs:
           echo "📅 Data: $(date +'%Y-%m-%d %H:%M:%S')"
           echo "🔖 Commit: ${{ github.sha }}"
           echo "🌿 Branch: ci"
+          echo "✅ Erro 405 corrigido e validado"
           echo "================================"

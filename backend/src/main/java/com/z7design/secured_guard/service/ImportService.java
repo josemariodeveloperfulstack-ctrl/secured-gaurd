@@ -2,7 +2,6 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.ImportResultDto;
 import com.z7design.secured_guard.model.Employee;
-import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UserRepository;
@@ -57,54 +56,93 @@ public class ImportService {
 
                 try {
                     // EXTRAIR: apenas nome, CPF e WhatsApp do PDF
-                    // Os outros campos obrigatórios serão preenchidos com dados fake
-                    
                     log.info("Processando dados extraídos - Nome: {}, CPF: {}, WhatsApp: {}", 
                              data.name, data.cpf, data.whatsapp);
                     
-                    // Upsert Employee - usando apenas os 3 campos extraídos
-                    Optional<Employee> empOpt = employeeRepository.findByDocument(data.cpf);
-                    Employee emp;
+                    // Busca em cascata: CPF -> Nome -> WhatsApp
+                    Optional<Employee> empOpt = Optional.empty();
+                    String searchMethod = "";
                     
+                    // 1. Tentar buscar por CPF primeiro
+                    if (data.cpf != null && !data.cpf.trim().isEmpty()) {
+                        empOpt = employeeRepository.findByCpf(normalizeDigits(data.cpf));
+                        if (empOpt.isPresent()) {
+                            searchMethod = "CPF";
+                            log.info("Employee encontrado por CPF: {}", data.cpf);
+                        }
+                    }
+                    
+                    // 2. Se não encontrou por CPF, tentar por Nome
+                    if (!empOpt.isPresent() && data.name != null && !data.name.trim().isEmpty()) {
+                        empOpt = employeeRepository.findByNameExact(data.name.trim());
+                        if (empOpt.isPresent()) {
+                            searchMethod = "Nome";
+                            log.info("Employee encontrado por Nome: {}", data.name);
+                        }
+                    }
+                    
+                    // 3. Se não encontrou por CPF nem Nome, tentar por WhatsApp
+                    if (!empOpt.isPresent() && data.whatsapp != null && !data.whatsapp.trim().isEmpty()) {
+                        String whatsappNormalized = normalizeDigits(data.whatsapp.trim());
+                        empOpt = employeeRepository.findByWhatsApp(whatsappNormalized);
+                        if (empOpt.isPresent()) {
+                            searchMethod = "WhatsApp";
+                            log.info("Employee encontrado por WhatsApp: {}", whatsappNormalized);
+                        }
+                    }
+                    
+                    // Se encontrou o Employee, verificar se já tem nome e atualizar whatsapp
                     if (empOpt.isPresent()) {
-                        emp = empOpt.get();
-                        log.info("Employee existente encontrado, atualizando...");
-                        result.setUpdated(result.getUpdated() + 1);
+                        Employee emp = empOpt.get();
+                        
+                        // Verificar se já tem nome na coluna name
+                        if (emp.getName() != null && !emp.getName().trim().isEmpty()) {
+                            log.info("Employee encontrado por {} e possui nome '{}', atualizando whatsapp...", 
+                                    searchMethod, emp.getName());
+                            
+                            // Normalizar WhatsApp extraído do PDF (apenas dígitos)
+                            String whatsappValue = null;
+                            if (data.whatsapp != null && !data.whatsapp.trim().isEmpty()) {
+                                // Normalizar para formato numérico puro (remove tudo exceto dígitos)
+                                whatsappValue = normalizeDigits(data.whatsapp.trim());
+                                // Adicionar DDI 55 se não tiver (garantir formato internacional)
+                                if (!whatsappValue.startsWith("55") && whatsappValue.length() >= 10) {
+                                    whatsappValue = "55" + whatsappValue;
+                                }
+                                // Garantir que tenha pelo menos 12 dígitos (55 + DDD + 9 dígitos)
+                                if (whatsappValue.length() < 12) {
+                                    log.warn("WhatsApp muito curto: {}, ignorando", whatsappValue);
+                                    whatsappValue = null;
+                                }
+                            }
+                            
+                            // Update nativo para atualizar apenas a coluna whatsapp (não document, não name, não cpf)
+                            if (whatsappValue != null && !whatsappValue.isEmpty()) {
+                                jakarta.persistence.Query updateQuery = entityManager.createNativeQuery(
+                                    "UPDATE employees SET whatsapp = :whatsapp WHERE id = :id"
+                                );
+                                updateQuery.setParameter("whatsapp", whatsappValue);
+                                updateQuery.setParameter("id", emp.getId());
+                                
+                                int updated = updateQuery.executeUpdate();
+                                log.info("✅ WhatsApp atualizado - ID: {}, Nome: {}, WhatsApp: {}", 
+                                         emp.getId(), emp.getName(), whatsappValue);
+                                
+                                result.setUpdated(result.getUpdated() + 1);
+                            } else {
+                                log.warn("⚠️ WhatsApp não foi extraído do PDF para CPF: {}", data.cpf);
+                                result.setSkipped(result.getSkipped() + 1);
+                            }
+                        } else {
+                            log.warn("⚠️ Employee encontrado por {} mas não possui nome, pulando atualização", searchMethod);
+                            result.setSkipped(result.getSkipped() + 1);
+                        }
                     } else {
-                        emp = new Employee();
-                        log.info("Criando novo Employee...");
-                        result.setInserted(result.getInserted() + 1);
+                        log.warn("⚠️ Employee não encontrado no banco (CPF: {}, Nome: {}, WhatsApp: {}), pulando...", 
+                                 data.cpf, data.name, data.whatsapp);
+                        result.setSkipped(result.getSkipped() + 1);
+                        result.getErrors().add("Funcionário não encontrado (CPF: " + data.cpf + ", Nome: " + data.name + ")");
                     }
-                    
-                    // SEMPRE definir os 3 campos extraídos (não condicional)
-                    // 1. NOME
-                    if (data.name != null && !data.name.trim().isEmpty()) {
-                        emp.setName(data.name.trim());
-                        log.info("Nome definido: {}", emp.getName());
-                    } else {
-                        emp.setName("Funcionário " + data.cpf);
-                        log.warn("Nome não encontrado no PDF, usando padrão: {}", emp.getName());
-                    }
-                    
-                    // 2. CPF (document) - SEMPRE definir
-                    emp.setDocument(data.cpf);
-                    log.info("CPF definido: {}", emp.getDocument());
-                    
-                    // 3. WhatsApp (phone) - definir se foi extraído
-                    if (data.whatsapp != null && !data.whatsapp.trim().isEmpty()) {
-                        String phoneNormalized = normalizePhone(data.whatsapp.trim());
-                        emp.setPhone(phoneNormalized);
-                        log.info("WhatsApp definido: {}", emp.getPhone());
-                    } else {
-                        log.warn("WhatsApp não encontrado no PDF para CPF: {}", data.cpf);
-                        // Será preenchido com fake no fillRequiredFieldsWithDefaults
-                    }
-                    
-                    // Preencher TODOS os campos obrigatórios com dados fake/padrão
-                    fillRequiredFieldsWithDefaults(emp, data.cpf);
-                    employeeRepository.save(emp);
-                    log.info("Employee salvo com sucesso - CPF: {}, Nome: {}, Phone: {}", 
-                             emp.getDocument(), emp.getName(), emp.getPhone());
 
                     // Upsert User
                     Optional<User> userOpt = userRepository.findByUsername(data.cpf);
@@ -217,55 +255,79 @@ public class ImportService {
     }
     
     private String extractWhatsAppFromContext(String context) {
-        // Padrões para detectar WhatsApp
-        // Padrão 1: (XX) 9 XXXX-XXXX ou XX 9 XXXX-XXXX
+        // Padrões para detectar WhatsApp - priorizar formato "+55 XX XXXX-XXXX"
+        // Padrão 1: +55 XX XXXX-XXXX ou +55 XX 9XXXX-XXXX (formato internacional)
         Pattern pattern1 = Pattern.compile(
-            "(?:\\()?(\\d{2})(?:\\))?\\s*(?:9)?\\s*(\\d{4})(?:\\s*-?\\s*)?(\\d{4})",
+            "\\+55\\s*(\\d{2})\\s*(?:9)?(\\d{4})\\s*-?\\s*(\\d{4})",
             Pattern.CASE_INSENSITIVE
         );
-        // Padrão 2: 55XX9XXXXXXXX ou 55XX9XXXXXX
-        Pattern pattern2 = Pattern.compile("55(\\d{2})(?:9)?(\\d{8,9})");
-        // Padrão 3: números com 10-13 dígitos que podem ser telefone
-        Pattern pattern3 = Pattern.compile("(?:^|\\s)(\\d{10,13})(?:\\s|$)");
+        // Padrão 2: (XX) 9 XXXX-XXXX ou XX 9 XXXX-XXXX (formato nacional)
+        Pattern pattern2 = Pattern.compile(
+            "(?:\\+55\\s*)?(?:\\()?(\\d{2})(?:\\))?\\s*(?:9)?\\s*(\\d{4})(?:\\s*-?\\s*)?(\\d{4})",
+            Pattern.CASE_INSENSITIVE
+        );
+        // Padrão 3: 55XX9XXXXXXXX (sem formatação)
+        Pattern pattern3 = Pattern.compile("55(\\d{2})(?:9)?(\\d{8,9})");
+        // Padrão 4: números com 10-13 dígitos que podem ser telefone
+        Pattern pattern4 = Pattern.compile("(?:^|\\s|\\+)(\\d{10,13})(?:\\s|$)");
         
-        // Tentar padrão 1 (formato brasileiro comum)
+        // Tentar padrão 1 primeiro (formato +55 XX XXXX-XXXX)
         Matcher m1 = pattern1.matcher(context);
         if (m1.find()) {
             String ddd = m1.group(1);
             String parte1 = m1.group(2);
             String parte2 = m1.group(3);
+            String whats = "55" + ddd + parte1 + parte2;
+            log.debug("WhatsApp extraído (padrão 1): +55 {} {}-{}", ddd, parte1, parte2);
+            return whats;
+        }
+        
+        // Tentar padrão 2 (formato nacional com ou sem +55)
+        Matcher m2 = pattern2.matcher(context);
+        if (m2.find()) {
+            String ddd = m2.group(1);
+            String parte1 = m2.group(2);
+            String parte2 = m2.group(3);
             String whats = ddd + parte1 + parte2;
             // Se tiver 10 dígitos, adiciona o 9 (celular)
             if (whats.length() == 10) {
                 whats = ddd + "9" + parte1 + parte2;
             }
             if (whats.length() == 11 || whats.length() == 12) {
-                return normalizePhone("55" + whats);
+                String result = "55" + whats;
+                log.debug("WhatsApp extraído (padrão 2): {}", result);
+                return result;
             }
         }
         
-        // Tentar padrão 2 (com DDI)
-        Matcher m2 = pattern2.matcher(context);
-        if (m2.find()) {
-            String ddd = m2.group(1);
-            String numero = m2.group(2);
-            return normalizePhone("55" + ddd + numero);
+        // Tentar padrão 3 (com DDI já presente - 55 já está na captura)
+        Matcher m3 = pattern3.matcher(context);
+        if (m3.find()) {
+            String ddd = m3.group(1);
+            String numero = m3.group(2);
+            // O padrão já captura após "55", então só concatenamos
+            String result = "55" + ddd + numero;
+            log.debug("WhatsApp extraído (padrão 3): {}", result);
+            return result;
         }
         
-        // Tentar padrão 3 (número longo que pode ser telefone)
-        Matcher m3 = pattern3.matcher(context);
-        while (m3.find()) {
-            String numero = m3.group(1);
+        // Tentar padrão 4 (número longo que pode ser telefone)
+        Matcher m4 = pattern4.matcher(context);
+        while (m4.find()) {
+            String numero = m4.group(1);
             // Filtrar CPFs (11 dígitos começando com 0-3)
             if (numero.length() == 11 && numero.charAt(0) >= '0' && numero.charAt(0) <= '3') {
                 continue; // Provavelmente é um CPF, não telefone
             }
             // Se tem 10-13 dígitos e parece ser telefone
             if (numero.length() >= 10 && numero.length() <= 13) {
-                return normalizePhone(numero);
+                String result = numero.startsWith("55") ? numero : "55" + numero;
+                log.debug("WhatsApp extraído (padrão 4): {}", result);
+                return result;
             }
         }
         
+        log.debug("WhatsApp não encontrado no contexto");
         return ""; // Não encontrou WhatsApp
     }
 
@@ -349,38 +411,6 @@ public class ImportService {
     }
 
 
-    private void fillRequiredFieldsWithDefaults(Employee emp, String cpf) {
-        // Campos obrigatórios preenchidos com dados fake/padrão
-        if (emp.getStatus() == null) {
-            emp.setStatus(EmploymentStatus.ACTIVE);
-        }
-        if (emp.getRegistrationNumber() == null || emp.getRegistrationNumber().isEmpty()) {
-            emp.setRegistrationNumber("IMP-" + cpf);
-        }
-        if (emp.getHireDate() == null) {
-            emp.setHireDate(java.time.LocalDate.now());
-        }
-        
-        // Campos opcionais mas importantes - preencher com dados fake se vazios
-        // IMPORTANTE: não sobrescrever dados já preenchidos (nome, cpf, phone)
-        if (emp.getAddress() == null || emp.getAddress().isEmpty()) {
-            emp.setAddress("Rua não informada, 0 - Bairro não informado - Belo Horizonte/MG");
-        }
-        if (emp.getEmail() == null || emp.getEmail().isEmpty()) {
-            emp.setEmail("colaborador." + cpf + "@promovervigilancia.com.br");
-        }
-        // Phone só preencher se estiver vazio (não sobrescrever o extraído do PDF)
-        if (emp.getPhone() == null || emp.getPhone().isEmpty() || emp.getPhone().equals("5500000000000")) {
-            emp.setPhone("5500000000000");
-        }
-        
-        // Campos adicionais com valores fake (para evitar erros)
-        if (emp.getBirthDate() == null) {
-            emp.setBirthDate(java.time.LocalDate.now().minusYears(30)); // Data fake: 30 anos atrás
-        }
-        // Nome e document já foram definidos acima, não sobrescrever aqui
-        // Apenas garantir que document não está null (já garantido acima)
-    }
 
     private String normalizePhone(String s) {
         String n = normalizeDigits(s);
