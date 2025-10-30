@@ -59,6 +59,8 @@ import { employeeService } from '@/services/employeeService';
 const Holerites: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [cpfSearch, setCpfSearch] = useState('');
+  const cpfDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -2898,10 +2900,54 @@ const Holerites: React.FC = () => {
     }
   };
 
-  // Função para limpar seleção de documentos unificados
+  // Debounce para busca por CPF no backend
+  useEffect(() => {
+    if (cpfDebounceRef.current) clearTimeout(cpfDebounceRef.current);
+    cpfDebounceRef.current = setTimeout(async () => {
+      const onlyDigits = cpfSearch.replace(/\D/g, '');
+      try {
+        if (onlyDigits.length === 0) {
+          // Sem CPF → recarrega lista padrão
+          await loadHolerites(filters);
+          return;
+        }
+        if (onlyDigits.length < 3) return; // evita flood
+        setLoading(true);
+        const result = await holeriteService.getHoleritesByCpf(onlyDigits);
+        setHolerites(Array.isArray(result) ? result : []);
+      } catch (e) {
+        console.error('Erro ao buscar por CPF:', e);
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+    // cleanup
+    return () => {
+      if (cpfDebounceRef.current) clearTimeout(cpfDebounceRef.current);
+    };
+  }, [cpfSearch]);
 
   return (
     <StandardLayout>
+      {/* Barra superior com navegação por período já existente */}
+      {/* Campo de busca por CPF */}
+      <div className="w-full mt-2 px-4">
+        <div className="flex items-center gap-3">
+          <div className="relative w-full max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-seguranca-lightgray" size={18} />
+            <Input
+              placeholder="Buscar por CPF (somente números)"
+              value={cpfSearch}
+              onChange={(e) => setCpfSearch(e.target.value)}
+              className="pl-9 bg-seguranca-dark text-white border-seguranca-gray"
+            />
+          </div>
+          <Button variant="ghost" onClick={() => setCpfSearch('')} className="text-seguranca-lightgray">
+            Limpar
+          </Button>
+        </div>
+      </div>
+
       <div className="space-y-6">
         {/* Header Atraente */}
         <div className="bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black rounded-xl border border-gray-700 p-6 shadow-lg">

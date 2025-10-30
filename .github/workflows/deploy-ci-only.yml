@@ -116,6 +116,7 @@ jobs:
           # Criar estrutura de diretórios
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             mkdir -p /var/www/secured_guard/ci
+            mkdir -p /var/www/secured_guard/ci/nginx
             mkdir -p /var/www/secured_guard/ci/uploads
             mkdir -p /var/www/secured_guard/ci/logs
             mkdir -p /var/www/secured_guard/ci/postgres_data
@@ -124,6 +125,9 @@ jobs:
           
           # Transferir docker-compose.ci.yml
           sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.ci.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/
+          
+          # Transferir configuração do Nginx
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp nginx/ci.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/nginx/
           
           echo "✅ Arquivos transferidos!"
 

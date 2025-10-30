@@ -88,26 +88,9 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    # DESABILITADO TRAEFIK - usando Nginx como proxy reverso
     labels:
-      - "traefik.enable=true"
-      # Router principal
-      - "traefik.http.routers.backend-ci.rule=Host(`ci.z7botsolutions.com.br`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.backend-ci.entrypoints=websecure"
-      - "traefik.http.routers.backend-ci.tls.certresolver=letsencryptresolver"
-      - "traefik.http.routers.backend-ci.service=backend-ci"
-      - "traefik.http.routers.backend-ci.priority=100"
-      # Service
-      - "traefik.http.services.backend-ci.loadbalancer.server.port=8081"
-      - "traefik.http.services.backend-ci.loadbalancer.passhostheader=true"
-      # CORS Middleware - SIMPLIFICADO
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolalloworiginlistregex=.*"
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowmethods=*"
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowcredentials=true"
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolmaxage=3600"
-      - "traefik.http.middlewares.backend-ci-cors.headers.addvaryheader=true"
-      # Aplicar apenas CORS middleware
-      - "traefik.http.routers.backend-ci.middlewares=backend-ci-cors"
+      - "traefik.enable=false"
 
   # ========================================
   # EVOLUTION API (WhatsApp)
@@ -188,6 +171,29 @@ services:
       - "traefik.http.services.evolution-ci.loadbalancer.server.port=8080"
 
   # ========================================
+  # NGINX PROXY CI (EXPOSTO DIRETAMENTE - BYPASS TRAEFIK)
+  # ========================================
+  nginx-ci:
+    image: nginx:alpine
+    container_name: secured-guard-nginx-ci
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ci.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend-ci
+      - frontend-ci
+    networks:
+      - secured-guard-ci-network
+      - z7network
+    restart: unless-stopped
+    # DESABILITADO TRAEFIK - Nginx exposto diretamente
+    labels:
+      - "traefik.enable=false"
+
+  # ========================================
   # FRONTEND CI
   # ========================================
   frontend-ci:
@@ -209,12 +215,9 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    # DESABILITADO TRAEFIK - usando Nginx como proxy reverso
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend-ci.rule=Host(`ci.z7botsolutions.com.br`)"
-      - "traefik.http.routers.frontend-ci.entrypoints=websecure"
-      - "traefik.http.routers.frontend-ci.tls.certresolver=letsencryptresolver"
-      - "traefik.http.services.frontend-ci.loadbalancer.server.port=80"
+      - "traefik.enable=false"
 
 # ========================================
 # VOLUMES CI (usando bind mounts)

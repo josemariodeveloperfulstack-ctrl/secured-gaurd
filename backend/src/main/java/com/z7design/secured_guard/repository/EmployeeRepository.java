@@ -51,7 +51,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     Optional<String> findNameById(@Param("id") UUID id);
     
     // Buscar por CPF (coluna cpf do banco)
-    @Query(value = "SELECT * FROM employees WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = :cpf OR REPLACE(REPLACE(REPLACE(document, '.', ''), '-', ''), ' ', '') = :cpf LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT * FROM employees WHERE REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :cpf LIMIT 1", nativeQuery = true)
     Optional<Employee> findByCpf(@Param("cpf") String cpf);
     
     // Buscar por nome (exato, case insensitive)
