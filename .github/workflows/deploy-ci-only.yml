@@ -121,6 +121,7 @@ jobs:
             mkdir -p /var/www/secured_guard/ci/logs
             mkdir -p /var/www/secured_guard/ci/postgres_data
             mkdir -p /var/www/secured_guard/ci/redis_data
+            mkdir -p /var/www/secured_guard/traefik/dynamic
           EOF
           
           # Transferir docker-compose.ci.yml
@@ -128,6 +129,12 @@ jobs:
           
           # Transferir configuração do Nginx
           sshpass -p "${{ secrets.VPS_PASSWORD }}" scp nginx/ci.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/nginx/
+          
+          # Transferir configuração dinâmica do Traefik
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp traefik-dynamic-ci.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/traefik/dynamic/ci.yml
+          
+          # Transferir docker-compose.traefik.yml atualizado
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.traefik.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/
           
           echo "✅ Arquivos transferidos!"
 
@@ -182,7 +189,30 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣2️⃣ FAZER PULL DAS NOVAS IMAGENS
+      # 1️⃣2️⃣ REINICIAR TRAEFIK COM NOVA CONFIGURAÇÃO
+      # ============================================
+      - name: 🔄 Restart Traefik
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔄 Reiniciando Traefik com nova configuração..."
+            
+            cd /var/www/secured_guard
+            
+            # Reiniciar Traefik para carregar configuração dinâmica
+            docker-compose -f docker-compose.traefik.yml down
+            docker-compose -f docker-compose.traefik.yml up -d
+            
+            echo "⏳ Aguardando Traefik iniciar (10s)..."
+            sleep 10
+            
+            # Verificar se Traefik está rodando
+            docker ps | grep traefik
+            
+            echo "✅ Traefik reiniciado!"
+          EOF
+
+      # ============================================
+      # 1️⃣3️⃣ FAZER PULL DAS NOVAS IMAGENS
       # ============================================
       - name: 📥 Pull new images
         run: |
@@ -202,7 +232,7 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣3️⃣ INICIAR CONTAINERS CI
+      # 1️⃣4️⃣ INICIAR CONTAINERS CI
       # ============================================
       - name: 🚀 Start CI containers
         run: |
@@ -224,7 +254,7 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣4️⃣ HEALTH CHECK
+      # 1️⃣5️⃣ HEALTH CHECK
       # ============================================
       - name: 🏥 Health check
         run: |
@@ -250,7 +280,7 @@ jobs:
           exit 1
 
       # ============================================
-      # 1️⃣5️⃣ VALIDAR CORREÇÃO DO ERRO 405
+      # 1️⃣6️⃣ VALIDAR CORREÇÃO DO ERRO 405
       # ============================================
       - name: 🧪 Validate 405 fix
         run: |
@@ -276,7 +306,7 @@ jobs:
           fi
 
       # ============================================
-      # 1️⃣6️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 1️⃣7️⃣ NOTIFICAÇÃO DE SUCESSO
       # ============================================
       - name: 🎉 CI Deployment successful
         if: success()

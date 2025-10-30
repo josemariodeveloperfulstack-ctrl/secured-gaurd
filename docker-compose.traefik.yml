@@ -10,6 +10,9 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=z7network"
+      # Adicionar provider de arquivo para configuração dinâmica
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
@@ -26,6 +29,8 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "/var/www/secured_guard/traefik/letsencrypt:/etc/traefik/letsencrypt"
       - "/var/www/secured_guard/traefik/logs:/var/log/traefik"
+      # Montar diretório de configuração dinâmica
+      - "/var/www/secured_guard/traefik/dynamic:/etc/traefik/dynamic:ro"
     ports:
       - "80:80"
       - "443:443"
