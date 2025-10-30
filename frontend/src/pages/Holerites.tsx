@@ -59,8 +59,6 @@ import { employeeService } from '@/services/employeeService';
 const Holerites: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [cpfSearch, setCpfSearch] = useState('');
-  const cpfDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -281,6 +279,14 @@ const Holerites: React.FC = () => {
   const [selectedPaymentReceipts, setSelectedPaymentReceipts] = useState<string[]>([]);
   const [selectedPaymentReceiptForView, setSelectedPaymentReceiptForView] = useState<PaymentReceipt | null>(null);
   const [showPaymentReceiptViewModal, setShowPaymentReceiptViewModal] = useState(false);
+
+  // Estados para modal de aviso de período duplicado
+  const [showDuplicatePeriodModal, setShowDuplicatePeriodModal] = useState(false);
+  const [duplicatePeriodInfo, setDuplicatePeriodInfo] = useState<{
+    type: 'holerite' | 'comprovante';
+    periods: string[];
+    count: number;
+  } | null>(null);
 
   // Estados para unificação em lote
   const [showBatchUnificationModal, setShowBatchUnificationModal] = useState(false);
@@ -1045,6 +1051,48 @@ const Holerites: React.FC = () => {
   };
 
   // Função para processar upload de comprovantes - USANDO PROCESSAMENTO AUTOMÃTICO
+  // Função para validar se já existem documentos do período antes de importar
+  const validatePeriodBeforeUpload = (type: 'holerite' | 'comprovante'): boolean => {
+    if (type === 'comprovante') {
+      // Verificar se há comprovantes no período ativo
+      const receiptsInPeriod = paymentReceipts.filter(r => 
+        r.year === parseInt(activeYear) && r.month === parseInt(activeMonth)
+      );
+      
+      if (receiptsInPeriod.length > 0) {
+        const periodStr = `${activeMonth.padStart(2, '0')}/${activeYear}`;
+        setDuplicatePeriodInfo({
+          type: 'comprovante',
+          periods: [periodStr],
+          count: receiptsInPeriod.length
+        });
+        setShowDuplicatePeriodModal(true);
+        return false;
+      }
+    } else if (type === 'holerite') {
+      // Agrupar holerites por período
+      const periodCounts = new Map<string, number>();
+      holerites.forEach(h => {
+        const key = `${h.month}/${h.year}`;
+        periodCounts.set(key, (periodCounts.get(key) || 0) + 1);
+      });
+      
+      if (periodCounts.size > 0) {
+        const periods = Array.from(periodCounts.keys());
+        const totalCount = Array.from(periodCounts.values()).reduce((a, b) => a + b, 0);
+        setDuplicatePeriodInfo({
+          type: 'holerite',
+          periods: periods,
+          count: totalCount
+        });
+        setShowDuplicatePeriodModal(true);
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const handlePaymentReceiptUpload = async (file: File) => {
     try {
       setProcessingPaymentReceipts(true);
@@ -2002,7 +2050,7 @@ const Holerites: React.FC = () => {
         if (result.invalidCount && result.invalidCount > 0) {
           toast({
             title: "Aviso",
-            description: `${result.invalidCount} holerite${result.invalidCount > 1 ? 's' : ''} com ID${result.invalidCount > 1 ? 's' : ''} inválido${result.invalidCount > 1 ? 's' : ''} foram ignorado${result.invalidCount > 1 ? 's' : ''}.`,
+            description: `${result.invalidCount} holerite${result.invalidCount > 1 ? 's' : ''} com ID${result.invalidCount > 1 ? 's' : ''} inválido${result.invalidCount > 1 ? 's' : ''}.`,
             variant: "destructive"
           });
         }
@@ -2905,23 +2953,6 @@ const Holerites: React.FC = () => {
   return (
     <StandardLayout>
       {/* Barra superior com navegação por período já existente */}
-      {/* Campo de busca por CPF */}
-      <div className="w-full mt-2 px-4">
-        <div className="flex items-center gap-3">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-seguranca-lightgray" size={18} />
-            <Input
-              placeholder="Buscar por CPF (somente números)"
-              value={cpfSearch}
-              onChange={(e) => setCpfSearch(e.target.value)}
-              className="pl-9 bg-seguranca-dark text-white border-seguranca-gray"
-            />
-          </div>
-          <Button variant="ghost" onClick={() => setCpfSearch('')} className="text-seguranca-lightgray">
-            Limpar
-          </Button>
-        </div>
-      </div>
 
       <div className="space-y-6">
         {/* Header Atraente */}
@@ -3115,7 +3146,12 @@ const Holerites: React.FC = () => {
                 {/* BotÃµes de AÃ§Ã£o */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button 
-                      onClick={() => setShowUploadModal(true)}
+                      onClick={() => {
+                        // Validar se já existem holerites antes de abrir o modal
+                        if (validatePeriodBeforeUpload('holerite')) {
+                          setShowUploadModal(true);
+                        }
+                      }}
                       disabled={loading}
                       className="group relative bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 px-8 py-4 rounded-2xl shadow-2xl hover:shadow-red-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-red-400/20"
                     >
@@ -3583,7 +3619,12 @@ const Holerites: React.FC = () => {
                   {/* BotÃ£o de Upload Melhorado */}
                   <div className="flex justify-center">
                       <Button 
-                      onClick={() => setShowPaymentReceiptUploadModal(true)}
+                      onClick={() => {
+                        // Validar se já existem comprovantes do período antes de abrir o modal
+                        if (validatePeriodBeforeUpload('comprovante')) {
+                          setShowPaymentReceiptUploadModal(true);
+                        }
+                      }}
                       disabled={processingPaymentReceipts}
                       className="group relative bg-gradient-to-r from-blue-500 via-purple-600 to-blue-700 hover:from-blue-600 hover:via-purple-700 hover:to-blue-800 px-12 py-6 rounded-3xl shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 transform hover:scale-110 hover:-translate-y-2 text-white font-bold text-xl border border-blue-400/30 overflow-hidden"
                     >
@@ -3862,7 +3903,12 @@ const Holerites: React.FC = () => {
                           Não há comprovantes para {getMonthName(parseInt(activeMonth))} de {activeYear}.
                       </p>
                       <Button
-                          onClick={() => setShowPaymentReceiptUploadModal(true)}
+                          onClick={() => {
+                            // Validar se já existem comprovantes do período antes de abrir o modal
+                            if (validatePeriodBeforeUpload('comprovante')) {
+                              setShowPaymentReceiptUploadModal(true);
+                            }
+                          }}
                           className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
                         >
                           <Plus size={20} className="mr-2" />
@@ -5048,6 +5094,290 @@ const Holerites: React.FC = () => {
               </Button>
               <Button onClick={() => handleSendDocuments(sendType)} className={sendType === 'email' ? 'w-full sm:w-auto bg-blue-600 hover:bg-blue-700' : 'w-full sm:w-auto bg-green-600 hover:bg-green-700'}>
                 {sendType === 'email' ? 'Enviar' : 'Enviar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Upload de Holerites */}
+        <HoleriteUpload
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onUploadSuccess={loadHolerites}
+        />
+
+        {/* Modal de Upload de Comprovantes de Pagamento */}
+        <Dialog open={showPaymentReceiptUploadModal} onOpenChange={setShowPaymentReceiptUploadModal}>
+          <DialogContent className="sm:max-w-[800px] bg-seguranca-graphite border-gray-600">
+            <DialogHeader>
+              <DialogTitle className="text-seguranca-lightgray">Upload de Comprovantes de Pagamento</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Importe comprovantes de pagamento de salário em PDF para processamento automático
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="payment-receipt-file" className="text-seguranca-lightgray">Arquivo PDF de Comprovante</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="payment-receipt-file"
+                    type="file"
+                    accept=".pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Validar se já existem documentos do período antes de processar
+                        if (validatePeriodBeforeUpload('comprovante')) {
+                          await handlePaymentReceiptUpload(file);
+                        } else {
+                          // Limpar o input para permitir nova seleção
+                          e.target.value = '';
+                        }
+                      }
+                    }}
+                    disabled={processingPaymentReceipts}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  />
+                </div>
+              </div>
+              
+              <div className="bg-seguranca-black p-4 rounded-lg">
+                <h4 className="font-medium mb-2 text-seguranca-lightgray">Como funciona:</h4>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• O PDF será processado automaticamente no servidor</li>
+                  <li>• Os dados do comprovante serão extraídos usando OCR</li>
+                  <li>• Informações como nome, CPF, valor e data serão identificadas</li>
+                  <li>• O comprovante será salvo e organizado por período</li>
+                </ul>
+              </div>
+
+              {processingPaymentReceipts && (
+                <div className="flex items-center justify-center gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+                  <span className="text-blue-300">Processando comprovante de pagamento...</span>
+                </div>
+              )}
+              
+              <div className="flex justify-end gap-2 mt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowPaymentReceiptUploadModal(false)} 
+                  disabled={processingPaymentReceipts}
+                  className="border-gray-600 text-seguranca-lightgray"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Visualização de Holerite */}
+        {showViewModal && selectedHolerite && (
+          <HoleriteViewModal
+            holerite={selectedHolerite}
+            onClose={() => {
+              setShowViewModal(false);
+              setSelectedHolerite(null);
+            }}
+          />
+        )}
+
+        {/* Modal de Email de Holerite */}
+        {showEmailModal && selectedHolerite && (
+          <HoleriteEmailModal
+            holerite={selectedHolerite}
+            onClose={() => {
+              setShowEmailModal(false);
+              setSelectedHolerite(null);
+            }}
+            onSuccess={loadHolerites}
+          />
+        )}
+
+        {/* Modal de Visualização de Comprovante de Pagamento */}
+        <PaymentReceiptViewModal
+          open={showPaymentReceiptViewModal}
+          onOpenChange={(open) => {
+            setShowPaymentReceiptViewModal(open);
+            if (!open) {
+              setSelectedPaymentReceiptForView(null);
+            }
+          }}
+          receipt={selectedPaymentReceiptForView}
+          onDownload={handleDownloadPaymentReceipt}
+        />
+
+        {/* Modal de Validação de Contatos */}
+        {showValidationModal && (
+          <ContactValidationModal
+            isOpen={showValidationModal}
+            onClose={() => setShowValidationModal(false)}
+            employeeIds={resolvedEmployeeIds}
+            sendType={validationSendType}
+          />
+        )}
+
+        {/* Modal de Atualização de WhatsApp */}
+        {showSingleWhatsappModal && selectedValidationDetail && (
+          <WhatsAppUpdateModal
+            isOpen={showSingleWhatsappModal}
+            onClose={() => {
+              setShowSingleWhatsappModal(false);
+              setSelectedValidationDetail(null);
+            }}
+            employeeId={selectedValidationDetail.employeeId}
+            currentWhatsApp={selectedValidationDetail.whatsapp || ''}
+            onSuccess={() => {
+              setShowSingleWhatsappModal(false);
+              setSelectedValidationDetail(null);
+            }}
+          />
+        )}
+
+        {/* Modal de Formulário Rápido */}
+        {showSingleUserModal && selectedValidationDetail && (
+          <QuickUserFormModal
+            isOpen={showSingleUserModal}
+            onClose={() => {
+              setShowSingleUserModal(false);
+              setSelectedValidationDetail(null);
+            }}
+            employeeId={selectedValidationDetail.employeeId}
+            employeeName={selectedValidationDetail.employeeName}
+            onSuccess={() => {
+              setShowSingleUserModal(false);
+              setSelectedValidationDetail(null);
+            }}
+          />
+        )}
+
+        {/* Modal de Aviso de Período Duplicado */}
+        <Dialog open={showDuplicatePeriodModal} onOpenChange={setShowDuplicatePeriodModal}>
+          <DialogContent className="sm:max-w-[500px] bg-seguranca-graphite border-yellow-600">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-yellow-400">
+                <AlertTriangle size={24} className="text-yellow-400" />
+                Período Já Importado
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Já existem documentos processados para este período
+              </DialogDescription>
+            </DialogHeader>
+            
+            {duplicatePeriodInfo && (
+              <div className="space-y-4">
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-300 mb-2">
+                        {duplicatePeriodInfo.count} {duplicatePeriodInfo.type === 'holerite' ? 'holerite(s)' : 'comprovante(s)'} já processado(s)
+                      </h4>
+                      <p className="text-gray-300 text-sm mb-3">
+                        {duplicatePeriodInfo.type === 'holerite' 
+                          ? 'Foram encontrados holerites já importados para os seguintes períodos:'
+                          : `Já existem ${duplicatePeriodInfo.count} comprovante(s) processado(s) para:`
+                        }
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {duplicatePeriodInfo.periods.map((period, idx) => (
+                          <Badge key={idx} variant="outline" className="border-yellow-500/50 text-yellow-300 bg-yellow-500/10">
+                            📅 {period}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-seguranca-black border border-gray-600 rounded-lg p-4">
+                  <h4 className="font-semibold text-seguranca-lightgray mb-2 flex items-center gap-2">
+                    <FileText size={16} />
+                    O que fazer?
+                  </h4>
+                  <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
+                    <li>Exclua todos os {duplicatePeriodInfo.type === 'holerite' ? 'holerites' : 'comprovantes'} do período desejado</li>
+                    <li>Certifique-se de que não restam documentos do período</li>
+                    <li>Realize uma nova importação com os documentos corretos</li>
+                  </ol>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-blue-300 text-sm flex items-start gap-2">
+                    <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      Esta validação evita duplicação de dados e garante que você tenha controle total sobre os documentos importados.
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDuplicatePeriodModal(false);
+                  setDuplicatePeriodInfo(null);
+                }}
+                className="border-gray-600 text-seguranca-lightgray"
+              >
+                Entendi
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (duplicatePeriodInfo) {
+                    if (duplicatePeriodInfo.type === 'comprovante') {
+                      // Extrair mês e ano do primeiro período
+                      const firstPeriod = duplicatePeriodInfo.periods[0];
+                      const [month, year] = firstPeriod.split('/');
+                      
+                      // Configurar o ano e mês ativos
+                      setActiveYear(year);
+                      setActiveMonth(month);
+                      
+                      // Navegar para a aba de comprovantes
+                      setActiveTab('comprovantes');
+                      
+                      // Scroll suave para o topo da lista
+                      setTimeout(() => {
+                        const mainContent = document.querySelector('[role="main"]') || document.querySelector('.space-y-6');
+                        if (mainContent) {
+                          mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 100);
+                      
+                      toast({
+                        title: "Redirecionado",
+                        description: `Exibindo comprovantes de ${month}/${year}. Selecione os documentos que deseja excluir.`,
+                      });
+                    } else {
+                      // Para holerites, apenas navegar para a aba
+                      setActiveTab('processados');
+                      
+                      setTimeout(() => {
+                        const mainContent = document.querySelector('[role="main"]') || document.querySelector('.space-y-6');
+                        if (mainContent) {
+                          mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 100);
+                      
+                      toast({
+                        title: "Redirecionado",
+                        description: `Exibindo holerites. Selecione os documentos que deseja excluir.`,
+                      });
+                    }
+                  }
+                  
+                  // Fechar o modal
+                  setShowDuplicatePeriodModal(false);
+                  setDuplicatePeriodInfo(null);
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Ir para Exclusão
               </Button>
             </DialogFooter>
           </DialogContent>
