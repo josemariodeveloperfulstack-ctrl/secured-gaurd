@@ -656,6 +656,15 @@ public class UnifiedDocumentService {
                         String employeeName = extractEmployeeNameFromFileName(fileName);
                         doc.put("employeeName", employeeName);
                         
+                        // Tentar extrair CPF do nome do arquivo (padrão: NOME_CPF_MES_ANO)
+                        java.util.regex.Pattern cpfPattern = java.util.regex.Pattern.compile("(\\d{11})");
+                        java.util.regex.Matcher cpfMatcher = cpfPattern.matcher(fileName);
+                        if (cpfMatcher.find()) {
+                            String cpf = cpfMatcher.group(1);
+                            doc.put("cpf", cpf);
+                            log.debug("📄 CPF extraído do arquivo: {}", cpf);
+                        }
+                        
                         // Tentar extrair mês e ano do nome do arquivo
                         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("_(\\d{1,2})_(\\d{4})");
                         java.util.regex.Matcher matcher = pattern.matcher(fileName);

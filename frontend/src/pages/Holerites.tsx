@@ -832,10 +832,114 @@ const Holerites: React.FC = () => {
     link.click();
   };
 
-  const sendSingleDocument = (type: 'email' | 'whatsapp', index: number) => {
-    setSelectedUnifiedDocuments(new Set([index]));
-    setSendType(type);
-    setShowSendModal(true);
+  // Função para validar documento unificado antes de enviar
+  const validateUnifiedDocumentForSending = async (doc: any): Promise<{ valid: boolean; employeeId?: string; reason?: string }> => {
+    // 1. Verificar se tem CPF
+    if (!doc.cpf) {
+      return { valid: false, reason: 'Documento sem CPF - não é possível identificar o destinatário' };
+    }
+
+    const cpf = doc.cpf.replace(/\D/g, '');
+    
+    // 2. Buscar funcionário pelo CPF
+    try {
+      const employees = await employeeService.searchEmployees(cpf);
+      const employee = employees?.find((e: any) => (e.document || e.cpf || '').replace(/\D/g, '') === cpf);
+      
+      if (!employee) {
+        return { valid: false, reason: 'CPF não encontrado na tabela de funcionários' };
+      }
+
+      // 3. Validar se o funcionário tem usuário e WhatsApp
+      const validation = await contactValidationService.validateContacts({
+        employeeIds: [employee.id],
+        type: 'whatsapp'
+      });
+
+      const detail = validation?.details?.[0];
+      
+      if (!detail) {
+        return { valid: false, reason: 'Erro ao validar contatos do funcionário' };
+      }
+
+      // 4. Verificar se está pronto para envio
+      if (detail.status !== 'ready') {
+        if (detail.needsUserCreation) {
+          return { valid: false, reason: 'Funcionário não possui usuário no sistema' };
+        }
+        if (detail.needsWhatsAppUpdate) {
+          return { valid: false, reason: 'Funcionário não possui WhatsApp cadastrado' };
+        }
+        return { valid: false, reason: 'Contatos do funcionário não estão prontos para envio' };
+      }
+
+      return { valid: true, employeeId: employee.id };
+      
+    } catch (error) {
+      console.error('Erro ao validar documento unificado:', error);
+      return { valid: false, reason: 'Erro ao buscar informações do funcionário' };
+    }
+  };
+
+  // Envio individual de documento unificado
+  const sendSingleDocument = async (type: 'email' | 'whatsapp', index: number) => {
+    const filteredDocs = getFilteredUnifiedDocuments();
+    const doc = filteredDocs[index];
+    
+    if (!doc) return;
+
+    try {
+      // Validar rigorosamente antes de enviar
+      const validation = await validateUnifiedDocumentForSending(doc);
+      
+      if (!validation.valid) {
+        toast({
+          title: "⚠️ Não é possível enviar",
+          description: validation.reason || 'Documento não possui informações válidas para envio',
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Enviar via API
+      const payload = {
+        tipo: type,
+        funcionarioId: validation.employeeId,
+        mensagem: type === 'whatsapp' 
+          ? 'Olá! Seu documento unificado (holerite + comprovante) está disponível para download. Acesse o sistema SecuredGuard para visualizar.'
+          : undefined
+      };
+
+      const response = await api.post('/api/envio/individual', payload);
+      
+      if (response.data.sucesso) {
+        toast({
+          title: '✅ Sucesso',
+          description: `Documento enviado ${type === 'email' ? 'por email' : 'por WhatsApp'} para ${doc.employeeName}`,
+        });
+      } else {
+        toast({
+          title: 'Erro no envio',
+          description: response.data.mensagem,
+          variant: 'destructive'
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao enviar documento unificado:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao enviar documento ${type === 'email' ? 'por email' : 'por WhatsApp'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Função auxiliar para validação em lote
+  const validateDocumentsForBatch = async (documents: any[]) => {
+    const validations = await Promise.all(
+      documents.map(doc => validateUnifiedDocumentForSending(doc))
+    );
+    return validations;
   };
 
   // Funções para envio de documentos
@@ -859,13 +963,48 @@ const Holerites: React.FC = () => {
     setSendingDocuments(true);
 
     try {
-      // TODO: Implementar envio real por email/WhatsApp
-      // Por enquanto, simular envio
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Validar e enviar todos os documentos com validação rigorosa por CPF
+      const validations = await Promise.all(
+        selected.map(doc => validateUnifiedDocumentForSending(doc))
+      );
+
+      const validDocs = selected.filter((_, idx) => validations[idx].valid);
+      
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < validDocs.length; i++) {
+        const doc = validDocs[i];
+        const globalIdx = selected.indexOf(doc);
+        const employeeId = validations[globalIdx].employeeId;
+
+        try {
+          const payload = {
+            tipo: sendType,
+            funcionarioId: employeeId,
+            mensagem: sendType === 'whatsapp' 
+              ? 'Olá! Seu documento unificado (holerite + comprovante) está disponível para download. Acesse o sistema SecuredGuard para visualizar.'
+              : undefined
+          };
+
+          const response = await api.post('/api/envio/individual', payload);
+          
+          if (response.data.sucesso) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Erro ao enviar documento para ${doc.employeeName}:`, error);
+          failCount++;
+        }
+      }
+
+      const invalidCount = selected.length - validDocs.length;
       
       toast({
-        title: `✅ Envio ${sendType === 'email' ? 'por Email' : 'por WhatsApp'} realizado`,
-        description: `${selected.length} documento(s) enviado(s) com sucesso!`,
+        title: '✅ Envio concluído',
+        description: `${successCount} enviado(s)${failCount > 0 ? `, ${failCount} falharam` : ''}${invalidCount > 0 ? `, ${invalidCount} inválido(s)` : ''}`,
       });
       
       setShowSendModal(false);
@@ -1103,7 +1242,7 @@ const Holerites: React.FC = () => {
     return true;
   };
 
-  const handlePaymentReceiptUpload = async (file: File) => {
+  const handlePaymentReceiptUpload = async (file: File, options?: { overwriteExisting?: boolean }) => {
     try {
       setProcessingPaymentReceipts(true);
       console.log('📊¤ Iniciando processamento automático do comprovante:', file.name);
@@ -1123,7 +1262,34 @@ const Holerites: React.FC = () => {
         const processedReceipts: PaymentReceipt[] = response.data;
         console.log('✅ Comprovantes processados automaticamente:', processedReceipts);
         
-        // Adicionar todos os comprovantes processados
+        // Se for sobrescrita, remover do estado (e do backend) os existentes que
+        // colidirem com os novos por (empresa quando disponível) + funcionário + período
+        if (options?.overwriteExisting) {
+          try {
+            for (const newRec of processedReceipts) {
+              // Localizar recebimentos existentes que batem com funcionário + período
+              const samePeriod = (r: PaymentReceipt) => {
+                const m = r.month || (r.paymentDate ? new Date(r.paymentDate).getMonth() + 1 : undefined);
+                const y = r.year || (r.paymentDate ? new Date(r.paymentDate).getFullYear() : undefined);
+                const nm = newRec.month || (newRec.paymentDate ? new Date(newRec.paymentDate).getMonth() + 1 : undefined);
+                const ny = newRec.year || (newRec.paymentDate ? new Date(newRec.paymentDate).getFullYear() : undefined);
+                return m === nm && y === ny;
+              };
+              const toDelete = paymentReceipts.filter(r => samePeriod(r) && (r.employeeName || '').trim().toLowerCase() === (newRec.employeeName || '').trim().toLowerCase());
+              for (const old of toDelete) {
+                try {
+                  await paymentReceiptService.deletePaymentReceipt(old.id);
+                } catch (err) {
+                  console.warn('Erro ao excluir duplicado existente:', err);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Erro na rotina de sobrescrita seletiva:', err);
+          }
+        }
+
+        // Adicionar todos os comprovantes processados ao estado
         setPaymentReceipts(prev => [...prev, ...processedReceipts]);
         
         toast({
@@ -4645,8 +4811,27 @@ const Holerites: React.FC = () => {
                                               size="sm"
                                               variant="outline"
                                               className="border-green-500/30 text-green-300 hover:bg-green-500/10"
+                                              title="Baixar documento"
                                           >
                                               <Download className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                              onClick={() => sendSingleDocument('email', index)}
+                                              size="sm"
+                                              variant="outline"
+                                              className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+                                              title="Enviar por Email"
+                                          >
+                                              <Mail className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                              onClick={() => sendSingleDocument('whatsapp', index)}
+                                              size="sm"
+                                              variant="outline"
+                                              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                                              title="Enviar por WhatsApp"
+                                          >
+                                              <MessageSquare className="h-4 w-4" />
                                           </Button>
                                           <Button
                                               onClick={() => {
@@ -4657,6 +4842,7 @@ const Holerites: React.FC = () => {
                                               size="sm"
                                               variant="outline"
                                               className="border-red-500/30 text-red-300 hover:bg-red-500/10"
+                                              title="Excluir documento"
                                           >
                                               <Trash2 className="h-4 w-4" />
                                           </Button>
@@ -4671,24 +4857,18 @@ const Holerites: React.FC = () => {
                       {selectedUnifiedDocuments.size > 0 && (
                           <div className="flex items-center justify-center gap-3 pt-4 border-t border-white/10">
                               <Button
-                                  onClick={() => {
-                                      setSendType('email');
-                                      setShowSendModal(true);
-                                  }}
-                                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                                  onClick={() => handleSendDocuments('email')}
+                                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
                               >
                                   <Mail className="mr-2 h-4 w-4" />
-                                  Enviar por Email
+                                  Enviar por Email ({selectedUnifiedDocuments.size})
                               </Button>
                               <Button
-                                  onClick={() => {
-                                      setSendType('whatsapp');
-                                      setShowSendModal(true);
-                                  }}
-                                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                                  onClick={() => handleSendDocuments('whatsapp')}
+                                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                               >
                                   <MessageSquare className="mr-2 h-4 w-4" />
-                                  Enviar por WhatsApp
+                                  Enviar por WhatsApp ({selectedUnifiedDocuments.size})
                               </Button>
                               <Button
                                   onClick={() => handleDeleteDocuments('batch')}
@@ -5087,8 +5267,19 @@ const Holerites: React.FC = () => {
               <Button variant="outline" onClick={() => setShowSendModal(false)} className="w-full sm:w-auto">
                 Cancelar
               </Button>
-              <Button onClick={() => handleSendDocuments(sendType)} className={sendType === 'email' ? 'w-full sm:w-auto bg-blue-600 hover:bg-blue-700' : 'w-full sm:w-auto bg-green-600 hover:bg-green-700'}>
-                {sendType === 'email' ? 'Enviar' : 'Enviar'}
+              <Button 
+                onClick={executeSendDocuments} 
+                disabled={sendingDocuments}
+                className={sendType === 'email' ? 'w-full sm:w-auto bg-blue-600 hover:bg-blue-700' : 'w-full sm:w-auto bg-green-600 hover:bg-green-700'}
+              >
+                {sendingDocuments ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>{sendType === 'email' ? 'Enviar Emails' : 'Enviar WhatsApp'}</>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -5450,28 +5641,52 @@ const Holerites: React.FC = () => {
                         <span className="sm:hidden">Baixar</span>
                       </Button>
                       
-                      <Button
-                        onClick={() => {
-                          setShowUnifiedViewerModal(false);
-                          handleEmailHolerite(viewerDocument as Holerite);
-                        }}
-                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all duration-300 text-sm sm:text-base"
-                      >
-                        <Mail size={16} className="sm:hidden mr-1.5" />
-                        <Mail size={18} className="hidden sm:block mr-2" />
-                        <span className="hidden sm:inline">Enviar Email</span>
-                        <span className="sm:hidden">Email</span>
-                      </Button>
+                      {viewerDocument?.cpf && (
+                        <>
+                          <Button
+                            onClick={async () => {
+                              const filteredDocs = getFilteredUnifiedDocuments();
+                              const docIndex = filteredDocs.findIndex(d => d.fileName === viewerDocument.fileName);
+                              if (docIndex !== -1) {
+                                await sendSingleDocument('email', docIndex);
+                              }
+                            }}
+                            className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all duration-300 text-sm sm:text-base"
+                          >
+                            <Mail size={16} className="sm:hidden mr-1.5" />
+                            <Mail size={18} className="hidden sm:block mr-2" />
+                            <span className="hidden sm:inline">Enviar Email</span>
+                            <span className="sm:hidden">Email</span>
+                          </Button>
+                          
+                          <Button
+                            onClick={async () => {
+                              const filteredDocs = getFilteredUnifiedDocuments();
+                              const docIndex = filteredDocs.findIndex(d => d.fileName === viewerDocument.fileName);
+                              if (docIndex !== -1) {
+                                await sendSingleDocument('whatsapp', docIndex);
+                              }
+                            }}
+                            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-green-500/25 transition-all duration-300 text-sm sm:text-base"
+                          >
+                            <MessageSquare size={16} className="sm:hidden mr-1.5" />
+                            <MessageSquare size={18} className="hidden sm:block mr-2" />
+                            <span className="hidden sm:inline">Enviar WhatsApp</span>
+                            <span className="sm:hidden">WhatsApp</span>
+                          </Button>
+                        </>
+                      )}
                       
-                      <Button
-                        onClick={() => handleSendWhatsAppIndividual(viewerDocument as Holerite)}
-                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-green-500/25 transition-all duration-300 text-sm sm:text-base"
-                      >
-                        <MessageSquare size={16} className="sm:hidden mr-1.5" />
-                        <MessageSquare size={18} className="hidden sm:block mr-2" />
-                        <span className="hidden sm:inline">Enviar WhatsApp</span>
-                        <span className="sm:hidden">WhatsApp</span>
-                      </Button>
+                      {!viewerDocument?.cpf && (
+                        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                          <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
+                            <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                            <span>
+                              Documento sem CPF. Envio bloqueado para evitar enviar para a pessoa errada.
+                            </span>
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
