@@ -90,25 +90,24 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
+      # Router principal
       - "traefik.http.routers.backend-ci.rule=Host(`ci.z7botsolutions.com.br`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend-ci.entrypoints=websecure"
       - "traefik.http.routers.backend-ci.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.backend-ci.service=backend-ci"
+      - "traefik.http.routers.backend-ci.priority=100"
+      # Service
       - "traefik.http.services.backend-ci.loadbalancer.server.port=8081"
-      # CORS Headers - CORRIGIDO
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolalloworiginlist=https://ci.z7botsolutions.com.br,http://localhost:3000"
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
-      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowheaders=DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Accept,Origin"
+      - "traefik.http.services.backend-ci.loadbalancer.passhostheader=true"
+      # CORS Middleware - SIMPLIFICADO
+      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolalloworiginlistregex=.*"
+      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowmethods=*"
+      - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowheaders=*"
       - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolallowcredentials=true"
       - "traefik.http.middlewares.backend-ci-cors.headers.accesscontrolmaxage=3600"
       - "traefik.http.middlewares.backend-ci-cors.headers.addvaryheader=true"
-      # Headers customizados
-      - "traefik.http.middlewares.backend-ci-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
-      - "traefik.http.middlewares.backend-ci-headers.headers.customresponseheaders.X-Robots-Tag=noindex,nofollow"
-      # Aplicar middlewares na ordem correta
-      - "traefik.http.routers.backend-ci.middlewares=backend-ci-cors,backend-ci-headers"
-      # Prioridade alta para garantir que esta rota seja processada primeiro
-      - "traefik.http.routers.backend-ci.priority=100"
+      # Aplicar apenas CORS middleware
+      - "traefik.http.routers.backend-ci.middlewares=backend-ci-cors"
 
   # ========================================
   # EVOLUTION API (WhatsApp)

@@ -133,6 +133,7 @@ const sstMenuItems = [
 const departamentoPessoalMenuItems = [
   // Gestão de Funcionários
   { icon: Users, text: 'Funcionários', to: '/rh/funcionarios', id: 'dp-funcionarios' },
+  { icon: Upload, text: 'Importar WhatsApp (PDF)', to: '/rh/funcionarios/importar-whatsapp', id: 'dp-funcionarios-importar-whatsapp' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
   
