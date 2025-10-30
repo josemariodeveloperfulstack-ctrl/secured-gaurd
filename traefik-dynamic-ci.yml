@@ -1,0 +1,55 @@
+# ========================================
+# Configuração Dinâmica do Traefik para CI
+# ========================================
+# Este arquivo deve ser colocado em /etc/traefik/dynamic/ no servidor
+# ou no diretório configurado para dynamic configuration do Traefik
+
+http:
+  middlewares:
+    # Middleware para permitir todos os métodos HTTP
+    allow-all-methods:
+      headers:
+        customRequestHeaders:
+          Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+        customResponseHeaders:
+          Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+    
+    # Middleware CORS permissivo para CI
+    ci-cors:
+      headers:
+        accessControlAllowOriginListRegex:
+          - ".*"
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "PATCH"
+          - "OPTIONS"
+          - "HEAD"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 3600
+        addVaryHeader: true
+
+  routers:
+    # Router específico para o ambiente CI
+    ci-backend:
+      rule: "Host(`ci.z7botsolutions.com.br`)"
+      entryPoints:
+        - websecure
+      service: ci-backend-service
+      middlewares:
+        - ci-cors
+        - allow-all-methods
+      tls:
+        certResolver: letsencryptresolver
+      priority: 1000
+
+  services:
+    ci-backend-service:
+      loadBalancer:
+        servers:
+          - url: "http://secured-guard-nginx-ci:80"
+        passHostHeader: true
