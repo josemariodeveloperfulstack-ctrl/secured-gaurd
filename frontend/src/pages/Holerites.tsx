@@ -5252,6 +5252,59 @@ const Holerites: React.FC = () => {
           />
         </>
       )}
+
+      {/* Resultado do envio em massa */}
+      <Dialog open={showMassResultModal} onOpenChange={setShowMassResultModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Resumo do Envio em Massa</DialogTitle>
+            <DialogDescription>
+              {massResult ? (
+                <div className="space-y-2">
+                  <div><b>Tipo:</b> {massResult.tipoEnvio}</div>
+                  <div><b>Enviados:</b> {massResult.totalEnviados} &nbsp; <b>Falhas:</b> {massResult.totalFalhas}</div>
+                  <div><b>Status:</b> {massResult.sucesso ? 'Sucesso' : 'Concluído com falhas'}</div>
+                </div>
+              ) : '—'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-auto border rounded p-2">
+            {massResult && massResult.detalhes && massResult.detalhes.length > 0 ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="p-1">CPF</th>
+                    <th className="p-1">Nome</th>
+                    <th className="p-1">Telefone</th>
+                    <th className="p-1">Destino</th>
+                    <th className="p-1">Status</th>
+                    <th className="p-1">Erro</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {massResult.detalhes
+                    .filter(d => !d.enviado || d.erro)
+                    .map((d, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-1">{d.cpf}</td>
+                        <td className="p-1">{d.nome}</td>
+                        <td className="p-1">{d.telefone || '-'}</td>
+                        <td className="p-1">{(d as any).destinoNormalizado || '-'}</td>
+                        <td className="p-1">{d.enviado ? 'OK' : 'Falha'}</td>
+                        <td className="p-1">{d.erro || '-'}</td>
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div>Nenhum detalhe disponível.</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowMassResultModal(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
      </StandardLayout>
    );
  };
