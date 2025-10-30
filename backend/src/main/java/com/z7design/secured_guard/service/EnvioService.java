@@ -604,6 +604,24 @@ public class EnvioService {
     }
 
     public java.util.List<PayslipDeliveryLog> listarLogs(String cpf, Integer month, Integer year) {
+        // Se não houver filtros, retornar todos os logs (limitado aos últimos 100)
+        if (cpf == null || cpf.isEmpty()) {
+            if (month != null && year != null) {
+                return deliveryLogRepository.findAll().stream()
+                    .filter(log -> log.getMonth() != null && log.getMonth().equals(month))
+                    .filter(log -> log.getYear() != null && log.getYear().equals(year))
+                    .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                    .limit(100)
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            // Sem filtros: retornar todos os logs mais recentes (limitado a 100)
+            return deliveryLogRepository.findAll().stream()
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .limit(100)
+                .collect(java.util.stream.Collectors.toList());
+        }
+        
+        // Com CPF: usar os métodos existentes
         if (month != null && year != null) {
             return deliveryLogRepository.findByCpfAndMonthAndYear(cpf, month, year);
         }

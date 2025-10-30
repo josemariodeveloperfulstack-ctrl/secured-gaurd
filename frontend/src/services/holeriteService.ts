@@ -73,8 +73,9 @@ class HoleriteService {
   }
 
   // Listar logs
-  async listSendLogs(cpf: string, month?: number, year?: number): Promise<any[]> {
-    const params: any = { cpf };
+  async listSendLogs(cpf?: string, month?: number, year?: number): Promise<any[]> {
+    const params: any = {};
+    if (cpf) params.cpf = cpf;
     if (month) params.month = month;
     if (year) params.year = year;
     const response = await api.get('/envio/logs', { params });

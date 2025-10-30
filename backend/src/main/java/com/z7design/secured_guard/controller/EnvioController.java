@@ -110,11 +110,11 @@ public class EnvioController {
     }
 
     /**
-     * 📜 Listar logs de envio por cpf/mês/ano
+     * 📜 Listar logs de envio por cpf/mês/ano (todos os parâmetros opcionais)
      */
     @GetMapping("/logs")
     public ResponseEntity<java.util.List<com.z7design.secured_guard.model.PayslipDeliveryLog>> listarLogs(
-            @RequestParam String cpf,
+            @RequestParam(required = false) String cpf,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year) {
         return ResponseEntity.ok(envioService.listarLogs(cpf, month, year));

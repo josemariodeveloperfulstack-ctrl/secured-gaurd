@@ -234,15 +234,31 @@ const Holerites: React.FC = () => {
   };
 
   const loadLogs = async () => {
-    if (!logsCpf) return;
     setLoadingLogs(true);
     try {
       const month = logsMonth ? parseInt(logsMonth) : undefined;
       const year = logsYear ? parseInt(logsYear) : undefined;
-      const data = await holeriteService.listSendLogs(logsCpf, month, year);
+      
+      // Permitir busca sem CPF para listar todos os logs
+      const cpfFilter = logsCpf || undefined;
+      
+      const data = await holeriteService.listSendLogs(cpfFilter, month, year);
       setLogs(Array.isArray(data) ? data : []);
-    } catch (e) {
+      
+      if (!Array.isArray(data) || data.length === 0) {
+        toast({
+          title: "Nenhum log encontrado",
+          description: "Não há registros de envio com os filtros informados.",
+        });
+      }
+    } catch (e: any) {
+      console.error('Erro ao carregar logs:', e);
       setLogs([]);
+      toast({
+        title: "Erro ao carregar logs",
+        description: e.message || "Erro desconhecido ao buscar logs de envio.",
+        variant: "destructive"
+      });
     } finally {
       setLoadingLogs(false);
     }
@@ -260,6 +276,14 @@ const Holerites: React.FC = () => {
     window.addEventListener('open-logs-tab', handler as any);
     return () => window.removeEventListener('open-logs-tab', handler as any);
   }, []);
+
+  // Carregar logs automaticamente quando a aba for ativada
+  React.useEffect(() => {
+    if (activeTab === 'logs-envio' && logs.length === 0 && !loadingLogs) {
+      console.log('📊 Carregando logs automaticamente ao abrir a aba...');
+      loadLogs();
+    }
+  }, [activeTab]);
   const [processedRecibos, setProcessedRecibos] = useState<any[]>([]);
   const [loadingProcessedFiles, setLoadingProcessedFiles] = useState(false);
 
@@ -4889,7 +4913,20 @@ const Holerites: React.FC = () => {
           <TabsContent value="logs-envio" className="space-y-6">
             <Card className="bg-seguranca-graphite border-gray-600">
               <CardHeader>
-                <CardTitle className="text-seguranca-lightgray">Logs de Envio de Holerites</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Logs de Envio de Holerites e Documentos
+                  </CardTitle>
+                  {logs.length > 0 && (
+                    <Badge className="bg-blue-500 text-white">
+                      {logs.length} registro(s)
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-gray-400 text-sm mt-2">
+                  Histórico completo de envios por Email e WhatsApp
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -4938,35 +4975,98 @@ const Holerites: React.FC = () => {
                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     <span className="ml-2 text-muted-foreground">Carregando logs...</span>
                   </div>
+                ) : logs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-16 h-16 bg-gray-700/50 rounded-2xl flex items-center justify-center mb-4">
+                      <FileText className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-300 mb-2">
+                      Nenhum log de envio encontrado
+                    </h3>
+                    <p className="text-gray-400 text-sm max-w-md mb-4">
+                      {logsCpf || logsName || logsStatus !== 'todos' 
+                        ? 'Não há registros com os filtros informados. Tente ajustar os critérios de busca.'
+                        : 'Ainda não há registros de envio. Os logs aparecerão aqui após enviar holerites ou documentos unificados.'
+                      }
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setLogsCpf('');
+                        setLogsName('');
+                        setLogsStatus('todos');
+                        setLogsMonth('');
+                        setLogsYear('');
+                        loadLogs();
+                      }}
+                      variant="outline"
+                      className="border-gray-600 text-gray-300"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Limpar Filtros e Recarregar
+                    </Button>
+                  </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {logs.map((log, index) => (
-                      <div key={index} className="p-3 bg-seguranca-black border border-gray-600 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
+                      <div key={index} className="p-4 bg-seguranca-black border border-gray-600 rounded-xl hover:border-gray-500 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-3">
+                            {/* Status Badge */}
                             <Badge 
-                              variant={log.status === 'SUCCESS' ? 'default' : log.status === 'FAILED' ? 'destructive' : 'secondary'}
-                              className="text-xs"
+                              className={
+                                log.success 
+                                  ? 'bg-green-500/20 text-green-400 border-green-500/40'
+                                  : 'bg-red-500/20 text-red-400 border-red-500/40'
+                              }
                             >
-                              {log.status === 'SUCCESS' ? 'Sucesso' : log.status === 'FAILED' ? 'Falhou' : 'Pendente'}
+                              {log.success ? '✅ Enviado' : '❌ Falhou'}
                             </Badge>
-                            <span className="text-seguranca-lightgray text-sm">
-                              {log.employeeName} ({log.cpf})
-                            </span>
+                            
+                            {/* Canal Badge */}
+                            <Badge 
+                              className={
+                                log.channel === 'EMAIL' 
+                                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                                  : 'bg-green-500/20 text-green-400 border-green-500/40'
+                              }
+                            >
+                              {log.channel === 'EMAIL' ? '📧 Email' : '💬 WhatsApp'}
+                            </Badge>
                           </div>
-                          <span className="text-gray-400 text-xs">
-                            {new Date(log.timestamp).toLocaleString()}
-                          </span>
+                          
+                          {/* Data e Hora */}
+                          <div className="flex items-center gap-2 text-gray-400 text-xs">
+                            <Calendar size={14} />
+                            <span>{new Date(log.createdAt || log.updatedAt).toLocaleString('pt-BR')}</span>
+                          </div>
                         </div>
-                        <p className="text-gray-300 text-sm">
-                          {log.message}
-                        </p>
-                        {log.error && (
-                          <p className="text-red-400 text-xs mt-1">
-                            Erro: {log.error}
-                          </p>
+                        
+                        {/* Informações do Funcionário */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <User size={16} className="text-gray-400" />
+                          <span className="text-white font-medium">{log.cpf}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-300 text-sm">Período: {log.month}/{log.year}</span>
+                        </div>
+                        
+                        {/* Mensagem de Erro */}
+                        {!log.success && log.errorMessage && (
+                          <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+                            <p className="text-red-300 text-sm flex items-start gap-2">
+                              <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                              <span>{log.errorMessage}</span>
+                            </p>
+                          </div>
                         )}
-                </div>
+                        
+                        {/* Tentativas */}
+                        {log.attempts > 1 && (
+                          <div className="mt-2 flex items-center gap-2 text-gray-400 text-xs">
+                            <RefreshCw size={12} />
+                            <span>{log.attempts} tentativa(s)</span>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
