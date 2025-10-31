@@ -69,6 +69,7 @@ const Grupos = lazy(() => import('@/pages/Grupos'));
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const Profile = lazy(() => import('@/pages/Profile'));
 import Holerites from '@/pages/Holerites';
+import HoleritesMobileTest from '@/pages/HoleritesMobileTest';
 const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
 const Payroll = lazy(() => import('@/pages/Payroll'));
 const PayslipView = lazy(() => import('@/pages/PayslipView'));
@@ -808,6 +809,11 @@ function App() {
                     <Route path="/holerites" element={
                       <ProtectedRoute>
                         <Holerites />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/holerites-mobile-test" element={
+                      <ProtectedRoute>
+                        <HoleritesMobileTest />
                       </ProtectedRoute>
                     } />
                     <Route path="/envio-holerites" element={

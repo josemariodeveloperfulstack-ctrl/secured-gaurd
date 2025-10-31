@@ -348,9 +348,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       <aside
         className={`
           fixed left-0 top-0 h-screen bg-seguranca-graphite border-r border-gray-700 
-          flex flex-col transition-all duration-300 z-50
-          ${collapsed ? 'w-16' : 'w-64'}
-          ${isMobile && collapsed ? '-translate-x-full' : ''}
+          flex flex-col transition-all duration-300 ease-in-out z-50
+          ${isMobile ? 'w-64' : (collapsed ? 'w-16' : 'w-64')}
+          ${isMobile && collapsed ? '-translate-x-full' : 'translate-x-0'}
         `}
       >
         {/* Header */}

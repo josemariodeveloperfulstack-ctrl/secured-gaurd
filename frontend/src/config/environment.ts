@@ -62,13 +62,35 @@ export function detectEnvironment(): 'local' | 'ci' | 'dev' | 'test' | 'prod' {
 }
 
 /**
+ * Obtém o host do backend baseado no host do frontend
+ * Se acessar via IP (ex: 192.168.1.116), usa o mesmo IP para o backend
+ */
+function getBackendHost(): string {
+  if (typeof window === 'undefined') {
+    return 'localhost';
+  }
+  
+  const hostname = window.location.hostname;
+  
+  // Se for IP local (192.168.x.x, 10.x.x.x, etc), usa o mesmo IP
+  if (hostname.match(/^(\d{1,3}\.){3}\d{1,3}$/)) {
+    console.log('🔧 Detectado acesso via IP:', hostname);
+    console.log('🔧 Usando mesmo IP para backend:', hostname);
+    return hostname;
+  }
+  
+  // Se for localhost ou 127.0.0.1, mantém localhost
+  return 'localhost';
+}
+
+/**
  * Configurações por ambiente
  */
 const environments: Record<string, EnvironmentConfig> = {
   local: {
     name: 'Desenvolvimento Local',
-    apiUrl: 'http://localhost:8081/api',
-    wsUrl: 'ws://localhost:8081/ws',
+    apiUrl: `http://${getBackendHost()}:8081/api`,
+    wsUrl: `ws://${getBackendHost()}:8081/ws`,
     debug: true,
     features: {
       notifications: true,

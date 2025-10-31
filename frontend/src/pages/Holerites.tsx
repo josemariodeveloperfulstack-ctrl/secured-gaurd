@@ -1217,52 +1217,11 @@ const Holerites: React.FC = () => {
 
   // Função para processar upload de comprovantes - USANDO PROCESSAMENTO AUTOMÃTICO
   // Função para validar se já existem documentos do período antes de importar
+  // ✅ ATUALIZADA: Não bloqueia mais o upload - o backend gerencia duplicidade automaticamente
+  // Regra backend: Mesmo CNPJ + Mesmo CPF + Mesmo Período = Sobrescreve automaticamente
+  // Diferente CNPJ OU Diferente CPF = Importa como novo registro
   const validatePeriodBeforeUpload = (type: 'holerite' | 'comprovante', file?: File): boolean => {
-    if (type === 'comprovante') {
-      // Verificar se há comprovantes no período ativo
-      const receiptsInPeriod = paymentReceipts.filter(r => 
-        r.year === parseInt(activeYear) && r.month === parseInt(activeMonth)
-      );
-      
-      if (receiptsInPeriod.length > 0) {
-        const periodStr = `${activeMonth.padStart(2, '0')}/${activeYear}`;
-        setDuplicatePeriodInfo({
-          type: 'comprovante',
-          periods: [periodStr],
-          count: receiptsInPeriod.length
-        });
-        // Armazenar o arquivo para processar depois se o usuário confirmar
-        if (file) {
-          setPendingUploadFile(file);
-        }
-        setShowDuplicatePeriodModal(true);
-        return false;
-      }
-    } else if (type === 'holerite') {
-      // Agrupar holerites por período
-      const periodCounts = new Map<string, number>();
-      holerites.forEach(h => {
-        const key = `${h.month}/${h.year}`;
-        periodCounts.set(key, (periodCounts.get(key) || 0) + 1);
-      });
-      
-      if (periodCounts.size > 0) {
-        const periods = Array.from(periodCounts.keys());
-        const totalCount = Array.from(periodCounts.values()).reduce((a, b) => a + b, 0);
-        setDuplicatePeriodInfo({
-          type: 'holerite',
-          periods: periods,
-          count: totalCount
-        });
-        // Armazenar o arquivo para processar depois se o usuário confirmar
-        if (file) {
-          setPendingUploadFile(file);
-        }
-        setShowDuplicatePeriodModal(true);
-        return false;
-      }
-    }
-    
+    // Sempre permite o upload - backend decide se sobrescreve ou cria novo
     return true;
   };
 
@@ -3155,226 +3114,115 @@ const Holerites: React.FC = () => {
       {/* Barra superior com navegação por período já existente */}
 
       <div className="space-y-6">
-        {/* Header Atraente */}
-        <div className="bg-gradient-to-r from-seguranca-black via-seguranca-graphite to-seguranca-black rounded-xl border border-gray-700 p-6 shadow-lg">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="p-3 bg-seguranca-red rounded-xl shadow-lg">
-                  <FileText className="w-8 h-8 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray truncate">
-                    <span className="hidden sm:inline">Gestão de </span>Holerites<span className="hidden md:inline"> e Comprovantes</span>
+        {/* Header - PADRÃO SST */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
+              <FileText className="h-8 w-8 text-seguranca-yellow" />
+              Gestão de Holerites
                   </h1>
-                  <p className="text-seguranca-yellow font-medium text-xs sm:text-sm mt-1 truncate">
-                    <span className="hidden sm:inline">Sistema completo de </span>Gestão<span className="hidden sm:inline"> de documentos financeiros</span>
-                  </p>
+            <p className="text-gray-400 mt-1">Sistema de gerenciamento de documentos financeiros</p>
                 </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-seguranca-yellow rounded-full animate-pulse"></div>
-                  <span className="text-gray-400">
-                    {loading ? 'Carregando...' : `${filteredHolerites.length} holerite${filteredHolerites.length !== 1 ? 's' : ''} encontrado${filteredHolerites.length !== 1 ? 's' : ''}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="text-gray-400">
-                    {Array.isArray(receipts) ? receipts.length : 0} comprovante{(Array.isArray(receipts) ? receipts.length : 0) !== 1 ? 's' : ''} processado{(Array.isArray(receipts) ? receipts.length : 0) !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros
+            </Button>
+            <Button 
+              onClick={() => setShowUploadModal(true)}
+              className="bg-seguranca-red hover:bg-seguranca-darkred"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Importar
+            </Button>
           </div>
         </div>
 
-        {/* Tabs Modernas e Responsivas */}
+        {/* Tabs - COPIADO DO PADRÃO SST (que funciona bem!) */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="relative tab-container">
-            <TabsList className="bg-gradient-to-r from-seguranca-graphite to-gray-800 border border-gray-600/50 rounded-2xl p-2 w-full shadow-2xl backdrop-blur-sm">
-              <div className="flex w-full gap-1">
-            <TabsTrigger 
-              value="processados" 
-                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state='active']:bg-gradient-to-r data-[state='active']:from-seguranca-yellow data-[state='active']:to-yellow-500 data-[state='active']:text-seguranca-black data-[state='active']:shadow-xl data-[state='active']:scale-105 data-[state='active']:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state='active']:border-seguranca-yellow/20"
-                >
-                  <div className="flex items-center justify-center gap-1 sm:gap-2">
-                    <div className="relative">
-                      <FileText size={14} className="sm:w-4 sm:h-4" />
-                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-seguranca-red rounded-full opacity-0 group-data-[state='active']:opacity-100 transition-opacity duration-300"></div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="font-medium leading-tight">
-                        <span className="hidden sm:inline">Holerites</span>
-              <span className="sm:hidden">Holerites</span>
-                      </span>
-                      <Badge variant="secondary" className="text-xs px-1 py-0 h-4 bg-seguranca-black/50 text-seguranca-yellow border-seguranca-yellow/30 group-data-[state='active']:bg-seguranca-black group-data-[state='active']:text-seguranca-yellow">
-                        {holerites.length}
-                      </Badge>
-                    </div>
-                  </div>
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-seguranca-graphite border-gray-600">
+            <TabsTrigger value="processados" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Holerites
             </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="recibos" 
-                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state='active']:bg-gradient-to-r data-[state='active']:from-seguranca-yellow data-[state='active']:to-yellow-500 data-[state='active']:text-seguranca-black data-[state='active']:shadow-xl data-[state='active']:scale-105 data-[state='active']:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state='active']:border-seguranca-yellow/20"
-                >
-                  <div className="flex items-center justify-center gap-1 sm:gap-2">
-                    <div className="relative">
-                      <FileText size={14} className="sm:w-4 sm:h-4" />
-                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full opacity-0 group-data-[state='active']:opacity-100 transition-opacity duration-300"></div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="font-medium leading-tight">
-                        <span className="hidden sm:inline">Comprovantes</span>
-                        <span className="sm:hidden">Comprovantes</span>
-                      </span>
-                      <Badge variant="secondary" className="text-xs px-1 py-0 h-4 bg-seguranca-black/50 text-green-400 border-green-400/30 group-data-[state='active']:bg-seguranca-black group-data-[state='active']:text-seguranca-yellow">
-                        {Array.isArray(receipts) ? receipts.length : 0}
-                      </Badge>
-                    </div>
-                  </div>
+            <TabsTrigger value="recibos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Comprovantes
             </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="logs-envio" 
-                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state='active']:bg-gradient-to-r data-[state='active']:from-seguranca-yellow data-[state='active']:to-yellow-500 data-[state='active']:text-seguranca-black data-[state='active']:shadow-xl data-[state='active']:scale-105 data-[state='active']:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state='active']:border-seguranca-yellow/20">
-                  <div className="flex items-center justify-center gap-1 sm:gap-2">
-                    <div className="relative">
-                      <FileText size={14} className="sm:w-4 sm:h-4" />
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="font-medium leading-tight">Logs de Envio</span>
-                    </div>
-                  </div>
+            <TabsTrigger value="logs-envio" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Logs
             </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="unificacao-individual" 
-                  className="group relative flex-1 tab-trigger tab-transition tab-hover-effect data-[state='active']:bg-gradient-to-r data-[state='active']:from-seguranca-yellow data-[state='active']:to-yellow-500 data-[state='active']:text-seguranca-black data-[state='active']:shadow-xl data-[state='active']:scale-105 data-[state='active']:tab-active-glow text-gray-300 hover:text-white hover:bg-seguranca-black/30 text-xs sm:text-sm rounded-xl transition-all duration-500 ease-out hover:scale-102 border border-transparent data-[state='active']:border-seguranca-yellow/20">
-                  <div className="flex items-center justify-center gap-1 sm:gap-2">
-                    <div className="relative">
-                      <RefreshCw size={14} className="sm:w-4 sm:h-4" />
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="font-medium leading-tight">Unificação</span>
-                    </div>
-                  </div>
+            <TabsTrigger value="unificacao-individual" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Unificação
             </TabsTrigger>
-
-              </div>
           </TabsList>
             
-            {/* Indicador de progresso animado */}
-            <div className="tab-indicator" 
-                 style={{
-                   width: activeTab === 'processados' ? '25%' : activeTab === 'recibos' ? '25%' : activeTab === 'logs-envio' ? '25%' : '25%',
-                   transform: `translateX(${activeTab === 'processados' ? '0%' : activeTab === 'recibos' ? '100%' : activeTab === 'logs-envio' ? '200%' : '300%'})`
-                 }}>
-            </div>
-          </div>
+          <TabsContent value="processados" className="space-y-6 mt-6">
+            {/* Cards de Estatísticas - PADRÃO SST */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Total de Holerites</CardTitle>
+                  <FileText className="h-4 w-4 text-seguranca-yellow" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{holerites.length}</div>
+                  <p className="text-xs text-gray-400 mt-1">Documentos processados</p>
+                </CardContent>
+              </Card>
 
-          <TabsContent value="processados">
-            {/* Header da SeÃ§Ã£o de Holerites */}
-            <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <FileText size={24} className="text-white" />
-                </div>
-                Gestão de Holerites
-              </h3>
-              <p className="text-gray-400 text-base max-w-2xl mx-auto">
-                Importe e processe holerites de funcionários com navegação organizada por período.
-              </p>
-            </div>
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Comprovantes</CardTitle>
+                  <Receipt className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{Array.isArray(receipts) ? receipts.length : 0}</div>
+                  <p className="text-xs text-gray-400 mt-1">Recibos de pagamento</p>
+                </CardContent>
+              </Card>
 
-            {/* Dashboard de Holerites */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm mb-8">
-              <div className="space-y-8">
-                {/* EstatÃ­sticas Melhoradas */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="group bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 rounded-2xl p-6 hover:border-red-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/10">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-red-300/80 text-sm font-medium">Total de Holerites</p>
-                        <p className="text-3xl font-bold text-white">{holerites.length}</p>
-                        <div className="flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                          <span className="text-red-300/60 text-xs">Ativo</span>
-                        </div>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-red-500/25 transition-all duration-300">
-                        <FileText size={28} className="text-white" />
-                      </div>
-                    </div>
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Processados Hoje</CardTitle>
+                  <Calendar className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{getHoleritesProcessedToday()}</div>
+                  <p className="text-xs text-gray-400 mt-1">Neste dia</p>
+                </CardContent>
+              </Card>
                   </div>
                   
-                  <div className="group bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-2xl p-6 hover:border-green-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-green-500/10">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-green-300/80 text-sm font-medium">Total de Holerites</p>
-                        <p className="text-3xl font-bold text-white">{holerites.length}</p>
-                        <div className="flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                          <span className="text-green-300/60 text-xs">Processados</span>
-                        </div>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-green-500/25 transition-all duration-300">
-                        <FileText size={28} className="text-white" />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="group bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-2xl p-6 hover:border-yellow-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-yellow-500/10">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-yellow-300/80 text-sm font-medium">Processados Hoje</p>
-                        <p className="text-3xl font-bold text-white">{getHoleritesProcessedToday()}</p>
-                        <div className="flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                          <span className="text-yellow-300/60 text-xs">Em tempo real</span>
-                        </div>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-yellow-500/25 transition-all duration-300">
-                        <CheckCircle size={28} className="text-white" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* BotÃµes de AÃ§Ã£o */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {/* Botão de Importação - PADRÃO SST */}
+            <div className="mt-6">
                   <Button 
                       onClick={() => setShowUploadModal(true)}
                       disabled={loading}
-                      className="group relative bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 px-8 py-4 rounded-2xl shadow-2xl hover:shadow-red-500/30 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 text-white font-semibold text-lg border border-red-400/20"
+                className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
                     >
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-400/20 to-pink-400/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                    <div className="relative flex items-center space-x-3">
                       {loading ? (
-                        <Loader2 size={24} className="animate-spin" />
-                      ) : (
-                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors duration-300">
-                          <Plus size={20} />
-                        </div>
-                      )}
-                      <span className="text-lg font-semibold">
-                        {loading ? 'Processando...' : 'Importar Holerites'}
-                      </span>
-                    </div>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Importar Holerites
+                  </>
+                )}
                   </Button>
-
                 </div>
-              </div>
-            </Card>
 
             {/* Sistema de Abas Hierárquico para Períodos */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
-              <div className="space-y-8">
-                <div className="text-center">
-                  <h4 className="text-2xl font-bold text-white mb-2">Holerites por Período</h4>
-                  <p className="text-gray-400">Navegue pelos anos e meses para visualizar os holerites</p>
+            <Card className="bg-seguranca-graphite border border-gray-600 rounded-lg p-3 md:p-6 lg:p-8">
+              <div className="space-y-4 md:space-y-8">
+                <div>
+                  <h4 className="text-base md:text-xl lg:text-2xl font-bold text-white mb-1 md:mb-2">Holerites por Período</h4>
+                  <p className="text-gray-400 text-xs md:text-sm hidden md:block">Navegue pelos anos e meses para visualizar os holerites</p>
                 </div>
                 
                 {/* Navegação de Abas */}
@@ -3470,153 +3318,130 @@ const Holerites: React.FC = () => {
                         {selectedMonth ? `Holerites de ${getMonthName(parseInt(selectedMonth))} ${selectedYear}` : `Todos os holerites de ${selectedYear}`}
                       </h5>
                       
-                      {/* Barra de Ações do Mês */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 p-4 bg-seguranca-black/30 rounded-lg border border-gray-600/30">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="select-all-holerites"
-                              checked={selectedHolerites.length === getFilteredHoleritesByPeriod().length && getFilteredHoleritesByPeriod().length > 0}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  const allIds = getFilteredHoleritesByPeriod().map(h => h.id);
-                                  setSelectedHolerites(allIds);
-                                } else {
-                                  setSelectedHolerites([]);
-                                }
-                              }}
-                            />
-                            <Label htmlFor="select-all-holerites" className="text-gray-300">
-                              Selecionar todos
-                            </Label>
-                          </div>
-                          
-                          {selectedHolerites.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              <Button
-                                onClick={async () => {
-                                  if (selectedHolerites.length === 0) return;
-                                  const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
-                                  const ids: string[] = [];
-                                  for (const h of selected) {
-                                    if (h.cpf) {
-                                      try {
-                                        const byCpf = await employeeService.searchEmployees(h.cpf);
-                                        if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                      } catch {}
-                                    }
-                                    try {
-                                      const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                                      if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                    } catch {}
-                                  }
-                                  const uniqueIds = Array.from(new Set(ids));
-                                  if (uniqueIds.length === 0) {
-                                    toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                    return;
-                                  }
-                                  setResolvedEmployeeIds(uniqueIds);
-                                  setValidationSendType('email');
-                                  setShowValidationModal(true);
-                                }}
-                                variant="outline"
-                                size="sm"
-                                className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400"
-                              >
-                                <Mail size={14} className="mr-1" />
-                                Email
-                              </Button>
-                              <Button
-                                onClick={async () => {
-                                  if (selectedHolerites.length === 0) return;
-                                  const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
-                                  const ids: string[] = [];
-                                  for (const h of selected) {
-                                    if (h.cpf) {
-                                      try {
-                                        const byCpf = await employeeService.searchEmployees(h.cpf);
-                                        if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                      } catch {}
-                                    }
-                                    try {
-                                      const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                                      if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                    } catch {}
-                                  }
-                                  const uniqueIds = Array.from(new Set(ids));
-                                  if (uniqueIds.length === 0) {
-                                    toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                    return;
-                                  }
-                                  setResolvedEmployeeIds(uniqueIds);
-                                  setValidationSendType('whatsapp');
-                                  setShowValidationModal(true);
-                                }}
-                                variant="outline"
-                                size="sm"
-                                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400"
-                              >
-                                <MessageSquare size={14} className="mr-1" />
-                                WhatsApp
-                              </Button>
-                              <Button
-                                onClick={handleDownloadSelectedHolerites}
-                                variant="outline"
-                                size="sm"
-                                className="border-gray-500/50 text-gray-300 hover:bg-gray-700/50"
-                              >
-                                <Download size={14} className="mr-1" />
-                                Baixar
-                              </Button>
-                              <Button
-                                onClick={handleBatchDeleteHolerites}
-                                variant="outline"
-                                size="sm"
-                                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400"
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                Excluir
-                              </Button>
-                            </div>
-                          )}
+                      {/* Barra de Ações - PADRÃO SST SIMPLIFICADO */}
+                      <div className="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
+                        {/* Checkbox Selecionar Todos */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <Checkbox
+                            id="select-all-holerites"
+                            checked={selectedHolerites.length === getFilteredHoleritesByPeriod().length && getFilteredHoleritesByPeriod().length > 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                const allIds = getFilteredHoleritesByPeriod().map(h => h.id);
+                                setSelectedHolerites(allIds);
+                              } else {
+                                setSelectedHolerites([]);
+                              }
+                            }}
+                            className="border-blue-400"
+                          />
+                          <Label htmlFor="select-all-holerites" className="text-white text-sm font-medium cursor-pointer">
+                            Selecionar todos
+                          </Label>
                         </div>
                         
-                        <div className="flex items-center gap-2">
-                          <Button
-                            onClick={() => setActivePeriodTab('ano')}
-                            variant="outline"
-                            size="sm"
-                            className="border-gray-500/50 text-gray-300 hover:bg-gray-700/50"
-                          >
-                            <RefreshCw size={14} className="mr-1" />
-                            Limpar Filtros
-                          </Button>
-                          <Button
-                            onClick={() => loadHolerites()}
-                            variant="outline"
-                            size="sm"
-                            className="border-gray-500/50 text-gray-300 hover:bg-gray-700/50"
-                          >
-                            <RefreshCw size={14} className="mr-1" />
-                            Atualizar
-                          </Button>
-                        </div>
+                        {/* Botões de ação em massa - só aparecem quando "Selecionar todos" está marcado */}
+                        {selectedHolerites.length === getFilteredHoleritesByPeriod().length && getFilteredHoleritesByPeriod().length > 0 && (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Button
+                              onClick={async () => {
+                                if (selectedHolerites.length === 0) return;
+                                const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
+                                const ids: string[] = [];
+                                for (const h of selected) {
+                                  if (h.cpf) {
+                                    try {
+                                      const byCpf = await employeeService.searchEmployees(h.cpf);
+                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                    } catch {}
+                                  }
+                                  try {
+                                    const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                  } catch {}
+                                }
+                                const uniqueIds = Array.from(new Set(ids));
+                                if (uniqueIds.length === 0) {
+                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                  return;
+                                }
+                                setResolvedEmployeeIds(uniqueIds);
+                                setValidationSendType('email');
+                                setShowValidationModal(true);
+                              }}
+                              size="sm"
+                              className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
+                            >
+                              <Mail size={16} className="mr-2" />
+                              Email ({selectedHolerites.length})
+                            </Button>
+                            
+                            <Button
+                              onClick={async () => {
+                                if (selectedHolerites.length === 0) return;
+                                const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
+                                const ids: string[] = [];
+                                for (const h of selected) {
+                                  if (h.cpf) {
+                                    try {
+                                      const byCpf = await employeeService.searchEmployees(h.cpf);
+                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                    } catch {}
+                                  }
+                                  try {
+                                    const byName = await employeeService.searchEmployeesByName(h.employeeName);
+                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                  } catch {}
+                                }
+                                const uniqueIds = Array.from(new Set(ids));
+                                if (uniqueIds.length === 0) {
+                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                  return;
+                                }
+                                setResolvedEmployeeIds(uniqueIds);
+                                setValidationSendType('whatsapp');
+                                setShowValidationModal(true);
+                              }}
+                              size="sm"
+                              className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              <MessageSquare size={16} className="mr-2" />
+                              WhatsApp ({selectedHolerites.length})
+                            </Button>
+                            
+                            <Button
+                              onClick={handleDownloadSelectedHolerites}
+                              size="sm"
+                              className="w-full sm:w-auto bg-gray-600 text-white hover:bg-gray-700"
+                            >
+                              <Download size={16} className="mr-2" />
+                              Baixar ({selectedHolerites.length})
+                            </Button>
+                            
+                            <Button
+                              onClick={handleBatchDeleteHolerites}
+                              size="sm"
+                              className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
+                            >
+                              <Trash2 size={16} className="mr-2" />
+                              Excluir ({selectedHolerites.length})
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Lista de Holerites */}
-                      <div className="bg-seguranca-black/30 rounded-lg border border-gray-600/30">
-                        <div className="p-4 border-b border-gray-600/30">
+                      {/* Lista de Holerites - SIMPLIFICADA */}
+                      <div className="space-y-3">
                           <p className="text-gray-400 text-sm">
                             {getFilteredHoleritesByPeriod().length} holerite(s) encontrado(s)
                           </p>
-                        </div>
                         
                         {getFilteredHoleritesByPeriod().length > 0 ? (
-                          <div className="divide-y divide-gray-600/30 max-h-96 overflow-y-auto">
-                            {getFilteredHoleritesByPeriod().map((holerite, index) => (
-                              <div key={holerite.id} className="p-4 hover:bg-seguranca-graphite/30 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-4">
+                          <div className="space-y-2">
+                            {getFilteredHoleritesByPeriod().map((holerite) => (
+                              <Card key={holerite.id} className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors">
+                                <CardContent className="p-4">
+                                  <div className="flex items-start gap-3">
                                     <Checkbox
                                       checked={selectedHolerites.includes(holerite.id)}
                                       onCheckedChange={(checked) => {
@@ -3628,66 +3453,53 @@ const Holerites: React.FC = () => {
                                       }}
                                     />
                                     
-                                    <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
-                                      <FileText size={16} className="text-red-400" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <FileText className="h-4 w-4 text-seguranca-yellow flex-shrink-0" />
+                                        <p className="text-white font-medium truncate">{holerite.employeeName}</p>
                                     </div>
                                     
-                                    <div className="flex-1">
-                                      <p className="text-white font-semibold text-lg">{holerite.employeeName}</p>
-                                      <div className="flex items-center space-x-4 mt-1">
-                                        <Badge variant="outline" className="bg-black text-white border-gray-500">
-                                          {holerite.month}/{holerite.year}
-                                        </Badge>
-                                        <div className="flex items-center space-x-4 text-gray-400 text-sm">
-                                          <div className="flex items-center space-x-1">
-                                            <User size={12} />
+                                      <div className="flex flex-wrap gap-2 text-xs text-gray-400">
                                             <span>CPF: {holerite.cpf || 'N/A'}</span>
-                                          </div>
-                                          <div className="flex items-center space-x-1">
-                                            <Calendar size={12} />
+                                        <span>•</span>
+                                        <span>{holerite.month}/{holerite.year}</span>
+                                        <span>•</span>
                                             <span>{new Date(holerite.createdAt || holerite.processedAt).toLocaleDateString('pt-BR')}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
                                   </div>
                                   
-                                  <div className="flex items-center space-x-2">
+                                      {/* Botões de Ação Individual - PADRÃO SST */}
+                                      <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
                                     <Button
                                       onClick={() => handleViewHolerite(holerite)}
-                                      variant="outline"
                                       size="sm"
-                                      className="border-white/30 text-white hover:bg-white/10"
+                                          className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
                                     >
                                       <Eye size={14} className="mr-1" />
-                                      Visualizar
+                                          Ver
                                     </Button>
                                     
                                     <Button
                                       onClick={() => handleEmailHolerite(holerite)}
-                                      variant="outline"
                                       size="sm"
-                                      className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                                          className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
                                     >
-                                      <Mail size={14} className="mr-1" />
-                                      Email
+                                          <Mail size={14} className="mr-1" />
+                                          Email
                                     </Button>
                                     
                                     <Button
                                       onClick={() => handleSendWhatsAppIndividual(holerite)}
-                                      variant="outline"
                                       size="sm"
-                                      className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                                          className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
                                     >
-                                      <MessageSquare size={14} className="mr-1" />
-                                      WhatsApp
+                                          <MessageSquare size={14} className="mr-1" />
+                                          WhatsApp
                                     </Button>
                                     
                                     <Button
                                       onClick={() => handleDownloadHolerite(holerite)}
-                                      variant="outline"
                                       size="sm"
-                                      className="border-white/30 text-white hover:bg-white/10"
+                                          className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
                                     >
                                       <Download size={14} className="mr-1" />
                                       Baixar
@@ -3695,9 +3507,8 @@ const Holerites: React.FC = () => {
                                     
                                     <Button
                                       onClick={() => handleDeleteHolerite(holerite)}
-                                      variant="outline"
                                       size="sm"
-                                      className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                          className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
                                     >
                                       <Trash2 size={14} className="mr-1" />
                                       Excluir
@@ -3705,12 +3516,14 @@ const Holerites: React.FC = () => {
                                   </div>
                                 </div>
                               </div>
+                                </CardContent>
+                              </Card>
                         ))}
                       </div>
                         ) : (
-                          <div className="p-8 text-center">
-                            <FileText size={48} className="mx-auto text-gray-500 mb-4" />
-                            <p className="text-gray-500">
+                          <div className="text-center py-8">
+                            <FileText className="mx-auto h-12 w-12 text-gray-500 mb-3" />
+                            <p className="text-gray-400">
                               Nenhum holerite encontrado para este período
                             </p>
                     </div>
@@ -3724,123 +3537,66 @@ const Holerites: React.FC = () => {
 
           </TabsContent>
 
-          <TabsContent value="recibos">
-            <div className="space-y-6">
-                {/* Header da aba - Design Moderno */}
-                <div className="text-center relative">
-                  <div className="relative inline-block">
-                    <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 via-purple-600 to-blue-700 rounded-3xl shadow-2xl mb-6 transform hover:scale-105 transition-all duration-300">
-                      <FileText size={36} className="text-white" />
-                    </div>
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-400 to-green-500 rounded-full border-2 border-seguranca-black flex items-center justify-center">
-                      <CheckCircle size={12} className="text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-seguranca-lightgray via-white to-seguranca-lightgray bg-clip-text text-transparent mb-4">
-                    Comprovantes<span className="hidden sm:inline"> de Pagamento</span><span className="hidden md:inline"> de Salário</span>
-                  </h3>
-                  <p className="text-gray-400 text-sm sm:text-base lg:text-lg max-w-3xl mx-auto leading-relaxed">
-                    Importe e processe comprovantes<span className="hidden sm:inline"> de transferência de pagamento de salário</span><span className="hidden md:inline"> de funcionários com tecnologia avançada de OCR e organização automática</span>.
-                  </p>
-                  <div className="flex items-center justify-center gap-2 mt-4">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                    <span className="text-blue-300 text-sm font-medium">Sistema ativo e monitorado</span>
-                  </div>
-                </div>
-                
-              {/* Dashboard de Comprovantes */}
-              <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
-                <div className="space-y-8">
-                  {/* EstatÃ­sticas Melhoradas */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="group bg-gradient-to-br from-blue-500/15 to-blue-600/10 border border-blue-500/30 rounded-3xl p-8 hover:border-blue-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 backdrop-blur-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
-                            <p className="text-blue-300/90 text-sm font-semibold uppercase tracking-wide">Total de Comprovantes</p>
-                          </div>
-                          <p className="text-4xl font-bold text-white">{paymentReceipts.length}</p>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                            <span className="text-blue-300/70 text-xs font-medium">Sistema ativo</span>
-                          </div>
-                        </div>
-                        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-blue-500/30 transition-all duration-500 group-hover:scale-110">
-                          <FileText size={32} className="text-white" />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="group bg-gradient-to-br from-green-500/15 to-green-600/10 border border-green-500/30 rounded-3xl p-8 hover:border-green-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20 backdrop-blur-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                            <p className="text-green-300/90 text-sm font-semibold uppercase tracking-wide">Anos DisponÃ­veis</p>
-                          </div>
-                          <p className="text-4xl font-bold text-white">{getAvailableYears().length}</p>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            <span className="text-green-300/70 text-xs font-medium">Organizado</span>
-                          </div>
-                        </div>
-                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-green-500/30 transition-all duration-500 group-hover:scale-110">
-                          <Calendar size={32} className="text-white" />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="group bg-gradient-to-br from-yellow-500/15 to-yellow-600/10 border border-yellow-500/30 rounded-3xl p-8 hover:border-yellow-400/50 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-yellow-500/20 backdrop-blur-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                            <p className="text-yellow-300/90 text-sm font-semibold uppercase tracking-wide">Processados Hoje</p>
-                          </div>
-                          <p className="text-4xl font-bold text-white">{getHoleritesProcessedToday()}</p>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                            <span className="text-yellow-300/70 text-xs font-medium">Em tempo real</span>
-                          </div>
-                        </div>
-                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-yellow-500/30 transition-all duration-500 group-hover:scale-110">
-                          <CheckCircle size={32} className="text-white" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+          <TabsContent value="recibos" className="space-y-6 mt-6">
+            {/* Cards de Estatísticas - PADRÃO SST */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Total de Comprovantes</CardTitle>
+                  <Receipt className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{paymentReceipts.length}</div>
+                  <p className="text-xs text-gray-400 mt-1">Recibos processados</p>
+                </CardContent>
+              </Card>
 
-                  {/* BotÃ£o de Upload Melhorado */}
-                  <div className="flex justify-center">
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Anos Disponíveis</CardTitle>
+                  <Calendar className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{getAvailableYears().length}</div>
+                  <p className="text-xs text-gray-400 mt-1">Períodos organizados</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Processados Hoje</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-seguranca-lightgray">{getHoleritesProcessedToday()}</div>
+                  <p className="text-xs text-gray-400 mt-1">Neste dia</p>
+                </CardContent>
+              </Card>
+                    </div>
+                    
+            {/* Botão de Upload - PADRÃO SST */}
+            <div className="mt-6">
                       <Button 
                       onClick={() => setShowPaymentReceiptUploadModal(true)}
                       disabled={processingPaymentReceipts}
-                      className="group relative bg-gradient-to-r from-blue-500 via-purple-600 to-blue-700 hover:from-blue-600 hover:via-purple-700 hover:to-blue-800 px-12 py-6 rounded-3xl shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 transform hover:scale-110 hover:-translate-y-2 text-white font-bold text-xl border border-blue-400/30 overflow-hidden"
+                className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-400/30 to-purple-400/30 rounded-3xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                      <div className="relative flex items-center space-x-4">
                         {processingPaymentReceipts ? (
-                          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                            <Loader2 size={24} className="animate-spin" />
-                          </div>
-                        ) : (
-                          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300 group-hover:scale-110">
-                            <Plus size={24} />
-                          </div>
-                        )}
-                        <span className="text-xl font-bold">
-                          {processingPaymentReceipts ? 'Processando...' : 'Importar Comprovante de Pagamento'}
-                        </span>
-                      </div>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Importar Comprovante
+                  </>
+                )}
                       </Button>
                   </div>
-                    </div>
-                  </Card>
 
             {/* Abas por Ano e Mês */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-gray-600/50 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+            <Card className="bg-seguranca-graphite border-gray-600 rounded-lg p-6">
                 <div className="space-y-8">
                   <div className="text-center">
                     <h4 className="text-2xl font-bold text-white mb-2">Comprovantes por Período</h4>
@@ -3938,136 +3694,108 @@ const Holerites: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* Controles de seleção em lote - responsivo */}
+                      {/* Botões de Ação - PADRÃO SST SIMPLIFICADO */}
                       {getFilteredPaymentReceipts().length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-blue-500/20">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                            
-                            {/* Checkbox de selecionar todos */}
-                            <div className="flex items-center space-x-3 bg-seguranca-black/50 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-gray-600/30">
-                              <Checkbox
-                                id="select-all-payment-receipts"
-                                checked={areAllPaymentReceiptsSelected()}
-                                onCheckedChange={handleSelectAllPaymentReceipts}
-                                className="border-blue-400 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 w-4 h-4 sm:w-5 sm:h-5"
-                              />
-                              <label htmlFor="select-all-payment-receipts" className="text-white text-xs sm:text-sm font-semibold cursor-pointer whitespace-nowrap">
-                                Selecionar Todos
-                              </label>
-                            </div>
-                            
-                            {/* BotÃµes de aÃ§Ã£o - responsivos */}
-                            {hasSelectedPaymentReceipts() && (
-                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                                <Button
-                                  onClick={async () => {
-                                    // Resolver IDs de funcionários a partir dos comprovantes selecionados
-                                    const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
-                                    const ids: string[] = [];
-                                    for (const r of selected) {
-                                      // tentamos por CPF no nome do arquivo ou campo document, se existir
-                                      let cpf: string | null = null;
-                                      if ((r as any).cpf) cpf = (r as any).cpf;
-                                      if (!cpf && r.fileName) {
-                                        const m = r.fileName.match(/(\d{11})/);
-                                        if (m) cpf = m[1];
-                                      }
-                                      if (cpf) {
-                                        try {
-                                          const byCpf = await employeeService.searchEmployees(cpf);
-                                          if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                        } catch {}
-                                      }
-                                      try {
-                                        const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
-                                        if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                      } catch {}
-                                    }
-                                    const uniqueIds = Array.from(new Set(ids));
-                                    if (uniqueIds.length === 0) {
-                                      toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                      return;
-                                    }
-                                    setResolvedEmployeeIds(uniqueIds);
-                                    setValidationSendType('email');
-                                    setShowValidationModal(true);
-                                  }}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
-                                >
-                                  <Mail size={14} className="mr-1" />
-                                  <span className="hidden sm:inline">Email</span>
-                                  <span className="sm:hidden">E</span>
-                                  <span className="ml-1">({selectedPaymentReceipts.length})</span>
-                                </Button>
-                                
-                                <Button
-                                  onClick={async () => {
-                                    const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
-                                    const ids: string[] = [];
-                                    for (const r of selected) {
-                                      let cpf: string | null = null;
-                                      if ((r as any).cpf) cpf = (r as any).cpf;
-                                      if (!cpf && r.fileName) {
-                                        const m = r.fileName.match(/(\d{11})/);
-                                        if (m) cpf = m[1];
-                                      }
-                                      if (cpf) {
-                                        try {
-                                          const byCpf = await employeeService.searchEmployees(cpf);
-                                          if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                        } catch {}
-                                      }
-                                      try {
-                                        const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
-                                        if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                      } catch {}
-                                    }
-                                    const uniqueIds = Array.from(new Set(ids));
-                                    if (uniqueIds.length === 0) {
-                                      toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                      return;
-                                    }
-                                    setResolvedEmployeeIds(uniqueIds);
-                                    setValidationSendType('whatsapp');
-                                    setShowValidationModal(true);
-                                  }}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
-                                >
-                                  <MessageSquare size={14} className="mr-1" />
-                                  <span className="hidden sm:inline">WhatsApp</span>
-                                  <span className="sm:hidden">W</span>
-                                  <span className="ml-1">({selectedPaymentReceipts.length})</span>
-                                </Button>
-                                
-                                <Button
-                                  onClick={handleDeleteMultiplePaymentReceipts}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
-                                >
-                                  <Trash2 size={14} className="mr-1" />
-                                  <span className="hidden sm:inline">Excluir</span>
-                                  <span className="sm:hidden">X</span>
-                                  <span className="ml-1">({selectedPaymentReceipts.length})</span>
-                                </Button>
-                                
-                                <Button
-                                  onClick={clearPaymentReceiptSelection}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-gray-500/50 text-gray-400 hover:bg-gray-500/10 hover:border-gray-400 px-3 py-1 text-sm flex-1 sm:flex-none min-w-0"
-                                >
-                                  <X size={14} className="mr-1" />
-                                  <span className="hidden sm:inline">Limpar</span>
-                                  <span className="sm:hidden">L</span>
-                                </Button>
-                              </div>
-                            )}
+                        <div className="mt-4 pt-4 border-t border-gray-600">
+                          {/* Checkbox Selecionar Todos */}
+                          <div className="mb-3 flex items-center gap-2 bg-gray-700 p-3 rounded">
+                            <Checkbox
+                              id="select-all-payment-receipts"
+                              checked={areAllPaymentReceiptsSelected()}
+                              onCheckedChange={handleSelectAllPaymentReceipts}
+                              className="border-blue-400"
+                            />
+                            <label htmlFor="select-all-payment-receipts" className="text-white text-sm font-medium cursor-pointer">
+                              Selecionar Todos
+                            </label>
                           </div>
+                          
+                          {/* Botões de ação em massa - só aparecem quando "Selecionar todos" está marcado */}
+                          {areAllPaymentReceiptsSelected() && (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Button
+                              onClick={async () => {
+                                const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
+                                const ids: string[] = [];
+                                for (const r of selected) {
+                                  let cpf: string | null = null;
+                                  if ((r as any).cpf) cpf = (r as any).cpf;
+                                  if (!cpf && r.fileName) {
+                                    const m = r.fileName.match(/(\d{11})/);
+                                    if (m) cpf = m[1];
+                                  }
+                                  if (cpf) {
+                                    try {
+                                      const byCpf = await employeeService.searchEmployees(cpf);
+                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                    } catch {}
+                                  }
+                                  try {
+                                    const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
+                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                  } catch {}
+                                }
+                                const uniqueIds = Array.from(new Set(ids));
+                                if (uniqueIds.length === 0) {
+                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                  return;
+                                }
+                                setResolvedEmployeeIds(uniqueIds);
+                                setValidationSendType('email');
+                                setShowValidationModal(true);
+                              }}
+                              className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
+                            >
+                              <Mail size={16} className="mr-2" />
+                              Email ({selectedPaymentReceipts.length})
+                            </Button>
+                            
+                            <Button
+                              onClick={async () => {
+                                const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
+                                const ids: string[] = [];
+                                for (const r of selected) {
+                                  let cpf: string | null = null;
+                                  if ((r as any).cpf) cpf = (r as any).cpf;
+                                  if (!cpf && r.fileName) {
+                                    const m = r.fileName.match(/(\d{11})/);
+                                    if (m) cpf = m[1];
+                                  }
+                                  if (cpf) {
+                                    try {
+                                      const byCpf = await employeeService.searchEmployees(cpf);
+                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
+                                    } catch {}
+                                  }
+                                  try {
+                                    const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
+                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
+                                  } catch {}
+                                }
+                                const uniqueIds = Array.from(new Set(ids));
+                                if (uniqueIds.length === 0) {
+                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
+                                  return;
+                                }
+                                setResolvedEmployeeIds(uniqueIds);
+                                setValidationSendType('whatsapp');
+                                setShowValidationModal(true);
+                              }}
+                              className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              <MessageSquare size={16} className="mr-2" />
+                              WhatsApp ({selectedPaymentReceipts.length})
+                            </Button>
+                            
+                            <Button
+                              onClick={handleDeleteMultiplePaymentReceipts}
+                              className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
+                            >
+                              <Trash2 size={16} className="mr-2" />
+                              Excluir ({selectedPaymentReceipts.length})
+                            </Button>
+                          </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -4101,111 +3829,121 @@ const Holerites: React.FC = () => {
                       </Button>
                     </div>
                     ) : (
-                      <div className="grid gap-4">
+                      <div className="space-y-2">
                         {getFilteredPaymentReceipts().map((receipt, index) => (
-                          <div key={receipt.id} className="group bg-gradient-to-r from-seguranca-black/50 to-seguranca-graphite/50 border border-gray-600/30 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 hover:scale-[1.02]">
-                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-                                  <div className="flex items-center space-x-3">
-                                    <Checkbox
-                                      id={`payment-receipt-${receipt.id}`}
-                                      checked={selectedPaymentReceipts.includes(receipt.id)}
-                                      onCheckedChange={(checked) => handleSelectPaymentReceipt(receipt.id, checked as boolean)}
-                                      className="border-blue-400 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                                    />
-                                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                                      <User size={20} className="text-white" />
-                    </div>
-                                    <div>
-                                      <h6 className="font-bold text-white text-lg">
-                                        {receipt.employeeName}
-                                      </h6>
-                                      <p className="text-gray-400 text-sm">Funcionário</p>
-                </div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    <Badge className="bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg">
-                                      ✅ Processado
-                        </Badge>
-                    </div>
-                    </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                                  <div className="flex items-center space-x-2 text-gray-300">
-                                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                                      <span className="text-green-400">💰</span>
-                  </div>
-                                    <div>
-                                      <p className="text-gray-400 text-xs">Valor</p>
-                                      <p className="font-semibold text-white">R$ {Number(receipt.netSalary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                      </div>
-                                  <div className="flex items-center space-x-2 text-gray-300">
-                                    <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                      <Calendar size={16} className="text-blue-400" />
-                    </div>
-                                    <div>
-                                      <p className="text-gray-400 text-xs">Processado em</p>
-                                      <p className="font-semibold text-white">{formatDate(receipt.processedAt || receipt.updatedAt)}</p>
-                        </div>
-                                </div>
-                                  <div className="flex items-center space-x-2 text-gray-300">
-                                    <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                      <FileText size={16} className="text-purple-400" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-gray-400 text-xs">Arquivo</p>
-                                      <p className="font-semibold text-white truncate">{receipt.fileName}</p>
-                                    </div>
-                                </div>
+                          <div key={receipt.id} className="bg-gray-700 p-3 rounded">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                id={`payment-receipt-${receipt.id}`}
+                                checked={selectedPaymentReceipts.includes(receipt.id)}
+                                onCheckedChange={(checked) => handleSelectPaymentReceipt(receipt.id, checked as boolean)}
+                                className="border-blue-400 mt-1"
+                              />
+                              <div className="flex-1">
+                                <p className="text-white font-medium">{receipt.employeeName}</p>
+                                <p className="text-gray-400 text-sm">CPF: {(receipt as any).cpf || 'Não informado'}</p>
+                                <p className="text-gray-400 text-sm">Período: {receipt.month}/{receipt.year}</p>
+                                <p className="text-green-400 text-sm">Transferência: {formatDate(receipt.processedAt || receipt.updatedAt)}</p>
                               </div>
                             </div>
                             
-                              <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
+                            {/* Botões de ação individual */}
+                            <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
                               <Button
-                                variant="outline"
                                 size="sm"
-                                  onClick={() => handleViewPaymentReceipt(receipt)}
-                                  className="group border-2 border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white hover:border-blue-500 px-4 py-2 rounded-xl font-semibold transition-all duration-300"
-                                >
-                                  <Eye size={16} className="mr-2 group-hover:scale-110 transition-transform duration-300" />
-                                  Visualizar
+                                onClick={async () => {
+                                  let cpf: string | null = null;
+                                  if ((receipt as any).cpf) cpf = (receipt as any).cpf;
+                                  if (!cpf && receipt.fileName) {
+                                    const m = receipt.fileName.match(/(\d{11})/);
+                                    if (m) cpf = m[1];
+                                  }
+                                  let employeeId: string | null = null;
+                                  if (cpf) {
+                                    try {
+                                      const byCpf = await employeeService.searchEmployees(cpf);
+                                      if (byCpf && byCpf.length === 1) employeeId = byCpf[0].id;
+                                    } catch {}
+                                  }
+                                  if (!employeeId) {
+                                    try {
+                                      const byName = await employeeService.searchEmployeesByName(receipt.employeeName || '');
+                                      if (byName && byName.length === 1) employeeId = byName[0].id;
+                                    } catch {}
+                                  }
+                                  if (!employeeId) {
+                                    toast({ title: 'Funcionário não encontrado', description: 'Não foi possível identificar o funcionário.', variant: 'destructive' });
+                                    return;
+                                  }
+                                  setResolvedEmployeeIds([employeeId]);
+                                  setValidationSendType('email');
+                                  setShowValidationModal(true);
+                                }}
+                                className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
+                              >
+                                <Mail size={14} className="mr-1" />
+                                Email
                               </Button>
+                              
                               <Button
-                                variant="outline"
                                 size="sm"
-                                  onClick={() => handleDownloadPaymentReceipt(receipt.id, receipt.fileName)}
-                                  className="group border-2 border-green-500/50 text-green-400 hover:bg-green-500 hover:text-white hover:border-green-500 px-4 py-2 rounded-xl font-semibold transition-all duration-300"
-                                >
-                                  <Download size={16} className="mr-2 group-hover:scale-110 transition-transform duration-300" />
-                                  Baixar
+                                onClick={async () => {
+                                  let cpf: string | null = null;
+                                  if ((receipt as any).cpf) cpf = (receipt as any).cpf;
+                                  if (!cpf && receipt.fileName) {
+                                    const m = receipt.fileName.match(/(\d{11})/);
+                                    if (m) cpf = m[1];
+                                  }
+                                  let employeeId: string | null = null;
+                                  if (cpf) {
+                                    try {
+                                      const byCpf = await employeeService.searchEmployees(cpf);
+                                      if (byCpf && byCpf.length === 1) employeeId = byCpf[0].id;
+                                    } catch {}
+                                  }
+                                  if (!employeeId) {
+                                    try {
+                                      const byName = await employeeService.searchEmployeesByName(receipt.employeeName || '');
+                                      if (byName && byName.length === 1) employeeId = byName[0].id;
+                                    } catch {}
+                                  }
+                                  if (!employeeId) {
+                                    toast({ title: 'Funcionário não encontrado', description: 'Não foi possível identificar o funcionário.', variant: 'destructive' });
+                                    return;
+                                  }
+                                  setResolvedEmployeeIds([employeeId]);
+                                  setValidationSendType('whatsapp');
+                                  setShowValidationModal(true);
+                                }}
+                                className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                <MessageSquare size={14} className="mr-1" />
+                                WhatsApp
                               </Button>
+                              
                               <Button
-                                variant="outline"
                                 size="sm"
-                                  onClick={() => handleDeletePaymentReceipt(receipt.id)}
-                                  className="group border-2 border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white hover:border-red-500 px-4 py-2 rounded-xl font-semibold transition-all duration-300"
-                                >
-                                  <Trash2 size={16} className="mr-2 group-hover:scale-110 transition-transform duration-300" />
-                                  Excluir
+                                onClick={() => handleDeletePaymentReceipt(receipt.id)}
+                                className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
+                              >
+                                <Trash2 size={14} className="mr-1" />
+                                Excluir
                               </Button>
                             </div>
                           </div>
-                        </div>
                       ))}
                     </div>
                   )}
                   </div>
               </Card>
-            </div>
           </TabsContent>
 
 
           {/* Nova Aba: Unificação Individual */}
-          <TabsContent value="unificacao-individual" className="space-y-6">
-              {/* Botões de Ação */}
-              <div className="flex justify-between mb-4">
-                <div className="flex gap-2">
+          <TabsContent value="unificacao-individual" className="space-y-6 mt-6">
+              {/* Botões de Ação - SIMPLIFICADO */}
+              <div className="flex flex-col sm:flex-row justify-between gap-2 mb-4">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => loadProcessedFiles()}
                     variant="outline"
@@ -4335,48 +4073,38 @@ const Holerites: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Lista de Holerites Processados */}
-                  <Card>
+                  {/* Lista de Holerites Processados - PADRÃO SST */}
+                  <Card className="bg-seguranca-graphite border-gray-600">
                       <CardHeader>
-                          <CardTitle className="flex items-center text-lg">
-                              <FileText className="w-5 h-5 mr-2 text-yellow-600" />
-                              Holerites Processados
-                              <Badge variant="secondary" className="ml-2">
-                                  {getFilteredHolerites().length} / {processedHolerites.length}
+                          <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
+                              <div className="flex items-center gap-2">
+                                  <FileText className="h-5 w-5 text-seguranca-yellow" />
+                                  <span className="text-base md:text-lg">Holerites</span>
+                              </div>
+                              <Badge variant="secondary" className="bg-seguranca-black text-seguranca-yellow">
+                                  {getFilteredHolerites().length}
                               </Badge>
                           </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                          {/* Campo de busca */}
-                          <div className="relative">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <CardContent className="space-y-3">
+                          {/* Busca */}
                               <Input
-                                  placeholder="Buscar holerites..."
+                              placeholder="Buscar..."
                                   value={holeriteSearchTerm}
                                   onChange={(e) => setHoleriteSearchTerm(e.target.value)}
-                                  className="pl-10 pr-10"
-                              />
-                              {holeriteSearchTerm && (
-                                  <button
-                                      onClick={() => setHoleriteSearchTerm('')}
-                                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                  >
-                                      <X className="w-4 h-4" />
-                                  </button>
-                              )}
-                          </div>
+                              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                          />
 
-                          {/* Lista de holerites */}
+                          {/* Lista */}
                           <div className="space-y-2 max-h-96 overflow-y-auto">
                               {loadingProcessedFiles ? (
-                                  <div className="flex items-center justify-center py-8">
-                                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                                      <span className="ml-2 text-muted-foreground">Carregando holerites...</span>
+                                  <div className="flex items-center justify-center py-6">
+                                      <Loader2 className="h-5 w-5 animate-spin text-seguranca-yellow" />
                                   </div>
                               ) : getFilteredHolerites().length === 0 ? (
-                                  <div className="text-center py-8 text-muted-foreground">
-                                      <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                      <p>Nenhum holerite encontrado</p>
+                                  <div className="text-center py-6 text-gray-400">
+                                      <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                      <p className="text-sm">Nenhum holerite</p>
                                   </div>
                               ) : (
                                   getFilteredHolerites().map((holerite) => (
@@ -4384,24 +4112,19 @@ const Holerites: React.FC = () => {
                                           key={holerite.id}
                                           draggable
                                           onDragStart={(e) => handleDragStart(e, holerite, 'holerite')}
-                                          className="p-3 border rounded-lg cursor-move hover:bg-yellow-50 hover:border-yellow-300 transition-all duration-200 active:scale-95"
+                                          className="p-3 bg-seguranca-black border border-gray-600 rounded-lg cursor-move hover:border-seguranca-yellow transition-colors"
                                       >
-                                          <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                              <GripVertical className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                               <div className="flex-1 min-w-0">
-                                                  <p className="font-medium text-sm truncate">
+                                                  <p className="text-white text-sm font-medium truncate">
                                                       {holerite.employeeName || 'Nome não disponível'}
                                                   </p>
-                                                  <p className="text-xs text-muted-foreground truncate">
-                                                      {holerite.name}
-                                                  </p>
                                                   <div className="flex items-center gap-2 mt-1">
-                                                      <Badge variant="outline" className="text-xs">
+                                                      <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
                                                           {holerite.month}/{holerite.year}
                                               </Badge>
                                                   </div>
-                                              </div>
-                                              <div className="flex-shrink-0 ml-2">
-                                                  <GripVertical className="w-4 h-4 text-muted-foreground" />
                                               </div>
                                           </div>
                                       </div>
@@ -4411,48 +4134,38 @@ const Holerites: React.FC = () => {
                       </CardContent>
                   </Card>
 
-                  {/* Lista de Comprovantes Processados */}
-                  <Card>
+                  {/* Lista de Comprovantes Processados - PADRÃO SST */}
+                  <Card className="bg-seguranca-graphite border-gray-600">
                       <CardHeader>
-                          <CardTitle className="flex items-center text-lg">
-                              <Receipt className="w-5 h-5 mr-2 text-green-600" />
-                              Comprovantes Processados
-                              <Badge variant="secondary" className="ml-2">
-                                  {getFilteredRecibos().length} / {processedRecibos.length}
+                          <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
+                              <div className="flex items-center gap-2">
+                                  <Receipt className="h-5 w-5 text-green-500" />
+                                  <span className="text-base md:text-lg">Comprovantes</span>
+                              </div>
+                              <Badge variant="secondary" className="bg-seguranca-black text-green-400">
+                                  {getFilteredRecibos().length}
                               </Badge>
                           </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                          {/* Campo de busca */}
-                          <div className="relative">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <CardContent className="space-y-3">
+                          {/* Busca */}
                               <Input
-                                  placeholder="Buscar comprovantes..."
+                              placeholder="Buscar..."
                                   value={reciboSearchTerm}
                                   onChange={(e) => setReciboSearchTerm(e.target.value)}
-                                  className="pl-10 pr-10"
-                              />
-                              {reciboSearchTerm && (
-                                  <button
-                                      onClick={() => setReciboSearchTerm('')}
-                                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                  >
-                                      <X className="w-4 h-4" />
-                              </button>
-                              )}
-                          </div>
+                              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                          />
 
-                          {/* Lista de comprovantes */}
+                          {/* Lista */}
                           <div className="space-y-2 max-h-96 overflow-y-auto">
                               {loadingProcessedFiles ? (
-                                  <div className="flex items-center justify-center py-8">
-                                      <Loader2 className="w-6 h-6 animate-spin text-green-600" />
-                                      <span className="ml-2 text-muted-foreground">Carregando comprovantes...</span>
+                                  <div className="flex items-center justify-center py-6">
+                                      <Loader2 className="h-5 w-5 animate-spin text-green-500" />
                                   </div>
                               ) : getFilteredRecibos().length === 0 ? (
-                                  <div className="text-center py-8 text-muted-foreground">
-                                      <Receipt className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                      <p>Nenhum comprovante encontrado</p>
+                                  <div className="text-center py-6 text-gray-400">
+                                      <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                      <p className="text-sm">Nenhum comprovante</p>
                                   </div>
                               ) : (
                                   getFilteredRecibos().map((recibo) => (
@@ -4460,24 +4173,19 @@ const Holerites: React.FC = () => {
                                           key={recibo.id}
                                           draggable
                                           onDragStart={(e) => handleDragStart(e, recibo, 'recibo')}
-                                          className="p-3 border rounded-lg cursor-move hover:bg-green-50 hover:border-green-300 transition-all duration-200 active:scale-95"
+                                          className="p-3 bg-seguranca-black border border-gray-600 rounded-lg cursor-move hover:border-green-500 transition-colors"
                                       >
-                                          <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                              <GripVertical className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                               <div className="flex-1 min-w-0">
-                                                  <p className="font-medium text-sm truncate">
+                                                  <p className="text-white text-sm font-medium truncate">
                                                       {recibo.employeeName || 'Nome não disponível'}
                                                   </p>
-                                                  <p className="text-xs text-muted-foreground truncate">
-                                                      {recibo.name}
-                                                  </p>
                                                   <div className="flex items-center gap-2 mt-1">
-                                                      <Badge variant="outline" className="text-xs">
+                                                      <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
                                                           {recibo.month}/{recibo.year}
                                               </Badge>
                                                   </div>
-                                              </div>
-                                              <div className="flex-shrink-0 ml-2">
-                                                  <GripVertical className="w-4 h-4 text-muted-foreground" />
                                               </div>
                                           </div>
                                       </div>
@@ -4776,37 +4484,47 @@ const Holerites: React.FC = () => {
                                           </p>
                                       </div>
                                   ) : (
-                                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                                      <div className="space-y-2 max-h-96 overflow-y-auto">
                                           {filteredDocs.map((doc, index) => (
-                                  <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
-                                      <div className="flex items-center space-x-3">
-                                          <input
-                                              type="checkbox"
+                                              <Card key={index} className="bg-seguranca-black border-gray-600 hover:border-gray-500 transition-colors">
+                                                  <CardContent className="p-3">
+                                                      <div className="flex items-start gap-3">
+                                                          <Checkbox
                                               checked={selectedUnifiedDocuments.has(index)}
-                                              onChange={() => toggleDocumentSelection(index)}
-                                              className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                                                              onCheckedChange={() => toggleDocumentSelection(index)}
                                           />
+                                                          
                                           <div className="flex-1 min-w-0">
-                                              <p className="text-white font-medium truncate">
+                                                              <div className="flex items-center gap-2 mb-1">
+                                                                  <FileText className="h-4 w-4 text-seguranca-yellow flex-shrink-0" />
+                                                                  <p className="text-white text-sm font-medium truncate">
                                                   {doc.employeeName || 'N/A'}
                                               </p>
-                                              <p className="text-gray-400 text-sm truncate">
-                                                  {doc.fileName}
-                                              </p>
-                                              <div className="flex items-center gap-2 mt-1">
-                                                  <Badge variant="outline" className="border-blue-500/30 text-blue-300 text-xs">
-                                                      {doc.month || '?'}/{doc.year || '?'}
-                                                  </Badge>
+                                                              </div>
+                                                              
+                                                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mb-2">
+                                                                  <span>{doc.month || '?'}/{doc.year || '?'}</span>
                                                   {doc.fileSize && (
-                                                      <span className="text-gray-500 text-xs">
-                                                          {(doc.fileSize / 1024).toFixed(1)} KB
-                                                      </span>
-                                                  )}
-                                              </div>
-                                          </div>
+                                                                      <>
+                                                                          <span>•</span>
+                                                                          <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                                                                      </>
+                                                                  )}
                                       </div>
                                       
-                                      <div className="flex items-center gap-2">
+                                                              {/* Botões de Ação Individual - PADRÃO SST */}
+                                                              {(() => {
+                                                                  // Verifica se "Selecionar Todos" está ativo
+                                                                  const allSelected = filteredDocs.length > 0 && 
+                                                                                     filteredDocs.length === selectedUnifiedDocuments.size &&
+                                                                                     filteredDocs.every((_, idx) => selectedUnifiedDocuments.has(idx));
+                                                                  
+                                                                  // Se "Selecionar Todos" está ativo, não mostra botões individuais
+                                                                  if (allSelected) return null;
+                                                                  
+                                                                  return (
+                                                              <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
+                                          {/* Botão Ver - sempre disponível */}
                                           <Button
                                               onClick={() => {
                                                   setViewerDocumentIndex(index);
@@ -4816,10 +4534,30 @@ const Holerites: React.FC = () => {
                                                   setShowUnifiedViewerModal(true);
                                               }}
                                               size="sm"
-                                              variant="outline"
-                                              className="border-blue-500/30 text-blue-300 hover:bg-blue-500/10"
-                                          >
-                                              <Eye className="h-4 w-4" />
+                                                                      className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                                                                  >
+                                                                      <Eye className="h-4 w-4 mr-1" />
+                                                                      Ver
+                                                                  </Button>
+                                          
+                                          {/* Botões de ação - só aparecem quando item está selecionado */}
+                                          {selectedUnifiedDocuments.has(index) && (
+                                              <>
+                                                                  <Button
+                                                                      onClick={() => sendSingleDocument('email', index)}
+                                                                      size="sm"
+                                                                      className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
+                                                                  >
+                                                                      <Mail className="h-4 w-4 mr-1" />
+                                                                      Email
+                                                                  </Button>
+                                                                  <Button
+                                                                      onClick={() => sendSingleDocument('whatsapp', index)}
+                                                                      size="sm"
+                                                                      className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                                                                  >
+                                                                      <MessageSquare className="h-4 w-4 mr-1" />
+                                                                      WhatsApp
                                           </Button>
                                           <Button
                                               onClick={() => {
@@ -4833,73 +4571,79 @@ const Holerites: React.FC = () => {
                                                   document.body.removeChild(link);
                                               }}
                                               size="sm"
-                                              variant="outline"
-                                              className="border-green-500/30 text-green-300 hover:bg-green-500/10"
-                                              title="Baixar documento"
-                                          >
-                                              <Download className="h-4 w-4" />
+                                                                      className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
+                                                                  >
+                                                                      <Download className="h-4 w-4 mr-1" />
+                                                                      Baixar
                                           </Button>
                                           <Button
-                                              onClick={() => sendSingleDocument('email', index)}
+                                              onClick={() => handleDeleteDocuments('individual', index)}
                                               size="sm"
-                                              variant="outline"
-                                              className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
-                                              title="Enviar por Email"
+                                                                      className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
                                           >
-                                              <Mail className="h-4 w-4" />
+                                                                      <Trash2 className="h-4 w-4 mr-1" />
+                                                                      Excluir
                                           </Button>
-                                          <Button
-                                              onClick={() => sendSingleDocument('whatsapp', index)}
-                                              size="sm"
-                                              variant="outline"
-                                              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
-                                              title="Enviar por WhatsApp"
-                                          >
-                                              <MessageSquare className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                              onClick={() => {
-                                                  setDeleteDocumentIndex(index);
-                                                  setDeleteType('individual');
-                                                  setShowUnifiedDeleteModal(true);
-                                              }}
-                                              size="sm"
-                                              variant="outline"
-                                              className="border-red-500/30 text-red-300 hover:bg-red-500/10"
-                                              title="Excluir documento"
-                                          >
-                                              <Trash2 className="h-4 w-4" />
-                                          </Button>
+                                          </>
+                                          )}
                                       </div>
+                                                                  );
+                                                              })()}
                                   </div>
+                                                      </div>
+                                                  </CardContent>
+                                              </Card>
                                           ))}
                                       </div>
                                   );
                               })()}
 
-                      {/* BotÃµes de AÃ§Ã£o em Lote */}
-                      {selectedUnifiedDocuments.size > 0 && (
-                          <div className="flex items-center justify-center gap-3 pt-4 border-t border-white/10">
+                      {/* Botões de Ação em Massa - PADRÃO SST - só aparecem quando "Selecionar Todos" está marcado */}
+                      {(() => {
+                          const filteredDocs = unifiedDocuments.filter(doc => {
+                              const yearMatch = doc.fileName.match(/_(\d{4})\.pdf$/);
+                              const monthMatch = doc.fileName.match(/UNIFICADO_.*?_(\d{1,2})_\d{4}\.pdf$/);
+                              
+                              const docYear = yearMatch ? yearMatch[1] : '';
+                              const docMonth = monthMatch ? monthMatch[1] : '';
+                              
+                              const matchesYear = !selectedYear || docYear === selectedYear;
+                              const matchesMonth = !selectedMonth || docMonth === selectedMonth;
+                              
+                              return matchesYear && matchesMonth;
+                          });
+                          
+                          // Verifica se todos os documentos filtrados estão selecionados
+                          const allSelected = filteredDocs.length > 0 && 
+                                             filteredDocs.length === selectedUnifiedDocuments.size &&
+                                             filteredDocs.every((_, index) => selectedUnifiedDocuments.has(index));
+                          
+                          return allSelected;
+                      })() && (
+                          <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-white/10">
                               <Button
                                   onClick={() => handleSendDocuments('email')}
-                                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+                                  size="sm"
+                                  className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
                               >
                                   <Mail className="mr-2 h-4 w-4" />
-                                  Enviar por Email ({selectedUnifiedDocuments.size})
+                                  Email ({selectedUnifiedDocuments.size})
                               </Button>
                               <Button
                                   onClick={() => handleSendDocuments('whatsapp')}
-                                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                                  size="sm"
+                                  className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
                               >
                                   <MessageSquare className="mr-2 h-4 w-4" />
-                                  Enviar por WhatsApp ({selectedUnifiedDocuments.size})
+                                  WhatsApp ({selectedUnifiedDocuments.size})
                               </Button>
                               <Button
                                   onClick={() => handleDeleteDocuments('batch')}
-                                  className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
+                                  size="sm"
+                                  className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
                               >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Excluir Todos
+                                  Excluir ({selectedUnifiedDocuments.size})
                                       </Button>
                                   </div>
                               )}

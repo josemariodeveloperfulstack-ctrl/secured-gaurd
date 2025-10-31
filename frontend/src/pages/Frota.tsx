@@ -1278,13 +1278,13 @@ const Frota: React.FC = () => {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-seguranca-lightgray">Gestão de Frota</h1>
-            <p className="text-gray-400 mt-1">Controle completo da frota de veículos</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray">Gestão de Frota</h1>
+            <p className="text-gray-400 text-sm md:text-base mt-1">Controle completo da frota de veículos</p>
           </div>
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <Card className="bg-seguranca-graphite border-gray-600">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-seguranca-lightgray">Veículos Ativos</CardTitle>

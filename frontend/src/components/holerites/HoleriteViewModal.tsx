@@ -30,6 +30,22 @@ export function HoleriteViewModal({
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Detecta se está em dispositivo móvel
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isMobileDevice || isSmallScreen);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (holerite) {
@@ -99,6 +115,13 @@ export function HoleriteViewModal({
   const handlePrint = () => {
     if (pdfUrl) {
       window.open(pdfUrl, '_blank');
+    }
+  };
+
+  const handleOpenInNewTab = () => {
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank');
+      toast.success('PDF aberto em nova aba');
     }
   };
 
@@ -282,8 +305,8 @@ export function HoleriteViewModal({
 
           {/* Área do PDF */}
           <div className="w-full lg:w-2/3 p-3 sm:p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/50 flex flex-col h-[60vh] lg:h-full">
-            {/* Controles do PDF */}
-            {pdfUrl && (
+            {/* Controles do PDF - escondidos no mobile */}
+            {pdfUrl && !isMobile && (
               <div className="flex items-center justify-between bg-gray-800/50 rounded-lg p-2 sm:p-3 mb-3 sm:mb-4 border border-gray-600/30">
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <Button
@@ -366,6 +389,27 @@ export function HoleriteViewModal({
                 </div>
               </div>
             ) : pdfUrl ? (
+              isMobile ? (
+                <div className="flex items-center justify-center h-full bg-gradient-to-br from-gray-100 to-gray-200">
+                  <div className="text-center p-6">
+                    <FileText className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                    <p className="text-gray-800 font-bold text-lg mb-2">PDF Pronto!</p>
+                    <p className="text-gray-600 text-sm mb-6">
+                      Clique no botão abaixo para visualizar o holerite
+                    </p>
+                    <Button
+                      onClick={handleOpenInNewTab}
+                      className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg"
+                    >
+                      <Eye size={18} className="mr-2" />
+                      Abrir PDF
+                    </Button>
+                    <p className="text-gray-500 text-xs mt-4">
+                      O PDF será aberto em uma nova aba
+                    </p>
+                  </div>
+                </div>
+              ) : (
                 <div className="relative w-full h-full">
                   <iframe
                     src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
@@ -385,7 +429,8 @@ export function HoleriteViewModal({
                       </span>
                     </div>
                   )}
-              </div>
+                </div>
+              )
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">

@@ -19,28 +19,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Set;
 
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.EmployeeRepository;
-import com.z7design.secured_guard.service.UserService;
-import com.z7design.secured_guard.model.User;
-import com.z7design.secured_guard.model.enums.UserStatus;
-import com.z7design.secured_guard.model.Role;
-import java.util.HashSet;
-import com.z7design.secured_guard.validation.CpfValidator;
-import java.util.UUID;
-import com.z7design.secured_guard.exception.DuplicatePayslipException;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.repository.UserRepository;
-import com.z7design.secured_guard.service.TesseractService;
 
 @Service
 @RequiredArgsConstructor
@@ -63,7 +54,8 @@ public class PayslipService {
             throw new IllegalArgumentException("O arquivo está vazio");
         }
 
-        if (!file.getContentType().equals("application/pdf")) {
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.equals("application/pdf")) {
             throw new IllegalArgumentException("O arquivo deve ser um PDF");
         }
 
@@ -104,12 +96,33 @@ public class PayslipService {
                     }
 
                     if (payslip != null && !payslip.getEmployeeName().equals("Desconhecido") && payslip.getCpf() != null) {
-                        // Evitar duplicidade de holerite para o mesmo CPF, mês e ano
+                        // Evitar duplicidade de holerite para a mesma empresa (CNPJ), CPF, mês e ano
                         try {
-                            if (payslipRepository.existsByCpfAndMonthAndYearCustom(payslip.getCpf(), payslip.getMonth(), payslip.getYear())) {
-                                String msg = String.format("Já existe holerite para CPF %s, mês %d, ano %d. Pulando página %d.", payslip.getCpf(), payslip.getMonth(), payslip.getYear(), i);
+                            boolean isDuplicate = payslipRepository.existsByCompanyCnpjAndCpfAndMonthAndYear(
+                                payslip.getCompanyCnpj(), 
+                                payslip.getCpf(), 
+                                payslip.getMonth(), 
+                                payslip.getYear()
+                            );
+                            
+                            if (isDuplicate) {
+                                String msg = String.format(
+                                    "Já existe holerite para Empresa CNPJ %s, CPF %s, mês %d, ano %d. Pulando página %d.",
+                                    payslip.getCompanyCnpj() != null ? payslip.getCompanyCnpj() : "não informado",
+                                    payslip.getCpf(), 
+                                    payslip.getMonth(), 
+                                    payslip.getYear(), 
+                                    i
+                                );
                                 log.warn(msg);
                                 continue; // Pular para próxima página ao invés de falhar
+                            } else {
+                                log.info("✅ Holerite não duplicado - permitindo importação (Empresa CNPJ: {}, CPF: {}, Período: {}/{})",
+                                    payslip.getCompanyCnpj() != null ? payslip.getCompanyCnpj() : "não informado",
+                                    payslip.getCpf(),
+                                    payslip.getMonth(),
+                                    payslip.getYear()
+                                );
                             }
                         } catch (Exception e) {
                             log.warn("⚠️ Erro ao verificar duplicidade, continuando processamento: {}", e.getMessage());
@@ -176,6 +189,8 @@ public class PayslipService {
         String codigo = null;
         String mes = null;
         String ano = null;
+        String empresaNome = null;
+        String empresaCnpj = null;
 
         // 1. EXTRAÇÃO DE CPF PRIMEIRO (mais confiável)
         Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})");
@@ -212,6 +227,67 @@ public class PayslipService {
                         break;
                     }
                 }
+                break;
+            }
+        }
+
+        // 1.5. EXTRAÇÃO DO CNPJ DA EMPRESA
+        Pattern cnpjPattern = Pattern.compile("CNPJ[:\\s]*([0-9]{2}\\.?[0-9]{3}\\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2}|[0-9]{14})");
+        for (String linha : linhas) {
+            Matcher cnpjMatcher = cnpjPattern.matcher(linha);
+            if (cnpjMatcher.find()) {
+                empresaCnpj = cnpjMatcher.group(1).replaceAll("[^0-9]", "");
+                log.info("✅ CNPJ da empresa encontrado: {} na linha: {}", empresaCnpj, linha.trim());
+                
+                // Tentar extrair nome da empresa da mesma linha ou linhas próximas
+                // Padrão comum: NOME_DA_EMPRESA + CNPJ
+                // Ou em linhas separadas
+                break;
+            }
+        }
+        
+        // 1.6. EXTRAÇÃO DO NOME DA EMPRESA
+        // Procurar por linhas que contenham palavras-chave de empresa
+        for (int i = 0; i < linhas.length; i++) {
+            String linha = linhas[i].trim();
+            String linhaUpper = linha.toUpperCase();
+            
+            // Se encontrar CNPJ na linha, tentar pegar nome da linha anterior ou mesma linha
+            if (linhaUpper.contains("CNPJ") && empresaNome == null) {
+                // Tentar extrair nome da mesma linha (antes do CNPJ)
+                int cnpjIndex = linhaUpper.indexOf("CNPJ");
+                if (cnpjIndex > 10) { // Se há texto suficiente antes
+                    String possibleName = linha.substring(0, cnpjIndex).trim();
+                    // Remover palavras-chave que não são parte do nome
+                    possibleName = possibleName.replaceAll("(?i)(EMPRESA|RAZÃO SOCIAL|EMPREGADOR)[:\\s]*", "").trim();
+                    if (possibleName.length() > 5 && !possibleName.matches(".*\\d{3}.*")) {
+                        empresaNome = possibleName;
+                        log.info("✅ Nome da empresa encontrado (mesma linha CNPJ): {}", empresaNome);
+                        break;
+                    }
+                }
+                
+                // Se não encontrou, tentar linha anterior
+                if (i > 0 && empresaNome == null) {
+                    String linhaNterior = linhas[i - 1].trim();
+                    if (linhaNterior.length() > 5 && !linhaNterior.matches(".*\\d{3}.*") && 
+                        !linhaNterior.toUpperCase().contains("FOLHA") &&
+                        !linhaNterior.toUpperCase().contains("PAGAMENTO") &&
+                        !linhaNterior.toUpperCase().contains("HOLERITE")) {
+                        empresaNome = linhaNterior;
+                        log.info("✅ Nome da empresa encontrado (linha anterior ao CNPJ): {}", empresaNome);
+                        break;
+                    }
+                }
+            }
+            
+            // Procurar por linhas com "LTDA", "S.A", "ME", etc. que geralmente indicam nome de empresa
+            if (empresaNome == null && (linhaUpper.contains("LTDA") || linhaUpper.contains("S.A") || 
+                linhaUpper.contains(" ME ") || linhaUpper.contains("EIRELI")) &&
+                !linhaUpper.contains("FUNCIONARIO") && !linhaUpper.contains("CPF") &&
+                linha.length() > 10 && linha.length() < 150) {
+                empresaNome = linha;
+                log.info("✅ Nome da empresa encontrado (por sufixo empresarial): {}", empresaNome);
                 break;
             }
         }
@@ -393,12 +469,14 @@ public class PayslipService {
                 return null;
             }
             
-            log.info("✅ Dados extraídos com sucesso - Página: {}, Código: {}, Nome: {}, CPF: {}, Período de Referência: {}/{}", 
-                    pageNumber, codigo, nome, cpf, mes, ano);
+            log.info("✅ Dados extraídos com sucesso - Página: {}, Código: {}, Nome: {}, CPF: {}, Empresa: {} (CNPJ: {}), Período de Referência: {}/{}", 
+                    pageNumber, codigo, nome, cpf, empresaNome, empresaCnpj, mes, ano);
 
             return Payslip.builder()
                     .employeeName(nome)
                     .cpf(cpf)
+                    .companyName(empresaNome)
+                    .companyCnpj(empresaCnpj)
                     .month(mesInt)
                     .year(anoInt)
                     .build();

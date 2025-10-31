@@ -27,6 +27,12 @@ public class Payslip {
     @Column(nullable = false, length = 20)
     private String cpf;
     
+    @Column(length = 255)
+    private String companyName;
+    
+    @Column(length = 20)
+    private String companyCnpj;
+    
     @Column(nullable = false)
     private Integer month;
     
