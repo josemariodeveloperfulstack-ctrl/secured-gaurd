@@ -3,11 +3,11 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.service.BaileysRestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/whatsapp")
@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class WhatsAppController {
 
     private final BaileysRestService baileysRestService;
+    
+    @Value("${chatbot.whatsapp.company-number:5531999999999}")
+    private String companyWhatsAppNumber;
 
     @GetMapping("/health")
     public ResponseEntity<?> health() {
@@ -42,6 +45,54 @@ public class WhatsAppController {
     public ResponseEntity<?> logout() {
         boolean ok = baileysRestService.disconnectInstance();
         return ResponseEntity.ok(java.util.Map.of("success", ok));
+    }
+
+    /**
+     * Envia mensagem simples via WhatsApp (usado pelo chatbot)
+     * Envia a mensagem do cliente para o número da empresa configurado
+     */
+    @PostMapping("/send-message")
+    public ResponseEntity<?> sendMessage(@RequestBody Map<String, String> request) {
+        try {
+            String message = request.get("message");
+            String customerName = request.get("customerName");
+            String customerPhone = request.get("customerPhone");
+            String customerEmail = request.get("customerEmail");
+            
+            if (message == null || message.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Mensagem é obrigatória"));
+            }
+            
+            // Construir mensagem completa com informações do cliente
+            StringBuilder fullMessage = new StringBuilder();
+            fullMessage.append("📱 *Nova mensagem do Chatbot*\n\n");
+            
+            if (customerName != null && !customerName.trim().isEmpty()) {
+                fullMessage.append("👤 *Nome:* ").append(customerName).append("\n");
+            }
+            if (customerEmail != null && !customerEmail.trim().isEmpty()) {
+                fullMessage.append("📧 *Email:* ").append(customerEmail).append("\n");
+            }
+            if (customerPhone != null && !customerPhone.trim().isEmpty()) {
+                fullMessage.append("📞 *Telefone:* ").append(customerPhone).append("\n");
+            }
+            
+            fullMessage.append("\n💬 *Mensagem:*\n").append(message);
+            
+            log.info("📤 Enviando mensagem do chatbot para número da empresa: {}", companyWhatsAppNumber);
+            boolean sent = baileysRestService.sendTextMessage(companyWhatsAppNumber, fullMessage.toString());
+            
+            if (sent) {
+                log.info("✅ Mensagem do chatbot enviada com sucesso para a empresa");
+                return ResponseEntity.ok(Map.of("success", true, "message", "Mensagem enviada com sucesso! Nossa equipe entrará em contato em breve."));
+            } else {
+                log.error("❌ Falha ao enviar mensagem do chatbot");
+                return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Falha ao enviar mensagem. Tente novamente ou entre em contato diretamente."));
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar mensagem do chatbot: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "error", "Erro interno: " + e.getMessage()));
+        }
     }
 }
 

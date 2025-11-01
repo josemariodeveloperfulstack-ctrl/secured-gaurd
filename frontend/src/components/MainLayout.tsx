@@ -140,7 +140,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           )}
 
           {/* Conteúdo principal */}
-          <div className="bg-seguranca-black rounded-lg border border-gray-700 p-2 sm:p-4 md:p-6 w-full max-w-[1200px] xl:max-w-[1400px] 2xl:max-w-[1800px] mx-auto">
+          <div className="bg-seguranca-black rounded-lg border border-gray-700 p-2 sm:p-4 md:p-6 w-full overflow-x-auto">
             {children}
           </div>
         </main>

@@ -137,10 +137,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/unified-documents/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO", "ROLE_COLABORADOR")
                 // Endpoints de relatórios - requerem permissões específicas
                 .requestMatchers("/api/reports/**").hasAnyAuthority("REPORTS_READ", "REPORTS_GENERATE", "REPORTS_EXPORT", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
-                // Endpoints de chat - requerem permissões específicas
-                .requestMatchers("/api/v1/chat/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
-                // Endpoints de mensagens - requerem permissões específicas
-                .requestMatchers("/api/v1/messages/**").hasAnyAuthority("MESSAGES_READ", "MESSAGES_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPERVISOR", "ROLE_COLABORADOR")
+                // Endpoints de chat - permitir para todos os roles principais
+                .requestMatchers("/api/v1/chat/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "SUPERVISOR", "COLABORADOR", "VIGILANTE", "RH", "FINANCEIRO", "GESTOR")
+                // Endpoints de mensagens - permitir para todos os roles principais
+                .requestMatchers("/api/v1/messages/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "SUPERVISOR", "COLABORADOR", "VIGILANTE", "RH", "FINANCEIRO", "GESTOR")
                 // Endpoints de suporte e atendimento - requerem permissões específicas
                 .requestMatchers("/api/v1/support/**").hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE", "SUPPORT_DELETE", "SUPPORT_MANAGE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de suporte (sem /api prefix) - temporariamente públicos para debug

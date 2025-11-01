@@ -31,6 +31,22 @@ export function PaymentReceiptViewModal({
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [showControls, setShowControls] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Detecta se está em dispositivo móvel
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isMobileDevice || isSmallScreen);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (open && receipt) {
@@ -84,6 +100,13 @@ export function PaymentReceiptViewModal({
   const handlePrint = () => {
     if (pdfUrl) {
       window.open(pdfUrl, '_blank');
+    }
+  };
+
+  const handleOpenInNewTab = () => {
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank');
+      toast.success('PDF aberto em nova aba');
     }
   };
 
@@ -231,8 +254,8 @@ export function PaymentReceiptViewModal({
 
           {/* Área do PDF */}
           <div className="w-full lg:w-2/3 p-3 sm:p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/50 flex flex-col h-[60vh] lg:h-full">
-            {/* Controles do PDF */}
-            {pdfUrl && (
+            {/* Controles do PDF - escondidos no mobile */}
+            {pdfUrl && !isMobile && (
               <div className="flex items-center justify-between bg-gray-800/50 rounded-lg p-2 sm:p-3 mb-3 sm:mb-4 border border-gray-600/30">
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <Button
@@ -315,26 +338,48 @@ export function PaymentReceiptViewModal({
                   </div>
                 </div>
               ) : pdfUrl ? (
-                <div className="relative w-full h-full">
-                  <iframe
-                    src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                    className="w-full h-full border-0 rounded-xl"
-                    style={{
-                      transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                      transformOrigin: 'center center',
-                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                    title={`Comprovante - ${receipt.employeeName}`}
-                  />
-                  {/* Overlay de zoom para melhor UX */}
-                  {zoom !== 1 && (
-                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-sm rounded-lg px-2 py-1 border border-gray-600/50">
-                      <span className="text-white text-xs font-mono">
-                        {Math.round(zoom * 100)}%
-                      </span>
+                isMobile ? (
+                  <div className="flex items-center justify-center h-full bg-gradient-to-br from-gray-100 to-gray-200">
+                    <div className="text-center p-6">
+                      <FileText className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                      <p className="text-gray-800 font-bold text-lg mb-2">Comprovante Pronto!</p>
+                      <p className="text-gray-600 text-sm mb-6">
+                        Clique no botão abaixo para visualizar o comprovante
+                      </p>
+                      <Button
+                        onClick={handleOpenInNewTab}
+                        className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg"
+                      >
+                        <Eye size={18} className="mr-2" />
+                        Abrir PDF
+                      </Button>
+                      <p className="text-gray-500 text-xs mt-4">
+                        O PDF será aberto em uma nova aba
+                      </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="relative w-full h-full">
+                    <iframe
+                      src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                      className="w-full h-full border-0 rounded-xl"
+                      style={{
+                        transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                        transformOrigin: 'center center',
+                        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      title={`Comprovante - ${receipt.employeeName}`}
+                    />
+                    {/* Overlay de zoom para melhor UX */}
+                    {zoom !== 1 && (
+                      <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-sm rounded-lg px-2 py-1 border border-gray-600/50">
+                        <span className="text-white text-xs font-mono">
+                          {Math.round(zoom * 100)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">

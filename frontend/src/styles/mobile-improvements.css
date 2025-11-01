@@ -307,14 +307,22 @@
     max-width: 100vw !important;
   }
   
-  /* Garantir que nenhum elemento cause scroll horizontal */
-  * {
-    max-width: 100%;
+  /* Garantir que containers principais não causem scroll horizontal */
+  .container, [class*="Container"], section {
+    max-width: 100% !important;
   }
   
   /* Permitir scroll apenas em containers específicos */
-  .overflow-x-auto {
+  .overflow-x-auto, .overflow-x-scroll {
     max-width: 100vw !important;
+    overflow-x: auto !important;
+  }
+  
+  /* Tabelas responsivas */
+  table {
+    display: block !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
   }
 }
 

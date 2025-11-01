@@ -3849,6 +3849,16 @@ const Holerites: React.FC = () => {
                             
                             {/* Botões de ação individual */}
                             <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
+                              {/* Botão Ver - sempre disponível */}
+                              <Button
+                                size="sm"
+                                onClick={() => handleViewPaymentReceipt(receipt)}
+                                className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                <Eye size={14} className="mr-1" />
+                                Ver
+                              </Button>
+                              
                               <Button
                                 size="sm"
                                 onClick={async () => {
