@@ -7,7 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import MeasurementCompleteTable from '@/components/financeiro/MeasurementCompleteTable';
+import MeasurementSimpleTable from '@/components/financeiro/MeasurementSimpleTable';
 import {
   Calculator,
   DollarSign,
@@ -384,6 +387,23 @@ const MedicoesTab: React.FC = () => {
         </div>
       </div>
 
+      {/* Tabs - Padrão SST */}
+      <Tabs defaultValue="dashboard" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border-gray-600">
+          <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="completa" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            Completa
+          </TabsTrigger>
+          <TabsTrigger value="simplificada" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            Simplificada
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tab Dashboard */}
+        <TabsContent value="dashboard" className="space-y-6 mt-6">
+
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-blue-600/20 border-blue-500/30">
@@ -583,8 +603,32 @@ const MedicoesTab: React.FC = () => {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+                  </CardContent>
+        </Card>
+        </TabsContent>
+
+        {/* Tab Completa */}
+        <TabsContent value="completa" className="mt-6">
+          <MeasurementCompleteTable
+            onView={handleVisualizarBoletim}
+            onEdit={handleEditarBoletim}
+            onDelete={handleExcluirBoletim}
+            onCreate={handleNovoBoletim}
+            onValidate={handleValidarBoletim}
+          />
+        </TabsContent>
+
+        {/* Tab Simplificada */}
+        <TabsContent value="simplificada" className="mt-6">
+          <MeasurementSimpleTable
+            onView={handleVisualizarBoletim}
+            onEdit={handleEditarBoletim}
+            onDelete={handleExcluirBoletim}
+            onCreate={handleNovoBoletim}
+            onValidate={handleValidarBoletim}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modal de Formulário */}
       <Dialog open={showFormModal} onOpenChange={setShowFormModal}>
