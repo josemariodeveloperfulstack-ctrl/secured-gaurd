@@ -114,10 +114,7 @@ services:
   # WHATSAPP SERVICE (Baileys REST API)
   # ========================================
   whatsapp-service:
-    build:
-      context: ../whatsapp-service
-      dockerfile: Dockerfile
-    image: secured-guard-whatsapp:latest
+    image: zemarioramos/secured-guard-whatsapp:ci
     container_name: whatsapp-service-ci
     environment:
       PORT: 3333
