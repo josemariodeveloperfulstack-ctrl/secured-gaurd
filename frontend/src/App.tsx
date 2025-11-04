@@ -33,6 +33,7 @@ const DashboardVigilante = lazy(() => import('@/pages/DashboardVigilante'));
 const Funcionarios = lazy(() => import('@/pages/Funcionarios'));
 const Usuarios = lazy(() => import('@/pages/Usuarios'));
 const Roles = lazy(() => import('@/pages/Roles'));
+const WhatsAppConnection = lazy(() => import('@/pages/WhatsAppConnection'));
 const Clientes = lazy(() => import('@/pages/Clientes'));
 const Fornecedores = lazy(() => import('@/pages/Fornecedores'));
 const Contratos = lazy(() => import('@/pages/Contratos'));
@@ -838,6 +839,13 @@ function App() {
                     <Route path="/usuarios" element={
                       <ProtectedRoute>
                         <Usuarios />
+                      </ProtectedRoute>
+                    } />
+                    
+                    {/* WhatsApp Connection */}
+                    <Route path="/whatsapp-connection" element={
+                      <ProtectedRoute>
+                        <WhatsAppConnection />
                       </ProtectedRoute>
                     } />
                     

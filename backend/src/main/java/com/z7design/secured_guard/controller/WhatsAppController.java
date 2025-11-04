@@ -48,6 +48,95 @@ public class WhatsAppController {
     }
 
     /**
+     * Obter status da conexão por nome da instância
+     */
+    @GetMapping("/status/{instanceName}")
+    public ResponseEntity<?> getStatus(@PathVariable String instanceName) {
+        try {
+            boolean connected = baileysRestService.checkConnection();
+            return ResponseEntity.ok(Map.of(
+                "connected", connected,
+                "instance", instanceName,
+                "state", connected ? "open" : "close"
+            ));
+        } catch (Exception e) {
+            log.error("❌ Erro ao verificar status: {}", e.getMessage());
+            return ResponseEntity.ok(Map.of(
+                "connected", false,
+                "instance", instanceName,
+                "state", "close"
+            ));
+        }
+    }
+
+    /**
+     * Criar nova instância e gerar QR Code
+     */
+    @PostMapping("/instance/create")
+    public ResponseEntity<?> createInstance(@RequestBody Map<String, Object> request) {
+        try {
+            String instanceName = (String) request.get("instanceName");
+            boolean qrcode = Boolean.TRUE.equals(request.get("qrcode"));
+            
+            boolean initialized = baileysRestService.initializeInstance();
+            
+            if (initialized && qrcode) {
+                String qrCodeData = baileysRestService.getQRCode();
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "instance", instanceName,
+                    "qrcode", Map.of("base64", qrCodeData != null ? qrCodeData : "")
+                ));
+            }
+            
+            return ResponseEntity.ok(Map.of("success", initialized));
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar instância: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Desconectar instância
+     */
+    @DeleteMapping("/instance/logout/{instanceName}")
+    public ResponseEntity<?> logoutInstance(@PathVariable String instanceName) {
+        try {
+            boolean ok = baileysRestService.disconnectInstance();
+            return ResponseEntity.ok(Map.of("success", ok));
+        } catch (Exception e) {
+            log.error("❌ Erro ao desconectar: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Enviar mensagem de teste
+     */
+    @PostMapping("/send-test")
+    public ResponseEntity<?> sendTest(@RequestBody Map<String, String> request) {
+        try {
+            String telefone = request.get("telefone");
+            
+            if (telefone == null || telefone.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Telefone é obrigatório"));
+            }
+            
+            String message = "✅ *Teste SecuredGuard*\n\nSeu WhatsApp está conectado e funcionando!\n\nSistema pronto para enviar holerites e mensagens automáticas.";
+            boolean sent = baileysRestService.sendTextMessage(telefone, message);
+            
+            if (sent) {
+                return ResponseEntity.ok(Map.of("success", true, "message", "Mensagem de teste enviada com sucesso"));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Falha ao enviar mensagem"));
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar teste: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /**
      * Envia mensagem simples via WhatsApp (usado pelo chatbot)
      * Envia a mensagem do cliente para o número da empresa configurado
      */

@@ -237,6 +237,7 @@ const comprasMenuItems = [
 const sistemaMenuItems = [
   { icon: UserCog, text: 'Usuários', to: '/usuarios', id: 'usuarios' },
   { icon: UserCheck, text: 'Grupos', to: '/grupos', id: 'grupos' },
+  { icon: MessageCircle, text: 'Conexão WhatsApp', to: '/whatsapp-connection', id: 'whatsapp-connection' },
   { icon: Settings, text: 'Gestão de Atividades', to: '/atividades', id: 'atividades' },
   { icon: Shield, text: 'Sistema', to: '/sistema', id: 'sistema' },
   { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
