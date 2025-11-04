@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,9 +15,7 @@ import {
   Settings,
   Eye,
   Plus,
-  Activity,
-  ChevronLeft,
-  ChevronRight
+  Activity
 } from 'lucide-react';
 import { StandardLayout } from '@/components/StandardLayout';
 import Equipamentos from './Equipamentos';
@@ -81,40 +79,6 @@ const Operacional: React.FC = () => {
 
   const { toast } = useToast();
 
-  // Refs para controle das setas de scroll
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(false);
-
-  // Função para verificar se precisa mostrar as setas
-  const checkScrollArrows = () => {
-    if (tabsContainerRef.current) {
-      const container = tabsContainerRef.current;
-      const scrollLeft = container.scrollLeft;
-      const scrollWidth = container.scrollWidth;
-      const clientWidth = container.clientWidth;
-      
-      setShowLeftArrow(scrollLeft > 0);
-      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 1);
-    }
-  };
-
-  // Função para scroll suave
-  const scrollTabs = (direction: 'left' | 'right') => {
-    if (tabsContainerRef.current) {
-      const scrollAmount = 200;
-      const currentScroll = tabsContainerRef.current.scrollLeft;
-      const targetScroll = direction === 'left' 
-        ? currentScroll - scrollAmount 
-        : currentScroll + scrollAmount;
-      
-      tabsContainerRef.current.scrollTo({
-        left: targetScroll,
-        behavior: 'smooth'
-      });
-    }
-  };
-
 
 
 
@@ -128,18 +92,6 @@ const Operacional: React.FC = () => {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
-
-  // Verificar setas de scroll quando o componente monta e redimensiona
-  useEffect(() => {
-    const checkArrows = () => {
-      setTimeout(checkScrollArrows, 100); // Delay para garantir que o DOM esteja renderizado
-    };
-    
-    checkArrows();
-    window.addEventListener('resize', checkArrows);
-    
-    return () => window.removeEventListener('resize', checkArrows);
-  }, []);
 
   useEffect(() => {
     if (activeTab === 'escalas') {
@@ -713,117 +665,42 @@ const Operacional: React.FC = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="relative w-full">
-            {/* Setas de navegação */}
-            {showLeftArrow && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 p-0 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full shadow-md"
-                onClick={() => scrollTabs('left')}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            )}
-            
-            {showRightArrow && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 p-0 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full shadow-md"
-                onClick={() => scrollTabs('right')}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            )}
-
-            {/* Container com scroll horizontal suave */}
-            <div 
-              ref={tabsContainerRef}
-              className="overflow-x-auto scrollbar-hide scroll-smooth"
-              onScroll={checkScrollArrows}
-            >
-              <TabsList className="inline-flex h-auto p-1 bg-gray-100 dark:bg-gray-800 rounded-lg min-w-max gap-1">
-                <TabsTrigger 
-                  value="dashboard" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="equipamentos" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <Shield className="h-4 w-4" />
-                  <span>Equipamentos</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="escalas" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span>Escalas</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="notificacoes" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>Notificações</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="ocorrencias" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <Eye className="h-4 w-4" />
-                  <span>Ocorrências</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="atividades" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <Activity className="h-4 w-4" />
-                  <span>Atividades</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="servicos" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span>Serviços</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="controle-visitas" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <MapPin className="h-4 w-4" />
-                  <span>Controle de Visitas</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="gestao-operacional" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Gestão</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="troca-plantao" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span>Plantão</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="guia-transporte" 
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 data-[state='active']:bg-white data-[state='active']:shadow-sm data-[state='active']:text-gray-900 text-gray-600 hover:text-gray-900 whitespace-nowrap flex-shrink-0 min-w-fit"
-                >
-                  <FileText className="h-4 w-4" />
-                  <span>Transporte</span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
+          {/* Tabs - Padrão SST */}
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 bg-seguranca-graphite border-gray-600">
+            <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="equipamentos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Equipamentos
+            </TabsTrigger>
+            <TabsTrigger value="escalas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Escalas
+            </TabsTrigger>
+            <TabsTrigger value="notificacoes" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Notificações
+            </TabsTrigger>
+            <TabsTrigger value="ocorrencias" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Ocorrências
+            </TabsTrigger>
+            <TabsTrigger value="atividades" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Atividades
+            </TabsTrigger>
+            <TabsTrigger value="servicos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Serviços
+            </TabsTrigger>
+            <TabsTrigger value="controle-visitas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Controle Visitas
+            </TabsTrigger>
+            <TabsTrigger value="gestao-operacional" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Gestão
+            </TabsTrigger>
+            <TabsTrigger value="troca-plantao" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Plantão
+            </TabsTrigger>
+            <TabsTrigger value="guia-transporte" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Transporte
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
             {renderDashboard()}
