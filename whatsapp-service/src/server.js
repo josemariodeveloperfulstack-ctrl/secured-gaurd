@@ -142,8 +142,17 @@ app.get('/instance/connectionState', (req, res) => {
 app.get('/instance/qr', async (req, res) => {
   if (!qrString) return res.status(404).json({ message: 'QR not available' });
   try {
-    const svg = await QRCode.toString(qrString, { type: 'svg' });
-    res.type('image/svg+xml').send(svg);
+    const format = req.query.format || 'svg';
+    
+    if (format === 'base64') {
+      // Retorna base64 PNG para o backend
+      const base64 = await QRCode.toDataURL(qrString);
+      res.json({ base64 });
+    } else {
+      // Retorna SVG (padrão)
+      const svg = await QRCode.toString(qrString, { type: 'svg' });
+      res.type('image/svg+xml').send(svg);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

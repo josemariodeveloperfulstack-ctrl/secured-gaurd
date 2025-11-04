@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -257,7 +258,8 @@ public class BaileysRestService {
      */
     public String getQRCode() {
         try {
-            String url = baileysRestUrl + "/instance/qr?key=" + instanceKey;
+            // Solicita QR Code em formato base64
+            String url = baileysRestUrl + "/instance/qr?key=" + instanceKey + "&format=base64";
             
             logger.info("📸 Solicitando QR Code de: {}", url);
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
@@ -267,10 +269,21 @@ public class BaileysRestService {
             if (response.getStatusCode() == HttpStatus.OK) {
                 String body = response.getBody();
                 logger.info("✅ QR Code recebido. Tamanho: {} caracteres", body != null ? body.length() : 0);
-                if (body != null && body.length() > 100) {
-                    logger.info("📸 Preview QR Code: {}...", body.substring(0, 100));
+                
+                if (body != null) {
+                    try {
+                        // Parse do JSON para extrair o campo base64
+                        ObjectMapper mapper = new ObjectMapper();
+                        JsonNode jsonNode = mapper.readTree(body);
+                        String base64 = jsonNode.get("base64").asText();
+                        
+                        logger.info("📸 QR Code base64 extraído. Tamanho: {} caracteres", base64.length());
+                        return base64;
+                    } catch (Exception parseEx) {
+                        logger.warn("⚠️ Não foi possível fazer parse do JSON, retornando corpo direto", parseEx);
+                        return body;
+                    }
                 }
-                return body;
             } else {
                 logger.warn("⚠️ Status inesperado ao obter QR Code: {}", response.getStatusCode());
             }
