@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.z7design.secured_guard.model.enums.DocumentType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,6 +34,11 @@ public class PayslipDeliveryLog {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private DeliveryChannel channel;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false, length = 50)
+    @Builder.Default
+    private DocumentType documentType = DocumentType.OUTROS;
 
     @Column(nullable = false)
     private boolean success;
