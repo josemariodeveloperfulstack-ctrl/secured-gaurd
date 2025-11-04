@@ -61,6 +61,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      # WhatsApp/Baileys REST API
+      BAILEYS_REST_URL: http://whatsapp-service-ci:3333
+      BAILEYS_INSTANCE_KEY: securedguard
       # Configurações para testes
       TEST_SHOW_SQL: "false"
       TEST_HIBERNATE_DDL_AUTO: "create-drop"
