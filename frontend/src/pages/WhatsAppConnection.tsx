@@ -43,18 +43,18 @@ const WhatsAppConnection: React.FC = () => {
   const checkConnection = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/whatsapp/status/${instanceName}`);
+      const response = await api.get(`/whatsapp/connection/status/${instanceName}`);
       
       if (response.data) {
         setConnectionStatus({
-          connected: response.data.state === 'open',
+          connected: response.data.state === 'open' || response.data.connected,
           instance: instanceName,
           state: response.data.state,
           phoneNumber: response.data.phoneNumber,
           lastConnected: response.data.lastConnected
         });
         
-        if (response.data.state === 'open') {
+        if (response.data.state === 'open' || response.data.connected) {
           toast({
             title: "✅ WhatsApp Conectado",
             description: `Número: ${response.data.phoneNumber || 'N/A'}`,
@@ -84,7 +84,7 @@ const WhatsAppConnection: React.FC = () => {
       });
 
       // Criar/conectar instância
-      const createResponse = await api.post('/whatsapp/instance/create', {
+      const createResponse = await api.post('/whatsapp/connection/create', {
         instanceName: instanceName,
         qrcode: true
       });
@@ -116,7 +116,7 @@ const WhatsAppConnection: React.FC = () => {
   const startConnectionPolling = () => {
     const interval = setInterval(async () => {
       try {
-        const response = await api.get(`/whatsapp/status/${instanceName}`);
+        const response = await api.get(`/whatsapp/connection/status/${instanceName}`);
         
         if (response.data.state === 'open') {
           setConnectionStatus({
@@ -147,7 +147,7 @@ const WhatsAppConnection: React.FC = () => {
     try {
       setLoading(true);
       
-      await api.delete(`/whatsapp/instance/logout/${instanceName}`);
+      await api.delete(`/whatsapp/connection/disconnect/${instanceName}`);
       
       setConnectionStatus({
         connected: false,
@@ -185,9 +185,10 @@ const WhatsAppConnection: React.FC = () => {
     try {
       setSendingTest(true);
       
+      // Usar o endpoint do WhatsAppTestController que já existe
       await api.post('/whatsapp/send-test', {
         telefone: testPhone,
-        instanceName: instanceName
+        mensagem: "✅ Teste SecuredGuard - WhatsApp conectado e funcionando!"
       });
       
       toast({
