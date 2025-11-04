@@ -89,8 +89,13 @@ const WhatsAppConnection: React.FC = () => {
         qrcode: true
       });
 
-      if (createResponse.data.qrcode) {
-        setQrCode(createResponse.data.qrcode.base64);
+      console.log('📥 Resposta recebida:', createResponse.data);
+
+      if (createResponse.data.qrcode && createResponse.data.qrcode.base64) {
+        const qrData = createResponse.data.qrcode.base64;
+        console.log('📸 QR Code recebido. Tamanho:', qrData.length);
+        
+        setQrCode(qrData);
         
         toast({
           title: "✅ QR Code Gerado",
@@ -99,12 +104,29 @@ const WhatsAppConnection: React.FC = () => {
 
         // Iniciar verificação periódica de conexão
         startConnectionPolling();
+      } else {
+        console.error('❌ Resposta sem QR Code:', createResponse.data);
+        toast({
+          title: "⚠️ Serviço WhatsApp Indisponível",
+          description: "O serviço Baileys REST não está rodando. Verifique se o container Docker está ativo em http://localhost:3333",
+          variant: "destructive",
+        });
       }
     } catch (error: any) {
-      console.error('Erro ao gerar QR Code:', error);
+      console.error('💥 Erro ao gerar QR Code:', error);
+      console.error('📊 Detalhes:', error.response?.data);
+      
+      let errorMessage = "Erro ao gerar QR Code";
+      
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        errorMessage = "Serviço WhatsApp não está acessível. Verifique se o Baileys REST está rodando em http://localhost:3333";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
       toast({
         title: "❌ Erro",
-        description: error.response?.data?.message || "Erro ao gerar QR Code",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

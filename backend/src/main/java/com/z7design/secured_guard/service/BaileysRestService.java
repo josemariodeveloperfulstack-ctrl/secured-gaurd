@@ -259,16 +259,27 @@ public class BaileysRestService {
         try {
             String url = baileysRestUrl + "/instance/qr?key=" + instanceKey;
             
+            logger.info("📸 Solicitando QR Code de: {}", url);
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
             
+            logger.info("📊 Status da resposta QR Code: {}", response.getStatusCode());
+            
             if (response.getStatusCode() == HttpStatus.OK) {
-                return response.getBody();
+                String body = response.getBody();
+                logger.info("✅ QR Code recebido. Tamanho: {} caracteres", body != null ? body.length() : 0);
+                if (body != null && body.length() > 100) {
+                    logger.info("📸 Preview QR Code: {}...", body.substring(0, 100));
+                }
+                return body;
+            } else {
+                logger.warn("⚠️ Status inesperado ao obter QR Code: {}", response.getStatusCode());
             }
             
             return null;
             
         } catch (Exception e) {
-            logger.error("Erro ao obter QR Code", e);
+            logger.error("❌ Erro ao obter QR Code de {}", baileysRestUrl, e);
+            logger.error("💥 Detalhes do erro: {}", e.getMessage());
             return null;
         }
     }

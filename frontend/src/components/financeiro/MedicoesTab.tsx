@@ -603,8 +603,8 @@ const MedicoesTab: React.FC = () => {
               </TableBody>
             </Table>
           </div>
-                  </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
         </TabsContent>
 
         {/* Tab Completa */}

@@ -78,20 +78,34 @@ public class WhatsAppController {
             String instanceName = (String) request.get("instanceName");
             boolean qrcode = Boolean.TRUE.equals(request.get("qrcode"));
             
+            log.info("🔄 Criando conexão WhatsApp. Instance: {}, QRCode solicitado: {}", instanceName, qrcode);
+            
             boolean initialized = baileysRestService.initializeInstance();
+            log.info("📱 Instância inicializada: {}", initialized);
             
             if (initialized && qrcode) {
                 String qrCodeData = baileysRestService.getQRCode();
+                log.info("📸 QR Code obtido. Tamanho: {} caracteres", qrCodeData != null ? qrCodeData.length() : 0);
+                
+                // Se o QR Code já vier em base64, usar diretamente
+                // Senão, precisará ser convertido
+                String base64QR = qrCodeData;
+                
+                // Se não começar com data:image, adicionar prefixo
+                if (base64QR != null && !base64QR.startsWith("data:image")) {
+                    base64QR = "data:image/png;base64," + base64QR;
+                }
+                
                 return ResponseEntity.ok(Map.of(
                     "success", true,
                     "instance", instanceName,
-                    "qrcode", Map.of("base64", qrCodeData != null ? qrCodeData : "")
+                    "qrcode", Map.of("base64", base64QR != null ? base64QR : "")
                 ));
             }
             
             return ResponseEntity.ok(Map.of("success", initialized));
         } catch (Exception e) {
-            log.error("❌ Erro ao criar instância: {}", e.getMessage());
+            log.error("❌ Erro ao criar instância: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
         }
     }
