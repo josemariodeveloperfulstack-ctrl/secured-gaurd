@@ -252,7 +252,55 @@ ENVEOF
           EOF
 
       # ============================================
-      # 1️⃣5️⃣ HEALTH CHECK
+      # 1️⃣5️⃣ DIAGNÓSTICO DOS CONTAINERS
+      # ============================================
+      - name: 🔍 Diagnostic - Container Status
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔍 Verificando status dos containers..."
+            cd /var/www/secured_guard/ci
+            docker-compose -f docker-compose.ci.yml ps
+            
+            echo ""
+            echo "🔍 Verificando logs do backend (últimas 50 linhas)..."
+            docker logs --tail 50 secured-guard-backend-ci
+            
+            echo ""
+            echo "🔍 Verificando logs do frontend (últimas 30 linhas)..."
+            docker logs --tail 30 secured-guard-frontend-ci
+            
+            echo ""
+            echo "🔍 Verificando logs do nginx (últimas 30 linhas)..."
+            docker logs --tail 30 secured-guard-nginx-ci
+          EOF
+
+      # ============================================
+      # 1️⃣6️⃣ DIAGNÓSTICO DE CONECTIVIDADE
+      # ============================================
+      - name: 🌐 Diagnostic - Network Connectivity
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🌐 Testando conectividade..."
+            
+            # Testar backend diretamente
+            echo "1. Testando backend na porta 8081..."
+            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "❌ Backend não responde"
+            
+            # Testar nginx
+            echo "2. Testando nginx na porta 8082..."
+            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8082 || echo "❌ Nginx não responde"
+            
+            # Verificar Traefik
+            echo "3. Verificando Traefik..."
+            if docker ps | grep -q traefik; then
+              echo "✅ Traefik está rodando"
+            else
+              echo "❌ Traefik NÃO está rodando!"
+            fi
+          EOF
+
+      # ============================================
+      # 1️⃣7️⃣ HEALTH CHECK
       # ============================================
       - name: 🏥 Health check
         run: |
@@ -264,7 +312,10 @@ ENVEOF
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "Tentativa $ATTEMPT de $MAX_ATTEMPTS..."
             
-            if curl -f -s -o /dev/null -w "%{http_code}" https://ci.z7botsolutions.com.br/api/health | grep -q "200"; then
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://ci.z7botsolutions.com.br/api/health)
+            echo "HTTP Code: $HTTP_CODE"
+            
+            if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health check passou! Aplicação está respondendo."
               exit 0
             fi
@@ -275,27 +326,18 @@ ENVEOF
           done
           
           echo "❌ Health check falhou após $MAX_ATTEMPTS tentativas!"
+          echo ""
+          echo "🔍 Coletando logs finais..."
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "📋 LOGS BACKEND (últimas 100 linhas):"
+            docker logs --tail 100 secured-guard-backend-ci
+          EOF
+          
           exit 1
 
       # ============================================
-      # 1️⃣6️⃣ CONFIGURAR NGINX (OPCIONAL - Usando Traefik)
-      # ============================================
-      - name: 🌐 Verify Traefik
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "🌐 Verificando Traefik..."
-            
-            # Verificar se Traefik está rodando
-            if docker ps | grep -q traefik; then
-              echo "✅ Traefik está rodando!"
-              docker ps | grep traefik
-            else
-              echo "⚠️  Traefik não está rodando. Containers CI dependem do Traefik!"
-            fi
-          EOF
-
-      # ============================================
-      # 1️⃣7️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 1️⃣8️⃣ NOTIFICAÇÃO DE SUCESSO
       # ============================================
       - name: 🎉 Deployment successful
         if: success()
@@ -310,7 +352,7 @@ ENVEOF
           echo "================================"
 
       # ============================================
-      # ❌ ROLLBACK EM CASO DE FALHA
+      # 1️⃣9️⃣ ROLLBACK EM CASO DE FALHA
       # ============================================
       - name: 🔄 Rollback on failure
         if: failure()
