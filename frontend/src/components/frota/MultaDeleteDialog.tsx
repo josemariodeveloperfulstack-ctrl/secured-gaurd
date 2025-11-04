@@ -64,8 +64,13 @@ const MultaDeleteDialog: React.FC<MultaDeleteDialogProps> = ({
 
     setIsLoading(true);
     try {
-      // Aqui você faria a chamada para a API
-      // await multaService.deleteMulta(multa.id);
+      // Importar o fleetService
+      const fleetService = await import('@/services/fleetService');
+      
+      // Chamar API para excluir multa
+      console.log('🗑️ Excluindo multa do backend:', multa.id);
+      await fleetService.default.deleteFine(multa.id);
+      console.log('✅ Multa excluída do backend!');
       
       toast({
         title: 'Sucesso!',
@@ -75,6 +80,7 @@ const MultaDeleteDialog: React.FC<MultaDeleteDialogProps> = ({
       onDelete();
       onClose();
     } catch (error: any) {
+      console.error('❌ Erro ao excluir multa:', error);
       toast({
         title: 'Erro!',
         description: error.response?.data?.message || 'Erro ao excluir multa.',

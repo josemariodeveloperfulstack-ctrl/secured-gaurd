@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Car, Fuel, Search, AlertTriangle, Loader2, Wrench, Calendar, DollarSign, Settings, FileText, Filter } from 'lucide-react';
+import { Plus, Car, Fuel, Search, AlertTriangle, Loader2, Wrench, Calendar, DollarSign, Settings, FileText, Filter, RefreshCw } from 'lucide-react';
 import VeiculosTable from '@/components/frota/VeiculosTable';
 import AbastecimentosTable from '@/components/frota/AbastecimentosTable';
 import MultasTable from '@/components/frota/MultasTable';
@@ -416,8 +416,19 @@ const Frota: React.FC = () => {
   };
 
   const handleMultaSuccess = () => {
+    console.log('✅ Multa salva com sucesso! Atualizando lista...');
+    
+    // Invalidar queries para forçar atualização
+    queryClient.invalidateQueries({ queryKey: ['fines'] });
+    
+    // Refetch explícito
     refetchFines();
+    
+    // Fechar modal
     setIsMultaModalOpen(false);
+    setSelectedMulta(null);
+    
+    console.log('🔄 Lista de multas atualizada!');
   };
 
   const handleViewMulta = (multa: MultaComponent) => {
@@ -453,8 +464,15 @@ const Frota: React.FC = () => {
         await fleetService.deleteFine(id);
       }
 
+      console.log('✅ Multas excluídas! Atualizando lista...');
+      
+      // Invalidar queries para forçar atualização
+      queryClient.invalidateQueries({ queryKey: ['fines'] });
+      
       // Atualizar lista
       await refetchFines();
+      
+      console.log('🔄 Lista de multas atualizada após exclusão múltipla!');
       
       toast({
         title: 'Sucesso!',
@@ -1914,9 +1932,19 @@ const Frota: React.FC = () => {
             setSelectedMulta(null);
           }}
           onDelete={() => {
+            console.log('🗑️ Multa excluída! Atualizando lista...');
+            
+            // Invalidar queries para forçar atualização
+            queryClient.invalidateQueries({ queryKey: ['fines'] });
+            
+            // Refetch explícito
             refetchFines();
+            
+            // Fechar dialog
             setIsMultaDeleteDialogOpen(false);
             setSelectedMulta(null);
+            
+            console.log('✅ Lista de multas atualizada após exclusão!');
           }}
         />
 

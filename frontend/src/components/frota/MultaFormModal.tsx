@@ -120,9 +120,37 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      employeeService.getActiveEmployees().then(setMotoristas);
+      console.log('🔄 Carregando lista de motoristas...');
+      employeeService.getAllEmployees()
+        .then(employees => {
+          // Filtrar apenas funcionários ativos
+          const ativos = employees.filter(emp => emp.status === 'ATIVO' || emp.status === 'ACTIVE');
+          setMotoristas(ativos);
+          console.log('✅ Motoristas carregados:', ativos.length);
+          
+          // Se estiver editando, preencher motorista APÓS carregar a lista
+          if (multa) {
+            const driverId = (multa as any).driverId || multa.motorista_id;
+            console.log('👤 Preenchendo motorista da multa:', driverId);
+            
+            if (driverId) {
+              // Verificar se o motorista existe na lista
+              const motoristaExiste = ativos.find(m => m.id === driverId);
+              if (motoristaExiste) {
+                setSelectedMotorista(driverId);
+                console.log('✅ Motorista selecionado:', motoristaExiste.name);
+              } else {
+                console.warn('⚠️ Motorista não encontrado na lista:', driverId);
+              }
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao carregar motoristas:', error);
+          setMotoristas([]);
+        });
     }
-  }, [isOpen]);
+  }, [isOpen, multa]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
