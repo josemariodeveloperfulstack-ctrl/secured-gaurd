@@ -171,6 +171,37 @@ services:
       - "traefik.http.services.evolution-ci.loadbalancer.server.port=8080"
 
   # ========================================
+  # WHATSAPP SERVICE (Baileys)
+  # ========================================
+  whatsapp-service-ci:
+    image: z7design/secured-guard-whatsapp:ci
+    container_name: secured-guard-whatsapp-ci
+    environment:
+      PORT: 3333
+      INSTANCE_KEY: securedguard_ci
+      SESSION_DIR: /app/sessions
+      WEBHOOK_URL: http://backend-ci:8081/api/whatsapp/webhook
+      NODE_ENV: production
+    ports:
+      - "3333:3333"
+    volumes:
+      - /var/www/secured_guard/ci/whatsapp_sessions:/app/sessions
+      - /var/www/secured_guard/ci/uploads:/app/uploads
+    networks:
+      - secured-guard-ci-network
+      - z7network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    # Memória compartilhada para Chromium/Puppeteer
+    shm_size: 256mb
+    labels:
+      - "traefik.enable=false"
+
+  # ========================================
   # NGINX PROXY CI
   # ========================================
   nginx-ci:

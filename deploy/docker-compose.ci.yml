@@ -117,7 +117,7 @@ services:
   # WHATSAPP SERVICE (Baileys REST API)
   # ========================================
   whatsapp-service:
-    image: zemarioramos/secured-guard-whatsapp:ci
+    image: z7design/secured-guard-whatsapp:ci
     container_name: whatsapp-service-ci
     environment:
       PORT: 3333

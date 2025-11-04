@@ -8,7 +8,7 @@ on:
 
 env:
   ENVIRONMENT: ci
-  DEPLOY_PATH: /var/www/secured-guard/ci
+  DEPLOY_PATH: /var/www/secured_guard/ci
   APP_URL: https://ci.z7botsolutions.com.br
 
 jobs:
@@ -79,15 +79,15 @@ jobs:
           echo "🐳 Construindo imagens Docker..."
           
           # Build backend image
-          docker build -t zemarioramos/secured-guard-backend:ci \
+          docker build -t z7design/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend
           
           # Build frontend image
-          docker build -t zemarioramos/secured-guard-frontend:ci \
+          docker build -t z7design/secured-guard-frontend:ci \
             -f frontend/Dockerfile.prod ./frontend
           
-          # Build WhatsApp service image
-          docker build -t zemarioramos/secured-guard-whatsapp:ci \
+          # Build WhatsApp service image (Baileys)
+          docker build -t z7design/secured-guard-whatsapp:ci \
             -f whatsapp-service/Dockerfile ./whatsapp-service
           
           echo "✅ Imagens Docker construídas!"
@@ -107,20 +107,21 @@ jobs:
       - name: 📤 Push images to Docker Hub
         run: |
           echo "📤 Enviando imagens para Docker Hub..."
-          docker push zemarioramos/secured-guard-backend:ci
-          docker push zemarioramos/secured-guard-frontend:ci
-          docker push zemarioramos/secured-guard-whatsapp:ci
+          docker push z7design/secured-guard-backend:ci
+          docker push z7design/secured-guard-frontend:ci
+          docker push z7design/secured-guard-whatsapp:ci
           echo "✅ Imagens enviadas com sucesso!"
 
       # ============================================
-      # 9️⃣ CONFIGURAR SSH
+      # 9️⃣ INSTALAR SSHPASS E CONFIGURAR SSH
       # ============================================
-      - name: 🔑 Configure SSH
+      - name: 🔑 Install sshpass and configure SSH
         run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_HOST }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          echo "✅ SSH configurado para usar senha"
 
       # ============================================
       # 🔟 TRANSFERIR ARQUIVOS PARA VPS
@@ -130,20 +131,25 @@ jobs:
           echo "📤 Transferindo arquivos para VPS..."
           
           # Criar diretório de deploy na VPS
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            mkdir -p /var/www/secured-guard/ci
-            mkdir -p /var/www/secured-guard/ci/uploads
-            mkdir -p /var/www/secured-guard/ci/logs
-            mkdir -p /var/www/secured-guard/ci/nginx
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            mkdir -p /var/www/secured_guard/ci
+            mkdir -p /var/www/secured_guard/ci/uploads
+            mkdir -p /var/www/secured_guard/ci/logs
+            mkdir -p /var/www/secured_guard/ci/nginx
+            mkdir -p /var/www/secured_guard/ci/postgres_data
+            mkdir -p /var/www/secured_guard/ci/redis_data
+            mkdir -p /var/www/secured_guard/ci/evolution_instances
+            mkdir -p /var/www/secured_guard/ci/holerites
+            mkdir -p /var/www/secured_guard/ci/whatsapp_sessions
           EOF
           
           # Transferir docker-compose.ci.yml
-          scp docker-compose.ci.yml \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured-guard/ci/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.ci.yml \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/
           
           # Transferir configuração do nginx
-          scp nginx/ci.conf \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured-guard/ci/nginx/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp nginx/ci.conf \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/nginx/
           
           echo "✅ Arquivos transferidos com sucesso!"
 
@@ -152,10 +158,10 @@ jobs:
       # ============================================
       - name: ⚙️ Create .env file on VPS
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "⚙️ Criando arquivo .env..."
             
-            cat > /var/www/secured-guard/ci/.env << 'ENVEOF'
+            cat > /var/www/secured_guard/ci/.env << 'ENVEOF'
 # ===== AMBIENTE CI =====
 ENVIRONMENT=ci
 APP_URL=https://ci.z7botsolutions.com.br
@@ -174,7 +180,7 @@ DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
 DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}
 ENVEOF
             
-            chmod 600 /var/www/secured-guard/ci/.env
+            chmod 600 /var/www/secured_guard/ci/.env
             echo "✅ Arquivo .env criado!"
           EOF
 
@@ -183,16 +189,16 @@ ENVEOF
       # ============================================
       - name: 💾 Backup and stop old containers
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "💾 Fazendo backup e parando containers antigos..."
             
-            cd /var/www/secured-guard/ci
+            cd /var/www/secured_guard/ci
             
             # Fazer backup dos volumes se existirem
-            if [ -d "postgres_ci_data" ]; then
-              BACKUP_DIR="/var/www/secured-guard/ci/backups/$(date +'%Y%m%d_%H%M%S')"
+            if [ -d "postgres_data" ]; then
+              BACKUP_DIR="/var/www/secured_guard/ci/backups/$(date +'%Y%m%d_%H%M%S')"
               mkdir -p "$BACKUP_DIR"
-              cp -r postgres_ci_data "$BACKUP_DIR/" 2>/dev/null || true
+              cp -r postgres_data "$BACKUP_DIR/" 2>/dev/null || true
               echo "✅ Backup dos dados criado em: $BACKUP_DIR"
             fi
             
@@ -207,17 +213,18 @@ ENVEOF
       # ============================================
       - name: 📥 Pull new images
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "📥 Fazendo pull das novas imagens..."
             
-            cd /var/www/secured-guard/ci
+            cd /var/www/secured_guard/ci
             
             # Login no Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
             # Pull das imagens
-            docker pull zemarioramos/secured-guard-backend:ci
-            docker pull zemarioramos/secured-guard-frontend:ci
+            docker pull z7design/secured-guard-backend:ci
+            docker pull z7design/secured-guard-frontend:ci
+            docker pull z7design/secured-guard-whatsapp:ci
             
             echo "✅ Imagens atualizadas!"
           EOF
@@ -227,10 +234,10 @@ ENVEOF
       # ============================================
       - name: 🚀 Start new containers
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             echo "🚀 Iniciando novos containers..."
             
-            cd /var/www/secured-guard/ci
+            cd /var/www/secured_guard/ci
             
             # Iniciar containers
             docker-compose -f docker-compose.ci.yml up -d
@@ -271,26 +278,20 @@ ENVEOF
           exit 1
 
       # ============================================
-      # 1️⃣6️⃣ CONFIGURAR NGINX
+      # 1️⃣6️⃣ CONFIGURAR NGINX (OPCIONAL - Usando Traefik)
       # ============================================
-      - name: 🌐 Configure Nginx
+      - name: 🌐 Verify Traefik
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "🌐 Configurando Nginx..."
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🌐 Verificando Traefik..."
             
-            # Copiar configuração do nginx
-            sudo cp /var/www/secured-guard/ci/nginx/ci.conf /etc/nginx/sites-available/secured-guard-ci
-            
-            # Ativar site
-            sudo ln -sf /etc/nginx/sites-available/secured-guard-ci /etc/nginx/sites-enabled/
-            
-            # Testar configuração
-            sudo nginx -t
-            
-            # Recarregar Nginx
-            sudo systemctl reload nginx
-            
-            echo "✅ Nginx configurado!"
+            # Verificar se Traefik está rodando
+            if docker ps | grep -q traefik; then
+              echo "✅ Traefik está rodando!"
+              docker ps | grep traefik
+            else
+              echo "⚠️  Traefik não está rodando. Containers CI dependem do Traefik!"
+            fi
           EOF
 
       # ============================================
@@ -316,21 +317,21 @@ ENVEOF
         run: |
           echo "❌ Deploy falhou! Iniciando rollback..."
           
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd /var/www/secured-guard/ci
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            cd /var/www/secured_guard/ci
             
             # Parar containers atuais
             docker-compose -f docker-compose.ci.yml down
             
             # Restaurar backup se existir
-            LATEST_BACKUP=$(ls -t /var/www/secured-guard/ci/backups/ | head -1)
+            LATEST_BACKUP=$(ls -t /var/www/secured_guard/ci/backups/ | head -1)
             
             if [ -n "$LATEST_BACKUP" ]; then
               echo "🔄 Restaurando backup: $LATEST_BACKUP"
               
               # Restaurar dados do banco
-              rm -rf postgres_ci_data
-              cp -r "/var/www/secured-guard/ci/backups/$LATEST_BACKUP/postgres_ci_data" ./
+              rm -rf postgres_data
+              cp -r "/var/www/secured_guard/ci/backups/$LATEST_BACKUP/postgres_data" ./
               
               # Iniciar containers com versão anterior
               docker-compose -f docker-compose.ci.yml up -d
