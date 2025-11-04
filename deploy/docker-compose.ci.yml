@@ -111,6 +111,31 @@ services:
     restart: unless-stopped
 
   # ========================================
+  # WHATSAPP SERVICE (Baileys REST API)
+  # ========================================
+  whatsapp-service:
+    build:
+      context: ../whatsapp-service
+      dockerfile: Dockerfile
+    image: secured-guard-whatsapp:latest
+    container_name: whatsapp-service-ci
+    environment:
+      PORT: 3333
+      INSTANCE_KEY: securedguard
+      SESSION_DIR: /app/sessions
+    volumes:
+      - whatsapp_sessions_ci:/app/sessions
+      - ../backend/holerites:/app/holerites:ro
+    ports:
+      - "3333:3333"
+    networks:
+      - secured-guard-ci
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    restart: unless-stopped
+
+  # ========================================
   # NGINX (CI/Test)
   # ========================================
   nginx:
@@ -138,6 +163,8 @@ volumes:
   backend_logs_ci:
     driver: local
   backend_uploads_ci:
+    driver: local
+  whatsapp_sessions_ci:
     driver: local
 
 # ========================================
