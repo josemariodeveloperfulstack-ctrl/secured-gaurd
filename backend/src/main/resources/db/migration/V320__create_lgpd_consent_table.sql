@@ -4,7 +4,10 @@
 -- Armazena o aceite dos termos de uso e política de privacidade
 -- conforme exigido pela Lei Geral de Proteção de Dados (LGPD)
 
-CREATE TABLE IF NOT EXISTS user_consents (
+-- Drop table se já existir (limpar estado inconsistente)
+DROP TABLE IF EXISTS user_consents CASCADE;
+
+CREATE TABLE user_consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     
@@ -44,10 +47,10 @@ CREATE TABLE IF NOT EXISTS user_consents (
 );
 
 -- Índices para performance
-CREATE INDEX idx_user_consents_user_id ON user_consents(user_id);
-CREATE INDEX idx_user_consents_type ON user_consents(consent_type);
-CREATE INDEX idx_user_consents_accepted ON user_consents(accepted);
-CREATE INDEX idx_user_consents_created_at ON user_consents(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_consents_user_id ON user_consents(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_consents_type ON user_consents(consent_type);
+CREATE INDEX IF NOT EXISTS idx_user_consents_accepted ON user_consents(accepted);
+CREATE INDEX IF NOT EXISTS idx_user_consents_created_at ON user_consents(created_at);
 
 COMMENT ON TABLE user_consents IS 'Armazena consentimentos LGPD dos usuários';
 COMMENT ON COLUMN user_consents.consent_type IS 'Tipo do consentimento: TERMS_OF_USE, PRIVACY_POLICY, DATA_PROCESSING';

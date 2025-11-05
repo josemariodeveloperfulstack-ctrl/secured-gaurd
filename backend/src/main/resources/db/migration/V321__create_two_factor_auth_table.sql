@@ -3,7 +3,10 @@
 -- =====================================================
 -- Armazena códigos de verificação enviados via WhatsApp
 
-CREATE TABLE IF NOT EXISTS two_factor_codes (
+-- Drop table se já existir (limpar estado inconsistente)
+DROP TABLE IF EXISTS two_factor_codes CASCADE;
+
+CREATE TABLE two_factor_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     
@@ -39,11 +42,11 @@ CREATE TABLE IF NOT EXISTS two_factor_codes (
 );
 
 -- Índices
-CREATE INDEX idx_2fa_user_id ON two_factor_codes(user_id);
-CREATE INDEX idx_2fa_code ON two_factor_codes(code);
-CREATE INDEX idx_2fa_created_at ON two_factor_codes(created_at);
-CREATE INDEX idx_2fa_expires_at ON two_factor_codes(expires_at);
-CREATE INDEX idx_2fa_is_used ON two_factor_codes(is_used);
+CREATE INDEX IF NOT EXISTS idx_2fa_user_id ON two_factor_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_2fa_code ON two_factor_codes(code);
+CREATE INDEX IF NOT EXISTS idx_2fa_created_at ON two_factor_codes(created_at);
+CREATE INDEX IF NOT EXISTS idx_2fa_expires_at ON two_factor_codes(expires_at);
+CREATE INDEX IF NOT EXISTS idx_2fa_is_used ON two_factor_codes(is_used);
 
 -- Adicionar campos ao modelo User para habilitar 2FA
 ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE;

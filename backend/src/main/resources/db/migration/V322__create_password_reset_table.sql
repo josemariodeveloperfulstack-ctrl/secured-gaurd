@@ -3,7 +3,10 @@
 -- =====================================================
 -- Armazena tokens para recuperação/reset de senha
 
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
+-- Drop table se já existir (limpar estado inconsistente)
+DROP TABLE IF EXISTS password_reset_tokens CASCADE;
+
+CREATE TABLE password_reset_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     
@@ -32,11 +35,11 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 
 -- Índices
-CREATE INDEX idx_password_reset_user_id ON password_reset_tokens(user_id);
-CREATE INDEX idx_password_reset_token ON password_reset_tokens(token);
-CREATE INDEX idx_password_reset_created_at ON password_reset_tokens(created_at);
-CREATE INDEX idx_password_reset_expires_at ON password_reset_tokens(expires_at);
-CREATE INDEX idx_password_reset_is_used ON password_reset_tokens(is_used);
+CREATE INDEX IF NOT EXISTS idx_password_reset_user_id ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_password_reset_created_at ON password_reset_tokens(created_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_expires_at ON password_reset_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_is_used ON password_reset_tokens(is_used);
 
 COMMENT ON TABLE password_reset_tokens IS 'Tokens para recuperação de senha via email';
 COMMENT ON COLUMN password_reset_tokens.token IS 'Token único UUID enviado por email';
