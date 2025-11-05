@@ -55,67 +55,32 @@ const WhatsAppChatbot: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Obter URL da API
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-      
-      // Enviar mensagem via API do sistema (para o número da empresa)
-      const response = await fetch(`${apiUrl}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerName: formData.name,
-          customerEmail: formData.email,
-          customerPhone: formData.phone,
-          message: formData.message
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success('Mensagem enviada com sucesso! Nossa equipe entrará em contato em breve.');
-        
-        // Reset form
-        setFormData({ name: '', email: '', phone: '', message: '' });
-        setStep(1);
-        setChatMode(null);
-        setIsOpen(false);
-      } else {
-        // Se falhar, tentar abrir WhatsApp Web como fallback
-        const whatsappMessage = `Olá! Gostaria de falar com vocês.\n\n` +
-          `*Nome:* ${formData.name}\n` +
-          `*Email:* ${formData.email}\n` +
-          `*Telefone:* ${formData.phone}\n\n` +
-          `*Mensagem:*\n${formData.message}`;
-        const whatsappNumber = '5531999999999'; // Número da empresa
-        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
-        window.open(whatsappUrl, '_blank');
-        toast.warning('Redirecionando para o WhatsApp Web...');
-        
-        setFormData({ name: '', email: '', phone: '', message: '' });
-        setStep(1);
-        setChatMode(null);
-        setIsOpen(false);
-      }
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      // Fallback: abrir WhatsApp Web
+      // Preparar mensagem para WhatsApp
       const whatsappMessage = `Olá! Gostaria de falar com vocês.\n\n` +
         `*Nome:* ${formData.name}\n` +
         `*Email:* ${formData.email}\n` +
         `*Telefone:* ${formData.phone}\n\n` +
         `*Mensagem:*\n${formData.message}`;
-      const whatsappNumber = '5531999999999';
+
+      // Número do WhatsApp da empresa (substitua pelo número real)
+      const whatsappNumber = '5531999999999'; // Formato: código do país + DDD + número
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Abrir WhatsApp
       window.open(whatsappUrl, '_blank');
-      toast.warning('Redirecionando para o WhatsApp Web...');
       
+      toast.success('Redirecionando para o WhatsApp...');
+      
+      // Reset form
       setFormData({ name: '', email: '', phone: '', message: '' });
       setStep(1);
       setChatMode(null);
       setIsOpen(false);
+    } catch (error) {
+      toast.error('Erro ao abrir WhatsApp. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
