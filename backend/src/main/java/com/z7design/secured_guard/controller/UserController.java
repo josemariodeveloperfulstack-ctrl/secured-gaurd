@@ -3,6 +3,7 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.UserListResponseDTO;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.ProfileResponse;
+import com.z7design.secured_guard.dto.UpdateUserRequest;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -208,8 +209,8 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<UserListResponseDTO> update(@PathVariable String id, @Valid @RequestBody User user) {
-        User updatedUser = userService.update(UUID.fromString(id), user);
+    public ResponseEntity<UserListResponseDTO> update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest request) {
+        User updatedUser = userService.updateFromRequest(UUID.fromString(id), request);
         
         UserListResponseDTO dto = new UserListResponseDTO();
         dto.setId(updatedUser.getId().toString());

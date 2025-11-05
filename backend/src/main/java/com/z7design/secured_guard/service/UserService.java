@@ -128,6 +128,46 @@ public class UserService {
         return userRepository.save(existingUser);
     }
 
+    public User updateFromRequest(UUID id, com.z7design.secured_guard.dto.UpdateUserRequest request) {
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        if (!StringUtils.hasText(request.getName())) {
+            throw new IllegalArgumentException("Nome não pode ser vazio");
+        }
+
+        // Atualizar campos básicos
+        existingUser.setName(request.getName());
+        existingUser.setEmail(request.getEmail());
+        existingUser.setUsername(request.getUsername());
+        
+        // Atualizar WhatsApp se fornecido (aceita vazio ou null)
+        if (request.getWhatsapp() != null) {
+            existingUser.setWhatsapp(request.getWhatsapp().trim().isEmpty() ? null : request.getWhatsapp());
+        }
+        
+        // Atualizar senha somente se fornecida
+        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+            existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        
+        // Atualizar status se fornecido
+        if (request.getActive() != null) {
+            existingUser.setActive(request.getActive());
+        }
+        
+        // Atualizar roles se fornecidas
+        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+            var roleNames = request.getRoles().stream()
+                    .map(com.z7design.secured_guard.dto.RoleDTO::getName)
+                    .toList();
+            var rolesFromDb = roleRepository.findByNames(roleNames);
+            existingUser.setRoles(new java.util.HashSet<>(rolesFromDb));
+        }
+
+        return userRepository.save(existingUser);
+    }
+
     public void delete(UUID id) {
         userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
