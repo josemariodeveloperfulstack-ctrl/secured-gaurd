@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -23,6 +25,7 @@ public class PasswordResetService {
     private final PasswordResetTokenRepository tokenRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final BaileysRestService baileysRestService;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.url:http://localhost:3000}")
@@ -178,6 +181,117 @@ public class PasswordResetService {
                 """, userName, resetLink, resetLink);
 
         return emailService.sendEmailWithAttachment(email, subject, htmlBody, null, null);
+    }
+
+    /**
+     * Versão melhorada com suporte a WhatsApp
+     */
+    public Map<String, Object> requestPasswordReset(String email, String deliveryMethod, String ipAddress, String userAgent) {
+        log.info("📧 Solicitação de recuperação de senha para: {} via {}", email, deliveryMethod);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+
+        var userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            // Por segurança, não revelar se o email existe ou não
+            log.warn("⚠️ Email não encontrado, mas retornando sucesso por segurança: {}", email);
+            result.put("message", "Se o email estiver cadastrado, você receberá um link para recuperação de senha.");
+            return result;
+        }
+
+        User user = userOpt.get();
+
+        // Verificar WhatsApp se método escolhido for WhatsApp
+        if ("whatsapp".equalsIgnoreCase(deliveryMethod)) {
+            if (user.getWhatsapp() == null || user.getWhatsapp().trim().isEmpty()) {
+                log.warn("⚠️ Usuário {} não possui WhatsApp cadastrado", email);
+                result.put("success", false);
+                result.put("warning", "Seu cadastro não possui WhatsApp registrado. Use a opção de Email ou solicite ao administrador que atualize seus dados de contato.");
+                return result;
+            }
+        }
+
+        // Invalidar tokens antigos
+        tokenRepository.expireAllUserTokens(user.getId());
+
+        // Gerar novo token
+        String token = UUID.randomUUID().toString();
+
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .user(user)
+                .token(token)
+                .email(email)
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+
+        PasswordResetToken saved = tokenRepository.save(resetToken);
+
+        // Enviar link de reset
+        String resetLink = String.format("%s/reset-password?token=%s", appUrl, token);
+        boolean sent = false;
+
+        if ("whatsapp".equalsIgnoreCase(deliveryMethod)) {
+            sent = sendPasswordResetWhatsApp(user.getWhatsapp(), user.getName(), resetLink);
+            if (sent) {
+                log.info("✅ Mensagem de recuperação enviada via WhatsApp para: {}", email);
+            }
+        } else {
+            sent = sendPasswordResetEmail(email, user.getName(), resetLink, token);
+            if (sent) {
+                log.info("✅ Email de recuperação enviado para: {}", email);
+            }
+        }
+
+        if (!sent) {
+            log.error("❌ Falha ao enviar recuperação via {} para: {}", deliveryMethod, email);
+            saved.markAsExpired();
+            tokenRepository.save(saved);
+            result.put("success", false);
+            result.put("message", "Erro ao enviar link de recuperação. Tente novamente.");
+            return result;
+        }
+
+        result.put("message", "Link de recuperação enviado com sucesso!");
+        return result;
+    }
+
+    /**
+     * Envia link de recuperação via WhatsApp
+     */
+    private boolean sendPasswordResetWhatsApp(String whatsapp, String userName, String resetLink) {
+        if (baileysRestService == null) {
+            log.error("❌ BaileysRestService não disponível!");
+            return false;
+        }
+
+        String message = String.format(
+                "🔑 *Recuperação de Senha - Secured Guard*\n\n" +
+                "Olá, *%s*!\n\n" +
+                "Você solicitou a recuperação de senha da sua conta.\n\n" +
+                "Clique no link abaixo para criar uma nova senha:\n" +
+                "%s\n\n" +
+                "⏰ *Importante:*\n" +
+                "• Este link expira em 1 hora\n" +
+                "• Use-o apenas uma vez\n" +
+                "• Não compartilhe com ninguém\n\n" +
+                "Se você não solicitou a recuperação de senha, ignore esta mensagem.\n\n" +
+                "_Secured Guard © 2025_",
+                userName, resetLink);
+
+        try {
+            // Normalizar número de telefone
+            String normalized = whatsapp.replaceAll("[^0-9]", "");
+            if (!normalized.startsWith("55")) {
+                normalized = "55" + normalized;
+            }
+            
+            return baileysRestService.sendTextMessage(normalized, message);
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar WhatsApp de recuperação: {}", e.getMessage(), e);
+            return false;
+        }
     }
 
     /**

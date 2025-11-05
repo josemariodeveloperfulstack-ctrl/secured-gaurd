@@ -47,6 +47,18 @@ const Login = () => {
     console.log('🔍 Touch support:', 'ontouchstart' in window);
   }, []);
 
+  // Carregar credenciais salvas (Remember Me)
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('rememberedUsername');
+    const savedRememberMe = localStorage.getItem('rememberMe') === 'true';
+    
+    if (savedRememberMe && savedUsername) {
+      setUsername(savedUsername);
+      setRememberMe(true);
+      console.log('🔐 Credenciais carregadas do Remember Me');
+    }
+  }, []);
+
   // If already logged in, redirect to dashboard
   useEffect(() => {
     console.log('🔍 Login useEffect - user check:', user);
@@ -69,6 +81,17 @@ const Login = () => {
 
     try {
       await login(username, password);
+      
+      // Gerenciar Remember Me
+      if (rememberMe) {
+        localStorage.setItem('rememberedUsername', username);
+        localStorage.setItem('rememberMe', 'true');
+        console.log('✅ Credenciais salvas (Remember Me)');
+      } else {
+        localStorage.removeItem('rememberedUsername');
+        localStorage.removeItem('rememberMe');
+        console.log('🔒 Credenciais removidas (Remember Me desabilitado)');
+      }
     } catch (error) {
       console.error('Error during sign in:', error);
       setError('Falha na autenticação. Verifique seu usuário e senha.');
@@ -282,13 +305,17 @@ const Login = () => {
                       onCheckedChange={(checked) => setRememberMe(checked === true)}
                       className="h-4 w-4 rounded border-gray-600 bg-seguranca-graphite text-seguranca-yellow focus:ring-seguranca-yellow"
                     />
-                    <label htmlFor="remember" className="text-sm">
+                    <label htmlFor="remember" className="text-sm cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
                       Lembrar-me
                     </label>
                   </div>
-                  <a href="#" className="text-seguranca-lightgray hover:text-seguranca-yellow transition-colors">
+                  <button 
+                    type="button"
+                    onClick={() => navigate('/forgot-password')} 
+                    className="text-seguranca-lightgray hover:text-seguranca-yellow transition-colors"
+                  >
                     Esqueci minha senha
-                  </a>
+                  </button>
                 </div>
 
                 <Button

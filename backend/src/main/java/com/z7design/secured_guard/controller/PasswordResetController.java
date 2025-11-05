@@ -21,7 +21,7 @@ public class PasswordResetController {
     private final PasswordResetService passwordResetService;
 
     @PostMapping("/forgot-password")
-    @Operation(summary = "Esqueci minha senha", description = "Envia email com link para recuperação de senha")
+    @Operation(summary = "Esqueci minha senha", description = "Envia link para recuperação de senha via Email ou WhatsApp")
     public ResponseEntity<?> forgotPassword(
             @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest
@@ -29,18 +29,16 @@ public class PasswordResetController {
         try {
             String ipAddress = getClientIP(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
+            String deliveryMethod = request.getDeliveryMethod() != null ? request.getDeliveryMethod() : "email";
 
-            passwordResetService.requestPasswordReset(
+            Map<String, Object> result = passwordResetService.requestPasswordReset(
                     request.getEmail(),
+                    deliveryMethod,
                     ipAddress,
                     userAgent
             );
 
-            // Sempre retorna sucesso por segurança (não revelar se email existe)
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Se o email estiver cadastrado, você receberá um link para recuperação de senha."
-            ));
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("Erro ao processar esqueci senha: {}", e.getMessage(), e);
             return ResponseEntity.ok(Map.of(
@@ -104,9 +102,12 @@ public class PasswordResetController {
     // DTOs
     public static class ForgotPasswordRequest {
         private String email;
+        private String deliveryMethod; // "email" ou "whatsapp"
 
         public String getEmail() { return email; }
         public void setEmail(String email) { this.email = email; }
+        public String getDeliveryMethod() { return deliveryMethod; }
+        public void setDeliveryMethod(String deliveryMethod) { this.deliveryMethod = deliveryMethod; }
     }
 
     public static class ResetPasswordRequest {
