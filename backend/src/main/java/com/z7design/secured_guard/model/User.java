@@ -132,10 +132,39 @@ public class User implements UserDetails {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
     
+    // ===== CAMPOS DE SEGURANÇA E LGPD =====
+    
+    @Column(name = "two_factor_enabled")
+    @Builder.Default
+    private Boolean twoFactorEnabled = false;
+    
+    @Column(name = "two_factor_whatsapp", length = 20)
+    private String twoFactorWhatsapp;
+    
+    @Column(name = "require_password_change")
+    @Builder.Default
+    private Boolean requirePasswordChange = false;
+    
+    @Column(name = "last_password_change")
+    private LocalDateTime lastPasswordChange;
+    
+    @Column(name = "first_access_completed")
+    @Builder.Default
+    private Boolean firstAccessCompleted = false;
+    
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (twoFactorEnabled == null) {
+            twoFactorEnabled = false;
+        }
+        if (requirePasswordChange == null) {
+            requirePasswordChange = false;
+        }
+        if (firstAccessCompleted == null) {
+            firstAccessCompleted = false;
+        }
     }
     
     @PreUpdate

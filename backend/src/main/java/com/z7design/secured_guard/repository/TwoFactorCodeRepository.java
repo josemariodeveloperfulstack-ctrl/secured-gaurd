@@ -1,8 +1,9 @@
 package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.TwoFactorCode;
-import com.z7design.secured_guard.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -12,14 +13,60 @@ import java.util.UUID;
 
 @Repository
 public interface TwoFactorCodeRepository extends JpaRepository<TwoFactorCode, UUID> {
-    
-    Optional<TwoFactorCode> findByUserAndCodeAndPurposeAndUsedFalseAndExpiryDateAfter(
-            User user, String code, String purpose, LocalDateTime now);
-    
-    List<TwoFactorCode> findByUserAndPurpose(User user, String purpose);
-    
-    void deleteByExpiryDateBefore(LocalDateTime date);
-    
-    void deleteByUser(User user);
-}
 
+    /**
+     * Busca código válido para um usuário
+     */
+    @Query("SELECT tfc FROM TwoFactorCode tfc " +
+           "WHERE tfc.user.id = :userId " +
+           "AND tfc.code = :code " +
+           "AND tfc.isUsed = FALSE " +
+           "AND tfc.isExpired = FALSE " +
+           "AND tfc.attempts < tfc.maxAttempts " +
+           "AND tfc.expiresAt > :now " +
+           "ORDER BY tfc.createdAt DESC " +
+           "LIMIT 1")
+    Optional<TwoFactorCode> findValidCode(
+        @Param("userId") UUID userId,
+        @Param("code") String code,
+        @Param("now") LocalDateTime now
+    );
+
+    /**
+     * Busca o código mais recente de um usuário (válido ou não)
+     */
+    @Query("SELECT tfc FROM TwoFactorCode tfc " +
+           "WHERE tfc.user.id = :userId " +
+           "ORDER BY tfc.createdAt DESC " +
+           "LIMIT 1")
+    Optional<TwoFactorCode> findLatestByUserId(@Param("userId") UUID userId);
+
+    /**
+     * Busca códigos não expirados de um usuário
+     */
+    @Query("SELECT tfc FROM TwoFactorCode tfc " +
+           "WHERE tfc.user.id = :userId " +
+           "AND tfc.isExpired = FALSE " +
+           "AND tfc.expiresAt > :now " +
+           "ORDER BY tfc.createdAt DESC")
+    List<TwoFactorCode> findActiveCodesByUserId(
+        @Param("userId") UUID userId,
+        @Param("now") LocalDateTime now
+    );
+
+    /**
+     * Invalida (marca como expirados) todos os códigos antigos de um usuário
+     */
+    @Query("UPDATE TwoFactorCode tfc " +
+           "SET tfc.isExpired = TRUE " +
+           "WHERE tfc.user.id = :userId " +
+           "AND tfc.isUsed = FALSE")
+    void expireAllUserCodes(@Param("userId") UUID userId);
+
+    /**
+     * Deleta códigos expirados há mais de 7 dias
+     */
+    @Query("DELETE FROM TwoFactorCode tfc " +
+           "WHERE tfc.expiresAt < :cutoffDate")
+    void deleteExpiredCodes(@Param("cutoffDate") LocalDateTime cutoffDate);
+}

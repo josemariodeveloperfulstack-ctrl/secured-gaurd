@@ -40,6 +40,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final UserCustomPermissionService customPermissionService;
+    private final LgpdConsentService lgpdConsentService;
+    private final TwoFactorAuthService twoFactorAuthService;
 
     @Override
     @Transactional
@@ -131,6 +133,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         // Buscar permissões customizadas
         java.util.List<String> customPermissions = customPermissionService.getActivePermissions(user.getId());
         
+        // Verificar status de LGPD e segurança
+        boolean requiresLgpdConsent = !lgpdConsentService.hasAcceptedAllRequiredConsents(user.getId());
+        boolean requires2FA = twoFactorAuthService.is2FAEnabled(user.getId());
+        boolean requiresPasswordChange = user.getRequirePasswordChange() != null && user.getRequirePasswordChange();
+        boolean firstAccessCompleted = user.getFirstAccessCompleted() != null && user.getFirstAccessCompleted();
+        
         return AuthenticationResponse.builder()
                 .token(jwtToken)
                 .refreshToken(refreshToken)
@@ -141,6 +149,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
                         .customPermissions(customPermissions)
                         .build())
+                .requiresLgpdConsent(requiresLgpdConsent)
+                .requires2FA(requires2FA)
+                .requiresPasswordChange(requiresPasswordChange)
+                .firstAccessCompleted(firstAccessCompleted)
                 .build();
     }
 

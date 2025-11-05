@@ -13,4 +13,10 @@ public class AuthenticationResponse {
     private String token;
     private String refreshToken;
     private UserResponse user;
+    
+    // Flags de primeiro acesso e segurança
+    private Boolean requiresLgpdConsent;
+    private Boolean requires2FA;
+    private Boolean requiresPasswordChange;
+    private Boolean firstAccessCompleted;
 } 
