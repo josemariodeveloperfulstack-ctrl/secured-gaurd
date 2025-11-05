@@ -11,12 +11,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,49 +54,40 @@ class TwoFactorServiceTest {
     @Test
     void testCreateCode_Success() {
         // Given
-        when(twoFactorCodeRepository.findByUserAndPurpose(testUser, "ACTIVATION"))
-                .thenReturn(new ArrayList<>());
+        String destination = "+5511999999999";
+        doNothing().when(twoFactorCodeRepository).expireAllUserCodes(testUser.getId());
         when(twoFactorCodeRepository.save(any(TwoFactorCode.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        TwoFactorCode result = twoFactorService.createCode(testUser, "ACTIVATION");
+        TwoFactorCode result = twoFactorService.createCode(testUser, destination);
 
         // Then
         assertNotNull(result);
         assertEquals(testUser, result.getUser());
-        assertEquals("ACTIVATION", result.getPurpose());
+        assertEquals(destination, result.getDestination());
         assertEquals(6, result.getCode().length());
-        assertFalse(result.isUsed());
-        assertNotNull(result.getExpiryDate());
+        assertFalse(result.getIsUsed());
+        assertNotNull(result.getExpiresAt());
         
-        verify(twoFactorCodeRepository).findByUserAndPurpose(testUser, "ACTIVATION");
+        verify(twoFactorCodeRepository).expireAllUserCodes(testUser.getId());
         verify(twoFactorCodeRepository).save(any(TwoFactorCode.class));
     }
 
     @Test
     void testCreateCode_InvalidatesOldCodes() {
         // Given
-        TwoFactorCode oldCode = TwoFactorCode.builder()
-                .id(UUID.randomUUID())
-                .user(testUser)
-                .code("123456")
-                .purpose("ACTIVATION")
-                .expiryDate(LocalDateTime.now().plusMinutes(5))
-                .used(false)
-                .build();
-
-        when(twoFactorCodeRepository.findByUserAndPurpose(testUser, "ACTIVATION"))
-                .thenReturn(java.util.List.of(oldCode));
+        String destination = "+5511999999999";
+        doNothing().when(twoFactorCodeRepository).expireAllUserCodes(testUser.getId());
         when(twoFactorCodeRepository.save(any(TwoFactorCode.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        twoFactorService.createCode(testUser, "ACTIVATION");
+        twoFactorService.createCode(testUser, destination);
 
         // Then
-        verify(twoFactorCodeRepository, times(2)).save(any(TwoFactorCode.class)); // old + new
-        assertTrue(oldCode.isUsed()); // Código antigo marcado como usado
+        verify(twoFactorCodeRepository).expireAllUserCodes(testUser.getId());
+        verify(twoFactorCodeRepository).save(any(TwoFactorCode.class));
     }
 
     @Test
@@ -106,35 +97,32 @@ class TwoFactorServiceTest {
                 .id(UUID.randomUUID())
                 .user(testUser)
                 .code("123456")
-                .purpose("ACTIVATION")
-                .expiryDate(LocalDateTime.now().plusMinutes(5))
-                .used(false)
+                .destination("+5511999999999")
                 .build();
 
-        when(twoFactorCodeRepository.findByUserAndCodeAndPurposeAndUsedFalseAndExpiryDateAfter(
-                eq(testUser), eq("123456"), eq("ACTIVATION"), any(LocalDateTime.class)))
+        when(twoFactorCodeRepository.findValidCode(
+                eq(testUser.getId()), eq("123456"), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(validCode));
         when(twoFactorCodeRepository.save(any(TwoFactorCode.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        boolean result = twoFactorService.validateCode(testUser, "123456", "ACTIVATION");
+        boolean result = twoFactorService.validateCode(testUser, "123456");
 
         // Then
         assertTrue(result);
-        assertTrue(validCode.isUsed());
         verify(twoFactorCodeRepository).save(validCode);
     }
 
     @Test
     void testValidateCode_InvalidCode() {
         // Given
-        when(twoFactorCodeRepository.findByUserAndCodeAndPurposeAndUsedFalseAndExpiryDateAfter(
-                eq(testUser), eq("wrong-code"), eq("ACTIVATION"), any(LocalDateTime.class)))
+        when(twoFactorCodeRepository.findValidCode(
+                eq(testUser.getId()), eq("wrong-code"), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
         // When
-        boolean result = twoFactorService.validateCode(testUser, "wrong-code", "ACTIVATION");
+        boolean result = twoFactorService.validateCode(testUser, "wrong-code");
 
         // Then
         assertFalse(result);
@@ -143,23 +131,13 @@ class TwoFactorServiceTest {
 
     @Test
     void testValidateCode_ExpiredCode() {
-        // Given
-        TwoFactorCode expiredCode = TwoFactorCode.builder()
-                .id(UUID.randomUUID())
-                .user(testUser)
-                .code("123456")
-                .purpose("ACTIVATION")
-                .expiryDate(LocalDateTime.now().minusMinutes(1)) // Expirado
-                .used(false)
-                .build();
-
-        // Como o código está expirado, o repository não retorna nada (query filtra por expiryDateAfter)
-        when(twoFactorCodeRepository.findByUserAndCodeAndPurposeAndUsedFalseAndExpiryDateAfter(
-                eq(testUser), eq("123456"), eq("ACTIVATION"), any(LocalDateTime.class)))
+        // Given - Como o código está expirado, o repository não retorna nada (query filtra por expiresAt)
+        when(twoFactorCodeRepository.findValidCode(
+                eq(testUser.getId()), eq("123456"), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
         // When
-        boolean result = twoFactorService.validateCode(testUser, "123456", "ACTIVATION");
+        boolean result = twoFactorService.validateCode(testUser, "123456");
 
         // Then
         assertFalse(result);
@@ -167,23 +145,13 @@ class TwoFactorServiceTest {
 
     @Test
     void testValidateCode_AlreadyUsed() {
-        // Given
-        TwoFactorCode usedCode = TwoFactorCode.builder()
-                .id(UUID.randomUUID())
-                .user(testUser)
-                .code("123456")
-                .purpose("ACTIVATION")
-                .expiryDate(LocalDateTime.now().plusMinutes(5))
-                .used(true) // Já usado
-                .build();
-
-        // Como o código está usado, o repository não retorna (query filtra por usedFalse)
-        when(twoFactorCodeRepository.findByUserAndCodeAndPurposeAndUsedFalseAndExpiryDateAfter(
-                eq(testUser), eq("123456"), eq("ACTIVATION"), any(LocalDateTime.class)))
+        // Given - Como o código está usado, o repository não retorna (query filtra por isUsed)
+        when(twoFactorCodeRepository.findValidCode(
+                eq(testUser.getId()), eq("123456"), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
         // When
-        boolean result = twoFactorService.validateCode(testUser, "123456", "ACTIVATION");
+        boolean result = twoFactorService.validateCode(testUser, "123456");
 
         // Then
         assertFalse(result);
@@ -191,11 +159,14 @@ class TwoFactorServiceTest {
 
     @Test
     void testCleanupExpiredCodes() {
+        // Given
+        doNothing().when(twoFactorCodeRepository).deleteExpiredCodes(any(LocalDateTime.class));
+
         // When
         twoFactorService.cleanupExpiredCodes();
 
         // Then
-        verify(twoFactorCodeRepository).deleteByExpiryDateBefore(any(LocalDateTime.class));
+        verify(twoFactorCodeRepository).deleteExpiredCodes(any(LocalDateTime.class));
     }
 }
 
