@@ -274,16 +274,23 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       }
       
       // Verificar se tem permissão customizada
-      if (user?.customPermissions && user.customPermissions.includes(permission)) {
+      if (user?.customPermissions && Array.isArray(user.customPermissions) && user.customPermissions.includes(permission)) {
         return true;
       }
       
       return false;
     }
     
-    // Para outros roles, verificar permissões específicas
+    // Para outros roles, verificar permissões específicas no objeto permissions
     if (!user?.permissions) return false;
-    return user.permissions.includes(permission);
+    
+    // Se ALL_PERMISSIONS for true, tem acesso a tudo
+    if (user.permissions.ALL_PERMISSIONS) {
+      return true;
+    }
+    
+    // Verificar permissão específica no objeto (não é array!)
+    return user.permissions[permission as keyof typeof user.permissions] === true;
   }, [user]);
 
   // Função para verificar se módulo deve ser exibido
