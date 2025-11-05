@@ -69,6 +69,7 @@ services:
       JWT_REFRESH_EXPIRATION: 2592000000
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
+      WHATSAPP_SERVICE_URL: http://whatsapp-service-ci:3333
     ports:
       - "8081:8081"
     volumes:
