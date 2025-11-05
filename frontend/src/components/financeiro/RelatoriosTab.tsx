@@ -25,7 +25,9 @@ import {
   FileImage,
   Settings,
   Eye,
-  Printer
+  Printer,
+  ArrowLeft,
+  X
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,6 +43,13 @@ interface RelatorioConfig {
   cor: string;
 }
 
+interface ViewState {
+  view: 'list' | 'report' | 'filtered';
+  data?: any;
+  filters?: any;
+  timestamp: number;
+}
+
 const RelatoriosTab: React.FC = () => {
   const { toast } = useToast();
   
@@ -50,6 +59,12 @@ const RelatoriosTab: React.FC = () => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   
+  // Sistema de navegação por histórico
+  const [viewHistory, setViewHistory] = useState<ViewState[]>([
+    { view: 'list', timestamp: Date.now() }
+  ]);
+  const [currentViewIndex, setCurrentViewIndex] = useState(0);
+  
   // Filtros
   const [filters, setFilters] = useState<ReportFilters>({
     startDate: subDays(new Date(), 30),
@@ -57,6 +72,79 @@ const RelatoriosTab: React.FC = () => {
     status: 'TODOS',
     tipo: 'TODOS'
   });
+
+  // Estado para filtros aplicados a uma empresa específica
+  const [empresaFiltrada, setEmpresaFiltrada] = useState<string | null>(null);
+
+  // Funções de navegação
+  const pushToHistory = (view: 'list' | 'report' | 'filtered', data?: any, filterData?: any) => {
+    const newState: ViewState = {
+      view,
+      data,
+      filters: filterData,
+      timestamp: Date.now()
+    };
+    
+    // Remove estados futuros se estiver navegando do meio do histórico
+    const newHistory = viewHistory.slice(0, currentViewIndex + 1);
+    newHistory.push(newState);
+    
+    setViewHistory(newHistory);
+    setCurrentViewIndex(newHistory.length - 1);
+  };
+
+  const navigateBack = () => {
+    if (currentViewIndex > 0) {
+      const newIndex = currentViewIndex - 1;
+      const previousState = viewHistory[newIndex];
+      
+      setCurrentViewIndex(newIndex);
+      
+      // Restaurar estado anterior
+      if (previousState.view === 'list') {
+        setReportData(null);
+        setSelectedReport(null);
+        setEmpresaFiltrada(null);
+      } else if (previousState.view === 'report') {
+        setReportData(previousState.data);
+        setEmpresaFiltrada(null);
+      } else if (previousState.view === 'filtered') {
+        setEmpresaFiltrada(previousState.data);
+        // Não chamar aplicarFiltroEmpresa para evitar adicionar ao histórico novamente
+      }
+      
+      toast({
+        title: "Navegação",
+        description: "Voltou para a visualização anterior",
+      });
+    }
+  };
+
+  const resetView = () => {
+    setReportData(null);
+    setSelectedReport(null);
+    setEmpresaFiltrada(null);
+    setViewHistory([{ view: 'list', timestamp: Date.now() }]);
+    setCurrentViewIndex(0);
+  };
+
+  const aplicarFiltroEmpresa = (empresa: string) => {
+    setEmpresaFiltrada(empresa);
+    pushToHistory('filtered', empresa, filters);
+    
+    toast({
+      title: "Filtro Aplicado",
+      description: `Exibindo contas da empresa: ${empresa}`,
+    });
+  };
+
+  const limparFiltroEmpresa = () => {
+    navigateBack();
+  };
+
+  // Verificar se pode voltar
+  const canGoBack = currentViewIndex > 0;
+  const isInListView = !reportData && !empresaFiltrada;
 
   // Configurações de relatórios
   const relatorios: RelatorioConfig[] = [
@@ -319,6 +407,11 @@ const RelatoriosTab: React.FC = () => {
     
     await carregarDadosRelatorio(selectedReport);
     setShowConfigModal(false);
+    
+    // Adicionar ao histórico quando gerar relatório
+    if (reportData) {
+      pushToHistory('report', reportData, filters);
+    }
   };
 
   const handleExportarPDF = () => {
@@ -383,33 +476,69 @@ const RelatoriosTab: React.FC = () => {
       {/* Header Principal */}
       <div className="bg-seguranca-graphite border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              Relatórios Financeiros
-            </h1>
-            <p className="text-gray-400 mt-1">
-              Gere relatórios detalhados em PDF, Excel e CSV
-            </p>
+          <div className="flex items-center gap-4">
+            {/* Botão Voltar */}
+            {canGoBack && (
+              <Button
+                onClick={navigateBack}
+                variant="outline"
+                size="icon"
+                className="border-gray-600 text-white hover:bg-seguranca-black hover:text-seguranca-yellow transition-all"
+                title="Voltar à visualização anterior"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
+            
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                Relatórios Financeiros
+              </h1>
+              <p className="text-gray-400 mt-1">
+                {empresaFiltrada 
+                  ? `Contas filtradas para a empresa: ${empresaFiltrada}` 
+                  : reportData 
+                    ? `${reportData.title} - ${reportData.period}`
+                    : 'Gere relatórios detalhados em PDF, Excel e CSV'
+                }
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              onClick={() => setShowConfigModal(true)}
-              variant="outline"
-              className="border-gray-600 text-white hover:bg-seguranca-black"
-            >
-              <Filter size={16} className="mr-2" />
-              Filtros
-            </Button>
-            <Button
-              onClick={() => setShowConfigModal(true)}
-              className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
-            >
-              <Settings size={16} className="mr-2" />
-              Configurar
-            </Button>
+            {/* Botão de limpar filtros/voltar quando há filtro ativo */}
+            {(empresaFiltrada || reportData) && (
+              <Button
+                onClick={resetView}
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-seguranca-black"
+              >
+                <X size={16} className="mr-2" />
+                Limpar Visualização
+              </Button>
+            )}
+            
+            {!reportData && !empresaFiltrada && (
+              <>
+                <Button
+                  onClick={() => setShowConfigModal(true)}
+                  variant="outline"
+                  className="border-gray-600 text-white hover:bg-seguranca-black"
+                >
+                  <Filter size={16} className="mr-2" />
+                  Filtros
+                </Button>
+                <Button
+                  onClick={() => setShowConfigModal(true)}
+                  className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+                >
+                  <Settings size={16} className="mr-2" />
+                  Configurar
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -582,21 +711,21 @@ const RelatoriosTab: React.FC = () => {
                 <div className="flex gap-2">
                   <Button
                     onClick={handleExportarPDF}
-                    className="bg-red-600 hover:bg-red-700 text-white"
+                    className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
                   >
                     <FileImage size={16} className="mr-2" />
                     PDF
                   </Button>
                   <Button
                     onClick={handleExportarExcel}
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="bg-green-600 hover:bg-green-700 text-white border border-green-700"
                   >
                     <FileSpreadsheet size={16} className="mr-2" />
                     Excel
                   </Button>
                   <Button
                     onClick={handleExportarCSV}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     <Download size={16} className="mr-2" />
                     CSV
@@ -605,6 +734,25 @@ const RelatoriosTab: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Alerta de Filtro Ativo */}
+              {empresaFiltrada && (
+                <div className="mb-4 p-4 bg-blue-900/30 border border-blue-700 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-blue-300">
+                    <Filter className="h-5 w-5" />
+                    <span>Contas filtradas para a empresa: <strong>{empresaFiltrada}</strong></span>
+                  </div>
+                  <Button
+                    onClick={limparFiltroEmpresa}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-600 text-blue-300 hover:bg-blue-900"
+                  >
+                    <X size={14} className="mr-1" />
+                    Remover Filtro
+                  </Button>
+                </div>
+              )}
+
               {/* Tabela de Dados */}
               <div className="overflow-x-auto rounded-lg border border-gray-600">
                 <table className="w-full">
@@ -618,11 +766,39 @@ const RelatoriosTab: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {reportData.rows.map((row, rowIndex) => (
+                    {reportData.rows
+                      .filter(row => !empresaFiltrada || row[1]?.toString().includes(empresaFiltrada))
+                      .map((row, rowIndex) => (
                       <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-seguranca-graphite' : 'bg-seguranca-black'}>
                         {row.map((cell, cellIndex) => (
                           <td key={cellIndex} className="px-4 py-3 text-gray-300 border-b border-gray-700">
-                            {cell}
+                            {/* Se for a coluna de Empresa, adicionar badge e botão de filtrar */}
+                            {cellIndex === 1 && typeof cell === 'string' && cell.match(/^[A-Z]{2,4}$/) ? (
+                              <div className="flex items-center gap-2">
+                                <Badge 
+                                  className={`${
+                                    cell === 'TERC' ? 'bg-green-600' : 
+                                    cell === 'VIG' ? 'bg-purple-600' : 
+                                    cell === 'ADM' ? 'bg-blue-600' : 
+                                    'bg-gray-600'
+                                  } text-white`}
+                                >
+                                  {cell}
+                                </Badge>
+                                {!empresaFiltrada && (
+                                  <Button
+                                    onClick={() => aplicarFiltroEmpresa(cell)}
+                                    variant="link"
+                                    size="sm"
+                                    className="text-blue-400 hover:text-blue-300 p-0 h-auto"
+                                  >
+                                    Filtrar
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              cell
+                            )}
                           </td>
                         ))}
                       </tr>
