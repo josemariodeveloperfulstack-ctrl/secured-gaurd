@@ -31,7 +31,7 @@ import {
   UserMinus,
   XCircle
 } from 'lucide-react';
-import { useAOS } from '@/hooks/use-aos';
+import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
 import { Employee } from '@/types/employee';
@@ -57,7 +57,7 @@ const Funcionarios: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
-  const aos = useAOS();
+  useGSAP();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -437,7 +437,7 @@ Confirma a exclusão?`)) {
         <TabsContent value="lista">
           <div className="space-y-6">
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-aos={aos.fadeDown}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-animate="fadeDown">
               <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 group">
                 <div className="p-5">
                   <div className="flex items-center justify-between">
@@ -496,7 +496,7 @@ Confirma a exclusão?`)) {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-aos={aos.fadeDown}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-animate="fadeDown">
               <div className="flex flex-wrap gap-2">
                 <Button 
                   variant="outline" 
@@ -522,7 +522,7 @@ Confirma a exclusão?`)) {
             </div>
 
             {/* Notificação sobre regras de exclusão */}
-            <Card className="bg-blue-900/20 border-blue-600/50" data-aos={aos.fadeUp}>
+            <Card className="bg-blue-900/20 border-blue-600/50" data-animate="fadeUp">
               <CardContent className="p-4">
                 <div className="flex items-start space-x-3">
                   <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -539,7 +539,7 @@ Confirma a exclusão?`)) {
 
 
             {/* Filtros Modernos */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-aos={aos.fadeUp}>
+            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               {/* Search Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -612,7 +612,7 @@ Confirma a exclusão?`)) {
             </Card>
 
             {/* Lista de Funcionários Moderna */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-aos={aos.fadeUp}>
+            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               <FuncionariosTable
                 employees={filteredEmployees}
                 onEdit={handleEditEmployee}

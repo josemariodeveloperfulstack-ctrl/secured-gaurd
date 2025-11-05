@@ -125,6 +125,14 @@ export interface UserPermissions {
   ATTENDANCE_WRITE: boolean;
   ATTENDANCE_MANAGE: boolean;
   
+  // Permissões de Visitas
+  VISITS_READ: boolean;
+  VISITS_WRITE: boolean;
+  VISITS_CREATE: boolean;
+  VISITS_UPDATE: boolean;
+  VISITS_DELETE: boolean;
+  VISITS_MANAGE: boolean;
+  
   // Permissão de Acesso Total
   ALL_PERMISSIONS: boolean;
 }

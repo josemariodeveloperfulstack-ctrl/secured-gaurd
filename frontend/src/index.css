@@ -500,12 +500,6 @@
       overflow-x: hidden !important;
     }
     
-    /* Garantir que elementos AOS sejam visíveis */
-    [data-aos] {
-      opacity: 1 !important;
-      transform: none !important;
-    }
-    
     .aos-init {
       opacity: 1 !important;
       transform: none !important;

@@ -133,7 +133,7 @@ export default defineConfig(({ mode }) => {
             'utils': ['axios', 'date-fns', 'clsx', 'tailwind-merge', 'class-variance-authority'],
             
             // Animations
-            'animations': ['framer-motion', 'aos'],
+            'animations': ['framer-motion', 'gsap'],
             
             // PDF
             'pdf': ['html2pdf.js', 'pdf-lib'],

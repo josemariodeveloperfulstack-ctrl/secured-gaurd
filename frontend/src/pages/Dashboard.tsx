@@ -1,14 +1,14 @@
 import React from 'react';
 import { Layout } from '@/components/Layout';
 import InteractiveDashboard from '@/components/dashboard/InteractiveDashboard';
-import { useAOS } from '@/hooks/use-aos';
+import { useGSAP } from '@/hooks/use-gsap';
 
 const Dashboard = () => {
-  const aos = useAOS();
+  useGSAP();
 
   return (
     <Layout activePage="dashboard">
-      <div data-aos={aos.fadeDown}>
+      <div data-animate="fadeDown">
         <InteractiveDashboard />
       </div>
     </Layout>

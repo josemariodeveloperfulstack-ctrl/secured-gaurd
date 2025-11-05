@@ -22,7 +22,7 @@ import {
   Trash2,
   Eye
 } from 'lucide-react';
-import { useAOS } from '@/hooks/use-aos';
+import { useGSAP } from '@/hooks/use-gsap';
 import { UserViewModal } from '@/components/usuarios/UserViewModal';
 import { UserEditModal } from '@/components/usuarios/UserEditModal';
 import { UserDeleteDialog } from '@/components/usuarios/UserDeleteDialog';
@@ -35,7 +35,7 @@ const Usuarios: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const aos = useAOS();
+  useGSAP();
 
   // Estados dos modais
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -206,7 +206,7 @@ const Usuarios: React.FC = () => {
     >
       <div className="space-y-6">
         {/* Filtros */}
-        <Card className="bg-seguranca-graphite border-gray-600" data-aos={aos.fadeUp}>
+        <Card className="bg-seguranca-graphite border-gray-600" data-animate="fadeUp">
           <CardHeader>
             <CardTitle className="text-seguranca-lightgray">Filtros</CardTitle>
           </CardHeader>
@@ -257,7 +257,7 @@ const Usuarios: React.FC = () => {
         </Card>
 
         {/* Lista de Usuários */}
-        <Card className="bg-seguranca-graphite border-gray-600" data-aos={aos.fadeUp}>
+        <Card className="bg-seguranca-graphite border-gray-600" data-animate="fadeUp">
           <CardHeader>
             <CardTitle className="text-seguranca-lightgray">Lista de Usuários</CardTitle>
           </CardHeader>

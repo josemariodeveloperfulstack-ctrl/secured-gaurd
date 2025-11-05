@@ -10,11 +10,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAOS } from '@/hooks/use-aos';
+import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
 
 const Login = () => {
-  const aos = useAOS();
+  useGSAP();
   const navigate = useNavigate();
   const { user, login } = useAuth();
   const { toast } = useToast();
@@ -231,12 +231,12 @@ const Login = () => {
         nofollow={true}
       />
       <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4 animate-fade-in">
-        <div className="mb-8" data-aos={aos.fadeDown}>
+        <div className="mb-8" data-animate="fadeDown">
           <Logo size="lg" />
         </div>
 
-        <div className="bg-seguranca-graphite rounded-xl shadow-lg w-full max-w-md p-6 md:p-8" data-aos={aos.zoomIn}>
-          <h2 className="text-2xl font-bold text-center mb-6" data-aos={aos.fadeUp}>Acesso ao Sistema</h2>
+        <div className="bg-seguranca-graphite rounded-xl shadow-lg w-full max-w-md p-6 md:p-8" data-animate="zoomIn">
+          <h2 className="text-2xl font-bold text-center mb-6" data-animate="fadeUp">Acesso ao Sistema</h2>
 
           <Tabs defaultValue="funcionario" className="w-full login-tabs">
             <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -486,7 +486,7 @@ const Login = () => {
           </Tabs>
         </div>
 
-        <div className="mt-6 text-sm text-gray-500" data-aos={aos.fadeUp} data-aos-delay="500">
+        <div className="mt-6 text-sm text-gray-500" data-animate="fadeUp" data-delay="500">
           Secure Guard Control © {new Date().getFullYear()}
         </div>
       </div>

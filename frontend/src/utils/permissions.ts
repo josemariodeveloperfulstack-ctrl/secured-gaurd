@@ -120,6 +120,19 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     MESSAGES_CREATE: false,
     MESSAGES_MANAGE: false,
     
+    // Permissões de Atendimento
+    ATTENDANCE_READ: false,
+    ATTENDANCE_WRITE: false,
+    ATTENDANCE_MANAGE: false,
+    
+    // Permissões de Visitas
+    VISITS_READ: false,
+    VISITS_WRITE: false,
+    VISITS_CREATE: false,
+    VISITS_UPDATE: false,
+    VISITS_DELETE: false,
+    VISITS_MANAGE: false,
+    
     // Permissão de Acesso Total
     ALL_PERMISSIONS: false,
   };
@@ -334,6 +347,14 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
+        
+        // Permissões de Mensagens
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        
+        // Permissões de Suporte
+        SUPPORT_READ: true,
       };
 
     case 'TI_SUPORTE':
@@ -393,6 +414,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     case 'COLABORADOR':
       return {
         ...basePermissions,
+        DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
         PAYSLIPS_READ: true,
@@ -438,6 +460,14 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
+        
+        // Permissões de Mensagens
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        
+        // Permissões de Suporte
+        SUPPORT_READ: true,
       };
 
     default:
@@ -565,6 +595,11 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     MESSAGES_CREATE: false,
     MESSAGES_MANAGE: false,
     
+    // Permissões de Atendimento
+    ATTENDANCE_READ: false,
+    ATTENDANCE_WRITE: false,
+    ATTENDANCE_MANAGE: false,
+    
     // Permissão de Acesso Total
     ALL_PERMISSIONS: false,
   };
@@ -645,6 +680,9 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     'MESSAGES_DELETE': 'MESSAGES_DELETE',
     'MESSAGES_CREATE': 'MESSAGES_CREATE',
     'MESSAGES_MANAGE': 'MESSAGES_MANAGE',
+    'ATTENDANCE_READ': 'ATTENDANCE_READ',
+    'ATTENDANCE_WRITE': 'ATTENDANCE_WRITE',
+    'ATTENDANCE_MANAGE': 'ATTENDANCE_MANAGE',
     'ALL_PERMISSIONS': 'ALL_PERMISSIONS',
   };
 

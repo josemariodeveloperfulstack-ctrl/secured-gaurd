@@ -8,9 +8,15 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import AOS from 'aos';
-import 'aos/dist/aos.css';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import '@/styles/gsap-animations.css';
+
+// Registrar plugins GSAP
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 // Portal Público - Carregamento imediato (página inicial)
 import PortalHome from '@/pages/PortalHome';
@@ -151,32 +157,13 @@ function App() {
     window.addEventListener('error', handleMessageChannelError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
-    // Inicializar AOS com configurações otimizadas para performance
-    AOS.init({
-      duration: 300, // Reduzido para animações mais rápidas
-      easing: 'ease-out', // Mudado para ease-out (mais performático)
-      once: true,
-      mirror: false,
-      offset: 50, // Reduzido para animações mais cedo
-      delay: 0, // Sem delay
-      disable: false // Habilitado em mobile
-    });
+    // GSAP já está registrado no import acima
+    // ScrollTrigger será configurado nos componentes individuais via useGSAP hook
+    console.log('✅ GSAP e ScrollTrigger registrados!');
 
-    // Re-inicializar AOS quando a rota mudar (com debounce)
-    let timeoutId: NodeJS.Timeout;
-    const handleRouteChange = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        AOS.refresh();
-      }, 100);
-    };
-
-    window.addEventListener('popstate', handleRouteChange);
     return () => {
-      window.removeEventListener('popstate', handleRouteChange);
       window.removeEventListener('error', handleMessageChannelError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-      clearTimeout(timeoutId);
     };
   }, []);
 

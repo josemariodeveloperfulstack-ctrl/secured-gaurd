@@ -19,11 +19,27 @@ interface Visit {
 }
 
 interface AllVisitsModalProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onVisitUpdated?: () => void;
 }
 
-const AllVisitsModal: React.FC<AllVisitsModalProps> = ({ onVisitUpdated }) => {
-  const [open, setOpen] = useState(false);
+const AllVisitsModal: React.FC<AllVisitsModalProps> = ({ 
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
+  onVisitUpdated 
+}) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Usar controle externo se fornecido, senão usar interno
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (externalOnOpenChange) {
+      externalOnOpenChange(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -79,12 +95,15 @@ const AllVisitsModal: React.FC<AllVisitsModalProps> = ({ onVisitUpdated }) => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600">
-          <Eye className="h-4 w-4 mr-2" />
-          Ver Todas
-        </Button>
-      </DialogTrigger>
+      {/* DialogTrigger só aparece quando não há controle externo */}
+      {externalOpen === undefined && (
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600">
+            <Eye className="h-4 w-4 mr-2" />
+            Ver Todas
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[800px] max-h-[80vh] bg-gray-800 border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-white">Todas as Visitas</DialogTitle>

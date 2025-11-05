@@ -25,7 +25,11 @@ import {
   Clock,
   CheckCircle,
   RefreshCw,
-  Building
+  Building,
+  ArrowLeft,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { ContasAPagarFormModal, ContaAPagar } from '@/components/financeiro/ContasAPagarFormModal';
 import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
@@ -70,6 +74,10 @@ const ContasAPagar: React.FC = () => {
   // Estados para filtro por empresa no relatório
   const [empresaFilterRelatorio, setEmpresaFilterRelatorio] = useState<string>('TODAS');
   const [showEmpresaFilterRelatorio, setShowEmpresaFilterRelatorio] = useState<boolean>(false);
+  
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
 
   // Estatísticas do dashboard
   const [stats, setStats] = useState({
@@ -250,6 +258,7 @@ const ContasAPagar: React.FC = () => {
   const handleEmpresaFilterRelatorio = (empresa: string) => {
     setEmpresaFilterRelatorio(empresa);
     setShowEmpresaFilterRelatorio(true);
+    setCurrentPage(1); // Reset para primeira página ao filtrar
     
     // Atualizar apenas o subtítulo do relatório
     if (reportData) {
@@ -263,6 +272,26 @@ const ContasAPagar: React.FC = () => {
       title: "Filtro Aplicado",
       description: `Mostrando apenas contas da empresa: ${empresa}`,
       duration: 3000
+    });
+  };
+
+  // Função para limpar filtro de empresa e voltar à lista completa
+  const handleLimparFiltroEmpresa = () => {
+    setEmpresaFilterRelatorio('TODAS');
+    setShowEmpresaFilterRelatorio(false);
+    setCurrentPage(1);
+    
+    if (reportData) {
+      setReportData({
+        ...reportData,
+        subtitle: reportData.type === 'empresa' ? 'Agrupamento das contas por empresa' : reportData.subtitle
+      });
+    }
+    
+    toast({
+      title: "Filtro Removido",
+      description: "Exibindo todas as empresas",
+      duration: 2000
     });
   };
 
@@ -765,6 +794,26 @@ const ContasAPagar: React.FC = () => {
       return sigla === empresaFilterRelatorio;
     });
   }, [reportData, empresaFilterRelatorio]);
+
+  // Cálculo de paginação
+  const totalPages = Math.ceil((filteredReportDisplayData?.length || 0) / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredReportDisplayData.slice(startIndex, endIndex);
+  }, [filteredReportDisplayData, currentPage, itemsPerPage]);
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   // Memoized summary for display in the report cards
   const displaySummary = useMemo(() => {
@@ -1313,6 +1362,28 @@ const ContasAPagar: React.FC = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Alerta de Filtro Ativo */}
+                  {empresaFilterRelatorio !== 'TODAS' && (
+                    <div className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Filter className="h-5 w-5 text-blue-300" />
+                        <div>
+                          <p className="text-blue-100 font-medium">Filtro Ativo</p>
+                          <p className="text-blue-300 text-sm">Exibindo apenas contas da empresa: <strong>{empresaFilterRelatorio}</strong></p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleLimparFiltroEmpresa}
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-600 text-blue-300 hover:bg-blue-900/50 hover:text-blue-200"
+                      >
+                        <X size={16} className="mr-2" />
+                        Limpar Filtro
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Resumo do Relatório */}
                   {displaySummary && Object.keys(displaySummary).length > 0 && (
                     <div className="space-y-6 mb-8">
@@ -1401,7 +1472,7 @@ const ContasAPagar: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredReportDisplayData.map((conta: ContaAPagar, index: number) => {
+                          {paginatedData.map((conta: ContaAPagar, index: number) => {
                             const empresaSigla = conta.companySigla || conta.empresa || 'Não informado';
                             return (
                               <tr key={conta.id || index} className={index % 2 === 0 ? 'bg-seguranca-graphite/30' : 'bg-seguranca-black/30'}>
@@ -1446,6 +1517,70 @@ const ContasAPagar: React.FC = () => {
                           })}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+
+                  {/* Controles de Paginação */}
+                  {filteredReportDisplayData && filteredReportDisplayData.length > 0 && totalPages > 1 && (
+                    <div className="mt-6 flex items-center justify-between bg-seguranca-black/30 rounded-lg p-4 border border-gray-600/30">
+                      <div className="text-sm text-gray-400">
+                        Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, filteredReportDisplayData.length)} - {Math.min(currentPage * itemsPerPage, filteredReportDisplayData.length)} de {filteredReportDisplayData.length} registros
+                        {empresaFilterRelatorio !== 'TODAS' && ` (Filtrado por: ${empresaFilterRelatorio})`}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={handlePreviousPage}
+                          disabled={currentPage === 1}
+                          variant="outline"
+                          size="sm"
+                          className="border-gray-600 text-gray-300 hover:bg-seguranca-black disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ChevronLeft size={16} className="mr-1" />
+                          Anterior
+                        </Button>
+                        
+                        <div className="flex items-center gap-1">
+                          {[...Array(totalPages)].map((_, idx) => {
+                            const pageNum = idx + 1;
+                            // Mostrar apenas páginas próximas à atual
+                            if (
+                              pageNum === 1 ||
+                              pageNum === totalPages ||
+                              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                            ) {
+                              return (
+                                <Button
+                                  key={pageNum}
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  variant={currentPage === pageNum ? "default" : "outline"}
+                                  size="sm"
+                                  className={`min-w-[40px] ${
+                                    currentPage === pageNum
+                                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                                      : "border-gray-600 text-gray-300 hover:bg-seguranca-black"
+                                  }`}
+                                >
+                                  {pageNum}
+                                </Button>
+                              );
+                            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                              return <span key={pageNum} className="text-gray-500 px-2">...</span>;
+                            }
+                            return null;
+                          })}
+                        </div>
+
+                        <Button
+                          onClick={handleNextPage}
+                          disabled={currentPage === totalPages}
+                          variant="outline"
+                          size="sm"
+                          className="border-gray-600 text-gray-300 hover:bg-seguranca-black disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          Próxima
+                          <ChevronRight size={16} className="ml-1" />
+                        </Button>
+                      </div>
                     </div>
                   )}
 

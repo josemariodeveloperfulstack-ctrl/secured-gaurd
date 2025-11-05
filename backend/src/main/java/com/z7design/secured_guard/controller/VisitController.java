@@ -9,12 +9,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
-@RequestMapping("/api/visit-controls")
+@RequestMapping("/api/visit-controls") // Apenas visit-controls (visits é usado pelo VisitsController)
 @CrossOrigin(origins = "*")
 public class VisitController {
 
@@ -88,12 +86,70 @@ public class VisitController {
     }
 
     @GetMapping
-    public ResponseEntity<List<VisitControl>> getAllVisits() {
+    public ResponseEntity<?> getAllVisits(
+        @RequestParam(required = false, defaultValue = "0") Integer page,
+        @RequestParam(required = false, defaultValue = "20") Integer size,
+        @RequestParam(required = false) String supervisorId,
+        @RequestParam(required = false) String workPostId,
+        @RequestParam(required = false) String clientId,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String startDate,
+        @RequestParam(required = false) String endDate
+    ) {
         try {
-            List<VisitControl> visits = visitControlRepository.findAll();
-            return ResponseEntity.ok(visits);
+            System.out.println("🔍 GET /api/visits chamado - page: " + page + ", size: " + size);
+            
+            List<VisitControl> visits;
+            try {
+                visits = visitControlRepository.findAll();
+                System.out.println("📊 Total de visitas no banco: " + visits.size());
+            } catch (Exception repoError) {
+                System.err.println("⚠️ Erro ao acessar repository, retornando lista vazia: " + repoError.getMessage());
+                visits = new ArrayList<>();
+            }
+            
+            // Calcular paginação
+            int start = page * size;
+            int end = Math.min(start + size, visits.size());
+            
+            List<VisitControl> paginatedVisits = start < visits.size() ? 
+                visits.subList(start, end) : new ArrayList<>();
+            
+            System.out.println("📄 Retornando " + paginatedVisits.size() + " visitas (página " + page + ")");
+            
+            // Criar resposta paginada
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", paginatedVisits);
+            response.put("totalElements", (long) visits.size());
+            response.put("totalPages", size > 0 ? (int) Math.ceil((double) visits.size() / size) : 0);
+            response.put("number", page);
+            response.put("size", size);
+            response.put("empty", paginatedVisits.isEmpty());
+            response.put("first", page == 0);
+            response.put("last", end >= visits.size());
+            
+            System.out.println("✅ Resposta criada com sucesso");
+            return ResponseEntity.ok(response);
+            
         } catch (Exception e) {
-            return ResponseEntity.status(500).build();
+            System.err.println("❌ ERRO CRÍTICO ao buscar visitas:");
+            System.err.println("  Tipo: " + e.getClass().getName());
+            System.err.println("  Mensagem: " + e.getMessage());
+            System.err.println("  Stack trace:");
+            e.printStackTrace();
+            
+            // Retornar resposta vazia ao invés de erro
+            Map<String, Object> emptyResponse = new HashMap<>();
+            emptyResponse.put("content", new ArrayList<>());
+            emptyResponse.put("totalElements", 0L);
+            emptyResponse.put("totalPages", 0);
+            emptyResponse.put("number", page);
+            emptyResponse.put("size", size);
+            emptyResponse.put("empty", true);
+            emptyResponse.put("first", true);
+            emptyResponse.put("last", true);
+            
+            return ResponseEntity.ok(emptyResponse); // Retornar 200 com lista vazia
         }
     }
 

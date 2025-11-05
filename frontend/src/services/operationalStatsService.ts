@@ -82,7 +82,16 @@ export const operationalStatsService = {
   async getWorkPostStats(): Promise<WorkPostStats> {
     try {
       const response = await api.get('/api/work-posts');
-      const workPosts = response.data.content || response.data || [];
+      
+      // Garantir que workPosts é sempre um array
+      let workPosts = response.data;
+      if (workPosts && typeof workPosts === 'object' && 'content' in workPosts) {
+        workPosts = workPosts.content;
+      }
+      if (!Array.isArray(workPosts)) {
+        console.warn('⚠️ WorkPosts não é um array:', workPosts);
+        workPosts = [];
+      }
       
       const active = workPosts.filter((post: any) => post.status === 'ATIVO').length;
       const inactive = workPosts.filter((post: any) => post.status !== 'ATIVO').length;
@@ -115,7 +124,19 @@ export const operationalStatsService = {
   async getEmployeeStats(): Promise<EmployeeStats> {
     try {
       const response = await api.get('/api/employees/basic');
-      const employees = response.data.employees || [];
+      
+      // Garantir que employees é sempre um array
+      let employees = response.data;
+      if (employees && typeof employees === 'object' && 'employees' in employees) {
+        employees = employees.employees;
+      }
+      if (employees && typeof employees === 'object' && 'content' in employees) {
+        employees = employees.content;
+      }
+      if (!Array.isArray(employees)) {
+        console.warn('⚠️ Employees não é um array:', employees);
+        employees = [];
+      }
       
       // Simular funcionários em serviço (em um sistema real, isso viria de dados de presença)
       const onDuty = Math.floor(employees.length * 0.6); // 60% em serviço
@@ -173,7 +194,20 @@ export const operationalStatsService = {
     try {
       // Usar endpoint de equipamentos existente
       const response = await api.get('/api/equipments');
-      const equipments = response.data;
+      
+      // Garantir que equipments é sempre um array
+      let equipments = response.data;
+      
+      // Se for um objeto paginado, extrair o array content
+      if (equipments && typeof equipments === 'object' && 'content' in equipments) {
+        equipments = equipments.content;
+      }
+      
+      // Se não for array ou for null/undefined, usar array vazio
+      if (!Array.isArray(equipments)) {
+        console.warn('⚠️ Equipments não é um array:', equipments);
+        equipments = [];
+      }
       
       // Contar equipamentos ativos
       const activeCount = equipments.filter((eq: any) => 

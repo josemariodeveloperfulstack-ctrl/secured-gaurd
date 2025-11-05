@@ -15,6 +15,8 @@ import {
   Plus,
   Activity
 } from 'lucide-react';
+import NewVisitModal from './NewVisitModal';
+import AllVisitsModal from './AllVisitsModal';
 
 interface VisitSummary {
   totalVisits: number;
@@ -46,6 +48,8 @@ const VisitWidget: React.FC = () => {
   });
   const [recentVisits, setRecentVisits] = useState<RecentVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showNewVisitModal, setShowNewVisitModal] = useState(false);
+  const [showAllVisitsModal, setShowAllVisitsModal] = useState(false);
 
   useEffect(() => {
     fetchVisitData();
@@ -119,9 +123,10 @@ const VisitWidget: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Resumo de Métricas */}
-      <Card className="bg-seguranca-graphite border-gray-600">
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Resumo de Métricas */}
+        <Card className="bg-seguranca-graphite border-gray-600">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-seguranca-lightgray text-lg">
             <Calendar className="w-5 h-5 text-seguranca-darkred" />
@@ -168,6 +173,7 @@ const VisitWidget: React.FC = () => {
                 <Button 
                   size="sm" 
                   className="flex-1 bg-seguranca-darkred hover:bg-seguranca-red text-white text-xs"
+                  onClick={() => setShowNewVisitModal(true)}
                 >
                   <Plus className="w-3 h-3 mr-1" />
                   Nova Visita
@@ -176,6 +182,7 @@ const VisitWidget: React.FC = () => {
                   size="sm" 
                   variant="outline"
                   className="bg-transparent border-gray-600 text-seguranca-lightgray hover:bg-gray-700 text-xs"
+                  onClick={() => setShowAllVisitsModal(true)}
                 >
                   <Eye className="w-3 h-3 mr-1" />
                   Ver Todas
@@ -239,6 +246,22 @@ const VisitWidget: React.FC = () => {
         </CardContent>
       </Card>
     </div>
+
+    {/* Modais */}
+    <NewVisitModal 
+      open={showNewVisitModal}
+      onOpenChange={setShowNewVisitModal}
+      onVisitCreated={() => {
+        fetchVisitData(); // Recarregar dados após criar visita
+        setShowNewVisitModal(false);
+      }}
+    />
+    
+    <AllVisitsModal 
+      open={showAllVisitsModal}
+      onOpenChange={setShowAllVisitsModal}
+    />
+    </>
   );
 };
 

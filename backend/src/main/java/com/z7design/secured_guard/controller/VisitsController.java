@@ -29,10 +29,10 @@ public class VisitsController {
     public ResponseEntity<Page<Visit>> getAllVisits(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "scheduledDate") String sortBy,
+            @RequestParam(defaultValue = "visitDate") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection) {
         try {
-            log.info("Buscando visitas - página: {}, tamanho: {}", page, size);
+            log.info("🔍 GET /api/visits - página: {}, tamanho: {}, ordenar por: {}", page, size, sortBy);
             
             Sort.Direction direction = sortDirection.equalsIgnoreCase("ASC") 
                     ? Sort.Direction.ASC 
@@ -41,10 +41,10 @@ public class VisitsController {
             Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
             Page<Visit> visits = visitRepository.findAll(pageable);
             
-            log.info("Visitas encontradas: {}", visits.getTotalElements());
+            log.info("✅ Visitas encontradas: {} registros", visits.getTotalElements());
             return ResponseEntity.ok(visits);
         } catch (Exception e) {
-            log.error("Erro ao buscar visitas", e);
+            log.error("❌ Erro ao buscar visitas", e);
             return ResponseEntity.status(500).build();
         }
     }
@@ -115,7 +115,7 @@ public class VisitsController {
             @RequestParam(defaultValue = "20") int size) {
         try {
             log.info("Buscando visitas do supervisor: {}", supervisorId);
-            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "scheduledDate"));
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "visitDate"));
             Page<Visit> visits = visitRepository.findBySupervisorId(supervisorId, pageable);
             return ResponseEntity.ok(visits);
         } catch (Exception e) {

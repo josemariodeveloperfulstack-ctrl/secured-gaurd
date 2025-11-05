@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
-import { useAOS } from '@/hooks/use-aos';
+import { useGSAP } from '@/hooks/use-gsap';
 import { Search, Plus, RefreshCw, Building2, Users, CheckCircle2, Clock, XCircle, AlertCircle, FileText } from 'lucide-react';
 import { clientService } from '@/services/clientService';
 import { notificationService } from '@/services/notificationService';
@@ -31,7 +31,7 @@ const Clientes: React.FC = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const { toast } = useToast();
-  const aos = useAOS();
+  useGSAP();
 
   // Load clients
   const loadClients = async (params: ClientSearchParams = {}) => {
@@ -238,7 +238,7 @@ const Clientes: React.FC = () => {
     >
       <div className="space-y-6">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-aos={aos.fadeDown}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-animate="fadeDown">
           <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-seguranca-red/50 transition-all duration-300 group">
             <div className="p-5">
               <div className="flex items-center justify-between">
@@ -297,7 +297,7 @@ const Clientes: React.FC = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-aos={aos.fadeDown}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-animate="fadeDown">
           <div className="flex flex-wrap gap-2">
             <Button 
               variant="outline" 
@@ -319,7 +319,7 @@ const Clientes: React.FC = () => {
         </div>
 
         {/* Report Filters */}
-        <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm" data-aos={aos.fadeUp}>
+        <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm" data-animate="fadeUp">
           <div className="flex items-center gap-4 mb-6">
             <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border border-blue-500/30 shadow-lg shadow-blue-500/10">
               <FileText className="h-6 w-6 text-blue-400" />
@@ -337,7 +337,7 @@ const Clientes: React.FC = () => {
         </Card>
 
         {/* Search Section */}
-        <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm mt-6" data-aos={aos.fadeUp}>
+        <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm mt-6" data-animate="fadeUp">
           {/* Search Header */}
           <div className="flex items-center gap-4 mb-8">
             <div className="p-3 rounded-xl bg-gradient-to-br from-seguranca-red/20 to-seguranca-red/10 border border-seguranca-red/30 shadow-lg shadow-seguranca-red/10">
@@ -397,7 +397,7 @@ const Clientes: React.FC = () => {
         </Card>
 
         {/* Clients Table */}
-        <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm mt-6" data-aos={aos.fadeUp}>
+        <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm mt-6" data-animate="fadeUp">
           <ClientsTable
             clients={clients}
             onEdit={handleEditClient}

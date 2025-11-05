@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useAOS } from '@/hooks/use-aos';
+import { useGSAP } from '@/hooks/use-gsap';
 import { 
   Users, 
   Plus, 
@@ -40,7 +40,7 @@ const Dependentes: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>();
 
   const { toast } = useToast();
-  const aos = useAOS();
+  useGSAP();
 
   // Load employees for selection
   const loadEmployees = async () => {
@@ -184,7 +184,7 @@ const Dependentes: React.FC = () => {
     <StandardLayout title="Gestão de Dependentes" subtitle="Gerencie os dependentes dos funcionários">
       <div className="space-y-6">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-aos={aos.fadeDown}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-animate="fadeDown">
           <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 group">
             <div className="p-5">
               <div className="flex items-center justify-between">
@@ -243,7 +243,7 @@ const Dependentes: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-aos={aos.fadeUp}>
+        <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
@@ -333,7 +333,7 @@ const Dependentes: React.FC = () => {
 
         {/* Selected Employee Info */}
         {selectedEmployee && (
-          <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-4" data-aos={aos.fadeUp}>
+          <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-4" data-animate="fadeUp">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
                 <Building2 className="h-5 w-5 text-seguranca-red" />
@@ -347,7 +347,7 @@ const Dependentes: React.FC = () => {
         )}
 
         {/* Dependents Table */}
-        <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-aos={aos.fadeUp}>
+        <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
@@ -388,7 +388,7 @@ const Dependentes: React.FC = () => {
               <Button
                 onClick={() => {
                   // Scroll to filters
-                  const filtersElement = document.querySelector('[data-aos]');
+                  const filtersElement = document.querySelector('[data-animate]');
                   filtersElement?.scrollIntoView({ behavior: 'smooth' });
                 }}
                 variant="outline"
