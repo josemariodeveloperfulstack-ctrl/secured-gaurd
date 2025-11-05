@@ -70,7 +70,8 @@ import {
   FileSignature,
   Heart,
   GraduationCap,
-  Car
+  Car,
+  Database
 } from 'lucide-react';
 
 interface CollapsibleSidebarProps {
@@ -240,6 +241,7 @@ const sistemaMenuItems = [
   { icon: MessageCircle, text: 'Conexão WhatsApp', to: '/whatsapp-connection', id: 'whatsapp-connection' },
   { icon: Settings, text: 'Gestão de Atividades', to: '/atividades', id: 'atividades' },
   { icon: Shield, text: 'Sistema', to: '/sistema', id: 'sistema' },
+  { icon: Database, text: 'Backup', to: '/configuracoes/backup', id: 'backup' },
   { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
 ];
 

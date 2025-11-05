@@ -26,6 +26,8 @@ import EnvironmentIndicator from '@/components/EnvironmentIndicator';
 
 // Sistema Administrativo - Lazy loading para páginas administrativas
 const Login = lazy(() => import('@/pages/Login').catch(() => ({ default: () => <div>Erro ao carregar Login</div> })));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Index = lazy(() => import('@/pages/Index').catch(() => ({ default: () => <div>Erro ao carregar Index</div> })));
 const Dashboard = lazy(() => import('@/pages/Dashboard').catch(() => ({ default: () => <div>Erro ao carregar Dashboard</div> })));
 const DashboardColaborador = lazy(() => import('@/pages/DashboardColaborador'));
@@ -68,6 +70,7 @@ const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
 const Grupos = lazy(() => import('@/pages/Grupos'));
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
+const ConfiguracaoBackup = lazy(() => import('@/pages/ConfiguracaoBackup'));
 const Profile = lazy(() => import('@/pages/Profile'));
 import Holerites from '@/pages/Holerites';
 import HoleritesMobileTest from '@/pages/HoleritesMobileTest';
@@ -225,6 +228,16 @@ function App() {
                         </div>
                       }>
                         <Login />
+                      </Suspense>
+                    } />
+                    <Route path="/forgot-password" element={
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <ForgotPassword />
+                      </Suspense>
+                    } />
+                    <Route path="/reset-password" element={
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <ResetPassword />
                       </Suspense>
                     } />
                     
@@ -786,6 +799,11 @@ function App() {
                     <Route path="/configuracoes" element={
                       <ProtectedRoute>
                         <Configuracoes />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/configuracoes/backup" element={
+                      <ProtectedRoute>
+                        <ConfiguracaoBackup />
                       </ProtectedRoute>
                     } />
                     
