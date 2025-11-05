@@ -265,7 +265,7 @@ export enum ReportType {
 export const REPORT_CONFIGS = {
   [ReportType.CONTAS_PAGAR]: {
     title: 'Relatório de Contas a Pagar',
-    headers: ['ID', 'Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Categoria', 'Centro de Custo']
+    headers: ['Empresa', 'Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo']
   },
   [ReportType.CONTAS_RECEBER]: {
     title: 'Relatório de Contas a Receber',

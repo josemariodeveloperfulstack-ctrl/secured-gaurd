@@ -246,14 +246,13 @@ const RelatoriosTab: React.FC = () => {
     });
 
     const rows = contas.map(conta => [
-      conta.id,
+      conta.companySigla || conta.empresa || 'N/A',
       conta.descricao,
       conta.fornecedor || 'Não informado',
       ReportGenerator.formatCurrency(conta.valor),
       format(conta.vencimento, 'dd/MM/yyyy', { locale: ptBR }),
       conta.status,
-      conta.categoria || 'Não informado',
-      conta.centroCusto || 'Não informado'
+      conta.tipo || 'FIXA'
     ]);
 
     const total = contas.reduce((sum, conta) => sum + conta.valor, 0);
@@ -473,6 +472,32 @@ const RelatoriosTab: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-seguranca-black">
+      {/* Breadcrumb de Navegação */}
+      {(reportData || empresaFiltrada) && (
+        <div className="bg-seguranca-black border-b border-gray-700 px-6 py-2">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <button 
+              onClick={resetView}
+              className="hover:text-seguranca-yellow transition-colors"
+            >
+              Relatórios
+            </button>
+            {reportData && (
+              <>
+                <span>/</span>
+                <span className="text-white">{reportData.title.split('-')[0].trim()}</span>
+              </>
+            )}
+            {empresaFiltrada && (
+              <>
+                <span>/</span>
+                <span className="text-seguranca-yellow">{empresaFiltrada}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header Principal */}
       <div className="bg-seguranca-graphite border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -483,8 +508,8 @@ const RelatoriosTab: React.FC = () => {
                 onClick={navigateBack}
                 variant="outline"
                 size="icon"
-                className="border-gray-600 text-white hover:bg-seguranca-black hover:text-seguranca-yellow transition-all"
-                title="Voltar à visualização anterior"
+                className="border-gray-600 text-white hover:bg-seguranca-black hover:text-seguranca-yellow transition-all shadow-lg"
+                title="Voltar à visualização anterior (Alt + ←)"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -492,16 +517,16 @@ const RelatoriosTab: React.FC = () => {
             
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <div className="p-2 bg-blue-600 rounded-lg">
-                  <FileText className="h-6 w-6 text-white" />
+                <div className={`p-2 rounded-lg ${reportData ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                  {reportData ? <Eye className="h-6 w-6 text-white" /> : <FileText className="h-6 w-6 text-white" />}
                 </div>
-                Relatórios Financeiros
+                {reportData ? reportData.title : 'Relatórios Financeiros'}
               </h1>
               <p className="text-gray-400 mt-1">
                 {empresaFiltrada 
                   ? `Contas filtradas para a empresa: ${empresaFiltrada}` 
                   : reportData 
-                    ? `${reportData.title} - ${reportData.period}`
+                    ? `Período: ${reportData.period}`
                     : 'Gere relatórios detalhados em PDF, Excel e CSV'
                 }
               </p>
@@ -767,13 +792,13 @@ const RelatoriosTab: React.FC = () => {
                   </thead>
                   <tbody>
                     {reportData.rows
-                      .filter(row => !empresaFiltrada || row[1]?.toString().includes(empresaFiltrada))
+                      .filter(row => !empresaFiltrada || row[0]?.toString() === empresaFiltrada)
                       .map((row, rowIndex) => (
                       <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-seguranca-graphite' : 'bg-seguranca-black'}>
                         {row.map((cell, cellIndex) => (
                           <td key={cellIndex} className="px-4 py-3 text-gray-300 border-b border-gray-700">
-                            {/* Se for a coluna de Empresa, adicionar badge e botão de filtrar */}
-                            {cellIndex === 1 && typeof cell === 'string' && cell.match(/^[A-Z]{2,4}$/) ? (
+                            {/* Se for a coluna de Empresa (primeira coluna), adicionar badge e botão de filtrar */}
+                            {cellIndex === 0 && typeof cell === 'string' && cell.match(/^[A-Z]{2,4}$/i) ? (
                               <div className="flex items-center gap-2">
                                 <Badge 
                                   className={`${
@@ -796,6 +821,19 @@ const RelatoriosTab: React.FC = () => {
                                   </Button>
                                 )}
                               </div>
+                            ) : cellIndex === 5 ? (
+                              // Coluna de Status com badge colorido
+                              <Badge 
+                                className={`${
+                                  cell === 'PAGA' || cell === 'RECEBIDA' ? 'bg-red-600' : 
+                                  cell === 'ABERTA' ? 'bg-gray-500' : 
+                                  cell === 'ATRASADA' ? 'bg-orange-600' : 
+                                  cell === 'CANCELADA' ? 'bg-gray-700' :
+                                  'bg-gray-600'
+                                } text-white`}
+                              >
+                                {cell}
+                              </Badge>
                             ) : (
                               cell
                             )}
