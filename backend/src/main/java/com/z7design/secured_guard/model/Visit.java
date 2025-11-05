@@ -116,6 +116,7 @@ public class Visit {
     private String qrCodeScanned;
     
     @Column(name = "qr_code_verified")
+    @Builder.Default
     private Boolean qrCodeVerified = false;
     
     @Column(name = "route_order")

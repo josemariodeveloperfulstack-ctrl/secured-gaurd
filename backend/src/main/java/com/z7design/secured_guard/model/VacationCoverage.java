@@ -58,6 +58,7 @@ public class VacationCoverage {
     private String observations;
     
     @Column(name = "is_confirmed", nullable = false)
+    @Builder.Default
     private Boolean isConfirmed = false;
     
     @ManyToOne(fetch = FetchType.LAZY)

@@ -55,9 +55,11 @@ public class WorkPostAssignment {
     private AssignmentStatus status;
     
     @Column(name = "is_primary_assignment", nullable = false)
+    @Builder.Default
     private Boolean isPrimaryAssignment = true;
     
     @Column(name = "is_backup_assignment", nullable = false)
+    @Builder.Default
     private Boolean isBackupAssignment = false;
     
     @Column(name = "observations", columnDefinition = "TEXT")

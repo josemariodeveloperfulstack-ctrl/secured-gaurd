@@ -53,6 +53,7 @@ public class Absence {
     private AbsenceStatus status;
     
     @Column(name = "is_justified", nullable = false)
+    @Builder.Default
     private Boolean isJustified = false;
     
     @ManyToOne(fetch = FetchType.LAZY)

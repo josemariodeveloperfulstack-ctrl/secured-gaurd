@@ -61,6 +61,7 @@ public class SpecificActivity {
     private ActivityStatus status;
     
     @Column(name = "is_completed", nullable = false)
+    @Builder.Default
     private Boolean isCompleted = false;
     
     @Column(name = "completion_notes", columnDefinition = "TEXT")

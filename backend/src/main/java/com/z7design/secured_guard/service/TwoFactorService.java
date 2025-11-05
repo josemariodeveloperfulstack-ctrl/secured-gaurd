@@ -32,14 +32,11 @@ public class TwoFactorService {
      * Cria e salva um código 2FA para o usuário
      */
     @Transactional
-    public TwoFactorCode createCode(User user, String purpose) {
-        log.info("🔐 Criando código 2FA para usuário: {} - Propósito: {}", user.getUsername(), purpose);
+    public TwoFactorCode createCode(User user, String destination) {
+        log.info("🔐 Criando código 2FA para usuário: {} - Destino: {}", user.getUsername(), destination);
 
-        // Invalidar códigos anteriores do mesmo propósito
-        twoFactorCodeRepository.findByUserAndPurpose(user, purpose).forEach(code -> {
-            code.setUsed(true);
-            twoFactorCodeRepository.save(code);
-        });
+        // Invalidar códigos anteriores do usuário
+        twoFactorCodeRepository.expireAllUserCodes(user.getId());
 
         // Gerar novo código
         String code = generateCode();
@@ -47,13 +44,12 @@ public class TwoFactorService {
         TwoFactorCode twoFactorCode = TwoFactorCode.builder()
                 .user(user)
                 .code(code)
-                .purpose(purpose)
-                .expiryDate(LocalDateTime.now().plusMinutes(5)) // Expira em 5 minutos
-                .used(false)
+                .destination(destination)
+                .deliveryChannel(TwoFactorCode.DeliveryChannel.WHATSAPP)
                 .build();
 
         twoFactorCode = twoFactorCodeRepository.save(twoFactorCode);
-        log.info("✅ Código 2FA criado: {} - Expira em: {}", code, twoFactorCode.getExpiryDate());
+        log.info("✅ Código 2FA criado: {} - Expira em: {}", code, twoFactorCode.getExpiresAt());
 
         return twoFactorCode;
     }
@@ -62,16 +58,16 @@ public class TwoFactorService {
      * Valida um código 2FA
      */
     @Transactional
-    public boolean validateCode(User user, String code, String purpose) {
-        log.info("🔍 Validando código 2FA para usuário: {} - Código: {} - Propósito: {}", 
-                user.getUsername(), code, purpose);
+    public boolean validateCode(User user, String code) {
+        log.info("🔍 Validando código 2FA para usuário: {} - Código: {}", 
+                user.getUsername(), code);
 
-        var twoFactorCode = twoFactorCodeRepository.findByUserAndCodeAndPurposeAndUsedFalseAndExpiryDateAfter(
-                user, code, purpose, LocalDateTime.now());
+        var twoFactorCodeOpt = twoFactorCodeRepository.findValidCode(
+                user.getId(), code, LocalDateTime.now());
 
-        if (twoFactorCode.isPresent()) {
-            TwoFactorCode validCode = twoFactorCode.get();
-            validCode.setUsed(true);
+        if (twoFactorCodeOpt.isPresent()) {
+            TwoFactorCode validCode = twoFactorCodeOpt.get();
+            validCode.markAsUsed();
             twoFactorCodeRepository.save(validCode);
             log.info("✅ Código 2FA válido e marcado como usado");
             return true;
@@ -89,7 +85,9 @@ public class TwoFactorService {
     public void cleanupExpiredCodes() {
         try {
             log.info("🧹 Limpando códigos 2FA expirados");
-            twoFactorCodeRepository.deleteByExpiryDateBefore(LocalDateTime.now());
+            // Deleta códigos expirados há mais de 7 dias
+            LocalDateTime cutoffDate = LocalDateTime.now().minusDays(7);
+            twoFactorCodeRepository.deleteExpiredCodes(cutoffDate);
             log.info("✅ Limpeza de códigos 2FA concluída");
         } catch (Exception e) {
             log.error("💥 Erro ao limpar códigos 2FA expirados: {}", e.getMessage(), e);

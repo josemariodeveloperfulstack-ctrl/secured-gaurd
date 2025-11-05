@@ -76,6 +76,7 @@ public class Equipment {
     private LocalDate validityDate;
     
     @Column(name = "is_dangerous", nullable = false)
+    @Builder.Default
     private Boolean isDangerous = false;
     
     @Column(columnDefinition = "TEXT")

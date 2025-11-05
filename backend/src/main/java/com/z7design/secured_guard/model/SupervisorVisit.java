@@ -60,16 +60,19 @@ public class SupervisorVisit {
     @ElementCollection
     @CollectionTable(name = "supervisor_visit_employees", joinColumns = @JoinColumn(name = "visit_id"))
     @Column(name = "employee_id")
+    @Builder.Default
     private List<UUID> presentEmployees = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "supervisor_visit_files", joinColumns = @JoinColumn(name = "visit_id"))
     @Column(name = "file_path")
+    @Builder.Default
     private List<String> attachedFiles = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "supervisor_visit_photos", joinColumns = @JoinColumn(name = "visit_id"))
     @Column(name = "photo_path")
+    @Builder.Default
     private List<String> photos = new ArrayList<>();
 
     // Geolocalização
@@ -87,6 +90,7 @@ public class SupervisorVisit {
     private String qrCodeScanned;
 
     @Column(name = "qr_code_verified")
+    @Builder.Default
     private Boolean qrCodeVerified = false;
 
     @CreationTimestamp
