@@ -183,6 +183,117 @@ public class SectorOrganizationController {
     }
 
     /**
+     * Download individual de PDF
+     * GET /api/sector-organization/download/{sector}/{period}/{fileName}
+     */
+    @GetMapping("/download/{sector}/{period}/{fileName}")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadDocument(
+            @PathVariable String sector,
+            @PathVariable String period,
+            @PathVariable String fileName) {
+        try {
+            log.info("📥 Download solicitado: Setor={}, Período={}, Arquivo={}", sector, period, fileName);
+            
+            org.springframework.core.io.Resource resource = sectorOrganizationService.downloadDocument(sector, period, fileName);
+            
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + fileName + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
+                    .body(resource);
+                    
+        } catch (Exception e) {
+            log.error("❌ Erro ao baixar documento: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    /**
+     * Download em massa (ZIP) por setor e período
+     * GET /api/sector-organization/download-zip/{sector}/{period}
+     */
+    @GetMapping("/download-zip/{sector}/{period}")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadSectorZip(
+            @PathVariable String sector,
+            @PathVariable String period) {
+        try {
+            log.info("📦 Download ZIP solicitado: Setor={}, Período={}", sector, period);
+            
+            org.springframework.core.io.Resource resource = sectorOrganizationService.createZipForSector(sector, period);
+            
+            String zipFileName = String.format("%s_%s.zip", sector.replaceAll("[^a-zA-Z0-9]", "_"), period);
+            
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + zipFileName + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/zip")
+                    .body(resource);
+                    
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar ZIP: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Enviar documento individual por email
+     * POST /api/sector-organization/send-email
+     */
+    @PostMapping("/send-email")
+    public ResponseEntity<Map<String, Object>> sendEmail(@RequestBody Map<String, Object> request) {
+        try {
+            String filePath = (String) request.get("filePath");
+            String cpf = (String) request.get("cpf");
+            
+            log.info("📧 Solicitação de envio por email: CPF={}, Arquivo={}", cpf, filePath);
+            
+            Map<String, Object> result = sectorOrganizationService.sendDocumentByEmail(filePath, cpf);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar email: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Erro ao enviar email: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Enviar documento individual por WhatsApp
+     * POST /api/sector-organization/send-whatsapp
+     */
+    @PostMapping("/send-whatsapp")
+    public ResponseEntity<Map<String, Object>> sendWhatsApp(@RequestBody Map<String, Object> request) {
+        try {
+            String filePath = (String) request.get("filePath");
+            String cpf = (String) request.get("cpf");
+            
+            log.info("📱 Solicitação de envio por WhatsApp: CPF={}, Arquivo={}", cpf, filePath);
+            
+            Map<String, Object> result = sectorOrganizationService.sendDocumentByWhatsApp(filePath, cpf);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar WhatsApp: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Erro ao enviar WhatsApp: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
      * Endpoint de health check para verificar se o serviço está ativo
      * GET /api/sector-organization/health
      */

@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Send,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Eye
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -364,6 +365,129 @@ const UnificadosPorSetorNovo: React.FC = () => {
     setShowDeleteModal(true);
   };
 
+  // Visualizar PDF
+  const handleViewDocument = (sector: string, period: string, fileName: string) => {
+    const url = `/api/sector-organization/download/${encodeURIComponent(sector)}/${encodeURIComponent(period)}/${encodeURIComponent(fileName)}`;
+    window.open(url, '_blank');
+  };
+
+  // Baixar PDF individual
+  const handleDownloadDocument = async (sector: string, period: string, fileName: string) => {
+    try {
+      const url = `/api/sector-organization/download/${encodeURIComponent(sector)}/${encodeURIComponent(period)}/${encodeURIComponent(fileName)}`;
+      const response = await axios.get(url, { responseType: 'blob' });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+      
+      toast({
+        title: '✅ Sucesso!',
+        description: 'Download iniciado',
+      });
+    } catch (error: any) {
+      console.error('Erro ao baixar:', error);
+      toast({
+        title: '❌ Erro no download',
+        description: error.response?.data?.message || 'Erro ao baixar documento',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Baixar ZIP por setor/período
+  const handleDownloadZip = async (sector: string, period: string) => {
+    try {
+      toast({
+        title: '📦 Preparando ZIP...',
+        description: 'Aguarde enquanto compactamos os documentos',
+      });
+
+      const url = `/api/sector-organization/download-zip/${encodeURIComponent(sector)}/${encodeURIComponent(period)}`;
+      const response = await axios.get(url, { responseType: 'blob' });
+      
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `${sector.replace(/[^a-zA-Z0-9]/g, '_')}_${period}.zip`;
+      link.click();
+      
+      toast({
+        title: '✅ Sucesso!',
+        description: 'Download do ZIP iniciado',
+      });
+    } catch (error: any) {
+      console.error('Erro ao baixar ZIP:', error);
+      toast({
+        title: '❌ Erro no download',
+        description: error.response?.data?.message || 'Erro ao criar ZIP',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Enviar por email
+  const handleSendEmail = async (doc: DocumentData) => {
+    try {
+      const response = await axios.post('/api/sector-organization/send-email', {
+        filePath: doc.filePath,
+        cpf: doc.cpf
+      });
+
+      if (response.data.success) {
+        toast({
+          title: '✅ Email enviado!',
+          description: response.data.message,
+        });
+      } else {
+        toast({
+          title: '⚠️ Aviso',
+          description: response.data.message || 'Não foi possível enviar o email',
+          variant: 'default'
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao enviar email:', error);
+      toast({
+        title: '❌ Erro no envio',
+        description: error.response?.data?.message || 'Erro ao enviar email',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Enviar por WhatsApp
+  const handleSendWhatsApp = async (doc: DocumentData) => {
+    try {
+      const response = await axios.post('/api/sector-organization/send-whatsapp', {
+        filePath: doc.filePath,
+        cpf: doc.cpf
+      });
+
+      if (response.data.success) {
+        toast({
+          title: '✅ WhatsApp enviado!',
+          description: response.data.message,
+        });
+      } else {
+        toast({
+          title: '⚠️ Aviso',
+          description: response.data.message || 'Não foi possível enviar o WhatsApp',
+          variant: 'default'
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao enviar WhatsApp:', error);
+      toast({
+        title: '❌ Erro no envio',
+        description: error.response?.data?.message || 'Erro ao enviar WhatsApp',
+        variant: 'destructive'
+      });
+    }
+  };
+
   // Carregar ao montar componente
   useEffect(() => {
     loadOrganizedDocuments();
@@ -580,7 +704,7 @@ const UnificadosPorSetorNovo: React.FC = () => {
                                   </div>
                                 </div>
                                 
-                                {/* Botões de envio em massa */}
+                                {/* Botões de envio em massa e download ZIP */}
                                 <div className="flex gap-2">
                                   <Button
                                     size="sm"
@@ -601,6 +725,16 @@ const UnificadosPorSetorNovo: React.FC = () => {
                                   >
                                     <MessageSquare className="w-3 h-3" />
                                     Enviar Todos (WhatsApp)
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex items-center gap-1 border-purple-700/50 hover:bg-purple-900/30"
+                                    onClick={() => handleDownloadZip(sector.name, period.period)}
+                                    title="Baixar todos os documentos em ZIP"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    Baixar ZIP
                                   </Button>
                                 </div>
                               </div>
@@ -625,43 +759,61 @@ const UnificadosPorSetorNovo: React.FC = () => {
                                         </div>
                                       </div>
                                       
-                                      <div className="flex gap-2">
+                                      {/* Botões de Ação */}
+                                      <div className="flex items-center gap-2">
+                                        {/* Visualizar */}
                                         <Button
                                           size="sm"
-                                          variant="outline"
-                                          className="flex items-center gap-1 border-blue-700/50 hover:bg-blue-900/30"
-                                          onClick={() => handleSendIndividual(doc, 'email')}
-                                          disabled={sendingIndividual === `${doc.cpf}_email`}
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0"
+                                          title="Visualizar PDF"
+                                          onClick={() => handleViewDocument(sector.name, period.period, doc.filePath.split('/').pop() || '')}
                                         >
-                                          <Mail className="w-3 h-3" />
-                                          Email
+                                          <Eye className="w-4 h-4 text-blue-400" />
                                         </Button>
+
+                                        {/* Baixar */}
                                         <Button
                                           size="sm"
-                                          variant="outline"
-                                          className="flex items-center gap-1 border-green-700/50 hover:bg-green-900/30"
-                                          onClick={() => handleSendIndividual(doc, 'whatsapp')}
-                                          disabled={sendingIndividual === `${doc.cpf}_whatsapp`}
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0"
+                                          title="Baixar PDF"
+                                          onClick={() => handleDownloadDocument(sector.name, period.period, doc.filePath.split('/').pop() || '')}
                                         >
-                                          <MessageSquare className="w-3 h-3" />
-                                          WhatsApp
+                                          <Download className="w-4 h-4 text-green-400" />
                                         </Button>
+
+                                        {/* Email */}
                                         <Button
                                           size="sm"
-                                          variant="outline"
-                                          className="flex items-center gap-1 border-gray-700/50 hover:bg-gray-700/30"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0"
+                                          title="Enviar por Email"
+                                          onClick={() => handleSendEmail(doc)}
                                         >
-                                          <Download className="w-3 h-3" />
-                                          Baixar
+                                          <Mail className="w-4 h-4 text-purple-400" />
                                         </Button>
-                                        {/* Botão Deletar Individual */}
+
+                                        {/* WhatsApp */}
                                         <Button
                                           size="sm"
-                                          variant="outline"
-                                          className="flex items-center gap-1 border-red-700/50 hover:bg-red-900/30 text-red-400"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0"
+                                          title="Enviar por WhatsApp"
+                                          onClick={() => handleSendWhatsApp(doc)}
+                                        >
+                                          <MessageSquare className="w-4 h-4 text-green-500" />
+                                        </Button>
+
+                                        {/* Deletar */}
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0"
+                                          title="Deletar documento"
                                           onClick={() => handleDeleteIndividual(doc)}
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Trash2 className="w-4 h-4 text-red-400" />
                                         </Button>
                                       </div>
                                     </div>

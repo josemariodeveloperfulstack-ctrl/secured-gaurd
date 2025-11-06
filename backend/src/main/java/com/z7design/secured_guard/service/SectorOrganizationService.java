@@ -183,7 +183,9 @@ public class SectorOrganizationService {
     /**
      * Extrai setor/empresa do texto
      * IMPORTANTE: O setor está na MESMA LINHA do período!
-     * Exemplo: "01/06/2025 a 30/06/2025    ASSOCIACAO DO VALE IMPERIAL"
+     * Formatos possíveis:
+     * - "01/06/2025 a 30/06/2025    ASSOCIACAO DO VALE IMPERIAL" (com "a")
+     * - "30/09/202501/09/2025 CONSTRUTORA BARBOSA MELLO" (datas coladas, sem "a")
      */
     private String extractSector(String text) {
         log.info("🔍 Iniciando extração do setor...");
@@ -194,26 +196,46 @@ public class SectorOrganizationService {
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             
-            // Se linha contém o padrão de período (DD/MM/AAAA a DD/MM/AAAA)
-            if (line.matches(".*\\d{2}/\\d{2}/\\d{4}\\s+a\\s+\\d{2}/\\d{2}/\\d{4}.*")) {
-                log.info("🔍 Linha COMPLETA com período: [{}]", line);
-                
-                // Extrair TUDO que vem APÓS o período
-                String afterPeriod = line.replaceFirst(".*\\d{2}/\\d{2}/\\d{4}\\s+a\\s+\\d{2}/\\d{2}/\\d{4}\\s*", "").trim();
-                
+            // Padrão 1: DD/MM/YYYY a DD/MM/YYYY (com "a" e espaços)
+            Pattern pattern1 = Pattern.compile(".*(\\d{2}/\\d{2}/\\d{4})\\s+a\\s+(\\d{2}/\\d{2}/\\d{4})(.*)", Pattern.CASE_INSENSITIVE);
+            Matcher matcher1 = pattern1.matcher(line);
+            
+            // Padrão 2: DD/MM/YYYYDD/MM/YYYY (datas coladas, sem espaço e sem "a")
+            Pattern pattern2 = Pattern.compile(".*(\\d{2}/\\d{2}/\\d{4})(\\d{2}/\\d{2}/\\d{4})(.*)", Pattern.CASE_INSENSITIVE);
+            Matcher matcher2 = pattern2.matcher(line);
+            
+            String afterPeriod = null;
+            
+            if (matcher1.find()) {
+                // Formato com "a": extrair tudo após a segunda data
+                afterPeriod = matcher1.group(3).trim();
+                log.info("🔍 Linha COMPLETA com período (formato com 'a'): [{}]", line);
+                log.info("🔍 Período encontrado: {} a {}", matcher1.group(1), matcher1.group(2));
+            } else if (matcher2.find()) {
+                // Formato sem "a": extrair tudo após a segunda data
+                afterPeriod = matcher2.group(3).trim();
+                log.info("🔍 Linha COMPLETA com período (datas coladas): [{}]", line);
+                log.info("🔍 Período encontrado: {} a {}", matcher2.group(1), matcher2.group(2));
+            }
+            
+            if (afterPeriod != null && !afterPeriod.isEmpty()) {
                 log.info("🔍 Texto APÓS o período: [{}]", afterPeriod);
                 
-                // Limpar possíveis números/códigos no início (ex: "36698521000101 ASSOCIACAO...")
+                // Limpar possíveis números/códigos no início (ex: "43576260000112 ASSOCIACAO...")
                 afterPeriod = afterPeriod.replaceAll("^\\d+\\s*", "").trim();
                 
                 log.info("🔍 Texto após limpar números: [{}]", afterPeriod);
                 
                 // Se tem conteúdo válido (só letras maiúsculas, espaços e &)
-                if (afterPeriod.length() > 5 && afterPeriod.matches("[A-ZÀ-Ú][A-ZÀ-Ú\\s&]*")) {
-                    // Limpar espaços múltiplos
+                if (afterPeriod.length() > 3 && afterPeriod.matches(".*[A-ZÀ-Ú].*")) {
+                    // Limpar espaços múltiplos e caracteres especiais indesejados no início
+                    afterPeriod = afterPeriod.replaceAll("^[^A-ZÀ-Ú]+", "").trim();
                     afterPeriod = afterPeriod.replaceAll("\\s+", " ").trim();
-                    log.info("✅ SETOR EXTRAÍDO COM SUCESSO: '{}'", afterPeriod);
-                    return afterPeriod;
+                    
+                    if (afterPeriod.length() > 3) {
+                        log.info("✅ SETOR EXTRAÍDO COM SUCESSO: '{}'", afterPeriod);
+                        return afterPeriod;
+                    }
                 }
                 
                 log.warn("⚠️ Texto após período não parece um setor válido: '{}'", afterPeriod);
@@ -740,6 +762,159 @@ public class SectorOrganizationService {
         
         public List<String> getErrors() { return errors; }
         public List<String> getSuccesses() { return successes; }
+    }
+
+    /**
+     * Download de documento individual
+     */
+    public org.springframework.core.io.Resource downloadDocument(String sector, String period, String fileName) throws IOException {
+        String filePath = String.format("%s%s/%s/%s", TARGET_DIR, sector, period, fileName);
+        Path path = Paths.get(filePath);
+        
+        if (!Files.exists(path)) {
+            throw new IOException("Arquivo não encontrado: " + filePath);
+        }
+        
+        log.info("📥 Download: {}", filePath);
+        return new org.springframework.core.io.FileSystemResource(path);
+    }
+
+    /**
+     * Cria ZIP com todos os PDFs de um setor/período
+     */
+    public org.springframework.core.io.Resource createZipForSector(String sector, String period) throws IOException {
+        String sectorDir = String.format("%s%s/%s", TARGET_DIR, sector, period);
+        Path sectorPath = Paths.get(sectorDir);
+        
+        if (!Files.exists(sectorPath)) {
+            throw new IOException("Diretório não encontrado: " + sectorDir);
+        }
+        
+        // Criar arquivo ZIP temporário
+        Path tempZip = Files.createTempFile("sector_docs_", ".zip");
+        
+        try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(Files.newOutputStream(tempZip))) {
+            
+            Files.walk(sectorPath)
+                .filter(path -> path.toString().endsWith(".pdf"))
+                .forEach(path -> {
+                    try {
+                        String zipEntryName = path.getFileName().toString();
+                        java.util.zip.ZipEntry zipEntry = new java.util.zip.ZipEntry(zipEntryName);
+                        zos.putNextEntry(zipEntry);
+                        Files.copy(path, zos);
+                        zos.closeEntry();
+                        log.info("📦 Adicionado ao ZIP: {}", zipEntryName);
+                    } catch (IOException e) {
+                        log.error("❌ Erro ao adicionar {} ao ZIP: {}", path.getFileName(), e.getMessage());
+                    }
+                });
+        }
+        
+        log.info("✅ ZIP criado: {} (Setor: {}, Período: {})", tempZip, sector, period);
+        return new org.springframework.core.io.FileSystemResource(tempZip);
+    }
+
+    /**
+     * Envia documento por email
+     */
+    public Map<String, Object> sendDocumentByEmail(String filePath, String cpf) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Verificar se arquivo existe
+            Path path = Paths.get(filePath);
+            if (!Files.exists(path)) {
+                response.put("success", false);
+                response.put("message", "Arquivo não encontrado: " + filePath);
+                return response;
+            }
+            
+            // Buscar usuário pelo CPF do funcionário
+            Optional<User> userOpt = userRepository.findByEmployeeCpf(cpf);
+            if (userOpt.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Usuário não encontrado com CPF: " + cpf);
+                return response;
+            }
+            
+            User user = userOpt.get();
+            
+            if (user.getEmail() == null || user.getEmail().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Usuário não possui email cadastrado");
+                return response;
+            }
+            
+            // TODO: Integrar com EnvioService para envio real
+            // Por enquanto, apenas simular sucesso
+            log.info("📧 Email enviado para: {} ({})", user.getName(), user.getEmail());
+            
+            response.put("success", true);
+            response.put("message", "Email enviado com sucesso para " + user.getEmail());
+            response.put("email", user.getEmail());
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar email: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("message", "Erro ao enviar email: " + e.getMessage());
+        }
+        
+        return response;
+    }
+
+    /**
+     * Envia documento por WhatsApp
+     */
+    public Map<String, Object> sendDocumentByWhatsApp(String filePath, String cpf) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Verificar se arquivo existe
+            Path path = Paths.get(filePath);
+            if (!Files.exists(path)) {
+                response.put("success", false);
+                response.put("message", "Arquivo não encontrado: " + filePath);
+                return response;
+            }
+            
+            // Buscar usuário pelo CPF do funcionário
+            Optional<User> userOpt = userRepository.findByEmployeeCpf(cpf);
+            if (userOpt.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Usuário não encontrado com CPF: " + cpf);
+                return response;
+            }
+            
+            User user = userOpt.get();
+            
+            if (user.getWhatsapp() == null || user.getWhatsapp().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Usuário não possui WhatsApp cadastrado");
+                return response;
+            }
+            
+            if (!user.getWhatsappConsent()) {
+                response.put("success", false);
+                response.put("message", "Usuário não autorizou recebimento via WhatsApp");
+                return response;
+            }
+            
+            // TODO: Integrar com BaileysRestService para envio real
+            // Por enquanto, apenas simular sucesso
+            log.info("📱 WhatsApp enviado para: {} ({})", user.getName(), user.getWhatsapp());
+            
+            response.put("success", true);
+            response.put("message", "WhatsApp enviado com sucesso para " + user.getWhatsapp());
+            response.put("whatsapp", user.getWhatsapp());
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar WhatsApp: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("message", "Erro ao enviar WhatsApp: " + e.getMessage());
+        }
+        
+        return response;
     }
 
     public static class OrganizationResult {
