@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from '../lib/axios';
 import { useToast } from '@/hooks/use-toast';
 import { ContactValidationModal } from '@/components/contact-validation/ContactValidationModal';
+import { DocumentSendValidationModal } from '@/components/DocumentSendValidationModal';
 import { employeeService } from '@/services/employeeService';
 import { useAuth } from '../contexts/AuthContext';
 import { getApiUrl } from '../config/environment';
@@ -107,6 +108,12 @@ const DocumentosUnificados: React.FC = () => {
     const [showValidationModal, setShowValidationModal] = useState(false);
     const [validationSendType, setValidationSendType] = useState<'email' | 'whatsapp' | 'both'>('whatsapp');
     const [resolvedEmployeeIds, setResolvedEmployeeIds] = useState<string[]>([]);
+    
+    // Estados para validação de envio individual
+    const [showSendValidationModal, setShowSendValidationModal] = useState(false);
+    const [sendValidationResult, setSendValidationResult] = useState<any>(null);
+    const [pendingSendDocument, setPendingSendDocument] = useState<UnifiedDocument | null>(null);
+    const [pendingSendType, setPendingSendType] = useState<'email' | 'whatsapp'>('whatsapp');
 
     const { toast } = useToast();
 
@@ -292,14 +299,91 @@ const DocumentosUnificados: React.FC = () => {
     };
 
     const handleSendEmail = async (document: UnifiedDocument) => {
-        setEmailForm({
-            toEmail: '',
-            employeeName: document.employeeName,
-            month: document.month,
-            year: document.year,
-            filePath: document.filePath
-        });
-        setShowEmailDialog(true);
+        setLoading(true);
+        try {
+            // Extrair CPF do nome do arquivo
+            const cpfMatch = document.fileName?.match(/(\d{11})/);
+            const cpf = cpfMatch ? cpfMatch[1] : null;
+
+            if (!cpf) {
+                toast({
+                    title: '❌ CPF não encontrado',
+                    description: 'Não foi possível identificar o CPF no documento. O arquivo deve conter o CPF no nome.',
+                    variant: 'destructive',
+                });
+                setLoading(false);
+                return;
+            }
+
+            console.log('🔍 Validando usuário antes de enviar email...');
+            console.log('📄 CPF extraído:', cpf);
+            console.log('👤 Nome no arquivo:', document.employeeName);
+
+            // VALIDAR usuário antes de enviar
+            const validationResponse = await axios.get(`/api/user-validation/validate-by-cpf/${cpf}`);
+            const validation = validationResponse.data;
+
+            console.log('✅ Resultado da validação:', validation);
+
+            // Verificar se nome confere
+            const nameMatches = compareNames(document.employeeName, validation.name);
+            
+            if (!validation.valid || !validation.exists || !nameMatches || !validation.canSendEmail) {
+                // Mostrar modal de validação com erro
+                setPendingSendDocument(document);
+                setPendingSendType('email');
+                setSendValidationResult(validation);
+                setShowSendValidationModal(true);
+                setLoading(false);
+                return;
+            }
+
+            // ✅ Validação OK - Enviar email
+            console.log('✅ Validação OK - Enviando email para CPF:', cpf);
+
+            const response = await axios.post('/api/envio/individual', {
+                tipo: 'email',
+                cpf: cpf,
+                assunto: `Documento Unificado - ${document.month}/${document.year}`,
+                mensagem: `Olá! Seu documento unificado (holerite + comprovante) de ${document.month}/${document.year} está anexo. Em caso de dúvidas, entre em contato com o RH.`
+            });
+
+            if (response.data.sucesso) {
+                toast({
+                    title: '✅ Email enviado',
+                    description: `Documento enviado com sucesso para ${document.employeeName}`,
+                });
+            } else {
+                toast({
+                    title: '❌ Erro no envio',
+                    description: response.data.mensagem || 'Falha ao enviar email',
+                    variant: 'destructive',
+                });
+            }
+        } catch (err: any) {
+            console.error('❌ Erro ao enviar email:', err);
+            toast({
+                title: '❌ Erro',
+                description: err.response?.data?.mensagem || 'Erro ao enviar email',
+                variant: 'destructive',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    // Função auxiliar para comparar nomes (ignorando maiúsculas e acentos)
+    const compareNames = (name1: string, name2: string): boolean => {
+        if (!name1 || !name2) return false;
+        
+        const normalize = (str: string) => str
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')  // Remove acentos
+            .replace(/[^A-Z0-9]/g, '')         // Remove caracteres especiais
+            .trim();
+        
+        return normalize(name1) === normalize(name2);
     };
 
     const sendEmail = async () => {
@@ -332,13 +416,77 @@ const DocumentosUnificados: React.FC = () => {
     };
 
     const handleSendWhatsApp = async (document: UnifiedDocument) => {
-        setWhatsappForm({
-            phoneNumber: '',
-            employeeName: document.employeeName,
-            month: document.month,
-            year: document.year
-        });
-        setShowWhatsappDialog(true);
+        setLoading(true);
+        try {
+            // Extrair CPF do nome do arquivo
+            const cpfMatch = document.fileName?.match(/(\d{11})/);
+            const cpf = cpfMatch ? cpfMatch[1] : null;
+
+            if (!cpf) {
+                toast({
+                    title: '❌ CPF não encontrado',
+                    description: 'Não foi possível identificar o CPF no documento. O arquivo deve conter o CPF no nome.',
+                    variant: 'destructive',
+                });
+                setLoading(false);
+                return;
+            }
+
+            console.log('🔍 Validando usuário antes de enviar WhatsApp...');
+            console.log('📄 CPF extraído:', cpf);
+            console.log('👤 Nome no arquivo:', document.employeeName);
+
+            // VALIDAR usuário antes de enviar
+            const validationResponse = await axios.get(`/api/user-validation/validate-by-cpf/${cpf}`);
+            const validation = validationResponse.data;
+
+            console.log('✅ Resultado da validação:', validation);
+
+            // Verificar se nome confere
+            const nameMatches = compareNames(document.employeeName, validation.name);
+            
+            if (!validation.valid || !validation.exists || !nameMatches || !validation.canSendWhatsApp) {
+                // Mostrar modal de validação com erro
+                setPendingSendDocument(document);
+                setPendingSendType('whatsapp');
+                setSendValidationResult(validation);
+                setShowSendValidationModal(true);
+                setLoading(false);
+                return;
+            }
+
+            // ✅ Validação OK - Enviar WhatsApp
+            console.log('✅ Validação OK - Enviando WhatsApp para CPF:', cpf);
+
+            const response = await axios.post('/api/envio/individual', {
+                tipo: 'whatsapp',
+                cpf: cpf,
+                mensagem: `Olá! Seu documento unificado (holerite + comprovante) de ${document.month}/${document.year} está disponível. Em caso de dúvidas, entre em contato com o RH.`
+            });
+
+            if (response.data.sucesso) {
+                toast({
+                    title: '✅ WhatsApp enviado',
+                    description: `Documento enviado com sucesso para ${document.employeeName}`,
+                });
+            } else {
+                const mensagemErro = response.data.mensagem || '';
+                toast({
+                    title: '❌ Erro no envio',
+                    description: mensagemErro || 'Falha ao enviar WhatsApp',
+                    variant: 'destructive',
+                });
+            }
+        } catch (err: any) {
+            console.error('❌ Erro ao enviar WhatsApp:', err);
+            toast({
+                title: '❌ Erro',
+                description: err.response?.data?.mensagem || 'Erro ao enviar WhatsApp',
+                variant: 'destructive',
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const generateWhatsAppLink = async () => {
@@ -1355,6 +1503,30 @@ const DocumentosUnificados: React.FC = () => {
                 documentType="unificado"
                 onValidated={handleValidated}
             />
+
+            {/* MODAL: Validação de Envio Individual */}
+            {sendValidationResult && pendingSendDocument && (
+                <DocumentSendValidationModal
+                    isOpen={showSendValidationModal}
+                    onClose={() => {
+                        setShowSendValidationModal(false);
+                        setSendValidationResult(null);
+                        setPendingSendDocument(null);
+                    }}
+                    validation={sendValidationResult}
+                    documentName={pendingSendDocument.fileName}
+                    sendType={pendingSendType}
+                    expectedName={pendingSendDocument.employeeName}
+                    onRegisterContacts={() => {
+                        // Abrir modal de cadastro de contatos (implementar se necessário)
+                        setShowSendValidationModal(false);
+                        toast({
+                            title: 'ℹ️ Cadastro de Contatos',
+                            description: 'Funcionalidade em desenvolvimento. Por favor, cadastre via menu Usuários.',
+                        });
+                    }}
+                />
+            )}
 
             {/* MODAL CUSTOMIZADO: Exclusão em Lote */}
             {showBatchDeleteModal && (

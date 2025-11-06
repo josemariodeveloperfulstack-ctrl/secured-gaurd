@@ -546,8 +546,8 @@ public class ReceiptProcessingService {
                             data.year = Integer.parseInt(transferMatcher2.group(3));  // AAAA
                             log.info("✅ Período de referência extraído da data de transferência (formato com pontos): {}/{}", data.month, data.year);
                         } else {
-                            // Padrão 3c: "Transferência realizada em DD/MM/AAAA" (formato com barras)
-                            Pattern transferPattern3 = Pattern.compile("Transferência\\s+realizada\\s+em\\s+(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                            // Padrão 3c: "Transferência efetuada/realizada em DD/MM/AAAA" (formato com barras)
+                            Pattern transferPattern3 = Pattern.compile("Transferência\\s+(?:efetuada|realizada)\\s+em\\s+(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
                             Matcher transferMatcher3 = transferPattern3.matcher(text);
                             if (transferMatcher3.find()) {
                                 data.month = Integer.parseInt(transferMatcher3.group(2)); // MM
@@ -571,11 +571,16 @@ public class ReceiptProcessingService {
                                     }
                                 }
                                 
-                                // Se ainda não encontrou, usar data atual como fallback
+                                // Se ainda não encontrou, BLOQUEAR (não usar fallback!)
                                 if (data.month == 0 || data.year == 0) {
-                                    data.month = LocalDateTime.now().getMonthValue();
-                                    data.year = LocalDateTime.now().getYear();
-                                    log.warn("⚠️ Período de referência não encontrado, usando data atual: {}/{}", data.month, data.year);
+                                    log.error("❌ CRÍTICO: Período de referência NÃO encontrado no comprovante!");
+                                    log.error("❌ Não é possível processar sem data correta.");
+                                    log.error("⚠️ Verifique se o comprovante contém:");
+                                    log.error("   - 'Transferência efetuada em DD/MM/AAAA'");
+                                    log.error("   - 'Transferência realizada em DD.MM.AAAA'");
+                                    log.error("   - 'PERÍODO: MM/AAAA' ou 'COMPETÊNCIA: MM/AAAA'");
+                                    log.error("📄 Texto do PDF: {}", text.substring(0, Math.min(500, text.length())));
+                                    return null; // ← BLOQUEAR upload se não encontrar data
                                 }
                             }
                         }

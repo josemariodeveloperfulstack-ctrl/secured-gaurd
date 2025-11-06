@@ -43,7 +43,9 @@ import {
   Target,
   Package,
   ShoppingCart,
-  CheckCircle
+  CheckCircle,
+  FolderTree,
+  Files
 } from 'lucide-react';
 import {
   Sidebar,
@@ -282,6 +284,20 @@ export function DynamicSidebar() {
       text: 'Holerites',
       to: '/holerites',
       id: 'holerites',
+      requiredPermission: 'PAYSLIPS_READ'
+    },
+    {
+      icon: Files,
+      text: 'Documentos Unificados',
+      to: '/documentos-unificados',
+      id: 'documentos-unificados',
+      requiredPermission: 'PAYSLIPS_READ'
+    },
+    {
+      icon: FolderTree,
+      text: 'Unificados por Setor',
+      to: '/unificados-por-setor',
+      id: 'unificados-por-setor',
       requiredPermission: 'PAYSLIPS_READ'
     },
     {
@@ -580,7 +596,7 @@ export function DynamicSidebar() {
         ['frota'].includes(item.id)
       ),
       holerites: filteredItems.filter(item =>
-        ['holerites', 'payrolls'].includes(item.id)
+        ['holerites', 'documentos-unificados', 'unificados-por-setor', 'payrolls'].includes(item.id)
       ),
       mensagens: filteredItems.filter(item =>
         ['mensagens', 'chat-interno', 'gestao-mensagens', 'gestao-mensagens-internas', 'gestao-mensagens-internas-enviar', 'gestao-mensagens-internas-notificacoes', 'gestao-mensagens-internas-grupos'].includes(item.id)

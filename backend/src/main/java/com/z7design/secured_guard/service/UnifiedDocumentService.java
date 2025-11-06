@@ -1605,9 +1605,28 @@ public class UnifiedDocumentService {
             Files.createDirectories(unifiedDir);
         }
         
-        // Nome do arquivo unificado
+        // Extrair CPF do nome do arquivo do holerite
+        String cpf = "";
+        String holeriteFileName = Paths.get(holeritePath).getFileName().toString();
+        java.util.regex.Pattern cpfPattern = java.util.regex.Pattern.compile("(\\d{11})");
+        java.util.regex.Matcher cpfMatcher = cpfPattern.matcher(holeriteFileName);
+        if (cpfMatcher.find()) {
+            cpf = cpfMatcher.group(1);
+            log.info("✅ CPF extraído do holerite: {}", cpf);
+        } else {
+            log.warn("⚠️ CPF não encontrado no nome do holerite: {}", holeriteFileName);
+        }
+        
+        // Nome do arquivo unificado COM CPF
         String cleanName = employeeName.replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "").replaceAll("\\s+", "_");
-        String fileName = String.format("UNIFICADO_%s_%d_%d.pdf", cleanName.toUpperCase(), month, year);
+        String fileName;
+        if (!cpf.isEmpty()) {
+            fileName = String.format("UNIFICADO_%s_%s_%d_%d.pdf", cleanName.toUpperCase(), cpf, month, year);
+            log.info("📄 Nome do arquivo unificado COM CPF: {}", fileName);
+        } else {
+            fileName = String.format("UNIFICADO_%s_%d_%d.pdf", cleanName.toUpperCase(), month, year);
+            log.warn("⚠️ Nome do arquivo unificado SEM CPF: {}", fileName);
+        }
         String outputPath = unifiedDir.resolve(fileName).toString();
         
         log.info("🔄 Criando PDF unificado: {}", outputPath);

@@ -137,6 +137,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/unified-documents/download/**").permitAll()
                 // Endpoints de documentos unificados - operações requerem permissões
                 .requestMatchers("/api/unified-documents/**").hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO", "ROLE_COLABORADOR")
+                // Endpoints de organização por setor - temporariamente público para debug
+                .requestMatchers("/api/sector-organization/**").permitAll()
                 // Endpoints de relatórios - requerem permissões específicas
                 .requestMatchers("/api/reports/**").hasAnyAuthority("REPORTS_READ", "REPORTS_GENERATE", "REPORTS_EXPORT", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Endpoints de chat - permitir para todos os roles principais

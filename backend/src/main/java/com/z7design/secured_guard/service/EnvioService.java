@@ -13,7 +13,6 @@ import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -291,15 +290,26 @@ public class EnvioService {
                 log.info("✅ Encontrados {} users com email", cpfsParaEnvio.size());
                 
             } else if ("whatsapp".equals(request.getTipo())) {
-                // Para WhatsApp, buscar APENAS na tabela USERS
-                log.info("📱 Buscando users com WHATSAPP cadastrado...");
+                // Para WhatsApp, buscar APENAS na tabela USERS com CONSENTIMENTO
+                log.info("📱 Buscando users com WHATSAPP cadastrado E CONSENTIMENTO ativo...");
                 List<User> usersComWhatsApp = userRepository.findAll().stream()
                     .filter(user -> user.getWhatsapp() != null && !user.getWhatsapp().trim().isEmpty())
+                    .filter(user -> user.getWhatsappConsent() != null && user.getWhatsappConsent())
                     .toList();
                 cpfsParaEnvio = usersComWhatsApp.stream()
                     .map(User::getUsername)  // username = CPF
                     .toList();
-                log.info("✅ Encontrados {} users com WhatsApp", cpfsParaEnvio.size());
+                log.info("✅ Encontrados {} users com WhatsApp E consentimento ativo", cpfsParaEnvio.size());
+                
+                // Contar usuários sem consentimento para relatório
+                long semConsentimento = userRepository.findAll().stream()
+                    .filter(user -> user.getWhatsapp() != null && !user.getWhatsapp().trim().isEmpty())
+                    .filter(user -> user.getWhatsappConsent() == null || !user.getWhatsappConsent())
+                    .count();
+                if (semConsentimento > 0) {
+                    log.warn("⚠️ {} funcionários com WhatsApp cadastrado NÃO autorizaram receber mensagens (sem consentimento)", 
+                            semConsentimento);
+                }
                 
             } else {
                 response.setMensagem("Tipo de envio inválido");
@@ -421,8 +431,20 @@ public class EnvioService {
                     return detalhe;
                 }
                 
+                // 🔒 VALIDAÇÃO DE CONSENTIMENTO (Meta/WhatsApp Policy + LGPD)
+                if (user.getWhatsappConsent() == null || !user.getWhatsappConsent()) {
+                    String erroConsent = "Funcionário não autorizou recebimento de mensagens via WhatsApp. " +
+                            "É necessário obter consentimento explícito antes do envio (Meta Policy + LGPD).";
+                    detalhe.setErro(erroConsent);
+                    registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, erroConsent);
+                    log.warn("⚠️ CONSENTIMENTO WHATSAPP AUSENTE para {} (CPF: {}). Envio bloqueado.", 
+                            employee.getName(), cpf);
+                    return detalhe;
+                }
+                
                 log.info("✅ WhatsApp encontrado para {} (CPF: {}): {}", 
                         employee.getName(), cpf, whatsappNumber);
+                log.info("✅ Consentimento WhatsApp confirmado em: {}", user.getWhatsappConsentDate());
                 
                 // Atualizar o telefone no detalhe para mostrar o número do WhatsApp
                 detalhe.setTelefone(whatsappNumber);

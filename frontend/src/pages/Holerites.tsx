@@ -43,6 +43,7 @@ import HoleriteDeleteDialog from '@/components/holerites/HoleriteDeleteDialog';
 import AdvancedFilters from '@/components/holerites/AdvancedFilters';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import UnificadosPorSetor from './UnificadosPorSetor';
 import { payslipService } from '@/services/payslipService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -433,6 +434,10 @@ const Holerites: React.FC = () => {
         setBatchUnificationResult(response.data);
         setShowBatchUnificationModal(false);
         setShowBatchResultModal(true);
+        
+        // ✅ RECARREGAR lista de documentos unificados
+        console.log('🔄 Recarregando lista de documentos unificados após unificação em massa...');
+        await fetchUnifiedDocuments(true);
         
         toast({
           title: "✅ Unificação concluída",
@@ -3144,7 +3149,7 @@ const Holerites: React.FC = () => {
 
         {/* Tabs - COPIADO DO PADRÃO SST (que funciona bem!) */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-seguranca-graphite border-gray-600">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-seguranca-graphite border-gray-600">
             <TabsTrigger value="processados" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Holerites
             </TabsTrigger>
@@ -3156,6 +3161,9 @@ const Holerites: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="unificacao-individual" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Unificação
+            </TabsTrigger>
+            <TabsTrigger value="unificados-por-setor" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Por Setor
             </TabsTrigger>
           </TabsList>
             
@@ -4828,6 +4836,11 @@ const Holerites: React.FC = () => {
             </Card>
           </TabsContent>
 
+          {/* Nova Aba: Unificados por Setor */}
+          <TabsContent value="unificados-por-setor" className="space-y-6 mt-6">
+            <UnificadosPorSetor />
+          </TabsContent>
+
         </Tabs>
 
         {/* Modais */}
@@ -5365,7 +5378,7 @@ const Holerites: React.FC = () => {
                 Cancelar
               </Button>
               <Button 
-                onClick={handleDeleteDocuments}
+                onClick={executeDeleteDocuments}
                 disabled={deletingDocuments}
                 className="bg-red-600 hover:bg-red-700"
               >

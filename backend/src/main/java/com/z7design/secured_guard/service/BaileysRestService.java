@@ -26,12 +26,18 @@ public class BaileysRestService {
     @Value("${baileys.rest.instance.key:securedguard}")
     private String instanceKey;
     
+    @Value("${baileys.enabled:false}")
+    private boolean baileysEnabled;
+    
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final com.z7design.secured_guard.config.WhatsAppTestConfig testConfig;
     
-    public BaileysRestService(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public BaileysRestService(RestTemplate restTemplate, ObjectMapper objectMapper,
+                             com.z7design.secured_guard.config.WhatsAppTestConfig testConfig) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.testConfig = testConfig;
     }
     
     /**
@@ -197,6 +203,14 @@ public class BaileysRestService {
      * CORRIGIDO: Adiciona DDI 55 para evitar redirecionamento
      */
     public boolean sendFileMessage(String phoneNumber, String message, String filePath) {
+        // ⚠️ PROTEÇÃO: Verificar limite de envios (modo teste Baileys)
+        if (!testConfig.canSendMessage(phoneNumber)) {
+            logger.error("🚫 Envio bloqueado - Limite de testes atingido");
+            logger.warn("💡 SOLUÇÃO: Migre para WhatsApp Cloud API (oficial)");
+            logger.warn("📄 Guia: MIGRACAO_WHATSAPP_BUSINESS_API_OFICIAL.md");
+            return false;
+        }
+        
         try {
             // Verificar se arquivo existe
             File file = new File(filePath);
@@ -239,6 +253,15 @@ public class BaileysRestService {
             if (response.getStatusCode() == HttpStatus.OK) {
                 logger.info("✅ Arquivo enviado com sucesso via Baileys REST");
                 logger.info("📋 Response: {}", response.getBody());
+                
+                // Incrementar contador (proteção)
+                testConfig.incrementMessageCount();
+                
+                // Avisar sobre migração se próximo do limite
+                if (testConfig.getRemainingMessages() <= 5) {
+                    testConfig.showMigrationWarning();
+                }
+                
                 return true;
             } else {
                 logger.error("❌ Erro ao enviar arquivo. Status: {}", response.getStatusCode());

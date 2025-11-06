@@ -3,7 +3,6 @@ package com.z7design.secured_guard.model;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,7 +22,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -87,6 +85,20 @@ public class User implements UserDetails {
     @Pattern(regexp = "^\\d{9,20}$", message = "O número do WhatsApp deve conter apenas dígitos e ter entre 9 e 20 caracteres")
     @Column(nullable = true, length = 20)
     private String whatsapp;
+    
+    // Consentimento WhatsApp (LGPD + Meta Policy Compliance)
+    @Column(name = "whatsapp_consent", nullable = false)
+    @Builder.Default
+    private Boolean whatsappConsent = false;
+    
+    @Column(name = "whatsapp_consent_date")
+    private LocalDateTime whatsappConsentDate;
+    
+    @Column(name = "whatsapp_consent_ip", length = 45)
+    private String whatsappConsentIp;
+    
+    @Column(name = "whatsapp_consent_user_agent", length = 500)
+    private String whatsappConsentUserAgent;
     
     @ManyToMany(fetch = jakarta.persistence.FetchType.EAGER)
     @JoinTable(
