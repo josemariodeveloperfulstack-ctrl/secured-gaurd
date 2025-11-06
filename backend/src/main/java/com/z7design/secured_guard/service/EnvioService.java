@@ -647,7 +647,11 @@ public class EnvioService {
         if (month != null && year != null) {
             return deliveryLogRepository.findByCpfAndMonthAndYear(cpf, month, year);
         }
-        return deliveryLogRepository.findByCpfAndMonthAndYear(cpf, 0, 0);
+        // Com CPF mas sem month/year: retornar todos os logs daquele CPF, ordenados
+        return deliveryLogRepository.findByCpf(cpf).stream()
+            .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+            .limit(100)
+            .collect(java.util.stream.Collectors.toList());
     }
     
     /**

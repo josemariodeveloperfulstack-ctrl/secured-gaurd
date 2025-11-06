@@ -27,6 +27,10 @@ public enum DocumentType {
     IPVA("IPVA", "Imposto sobre Propriedade de Veículos Automotores"),
     SEGURO("Seguro", "Apólice de Seguro"),
     
+    // Documentos de Pagamento/Financeiros
+    HOLERITE("Holerite", "Holerite/Contracheque de Pagamento"),
+    COMPROVANTE_PAGAMENTO("Comprovante de Pagamento", "Comprovante de Pagamento Bancário"),
+    
     // Outros
     OUTROS("Outros", "Outros Documentos");
 

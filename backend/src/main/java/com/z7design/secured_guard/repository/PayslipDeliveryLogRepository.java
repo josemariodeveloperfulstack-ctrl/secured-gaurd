@@ -10,6 +10,7 @@ import java.util.UUID;
 @Repository
 public interface PayslipDeliveryLogRepository extends JpaRepository<PayslipDeliveryLog, UUID> {
     List<PayslipDeliveryLog> findByCpfAndMonthAndYear(String cpf, Integer month, Integer year);
+    List<PayslipDeliveryLog> findByCpf(String cpf);
 }
 
 
