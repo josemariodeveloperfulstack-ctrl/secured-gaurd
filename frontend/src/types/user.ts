@@ -132,7 +132,19 @@ export interface UserPermissions {
   VISITS_UPDATE: boolean;
   VISITS_DELETE: boolean;
   VISITS_MANAGE: boolean;
-  
+
+  // Permissões de Ponto Eletrônico
+  TIME_RECORD_READ: boolean;
+  TIME_RECORD_CREATE: boolean;
+  TIME_RECORD_UPDATE: boolean;
+  TIME_RECORD_DELETE: boolean;
+  TIME_RECORD_MANAGE: boolean;
+
+  // Permissões de Folha de Pagamento
+  PAYROLL_READ: boolean;
+  PAYROLL_CREATE: boolean;
+  PAYROLL_MANAGE: boolean;
+
   // Permissão de Acesso Total
   ALL_PERMISSIONS: boolean;
 }

@@ -132,6 +132,18 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     VISITS_UPDATE: false,
     VISITS_DELETE: false,
     VISITS_MANAGE: false,
+
+    // Permissões de Ponto Eletrônico
+    TIME_RECORD_READ: false,
+    TIME_RECORD_CREATE: false,
+    TIME_RECORD_UPDATE: false,
+    TIME_RECORD_DELETE: false,
+    TIME_RECORD_MANAGE: false,
+
+    // Permissões de Folha de Pagamento
+    PAYROLL_READ: false,
+    PAYROLL_CREATE: false,
+    PAYROLL_MANAGE: false,
     
     // Permissão de Acesso Total
     ALL_PERMISSIONS: false,
@@ -313,6 +325,17 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
+
+        // Permissões de Ponto Eletrônico
+        TIME_RECORD_READ: true,
+        TIME_RECORD_CREATE: true,
+        TIME_RECORD_UPDATE: true,
+        TIME_RECORD_MANAGE: true,
+
+        // Permissões de Folha de Pagamento
+        PAYROLL_READ: true,
+        PAYROLL_CREATE: true,
+        PAYROLL_MANAGE: true,
         
         // Permissões de Mensagens
         MESSAGES_READ: true,
@@ -514,6 +537,18 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         SUPPORT_READ: true,
         ATTENDANCE_READ: true,
         ATTENDANCE_WRITE: true,
+
+        // Permissões de Ponto Eletrônico
+        TIME_RECORD_READ: true,
+        TIME_RECORD_CREATE: true,
+        TIME_RECORD_UPDATE: true,
+        TIME_RECORD_DELETE: true,
+        TIME_RECORD_MANAGE: true,
+
+        // Permissões de Folha de Pagamento
+        PAYROLL_READ: true,
+        PAYROLL_CREATE: true,
+        PAYROLL_MANAGE: true,
       };
 
     case 'OPERACIONAL':

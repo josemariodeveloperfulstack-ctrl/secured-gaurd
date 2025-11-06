@@ -1,206 +1,216 @@
 package com.z7design.secured_guard.controller;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.UUID;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import com.z7design.secured_guard.model.TimeRecord;
+import com.z7design.secured_guard.service.TimeRecordService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import com.z7design.secured_guard.model.TimeRecord;
-import com.z7design.secured_guard.model.enums.TimeRecordStatus;
-import com.z7design.secured_guard.service.TimeRecordService;
-import com.z7design.secured_guard.dto.ErrorResponse;
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.Parameter;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/time-records")
-@Tag(name = "Registros de Ponto", description = "Endpoints para gestão de registros de ponto de funcionários.")
-@SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
+@Slf4j
 public class TimeRecordController {
 
-    @Autowired
-    private TimeRecordService timeRecordService;
+    private final TimeRecordService timeRecordService;
 
-    @Operation(summary = "Cria um novo registro de ponto",
-               description = "Adiciona um novo registro de ponto ao sistema. Requer o papel de ADMIN, GESTOR ou VIGILANTE (para o próprio registro).")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Registro de ponto criado com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados do registro de ponto para criação",
-            content = @Content(mediaType = "application/json",
-                    schema = @Schema(implementation = TimeRecord.class),
-                    examples = @ExampleObject(value = "{\"employee\":{\"id\":\"UUID_DO_FUNCIONARIO\"}, \"recordDate\":\"2024-07-01\", \"entryTime\":\"08:00:00\", \"exitTime\":\"17:00:00\", \"entryLunchTime\":\"12:00:00\", \"exitLunchTime\":\"13:00:00\", \"status\":\"PENDING\"}")))
-    @PostMapping
-    public ResponseEntity<TimeRecord> create(@RequestBody TimeRecord timeRecord) {
-        return ResponseEntity.ok(timeRecordService.create(timeRecord));
+    @PostMapping("/register")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_CREATE', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> registerTimeRecord(@RequestBody Map<String, Object> request) {
+        try {
+            UUID employeeId = UUID.fromString((String) request.get("employeeId"));
+            TimeRecord.RecordType recordType = TimeRecord.RecordType.valueOf(
+                    (String) request.get("recordType"));
+            String qrCode = (String) request.get("qrCode");
+            String location = (String) request.get("location");
+            Double latitude = request.get("latitude") != null 
+                    ? Double.valueOf(request.get("latitude").toString()) : null;
+            Double longitude = request.get("longitude") != null 
+                    ? Double.valueOf(request.get("longitude").toString()) : null;
+            String ipAddress = (String) request.get("ipAddress");
+            String userAgent = (String) request.get("userAgent");
+
+            TimeRecord record = timeRecordService.registerTimeRecord(
+                    employeeId, recordType, qrCode, location, latitude, longitude, 
+                    ipAddress, userAgent);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Ponto registrado com sucesso",
+                    "data", record
+            ));
+
+        } catch (Exception e) {
+            log.error("Erro ao registrar ponto: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
     }
 
-    @Operation(summary = "Atualiza um registro de ponto existente",
-               description = "Atualiza as informações de um registro de ponto pelo seu ID. Requer o papel de ADMIN ou GESTOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Registro de ponto atualizado com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Registro de ponto não encontrado",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados do registro de ponto para atualização",
-            content = @Content(mediaType = "application/json",
-                    schema = @Schema(implementation = TimeRecord.class),
-                    examples = @ExampleObject(value = "{\"id\":\"a1b2c3d4-e5f6-7890-1234-567890abcdef\", \"exitTime\":\"17:30:00\", \"justification\":\"Reunião estendida.\"}")))
-    @PutMapping("/{id}")
-    public ResponseEntity<TimeRecord> update(@PathVariable UUID id, @RequestBody TimeRecord timeRecord) {
-        return ResponseEntity.ok(timeRecordService.update(id, timeRecord));
+    @GetMapping("/today/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getTodayRecords(@PathVariable UUID employeeId) {
+        try {
+            List<TimeRecord> records = timeRecordService.getTodayRecords(employeeId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", records
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao buscar registros do dia: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
     }
 
-    @Operation(summary = "Aprova um registro de ponto",
-               description = "Altera o status de um registro de ponto para APROVADO. Requer o papel de ADMIN ou GESTOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Registro de ponto aprovado com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida ou transição de status não permitida",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Registro de ponto não encontrado",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @PostMapping("/{id}/approve")
-    public ResponseEntity<TimeRecord> approve(@PathVariable UUID id) {
-        return ResponseEntity.ok(timeRecordService.approve(id));
-    }
-
-    @Operation(summary = "Rejeita um registro de ponto",
-               description = "Altera o status de um registro de ponto para REJEITADO e adiciona uma justificativa. Requer o papel de ADMIN ou GESTOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Registro de ponto rejeitado com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida ou transição de status não permitida",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Registro de ponto não encontrado",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @Parameter(description = "Justificativa para a rejeição do registro de ponto", required = true)
-    @PostMapping("/{id}/reject")
-    public ResponseEntity<TimeRecord> reject(@PathVariable UUID id, @RequestParam String justification) {
-        return ResponseEntity.ok(timeRecordService.reject(id, justification));
-    }
-
-    @Operation(summary = "Ajusta um registro de ponto",
-               description = "Ajusta os horários de entrada, saída e almoço de um registro de ponto e adiciona uma justificativa. Requer o papel de ADMIN ou GESTOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Registro de ponto ajustado com sucesso",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida (horários ou justificativa)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Registro de ponto não encontrado",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @Parameter(description = "ID do registro de ponto a ser ajustado", required = true)
-    @Parameter(description = "Novo horário de entrada (formato HH:MM:SS)", example = "08:15:00", required = true)
-    @Parameter(description = "Novo horário de saída (formato HH:MM:SS)", example = "17:45:00", required = true)
-    @Parameter(description = "Novo horário de entrada de almoço (formato HH:MM:SS, opcional)", example = "12:05:00")
-    @Parameter(description = "Novo horário de saída de almoço (formato HH:MM:SS, opcional)", example = "13:10:00")
-    @Parameter(description = "Justificativa para o ajuste do registro de ponto", required = true)
-    @PostMapping("/{id}/adjust")
-    public ResponseEntity<TimeRecord> adjust(
-            @PathVariable UUID id,
-            @RequestParam LocalTime entryTime,
-            @RequestParam LocalTime exitTime,
-            @RequestParam(required = false) LocalTime entryLunchTime,
-            @RequestParam(required = false) LocalTime exitLunchTime,
-            @RequestParam String justification) {
-        return ResponseEntity.ok(timeRecordService.adjust(id, entryTime, exitTime, entryLunchTime, exitLunchTime, justification));
-    }
-
-    @Operation(summary = "Busca um registro de ponto pelo ID",
-               description = "Retorna as informações de um registro de ponto específico. Requer o papel de ADMIN, GESTOR, SUPERVISOR ou VIGILANTE (se for seu próprio registro).")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Registro de ponto encontrado",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Registro de ponto não encontrado",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @GetMapping("/{id}")
-    public ResponseEntity<TimeRecord> findById(@PathVariable UUID id) {
-        return ResponseEntity.ok(timeRecordService.findById(id));
-    }
-
-    @Operation(summary = "Busca registros de ponto por ID de funcionário",
-               description = "Retorna uma lista de registros de ponto associados a um funcionário específico. Requer o papel de ADMIN, GESTOR, SUPERVISOR ou VIGILANTE (se for o próprio funcionário).")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de registros de ponto do funcionário",
-                    content = @Content(mediaType = "application/json", schema = @Schema(type = "array", implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<TimeRecord>> findByEmployeeId(@PathVariable UUID employeeId) {
-        return ResponseEntity.ok(timeRecordService.findByEmployeeId(employeeId));
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getEmployeeRecords(
+            @PathVariable UUID employeeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<TimeRecord> records = timeRecordService.getRecordsByEmployee(employeeId, pageable);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", records.getContent(),
+                    "totalPages", records.getTotalPages(),
+                    "totalElements", records.getTotalElements(),
+                    "currentPage", records.getNumber()
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao buscar registros do funcionário: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
     }
 
-    @Operation(summary = "Busca registros de ponto por ID de funcionário e período",
-               description = "Retorna uma lista de registros de ponto de um funcionário dentro de um período de datas específico. Requer o papel de ADMIN, GESTOR ou SUPERVISOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de registros de ponto por funcionário e período",
-                    content = @Content(mediaType = "application/json", schema = @Schema(type = "array", implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Requisição inválida (formato de data)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @Parameter(description = "Data de início do período (formato YYYY-MM-DD)", example = "2023-01-01", required = true)
-    @Parameter(description = "Data de fim do período (formato YYYY-MM-DD)", example = "2023-12-31", required = true)
-    @GetMapping("/employee/{employeeId}/period")
-    public ResponseEntity<List<TimeRecord>> findByEmployeeIdAndPeriod(
+    @GetMapping("/period/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getRecordsByPeriod(
             @PathVariable UUID employeeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(timeRecordService.findByEmployeeIdAndRecordDateBetween(employeeId, startDate, endDate));
+        try {
+            List<TimeRecord> records = timeRecordService.getRecordsByPeriod(
+                    employeeId, startDate, endDate);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", records
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao buscar registros por período: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
     }
 
-    @Operation(summary = "Busca registros de ponto por ID de funcionário e status",
-               description = "Retorna uma lista de registros de ponto de um funcionário com um status específico. Requer o papel de ADMIN, GESTOR ou SUPERVISOR.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de registros de ponto por funcionário e status",
-                    content = @Content(mediaType = "application/json", schema = @Schema(type = "array", implementation = TimeRecord.class))),
-            @ApiResponse(responseCode = "400", description = "Status de registro de ponto inválido",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @Parameter(description = "Status do registro de ponto (PENDING, APPROVED, REJECTED)", required = true)
-    @GetMapping("/employee/{employeeId}/status")
-    public ResponseEntity<List<TimeRecord>> findByEmployeeIdAndStatus(
-            @PathVariable UUID employeeId,
-            @RequestParam String status) {
-        return ResponseEntity.ok(timeRecordService.findByEmployeeIdAndStatus(employeeId, TimeRecordStatus.valueOf(status)));
+    @GetMapping("/next-record-type/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getNextRecordType(@PathVariable UUID employeeId) {
+        try {
+            TimeRecord.RecordType nextType = timeRecordService.getNextRecordType(employeeId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "nextRecordType", nextType.name()
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao buscar próximo tipo de registro: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
     }
-} 
+
+    @GetMapping("/pending")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getPendingRecords(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<TimeRecord> records = timeRecordService.getPendingRecords(pageable);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", records.getContent(),
+                    "totalPages", records.getTotalPages(),
+                    "totalElements", records.getTotalElements()
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao buscar registros pendentes: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/{recordId}/approve")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> approveRecord(
+            @PathVariable UUID recordId,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            UUID approverId = UUID.fromString(request.get("approverId"));
+            TimeRecord record = timeRecordService.approveRecord(recordId, approverId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Registro aprovado com sucesso",
+                    "data", record
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao aprovar registro: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/{recordId}/reject")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> rejectRecord(
+            @PathVariable UUID recordId,
+            @RequestBody Map<String, String> request) {
+        try {
+            UUID approverId = UUID.fromString(request.get("approverId"));
+            String reason = request.get("reason");
+            TimeRecord record = timeRecordService.rejectRecord(recordId, approverId, reason);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Registro rejeitado com sucesso",
+                    "data", record
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao rejeitar registro: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+}

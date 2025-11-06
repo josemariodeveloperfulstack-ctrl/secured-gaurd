@@ -66,6 +66,7 @@ const SSTTemplates = lazy(() => import('@/pages/RH/SST/Templates'));
 const SSTCIPA = lazy(() => import('@/pages/RH/SST/CIPA'));
 const SSTTreinamentos = lazy(() => import('@/pages/RH/SST/Treinamentos'));
 const Treinamentos = lazy(() => import('@/pages/RH/Treinamentos'));
+const PontoEletronico = lazy(() => import('@/pages/RH/PontoEletronico'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
@@ -615,6 +616,13 @@ function App() {
                     <Route path="/rh/treinamentos" element={
                       <ProtectedRoute>
                         <Treinamentos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/ponto-eletronico" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <PontoEletronico />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/funcionarios" element={

@@ -1,83 +1,99 @@
 package com.z7design.secured_guard.model;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.UUID;
-
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.z7design.secured_guard.model.enums.TimeRecordStatus;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
 @Entity
-@Builder
+@Table(name = "time_records")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "time_records")
 public class TimeRecord {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
-    @NotNull(message = "Employee is required")
+
     @ManyToOne
     @JoinColumn(name = "employee_id", nullable = false)
-    @JsonBackReference("employee-time-records")
     private Employee employee;
-    
-    @NotNull(message = "Record date is required")
-    @Column(name = "record_date", nullable = false)
-    private LocalDate recordDate;
-    
-    @NotNull(message = "Entry time is required")
-    @Column(name = "entry_time")
-    private LocalTime entryTime;
-    
-    @NotNull(message = "Exit time is required")
-    @Column(name = "exit_time")
-    private LocalTime exitTime;
-    
-    @NotNull(message = "Entry lunch time is required")
-    @Column(name = "entry_lunch_time")
-    private LocalTime entryLunchTime;
-    
-    @NotNull(message = "Exit lunch time is required")
-    @Column(name = "exit_lunch_time")
-    private LocalTime exitLunchTime;
-    
-    @NotNull(message = "Time record status is required")
+
+    @ManyToOne
+    @JoinColumn(name = "work_post_id")
+    private WorkPost workPost;
+
+    @Column(name = "record_type", nullable = false)
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private TimeRecordStatus status;
-    
-    @Size(max = 1000, message = "Justification cannot exceed 1000 characters")
+    private RecordType recordType;
+
+    @Column(name = "recorded_at", nullable = false)
+    private LocalDateTime recordedAt;
+
+    @Column(name = "location")
+    private String location;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "ip_address")
+    private String ipAddress;
+
+    @Column(name = "user_agent")
+    private String userAgent;
+
+    @Column(name = "qr_code_used")
+    private String qrCodeUsed;
+
+    @Column(name = "device_info")
+    private String deviceInfo;
+
+    @Column(name = "photo_url")
+    private String photoUrl;
+
+    @Column(name = "is_manual")
+    private Boolean isManual = false;
+
     @Column(name = "justification")
     private String justification;
-    
+
+    @Column(name = "approved_by_id")
+    private UUID approvedById;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "status")
+    @Enumerated(EnumType.STRING)
+    private RecordStatus status = RecordStatus.APPROVED;
+
     @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
+
     @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-} 
+
+    public enum RecordType {
+        ENTRADA,
+        SAIDA_ALMOCO,
+        RETORNO_ALMOCO,
+        SAIDA
+    }
+
+    public enum RecordStatus {
+        PENDING,
+        APPROVED,
+        REJECTED
+    }
+}
