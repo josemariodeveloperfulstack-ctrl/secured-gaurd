@@ -15,7 +15,7 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   whatsapp?: string;
-  roles?: string[];
+  roles?: string[]; // Backend DTO espera List<String>
   active?: boolean;
 }
 
@@ -25,7 +25,7 @@ export interface UpdateUserRequest {
   email?: string;
   whatsapp?: string;
   active?: boolean;
-  roles?: string[];
+  roles?: string[]; // Backend DTO espera List<String>
 }
 
 export const userService = {

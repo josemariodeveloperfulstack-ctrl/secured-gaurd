@@ -80,6 +80,7 @@ const Mensagens = lazy(() => import('@/pages/Mensagens'));
 const GestaoMensagens = lazy(() => import('@/pages/GestaoMensagens'));
 const GestaoAtendimento = lazy(() => import('@/pages/GestaoAtendimento'));
 const ChatInterno = lazy(() => import('@/pages/ChatInterno'));
+const WhatsAppConnection = lazy(() => import('@/pages/WhatsAppConnection'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 const OrdemServico = lazy(() => import('@/pages/OrdemServico'));
 const FuncionarioNovo = lazy(() => import('@/pages/FuncionarioNovo'));
@@ -282,6 +283,13 @@ function App() {
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <ChatInterno />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/whatsapp-connection" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <WhatsAppConnection />
                         </Suspense>
                       </ProtectedRoute>
                     } />

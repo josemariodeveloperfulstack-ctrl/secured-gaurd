@@ -142,8 +142,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           username: formData.username,
           email: formData.email,
           password: formData.password,
-          whatsapp: formData.whatsapp,
-          roles: formData.roles,
+          whatsapp: formData.whatsapp || undefined,
+          roles: formData.roles, // Backend espera array de strings!
           active: formData.active
         };
         
@@ -158,8 +158,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           name: formData.name,
           username: formData.username,
           email: formData.email,
-          whatsapp: formData.whatsapp,
-          roles: formData.roles,
+          whatsapp: formData.whatsapp || undefined,
+          roles: formData.roles, // Backend espera array de strings!
           active: formData.active
         };
 

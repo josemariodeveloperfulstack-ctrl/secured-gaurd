@@ -83,27 +83,44 @@ public class WhatsAppController {
             boolean initialized = baileysRestService.initializeInstance();
             log.info("📱 Instância inicializada: {}", initialized);
             
-            if (initialized && qrcode) {
+            if (!initialized) {
+                log.error("❌ Baileys REST não disponível ou falhou ao inicializar");
+                return ResponseEntity.status(503).body(Map.of(
+                    "success", false,
+                    "error", "Serviço WhatsApp não disponível. Verifique se o Baileys REST está rodando em http://localhost:3333"
+                ));
+            }
+            
+            if (qrcode) {
                 String qrCodeData = baileysRestService.getQRCode();
                 log.info("📸 QR Code obtido. Tamanho: {} caracteres", qrCodeData != null ? qrCodeData.length() : 0);
+                
+                if (qrCodeData == null || qrCodeData.isEmpty()) {
+                    log.error("❌ QR Code não foi gerado pelo Baileys REST");
+                    return ResponseEntity.status(503).body(Map.of(
+                        "success", false,
+                        "error", "Não foi possível gerar o QR Code. O serviço Baileys REST pode estar indisponível ou já conectado."
+                    ));
+                }
                 
                 // Se o QR Code já vier em base64, usar diretamente
                 // Senão, precisará ser convertido
                 String base64QR = qrCodeData;
                 
                 // Se não começar com data:image, adicionar prefixo
-                if (base64QR != null && !base64QR.startsWith("data:image")) {
+                if (!base64QR.startsWith("data:image")) {
                     base64QR = "data:image/png;base64," + base64QR;
                 }
                 
+                log.info("✅ QR Code preparado para envio ao frontend");
                 return ResponseEntity.ok(Map.of(
                     "success", true,
                     "instance", instanceName,
-                    "qrcode", Map.of("base64", base64QR != null ? base64QR : "")
+                    "qrcode", Map.of("base64", base64QR)
                 ));
             }
             
-            return ResponseEntity.ok(Map.of("success", initialized));
+            return ResponseEntity.ok(Map.of("success", true, "instance", instanceName));
         } catch (Exception e) {
             log.error("❌ Erro ao criar instância: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));

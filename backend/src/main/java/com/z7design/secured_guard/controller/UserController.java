@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.UserListResponseDTO;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.ProfileResponse;
 import com.z7design.secured_guard.dto.UpdateUserRequest;
+import com.z7design.secured_guard.dto.CreateUserRequest;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -176,13 +177,15 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<UserListResponseDTO> create(@Valid @RequestBody User user) {
+    public ResponseEntity<UserListResponseDTO> create(@Valid @RequestBody CreateUserRequest request) {
         try {
-            System.out.println("[DEBUG] UserController.create - Iniciando criação de usuário");
-            System.out.println("[DEBUG] Dados recebidos: " + user.getName() + " - " + user.getEmail() + " - " + user.getUsername());
+            System.out.println("✅ UserController.create - Iniciando criação de usuário");
+            System.out.println("📋 Dados: " + request.getName() + " | " + request.getEmail() + " | " + request.getUsername());
+            System.out.println("📱 WhatsApp: " + request.getWhatsapp());
+            System.out.println("🔐 Roles: " + request.getRoles());
             
-            User createdUser = userService.create(user);
-            System.out.println("[DEBUG] Usuário criado com sucesso: " + createdUser.getId());
+            User createdUser = userService.createFromRequest(request);
+            System.out.println("✅ Usuário criado: " + createdUser.getId());
             
             UserListResponseDTO dto = new UserListResponseDTO();
             dto.setId(createdUser.getId().toString());
@@ -194,7 +197,7 @@ public class UserController {
             
             return ResponseEntity.status(201).body(dto);
         } catch (Exception e) {
-            System.err.println("[ERROR] Erro ao criar usuário: " + e.getMessage());
+            System.err.println("❌ Erro ao criar usuário: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Erro ao criar usuário: " + e.getMessage(), e);
         }

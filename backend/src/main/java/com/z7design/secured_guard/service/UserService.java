@@ -15,6 +15,7 @@ import com.z7design.secured_guard.model.Role;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.model.Permission;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
+import com.z7design.secured_guard.dto.CreateUserRequest;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +37,84 @@ public class UserService {
         return userRepository.findAll();
     }
 
+    public User createFromRequest(CreateUserRequest request) {
+        System.out.println("🔧 UserService.createFromRequest - Iniciando");
+        
+        // Validações básicas
+        if (!StringUtils.hasText(request.getName())) {
+            throw new IllegalArgumentException("Nome não pode ser nulo ou vazio");
+        }
+        
+        if (!StringUtils.hasText(request.getEmail())) {
+            throw new IllegalArgumentException("Email não pode ser nulo ou vazio");
+        }
+        
+        if (!StringUtils.hasText(request.getUsername())) {
+            throw new IllegalArgumentException("Nome de usuário não pode ser nulo ou vazio");
+        }
+        
+        if (!StringUtils.hasText(request.getPassword())) {
+            throw new IllegalArgumentException("Senha não pode ser nula ou vazia");
+        }
+        
+        if (request.getRoles() == null || request.getRoles().isEmpty()) {
+            throw new IllegalArgumentException("Pelo menos uma função deve ser selecionada");
+        }
+        
+        // Verificar se username já existe
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            throw new IllegalArgumentException("Nome de usuário já está em uso");
+        }
+        
+        // Verificar se email já existe
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email já está em uso");
+        }
+        
+        // Validar formato do email
+        if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new IllegalArgumentException("Formato de email inválido");
+        }
+        
+        // Validar força da senha
+        if (request.getPassword().length() < 6) {
+            throw new IllegalArgumentException("Senha deve ter pelo menos 6 caracteres");
+        }
+        
+        // Permitir exceção para padrão cpf@2025
+        boolean isCpfDefault = request.getPassword().matches("^\\d{11}@2025$");
+        if (!isCpfDefault && !request.getPassword().matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+            throw new IllegalArgumentException("Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial");
+        }
+        
+        // Buscar roles do banco de dados pelos nomes (Array de Strings)
+        System.out.println("🔍 Buscando roles: " + request.getRoles());
+        List<Role> rolesFromDb = roleRepository.findByNames(request.getRoles());
+        System.out.println("✅ Roles encontrados: " + rolesFromDb.size());
+        
+        if (rolesFromDb.isEmpty()) {
+            throw new IllegalArgumentException("Nenhuma função válida encontrada. Certifique-se de que as funções existem no banco de dados.");
+        }
+        
+        // Criar usuário
+        User user = User.builder()
+                .name(request.getName())
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .whatsapp(request.getWhatsapp() != null && !request.getWhatsapp().trim().isEmpty() ? request.getWhatsapp() : null)
+                .roles(new java.util.HashSet<>(rolesFromDb))
+                .active(request.getActive() != null ? request.getActive() : true)
+                .status(UserStatus.ACTIVE)
+                .build();
+        
+        System.out.println("💾 Salvando usuário no banco...");
+        User savedUser = userRepository.save(user);
+        System.out.println("✅ Usuário salvo com ID: " + savedUser.getId());
+        
+        return savedUser;
+    }
+    
     public User create(User user) {
         // Validações básicas
         if (!StringUtils.hasText(user.getName())) {

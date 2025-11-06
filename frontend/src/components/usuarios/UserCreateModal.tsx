@@ -97,8 +97,8 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         email: formData.email,
         name: formData.name,
         password: formData.password,
-        roles: [{ name: formData.role }],
-        whatsapp: formData.whatsapp,
+        roles: [formData.role], // Backend espera array de STRINGS!
+        whatsapp: formData.whatsapp || undefined,
         status: "ACTIVE",
         active: true
       };
