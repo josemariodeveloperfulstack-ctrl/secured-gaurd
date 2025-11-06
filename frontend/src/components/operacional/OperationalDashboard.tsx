@@ -4,6 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import '@/styles/mobile-tabs-sst.css';
+import {
   Calendar,
   Users,
   Clock,
@@ -114,24 +121,88 @@ const OperationalDashboard: React.FC = () => {
       </div>
 
       <Tabs defaultValue="vacations" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="vacations" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Férias
-          </TabsTrigger>
-          <TabsTrigger value="absences" className="flex items-center gap-2">
-            <UserX className="h-4 w-4" />
-            Faltas
-          </TabsTrigger>
-          <TabsTrigger value="assignments" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Postos
-          </TabsTrigger>
-          <TabsTrigger value="activities" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Atividades
-          </TabsTrigger>
-        </TabsList>
+        {/* Tabs com Padrão SST Mobile */}
+        <TooltipProvider>
+          <div className="relative overflow-hidden rounded-lg glass-card border-slate-700/50 shadow-xl">
+            <TabsList className="
+              w-full
+              flex md:grid
+              overflow-x-auto md:overflow-x-visible
+              md:grid-cols-4
+              glass-card border-0
+              p-2
+              gap-2
+              min-h-[100px] md:min-h-[80px]
+              scrollbar-hide
+            ">
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="vacations" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Calendar className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Férias</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Cobertura de Férias</p>
+                  <p className="text-xs text-gray-400">Gestão de férias e substituições</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="absences" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <UserX className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Faltas</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Controle de Faltas</p>
+                  <p className="text-xs text-gray-400">Registro e justificativas</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="assignments" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <MapPin className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Postos</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Atribuições de Posto</p>
+                  <p className="text-xs text-gray-400">Alocação de funcionários</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="activities" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Activity className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Atividades</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Atividades Específicas</p>
+                  <p className="text-xs text-gray-400">Tarefas e eventos especiais</p>
+                </TooltipContent>
+              </Tooltip>
+
+            </TabsList>
+          </div>
+        </TooltipProvider>
 
         {/* Aba de Cobertura de Férias */}
         <TabsContent value="vacations" className="space-y-4">

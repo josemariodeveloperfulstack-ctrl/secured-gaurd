@@ -470,6 +470,128 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         SUPPORT_READ: true,
       };
 
+    case 'ASSISTENCIA_RH':
+      return {
+        ...basePermissions,
+        // Assistente de RH - Permissões de leitura e escrita básica
+        EMPLOYEES_READ: true,
+        EMPLOYEES_WRITE: true,
+        PAYSLIPS_READ: true,
+        CONTRACTS_READ: true,
+        REPORTS_READ: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+      };
+
+    case 'DEPARTAMENTO_PESSOAL':
+      return {
+        ...basePermissions,
+        // Departamento Pessoal - Gestão completa de RH
+        EMPLOYEES_READ: true,
+        EMPLOYEES_WRITE: true,
+        EMPLOYEES_CREATE: true,
+        EMPLOYEES_DELETE: true,
+        PAYSLIPS_READ: true,
+        PAYSLIPS_WRITE: true,
+        PAYSLIPS_CREATE: true,
+        PAYSLIPS_PUBLISH: true,
+        CONTRACTS_READ: true,
+        CONTRACTS_WRITE: true,
+        CONTRACTS_CREATE: true,
+        REPORTS_READ: true,
+        REPORTS_GENERATE: true,
+        REPORTS_EXPORT: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        SUPPORT_READ: true,
+        ATTENDANCE_READ: true,
+        ATTENDANCE_WRITE: true,
+      };
+
+    case 'OPERACIONAL':
+      return {
+        ...basePermissions,
+        // Operacional - Gestão operacional e equipamentos
+        EQUIPMENTS_READ: true,
+        EQUIPMENTS_WRITE: true,
+        EQUIPMENTS_ASSIGN: true,
+        EMPLOYEES_READ: true,
+        CONTRACTS_READ: true,
+        REPORTS_READ: true,
+        REPORTS_GENERATE: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        VISITS_READ: true,
+        VISITS_WRITE: true,
+        VISITS_CREATE: true,
+      };
+
+    case 'VIGILANTE':
+      return {
+        ...basePermissions,
+        // Vigilante - Permissões básicas operacionais
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        PAYSLIPS_READ: true,
+        REPORTS_READ: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        EQUIPMENTS_READ: true,
+        VISITS_READ: true,
+      };
+
+    case 'AUXI_ADMINISTRATIVO':
+      return {
+        ...basePermissions,
+        // Auxiliar Administrativo - Suporte administrativo geral
+        EMPLOYEES_READ: true,
+        CLIENTS_READ: true,
+        CONTRACTS_READ: true,
+        REPORTS_READ: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        SUPPORT_READ: true,
+        SUPPORT_WRITE: true,
+        SUPPORT_CREATE: true,
+        LEADS_READ: true,
+        PROPOSALS_READ: true,
+      };
+
+    case 'AUX_DEP':
+      return {
+        ...basePermissions,
+        // Auxiliar de Departamento Pessoal - Suporte ao RH
+        EMPLOYEES_READ: true,
+        PAYSLIPS_READ: true,
+        CONTRACTS_READ: true,
+        REPORTS_READ: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        ATTENDANCE_READ: true,
+      };
+
     default:
       return basePermissions;
   }
@@ -758,7 +880,13 @@ export const getRoleDisplayName = (role: UserRole): string => {
     ADMIN: 'Administrador',
     SUPERVISOR: 'Supervisor',
     RH: 'Recursos Humanos',
+    ASSISTENCIA_RH: 'Assistência de RH',
+    DEPARTAMENTO_PESSOAL: 'Departamento Pessoal',
     FINANCEIRO: 'Financeiro',
+    OPERACIONAL: 'Operacional',
+    VIGILANTE: 'Vigilante',
+    AUXI_ADMINISTRATIVO: 'Auxiliar Administrativo',
+    AUX_DEP: 'Auxiliar Depto. Pessoal',
     TI_SUPORTE: 'TI / Suporte Técnico',
     AUDITOR: 'Auditor / Consultor',
     COLABORADOR: 'Colaborador',
@@ -774,7 +902,13 @@ export const getRoleColor = (role: UserRole): string => {
     ADMIN: 'bg-blue-100 text-blue-800',
     SUPERVISOR: 'bg-green-100 text-green-800',
     RH: 'bg-yellow-100 text-yellow-800',
+    ASSISTENCIA_RH: 'bg-yellow-50 text-yellow-700',
+    DEPARTAMENTO_PESSOAL: 'bg-amber-100 text-amber-800',
     FINANCEIRO: 'bg-orange-100 text-orange-800',
+    OPERACIONAL: 'bg-cyan-100 text-cyan-800',
+    VIGILANTE: 'bg-slate-100 text-slate-800',
+    AUXI_ADMINISTRATIVO: 'bg-pink-100 text-pink-800',
+    AUX_DEP: 'bg-lime-100 text-lime-800',
     TI_SUPORTE: 'bg-purple-100 text-purple-800',
     AUDITOR: 'bg-gray-100 text-gray-800',
     COLABORADOR: 'bg-indigo-100 text-indigo-800',

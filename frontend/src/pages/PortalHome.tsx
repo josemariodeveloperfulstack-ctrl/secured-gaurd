@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import SEO from '@/components/SEO';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { useGSAP } from '@/hooks/use-gsap';
+import { ensureAllContentVisible } from '@/utils/ensureVisibility';
 import Logo from '@/components/Logo';
 import LoadingSpinner from '@/components/LoadingSpinner';
 

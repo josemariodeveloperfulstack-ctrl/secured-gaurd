@@ -1,4 +1,4 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'FINANCEIRO' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR';
 
 export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_SUPERVISOR' | 'GRUPO_RH' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_COLABORADORES' | 'GRUPO_AUXILIARES';
 
@@ -169,13 +169,13 @@ export interface User {
   position?: string;
   employeeCode?: string;
   phone?: string;
+  whatsapp?: string;
   address?: string;
   username?: string;
   status?: string;
   active?: boolean;
   createdAt?: string;
   updatedAt?: string;
-  whatsapp?: string;
 }
 
 export interface AuthContextType {

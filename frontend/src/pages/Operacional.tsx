@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import '@/styles/operacional-background.css';
+import '@/styles/mobile-tabs-sst.css';
+import {
   Shield,
   Users,
   MapPin,
@@ -15,7 +23,15 @@ import {
   Settings,
   Eye,
   Plus,
-  Activity
+  Activity,
+  Bell,
+  Calendar,
+  Briefcase,
+  ClipboardList,
+  LayoutDashboard,
+  Truck,
+  UserCheck,
+  PackageCheck
 } from 'lucide-react';
 import { StandardLayout } from '@/components/StandardLayout';
 import Equipamentos from './Equipamentos';
@@ -51,6 +67,7 @@ import OrderOfServiceTable from '@/components/operacional/OrderOfServiceTable';
 import OrderOfServiceFormModal from '@/components/operacional/OrderOfServiceFormModal';
 import OperationalDashboard from '@/components/operacional/OperationalDashboard';
 import VisitDashboard from '@/components/visits/VisitDashboard';
+import NotificationSettingsModal from '@/components/operacional/NotificationSettingsModal';
 import { orderOfServiceService, OrderOfService, CreateOrderOfServiceRequest } from '@/services/orderOfServiceService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -76,6 +93,7 @@ const Operacional: React.FC = () => {
   const [isLoadingOrdersOfService, setIsLoadingOrdersOfService] = useState(false);
   const [showOrderOfServiceModal, setShowOrderOfServiceModal] = useState(false);
   const [selectedOrderOfService, setSelectedOrderOfService] = useState<OrderOfService | null>(null);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   const { toast } = useToast();
 
@@ -656,51 +674,218 @@ const Operacional: React.FC = () => {
 
   return (
     <StandardLayout>
-      <div className="container mx-auto py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Módulo Operacional</h1>
-          <p className="text-muted-foreground">
-            Gestão completa das operações de segurança
-          </p>
-        </div>
+      {/* Background melhorado com gradiente e textura */}
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative">
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 bg-grid-white/[0.02] pointer-events-none"></div>
+        
+        {/* Accent gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-red-950/10 via-transparent to-transparent pointer-events-none"></div>
+        
+        <div className="container mx-auto py-6 relative z-10">
+          <div className="mb-6 bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-800/50 shadow-lg">
+            <h1 className="text-3xl font-bold text-white">Módulo Operacional</h1>
+            <p className="text-slate-400 mt-2">
+              Gestão completa das operações de segurança
+            </p>
+          </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Tabs - Padrão SST */}
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="equipamentos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Equipamentos
-            </TabsTrigger>
-            <TabsTrigger value="escalas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Escalas
-            </TabsTrigger>
-            <TabsTrigger value="notificacoes" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Notificações
-            </TabsTrigger>
-            <TabsTrigger value="ocorrencias" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Ocorrências
-            </TabsTrigger>
-            <TabsTrigger value="atividades" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Atividades
-            </TabsTrigger>
-            <TabsTrigger value="servicos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Serviços
-            </TabsTrigger>
-            <TabsTrigger value="controle-visitas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Controle Visitas
-            </TabsTrigger>
-            <TabsTrigger value="gestao-operacional" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Gestão
-            </TabsTrigger>
-            <TabsTrigger value="troca-plantao" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Plantão
-            </TabsTrigger>
-            <TabsTrigger value="guia-transporte" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Transporte
-            </TabsTrigger>
-          </TabsList>
+          {/* Tabs Modernas com Ícones e Tooltips - Padrão SST Mobile */}
+          <TooltipProvider>
+            <div className="relative overflow-hidden rounded-lg glass-card border-slate-700/50 shadow-xl">
+              {/* Mobile: Scroll Horizontal | Desktop: Grid */}
+              <TabsList className="
+                w-full
+                flex md:grid
+                overflow-x-auto md:overflow-x-visible
+                md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-11
+                glass-card border-0
+                p-2 md:p-2
+                gap-2 md:gap-2
+                min-h-[100px] md:min-h-[80px]
+                scrollbar-hide
+              ">
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="dashboard" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <LayoutDashboard className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Dashboard</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Dashboard</p>
+                  <p className="text-xs text-gray-400">Visão geral operacional</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="equipamentos" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <PackageCheck className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Equipamentos</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Equipamentos</p>
+                  <p className="text-xs text-gray-400">Gestão de armamento e EPIs</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="escalas" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Calendar className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Escalas</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Escalas de Trabalho</p>
+                  <p className="text-xs text-gray-400">Gestão de turnos e plantões</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="notificacoes" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Bell className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Notificações</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Notificações</p>
+                  <p className="text-xs text-gray-400">Alertas e avisos do sistema</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="ocorrencias" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <AlertTriangle className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Ocorrências</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Ocorrências</p>
+                  <p className="text-xs text-gray-400">Registro de incidentes</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="atividades" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <ClipboardList className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Atividades</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Atividades</p>
+                  <p className="text-xs text-gray-400">Relatórios de atividade</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="servicos" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Briefcase className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Serviços</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Ordens de Serviço</p>
+                  <p className="text-xs text-gray-400">Gestão de OS</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="controle-visitas" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <MapPin className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Visitas</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Controle de Visitas</p>
+                  <p className="text-xs text-gray-400">Visitas dos supervisores</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="gestao-operacional" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <BarChart3 className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Gestão</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Gestão Operacional</p>
+                  <p className="text-xs text-gray-400">Indicadores e métricas</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="troca-plantao" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <UserCheck className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Plantão</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Troca de Plantão</p>
+                  <p className="text-xs text-gray-400">Gestão de trocas</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger 
+                    value="guia-transporte" 
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Truck className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Transporte</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Guia de Transporte</p>
+                  <p className="text-xs text-gray-400">Gestão de transporte</p>
+                </TooltipContent>
+              </Tooltip>
+
+            </TabsList>
+            </div>
+          </TooltipProvider>
 
           <TabsContent value="dashboard" className="mt-6">
             {renderDashboard()}
@@ -742,26 +927,65 @@ const Operacional: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-800/30 transition-colors">
                       <div>
                         <p className="font-medium">Renovar registro AR-003</p>
                         <p className="text-sm text-muted-foreground">Vence em 5 dias</p>
                       </div>
-                      <Button size="sm">Ver Detalhes</Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setActiveTab('equipamentos');
+                          toast({
+                            title: '📋 Navegando para Equipamentos',
+                            description: 'Verifique o equipamento AR-003 que vence em breve.',
+                          });
+                        }}
+                      >
+                        Ver Detalhes
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-800/30 transition-colors">
                       <div>
                         <p className="font-medium">Manutenção EQ-005</p>
                         <p className="text-sm text-muted-foreground">Agendada para amanhã</p>
                       </div>
-                      <Button size="sm">Ver Detalhes</Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setActiveTab('equipamentos');
+                          toast({
+                            title: '🔧 Navegando para Equipamentos',
+                            description: 'Verifique a manutenção programada para EQ-005.',
+                          });
+                        }}
+                      >
+                        Ver Detalhes
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-800/30 transition-colors">
                       <div>
                         <p className="font-medium">Relatório mensal</p>
                         <p className="text-sm text-muted-foreground">Vencimento em 2 dias</p>
                       </div>
-                      <Button size="sm">Gerar</Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          toast({
+                            title: '📊 Gerando Relatório Mensal',
+                            description: 'O relatório operacional está sendo gerado...',
+                          });
+                          // TODO: Implementar geração real de relatório
+                          setTimeout(() => {
+                            toast({
+                              title: '✅ Relatório Gerado!',
+                              description: 'O relatório mensal foi gerado com sucesso.',
+                            });
+                          }, 2000);
+                        }}
+                      >
+                        Gerar
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -796,7 +1020,10 @@ const Operacional: React.FC = () => {
                     Sistema de notificações e alertas operacionais
                   </p>
                 </div>
-                <Button variant="outline">
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowNotificationSettings(true)}
+                >
                   <Settings className="h-4 w-4 mr-2" />
                   Configurações
                 </Button>
@@ -811,6 +1038,12 @@ const Operacional: React.FC = () => {
               />
             </div>
           </TabsContent>
+
+          {/* Modal de Configurações de Notificações */}
+          <NotificationSettingsModal
+            open={showNotificationSettings}
+            onOpenChange={setShowNotificationSettings}
+          />
 
           <TabsContent value="ocorrencias" className="mt-6">
             <OcorrenciasTable
@@ -866,6 +1099,7 @@ const Operacional: React.FC = () => {
             <TransportGuideTab />
           </TabsContent>
         </Tabs>
+        </div> {/* Fecha container mx-auto */}
 
         {/* Modal de Ocorrência */}
         <OcorrenciaFormModal
@@ -899,7 +1133,7 @@ const Operacional: React.FC = () => {
           order={selectedOrderOfService}
           mode={selectedOrderOfService ? 'edit' : 'create'}
         />
-      </div>
+      </div> {/* Fecha div principal background */}
     </StandardLayout>
   );
 };

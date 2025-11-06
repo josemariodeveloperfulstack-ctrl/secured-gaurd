@@ -35,9 +35,16 @@ const AVAILABLE_ROLES = [
   { value: 'ADMIN', label: 'Administrador' },
   { value: 'GESTOR', label: 'Gestor' },
   { value: 'RH', label: 'Recursos Humanos' },
+  { value: 'ASSISTENCIA_RH', label: 'Assistência de RH' },
+  { value: 'DEPARTAMENTO_PESSOAL', label: 'Departamento Pessoal' },
   { value: 'FINANCEIRO', label: 'Financeiro' },
   { value: 'OPERACIONAL', label: 'Operacional' },
+  { value: 'VIGILANTE', label: 'Vigilante' },
+  { value: 'AUXI_ADMINISTRATIVO', label: 'Auxiliar Administrativo' },
+  { value: 'AUX_DEP', label: 'Auxiliar Depto. Pessoal' },
   { value: 'SUPERVISOR', label: 'Supervisor' },
+  { value: 'TI_SUPORTE', label: 'TI / Suporte' },
+  { value: 'AUDITOR', label: 'Auditor' },
   { value: 'COLABORADOR', label: 'Colaborador' }
 ];
 
@@ -57,6 +64,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     username: '',
     email: '',
     password: '',
+    whatsapp: '',
     roles: [] as string[],
     active: true
   });
@@ -70,6 +78,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           username: user.username || '',
           email: user.email || '',
           password: '', // Don't pre-fill password
+          whatsapp: user.whatsapp || '',
           roles: user.roles || [],
           active: user.active
         });
@@ -79,6 +88,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           username: '',
           email: '',
           password: '',
+          whatsapp: '',
           roles: [],
           active: true
         });
@@ -132,6 +142,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           username: formData.username,
           email: formData.email,
           password: formData.password,
+          whatsapp: formData.whatsapp,
           roles: formData.roles,
           active: formData.active
         };
@@ -147,6 +158,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           name: formData.name,
           username: formData.username,
           email: formData.email,
+          whatsapp: formData.whatsapp,
           roles: formData.roles,
           active: formData.active
         };
@@ -225,20 +237,39 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-seguranca-lightgray flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Email *
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-              placeholder="Ex: joao@empresa.com"
-              required
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-seguranca-lightgray flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email *
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                placeholder="Ex: joao@empresa.com"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp" className="text-seguranca-lightgray">
+                WhatsApp
+              </Label>
+              <Input
+                id="whatsapp"
+                value={formData.whatsapp}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  handleInputChange('whatsapp', value);
+                }}
+                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                placeholder="Somente números (ex: 11999999999)"
+                maxLength={20}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

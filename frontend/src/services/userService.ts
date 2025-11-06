@@ -14,6 +14,7 @@ export interface CreateUserRequest {
   username: string;
   email: string;
   password: string;
+  whatsapp?: string;
   roles?: string[];
   active?: boolean;
 }
@@ -22,6 +23,7 @@ export interface UpdateUserRequest {
   name?: string;
   username?: string;
   email?: string;
+  whatsapp?: string;
   active?: boolean;
   roles?: string[];
 }

@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Occurrence } from '@/services/occurrenceService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { occurrenceService } from '@/services/occurrenceService';
+import { workPostService, WorkPost } from '@/services/workPostService';
+import { Loader2 } from 'lucide-react';
 
 interface OcorrenciaFormModalProps {
   ocorrencia: Occurrence | null;
@@ -31,7 +33,9 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
   const [formData, setFormData] = useState<Partial<Occurrence>>({
     type: 'incidente',
     title: '',
@@ -89,25 +93,34 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
   }, [ocorrencia, open]);
 
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchData = async () => {
       if (open) {
         setLoadingEmployees(true);
+        setLoadingWorkPosts(true);
+        
         try {
-          const data = await employeeService.getAllEmployees();
-          setEmployees(data);
+          // Buscar funcionários e postos de trabalho em paralelo
+          const [employeesData, workPostsData] = await Promise.all([
+            employeeService.getAllEmployees(),
+            workPostService.getAllWorkPosts()
+          ]);
+          
+          setEmployees(employeesData);
+          setWorkPosts(workPostsData);
         } catch (error) {
           toast({
-            title: 'Erro ao carregar funcionários',
-            description: 'Não foi possível buscar a lista de funcionários.',
+            title: 'Erro ao carregar dados',
+            description: 'Não foi possível buscar funcionários e postos de trabalho.',
             variant: 'destructive',
           });
         } finally {
           setLoadingEmployees(false);
+          setLoadingWorkPosts(false);
         }
       }
     };
 
-    fetchEmployees();
+    fetchData();
   }, [open, toast]);
 
   const validateForm = () => {
@@ -337,14 +350,32 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location" className="text-seguranca-lightgray">Local *</Label>
-              <Input
-                id="location"
+              <Label htmlFor="location" className="text-seguranca-lightgray">
+                Setor/Posto de Trabalho *
+              </Label>
+              <Select
                 value={formData.location}
-                onChange={(e) => handleInputChange('location', e.target.value)}
-                className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray ${errors.location ? 'border-red-500' : ''}`}
-                placeholder="Local da ocorrência"
-              />
+                onValueChange={(value) => handleInputChange('location', value)}
+                disabled={loadingWorkPosts}
+              >
+                <SelectTrigger className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray ${errors.location ? 'border-red-500' : ''}`}>
+                  <SelectValue placeholder={loadingWorkPosts ? 'Carregando...' : 'Selecione o posto de trabalho'}>
+                    {loadingWorkPosts && <Loader2 className="h-4 w-4 animate-spin inline mr-2" />}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600 max-h-[300px]">
+                  {workPosts.map((post) => (
+                    <SelectItem key={post.id} value={post.name}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{post.name}</span>
+                        {post.client && (
+                          <span className="text-xs text-gray-400">Cliente: {post.client}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.location && <p className="text-red-500 text-sm">{errors.location}</p>}
             </div>
           </div>
@@ -388,14 +419,32 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
           {/* Quarta linha - 2 colunas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="responsible" className="text-seguranca-lightgray">Responsável *</Label>
-              <Input
-                id="responsible"
+              <Label htmlFor="responsible" className="text-seguranca-lightgray">
+                Responsável (Funcionário) *
+              </Label>
+              <Select
                 value={formData.responsible}
-                onChange={(e) => handleInputChange('responsible', e.target.value)}
-                className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray ${errors.responsible ? 'border-red-500' : ''}`}
-                placeholder="Nome do responsável"
-              />
+                onValueChange={(value) => handleInputChange('responsible', value)}
+                disabled={loadingEmployees}
+              >
+                <SelectTrigger className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray ${errors.responsible ? 'border-red-500' : ''}`}>
+                  <SelectValue placeholder={loadingEmployees ? 'Carregando...' : 'Selecione o responsável'}>
+                    {loadingEmployees && <Loader2 className="h-4 w-4 animate-spin inline mr-2" />}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600 max-h-[300px]">
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.name}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{employee.name}</span>
+                        {employee.role && (
+                          <span className="text-xs text-gray-400">Cargo: {employee.role}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.responsible && <p className="text-red-500 text-sm">{errors.responsible}</p>}
             </div>
 
