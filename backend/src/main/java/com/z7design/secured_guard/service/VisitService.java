@@ -100,14 +100,14 @@ public class VisitService {
                 .description(createVisitDTO.getDescription())
                 .observations(createVisitDTO.getObservations())
                 .status(createVisitDTO.getStatus())
-                .presentEmployees(createVisitDTO.getPresentEmployees() != null ? createVisitDTO.getPresentEmployees() : List.of())
-                .attachedFiles(createVisitDTO.getAttachedFiles() != null ? createVisitDTO.getAttachedFiles() : List.of())
-                .photos(createVisitDTO.getPhotos() != null ? createVisitDTO.getPhotos() : List.of())
-                .latitude(createVisitDTO.getLatitude())
-                .longitude(createVisitDTO.getLongitude())
-                .locationAddress(createVisitDTO.getLocationAddress())
-                .qrCodeScanned(createVisitDTO.getQrCodeScanned())
-                .qrCodeVerified(createVisitDTO.getQrCodeVerified() != null ? createVisitDTO.getQrCodeVerified() : false)
+                // .presentEmployees(...) // Removido
+                // .attachedFiles(...) // Removido
+                // .photos(...) // Removido
+                // .latitude(...) // Removido
+                // .longitude(...) // Removido
+                // .locationAddress(...) // Removido
+                // .qrCodeScanned(...) // Removido
+                // .qrCodeVerified(...) // Removido
                 .createdBy(createdBy)
                 .build();
 
@@ -166,37 +166,31 @@ public class VisitService {
             visit.setStatus(updateDTO.getStatus());
         }
 
-        if (updateDTO.getPresentEmployees() != null) {
-            visit.setPresentEmployees(updateDTO.getPresentEmployees());
-        }
-
-        if (updateDTO.getAttachedFiles() != null) {
-            visit.setAttachedFiles(updateDTO.getAttachedFiles());
-        }
-
-        if (updateDTO.getPhotos() != null) {
-            visit.setPhotos(updateDTO.getPhotos());
-        }
-
-        if (updateDTO.getLatitude() != null) {
-            visit.setLatitude(updateDTO.getLatitude());
-        }
-
-        if (updateDTO.getLongitude() != null) {
-            visit.setLongitude(updateDTO.getLongitude());
-        }
-
-        if (updateDTO.getLocationAddress() != null) {
-            visit.setLocationAddress(updateDTO.getLocationAddress());
-        }
-
-        if (updateDTO.getQrCodeScanned() != null) {
-            visit.setQrCodeScanned(updateDTO.getQrCodeScanned());
-        }
-
-        if (updateDTO.getQrCodeVerified() != null) {
-            visit.setQrCodeVerified(updateDTO.getQrCodeVerified());
-        }
+        // Campos removidos temporariamente - Visit.java refatorado
+        // if (updateDTO.getPresentEmployees() != null) {
+        //     visit.setPresentEmployees(updateDTO.getPresentEmployees());
+        // }
+        // if (updateDTO.getAttachedFiles() != null) {
+        //     visit.setAttachedFiles(updateDTO.getAttachedFiles());
+        // }
+        // if (updateDTO.getPhotos() != null) {
+        //     visit.setPhotos(updateDTO.getPhotos());
+        // }
+        // if (updateDTO.getLatitude() != null) {
+        //     visit.setLatitude(updateDTO.getLatitude());
+        // }
+        // if (updateDTO.getLongitude() != null) {
+        //     visit.setLongitude(updateDTO.getLongitude());
+        // }
+        // if (updateDTO.getLocationAddress() != null) {
+        //     visit.setLocationAddress(updateDTO.getLocationAddress());
+        // }
+        // if (updateDTO.getQrCodeScanned() != null) {
+        //     visit.setQrCodeScanned(updateDTO.getQrCodeScanned());
+        // }
+        // if (updateDTO.getQrCodeVerified() != null) {
+        //     visit.setQrCodeVerified(updateDTO.getQrCodeVerified());
+        // }
 
         visit.setUpdatedBy(updatedBy);
 
@@ -218,49 +212,32 @@ public class VisitService {
         log.info("Visita excluída com sucesso: {}", id);
     }
 
+    // Métodos de upload desabilitados temporariamente - campos removidos do Visit.java
+    /*
     @Transactional
     public String uploadFile(UUID visitId, MultipartFile file) {
         log.info("Fazendo upload de arquivo para visita: {}", visitId);
-
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new RuntimeException("Visita não encontrada"));
-
         String fileName = fileStorageService.storeFile(file);
-        
-        List<String> files = visit.getAttachedFiles();
-        if (files == null) {
-            files = List.of();
-        }
-        files.add(fileName);
-        visit.setAttachedFiles(files);
-
+        // visit.setAttachedFiles(...) // Campo removido
         visitRepository.save(visit);
         log.info("Arquivo uploadado com sucesso: {}", fileName);
-
         return fileName;
     }
 
     @Transactional
     public String uploadPhoto(UUID visitId, MultipartFile photo) {
         log.info("Fazendo upload de foto para visita: {}", visitId);
-
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new RuntimeException("Visita não encontrada"));
-
         String fileName = fileStorageService.storeFile(photo);
-        
-        List<String> photos = visit.getPhotos();
-        if (photos == null) {
-            photos = List.of();
-        }
-        photos.add(fileName);
-        visit.setPhotos(photos);
-
+        // visit.setPhotos(...) // Campo removido
         visitRepository.save(visit);
         log.info("Foto uploadada com sucesso: {}", fileName);
-
         return fileName;
     }
+    */
 
     private VisitDTO convertToDTO(Visit visit) {
         try {
@@ -272,22 +249,16 @@ public class VisitService {
                     .workPostName(visit.getWorkPost() != null ? visit.getWorkPost().getName() : "N/A")
                     .clientId(visit.getClient() != null ? visit.getClient().getId() : null)
                     .clientName(visit.getClient() != null ? visit.getClient().getName() : "N/A")
-                    .unitId(visit.getUnit() != null ? visit.getUnit().getId() : null)
-                    .unitName(visit.getUnit() != null ? visit.getUnit().getName() : "N/A")
-                    .unitAddress(visit.getUnit() != null ? visit.getUnit().getAddress() : "N/A")
-                    .unitAddressCity(visit.getUnit() != null ? visit.getUnit().getAddressCity() : "N/A")
-                    .unitAddressState(visit.getUnit() != null ? visit.getUnit().getAddressState() : "N/A")
-                    .unitLatitude(visit.getUnit() != null ? visit.getUnit().getLatitude() : null)
-                    .unitLongitude(visit.getUnit() != null ? visit.getUnit().getLongitude() : null)
+                    // .unitId(visit.getUnit()...) // Removido - usar workPost
                     .visitScheduleId(visit.getVisitSchedule() != null ? visit.getVisitSchedule().getId() : null)
                     .visitDate(visit.getVisitDate())
                     .visitTime(visit.getVisitTime())
                     .description(visit.getDescription())
                     .observations(visit.getObservations())
                     .status(visit.getStatus())
-                    .presentEmployees(visit.getPresentEmployees() != null ? visit.getPresentEmployees() : List.of())
-                    .attachedFiles(visit.getAttachedFiles() != null ? visit.getAttachedFiles() : List.of())
-                    .photos(visit.getPhotos() != null ? visit.getPhotos() : List.of())
+                    // .presentEmployees(...) // Removido
+                    // .attachedFiles(...) // Removido
+                    // .photos(...) // Removido
                     // .arrivalTime(visit.getArrivalTime() != null ? visit.getArrivalTime().toLocalTime() : null)
                     // .departureTime(visit.getDepartureTime() != null ? visit.getDepartureTime().toLocalTime() : null)
                     // .securityCheck(visit.getSecurityCheck())

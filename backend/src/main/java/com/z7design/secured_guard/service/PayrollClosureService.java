@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -264,7 +265,9 @@ public class PayrollClosureService {
     public List<PayrollClosure> generateBatchClosures(int month, int year, UUID closedById) {
         log.info("📊 Gerando fechamentos em lote - Período: {}/{}", month, year);
 
-        List<Employee> activeEmployees = employeeRepository.findByActiveTrue();
+        List<Employee> activeEmployees = employeeRepository.findAll().stream()
+                .filter(Employee::getActive)
+                .collect(Collectors.toList());
         List<PayrollClosure> closures = new ArrayList<>();
 
         for (Employee employee : activeEmployees) {

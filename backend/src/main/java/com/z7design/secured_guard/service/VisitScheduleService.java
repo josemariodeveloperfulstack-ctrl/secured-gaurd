@@ -75,11 +75,11 @@ public class VisitScheduleService {
             Visit visit = Visit.builder()
                 .visitDate(scheduleDate)
                 .supervisor(supervisor)
-                .unit(unit)
+                // .unit(unit) // Removido - usar workPost
                 .visitSchedule(schedule)
                 .status(VisitStatus.PENDING)
-                .estimatedDurationMinutes(30) // Padrão
-                .priorityLevel(1) // Padrão
+                // .estimatedDurationMinutes(30) // Removido
+                // .priorityLevel(1) // Removido
                 .build();
             visits.add(visit);
         }
@@ -102,10 +102,10 @@ public class VisitScheduleService {
                 optimizedVisits.stream()
                     .map(v -> Map.of(
                         "visitId", v.getId(),
-                        "unitName", v.getUnit().getName(),
-                        "order", v.getRouteOrder(),
-                        "estimatedDuration", v.getEstimatedDurationMinutes(),
-                        "travelTimeToNext", v.getTravelTimeToNextMinutes() != null ? v.getTravelTimeToNextMinutes() : 0
+                        "workPostName", v.getWorkPost() != null ? v.getWorkPost().getName() : "N/A"
+                        // "order", v.getRouteOrder(), // Removido
+                        // "estimatedDuration", v.getEstimatedDurationMinutes(), // Removido
+                        // "travelTimeToNext", v.getTravelTimeToNextMinutes() // Removido
                     ))
                     .collect(Collectors.toList())
             );
@@ -347,30 +347,12 @@ public class VisitScheduleService {
             .id(visit.getId())
             .visitDate(visit.getVisitDate())
             .supervisorId(visit.getSupervisor().getId())
-            .unitId(visit.getUnit().getId())
+            .workPostId(visit.getWorkPost() != null ? visit.getWorkPost().getId() : null)
             .visitScheduleId(visit.getVisitSchedule() != null ? visit.getVisitSchedule().getId() : null)
             .status(visit.getStatus())
             .observations(visit.getObservations())
-            .arrivalTime(visit.getArrivalTime() != null ? visit.getArrivalTime().toLocalTime() : null)
-            .departureTime(visit.getDepartureTime() != null ? visit.getDepartureTime().toLocalTime() : null)
-            .securityCheck(visit.getSecurityCheck())
-            .equipmentCheck(visit.getEquipmentCheck())
-            .staffCheck(visit.getStaffCheck())
-            .procedureCheck(visit.getProcedureCheck())
-            .estimatedDurationMinutes(visit.getEstimatedDurationMinutes())
-            .priorityLevel(visit.getPriorityLevel())
-            .preferredTimeStart(visit.getPreferredTimeStart())
-            .preferredTimeEnd(visit.getPreferredTimeEnd())
-            .routeOrder(visit.getRouteOrder())
-            .travelTimeToNextMinutes(visit.getTravelTimeToNextMinutes())
-            .travelDistanceToNextKm(visit.getTravelDistanceToNextKm())
             .supervisorName(visit.getSupervisor().getName())
-            .unitName(visit.getUnit().getName())
-            .unitAddress(visit.getUnit().getAddress())
-            .unitLatitude(visit.getUnit().getLatitude())
-            .unitLongitude(visit.getUnit().getLongitude())
-            .unitAddressCity(visit.getUnit().getAddressCity())
-            .unitAddressState(visit.getUnit().getAddressState())
+            .workPostName(visit.getWorkPost() != null ? visit.getWorkPost().getName() : "N/A")
             .createdAt(visit.getCreatedAt())
             .updatedAt(visit.getUpdatedAt())
             .build();
