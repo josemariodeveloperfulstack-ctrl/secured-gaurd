@@ -1,6 +1,6 @@
 package com.z7design.secured_guard.util;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 
 /**
  * Utilitário para gerar hashes BCrypt de senhas
@@ -11,10 +11,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 public class PasswordHashGenerator {
 
     public static void main(String[] args) {
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        Argon2PasswordEncoder encoder = new Argon2PasswordEncoder(16, 32, 1, 1 << 16, 3);
         
         System.out.println("=".repeat(60));
-        System.out.println("🔐 GERADOR DE HASH BCRYPT");
+        System.out.println("🔐 GERADOR DE HASH ARGON2id");
         System.out.println("=".repeat(60));
         System.out.println();
         
