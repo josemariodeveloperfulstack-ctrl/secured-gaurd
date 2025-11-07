@@ -5,6 +5,7 @@ import com.z7design.secured_guard.model.PayrollClosure;
 import com.z7design.secured_guard.model.TimeRecord;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.PayrollClosureRepository;
+import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -266,7 +267,7 @@ public class PayrollClosureService {
         log.info("📊 Gerando fechamentos em lote - Período: {}/{}", month, year);
 
         List<Employee> activeEmployees = employeeRepository.findAll().stream()
-                .filter(Employee::getActive)
+                .filter(employee -> EmploymentStatus.ACTIVE.equals(employee.getStatus()))
                 .collect(Collectors.toList());
         List<PayrollClosure> closures = new ArrayList<>();
 
