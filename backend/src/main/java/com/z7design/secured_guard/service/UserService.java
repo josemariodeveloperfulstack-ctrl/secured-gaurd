@@ -96,6 +96,16 @@ public class UserService {
             throw new IllegalArgumentException("Nenhuma função válida encontrada. Certifique-se de que as funções existem no banco de dados.");
         }
         
+        // Determinar status do usuário
+        UserStatus status = UserStatus.ACTIVE;
+        if (StringUtils.hasText(request.getStatus())) {
+            try {
+                status = UserStatus.valueOf(request.getStatus().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("Status de usuário inválido: " + request.getStatus());
+            }
+        }
+
         // Criar usuário
         User user = User.builder()
                 .name(request.getName())
@@ -105,7 +115,7 @@ public class UserService {
                 .whatsapp(request.getWhatsapp() != null && !request.getWhatsapp().trim().isEmpty() ? request.getWhatsapp() : null)
                 .roles(new java.util.HashSet<>(rolesFromDb))
                 .active(request.getActive() != null ? request.getActive() : true)
-                .status(UserStatus.ACTIVE)
+                .status(status)
                 .build();
         
         System.out.println("💾 Salvando usuário no banco...");
@@ -233,6 +243,14 @@ public class UserService {
         // Atualizar status se fornecido
         if (request.getActive() != null) {
             existingUser.setActive(request.getActive());
+        }
+
+        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
+            try {
+                existingUser.setStatus(UserStatus.valueOf(request.getStatus().toUpperCase()));
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("Status de usuário inválido: " + request.getStatus());
+            }
         }
         
         // Atualizar roles se fornecidas

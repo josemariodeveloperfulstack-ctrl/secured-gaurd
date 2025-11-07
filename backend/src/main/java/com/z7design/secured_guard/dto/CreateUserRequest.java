@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.List;
+import com.z7design.secured_guard.model.enums.UserStatus;
 
 @Data
 public class CreateUserRequest {
@@ -37,5 +38,7 @@ public class CreateUserRequest {
     private List<String> roles;  // Array de Strings com nomes dos roles
     
     private Boolean active = true;
+
+    private String status = UserStatus.ACTIVE.name();
 }
 
