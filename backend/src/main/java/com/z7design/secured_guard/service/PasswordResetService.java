@@ -186,30 +186,61 @@ public class PasswordResetService {
     /**
      * Versão melhorada com suporte a WhatsApp
      */
-    public Map<String, Object> requestPasswordReset(String email, String deliveryMethod, String ipAddress, String userAgent) {
-        log.info("📧 Solicitação de recuperação de senha para: {} via {}", email, deliveryMethod);
+    public Map<String, Object> requestPasswordReset(String contact, String deliveryMethod, String ipAddress, String userAgent) {
+        log.info("📧 Solicitação de recuperação de senha para: {} via {}", contact, deliveryMethod);
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
 
-        var userOpt = userRepository.findByEmail(email);
-        if (userOpt.isEmpty()) {
-            // Por segurança, não revelar se o email existe ou não
-            log.warn("⚠️ Email não encontrado, mas retornando sucesso por segurança: {}", email);
-            result.put("message", "Se o email estiver cadastrado, você receberá um link para recuperação de senha.");
-            return result;
-        }
+        boolean isWhatsapp = "whatsapp".equalsIgnoreCase(deliveryMethod);
+        User user;
+        if (isWhatsapp) {
+            String normalized = contact != null ? contact.replaceAll("[^0-9]", "") : "";
+            if (normalized.isEmpty()) {
+                log.warn("⚠️ Nenhum número de WhatsApp informado");
+                result.put("success", false);
+                result.put("warning", "Informe o número de WhatsApp com DDD (somente números).");
+                return result;
+            }
 
-        User user = userOpt.get();
+            var userOpt = userRepository.findByWhatsapp(normalized);
+            if (userOpt.isEmpty() && normalized.startsWith("55")) {
+                String withoutCountry = normalized.substring(2);
+                userOpt = userRepository.findByWhatsapp(withoutCountry);
+            } else if (userOpt.isEmpty() && normalized.length() >= 10) {
+                userOpt = userRepository.findByWhatsapp("55" + normalized);
+            }
 
-        // Verificar WhatsApp se método escolhido for WhatsApp
-        if ("whatsapp".equalsIgnoreCase(deliveryMethod)) {
+            if (userOpt.isEmpty()) {
+                log.warn("⚠️ Nenhum usuário encontrado com WhatsApp {}", normalized);
+                result.put("success", false);
+                result.put("warning", "Não encontramos um cadastro com este número de WhatsApp. Verifique o número (DDI + DDD) ou escolha a opção de email.");
+                return result;
+            }
+
+            user = userOpt.get();
+
             if (user.getWhatsapp() == null || user.getWhatsapp().trim().isEmpty()) {
-                log.warn("⚠️ Usuário {} não possui WhatsApp cadastrado", email);
+                log.warn("⚠️ Usuário {} não possui WhatsApp cadastrado", user.getEmail());
                 result.put("success", false);
                 result.put("warning", "Seu cadastro não possui WhatsApp registrado. Use a opção de Email ou solicite ao administrador que atualize seus dados de contato.");
                 return result;
             }
+            if (user.getWhatsappConsent() == null || !user.getWhatsappConsent()) {
+                log.warn("⚠️ Usuário {} não autorizou recebimento via WhatsApp", user.getEmail());
+                result.put("success", false);
+                result.put("warning", "Seu usuário ainda não autorizou o recebimento de notificações via WhatsApp. Use a opção de Email ou peça ao administrador para registrar o consentimento.");
+                return result;
+            }
+        } else {
+            var userOpt = userRepository.findByEmail(contact);
+            if (userOpt.isEmpty()) {
+                // Por segurança, não revelar se o email existe ou não
+                log.warn("⚠️ Email não encontrado, mas retornando sucesso por segurança: {}", contact);
+                result.put("message", "Se o email estiver cadastrado, você receberá um link para recuperação de senha.");
+                return result;
+            }
+            user = userOpt.get();
         }
 
         // Invalidar tokens antigos
@@ -221,7 +252,7 @@ public class PasswordResetService {
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .user(user)
                 .token(token)
-                .email(email)
+                .email(user.getEmail())
                 .ipAddress(ipAddress)
                 .userAgent(userAgent)
                 .build();
@@ -232,20 +263,21 @@ public class PasswordResetService {
         String resetLink = String.format("%s/reset-password?token=%s", appUrl, token);
         boolean sent = false;
 
-        if ("whatsapp".equalsIgnoreCase(deliveryMethod)) {
+        if (isWhatsapp) {
             sent = sendPasswordResetWhatsApp(user.getWhatsapp(), user.getName(), resetLink);
             if (sent) {
-                log.info("✅ Mensagem de recuperação enviada via WhatsApp para: {}", email);
+                log.info("✅ Mensagem de recuperação enviada via WhatsApp para: {}", user.getWhatsapp());
             }
         } else {
-            sent = sendPasswordResetEmail(email, user.getName(), resetLink, token);
+            sent = sendPasswordResetEmail(user.getEmail(), user.getName(), resetLink, token);
             if (sent) {
-                log.info("✅ Email de recuperação enviado para: {}", email);
+                log.info("✅ Email de recuperação enviado para: {}", user.getEmail());
             }
         }
 
         if (!sent) {
-            log.error("❌ Falha ao enviar recuperação via {} para: {}", deliveryMethod, email);
+            String destination = isWhatsapp ? user.getWhatsapp() : user.getEmail();
+            log.error("❌ Falha ao enviar recuperação via {} para: {}", deliveryMethod, destination);
             saved.markAsExpired();
             tokenRepository.save(saved);
             result.put("success", false);
