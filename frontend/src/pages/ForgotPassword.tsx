@@ -14,6 +14,7 @@ type DeliveryMethod = 'email' | 'whatsapp';
 const ForgotPassword: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -27,9 +28,9 @@ const ForgotPassword: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await api.post('/api/auth/forgot-password', { 
-        email,
-        deliveryMethod: selectedMethod 
+      const response = await api.post('/api/auth/forgot-password', {
+        email: selectedMethod === 'email' ? email : whatsapp,
+        deliveryMethod: selectedMethod,
       });
 
       if (response.data.success) {
@@ -68,7 +69,11 @@ const ForgotPassword: React.FC = () => {
               {selectedMethod === 'email' ? 'Email Enviado!' : 'Mensagem Enviada!'}
             </CardTitle>
             <CardDescription className="text-gray-300">
-              Se o email <strong>{email}</strong> estiver cadastrado, você receberá um link para recuperação de senha.
+              {selectedMethod === 'email' ? (
+                <>Se o email <strong>{email}</strong> estiver cadastrado, você receberá um link para recuperação de senha.</>
+              ) : (
+                <>Se o número <strong>{whatsapp}</strong> estiver cadastrado e autorizado, você receberá uma mensagem com o link de recuperação.</>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -90,7 +95,7 @@ const ForgotPassword: React.FC = () => {
                 ) : (
                   <>
                     <li>• A mensagem pode demorar alguns segundos para chegar</li>
-                    <li>• Verifique se o WhatsApp está ativo</li>
+                    <li>• Lembre-se de incluir DDD e DDI (ex: 5531999999999)</li>
                     <li>• O link expira em 1 hora</li>
                   </>
                 )}
@@ -145,26 +150,44 @@ const ForgotPassword: React.FC = () => {
               </TabsList>
             </Tabs>
 
-            {/* Campo de email */}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-seguranca-lightgray">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                required
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
-              />
-              <p className="text-xs text-gray-400">
-                {selectedMethod === 'email' 
-                  ? 'Enviaremos um link de recuperação para este email'
-                  : 'Enviaremos um link de recuperação via WhatsApp cadastrado neste email'}
-              </p>
-            </div>
+            {/* Campo de email ou WhatsApp */}
+            {selectedMethod === 'email' ? (
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-seguranca-lightgray">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  required
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                />
+                <p className="text-xs text-gray-400">
+                  Enviaremos um link de recuperação para este email cadastrado.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp" className="text-seguranca-lightgray">
+                  Número do WhatsApp
+                </Label>
+                <Input
+                  id="whatsapp"
+                  type="tel"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value.replace(/[^\d]/g, ''))}
+                  placeholder="5531999999999"
+                  required
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                />
+                <p className="text-xs text-gray-400">
+                  Informe o número completo com DDI e DDD (apenas dígitos). Usaremos o WhatsApp vinculado a este número.
+                </p>
+              </div>
+            )}
 
             {/* Aviso de WhatsApp não cadastrado */}
             {whatsappWarning && (
@@ -197,7 +220,7 @@ const ForgotPassword: React.FC = () => {
             <div className="space-y-2">
               <Button
                 type="submit"
-                disabled={isSubmitting || !email}
+                disabled={isSubmitting || (selectedMethod === 'email' ? !email : !whatsapp)}
                 className={`w-full ${
                   selectedMethod === 'whatsapp' 
                     ? 'bg-green-600 hover:bg-green-700' 
