@@ -76,6 +76,11 @@ public class WhatsAppTestConfig {
             return true; // Sem restrições se não estiver em modo teste com Baileys
         }
 
+        if (maxMessagesPerDay <= 0) {
+            // Modo ilimitado
+            return true;
+        }
+
         // Resetar contador diário
         if (!LocalDate.now().equals(lastResetDate)) {
             messagesCount.set(0);
@@ -110,7 +115,7 @@ public class WhatsAppTestConfig {
      * Incrementa contador de mensagens enviadas
      */
     public void incrementMessageCount() {
-        if (testMode && baileysEnabled) {
+        if (testMode && baileysEnabled && maxMessagesPerDay > 0) {
             int count = messagesCount.incrementAndGet();
             log.info("📊 Mensagens enviadas hoje: {}/{}", count, maxMessagesPerDay);
             
@@ -132,6 +137,9 @@ public class WhatsAppTestConfig {
      */
     public int getRemainingMessages() {
         if (!testMode || !baileysEnabled) {
+            return Integer.MAX_VALUE;
+        }
+        if (maxMessagesPerDay <= 0) {
             return Integer.MAX_VALUE;
         }
         return Math.max(0, maxMessagesPerDay - messagesCount.get());
