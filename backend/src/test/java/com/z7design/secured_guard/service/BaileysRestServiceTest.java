@@ -7,14 +7,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import com.z7design.secured_guard.config.WhatsAppTestConfig;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -34,6 +33,7 @@ class BaileysRestServiceTest {
     private ObjectMapper objectMapper;
 
     private BaileysRestService baileysRestService;
+    private WhatsAppTestConfig whatsAppTestConfig;
 
     @TempDir
     Path tempDir;
@@ -41,7 +41,12 @@ class BaileysRestServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        baileysRestService = new BaileysRestService(restTemplate, objectMapper);
+        whatsAppTestConfig = new WhatsAppTestConfig();
+        ReflectionTestUtils.setField(whatsAppTestConfig, "testMode", false);
+        ReflectionTestUtils.setField(whatsAppTestConfig, "baileysEnabled", false);
+        ReflectionTestUtils.setField(whatsAppTestConfig, "testNumbersConfig", "");
+
+        baileysRestService = new BaileysRestService(restTemplate, objectMapper, whatsAppTestConfig);
         
         // Configurar valores das propriedades
         ReflectionTestUtils.setField(baileysRestService, "baileysRestUrl", "http://localhost:3333");
@@ -108,7 +113,8 @@ class BaileysRestServiceTest {
         assertTrue(result);
         
         // Verificar que foi chamado com multipart
-        ArgumentCaptor<HttpEntity> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<HttpEntity<?>> entityCaptor = ArgumentCaptor.forClass((Class<HttpEntity<?>>) (Class<?>) HttpEntity.class);
         verify(restTemplate).postForEntity(anyString(), entityCaptor.capture(), eq(String.class));
         
         HttpEntity<?> capturedEntity = entityCaptor.getValue();
