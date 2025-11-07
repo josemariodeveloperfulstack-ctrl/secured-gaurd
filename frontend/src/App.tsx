@@ -30,6 +30,8 @@ import CookieConsent from '@/components/CookieConsent';
 
 // Sistema Administrativo - Lazy loading para páginas administrativas
 const Login = lazy(() => import('@/pages/Login').catch(() => ({ default: () => <div>Erro ao carregar Login</div> })));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword').catch(() => ({ default: () => <div>Erro ao carregar Recuperação de Senha</div> })));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword').catch(() => ({ default: () => <div>Erro ao carregar Redefinição de Senha</div> })));
 const Index = lazy(() => import('@/pages/Index').catch(() => ({ default: () => <div>Erro ao carregar Index</div> })));
 const Dashboard = lazy(() => import('@/pages/Dashboard').catch(() => ({ default: () => <div>Erro ao carregar Dashboard</div> })));
 const DashboardColaborador = lazy(() => import('@/pages/DashboardColaborador'));
@@ -211,6 +213,26 @@ function App() {
                         </div>
                       }>
                         <Login />
+                      </Suspense>
+                    } />
+                    <Route path="/forgot-password" element={
+                      <Suspense fallback={
+                        <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-seguranca-yellow"></div>
+                          <p className="mt-4 text-seguranca-lightgray">Carregando recuperação de senha...</p>
+                        </div>
+                      }>
+                        <ForgotPassword />
+                      </Suspense>
+                    } />
+                    <Route path="/reset-password" element={
+                      <Suspense fallback={
+                        <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-seguranca-yellow"></div>
+                          <p className="mt-4 text-seguranca-lightgray">Carregando redefinição de senha...</p>
+                        </div>
+                      }>
+                        <ResetPassword />
                       </Suspense>
                     } />
                     
