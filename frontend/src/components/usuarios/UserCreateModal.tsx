@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { User, Mail, Shield, Save, X, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '@/types/user';
-import { getRoleDisplayName, getRoleColor } from '@/utils/permissions';
+import { getRoleDisplayName, getRoleColor, USER_ROLE_LIST } from '@/utils/permissions';
 import { userService } from '@/services/userService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -147,23 +147,6 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     onClose();
   };
 
-  const roles: UserRole[] = [
-    'SUPER_ADMIN',
-    'ADMIN',
-    'SUPERVISOR',
-    'RH',
-    'ASSISTENCIA_RH',
-    'DEPARTAMENTO_PESSOAL',
-    'FINANCEIRO',
-    'OPERACIONAL',
-    'VIGILANTE',
-    'AUXI_ADMINISTRATIVO',
-    'AUX_DEP',
-    'TI_SUPORTE',
-    'AUDITOR',
-    'COLABORADOR',
-  ];
-
   const isFormValid = formData.username && 
                      formData.email && 
                      formData.name && 
@@ -249,7 +232,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
                       <SelectValue placeholder="Selecione a função" />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
-                      {roles.map((role) => (
+                      {USER_ROLE_LIST.map((role) => (
                         <SelectItem key={role} value={role}>
                           <div className="flex items-center gap-2">
                             <Badge className={getRoleColor(role)}>

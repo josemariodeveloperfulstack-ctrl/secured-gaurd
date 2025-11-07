@@ -4,7 +4,7 @@ import { UserGroupData } from '@/types/user';
 export const groupService = {
   // Buscar todos os grupos
   async getGroups(): Promise<UserGroupData[]> {
-    const response = await api.get('/groups');
+    const response = await api.get('/api/groups');
     return response.data;
   },
 
@@ -28,13 +28,13 @@ export const groupService = {
 
   // Buscar permissões do usuário por grupo
   async getUserGroupPermissions(userId: string | number): Promise<any> {
-    const response = await api.get(`/groups/user/${userId}/permissions`);
+    const response = await api.get(`/api/groups/user/${userId}/permissions`);
     return response.data;
   },
 
   // Criar novo grupo
   async createGroup(groupData: Partial<UserGroupData>): Promise<UserGroupData> {
-    const response = await api.post('/groups', groupData);
+    const response = await api.post('/api/groups', groupData);
     return response.data;
   },
 
@@ -71,6 +71,6 @@ export const groupService = {
 
   // Inicializar grupos padrão
   async initializeGroups(): Promise<void> {
-    await api.post('/groups/initialize');
+    await api.post('/api/groups/initialize');
   }
 }; 

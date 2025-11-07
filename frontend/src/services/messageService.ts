@@ -167,6 +167,10 @@ export const messageService = {
       });
       return response.data || 0;
     } catch (error) {
+      if ((error as any)?.response?.status === 403) {
+        console.warn('[MessageService] Usuário sem permissão para ler contagem de mensagens, retornando zero');
+        return 0;
+      }
       console.warn('[MessageService] Backend indisponível, usando contagem de demonstração');
       return 2; // Corresponde às mensagens de demo
     }

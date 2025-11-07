@@ -21,6 +21,7 @@ import {
 import { Loader2, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { userService, CreateUserRequest, UpdateUserRequest, User as UserType } from '@/services/userService';
+import { getRoleDisplayName, USER_ROLE_LIST } from '@/utils/permissions';
 
 interface UserFormModalProps {
   isOpen: boolean;
@@ -30,23 +31,10 @@ interface UserFormModalProps {
   mode: 'create' | 'edit';
 }
 
-const AVAILABLE_ROLES = [
-  { value: 'SUPER_ADMIN', label: 'Super Administrador' },
-  { value: 'ADMIN', label: 'Administrador' },
-  { value: 'GESTOR', label: 'Gestor' },
-  { value: 'RH', label: 'Recursos Humanos' },
-  { value: 'ASSISTENCIA_RH', label: 'Assistência de RH' },
-  { value: 'DEPARTAMENTO_PESSOAL', label: 'Departamento Pessoal' },
-  { value: 'FINANCEIRO', label: 'Financeiro' },
-  { value: 'OPERACIONAL', label: 'Operacional' },
-  { value: 'VIGILANTE', label: 'Vigilante' },
-  { value: 'AUXI_ADMINISTRATIVO', label: 'Auxiliar Administrativo' },
-  { value: 'AUX_DEP', label: 'Auxiliar Depto. Pessoal' },
-  { value: 'SUPERVISOR', label: 'Supervisor' },
-  { value: 'TI_SUPORTE', label: 'TI / Suporte' },
-  { value: 'AUDITOR', label: 'Auditor' },
-  { value: 'COLABORADOR', label: 'Colaborador' }
-];
+const AVAILABLE_ROLES = USER_ROLE_LIST.map(role => ({
+  value: role,
+  label: getRoleDisplayName(role),
+}));
 
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   isOpen,

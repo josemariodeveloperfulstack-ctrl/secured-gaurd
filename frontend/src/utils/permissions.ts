@@ -1,5 +1,23 @@
 import { UserRole, UserPermissions, UserGroupData } from '@/types/user';
 
+export const USER_ROLE_LIST: UserRole[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'GESTOR',
+  'SUPERVISOR',
+  'RH',
+  'ASSISTENCIA_RH',
+  'DEPARTAMENTO_PESSOAL',
+  'FINANCEIRO',
+  'OPERACIONAL',
+  'TI_SUPORTE',
+  'AUDITOR',
+  'COLABORADOR',
+  'VIGILANTE',
+  'AUXI_ADMINISTRATIVO',
+  'AUX_DEP',
+];
+
 // Função para gerar permissões baseadas no role principal
 export const generatePermissions = (role: UserRole): UserPermissions => {
   const basePermissions: UserPermissions = {
