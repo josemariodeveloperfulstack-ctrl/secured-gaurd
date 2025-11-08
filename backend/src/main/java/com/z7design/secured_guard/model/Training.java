@@ -47,6 +47,16 @@ public class Training {
     @Min(value = 1, message = "Duration must be at least 1")
     @Column
     private Integer duration;
+
+    @NotNull(message = "Renewal period is required")
+    @Min(value = 1, message = "Renewal period must be at least 1 month")
+    @Column(name = "renewal_period_months", nullable = false)
+    @Builder.Default
+    private Integer renewalPeriodMonths = 12;
+
+    @Column(name = "mandatory_for_guards", nullable = false)
+    @Builder.Default
+    private Boolean mandatoryForGuards = Boolean.TRUE;
     
     @OneToMany(mappedBy = "training")
     @JsonIgnoreProperties("training")

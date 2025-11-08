@@ -56,7 +56,7 @@ public class EmployeeCertificationService {
     }
     
     public EmployeeCertification findById(UUID id) {
-        return certificationRepository.findById(id)
+        return certificationRepository.findWithDetailsById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Certificação não encontrada"));
     }
     

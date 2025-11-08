@@ -1,65 +1,918 @@
-import React from 'react';
-import { Construction, GraduationCap } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Badge,
+} from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { StandardLayout } from '@/components/StandardLayout';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/use-toast';
+import { trainingService, Training, EmployeeCertification } from '@/services/trainingService';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
+import {
+  CalendarClock,
+  CheckCircle2,
+  GraduationCap,
+  Loader2,
+  RefreshCcw,
+  ShieldAlert,
+  Users,
+} from 'lucide-react';
+
+type CertificationFilter = 'all' | 'dueSoon' | 'expired' | 'compliant';
+
+const DAYS_DUE_SOON = 30;
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('pt-BR').format(date);
+};
+
+const normalizeDate = (value: string) => {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const calculateDaysUntil = (value?: string | null): number | null => {
+  if (!value) return null;
+  const target = normalizeDate(value);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = target.getTime() - startOfToday.getTime();
+  return Math.round(diff / (1000 * 60 * 60 * 24));
+};
+
+const addMonthsToDate = (value: string, months: number): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const originalDay = date.getDate();
+  date.setMonth(date.getMonth() + months);
+  if (date.getDate() < originalDay) {
+    date.setDate(0);
+  }
+  return date.toISOString().split('T')[0];
+};
+
+const todayIso = new Date().toISOString().split('T')[0];
+
+interface TrainingStats {
+  total: number;
+  expired: number;
+  dueSoon: number;
+  compliant: number;
+}
 
 const Treinamentos: React.FC = () => {
-  return (
-    <StandardLayout title="Treinamentos" subtitle="Gestão de treinamentos e capacitação de colaboradores">
-      <Card className="border-orange-200 bg-orange-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-orange-800">
-            <Construction className="h-5 w-5" />
-            Módulo em Desenvolvimento
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-gray-700">
-            O módulo de <strong>Treinamentos</strong> está em desenvolvimento e em breve estará disponível.
-          </p>
-          
-          <div className="bg-white p-4 rounded-lg border border-orange-200">
-            <h3 className="font-semibold text-gray-900 mb-3">Funcionalidades planejadas:</h3>
-            <ul className="space-y-2 text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Cadastro de programas de treinamento</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Agendamento de turmas e sessões</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Controle de presença e participação</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Avaliação de desempenho em treinamentos</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Certificados de conclusão</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Histórico de treinamentos por colaborador</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Relatórios e indicadores de capacitação</span>
-              </li>
-            </ul>
-          </div>
+  const { toast } = useToast();
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [certifications, setCertifications] = useState<EmployeeCertification[]>([]);
+  const [employees, setEmployees] = useState<SimpleEmployee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<CertificationFilter>('dueSoon');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isTrainingModalOpen, setTrainingModalOpen] = useState(false);
+  const [isAssignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [isSavingTraining, setIsSavingTraining] = useState(false);
+  const [isSavingAssignment, setIsSavingAssignment] = useState(false);
+  const [renewingCertificationId, setRenewingCertificationId] = useState<string | null>(null);
 
-          <p className="text-sm text-gray-600 italic">
-            Para solicitar priorização deste módulo ou sugerir funcionalidades, entre em contato com a equipe de desenvolvimento.
-          </p>
-        </CardContent>
-      </Card>
+  const [trainingForm, setTrainingForm] = useState({
+    name: '',
+    description: '',
+    provider: '',
+    duration: 8,
+    renewalPeriodMonths: 12,
+    mandatoryForGuards: true,
+  });
+
+  const [assignmentForm, setAssignmentForm] = useState({
+    employeeId: '',
+    trainingId: '',
+    certificationNumber: '',
+    issueDate: todayIso,
+    expirationDate: '',
+    documentUrl: '',
+  });
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [trainingData, certificationData, employeeData] = await Promise.all([
+        trainingService.getTrainings(),
+        trainingService.getEmployeeCertifications(),
+        employeeService.getSimpleEmployees(),
+      ]);
+      setTrainings(trainingData);
+      setCertifications(certificationData);
+      setEmployees(employeeData);
+    } catch (error) {
+      console.error('Erro ao carregar dados de treinamentos', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar as informações de treinamentos. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTrainingRenewalPeriod = (trainingId: string): number => {
+    if (!trainingId) return 12;
+    const training = trainings.find((item) => item.id === trainingId);
+    return training?.renewalPeriodMonths ?? 12;
+  };
+
+  const trainingStats = useMemo(() => {
+    const stats = new Map<string, TrainingStats>();
+    for (const training of trainings) {
+      stats.set(training.id, { total: 0, expired: 0, dueSoon: 0, compliant: 0 });
+    }
+
+    certifications.forEach((cert) => {
+      if (!cert.trainingId) return;
+      const entry = stats.get(cert.trainingId);
+      if (!entry) return;
+
+      entry.total += 1;
+      const days = calculateDaysUntil(cert.expirationDate);
+      if (cert.status === 'CANCELLED') {
+        return;
+      }
+      if (days !== null && days < 0) {
+        entry.expired += 1;
+      } else if (days !== null && days <= DAYS_DUE_SOON) {
+        entry.dueSoon += 1;
+      } else {
+        entry.compliant += 1;
+      }
+    });
+
+    return stats;
+  }, [certifications, trainings]);
+
+  const summary = useMemo(() => {
+    let dueSoon = 0;
+    let expired = 0;
+    let compliant = 0;
+    certifications.forEach((cert) => {
+      if (cert.status === 'CANCELLED') return;
+      const days = calculateDaysUntil(cert.expirationDate);
+      if (days !== null && days < 0) {
+        expired += 1;
+      } else if (days !== null && days <= DAYS_DUE_SOON) {
+        dueSoon += 1;
+      } else {
+        compliant += 1;
+      }
+    });
+    return {
+      totalMandatory: trainings.filter((training) => training.mandatoryForGuards !== false).length,
+      dueSoon,
+      expired,
+      compliant,
+    };
+  }, [certifications, trainings]);
+
+  const filteredCertifications = useMemo(() => {
+    const lowerTerm = searchTerm.toLowerCase().trim();
+    return certifications
+      .filter((cert) => {
+        const matchesSearch =
+          !lowerTerm ||
+          cert.employeeName?.toLowerCase().includes(lowerTerm) ||
+          cert.trainingName?.toLowerCase().includes(lowerTerm) ||
+          cert.employeeDocument?.replace(/\D/g, '').includes(lowerTerm.replace(/\D/g, ''));
+
+        if (!matchesSearch) return false;
+
+        if (cert.status === 'CANCELLED') {
+          return filterStatus === 'all';
+        }
+
+        const days = calculateDaysUntil(cert.expirationDate);
+        if (filterStatus === 'expired') {
+          return days !== null && days < 0;
+        }
+        if (filterStatus === 'dueSoon') {
+          return days !== null && days >= 0 && days <= DAYS_DUE_SOON;
+        }
+        if (filterStatus === 'compliant') {
+          return days === null || days > DAYS_DUE_SOON;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aDate = a.expirationDate || a.issueDate || '';
+        const bDate = b.expirationDate || b.issueDate || '';
+        return aDate.localeCompare(bDate);
+      });
+  }, [certifications, filterStatus, searchTerm]);
+
+  const openAssignmentModal = (trainingId?: string) => {
+    const targetTraining = trainingId ?? '';
+    const expiration = targetTraining ? addMonthsToDate(todayIso, getTrainingRenewalPeriod(targetTraining)) : '';
+    const trainingName = trainings.find((item) => item.id === targetTraining)?.name ?? '';
+    const defaultCertification = trainingName
+      ? `${trainingName.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date().getFullYear()}`
+      : '';
+
+    setAssignmentForm({
+      employeeId: '',
+      trainingId: targetTraining,
+      certificationNumber: defaultCertification,
+      issueDate: todayIso,
+      expirationDate: expiration,
+      documentUrl: '',
+    });
+    setAssignmentModalOpen(true);
+  };
+
+  const handleCreateTraining = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingTraining(true);
+    try {
+      await trainingService.createTraining({
+        name: trainingForm.name.trim(),
+        description: trainingForm.description.trim(),
+        provider: trainingForm.provider.trim(),
+        duration: trainingForm.duration,
+        renewalPeriodMonths: trainingForm.renewalPeriodMonths,
+        mandatoryForGuards: trainingForm.mandatoryForGuards,
+      });
+      toast({
+        title: 'Treinamento cadastrado',
+        description: 'O treinamento foi registrado com sucesso.',
+      });
+      setTrainingModalOpen(false);
+      setTrainingForm({
+        name: '',
+        description: '',
+        provider: '',
+        duration: 8,
+        renewalPeriodMonths: 12,
+        mandatoryForGuards: true,
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao criar treinamento', error);
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível criar o treinamento. Verifique os dados e tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingTraining(false);
+    }
+  };
+
+  const handleAssignmentSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!assignmentForm.employeeId || !assignmentForm.trainingId || !assignmentForm.issueDate) {
+      toast({
+        title: 'Dados incompletos',
+        description: 'Selecione o colaborador, o treinamento e a data de conclusão.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSavingAssignment(true);
+    try {
+      await trainingService.createEmployeeCertification({
+        employeeId: assignmentForm.employeeId,
+        trainingId: assignmentForm.trainingId,
+        certificationNumber: assignmentForm.certificationNumber || 'N/A',
+        issueDate: assignmentForm.issueDate,
+        expirationDate: assignmentForm.expirationDate,
+        documentUrl: assignmentForm.documentUrl || undefined,
+      });
+      toast({
+        title: 'Treinamento registrado',
+        description: 'A reciclagem foi vinculada ao colaborador.',
+      });
+      setAssignmentModalOpen(false);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao registrar certificação', error);
+      toast({
+        title: 'Erro ao registrar',
+        description: 'Não foi possível registrar a reciclagem. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingAssignment(false);
+    }
+  };
+
+  const handleRenewCertification = async (cert: EmployeeCertification) => {
+    const referenceDate = cert.expirationDate || cert.issueDate;
+    if (!referenceDate) {
+      toast({
+        title: 'Data não encontrada',
+        description: 'Não foi possível determinar a data base para renovação.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const months = cert.renewalPeriodMonths ?? getTrainingRenewalPeriod(cert.trainingId);
+    const newExpiration = addMonthsToDate(referenceDate, months);
+
+    setRenewingCertificationId(cert.id);
+    try {
+      await trainingService.renewEmployeeCertification(cert.id, newExpiration);
+      toast({
+        title: 'Reciclagem renovada',
+        description: `Nova validade: ${formatDate(newExpiration)}.`,
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao renovar certificação', error);
+      toast({
+        title: 'Erro ao renovar',
+        description: 'Não foi possível renovar a reciclagem. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRenewingCertificationId(null);
+    }
+  };
+
+  const renderStatusBadge = (cert: EmployeeCertification) => {
+    if (cert.status === 'CANCELLED') {
+      return <Badge variant="outline" className="border-gray-600 text-gray-400">Cancelada</Badge>;
+    }
+    const days = calculateDaysUntil(cert.expirationDate);
+    if (days === null) {
+      return <Badge className="bg-slate-600 text-white">Sem validade</Badge>;
+    }
+    if (days < 0) {
+      return <Badge className="bg-red-500/20 text-red-400 border border-red-500/40">Expirada</Badge>;
+    }
+    if (days <= DAYS_DUE_SOON) {
+      return (
+        <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/40">
+          Expira em {days} dia{days === 1 ? '' : 's'}
+        </Badge>
+      );
+    }
+    return <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">Em dia</Badge>;
+  };
+
+  if (loading) {
+    return (
+      <StandardLayout
+        title="Treinamentos e Reciclagens"
+        subtitle="Acompanhe os cursos obrigatórios e organize as reciclagens anuais dos vigilantes."
+      >
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-28 rounded-xl bg-seguranca-graphite/80" />
+            ))}
+          </div>
+          <Skeleton className="h-[420px] rounded-xl bg-seguranca-graphite/80" />
+          <Skeleton className="h-[420px] rounded-xl bg-seguranca-graphite/80" />
+        </div>
+      </StandardLayout>
+    );
+  }
+
+  return (
+    <StandardLayout
+      title="Treinamentos e Reciclagens"
+      subtitle="Organize os cursos obrigatórios dos vigilantes e acompanhe as reciclagens anuais."
+    >
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="bg-seguranca-graphite border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Treinamentos obrigatórios</CardTitle>
+              <GraduationCap className="h-5 w-5 text-seguranca-yellow" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold text-white">{summary.totalMandatory}</div>
+              <p className="text-xs text-gray-400 mt-1">
+                Cursos marcados como obrigatórios para vigilantes
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-seguranca-graphite border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Reciclagens próximas (30 dias)</CardTitle>
+              <CalendarClock className="h-5 w-5 text-amber-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold text-white">{summary.dueSoon}</div>
+              <p className="text-xs text-gray-400 mt-1">
+                Colaboradores que precisam renovar treinamento em breve
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-seguranca-graphite border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Treinamentos vencidos</CardTitle>
+              <ShieldAlert className="h-5 w-5 text-red-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold text-white">{summary.expired}</div>
+              <p className="text-xs text-gray-400 mt-1">
+                Reciclagens obrigatórias já vencidas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-seguranca-graphite border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Colaboradores em dia</CardTitle>
+              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold text-white">{summary.compliant}</div>
+              <p className="text-xs text-gray-400 mt-1">
+                Treinamentos com validade superior a 30 dias
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="bg-seguranca-graphite border-gray-700">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-xl text-white">Mapa de treinamentos obrigatórios</CardTitle>
+              <CardDescription className="text-gray-400">
+                Cadastre os cursos exigidos para vigilantes e acompanhe a quantidade de colaboradores cobertos.
+              </CardDescription>
+            </div>
+            <Button onClick={() => setTrainingModalOpen(true)} className="gap-2">
+              <GraduationCap className="h-4 w-4" />
+              Novo treinamento
+            </Button>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700 text-gray-400">
+                  <th className="py-3 text-left font-medium">Treinamento</th>
+                  <th className="py-3 text-left font-medium">Carga horária</th>
+                  <th className="py-3 text-left font-medium">Renovação</th>
+                  <th className="py-3 text-left font-medium">Cobertura</th>
+                  <th className="py-3 text-left font-medium">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trainings.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-gray-400">
+                      Nenhum treinamento cadastrado ainda.
+                    </td>
+                  </tr>
+                )}
+                {trainings.map((training) => {
+                  const stats = trainingStats.get(training.id) ?? { total: 0, expired: 0, dueSoon: 0, compliant: 0 };
+                  return (
+                    <tr key={training.id} className="border-b border-gray-800 last:border-0">
+                      <td className="py-3 align-top">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold text-white">{training.name}</span>
+                          {training.description && (
+                            <span className="text-xs text-gray-400">{training.description}</span>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            {training.provider && <span>Instrutor/Fornecedor: {training.provider}</span>}
+                            {training.mandatoryForGuards !== false && (
+                              <Badge className="uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                Obrigatório
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 text-gray-300">{training.duration ?? 0} h</td>
+                      <td className="py-3 text-gray-300">{training.renewalPeriodMonths ?? 12} meses</td>
+                      <td className="py-3 text-gray-300">
+                        <div className="flex flex-col gap-1">
+                          <span>Total certificados: {stats.total}</span>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span className="text-emerald-400">Em dia: {stats.compliant}</span>
+                            <span className="text-amber-400">Em 30 dias: {stats.dueSoon}</span>
+                            <span className="text-red-400">Vencidos: {stats.expired}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-gray-600 text-gray-200"
+                            onClick={() => openAssignmentModal(training.id)}
+                          >
+                            Registrar reciclagem
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-seguranca-graphite border-gray-700">
+          <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="text-xl text-white">Agenda de reciclagens</CardTitle>
+              <CardDescription className="text-gray-400">
+                Acompanhe quais vigilantes precisam renovar os cursos obrigatórios.
+              </CardDescription>
+            </div>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="filter-status" className="text-gray-400 text-sm">
+                  Visualizar
+                </Label>
+                <Select value={filterStatus} onValueChange={(value: CertificationFilter) => setFilterStatus(value)}>
+                  <SelectTrigger id="filter-status" className="w-[180px] bg-seguranca-black border-gray-700 text-gray-200">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100">
+                    <SelectItem value="all">Todos os registros</SelectItem>
+                    <SelectItem value="dueSoon">Válidos por até 30 dias</SelectItem>
+                    <SelectItem value="expired">Já vencidos</SelectItem>
+                    <SelectItem value="compliant">Em dia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Buscar por nome, CPF ou treinamento"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="w-full md:w-[240px] bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
+                />
+                <Button variant="outline" className="border-gray-600 text-gray-200" onClick={() => openAssignmentModal()}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Registrar reciclagem
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700 text-gray-400">
+                  <th className="py-3 text-left font-medium">Colaborador</th>
+                  <th className="py-3 text-left font-medium">Treinamento</th>
+                  <th className="py-3 text-left font-medium">Emitido em</th>
+                  <th className="py-3 text-left font-medium">Válido até</th>
+                  <th className="py-3 text-left font-medium">Status</th>
+                  <th className="py-3 text-left font-medium">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCertifications.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-gray-400">
+                      Nenhum registro encontrado para os filtros selecionados.
+                    </td>
+                  </tr>
+                )}
+                {filteredCertifications.map((cert) => (
+                  <tr key={cert.id} className="border-b border-gray-800 last:border-0">
+                    <td className="py-3">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-white">{cert.employeeName ?? '—'}</span>
+                        {cert.employeeDocument && (
+                          <span className="text-xs text-gray-500">CPF: {cert.employeeDocument}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 text-gray-300">
+                      <div className="flex flex-col gap-1">
+                        <span>{cert.trainingName ?? '—'}</span>
+                        <span className="text-xs text-gray-500">
+                          Certificado: {cert.certificationNumber || '—'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 text-gray-300">{formatDate(cert.issueDate)}</td>
+                    <td className="py-3 text-gray-300">{formatDate(cert.expirationDate)}</td>
+                    <td className="py-3">{renderStatusBadge(cert)}</td>
+                    <td className="py-3">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-gray-600 text-gray-200"
+                          onClick={() => handleRenewCertification(cert)}
+                          disabled={cert.status === 'CANCELLED' || renewingCertificationId === cert.id}
+                        >
+                          {renewingCertificationId === cert.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCcw className="h-4 w-4" />
+                          )}
+                          <span className="ml-2">Renovar</span>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={isTrainingModalOpen} onOpenChange={setTrainingModalOpen}>
+        <DialogContent className="sm:max-w-lg bg-seguranca-black border-gray-700 text-gray-200">
+          <DialogHeader>
+            <DialogTitle>Novo treinamento obrigatório</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Cadastre cursos e reciclagens que devem ser renovados periodicamente pelos vigilantes.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTraining} className="space-y-5 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="training-name" className="text-gray-300">Nome do treinamento</Label>
+              <Input
+                id="training-name"
+                value={trainingForm.name}
+                onChange={(event) => setTrainingForm((prev) => ({ ...prev, name: event.target.value }))}
+                required
+                placeholder="Ex.: Reciclagem anual de tiro"
+                className="bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="training-provider" className="text-gray-300">Instrutor ou fornecedor</Label>
+              <Input
+                id="training-provider"
+                value={trainingForm.provider}
+                onChange={(event) => setTrainingForm((prev) => ({ ...prev, provider: event.target.value }))}
+                placeholder="Ex.: Centro de Treinamento XYZ"
+                className="bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="training-description" className="text-gray-300">Descrição</Label>
+              <Textarea
+                id="training-description"
+                value={trainingForm.description}
+                onChange={(event) => setTrainingForm((prev) => ({ ...prev, description: event.target.value }))}
+                placeholder="Resumo do conteúdo abordado"
+                className="bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500 resize-none"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="training-duration" className="text-gray-300">Carga horária (horas)</Label>
+                <Input
+                  id="training-duration"
+                  type="number"
+                  min={1}
+                  value={trainingForm.duration}
+                  onChange={(event) =>
+                    setTrainingForm((prev) => ({ ...prev, duration: Number(event.target.value) || 0 }))
+                  }
+                  className="bg-seguranca-black border-gray-700 text-gray-100"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="training-renewal" className="text-gray-300">Renovação a cada (meses)</Label>
+                <Input
+                  id="training-renewal"
+                  type="number"
+                  min={1}
+                  value={trainingForm.renewalPeriodMonths}
+                  onChange={(event) =>
+                    setTrainingForm((prev) => ({
+                      ...prev,
+                      renewalPeriodMonths: Number(event.target.value) || 12,
+                    }))
+                  }
+                  className="bg-seguranca-black border-gray-700 text-gray-100"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="training-mandatory"
+                checked={trainingForm.mandatoryForGuards}
+                onCheckedChange={(checked) =>
+                  setTrainingForm((prev) => ({ ...prev, mandatoryForGuards: checked === true }))
+                }
+              />
+              <Label htmlFor="training-mandatory" className="text-gray-300">
+                Treinamento obrigatório para vigilantes
+              </Label>
+            </div>
+            <DialogFooter className="flex gap-2 sm:justify-end pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-gray-600 text-gray-200"
+                onClick={() => setTrainingModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSavingTraining} className="gap-2">
+                {isSavingTraining && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar treinamento
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAssignmentModalOpen} onOpenChange={setAssignmentModalOpen}>
+        <DialogContent className="sm:max-w-xl bg-seguranca-black border-gray-700 text-gray-200">
+          <DialogHeader>
+            <DialogTitle>Registrar reciclagem realizada</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Informe qual vigilante concluiu o treinamento e quando. A validade será calculada automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAssignmentSubmit} className="space-y-5 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="assignment-employee" className="text-gray-300">Colaborador</Label>
+              <Select
+                value={assignmentForm.employeeId}
+                onValueChange={(value) => setAssignmentForm((prev) => ({ ...prev, employeeId: value }))}
+                required
+              >
+                <SelectTrigger
+                  id="assignment-employee"
+                  className="bg-seguranca-black border-gray-700 text-gray-100"
+                >
+                  <SelectValue placeholder="Selecione o vigilante" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100 max-h-64">
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.name} {employee.document ? `- ${employee.document}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assignment-training" className="text-gray-300">Treinamento</Label>
+              <Select
+                value={assignmentForm.trainingId}
+                onValueChange={(value) => {
+                  const expiration = addMonthsToDate(
+                    assignmentForm.issueDate,
+                    getTrainingRenewalPeriod(value),
+                  );
+                  const selectedTraining = trainings.find((training) => training.id === value);
+                  setAssignmentForm((prev) => ({
+                    ...prev,
+                    trainingId: value,
+                    expirationDate: expiration,
+                    certificationNumber: prev.certificationNumber || (selectedTraining
+                      ? `${selectedTraining.name.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date(
+                        prev.issueDate || todayIso,
+                      ).getFullYear()}`
+                      : ''),
+                  }));
+                }}
+                required
+              >
+                <SelectTrigger
+                  id="assignment-training"
+                  className="bg-seguranca-black border-gray-700 text-gray-100"
+                >
+                  <SelectValue placeholder="Selecione o treinamento" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100 max-h-64">
+                  {trainings.map((training) => (
+                    <SelectItem key={training.id} value={training.id}>
+                      {training.name} ({training.renewalPeriodMonths ?? 12} meses)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="assignment-issueDate" className="text-gray-300">Data de conclusão</Label>
+                <Input
+                  id="assignment-issueDate"
+                  type="date"
+                  value={assignmentForm.issueDate}
+                  max={todayIso}
+                  onChange={(event) => {
+                    const newDate = event.target.value;
+                    setAssignmentForm((prev) => ({
+                      ...prev,
+                      issueDate: newDate,
+                      expirationDate: prev.trainingId
+                        ? addMonthsToDate(newDate, getTrainingRenewalPeriod(prev.trainingId))
+                        : prev.expirationDate,
+                    }));
+                  }}
+                  className="bg-seguranca-black border-gray-700 text-gray-100"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignment-expirationDate" className="text-gray-300">Validade até</Label>
+                <Input
+                  id="assignment-expirationDate"
+                  type="date"
+                  value={assignmentForm.expirationDate}
+                  onChange={(event) =>
+                    setAssignmentForm((prev) => ({ ...prev, expirationDate: event.target.value }))
+                  }
+                  className="bg-seguranca-black border-gray-700 text-gray-100"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="assignment-certNumber" className="text-gray-300">Número do certificado</Label>
+                <Input
+                  id="assignment-certNumber"
+                  value={assignmentForm.certificationNumber}
+                  onChange={(event) =>
+                    setAssignmentForm((prev) => ({ ...prev, certificationNumber: event.target.value }))
+                  }
+                  placeholder="Ex.: REC-TIRO-2025-001"
+                  className="bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignment-docUrl" className="text-gray-300">Link do certificado (opcional)</Label>
+                <Input
+                  id="assignment-docUrl"
+                  value={assignmentForm.documentUrl}
+                  onChange={(event) =>
+                    setAssignmentForm((prev) => ({ ...prev, documentUrl: event.target.value }))
+                  }
+                  placeholder="URL do certificado digitalizado"
+                  className="bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2 sm:justify-end pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-gray-600 text-gray-200"
+                onClick={() => setAssignmentModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSavingAssignment} className="gap-2">
+                {isSavingAssignment && <Loader2 className="h-4 w-4 animate-spin" />}
+                Registrar reciclagem
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </StandardLayout>
   );
 };
 
 export default Treinamentos;
-

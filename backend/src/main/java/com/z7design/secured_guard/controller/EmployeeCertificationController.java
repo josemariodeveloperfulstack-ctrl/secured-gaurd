@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.z7design.secured_guard.dto.EmployeeCertificationResponse;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.service.EmployeeCertificationService;
@@ -38,48 +39,57 @@ public class EmployeeCertificationController {
     @Operation(summary = "Lista certificações com filtros")
     @GetMapping
     // @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')") // Temporariamente removido para debug
-    public ResponseEntity<List<EmployeeCertification>> find(
+    public ResponseEntity<List<EmployeeCertificationResponse>> find(
             @RequestParam(value = "employeeId", required = false) UUID employeeId,
             @RequestParam(value = "trainingId", required = false) UUID trainingId,
             @RequestParam(value = "status", required = false) CertificationStatus status,
             @RequestParam(value = "expiringBefore", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiringBefore) {
+        List<EmployeeCertification> results;
         if (employeeId != null && status != null) {
-            return ResponseEntity.ok(certificationService.findByEmployeeIdAndStatus(employeeId, status));
+            results = certificationService.findByEmployeeIdAndStatus(employeeId, status);
+        } else if (employeeId != null) {
+            results = certificationService.findByEmployeeId(employeeId);
+        } else if (trainingId != null) {
+            results = certificationService.findByTrainingId(trainingId);
+        } else if (expiringBefore != null) {
+            results = certificationService.findExpiringSoon(expiringBefore);
+        } else {
+            results = certificationService.findAll();
         }
-        if (employeeId != null) {
-            return ResponseEntity.ok(certificationService.findByEmployeeId(employeeId));
-        }
-        if (trainingId != null) {
-            return ResponseEntity.ok(certificationService.findByTrainingId(trainingId));
-        }
-        if (expiringBefore != null) {
-            return ResponseEntity.ok(certificationService.findExpiringSoon(expiringBefore));
-        }
-        // default: retornar todos
-        return ResponseEntity.ok(certificationService.findAll());
+
+        List<EmployeeCertificationResponse> payload = results.stream()
+                .map(EmployeeCertificationResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(payload);
     }
 
     @Operation(summary = "Cria certificação")
     @PostMapping
     @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<EmployeeCertification> create(@RequestBody EmployeeCertification certification) {
-        return ResponseEntity.ok(certificationService.create(certification));
+    public ResponseEntity<EmployeeCertificationResponse> create(@RequestBody EmployeeCertification certification) {
+        EmployeeCertification created = certificationService.create(certification);
+        EmployeeCertification loaded = certificationService.findById(created.getId());
+        return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
     }
 
     @Operation(summary = "Atualiza certificação")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<EmployeeCertification> update(@PathVariable UUID id, @RequestBody EmployeeCertification certification) {
-        return ResponseEntity.ok(certificationService.update(id, certification));
+    public ResponseEntity<EmployeeCertificationResponse> update(@PathVariable UUID id, @RequestBody EmployeeCertification certification) {
+        EmployeeCertification updated = certificationService.update(id, certification);
+        EmployeeCertification loaded = certificationService.findById(updated.getId());
+        return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
     }
 
     @Operation(summary = "Renova certificação")
     @PutMapping("/{id}/renew")
     @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<EmployeeCertification> renew(@PathVariable UUID id,
+    public ResponseEntity<EmployeeCertificationResponse> renew(@PathVariable UUID id,
             @RequestParam("expirationDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate newExpirationDate) {
-        return ResponseEntity.ok(certificationService.renew(id, newExpirationDate));
+        EmployeeCertification renewed = certificationService.renew(id, newExpirationDate);
+        EmployeeCertification loaded = certificationService.findById(renewed.getId());
+        return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
     }
 
     @Operation(summary = "Cancela certificação")

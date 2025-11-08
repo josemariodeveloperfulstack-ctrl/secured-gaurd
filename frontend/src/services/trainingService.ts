@@ -6,6 +6,8 @@ export interface Training {
   description?: string;
   provider?: string;
   duration?: number;
+  renewalPeriodMonths?: number;
+  mandatoryForGuards?: boolean;
 }
 
 export interface Position {
@@ -29,8 +31,12 @@ export interface Unit {
 
 export interface EmployeeCertification {
   id: string;
-  employee: { id: string };
-  training: Training;
+  employeeId: string;
+  employeeName?: string;
+  employeeDocument?: string;
+  trainingId: string;
+  trainingName?: string;
+  renewalPeriodMonths?: number;
   certificationNumber: string;
   issueDate: string;
   expirationDate?: string;
@@ -79,6 +85,13 @@ class TrainingService {
       issueDate: payload.issueDate,
       expirationDate: payload.expirationDate || null,
       documentUrl: payload.documentUrl ?? 'N/A'
+    });
+    return response.data;
+  }
+
+  async renewEmployeeCertification(id: string, expirationDate: string): Promise<EmployeeCertification> {
+    const response = await api.put(`/employee-certifications/${id}/renew`, undefined, {
+      params: { expirationDate }
     });
     return response.data;
   }

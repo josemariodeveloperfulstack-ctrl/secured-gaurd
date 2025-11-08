@@ -2,8 +2,10 @@ package com.z7design.secured_guard.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,9 +14,25 @@ import com.z7design.secured_guard.model.enums.CertificationStatus;
 
 @Repository
 public interface EmployeeCertificationRepository extends JpaRepository<EmployeeCertification, UUID> {
+    @Override
+    @EntityGraph(attributePaths = {"employee", "training"})
+    List<EmployeeCertification> findAll();
+
+    @EntityGraph(attributePaths = {"employee", "training"})
     List<EmployeeCertification> findByEmployeeId(UUID employeeId);
+
+    @EntityGraph(attributePaths = {"employee", "training"})
     List<EmployeeCertification> findByEmployeeIdAndStatus(UUID employeeId, CertificationStatus status);
+
+    @EntityGraph(attributePaths = {"employee", "training"})
     List<EmployeeCertification> findByTrainingId(UUID trainingId);
+
+    @EntityGraph(attributePaths = {"employee", "training"})
     List<EmployeeCertification> findByExpirationDateBefore(LocalDate date);
+
+    @EntityGraph(attributePaths = {"employee", "training"})
     List<EmployeeCertification> findByExpirationDateBetween(LocalDate startDate, LocalDate endDate);
+
+    @EntityGraph(attributePaths = {"employee", "training"})
+    Optional<EmployeeCertification> findWithDetailsById(UUID id);
 } 

@@ -21,6 +21,7 @@ public class TrainingService {
     @Transactional
     public Training create(Training training) {
         validateTraining(training);
+        applyDefaults(training);
         return trainingRepository.save(training);
     }
     
@@ -33,6 +34,9 @@ public class TrainingService {
         existingTraining.setDescription(training.getDescription());
         existingTraining.setProvider(training.getProvider());
         existingTraining.setDuration(training.getDuration());
+        existingTraining.setRenewalPeriodMonths(training.getRenewalPeriodMonths());
+        existingTraining.setMandatoryForGuards(training.getMandatoryForGuards());
+        applyDefaults(existingTraining);
         
         return trainingRepository.save(existingTraining);
     }
@@ -67,6 +71,19 @@ public class TrainingService {
         
         if (training.getDuration() != null && training.getDuration() <= 0) {
             throw new IllegalArgumentException("Duração do treinamento deve ser maior que zero");
+        }
+
+        if (training.getRenewalPeriodMonths() != null && training.getRenewalPeriodMonths() <= 0) {
+            throw new IllegalArgumentException("Periodicidade de renovação deve ser maior que zero");
+        }
+    }
+
+    private void applyDefaults(Training training) {
+        if (training.getRenewalPeriodMonths() == null || training.getRenewalPeriodMonths() <= 0) {
+            training.setRenewalPeriodMonths(12);
+        }
+        if (training.getMandatoryForGuards() == null) {
+            training.setMandatoryForGuards(Boolean.TRUE);
         }
     }
 } 
