@@ -229,15 +229,29 @@ public class WorkPostAssignmentService {
             );
         }
 
+        String shift = assignment.getShiftType() != null ? assignment.getShiftType().name() : null;
+
+        String status = null;
+        if (assignment.getStatus() != null) {
+            switch (assignment.getStatus()) {
+                case PENDING -> status = "SCHEDULED";
+                case ACTIVE, CONFIRMED -> status = "CONFIRMED";
+                case COMPLETED -> status = "COMPLETED";
+                case CANCELLED -> status = "CANCELLED";
+                case MODIFIED -> status = "MODIFIED";
+                default -> status = assignment.getStatus().name();
+            }
+        }
+
         return WorkPostAssignmentResponse.builder()
                 .id(assignment.getId())
                 .employee(employeeData)
                 .workPost(workPostData)
                 .assignmentDate(assignment.getAssignmentDate())
-                .shift(assignment.getShiftType() != null ? assignment.getShiftType().name() : null)
+                .shift(shift)
                 .startTime(assignment.getStartTime())
                 .endTime(assignment.getEndTime())
-                .status(assignment.getStatus() != null ? assignment.getStatus().name() : null)
+                .status(status)
                 .primaryAssignment(assignment.getIsPrimaryAssignment())
                 .backupAssignment(assignment.getIsBackupAssignment())
                 .observations(assignment.getObservations())
