@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.WorkPostAssignment;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.WorkPost;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -28,43 +30,68 @@ public class WorkPostAssignmentService {
     @Autowired
     private WorkPostRepository workPostRepository;
 
-    public List<WorkPostAssignment> getAllWorkPostAssignments() {
-        return workPostAssignmentRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getAllWorkPostAssignments() {
+        return workPostAssignmentRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public Optional<WorkPostAssignment> getWorkPostAssignmentById(UUID id) {
-        return workPostAssignmentRepository.findById(id);
+    @Transactional(readOnly = true)
+    public Optional<WorkPostAssignmentResponse> getWorkPostAssignmentById(UUID id) {
+        return workPostAssignmentRepository.findById(id).map(this::mapToResponse);
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByEmployee(UUID employeeId) {
-        return workPostAssignmentRepository.findByEmployeeId(employeeId);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByEmployee(UUID employeeId) {
+        return workPostAssignmentRepository.findByEmployeeId(employeeId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByWorkPost(UUID workPostId) {
-        return workPostAssignmentRepository.findByWorkPostId(workPostId);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByWorkPost(UUID workPostId) {
+        return workPostAssignmentRepository.findByWorkPostId(workPostId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByDate(LocalDate date) {
-        return workPostAssignmentRepository.findByAssignmentDate(date);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByDate(LocalDate date) {
+        return workPostAssignmentRepository.findByAssignmentDate(date).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByStatus(WorkPostAssignment.AssignmentStatus status) {
-        return workPostAssignmentRepository.findByStatus(status);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByStatus(WorkPostAssignment.AssignmentStatus status) {
+        return workPostAssignmentRepository.findByStatus(status).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByDateRange(LocalDate startDate, LocalDate endDate) {
-        return workPostAssignmentRepository.findByDateRange(startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByDateRange(LocalDate startDate, LocalDate endDate) {
+        return workPostAssignmentRepository.findByDateRange(startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByEmployeeAndDateRange(UUID employeeId, LocalDate startDate, LocalDate endDate) {
-        return workPostAssignmentRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByEmployeeAndDateRange(UUID employeeId, LocalDate startDate, LocalDate endDate) {
+        return workPostAssignmentRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getWorkPostAssignmentsByWorkPostAndDateRange(UUID workPostId, LocalDate startDate, LocalDate endDate) {
-        return workPostAssignmentRepository.findByWorkPostAndDateRange(workPostId, startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByWorkPostAndDateRange(UUID workPostId, LocalDate startDate, LocalDate endDate) {
+        return workPostAssignmentRepository.findByWorkPostAndDateRange(workPostId, startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public WorkPostAssignment createWorkPostAssignment(WorkPostAssignment assignment) {
+    public WorkPostAssignmentResponse createWorkPostAssignment(WorkPostAssignment assignment) {
         // Validar se o funcionário existe
         Employee employee = employeeRepository.findById(assignment.getEmployee().getId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
@@ -94,10 +121,10 @@ public class WorkPostAssignmentService {
         assignment.setCreatedAt(java.time.LocalDateTime.now());
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
 
-        return workPostAssignmentRepository.save(assignment);
+        return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
-    public WorkPostAssignment updateWorkPostAssignment(UUID id, WorkPostAssignment updatedAssignment) {
+    public WorkPostAssignmentResponse updateWorkPostAssignment(UUID id, WorkPostAssignment updatedAssignment) {
         WorkPostAssignment existingAssignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
 
@@ -124,7 +151,7 @@ public class WorkPostAssignmentService {
             existingAssignment.setWorkPost(workPost);
         }
 
-        return workPostAssignmentRepository.save(existingAssignment);
+        return mapToResponse(workPostAssignmentRepository.save(existingAssignment));
     }
 
     public void deleteWorkPostAssignment(UUID id) {
@@ -134,45 +161,91 @@ public class WorkPostAssignmentService {
         workPostAssignmentRepository.deleteById(id);
     }
 
-    public WorkPostAssignment updateStatus(UUID id, WorkPostAssignment.AssignmentStatus status) {
+    public WorkPostAssignmentResponse updateStatus(UUID id, WorkPostAssignment.AssignmentStatus status) {
         WorkPostAssignment assignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
         
         assignment.setStatus(status);
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return workPostAssignmentRepository.save(assignment);
+        return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
-    public WorkPostAssignment confirmAssignment(UUID id) {
+    public WorkPostAssignmentResponse confirmAssignment(UUID id) {
         WorkPostAssignment assignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
         
         assignment.setStatus(WorkPostAssignment.AssignmentStatus.CONFIRMED);
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return workPostAssignmentRepository.save(assignment);
+        return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
-    public WorkPostAssignment completeAssignment(UUID id) {
+    public WorkPostAssignmentResponse completeAssignment(UUID id) {
         WorkPostAssignment assignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
         
         assignment.setStatus(WorkPostAssignment.AssignmentStatus.COMPLETED);
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return workPostAssignmentRepository.save(assignment);
+        return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
-    public List<WorkPostAssignment> getTodayAssignments() {
-        return workPostAssignmentRepository.findByAssignmentDate(LocalDate.now());
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getTodayAssignments() {
+        return workPostAssignmentRepository.findByAssignmentDate(LocalDate.now()).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getPendingAssignments() {
-        return workPostAssignmentRepository.findByStatus(WorkPostAssignment.AssignmentStatus.PENDING);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getPendingAssignments() {
+        return workPostAssignmentRepository.findByStatus(WorkPostAssignment.AssignmentStatus.PENDING).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<WorkPostAssignment> getActiveAssignments() {
-        return workPostAssignmentRepository.findByStatus(WorkPostAssignment.AssignmentStatus.CONFIRMED);
+    @Transactional(readOnly = true)
+    public List<WorkPostAssignmentResponse> getActiveAssignments() {
+        return workPostAssignmentRepository.findByStatus(WorkPostAssignment.AssignmentStatus.CONFIRMED).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private WorkPostAssignmentResponse mapToResponse(WorkPostAssignment assignment) {
+        WorkPostAssignmentResponse.SimpleEmployee employeeData = null;
+        if (assignment.getEmployee() != null) {
+            employeeData = new WorkPostAssignmentResponse.SimpleEmployee(
+                    assignment.getEmployee().getId(),
+                    assignment.getEmployee().getName()
+            );
+        }
+
+        WorkPostAssignmentResponse.SimpleWorkPost workPostData = null;
+        if (assignment.getWorkPost() != null) {
+            workPostData = new WorkPostAssignmentResponse.SimpleWorkPost(
+                    assignment.getWorkPost().getId(),
+                    assignment.getWorkPost().getName()
+            );
+        }
+
+        return WorkPostAssignmentResponse.builder()
+                .id(assignment.getId())
+                .employee(employeeData)
+                .workPost(workPostData)
+                .assignmentDate(assignment.getAssignmentDate())
+                .shift(assignment.getShiftType() != null ? assignment.getShiftType().name() : null)
+                .startTime(assignment.getStartTime())
+                .endTime(assignment.getEndTime())
+                .status(assignment.getStatus() != null ? assignment.getStatus().name() : null)
+                .primaryAssignment(assignment.getIsPrimaryAssignment())
+                .backupAssignment(assignment.getIsBackupAssignment())
+                .observations(assignment.getObservations())
+                .specialInstructions(assignment.getSpecialInstructions())
+                .assignedById(assignment.getAssignedBy() != null ? assignment.getAssignedBy().getId() : null)
+                .assignmentDateTime(assignment.getAssignmentDateTime())
+                .createdAt(assignment.getCreatedAt())
+                .updatedAt(assignment.getUpdatedAt())
+                .build();
     }
 }
