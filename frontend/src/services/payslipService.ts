@@ -52,6 +52,23 @@ export const payslipService = {
     return response.data;
   },
 
+  async getAllPayslips(): Promise<Payslip[]> {
+    // Verificar se é um colaborador e filtrar por CPF
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      console.log('👤 PayslipService - Usuário logado:', user.name, 'Role:', user.role);
+      
+      // Se for COLABORADOR, filtrar por CPF (username é o CPF)
+      if (user.role === 'COLABORADOR' && user.username) {
+        console.log('🔒 PayslipService - Filtrando por CPF:', user.username);
+        return this.getPayslips({ cpf: user.username });
+      }
+    }
+    
+    return this.getPayslips();
+  },
+
   // Upload simples (apenas processamento)
   async uploadPayslips(file: File): Promise<Payslip[]> {
     const formData = new FormData();
@@ -151,14 +168,24 @@ export const payslipService = {
   // Baixar holerite
   async downloadPayslip(fileName: string): Promise<Blob> {
     console.log('🔍 PayslipService - Tentando baixar:', fileName);
-    
-    // Temporariamente usar o endpoint de teste
-    const response = await api.get(`/payslips/test-download/${encodeURIComponent(fileName)}`, {
-      responseType: 'blob',
-    });
-    
-    console.log('✅ PayslipService - Download bem-sucedido, tamanho:', response.data.size);
-    return response.data;
+    try {
+      const response = await api.get(`/payslips/download/${encodeURIComponent(fileName)}`, {
+        responseType: 'blob',
+      });
+      console.log('✅ PayslipService - Download bem-sucedido, tamanho:', response.data.size);
+      return response.data;
+    } catch (error: any) {
+      console.warn('⚠️ PayslipService - Falha no endpoint principal, tentando fallback', error?.response?.status);
+      if (error?.response?.status !== 404) {
+        throw error;
+      }
+
+      const fallbackResponse = await api.get(`/payslips/test-download/${encodeURIComponent(fileName)}`, {
+        responseType: 'blob',
+      });
+      console.log('✅ PayslipService - Download via fallback bem-sucedido, tamanho:', fallbackResponse.data.size);
+      return fallbackResponse.data;
+    }
   },
 
   // ==================== NOVOS ENDPOINTS DE GERENCIAMENTO ====================

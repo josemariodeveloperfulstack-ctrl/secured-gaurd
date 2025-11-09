@@ -20,6 +20,7 @@ import {
   DollarSign 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import fleetService from '@/services/fleetService';
 
 interface Multa {
   id: string;
@@ -63,13 +64,10 @@ const MultaDeleteDialog: React.FC<MultaDeleteDialogProps> = ({
     if (!multa) return;
 
     setIsLoading(true);
-    try {
-      // Importar o fleetService
-      const fleetService = await import('@/services/fleetService');
-      
+    try {      
       // Chamar API para excluir multa
       console.log('🗑️ Excluindo multa do backend:', multa.id);
-      await fleetService.default.deleteFine(multa.id);
+      await fleetService.deleteFine(multa.id);
       console.log('✅ Multa excluída do backend!');
       
       toast({

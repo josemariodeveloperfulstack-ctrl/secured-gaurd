@@ -44,7 +44,9 @@ import AdvancedFilters from '@/components/holerites/AdvancedFilters';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import UnificadosPorSetor from './UnificadosPorSetor';
+import CollaboratorHolerites from './HoleritesColaborador';
 import { payslipService } from '@/services/payslipService';
+import { unifiedDocumentService } from '@/services/unifiedDocumentService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -59,6 +61,10 @@ import { employeeService } from '@/services/employeeService';
 
 const Holerites: React.FC = () => {
   const { user } = useAuth();
+  const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '').toUpperCase();
+  if (normalizedRole === 'COLABORADOR' && user) {
+    return <CollaboratorHolerites user={user} />;
+  }
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -141,7 +147,8 @@ const Holerites: React.FC = () => {
   const [showUnifiedViewerModal, setShowUnifiedViewerModal] = useState(false);
   const [viewerDocumentIndex, setViewerDocumentIndex] = useState<number | null>(null);
   const [viewerDocument, setViewerDocument] = useState<any>(null);
-  const [viewerUrl, setViewerUrl] = useState<string>('');
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const viewerUrlRef = useRef<string | null>(null);
   
   // Estados para exclusão de documentos unificados
   const [showUnifiedDeleteModal, setShowUnifiedDeleteModal] = useState(false);
@@ -168,6 +175,15 @@ const Holerites: React.FC = () => {
   const [logsMonth, setLogsMonth] = useState<string>('');
   const [logsYear, setLogsYear] = useState<string>('');
   const [loadingLogs, setLoadingLogs] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (viewerUrlRef.current) {
+        URL.revokeObjectURL(viewerUrlRef.current);
+        viewerUrlRef.current = null;
+      }
+    };
+  }, []);
 
   // Callback após validação: aqui chamaremos envio real na Fase 3
   const handleValidated = async (validatedIds: string[]) => {
@@ -842,23 +858,54 @@ const Holerites: React.FC = () => {
   };
 
   // AÃ§Ãµes de visualizaÃ§Ã£o/baixa/envio por item
-  const openUnifiedViewer = (doc: any, index: number) => {
-    const apiUrl = getApiUrl().replace('/api', '');
-    const url = `${apiUrl}/api/unified-documents/public/file/${encodeURIComponent(doc.fileName)}`;
-    setViewerDocumentIndex(index);
-    setViewerDocument(doc);
-    setViewerUrl(url);
-    setShowUnifiedViewerModal(true);
+  const openUnifiedViewer = async (doc: any, index: number) => {
+    try {
+      const blob = await unifiedDocumentService.fetchUnifiedDocumentBlob(doc.fileName);
+      const objectUrl = URL.createObjectURL(blob);
+
+      if (viewerUrlRef.current) {
+        URL.revokeObjectURL(viewerUrlRef.current);
+      }
+
+      viewerUrlRef.current = objectUrl;
+      setViewerUrl(objectUrl);
+      setViewerDocumentIndex(index);
+      setViewerDocument(doc);
+      setShowUnifiedViewerModal(true);
+    } catch (error) {
+      console.error('Erro ao carregar documento unificado:', error);
+      toast({
+        title: 'Erro ao abrir documento',
+        description: 'Não foi possível carregar o PDF unificado. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const downloadUnifiedDocument = (doc: any) => {
-    const apiUrl = getApiUrl().replace('/api', '');
-    const url = `${apiUrl}/api/unified-documents/download/${encodeURIComponent(doc.fileName)}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = doc.fileName;
-    link.target = '_blank';
-    link.click();
+  const downloadUnifiedDocument = async (doc: any) => {
+    try {
+      await unifiedDocumentService.downloadUnifiedDocument(doc.fileName);
+    } catch (error) {
+      console.error('Erro ao baixar documento unificado:', error);
+      toast({
+        title: 'Erro ao baixar documento',
+        description: 'Não foi possível iniciar o download. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUnifiedViewerOpenChange = (open: boolean) => {
+    setShowUnifiedViewerModal(open);
+    if (!open) {
+      setViewerDocumentIndex(null);
+      setViewerDocument(null);
+      setViewerUrl(null);
+      if (viewerUrlRef.current) {
+        URL.revokeObjectURL(viewerUrlRef.current);
+        viewerUrlRef.current = null;
+      }
+    }
   };
 
   // Função para validar documento unificado antes de enviar
@@ -4543,14 +4590,8 @@ const Holerites: React.FC = () => {
                                                                   return (
                                                               <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
                                           {/* Botão Ver - sempre disponível */}
-                                          <Button
-                                              onClick={() => {
-                                                  setViewerDocumentIndex(index);
-                                                  setViewerDocument(doc);
-                                                  const apiUrl = getApiUrl().replace('/api', '');
-                                                  setViewerUrl(`${apiUrl}/api/unified-documents/public/file/${encodeURIComponent(doc.fileName)}`);
-                                                  setShowUnifiedViewerModal(true);
-                                              }}
+                                                                  <Button
+                                              onClick={() => openUnifiedViewer(doc, index)}
                                               size="sm"
                                                                       className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
                                                                   >
@@ -4578,16 +4619,7 @@ const Holerites: React.FC = () => {
                                                                       WhatsApp
                                           </Button>
                                           <Button
-                                              onClick={() => {
-                                                  const link = document.createElement('a');
-                                                  const apiUrl = getApiUrl().replace('/api', '');
-                                                  link.href = `${apiUrl}/api/unified-documents/download/${encodeURIComponent(doc.fileName)}`;
-                                                  link.download = doc.fileName;
-                                                  link.target = '_blank';
-                                                  document.body.appendChild(link);
-                                                  link.click();
-                                                  document.body.removeChild(link);
-                                              }}
+                                              onClick={() => downloadUnifiedDocument(doc)}
                                               size="sm"
                                                                       className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
                                                                   >
@@ -5400,7 +5432,7 @@ const Holerites: React.FC = () => {
 
         {/* Modal de Visualização de Documento Unificado */}
         {showUnifiedViewerModal && viewerDocument && viewerUrl && (
-          <Dialog open={showUnifiedViewerModal} onOpenChange={setShowUnifiedViewerModal}>
+          <Dialog open={showUnifiedViewerModal} onOpenChange={handleUnifiedViewerOpenChange}>
             <DialogContent className="w-[95vw] h-[95vh] sm:w-[90vw] sm:h-[90vh] lg:max-w-6xl lg:max-h-[90vh] bg-gradient-to-br from-seguranca-graphite via-seguranca-black to-seguranca-graphite border border-purple-600/50 rounded-2xl p-0 overflow-hidden">
               <DialogHeader className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-b border-purple-500/20 p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

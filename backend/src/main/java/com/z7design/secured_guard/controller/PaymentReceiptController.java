@@ -5,6 +5,7 @@ import com.z7design.secured_guard.dto.PaymentReceiptDTO;
 import com.z7design.secured_guard.service.PaymentReceiptService;
 import com.z7design.secured_guard.service.ReceiptProcessingService;
 import com.z7design.secured_guard.model.PaymentReceipt;
+import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -30,6 +32,9 @@ public class PaymentReceiptController {
     
     @Autowired
     private ReceiptProcessingService receiptProcessingService;
+    
+    @Autowired
+    private AuthenticatedCpfResolver authenticatedCpfResolver;
     
     // Criar novo comprovante
     @PostMapping
@@ -52,10 +57,14 @@ public class PaymentReceiptController {
             
             List<PaymentReceiptDTO> receipts;
             if (isColaborador) {
-                String cpf = auth.getName(); // username é o CPF
-                log.info("👤 Usuário colaborador, buscando comprovantes por CPF: {}", cpf);
-                // Por enquanto, buscar todos e filtrar no service
-                receipts = paymentReceiptService.findByUserCpf(cpf);
+                var resolvedCpf = authenticatedCpfResolver.resolve(auth);
+                if (resolvedCpf.isEmpty()) {
+                    log.warn("⚠️ Não foi possível determinar o CPF do colaborador {}", auth.getName());
+                    receipts = Collections.emptyList();
+                } else {
+                    log.info("👤 Usuário colaborador, buscando comprovantes por CPF: {}", resolvedCpf.get());
+                    receipts = paymentReceiptService.findByUserCpf(resolvedCpf.get());
+                }
             } else {
                 log.info("👑 Usuário admin, buscando todos os comprovantes");
                 receipts = paymentReceiptService.findAll();

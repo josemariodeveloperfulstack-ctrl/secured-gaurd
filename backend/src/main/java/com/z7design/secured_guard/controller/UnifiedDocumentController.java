@@ -7,6 +7,7 @@ import com.z7design.secured_guard.service.PayslipService;
 import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
+import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.FileSystemResource;
@@ -27,6 +29,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @RestController
 @RequestMapping("/api/unified-documents")
@@ -39,6 +46,9 @@ public class UnifiedDocumentController {
     private final WhatsAppService whatsAppService;
     private final PayslipService payslipService;
     private final PaymentReceiptRepository paymentReceiptRepository;
+    private final AuthenticatedCpfResolver authenticatedCpfResolver;
+
+    private static final Pattern CPF_PATTERN = Pattern.compile("(\\d{11})");
 
     /**
      * Cria documento unificado para um funcionário específico
@@ -425,6 +435,51 @@ public class UnifiedDocumentController {
         }
     }
 
+    @GetMapping("/view/{fileName:.+}")
+    public ResponseEntity<Resource> viewUnifiedDocument(@PathVariable String fileName) {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+
+            if (isColaborador) {
+                Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+                Optional<String> fileCpf = extractCpfFromFileName(fileName);
+                if (resolvedCpf.isEmpty() || fileCpf.isEmpty() || !resolvedCpf.get().equals(fileCpf.get())) {
+                    log.warn("⚠️ Colaborador {} sem permissão para visualizar documento {}", auth.getName(), fileName);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+            }
+
+            Path basePath = Paths.get("uploads", "unified");
+            Path filePath = findFileRecursively(basePath, fileName);
+
+            if (filePath == null) {
+                log.warn("⚠️ Documento unificado não encontrado: {}", fileName);
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new FileSystemResource(filePath.toFile());
+            if (!resource.exists()) {
+                log.warn("⚠️ Recurso não encontrado no caminho: {}", filePath);
+                return ResponseEntity.notFound().build();
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("inline", fileName);
+            headers.setCacheControl("no-cache, no-store, must-revalidate");
+            headers.setPragma("no-cache");
+            headers.setExpires(0);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("💥 Erro ao visualizar documento unificado {}: {}", fileName, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     /**
      * Endpoint alternativo para download de arquivos unificados
      */
@@ -496,6 +551,19 @@ public class UnifiedDocumentController {
             log.error("💥 Erro ao procurar arquivo recursivamente: {}", e.getMessage());
             return null;
         }
+    }
+
+    private Optional<String> extractCpfFromFileName(String fileName) {
+        if (fileName == null) {
+            return Optional.empty();
+        }
+
+        Matcher matcher = CPF_PATTERN.matcher(fileName);
+        if (matcher.find()) {
+            return Optional.of(matcher.group(1));
+        }
+
+        return Optional.empty();
     }
 
     /**
@@ -723,7 +791,6 @@ public class UnifiedDocumentController {
                 
                 // Determinar tipo de unificação baseado no nome do arquivo
                 String fileName = (String) doc.get("fileName");
-                String employeeName = (String) doc.get("employeeName");
                 
                 if (fileName != null && fileName.contains("UNIFICADO_")) {
                     // Documento unificado individual
@@ -800,7 +867,6 @@ public class UnifiedDocumentController {
                 
                 // Determinar tipo de unificação baseado no nome do arquivo
                 String fileName = (String) doc.get("fileName");
-                String employeeName = (String) doc.get("employeeName");
                 
                 if (fileName != null && fileName.contains("UNIFICADO_")) {
                     // Documento unificado individual

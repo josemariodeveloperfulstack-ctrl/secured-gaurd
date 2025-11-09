@@ -5,6 +5,7 @@ import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.service.PayslipProcessingService;
 import com.z7design.secured_guard.service.PayslipService;
 import com.z7design.secured_guard.service.ExtractDataHoleritesService;
+import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +23,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.CompletableFuture;
 import java.util.Collections;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,6 +45,7 @@ public class PayslipController {
     private final PayslipService payslipService;
     private final PayslipProcessingService payslipProcessingService;
     private final ExtractDataHoleritesService extractDataHoleritesService;
+    private final AuthenticatedCpfResolver authenticatedCpfResolver;
 
     // ==================== ENDPOINTS UNIFICADOS ====================
 
@@ -104,8 +106,7 @@ public class PayslipController {
             envioRequest.setFuncionarioIds(funcionarioIds);
             
             // Iniciar processamento assíncrono
-            CompletableFuture<PayslipProcessingService.ProcessingResult> future = 
-                payslipProcessingService.processAsync(file, envioRequest);
+            payslipProcessingService.processAsync(file, envioRequest);
             
             return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
@@ -157,11 +158,16 @@ public class PayslipController {
         log.info("🔍 Iniciando busca de todos os payslips...");
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+        Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
         List<Payslip> payslips;
         if (isColaborador) {
-            String cpf = auth.getName(); // username é o CPF
-            log.info("👤 Usuário colaborador, buscando payslips por CPF: {}", cpf);
-            payslips = payslipService.getPayslipsByCpf(cpf);
+            if (resolvedCpf.isEmpty()) {
+                log.warn("⚠️ Não foi possível determinar o CPF do colaborador {}", auth.getName());
+                payslips = Collections.emptyList();
+            } else {
+                log.info("👤 Usuário colaborador, buscando payslips por CPF: {}", resolvedCpf.get());
+                payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+            }
         } else {
             log.info("👑 Usuário admin, buscando todos os payslips");
             payslips = payslipService.getAllPayslips();
@@ -180,23 +186,16 @@ public class PayslipController {
     public ResponseEntity<Resource> downloadPayslip(@PathVariable String fileName) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+        Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+        Payslip payslip = payslipService.getPayslipByFileName(fileName);
         if (isColaborador) {
-            String cpf = auth.getName();
-            Payslip payslip = payslipService.getPayslipByFileName(fileName);
-            if (payslip == null || !cpf.equals(payslip.getCpf())) {
+            Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip != null ? payslip.getCpf() : null);
+            if (payslip == null || resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
         }
         try {
-            // Usar caminho configurável ou padrão
-            String uploadDir = System.getProperty("payslips.upload.dir", "uploads/payslips");
-            Path filePath = Paths.get(uploadDir, fileName);
-            
-            // Se o caminho não existir, tentar o caminho antigo como fallback
-            if (!java.nio.file.Files.exists(filePath)) {
-                filePath = Paths.get("backend/payslips_output", fileName);
-            }
-            
+            Path filePath = resolvePayslipPath(payslip, fileName);
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return ResponseEntity.ok()
@@ -251,42 +250,63 @@ public class PayslipController {
         }
     }
     
+    private Path resolvePayslipPath(Payslip payslip, String fileName) throws MalformedURLException {
+        Path filePath = null;
+
+        if (payslip != null && payslip.getCpf() != null && payslip.getMonth() != null && payslip.getYear() != null) {
+            filePath = payslipService.resolvePayslipPathByCpfMonthYear(
+                    payslip.getCpf(),
+                    payslip.getMonth(),
+                    payslip.getYear()
+            ).map(Paths::get).orElse(null);
+        }
+
+        if (filePath == null || !java.nio.file.Files.exists(filePath)) {
+            filePath = findPayslipFile(fileName);
+        }
+
+        if (filePath == null || !java.nio.file.Files.exists(filePath)) {
+            throw new MalformedURLException("Arquivo não encontrado nos diretórios configurados");
+        }
+
+        return filePath;
+    }
+    
     private Path findPayslipFile(String fileName) {
-        // 1. Tentar no diretório de uploads padrão
         String uploadDir = System.getProperty("payslips.upload.dir", "uploads/payslips");
         Path filePath = Paths.get(uploadDir, fileName);
         
-        // 2. Se não existir, tentar no diretório de output antigo
-        if (!java.nio.file.Files.exists(filePath)) {
-            filePath = Paths.get("backend/payslips_output", fileName);
+        if (java.nio.file.Files.exists(filePath)) {
+            return filePath;
         }
         
-        // 3. Se não existir, tentar no diretório de holerites (raiz)
-        if (!java.nio.file.Files.exists(filePath)) {
-            filePath = Paths.get("backend/holerites", fileName);
+        filePath = Paths.get("backend/payslips_output", fileName);
+        if (java.nio.file.Files.exists(filePath)) {
+            return filePath;
         }
         
-        // 4. Se não existir, tentar buscar nas subpastas de holerites por mês/ano
-        if (!java.nio.file.Files.exists(filePath)) {
-            Path holeritesDir = Paths.get("backend/holerites");
-            if (java.nio.file.Files.exists(holeritesDir)) {
-                try {
-                    for (Path subDir : java.nio.file.Files.list(holeritesDir).toList()) {
-                        if (java.nio.file.Files.isDirectory(subDir)) {
-                            Path potentialFile = subDir.resolve(fileName);
-                            if (java.nio.file.Files.exists(potentialFile)) {
-                                filePath = potentialFile;
-                                break;
-                            }
+        filePath = Paths.get("backend/holerites", fileName);
+        if (java.nio.file.Files.exists(filePath)) {
+            return filePath;
+        }
+        
+        Path holeritesDir = Paths.get("backend/holerites");
+        if (java.nio.file.Files.exists(holeritesDir)) {
+            try {
+                for (Path subDir : java.nio.file.Files.list(holeritesDir).toList()) {
+                    if (java.nio.file.Files.isDirectory(subDir)) {
+                        Path potentialFile = subDir.resolve(fileName);
+                        if (java.nio.file.Files.exists(potentialFile)) {
+                            return potentialFile;
                         }
                     }
-                } catch (Exception e) {
-                    log.warn("Erro ao buscar em subpastas: {}", e.getMessage());
                 }
+            } catch (Exception e) {
+                log.warn("Erro ao buscar em subpastas: {}", e.getMessage());
             }
         }
         
-        return filePath;
+        return null;
     }
 
     // Exclusão individual de payslip

@@ -1,15 +1,13 @@
 import api from '@/lib/axios';
 
 export interface UnifiedDocument {
-  id: string;
-  employeeName: string;
-  cpf: string;
-  month: number;
-  year: number;
-  payslipFileName: string;
-  receiptFileName: string;
-  unifiedFileName: string;
-  createdAt: string;
+  fileName: string;
+  filePath?: string;
+  employeeName?: string;
+  cpf?: string;
+  month?: number;
+  year?: number;
+  [key: string]: unknown;
 }
 
 export const unifiedDocumentService = {
@@ -19,22 +17,37 @@ export const unifiedDocumentService = {
    */
   async getAllUnifiedDocuments(): Promise<UnifiedDocument[]> {
     try {
+      // Verificar se é um colaborador para adicionar filtro por CPF
+      const userStr = localStorage.getItem('user');
+      let cpfParam = '';
+      
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log('👤 UnifiedDocumentService - Usuário logado:', user.name, 'Role:', user.role);
+        
+        // Se for COLABORADOR, adicionar filtro por CPF (username é o CPF)
+        if (user.role === 'COLABORADOR' && user.username) {
+          console.log('🔒 UnifiedDocumentService - Filtrando por CPF:', user.username);
+          cpfParam = `?cpf=${user.username}`;
+        }
+      }
+      
       // Tentar primeiro o endpoint protegido (quando as permissões estiverem funcionando)
       try {
-        const response = await api.get('/unified-documents/list');
+        const response = await api.get(`/unified-documents/list${cpfParam}`);
         if (response.data && response.data.documents) {
-          return response.data.documents;
+          return normalizeDocuments(response.data.documents);
         }
-        return response.data || [];
+        return normalizeDocuments(response.data || []);
       } catch (protectedError) {
         console.warn('Endpoint protegido falhou, tentando público:', protectedError);
         
         // Fallback para endpoint público
-        const publicResponse = await api.get('/unified-documents/public/list');
+        const publicResponse = await api.get(`/unified-documents/public/list${cpfParam}`);
         if (publicResponse.data && publicResponse.data.documents) {
-          return publicResponse.data.documents;
+          return normalizeDocuments(publicResponse.data.documents);
         }
-        return publicResponse.data || [];
+        return normalizeDocuments(publicResponse.data || []);
       }
     } catch (error) {
       console.error('Erro ao buscar documentos unificados:', error);
@@ -47,7 +60,7 @@ export const unifiedDocumentService = {
    */
   async downloadUnifiedDocument(fileName: string): Promise<void> {
     try {
-      const response = await api.get(`/unified-documents/download/${fileName}`, {
+      const response = await api.get(`/unified-documents/download/${encodeURIComponent(fileName)}`, {
         responseType: 'blob'
       });
 
@@ -66,19 +79,27 @@ export const unifiedDocumentService = {
     }
   },
 
+  async fetchUnifiedDocumentBlob(fileName: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/unified-documents/view/${encodeURIComponent(fileName)}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar blob do documento unificado:', error);
+      throw error;
+    }
+  },
+
   /**
    * Visualiza um documento unificado em nova aba
    */
   async viewUnifiedDocument(fileName: string): Promise<void> {
     try {
-      const response = await api.get(`/unified-documents/view/${fileName}`, {
-        responseType: 'blob'
-      });
-
-      // Abrir em nova aba
-      const file = new Blob([response.data], { type: 'application/pdf' });
-      const fileURL = URL.createObjectURL(file);
-      window.open(fileURL, '_blank');
+      const blob = await this.fetchUnifiedDocumentBlob(fileName);
+      const fileURL = URL.createObjectURL(blob);
+      window.open(fileURL, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(fileURL), 60_000);
     } catch (error) {
       console.error('Erro ao visualizar documento unificado:', error);
       throw error;
@@ -87,4 +108,48 @@ export const unifiedDocumentService = {
 };
 
 export default unifiedDocumentService;
+
+function normalizeDocuments(data: unknown): UnifiedDocument[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .map((doc) => {
+      const candidateFileName =
+        doc?.unifiedFileName ||
+        doc?.fileName ||
+        doc?.payslipFileName ||
+        doc?.receiptFileName ||
+        '';
+
+      const rawMonth = doc?.month;
+      const rawYear = doc?.year;
+      const parsedMonth = typeof rawMonth === 'string' ? parseInt(rawMonth, 10) : rawMonth;
+      const parsedYear = typeof rawYear === 'string' ? parseInt(rawYear, 10) : rawYear;
+      const periodMonth = parseInt(doc?.period?.split?.('_')?.[0] ?? '0', 10);
+      const periodYear = parseInt(doc?.period?.split?.('_')?.[1] ?? '0', 10);
+
+      const normalized: UnifiedDocument = {
+        ...doc,
+        fileName: candidateFileName,
+        filePath: doc?.filePath,
+        employeeName: doc?.employeeName,
+        cpf: doc?.cpf,
+        month: Number.isFinite(parsedMonth) && parsedMonth
+          ? parsedMonth as number
+          : Number.isFinite(periodMonth) && periodMonth > 0
+            ? periodMonth
+            : undefined,
+        year: Number.isFinite(parsedYear) && parsedYear
+          ? parsedYear as number
+          : Number.isFinite(periodYear) && periodYear > 0
+            ? periodYear
+            : undefined,
+      };
+
+      return normalized;
+    })
+    .filter((doc) => !!doc.fileName);
+}
 
