@@ -262,24 +262,24 @@ const InteractiveDashboard: React.FC = () => {
   const renderModuleCard = (module: DashboardModule) => (
     <Card 
       key={module.id} 
-      className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-colors cursor-pointer group"
+      className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors cursor-pointer group"
       onClick={() => module.route && navigate(module.route)}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 space-y-3">
         <div className="flex items-center justify-between">
           <div className={`p-3 rounded-lg ${module.color} group-hover:scale-110 transition-transform`}>
             <module.icon className="h-6 w-6 text-white" />
           </div>
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs bg-seguranca-black/40 border-gray-700 text-seguranca-lightgray">
             {module.stats?.length || 0} métricas
           </Badge>
         </div>
         <CardTitle className="text-seguranca-lightgray text-lg group-hover:text-seguranca-yellow transition-colors">
           {module.name}
         </CardTitle>
-        <p className="text-gray-400 text-sm">{module.description}</p>
+        <p className="text-gray-400 text-sm leading-relaxed">{module.description}</p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         {module.stats && module.stats.length > 0 && (
           <div className="space-y-3">
             {module.stats.slice(0, 2).map((stat, index) => (
@@ -308,10 +308,10 @@ const InteractiveDashboard: React.FC = () => {
 
   // Renderizar perfil do usuário
   const renderUserProfile = () => (
-    <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-700">
-      <CardHeader className="text-center pb-4">
-        <div className="flex justify-center mb-4">
-          <Avatar className="h-20 w-20 border-2 border-seguranca-yellow">
+    <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+      <CardHeader className="text-center pb-4 space-y-4">
+        <div className="flex justify-center mb-2">
+          <Avatar className="h-20 w-20 border-2 border-seguranca-yellow/80">
             <AvatarImage src={user?.avatar} />
             <AvatarFallback className="bg-seguranca-yellow text-black text-xl font-bold">
               {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
@@ -348,7 +348,7 @@ const InteractiveDashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Estatísticas em tempo real */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-colors">
+        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -364,7 +364,7 @@ const InteractiveDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-colors">
+        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -380,7 +380,7 @@ const InteractiveDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-colors">
+        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -396,7 +396,7 @@ const InteractiveDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-black border-gray-700 hover:border-seguranca-yellow transition-colors">
+        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -414,7 +414,7 @@ const InteractiveDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-seguranca-black border-gray-700">
+        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
           <CardHeader>
             <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
               <Bell className="h-5 w-5 text-seguranca-yellow" />
@@ -423,7 +423,7 @@ const InteractiveDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-start gap-3 p-3 bg-seguranca-graphite rounded-lg">
+              <div className="flex items-start gap-3 p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
                 <div>
                   <p className="text-seguranca-lightgray text-sm font-medium">
@@ -435,7 +435,7 @@ const InteractiveDashboard: React.FC = () => {
                   <p className="text-gray-500 text-xs mt-1">2 horas atrás</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-seguranca-graphite rounded-lg">
+              <div className="flex items-start gap-3 p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg">
                 <Users className="h-5 w-5 text-blue-500 mt-0.5" />
                 <div>
                   <p className="text-seguranca-lightgray text-sm font-medium">
@@ -451,7 +451,7 @@ const InteractiveDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-black border-gray-700">
+        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
           <CardHeader>
             <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
               <Activity className="h-5 w-5 text-seguranca-yellow" />
@@ -460,21 +460,21 @@ const InteractiveDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="text-seguranca-lightgray text-sm">
                   Equipamento EQ-001 atribuído a João Silva
                 </span>
                 <span className="text-xs text-gray-500 ml-auto">2h atrás</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
                 <span className="text-seguranca-lightgray text-sm">
                   Alerta: Arma AR-002 vencendo em 15 dias
                 </span>
                 <span className="text-xs text-gray-500 ml-auto">4h atrás</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                 <span className="text-seguranca-lightgray text-sm">
                   Nova escala criada para Portaria Principal
@@ -617,7 +617,7 @@ const InteractiveDashboard: React.FC = () => {
               {renderUserProfile()}
             </div>
             <div className="lg:col-span-2 space-y-6">
-              <Card className="bg-seguranca-black border-gray-700">
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray">Permissões do Usuário</CardTitle>
                 </CardHeader>
@@ -634,7 +634,7 @@ const InteractiveDashboard: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-seguranca-black border-gray-700">
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray">Informações da Sessão</CardTitle>
                 </CardHeader>
@@ -662,7 +662,7 @@ const InteractiveDashboard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="activity" className="mt-5">
-          <Card className="bg-seguranca-black border-gray-700">
+          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
                 <Activity className="h-5 w-5 text-seguranca-yellow" />
@@ -678,7 +678,7 @@ const InteractiveDashboard: React.FC = () => {
                   { action: 'Gerou relatório de medições', time: '2 horas atrás', icon: '📄' },
                   { action: 'Cadastrou novo funcionário', time: '3 horas atrás', icon: '👤' }
                 ].map((activity, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-seguranca-graphite rounded-lg">
+                  <div key={index} className="flex items-center gap-3 p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg">
                     <span className="text-lg">{activity.icon}</span>
                     <div className="flex-1">
                       <p className="text-seguranca-lightgray text-sm">{activity.action}</p>
