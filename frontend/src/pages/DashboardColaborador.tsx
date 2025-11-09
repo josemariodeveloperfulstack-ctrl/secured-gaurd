@@ -180,40 +180,42 @@ const DashboardColaborador: React.FC = () => {
     <StandardLayout>
       <div className="space-y-6 p-6">
         {/* Cabeçalho com dados do colaborador */}
-        <div className="bg-gradient-to-r from-seguranca-graphite to-seguranca-black border border-seguranca-yellow rounded-lg p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-seguranca-yellow/10 rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-seguranca-yellow" />
-              </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3 bg-seguranca-black border border-seguranca-yellow/60 rounded-lg p-4 w-full sm:w-auto">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-seguranca-yellow/10 rounded-full flex items-center justify-center">
+              <User className="h-6 w-6 sm:h-7 sm:w-7 text-seguranca-yellow" />
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-seguranca-lightgray">
+                Bem-vindo, {user?.name}!
+              </h1>
+              <p className="text-gray-400 text-sm">Portal do Colaborador</p>
+              <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30 w-fit text-xs">
+                Colaborador
+              </Badge>
+            </div>
+          </div>
+          <div className="bg-seguranca-black border border-gray-700 rounded-lg p-4 w-full sm:w-[260px] space-y-2">
+            <div>
+              <p className="text-xs uppercase text-gray-500">CPF</p>
+              <p className="text-sm font-medium text-seguranca-lightgray break-all">
+                {user?.username}
+              </p>
+            </div>
+            {user?.email && (
               <div>
-                <h1 className="text-2xl font-bold text-seguranca-lightgray mb-1">
-                  Bem-vindo, {user?.name}!
-                </h1>
-                <p className="text-gray-400 text-sm">Portal do Colaborador</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30">
-                    Colaborador
-                  </Badge>
-                </div>
+                <p className="text-xs uppercase text-gray-500">Email</p>
+                <p className="text-sm font-medium text-seguranca-lightgray break-all">
+                  {user.email}
+                </p>
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-400">CPF</p>
-              <p className="text-seguranca-lightgray font-medium">{user?.username}</p>
-              {user?.email && (
-                <>
-                  <p className="text-sm text-gray-400 mt-2">Email</p>
-                  <p className="text-seguranca-lightgray font-medium">{user.email}</p>
-                </>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
         {/* Cards de Resumo */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-seguranca-black border-gray-700">
+          <Card className="bg-seguranca-graphite border-gray-700">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-400" />
@@ -221,14 +223,14 @@ const DashboardColaborador: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-seguranca-lightgray">
+              <div className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
                 {payslips.length}
               </div>
               <p className="text-xs text-gray-400 mt-1">Disponíveis para download</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-black border-gray-700">
+          <Card className="bg-seguranca-graphite border-gray-700">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
                 <File className="w-4 h-4 text-green-400" />
@@ -236,14 +238,14 @@ const DashboardColaborador: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-seguranca-lightgray">
+              <div className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
                 {receipts.length}
               </div>
               <p className="text-xs text-gray-400 mt-1">Disponíveis para download</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-black border-gray-700">
+          <Card className="bg-seguranca-graphite border-gray-700">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-purple-400" />
@@ -251,7 +253,7 @@ const DashboardColaborador: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-seguranca-lightgray">
+              <div className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
                 {unifiedDocs.length}
               </div>
               <p className="text-xs text-gray-400 mt-1">Documentos completos</p>
@@ -261,11 +263,31 @@ const DashboardColaborador: React.FC = () => {
 
         {/* Tabs com conteúdo */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="payslips">Holerites</TabsTrigger>
-            <TabsTrigger value="receipts">Comprovantes</TabsTrigger>
-            <TabsTrigger value="unified">Unificados</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-seguranca-graphite border border-gray-700">
+            <TabsTrigger
+              value="overview"
+              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            >
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger
+              value="payslips"
+              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            >
+              Holerites
+            </TabsTrigger>
+            <TabsTrigger
+              value="receipts"
+              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            >
+              Comprovantes
+            </TabsTrigger>
+            <TabsTrigger
+              value="unified"
+              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            >
+              Unificados
+            </TabsTrigger>
           </TabsList>
 
           {/* Visão Geral */}
@@ -301,9 +323,14 @@ const DashboardColaborador: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {payslips.slice(0, 3).map((payslip) => (
+                  {payslips.slice(0, 3).map((payslip) => {
+                    const payslipKey =
+                      payslip.id ??
+                      payslip.fileName ??
+                      `${payslip.employeeName}-${payslip.year}-${payslip.month}`;
+                    return (
                     <div
-                      key={payslip.id}
+                      key={payslipKey}
                       className="flex items-center justify-between p-3 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
                     >
                       <div className="flex items-center gap-3">
@@ -326,7 +353,8 @@ const DashboardColaborador: React.FC = () => {
                         <Download className="w-4 h-4" />
                       </Button>
                     </div>
-                  ))}
+                  );
+                  })}
                   {payslips.length === 0 && (
                     <p className="text-center text-gray-400 py-4">
                       Nenhum documento disponível
@@ -351,9 +379,14 @@ const DashboardColaborador: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {payslips.map((payslip) => (
+                  {payslips.map((payslip) => {
+                    const payslipKey =
+                      payslip.id ??
+                      payslip.fileName ??
+                      `${payslip.employeeName}-${payslip.year}-${payslip.month}`;
+                    return (
                     <div
-                      key={payslip.id}
+                      key={payslipKey}
                       className="flex items-center justify-between p-4 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
                     >
                       <div className="flex items-center gap-4">
@@ -381,7 +414,8 @@ const DashboardColaborador: React.FC = () => {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                   {payslips.length === 0 && (
                     <div className="text-center py-12">
                       <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -407,9 +441,14 @@ const DashboardColaborador: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {receipts.map((receipt) => (
+                  {receipts.map((receipt) => {
+                    const receiptKey =
+                      receipt.id ??
+                      receipt.fileName ??
+                      `${receipt.employeeName}-${receipt.year}-${receipt.month}`;
+                    return (
                     <div
-                      key={receipt.id}
+                      key={receiptKey}
                       className="flex items-center justify-between p-4 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
                     >
                       <div className="flex items-center gap-4">
@@ -437,7 +476,8 @@ const DashboardColaborador: React.FC = () => {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                   {receipts.length === 0 && (
                     <div className="text-center py-12">
                       <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -463,9 +503,14 @@ const DashboardColaborador: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {unifiedDocs.map((doc) => (
+                  {unifiedDocs.map((doc) => {
+                    const docKey =
+                      doc.id ??
+                      doc.unifiedFileName ??
+                      `${doc.employeeName}-${doc.year}-${doc.month}`;
+                    return (
                     <div
-                      key={doc.id}
+                      key={docKey}
                       className="flex items-center justify-between p-4 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
                     >
                       <div className="flex items-center gap-4">
@@ -493,7 +538,8 @@ const DashboardColaborador: React.FC = () => {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                   {unifiedDocs.length === 0 && (
                     <div className="text-center py-12">
                       <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
