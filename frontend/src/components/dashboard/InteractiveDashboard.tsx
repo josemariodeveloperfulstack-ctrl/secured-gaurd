@@ -500,88 +500,115 @@ const InteractiveDashboard: React.FC = () => {
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <div className="space-y-6">
         <Card className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm">
-          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex h-2 w-2 rounded-full bg-seguranca-yellow animate-pulse" />
-                <span className="text-xs uppercase tracking-wide text-gray-500">Dashboard</span>
+          <CardContent className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-3">
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-seguranca-yellow/15 text-seguranca-yellow text-xs tracking-wide">
+                  Portal Administrativo
+                </span>
+                <div className="space-y-1">
+                  <h1 className="text-2xl sm:text-3xl font-semibold text-seguranca-lightgray">
+                    Bem-vindo, {user?.name || 'usuário'}!
+                  </h1>
+                  <p className="text-gray-400 text-sm sm:text-base">
+                    Gerencie usuários, módulos e indicadores estratégicos do Secure Guard.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/40">
+                    {getRoleDisplayName(user?.role || 'COLABORADOR')}
+                  </Badge>
+                  <Badge variant="outline" className="border-gray-700 text-gray-300">
+                    {availableModules.length} módulos disponíveis
+                  </Badge>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h1 className="text-2xl sm:text-3xl font-semibold text-seguranca-lightgray">
-                  Bem-vindo, {user?.name || 'usuário'}!
-                </h1>
-                <p className="text-gray-400 text-sm sm:text-base">
-                  Acompanhe métricas, módulos liberados e atividades recentes em um só lugar.
+              <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">
+                <Button
+                  size="sm"
+                  className="w-full sm:w-auto bg-seguranca-yellow text-seguranca-black font-semibold hover:bg-seguranca-yellow/90"
+                  onClick={() =>
+                    toast({
+                      title: 'Dashboard atualizado',
+                      description: 'As métricas foram atualizadas com sucesso.',
+                    })
+                  }
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Atualizar
+                </Button>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  {isMobile ? (
+                    <Smartphone className="h-4 w-4" />
+                  ) : (
+                    <Monitor className="h-4 w-4" />
+                  )}
+                  <span className="font-medium text-gray-300">
+                    {isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'}
+                  </span>
+                  <span className="text-gray-500">({breakpoint})</span>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-gray-400">
+              <div>
+                <span className="block text-[11px] uppercase tracking-wide text-gray-500">Permissões ativas</span>
+                <p className="text-sm text-seguranca-lightgray font-medium">
+                  {user?.permissions ? Object.values(user.permissions).filter(Boolean).length : 0}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-seguranca-yellow/15 text-seguranca-yellow border-seguranca-yellow/40">
-                  {getRoleDisplayName(user?.role || 'COLABORADOR')}
-                </Badge>
-                <Badge variant="outline" className="border-gray-700 text-gray-300">
-                  {availableModules.length} módulos ativos
-                </Badge>
+              <div>
+                <span className="block text-[11px] uppercase tracking-wide text-gray-500">Último acesso</span>
+                <p className="text-sm text-seguranca-lightgray font-medium">
+                  {new Date().toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+              <div>
+                <span className="block text-[11px] uppercase tracking-wide text-gray-500">Ambiente</span>
+                <p className="text-sm text-seguranca-lightgray font-medium">
+                  {import.meta.env.VITE_ENVIRONMENT?.toUpperCase() || 'PRODUÇÃO'}
+                </p>
+              </div>
+              <div>
+                <span className="block text-[11px] uppercase tracking-wide text-gray-500">Email</span>
+                <p className="text-sm text-seguranca-lightgray font-medium break-all">
+                  {user?.email || 'não informado'}
+                </p>
               </div>
             </div>
-            <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">
-              <Button
-                className="w-full sm:w-auto bg-seguranca-yellow/20 border border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow/30"
-                onClick={() =>
-                  toast({
-                    title: 'Dashboard atualizado',
-                    description: 'As métricas foram atualizadas com sucesso.',
-                  })
-                }
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Atualizar métricas
-              </Button>
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                {isMobile ? (
-                  <Smartphone className="h-4 w-4" />
-                ) : (
-                  <Monitor className="h-4 w-4" />
-                )}
-                <span className="font-medium text-gray-300">
-                  {isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'}
-                </span>
-                <span className="text-gray-500">({breakpoint})</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <TabsList className="flex w-full gap-2 bg-seguranca-black/40 border border-gray-800 rounded-xl p-1 overflow-x-auto sm:grid sm:grid-cols-2 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-              <TabsTrigger 
-                value="overview" 
-                className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Visão Geral
-              </TabsTrigger>
-              <TabsTrigger 
-                value="modules" 
-                className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
-              >
-                <Package className="h-4 w-4 mr-2" />
-                Módulos
-              </TabsTrigger>
-              <TabsTrigger 
-                value="profile" 
-                className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
-              >
-                <User className="h-4 w-4 mr-2" />
-                Perfil
-              </TabsTrigger>
-              <TabsTrigger 
-                value="activity" 
-                className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
-              >
-                <Activity className="h-4 w-4 mr-2" />
-                Atividade
-              </TabsTrigger>
-            </TabsList>
           </CardContent>
         </Card>
+
+        <TabsList className="flex w-full gap-2 bg-seguranca-black/40 border border-gray-800 rounded-xl p-1 overflow-x-auto sm:grid sm:grid-cols-2 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          <TabsTrigger 
+            value="overview" 
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger 
+            value="modules" 
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Módulos
+          </TabsTrigger>
+          <TabsTrigger 
+            value="profile" 
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+          >
+            <User className="h-4 w-4 mr-2" />
+            Perfil
+          </TabsTrigger>
+          <TabsTrigger 
+            value="activity" 
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+          >
+            <Activity className="h-4 w-4 mr-2" />
+            Atividade
+          </TabsTrigger>
+        </TabsList>
 
         <TabsContent value="overview" className="mt-5">
           {renderOverview()}
