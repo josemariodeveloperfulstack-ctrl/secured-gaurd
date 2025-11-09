@@ -230,21 +230,36 @@ const Login = () => {
         noindex={true}
         nofollow={true}
       />
-      <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4 animate-fade-in">
-        <div className="mb-8" data-animate="fadeDown">
+      <div className="min-h-screen w-full bg-gradient-to-b from-seguranca-black via-seguranca-black to-seguranca-graphite flex flex-col items-center justify-center p-4 sm:p-6 animate-fade-in">
+        <div className="mb-8 sm:mb-10" data-animate="fadeDown">
           <Logo size="lg" />
         </div>
 
-        <div className="bg-seguranca-graphite rounded-xl shadow-lg w-full max-w-md p-6 md:p-8" data-animate="zoomIn">
-          <h2 className="text-2xl font-bold text-center mb-6" data-animate="fadeUp">Acesso ao Sistema</h2>
+        <div className="bg-seguranca-black/70 border border-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 space-y-6" data-animate="zoomIn">
+          <div className="text-center space-y-2" data-animate="fadeUp">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-seguranca-yellow/15 text-seguranca-yellow text-xs uppercase tracking-wide">
+              <Shield size={14} className="text-seguranca-yellow" />
+              Acesso seguro
+            </span>
+            <h2 className="text-2xl font-semibold text-seguranca-lightgray">Acesso ao Sistema</h2>
+            <p className="text-sm text-gray-400">
+              Escolha seu perfil de acesso para entrar na plataforma Secure Guard.
+            </p>
+          </div>
 
           <Tabs defaultValue="funcionario" className="w-full login-tabs">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="funcionario" className="flex items-center gap-2">
+            <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] mb-6">
+              <TabsTrigger
+                value="funcionario"
+                className="flex-1 min-w-[140px] justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black transition-colors"
+              >
                 <User size={16} />
                 Funcionário
               </TabsTrigger>
-              <TabsTrigger value="supervisor" className="flex items-center gap-2">
+              <TabsTrigger
+                value="supervisor"
+                className="flex-1 min-w-[140px] justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black transition-colors"
+              >
                 <Shield size={16} />
                 Supervisor
               </TabsTrigger>
@@ -260,7 +275,7 @@ const Login = () => {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
+                <div className="space-y-2 text-left">
                   <Label htmlFor="username" className="block text-sm font-medium">
                     Usuário
                   </Label>
@@ -274,7 +289,7 @@ const Login = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 text-left">
                   <Label htmlFor="password" className="block text-sm font-medium">
                     Senha
                   </Label>
@@ -297,7 +312,7 @@ const Login = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm flex-wrap gap-3">
                   <div className="flex items-center gap-2">
                     <Checkbox 
                       id="remember" 
@@ -321,7 +336,7 @@ const Login = () => {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="btn-primary w-full flex justify-center items-center"
+                  className="w-full flex justify-center items-center bg-seguranca-red hover:bg-seguranca-red/90 text-white font-semibold py-3 rounded-lg transition-all"
                 >
                   {loading ? (
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -398,7 +413,7 @@ const Login = () => {
                   type="button"
                   variant={supervisorAuthMethod === 'cpf' ? 'default' : 'outline'}
                   onClick={() => setSupervisorAuthMethod('cpf')}
-                  className="flex-1 flex items-center gap-2"
+                  className={`flex-1 flex items-center gap-2 justify-center ${supervisorAuthMethod === 'cpf' ? 'bg-seguranca-yellow text-seguranca-black border-none' : 'border border-gray-700 text-seguranca-lightgray hover:bg-seguranca-yellow/10'}`}
                 >
                   <CreditCard size={16} />
                   CPF
@@ -407,7 +422,7 @@ const Login = () => {
                   type="button"
                   variant={supervisorAuthMethod === 'facial' ? 'default' : 'outline'}
                   onClick={() => setSupervisorAuthMethod('facial')}
-                  className="flex-1 flex items-center gap-2"
+                  className={`flex-1 flex items-center gap-2 justify-center ${supervisorAuthMethod === 'facial' ? 'bg-seguranca-yellow text-seguranca-black border-none' : 'border border-gray-700 text-seguranca-lightgray hover:bg-seguranca-yellow/10'}`}
                 >
                   <Camera size={16} />
                   Reconhecimento Facial
@@ -435,7 +450,7 @@ const Login = () => {
                   <Button
                     type="submit"
                     disabled={supervisorLoading}
-                    className="btn-primary w-full flex justify-center items-center"
+                    className="w-full flex justify-center items-center bg-seguranca-red hover:bg-seguranca-red/90 text-white font-semibold py-3 rounded-lg transition-all"
                   >
                     {supervisorLoading ? (
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -475,7 +490,7 @@ const Login = () => {
                     type="button"
                     onClick={() => document.getElementById('facial-input')?.click()}
                     disabled={supervisorLoading}
-                    className="btn-primary w-full flex justify-center items-center"
+                    className="w-full flex justify-center items-center bg-seguranca-red hover:bg-seguranca-red/90 text-white font-semibold py-3 rounded-lg transition-all"
                   >
                     <Camera size={16} className="mr-2" />
                     {supervisorLoading ? 'Reconhecendo...' : 'Capturar Face'}
