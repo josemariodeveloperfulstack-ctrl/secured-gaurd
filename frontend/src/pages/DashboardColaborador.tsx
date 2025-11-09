@@ -180,42 +180,52 @@ const DashboardColaborador: React.FC = () => {
     <StandardLayout>
       <div className="space-y-6 p-6">
         {/* Cabeçalho com dados do colaborador */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3 bg-seguranca-black border border-seguranca-yellow/60 rounded-lg p-4 w-full sm:w-auto">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-seguranca-yellow/10 rounded-full flex items-center justify-center">
-              <User className="h-6 w-6 sm:h-7 sm:w-7 text-seguranca-yellow" />
-            </div>
-            <div className="space-y-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-seguranca-lightgray">
-                Bem-vindo, {user?.name}!
-              </h1>
-              <p className="text-gray-400 text-sm">Portal do Colaborador</p>
-              <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30 w-fit text-xs">
-                Colaborador
-              </Badge>
-            </div>
-          </div>
-          <div className="bg-seguranca-black border border-gray-700 rounded-lg p-4 w-full sm:w-[260px] space-y-2">
-            <div>
-              <p className="text-xs uppercase text-gray-500">CPF</p>
-              <p className="text-sm font-medium text-seguranca-lightgray break-all">
-                {user?.username}
-              </p>
-            </div>
-            {user?.email && (
-              <div>
-                <p className="text-xs uppercase text-gray-500">Email</p>
-                <p className="text-sm font-medium text-seguranca-lightgray break-all">
-                  {user.email}
-                </p>
+        <div className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-seguranca-yellow/15 rounded-full flex items-center justify-center">
+                <User className="h-6 w-6 sm:h-7 sm:w-7 text-seguranca-yellow" />
               </div>
-            )}
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Portal do Colaborador</p>
+                <h1 className="text-xl sm:text-2xl font-semibold text-seguranca-lightgray">
+                  Bem-vindo, {user?.name}!
+                </h1>
+                <p className="text-sm text-gray-400">
+                  Acompanhe seus holerites, comprovantes e documentos unificados em um só lugar.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30">
+                    Colaborador
+                  </Badge>
+                  <Badge variant="outline" className="border-gray-700 text-gray-300">
+                    {payslips.length + receipts.length + unifiedDocs.length} documentos disponíveis
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-400 w-full sm:w-auto">
+              <div>
+                <span className="block text-xs uppercase text-gray-500">CPF</span>
+                <span className="font-medium text-seguranca-lightgray break-all">
+                  {user?.username}
+                </span>
+              </div>
+              {user?.email && (
+                <div>
+                  <span className="block text-xs uppercase text-gray-500">Email</span>
+                  <span className="font-medium text-seguranca-lightgray break-all">
+                    {user.email}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Cards de Resumo */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-400" />
@@ -230,7 +240,7 @@ const DashboardColaborador: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
                 <File className="w-4 h-4 text-green-400" />
@@ -245,7 +255,7 @@ const DashboardColaborador: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-seguranca-graphite border-gray-700">
+          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-purple-400" />
@@ -263,37 +273,37 @@ const DashboardColaborador: React.FC = () => {
 
         {/* Tabs com conteúdo */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-seguranca-graphite border border-gray-700">
+          <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto md:grid md:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
             <TabsTrigger
               value="overview"
-              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
             >
               Visão Geral
             </TabsTrigger>
             <TabsTrigger
               value="payslips"
-              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
             >
               Holerites
             </TabsTrigger>
             <TabsTrigger
               value="receipts"
-              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
             >
               Comprovantes
             </TabsTrigger>
             <TabsTrigger
               value="unified"
-              className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
             >
               Unificados
             </TabsTrigger>
           </TabsList>
 
           {/* Visão Geral */}
-          <TabsContent value="overview" className="space-y-4 mt-4">
-            <Card className="bg-seguranca-black border-gray-700">
-              <CardHeader>
+          <TabsContent value="overview" className="space-y-4 mt-5">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+              <CardHeader className="space-y-1">
                 <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-seguranca-yellow" />
                   Comunicação Interna
@@ -314,8 +324,8 @@ const DashboardColaborador: React.FC = () => {
             </Card>
 
             {/* Documentos Recentes */}
-            <Card className="bg-seguranca-black border-gray-700">
-              <CardHeader>
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+              <CardHeader className="space-y-1">
                 <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
                   <Clock className="w-5 h-5 text-blue-400" />
                   Documentos Recentes
@@ -366,10 +376,10 @@ const DashboardColaborador: React.FC = () => {
           </TabsContent>
 
           {/* Holerites */}
-          <TabsContent value="payslips" className="mt-4">
-            <Card className="bg-seguranca-black border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+          <TabsContent value="payslips" className="mt-5">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-seguranca-lightgray text-base sm:text-lg flex items-center gap-2">
                   <FileText className="w-5 h-5 text-blue-400" />
                   Meus Holerites
                 </CardTitle>
@@ -428,10 +438,10 @@ const DashboardColaborador: React.FC = () => {
           </TabsContent>
 
           {/* Comprovantes */}
-          <TabsContent value="receipts" className="mt-4">
-            <Card className="bg-seguranca-black border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+          <TabsContent value="receipts" className="mt-5">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-seguranca-lightgray text-base sm:text-lg flex items-center gap-2">
                   <File className="w-5 h-5 text-green-400" />
                   Meus Comprovantes
                 </CardTitle>
@@ -490,10 +500,10 @@ const DashboardColaborador: React.FC = () => {
           </TabsContent>
 
           {/* Unificados */}
-          <TabsContent value="unified" className="mt-4">
-            <Card className="bg-seguranca-black border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+          <TabsContent value="unified" className="mt-5">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-seguranca-lightgray text-base sm:text-lg flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-purple-400" />
                   Documentos Unificados
                 </CardTitle>

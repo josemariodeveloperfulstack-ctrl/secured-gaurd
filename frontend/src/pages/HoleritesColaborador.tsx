@@ -403,29 +403,33 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
       title="Meus Documentos"
       subtitle="Visualize seus holerites, comprovantes e documentos unificados"
     >
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-seguranca-graphite border border-gray-700">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as typeof activeTab)}
+        className="space-y-6"
+      >
+        <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto md:grid md:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           <TabsTrigger
             value="holerites"
-            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
           >
             Holerites
           </TabsTrigger>
           <TabsTrigger
             value="receipts"
-            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
           >
             Comprovantes
           </TabsTrigger>
           <TabsTrigger
             value="unificacao"
-            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
           >
             Unificação
           </TabsTrigger>
           <TabsTrigger
             value="setores"
-            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
           >
             Por Setor
           </TabsTrigger>

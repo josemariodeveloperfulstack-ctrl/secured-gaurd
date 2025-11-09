@@ -238,40 +238,51 @@ const DashboardVigilante: React.FC = () => {
 
   return (
     <StandardLayout>
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-4 sm:p-6">
         {/* Cabeçalho com dados do vigilante */}
-        <div className="bg-gradient-to-r from-seguranca-graphite to-seguranca-black border border-seguranca-yellow rounded-lg p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-seguranca-yellow/10 rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-seguranca-yellow" />
+        <div className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-seguranca-yellow/15 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 sm:w-7 sm:h-7 text-seguranca-yellow" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-seguranca-lightgray mb-1">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Portal do Vigilante</p>
+                <h1 className="text-xl sm:text-2xl font-semibold text-seguranca-lightgray">
                   Bem-vindo, {user?.name}!
                 </h1>
-                <p className="text-gray-400 text-sm">Portal do Vigilante</p>
-                <div className="flex items-center gap-2 mt-2">
+                <p className="text-sm text-gray-400">
+                  Acompanhe seus treinamentos, holerites e documentos importantes.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30">
                     Vigilante
                   </Badge>
                   {treinamentosAtrasados.length > 0 && (
-                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-                      {treinamentosAtrasados.length} Treinamento(s) Atrasado(s)
+                    <Badge className="bg-red-500/15 text-red-400 border-red-500/30">
+                      {treinamentosAtrasados.length} treinamento(s) atrasado(s)
                     </Badge>
                   )}
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-400">CPF</p>
-              <p className="text-seguranca-lightgray font-medium">{user?.username}</p>
-              {user?.email && (
-                <>
-                  <p className="text-sm text-gray-400 mt-2">Email</p>
-                  <p className="text-seguranca-lightgray font-medium">{user.email}</p>
-                </>
-              )}
+            <div className="w-full sm:w-auto">
+              <div className="grid grid-cols-2 gap-3 text-sm text-gray-400">
+                <div>
+                  <span className="block text-xs uppercase text-gray-500">CPF</span>
+                  <span className="font-medium text-seguranca-lightgray break-all">
+                    {user?.username}
+                  </span>
+                </div>
+                {user?.email && (
+                  <div>
+                    <span className="block text-xs uppercase text-gray-500">Email</span>
+                    <span className="font-medium text-seguranca-lightgray break-all">
+                      {user.email}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -361,22 +372,40 @@ const DashboardVigilante: React.FC = () => {
 
         {/* Tabs com conteúdo */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite">
-            <TabsTrigger value="overview">
+          <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto md:grid md:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+            <TabsTrigger
+              value="overview"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            >
               Visão Geral
               {treinamentosPendentes.length > 0 && (
-                <Badge className="ml-2 bg-orange-500 text-white text-xs">
+                <Badge className="ml-2 bg-orange-500 text-white text-[10px]">
                   {treinamentosPendentes.length}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="payslips">Holerites</TabsTrigger>
-            <TabsTrigger value="receipts">Comprovantes</TabsTrigger>
-            <TabsTrigger value="unified">Unificados</TabsTrigger>
+            <TabsTrigger
+              value="payslips"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            >
+              Holerites
+            </TabsTrigger>
+            <TabsTrigger
+              value="receipts"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            >
+              Comprovantes
+            </TabsTrigger>
+            <TabsTrigger
+              value="unified"
+              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            >
+              Unificados
+            </TabsTrigger>
           </TabsList>
 
           {/* Visão Geral */}
-          <TabsContent value="overview" className="space-y-4 mt-4">
+          <TabsContent value="overview" className="space-y-4 mt-5">
             {/* Treinamentos Pendentes */}
             <Card className="bg-seguranca-black border-gray-700">
               <CardHeader>
@@ -510,7 +539,7 @@ const DashboardVigilante: React.FC = () => {
           </TabsContent>
 
           {/* Holerites */}
-          <TabsContent value="payslips" className="mt-4">
+          <TabsContent value="payslips" className="mt-5">
             <Card className="bg-seguranca-black border-gray-700">
               <CardHeader>
                 <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
@@ -564,7 +593,7 @@ const DashboardVigilante: React.FC = () => {
           </TabsContent>
 
           {/* Comprovantes */}
-          <TabsContent value="receipts" className="mt-4">
+          <TabsContent value="receipts" className="mt-5">
             <Card className="bg-seguranca-black border-gray-700">
               <CardHeader>
                 <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
@@ -618,7 +647,7 @@ const DashboardVigilante: React.FC = () => {
           </TabsContent>
 
           {/* Unificados */}
-          <TabsContent value="unified" className="mt-4">
+          <TabsContent value="unified" className="mt-5">
             <Card className="bg-seguranca-black border-gray-700">
               <CardHeader>
                 <CardTitle className="text-seguranca-lightgray flex items-center gap-2">

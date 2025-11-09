@@ -1,26 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import CollaboratorHolerites from './HoleritesColaborador';
-
-const MeusHolerites: React.FC = () => {
-  const { user } = useAuth();
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '').toUpperCase();
-
-  if (normalizedRole !== 'COLABORADOR') {
-    return <Navigate to="/holerites" replace />;
-  }
-
-  return <CollaboratorHolerites user={user} />;
-};
-
-export default MeusHolerites;
-import React, { useEffect, useMemo, useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +27,7 @@ const monthNames: Record<number, string> = {
 
 const formatMonth = (month: number) => monthNames[month] ?? `Mês ${month}`;
 
-const MeusHolerites: React.FC = () => {
+const MeusHoleritesContent: React.FC = () => {
   const { toast } = useToast();
   const [holerites, setHolerites] = useState<Holerite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -248,6 +228,22 @@ const MeusHolerites: React.FC = () => {
       )}
     </StandardLayout>
   );
+};
+
+const MeusHolerites: React.FC = () => {
+  const { user } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '').toUpperCase();
+
+  if (normalizedRole !== 'COLABORADOR') {
+    return <Navigate to="/holerites" replace />;
+  }
+
+  return <MeusHoleritesContent />;
 };
 
 export default MeusHolerites;

@@ -499,67 +499,93 @@ const InteractiveDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
-            Dashboard
+      <div className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm p-5 sm:p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-2 w-2 rounded-full bg-seguranca-yellow animate-pulse" />
+            <span className="text-xs uppercase tracking-wide text-gray-500">Dashboard</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-seguranca-lightgray">
+            Bem-vindo, {user?.name || 'usuário'}!
           </h1>
-          <p className="text-gray-400 mt-1">
-            Bem-vindo de volta, {user.name}! Aqui está um resumo do seu sistema.
+          <p className="text-gray-400 text-sm sm:text-base">
+            Acompanhe suas métricas principais, módulos liberados e atividades recentes em um só lugar.
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-seguranca-yellow/15 text-seguranca-yellow border-seguranca-yellow/40">
+              {getRoleDisplayName(user?.role || 'COLABORADOR')}
+            </Badge>
+            <Badge variant="outline" className="border-gray-700 text-gray-300">
+              {availableModules.length} módulos ativos
+            </Badge>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isMobile ? (
-            <Smartphone className="h-5 w-5 text-gray-400" />
-          ) : isTablet ? (
-            <Monitor className="h-5 w-5 text-gray-400" />
-          ) : (
-            <Monitor className="h-5 w-5 text-gray-400" />
-          )}
-          <span className="text-sm text-gray-400">
-            {isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'} ({breakpoint})
-          </span>
+        <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto border-seguranca-yellow/60 text-seguranca-yellow hover:bg-seguranca-yellow/10"
+            onClick={() =>
+              toast({
+                title: 'Dashboard atualizado',
+                description: 'As métricas foram atualizadas com sucesso.',
+              })
+            }
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Atualizar métricas
+          </Button>
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            {isMobile ? (
+              <Smartphone className="h-4 w-4" />
+            ) : (
+              <Monitor className="h-4 w-4" />
+            )}
+            <span className="font-medium text-gray-300">
+              {isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'}
+            </span>
+            <span className="text-gray-500">({breakpoint})</span>
+          </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 bg-seguranca-graphite border border-gray-600">
+        <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto sm:grid sm:grid-cols-2 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           <TabsTrigger 
             value="overview" 
-            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <BarChart3 className="h-4 w-4 mr-2" />
             Visão Geral
           </TabsTrigger>
           <TabsTrigger 
             value="modules" 
-            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <Package className="h-4 w-4 mr-2" />
             Módulos
           </TabsTrigger>
           <TabsTrigger 
             value="profile" 
-            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <User className="h-4 w-4 mr-2" />
             Perfil
           </TabsTrigger>
           <TabsTrigger 
             value="activity" 
-            className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
+            className="flex-1 min-w-[150px] sm:min-w-0 justify-center whitespace-nowrap border border-gray-700 rounded-lg py-2 sm:py-2.5 text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black"
           >
             <Activity className="h-4 w-4 mr-2" />
             Atividade
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-5">
           {renderOverview()}
         </TabsContent>
 
-        <TabsContent value="modules" className="mt-6">
+        <TabsContent value="modules" className="mt-5">
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
@@ -585,7 +611,7 @@ const InteractiveDashboard: React.FC = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="profile" className="mt-6">
+        <TabsContent value="profile" className="mt-5">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
               {renderUserProfile()}
@@ -635,7 +661,7 @@ const InteractiveDashboard: React.FC = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="activity" className="mt-6">
+        <TabsContent value="activity" className="mt-5">
           <Card className="bg-seguranca-black border-gray-700">
             <CardHeader>
               <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
