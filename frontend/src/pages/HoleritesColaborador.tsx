@@ -405,13 +405,33 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
     >
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-seguranca-graphite border border-gray-700">
-          <TabsTrigger value="holerites">Holerites</TabsTrigger>
-          <TabsTrigger value="receipts">Comprovantes</TabsTrigger>
-          <TabsTrigger value="unificacao">Unificação</TabsTrigger>
-          <TabsTrigger value="setores">Por Setor</TabsTrigger>
+          <TabsTrigger
+            value="holerites"
+            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+          >
+            Holerites
+          </TabsTrigger>
+          <TabsTrigger
+            value="receipts"
+            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+          >
+            Comprovantes
+          </TabsTrigger>
+          <TabsTrigger
+            value="unificacao"
+            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+          >
+            Unificação
+          </TabsTrigger>
+          <TabsTrigger
+            value="setores"
+            className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm"
+          >
+            Por Setor
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="holerites">
+        <TabsContent value="holerites" className="mt-6 space-y-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-300">
               <Loader2 className="w-8 h-8 animate-spin mb-3" />
@@ -428,7 +448,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-10">
+            <div className="space-y-6">
               {holeriteYears.map((year) => {
                 const months = Object.keys(holeritesGrouped[year])
                   .map((month) => Number(month))
@@ -480,7 +500,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="border-gray-600 text-gray-100 hover:bg-gray-800"
+                                      className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
                                       onClick={() => handleViewHolerite(item.fileName)}
                                     >
                                       <Eye className="w-4 h-4 mr-1" />
@@ -488,7 +508,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                     </Button>
                                     <Button
                                       size="sm"
-                                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                      className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto text-xs sm:text-sm"
                                       onClick={() => handleDownloadHolerite(item.fileName)}
                                     >
                                       <Download className="w-4 h-4 mr-1" />
@@ -509,7 +529,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
           )}
         </TabsContent>
 
-        <TabsContent value="receipts">
+        <TabsContent value="receipts" className="mt-6 space-y-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-300">
               <Loader2 className="w-8 h-8 animate-spin mb-3" />
@@ -584,7 +604,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="border-gray-600 text-gray-100 hover:bg-gray-800"
+                                      className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
                                       onClick={() => handleViewReceipt(item)}
                                     >
                                       <Eye className="w-4 h-4 mr-1" />
@@ -592,7 +612,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                     </Button>
                                     <Button
                                       size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto text-xs sm:text-sm"
                                       onClick={() => handleDownloadReceipt(item)}
                                     >
                                       <Download className="w-4 h-4 mr-1" />
@@ -613,7 +633,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
           )}
         </TabsContent>
 
-        <TabsContent value="unificacao">
+        <TabsContent value="unificacao" className="mt-6 space-y-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-300">
               <Loader2 className="w-8 h-8 animate-spin mb-3" />
@@ -666,7 +686,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="border-gray-600 text-gray-100 hover:bg-gray-800"
+                                  className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
                                   onClick={() => handleViewUnified(doc)}
                                 >
                                   <Eye className="w-4 h-4 mr-1" />
@@ -674,7 +694,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                                  className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto text-xs sm:text-sm"
                                   onClick={() => handleDownloadUnified(doc)}
                                 >
                                   <Download className="w-4 h-4 mr-1" />
@@ -691,7 +711,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
           )}
         </TabsContent>
 
-        <TabsContent value="setores">
+        <TabsContent value="setores" className="mt-6 space-y-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-300">
               <Loader2 className="w-8 h-8 animate-spin mb-3" />
@@ -753,7 +773,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="border-gray-600 text-gray-100 hover:bg-gray-800"
+                              className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
                               onClick={() => handleDownloadSectorDocument(doc)}
                             >
                               <FileDown className="w-4 h-4 mr-1" />
@@ -763,7 +783,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-gray-400 hover:text-gray-200"
+                                className="text-gray-400 hover:text-gray-200 w-full sm:w-auto text-xs sm:text-sm"
                                 onClick={() => window.open(buildDownloadUrl(doc.filePath), '_blank', 'noopener,noreferrer')}
                               >
                                 Abrir caminho
