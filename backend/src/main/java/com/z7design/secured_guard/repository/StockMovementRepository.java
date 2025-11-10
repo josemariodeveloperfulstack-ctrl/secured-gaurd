@@ -42,11 +42,11 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
            "(:startDate IS NULL OR sm.movementDate >= :startDate) AND " +
            "(:endDate IS NULL OR sm.movementDate <= :endDate) AND " +
            "(:searchTerm IS NULL OR " +
-           "sm.stockItem.name LIKE %:searchTerm% OR " +
-           "sm.stockItem.code LIKE %:searchTerm% OR " +
-           "sm.employeeName LIKE %:searchTerm% OR " +
-           "sm.userName LIKE %:searchTerm% OR " +
-           "sm.documentNumber LIKE %:searchTerm%)")
+           "LOWER(sm.stockItem.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(sm.stockItem.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(sm.employeeName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(sm.userName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(sm.documentNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<StockMovement> findByFilters(
             @Param("stockItemId") UUID stockItemId,
             @Param("employeeId") UUID employeeId,
