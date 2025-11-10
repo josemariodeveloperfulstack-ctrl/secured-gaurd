@@ -80,7 +80,7 @@ export const stockService = {
 
   async createItem(itemData: CreateStockItemDTO): Promise<StockItem> {
     try {
-      const response = await api.post('/stock/items', itemData);
+      const response = await api.post('/api/stock/items', itemData);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar item:', error);
@@ -119,7 +119,7 @@ export const stockService = {
 
   async getLowStockItems(): Promise<StockItem[]> {
     try {
-      const response = await api.get('/stock/items/low-stock');
+      const response = await api.get('/api/stock/items/low-stock');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar itens com baixo estoque:', error);
@@ -131,7 +131,7 @@ export const stockService = {
 
   async createMovement(movementData: CreateStockMovementDTO): Promise<StockMovement> {
     try {
-      const response = await api.post('/stock/movements', movementData);
+      const response = await api.post('/api/stock/movements', movementData);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar movimentação:', error);
@@ -245,7 +245,7 @@ export const stockService = {
 
   async getStockReport(): Promise<StockReport> {
     try {
-      const response = await api.get('/stock/report');
+      const response = await api.get('/api/stock/report');
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar relatório de estoque:', error);
@@ -257,7 +257,7 @@ export const stockService = {
 
   async getCategories(): Promise<StockCategory[]> {
     try {
-      const response = await api.get('/stock/enums/categories');
+      const response = await api.get('/api/stock/enums/categories');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar categorias:', error);
@@ -267,7 +267,7 @@ export const stockService = {
 
   async getMovementTypes(): Promise<MovementType[]> {
     try {
-      const response = await api.get('/stock/enums/movement-types');
+      const response = await api.get('/api/stock/enums/movement-types');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar tipos de movimentação:', error);
@@ -277,7 +277,7 @@ export const stockService = {
 
   async getMovementReasons(): Promise<MovementReason[]> {
     try {
-      const response = await api.get('/stock/enums/movement-reasons');
+      const response = await api.get('/api/stock/enums/movement-reasons');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar motivos de movimentação:', error);
