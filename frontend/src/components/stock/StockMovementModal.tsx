@@ -38,7 +38,8 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [employees, setEmployees] = useState<Array<{ id: string; name: string; document?: string }>>([]);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(item);
   const [formData, setFormData] = useState<CreateStockMovementDTO>({
     stockItemId: '',
@@ -69,11 +70,28 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
   }, [item]);
 
   const loadEmployees = async () => {
+    setEmployeeLoading(true);
     try {
-      const employeeData = await employeeService.getAllEmployees();
-      setEmployees(employeeData);
+      const employeeData = await employeeService.getSimpleEmployees();
+
+      const normalized = employeeData
+        .map((employee: any) => ({
+          id: employee.id,
+          name: employee.name || employee.fullName || employee.employeeName || 'Funcionário sem nome',
+          document: employee.document ?? employee.cpf ?? employee.username,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+      setEmployees(normalized);
     } catch (error) {
       console.error('Erro ao carregar funcionários:', error);
+      toast({
+        title: 'Erro ao buscar funcionários',
+        description: 'Não foi possível carregar a lista de colaboradores. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setEmployeeLoading(false);
     }
   };
 
@@ -289,16 +307,30 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
               <Select 
                 value={formData.employeeId} 
                 onValueChange={(value) => handleInputChange('employeeId', value)}
+                
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o funcionário" />
+                  <SelectValue
+                    placeholder={employeeLoading ? 'Carregando funcionários...' : 'Selecione o funcionário'}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
+                  {employeeLoading ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">Carregando funcionários...</div>
+                  ) : employees.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">Nenhum funcionário encontrado.</div>
+                  ) : (
+                    employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        <div className="flex flex-col">
+                          <span>{employee.name}</span>
+                          {employee.document && (
+                            <span className="text-xs text-gray-500">CPF: {employee.document}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -56,7 +56,8 @@ interface UnifiedDocument {
   year: number;
   payslipFileName: string;
   receiptFileName: string;
-  unifiedFileName: string;
+  unifiedFileName?: string;
+  fileName?: string;
   createdAt: string;
 }
 
@@ -116,9 +117,18 @@ const DashboardColaborador: React.FC = () => {
     }
   };
 
-  const handleDownloadReceipt = async (fileName: string) => {
+  const handleDownloadReceipt = async (receipt: Receipt) => {
+    if (!receipt?.id) {
+      toast({
+        title: 'Documento inválido',
+        description: 'Não foi possível identificar o comprovante.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      await receiptService.downloadReceipt(fileName);
+      await receiptService.downloadReceipt(receipt.id, receipt.fileName);
       toast({
         title: 'Sucesso',
         description: 'Comprovante baixado com sucesso!',
@@ -133,7 +143,16 @@ const DashboardColaborador: React.FC = () => {
     }
   };
 
-  const handleDownloadUnified = async (fileName: string) => {
+  const handleDownloadUnified = async (fileName?: string) => {
+    if (!fileName) {
+      toast({
+        title: 'Documento inválido',
+        description: 'Não foi possível identificar o arquivo para download.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       await unifiedDocumentService.downloadUnifiedDocument(fileName);
       toast({
@@ -273,28 +292,33 @@ const DashboardColaborador: React.FC = () => {
 
         {/* Tabs com conteúdo */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto md:grid md:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          <TabsList className="flex w-full flex-wrap gap-2 bg-[#08080F]/90 border border-gray-900/60 rounded-2xl p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.45)]">
             <TabsTrigger
               value="overview"
-              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
             >
               Visão Geral
+              {/* {treinamentosPendentes.length > 0 && (
+                <Badge className="ml-2 bg-orange-500 text-white text-[10px]">
+                  {treinamentosPendentes.length}
+                </Badge>
+              )} */}
             </TabsTrigger>
             <TabsTrigger
               value="payslips"
-              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
             >
               Holerites
             </TabsTrigger>
             <TabsTrigger
               value="receipts"
-              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
             >
               Comprovantes
             </TabsTrigger>
             <TabsTrigger
               value="unified"
-              className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
             >
               Unificados
             </TabsTrigger>
@@ -478,7 +502,7 @@ const DashboardColaborador: React.FC = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDownloadReceipt(receipt.fileName)}
+                          onClick={() => handleDownloadReceipt(receipt)}
                           className="border-green-500/30 text-green-400 hover:bg-green-500/10"
                         >
                           <Download className="w-4 h-4 mr-2" />
@@ -516,6 +540,7 @@ const DashboardColaborador: React.FC = () => {
                   {unifiedDocs.map((doc) => {
                     const docKey =
                       doc.id ??
+                      doc.fileName ??
                       doc.unifiedFileName ??
                       `${doc.employeeName}-${doc.year}-${doc.month}`;
                     return (
@@ -540,7 +565,7 @@ const DashboardColaborador: React.FC = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDownloadUnified(doc.unifiedFileName)}
+                          onClick={() => handleDownloadUnified(doc.fileName ?? doc.unifiedFileName)}
                           className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                         >
                           <Download className="w-4 h-4 mr-2" />

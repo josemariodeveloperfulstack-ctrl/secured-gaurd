@@ -63,6 +63,8 @@ const monthNames: Record<number, string> = {
   12: 'Dezembro',
 };
 
+const getMonthName = (month: number) => monthNames[month] ?? `Mês ${month}`;
+
 const sanitizeCpf = (value?: string | null) => (value ? value.replace(/\D/g, '') : '');
 
 const normalizeName = (value?: string | null) => {
@@ -408,28 +410,28 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
         onValueChange={(value) => setActiveTab(value as typeof activeTab)}
         className="space-y-6"
       >
-        <TabsList className="flex w-full gap-2 bg-transparent p-1 overflow-x-auto md:grid md:grid-cols-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        <TabsList className="flex w-full flex-wrap gap-2 bg-seguranca-black/80 border border-gray-900 rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
           <TabsTrigger
             value="holerites"
-            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+            className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_24px_rgba(236,28,36,0.45)]"
           >
             Holerites
           </TabsTrigger>
           <TabsTrigger
             value="receipts"
-            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+            className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_24px_rgba(236,28,36,0.45)]"
           >
             Comprovantes
           </TabsTrigger>
           <TabsTrigger
             value="unificacao"
-            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+            className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_24px_rgba(236,28,36,0.45)]"
           >
             Unificação
           </TabsTrigger>
           <TabsTrigger
             value="setores"
-            className="flex-1 min-w-[140px] md:min-w-0 justify-center whitespace-nowrap text-seguranca-lightgray data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-xs sm:text-sm border border-gray-700 rounded-lg py-2 sm:py-2.5"
+            className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_24px_rgba(236,28,36,0.45)]"
           >
             Por Setor
           </TabsTrigger>
@@ -442,8 +444,8 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
               <p>Carregando seus holerites...</p>
             </div>
           ) : holerites.length === 0 ? (
-            <Card className="bg-seguranca-graphite border-gray-700">
-              <CardContent className="py-10 flex flex-col items-center gap-3 text-gray-300">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm">
+              <CardContent className="py-12 flex flex-col items-center gap-3 text-gray-300">
                 <FileText className="w-10 h-10" />
                 <p>Nenhum holerite encontrado.</p>
                 <span className="text-sm text-gray-500">
@@ -459,52 +461,58 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                   .sort((a, b) => b - a);
 
                 return (
-                  <div key={year} className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-semibold text-gray-200">{year}</h2>
-                      <Badge className="bg-indigo-500/20 text-indigo-200 border-indigo-500/40">
+                  <Card
+                    key={year}
+                    className="bg-[#08080F]/95 border border-gray-900/60 rounded-3xl shadow-[0_22px_65px_rgba(0,0,0,0.55)] backdrop-blur-sm"
+                  >
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Ano</p>
+                        <h2 className="text-2xl font-semibold text-white">{year}</h2>
+                      </div>
+                      <Badge className="bg-white/10 text-white border border-white/10 backdrop-blur">
                         {months.length} mês{months.length > 1 ? 'es' : ''}
                       </Badge>
-                    </div>
-
-                    <Separator className="bg-gray-700" />
-
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                       {months.map((month) => {
                         const items = holeritesGrouped[year][month];
 
                         return (
-                          <Card
+                          <div
                             key={`${year}-${month}`}
-                            className="bg-seguranca-graphite border-gray-700 hover:border-gray-500 transition-colors"
+                            className="bg-[#0F0F1E]/95 border border-gray-900/70 rounded-2xl p-4 space-y-3 shadow-[0_15px_40px_rgba(0,0,0,0.45)]"
                           >
-                            <CardHeader>
-                              <CardTitle className="flex items-center justify-between text-gray-100">
-                                <span className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-indigo-400" />
-                                  {monthNames[month] ?? `Mês ${month}`}
-                                </span>
-                                <Badge className="bg-gray-800 text-gray-200 border-gray-600">
-                                  {items.length} arquivo{items.length > 1 ? 's' : ''}
-                                </Badge>
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <span className="flex items-center gap-2 text-lg text-white font-semibold">
+                                <Calendar className="w-4 h-4 text-indigo-300" />
+                                {getMonthName(month)}
+                              </span>
+                              <Badge className="bg-[#16162C] text-gray-200 border border-gray-700">
+                                {items.length} arquivo{items.length > 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-3">
                               {items.map((item) => (
                                 <div
-                                  key={item.id}
-                                  className="rounded-lg border border-gray-700 bg-seguranca-black/40 p-3 space-y-3"
+                                  key={item.id ?? item.fileName}
+                                  className="rounded-2xl border border-gray-800/80 bg-[#111124]/95 p-3 space-y-3 shadow-inner"
                                 >
                                   <div className="space-y-1 text-sm text-gray-300">
-                                    <p className="font-medium text-gray-100">{item.employeeName}</p>
-                                    <p className="text-xs text-gray-400">CPF: {item.cpf}</p>
-                                    <p className="text-xs text-gray-500 truncate">{item.fileName}</p>
+                                    <p className="font-medium text-white tracking-wide uppercase text-[11px]">
+                                      {item.employeeName}
+                                    </p>
+                                    <p className="text-[11px] text-gray-500">CPF: {item.cpf}</p>
+                                    <p className="text-[11px] text-gray-500 truncate">
+                                      {item.fileName}
+                                    </p>
                                   </div>
                                   <div className="flex flex-wrap gap-2">
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
+                                      className="bg-[#0B0B16] border border-gray-800 text-gray-100 hover:bg-black/80 hover:border-gray-700 w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5 transition-all"
                                       onClick={() => handleViewHolerite(item.fileName)}
                                     >
                                       <Eye className="w-4 h-4 mr-1" />
@@ -512,7 +520,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                     </Button>
                                     <Button
                                       size="sm"
-                                      className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto text-xs sm:text-sm"
+                                      className="bg-[#5F5CFF] hover:bg-[#4B48E6] text-white w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5 shadow-[0_12px_32px_rgba(95,92,255,0.45)] transition-all"
                                       onClick={() => handleDownloadHolerite(item.fileName)}
                                     >
                                       <Download className="w-4 h-4 mr-1" />
@@ -521,12 +529,12 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                   </div>
                                 </div>
                               ))}
-                            </CardContent>
-                          </Card>
+                            </div>
+                          </div>
                         );
                       })}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -540,8 +548,8 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
               <p>Carregando seus comprovantes...</p>
             </div>
           ) : receipts.length === 0 ? (
-            <Card className="bg-seguranca-graphite border-gray-700">
-              <CardContent className="py-10 flex flex-col items-center gap-3 text-gray-300">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm">
+              <CardContent className="py-12 flex flex-col items-center gap-3 text-gray-300">
                 <FileText className="w-10 h-10" />
                 <p>Nenhum comprovante encontrado.</p>
                 <span className="text-sm text-gray-500">
@@ -550,73 +558,65 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-10">
+            <div className="space-y-6">
               {receiptYears.map((year) => {
                 const months = Object.keys(receiptsGrouped[year])
                   .map((month) => Number(month))
                   .sort((a, b) => b - a);
 
                 return (
-                  <div key={year} className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-semibold text-gray-200">{year}</h2>
-                      <Badge className="bg-blue-500/20 text-blue-200 border-blue-500/40">
+                  <Card
+                    key={year}
+                    className="bg-[#08080F]/95 border border-gray-900/60 rounded-3xl shadow-[0_22px_65px_rgba(0,0,0,0.55)] backdrop-blur-sm"
+                  >
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Ano</p>
+                        <h2 className="text-2xl font-semibold text-white">{year}</h2>
+                      </div>
+                      <Badge className="bg-blue-500/15 text-blue-100 border border-blue-500/40 backdrop-blur">
                         {months.length} mês{months.length > 1 ? 'es' : ''}
                       </Badge>
-                    </div>
-
-                    <Separator className="bg-gray-700" />
-
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                       {months.map((month) => {
                         const items = receiptsGrouped[year][month];
 
                         return (
-                          <Card
+                          <div
                             key={`${year}-${month}`}
-                            className="bg-seguranca-graphite border-gray-700 hover:border-gray-500 transition-colors"
+                            className="bg-[#0F0F1E]/95 border border-gray-900/70 rounded-2xl p-4 space-y-3 shadow-[0_15px_40px_rgba(0,0,0,0.45)]"
                           >
-                            <CardHeader>
-                              <CardTitle className="flex items-center justify-between text-gray-100">
-                                <span className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-blue-400" />
-                                  {monthNames[month] ?? `Mês ${month}`}
-                                </span>
-                                <Badge className="bg-gray-800 text-gray-200 border-gray-600">
-                                  {items.length} arquivo{items.length > 1 ? 's' : ''}
-                                </Badge>
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <span className="flex items-center gap-2 text-lg text-white font-semibold">
+                                <Calendar className="w-4 h-4 text-blue-300" />
+                                {getMonthName(month)}
+                              </span>
+                              <Badge className="bg-[#122039] text-blue-100 border border-blue-500/30">
+                                {items.length} comprovante{items.length > 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-3">
                               {items.map((item) => (
                                 <div
-                                  key={item.id}
-                                  className="rounded-lg border border-gray-700 bg-seguranca-black/40 p-3 space-y-3"
+                                  key={item.id ?? item.fileName}
+                                  className="rounded-2xl border border-gray-800/80 bg-[#111124]/95 p-3 space-y-3 shadow-inner"
                                 >
                                   <div className="space-y-1 text-sm text-gray-300">
-                                    <p className="font-medium text-gray-100">
+                                    <p className="font-medium text-white tracking-wide uppercase text-[11px]">
                                       {item.employeeName || (item as any)?.creditedName}
                                     </p>
-                                    {((item as any)?.cpf || (item as any)?.creditedDocument) && (
-                                      <p className="text-xs text-gray-400">
-                                        CPF: {(item as any)?.cpf || (item as any)?.creditedDocument}
-                                      </p>
+                                    {item.transferDate && (
+                                      <p className="text-[11px] text-gray-500">Transferência: {item.transferDate}</p>
                                     )}
-                                    <p className="text-xs text-gray-500 truncate">{item.fileName}</p>
+                                    <p className="text-[11px] text-gray-500 truncate">{item.fileName}</p>
                                   </div>
                                   <div className="flex flex-wrap gap-2">
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
-                                      onClick={() => handleViewReceipt(item)}
-                                    >
-                                      <Eye className="w-4 h-4 mr-1" />
-                                      Visualizar
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto text-xs sm:text-sm"
+                                      className="bg-[#0B0B16] border border-gray-800 text-gray-100 hover:bg-black/80 hover:border-gray-700 w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5 transition-all"
                                       onClick={() => handleDownloadReceipt(item)}
                                     >
                                       <Download className="w-4 h-4 mr-1" />
@@ -625,12 +625,12 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                                   </div>
                                 </div>
                               ))}
-                            </CardContent>
-                          </Card>
+                            </div>
+                          </div>
                         );
                       })}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -644,8 +644,8 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
               <p>Carregando seus documentos unificados...</p>
             </div>
           ) : unifiedDocuments.length === 0 ? (
-            <Card className="bg-seguranca-graphite border-gray-700">
-              <CardContent className="py-10 flex flex-col items-center gap-3 text-gray-300">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm">
+              <CardContent className="py-12 flex flex-col items-center gap-3 text-gray-300">
                 <Folder className="w-10 h-10" />
                 <p>Nenhum documento unificado encontrado.</p>
                 <span className="text-sm text-gray-500">
@@ -659,57 +659,75 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                 .map((year) => Number(year))
                 .sort((a, b) => b - a)
                 .map((year) => (
-                  <div key={year} className="space-y-3">
-                    <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-purple-400" />
-                      {year}
-                    </h3>
-                    <div className="grid gap-3 md:grid-cols-2">
+                  <Card
+                    key={year}
+                    className="bg-[#08080F]/95 border border-gray-900/60 rounded-3xl shadow-[0_22px_65px_rgba(0,0,0,0.55)] backdrop-blur-sm"
+                  >
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Ano</p>
+                        <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-purple-300" />
+                          {year}
+                        </h3>
+                      </div>
+                      <Badge className="bg-purple-500/15 text-purple-100 border border-purple-500/40 backdrop-blur">
+                        {unifiedByYear[year].length} documento{unifiedByYear[year].length > 1 ? 's' : ''}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                       {unifiedByYear[year]
                         .sort((a, b) => (b.month ?? 0) - (a.month ?? 0))
                         .map((doc, index) => (
-                          <Card key={`${doc.fileName}-${index}`} className="bg-seguranca-graphite border-gray-700">
-                            <CardContent className="p-4 space-y-3">
+                          <div
+                            key={`${doc.fileName}-${index}`}
+                            className="bg-[#0F0F1E]/95 border border-gray-900/70 rounded-2xl p-4 space-y-3 shadow-[0_15px_40px_rgba(0,0,0,0.45)]"
+                          >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-300">
                               <div>
-                                <p className="text-sm text-gray-400">Documento</p>
-                                <p className="text-base font-medium text-gray-100 truncate">{doc.fileName}</p>
+                                <p className="text-xs uppercase text-gray-500">Documento</p>
+                                <p className="text-gray-100 text-sm truncate font-medium">
+                                  {doc.fileName}
+                                </p>
                               </div>
-                              <div className="grid grid-cols-2 gap-3 text-sm text-gray-400">
-                                <div>
-                                  <p className="text-xs uppercase text-gray-500">Funcionário</p>
-                                  <p className="text-gray-200">{doc.employeeName}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs uppercase text-gray-500">Período</p>
-                                  <p className="text-gray-200">
-                                    {doc.month ? `${monthNames[doc.month]} / ${year}` : year}
-                                  </p>
-                                </div>
+                              <div>
+                                <p className="text-xs uppercase text-gray-500">Período</p>
+                                <p className="text-gray-100 text-sm">
+                                  {doc.month ? `${getMonthName(doc.month)} / ${year}` : year}
+                                </p>
                               </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
-                                  onClick={() => handleViewUnified(doc)}
-                                >
-                                  <Eye className="w-4 h-4 mr-1" />
-                                  Visualizar
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto text-xs sm:text-sm"
-                                  onClick={() => handleDownloadUnified(doc)}
-                                >
-                                  <Download className="w-4 h-4 mr-1" />
-                                  Baixar
-                                </Button>
+                              <div>
+                                <p className="text-xs uppercase text-gray-500">Funcionário</p>
+                                <p className="text-gray-100 text-sm">{doc.employeeName}</p>
                               </div>
-                            </CardContent>
-                          </Card>
+                              <div>
+                                <p className="text-xs uppercase text-gray-500">CPF</p>
+                                <p className="text-gray-100 text-sm">{doc.cpf}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-[#0B0B16] border border-gray-800 text-gray-100 hover:bg-black/80 hover:border-gray-700 w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5 transition-all"
+                                onClick={() => handleViewUnified(doc)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Visualizar
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-[#7B4CFF] hover:bg-[#6936EB] text-white w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5 shadow-[0_12px_32px_rgba(123,76,255,0.45)] transition-all"
+                                onClick={() => handleDownloadUnified(doc)}
+                              >
+                                <Download className="w-4 h-4 mr-1" />
+                                Baixar
+                              </Button>
+                            </div>
+                          </div>
                         ))}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
             </div>
           )}
@@ -722,11 +740,11 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
               <p>Carregando seus documentos organizados por setor...</p>
             </div>
           ) : sectorGroups.length === 0 ? (
-            <Card className="bg-seguranca-graphite border-gray-700">
-              <CardContent className="py-10 flex flex-col items-center gap-3 text-gray-300">
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm">
+              <CardContent className="py-12 flex flex-col items-center gap-3 text-gray-300 text-center">
                 <Building2 className="w-10 h-10" />
                 <p>Nenhum documento encontrado para seus setores.</p>
-                <span className="text-sm text-gray-500 text-center">
+                <span className="text-sm text-gray-500">
                   Quando houver documentos organizados por setor para você, eles aparecerão aqui.
                 </span>
               </CardContent>
@@ -734,14 +752,17 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
           ) : (
             <div className="space-y-6">
               {sectorGroups.map((sector) => (
-                <Card key={sector.name} className="bg-seguranca-graphite border-gray-700">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <Card
+                  key={sector.name}
+                  className="bg-[#08080F]/95 border border-gray-900/60 rounded-3xl shadow-[0_22px_65px_rgba(0,0,0,0.55)] backdrop-blur-sm"
+                >
+                  <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-seguranca-black flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-xl bg-[#111124] border border-gray-800 flex items-center justify-center shadow-inner">
                         <Building2 className="w-5 h-5 text-seguranca-yellow" />
                       </div>
                       <div>
-                        <CardTitle className="text-gray-100 text-xl">{sector.name}</CardTitle>
+                        <CardTitle className="text-white text-xl font-semibold">{sector.name}</CardTitle>
                         <p className="text-sm text-gray-400">
                           {sector.documentCount} documento{sector.documentCount > 1 ? 's' : ''}
                         </p>
@@ -759,16 +780,16 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                       .map((doc) => (
                         <div
                           key={`${doc.sector}-${doc.period}-${doc.fileName}`}
-                          className="border border-gray-700 rounded-lg p-4 bg-seguranca-black/40 space-y-3"
+                          className="border border-gray-900/70 rounded-2xl p-4 bg-[#0F0F1E]/95 space-y-3 shadow-[0_15px_40px_rgba(0,0,0,0.45)]"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm text-gray-400">Período</p>
-                              <p className="text-base font-medium text-gray-100">
-                                {monthNames[doc.month] ?? doc.month}/{doc.year}
+                              <p className="text-xs uppercase text-gray-500">Período</p>
+                              <p className="text-base font-semibold text-white">
+                                {doc.month ? `${getMonthName(doc.month)}/${doc.year}` : doc.period || doc.year}
                               </p>
                             </div>
-                            <Badge className="bg-gray-800 text-gray-200 border-gray-600">
+                            <Badge className="bg-[#16162C] text-gray-200 border border-gray-700">
                               {doc.employeeName}
                             </Badge>
                           </div>
@@ -777,7 +798,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="border-gray-600 text-gray-100 hover:bg-gray-800 w-full sm:w-auto text-xs sm:text-sm"
+                              className="bg-[#0B0B16] border border-gray-800 text-gray-100 hover:bg-black/80 hover:border-gray-700 w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5 transition-all"
                               onClick={() => handleDownloadSectorDocument(doc)}
                             >
                               <FileDown className="w-4 h-4 mr-1" />
@@ -787,7 +808,7 @@ const CollaboratorHolerites: React.FC<{ user: User }> = ({ user }) => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-gray-400 hover:text-gray-200 w-full sm:w-auto text-xs sm:text-sm"
+                                className="text-gray-400 hover:text-gray-100 w-full sm:w-auto text-xs sm:text-sm rounded-lg py-2.5"
                                 onClick={() => window.open(buildDownloadUrl(doc.filePath), '_blank', 'noopener,noreferrer')}
                               >
                                 Abrir caminho
