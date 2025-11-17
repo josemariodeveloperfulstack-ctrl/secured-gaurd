@@ -109,6 +109,29 @@ export const employeeService = {
   },
 
   /**
+   * Buscar funcionário por CPF exato (normalizado)
+   */
+  async searchEmployeeByCpf(cpf: string): Promise<Employee | null> {
+    try {
+      // Normalizar CPF (remover caracteres não numéricos)
+      const normalizedCpf = cpf.replace(/\D/g, '');
+      if (!normalizedCpf || normalizedCpf.length < 11) {
+        return null;
+      }
+      
+      const response = await api.get(`/api/employees/search/cpf/${normalizedCpf}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Funcionário não encontrado - não é erro
+        return null;
+      }
+      console.error('Erro ao buscar funcionário por CPF:', error);
+      return null;
+    }
+  },
+
+  /**
    * Buscar funcionários simplificados por termo
    */
   async searchSimpleEmployees(query: string): Promise<SimpleEmployee[]> {

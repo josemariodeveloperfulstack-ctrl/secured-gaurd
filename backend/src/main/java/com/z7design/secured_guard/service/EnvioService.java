@@ -7,6 +7,7 @@ import com.z7design.secured_guard.model.DeliveryChannel;
 import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.model.PayslipDeliveryLog;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.DocumentType;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.PayslipDeliveryLogRepository;
 import com.z7design.secured_guard.repository.PayslipRepository;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -101,23 +103,10 @@ public class EnvioService {
                     log.info("📋 Dados do USER: ID={}, Email={}, WhatsApp='{}'", 
                             user.getId(), user.getEmail(), user.getWhatsapp());
                     
-                    // Verificar se tem WhatsApp
-                    if (user.getWhatsapp() == null) {
-                        log.warn("⚠️ Campo WhatsApp é NULL!");
-                        response.setMensagem("WhatsApp não cadastrado na tabela users para CPF: " + cpfBusca);
-                        return response;
-                    }
+                    // Verificar WhatsApp: primeiro em users, depois em employees
+                    String whatsappNumber = user.getWhatsapp();
                     
-                    if (user.getWhatsapp().trim().isEmpty()) {
-                        log.warn("⚠️ Campo WhatsApp está vazio (string vazia)!");
-                        response.setMensagem("WhatsApp não cadastrado na tabela users para CPF: " + cpfBusca);
-                        return response;
-                    }
-                    
-                    log.info("✅ WhatsApp encontrado: '{}' (tamanho: {} caracteres)", 
-                            user.getWhatsapp(), user.getWhatsapp().length());
-                    
-                    // Agora buscar Employee correspondente (opcional, para pegar dados adicionais)
+                    // Agora buscar Employee correspondente (para verificar WhatsApp como fallback)
                     log.info("🔍 PASSO 2: Buscando EMPLOYEE correspondente...");
                     Optional<Employee> employeeOpt = employeeRepository.findByDocument(cpfNormalizado);
                     
@@ -133,6 +122,20 @@ public class EnvioService {
                     if (employeeOpt.isPresent()) {
                         employee = employeeOpt.get();
                         log.info("✅ EMPLOYEE encontrado: {}", employee.getName());
+                        
+                        // Se não tem WhatsApp em users, verificar em employees
+                        if (whatsappNumber == null || whatsappNumber.trim().isEmpty()) {
+                            String employeeWhatsapp = employee.getPhone();
+                            if (employeeWhatsapp != null && !employeeWhatsapp.trim().isEmpty()) {
+                                whatsappNumber = employeeWhatsapp;
+                                log.info("✅ WhatsApp encontrado em employees: '{}' (tamanho: {} caracteres)", 
+                                        whatsappNumber, whatsappNumber.length());
+                                // Atualizar o user com o WhatsApp do employee
+                                user.setWhatsapp(whatsappNumber);
+                                userRepository.save(user);
+                                log.info("✅ WhatsApp atualizado na tabela users");
+                            }
+                        }
                     } else {
                         log.warn("⚠️ EMPLOYEE não encontrado, usando dados do USER");
                         // Criar Employee temporário com dados do User
@@ -142,6 +145,16 @@ public class EnvioService {
                         employee.setDocument(cpfNormalizado);
                         employee.setEmail(user.getEmail());
                     }
+                    
+                    // Validação final do WhatsApp
+                    if (whatsappNumber == null || whatsappNumber.trim().isEmpty()) {
+                        log.warn("⚠️ WhatsApp não encontrado nem em users nem em employees!");
+                        response.setMensagem("WhatsApp não cadastrado na tabela users nem na tabela employees para CPF: " + cpfBusca);
+                        return response;
+                    }
+                    
+                    log.info("✅ WhatsApp encontrado: '{}' (tamanho: {} caracteres)", 
+                            whatsappNumber, whatsappNumber.length());
                     
                 } else {
                     log.error("❌ USER não encontrado com CPF: {}", cpfBusca);
@@ -173,10 +186,23 @@ public class EnvioService {
                 
                 user = userOpt.get();
                 
-                if (user.getWhatsapp() == null || user.getWhatsapp().trim().isEmpty()) {
-                    log.warn("⚠️ USER não tem WhatsApp cadastrado!");
-                    response.setMensagem("WhatsApp não cadastrado na tabela users para CPF: " + employee.getDocument());
-                    return response;
+                // Verificar WhatsApp: primeiro em users, depois em employees
+                String whatsappNumber = user.getWhatsapp();
+                if (whatsappNumber == null || whatsappNumber.trim().isEmpty()) {
+                    log.warn("⚠️ USER não tem WhatsApp cadastrado, verificando em employees...");
+                    String employeeWhatsapp = employee.getPhone();
+                    if (employeeWhatsapp != null && !employeeWhatsapp.trim().isEmpty()) {
+                        whatsappNumber = employeeWhatsapp;
+                        log.info("✅ WhatsApp encontrado em employees: {}", whatsappNumber);
+                        // Atualizar o user com o WhatsApp do employee
+                        user.setWhatsapp(whatsappNumber);
+                        userRepository.save(user);
+                        log.info("✅ WhatsApp atualizado na tabela users");
+                    } else {
+                        log.warn("⚠️ WhatsApp não encontrado nem em users nem em employees!");
+                        response.setMensagem("WhatsApp não cadastrado na tabela users nem na tabela employees para CPF: " + employee.getDocument());
+                        return response;
+                    }
                 }
                 
             } else {
@@ -381,10 +407,46 @@ public class EnvioService {
         
         try {
             if ("email".equals(request.getTipo())) {
-                if (employee.getEmail() == null || employee.getEmail().trim().isEmpty()) {
-                    detalhe.setErro("Email não cadastrado");
-                    registrarLog(employee.getDocument(), null, null, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                String cpf = employee.getDocument();
+                Optional<User> userOpt = findUserByCpf(cpf);
+                if (userOpt.isEmpty()) {
+                    detalhe.setErro("Usuário não encontrado na tabela users para CPF: " + cpf);
+                    registrarLog(cpf, null, null, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
                     return detalhe;
+                }
+
+                User user = userOpt.get();
+                String destinationEmail = user.getEmail() != null ? user.getEmail().trim() : "";
+                if (destinationEmail.isEmpty()) {
+                    detalhe.setErro("Email não cadastrado na tabela users para CPF: " + cpf);
+                    registrarLog(cpf, null, null, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+
+                Optional<User> ownerByEmail = userRepository.findByEmail(destinationEmail);
+                if (ownerByEmail.isPresent() && !ownerByEmail.get().getId().equals(user.getId())) {
+                    detalhe.setErro("Email informado pertence a outro usuário. Verifique cadastro na tabela users.");
+                    registrarLog(cpf, null, null, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+
+                String userCpf = normalizeCpf(user.getUsername());
+                if (!userCpf.isEmpty() && !userCpf.equals(normalizeCpf(cpf))) {
+                    detalhe.setErro("CPF do usuário não coincide com o CPF do funcionário.");
+                    registrarLog(cpf, null, null, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+
+                if (employee.getName() != null && !employee.getName().isBlank() &&
+                        user.getName() != null && !namesMatch(employee.getName(), user.getName())) {
+                    detalhe.setErro("Nome do usuário na tabela users não coincide com o funcionário do holerite.");
+                    registrarLog(cpf, null, null, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+
+                detalhe.setEmail(destinationEmail);
+                if (employee.getEmail() == null || employee.getEmail().trim().isEmpty()) {
+                    employee.setEmail(destinationEmail);
                 }
                 // Resolver último holerite disponível (maior ano/mes)
                 var ultimoRegistro = obterUltimoPayslip(employee.getDocument());
@@ -400,7 +462,7 @@ public class EnvioService {
 
                 byte[] bytes = Files.readAllBytes(Path.of(filePath));
                 boolean emailOk = emailService.sendEmailWithAttachment(
-                        employee.getEmail(),
+                        destinationEmail,
                         request.getAssunto() != null ? request.getAssunto() : "Holerite",
                         request.getMensagem() != null ? request.getMensagem() : "Segue seu holerite em anexo.",
                         bytes,
@@ -412,21 +474,51 @@ public class EnvioService {
                 registrarLog(employee.getDocument(), ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null), DeliveryChannel.EMAIL, detalhe.isEnviado(), 1, detalhe.getErro());
                 
             } else if ("whatsapp".equals(request.getTipo())) {
-                // 🔍 VALIDAÇÃO: Verificar se existe User com CPF correspondente e WhatsApp cadastrado
+                // 🔍 VALIDAÇÃO: Verificar WhatsApp primeiro em users, depois em employees
                 String cpf = employee.getDocument();
-                Optional<User> userOpt = userRepository.findByUsername(cpf);
+                String whatsappNumber = null;
+                User user = null;
                 
-                if (userOpt.isEmpty()) {
-                    detalhe.setErro("Usuário não encontrado na tabela users para CPF: " + cpf);
+                // PASSO 1: Buscar User e verificar WhatsApp
+                Optional<User> userOpt = userRepository.findByUsername(cpf);
+                if (userOpt.isPresent()) {
+                    user = userOpt.get();
+                    whatsappNumber = user.getWhatsapp();
+                    log.info("🔍 WhatsApp encontrado em users: {} (CPF: {})", 
+                            whatsappNumber != null && !whatsappNumber.trim().isEmpty() ? whatsappNumber : "não cadastrado", cpf);
+                } else {
+                    log.warn("⚠️ User não encontrado para CPF: {}", cpf);
+                }
+                
+                // PASSO 2: Se não encontrou em users, verificar em employees
+                if (whatsappNumber == null || whatsappNumber.trim().isEmpty()) {
+                    String employeeWhatsapp = employee.getPhone();
+                    if (employeeWhatsapp != null && !employeeWhatsapp.trim().isEmpty()) {
+                        whatsappNumber = employeeWhatsapp;
+                        log.info("✅ WhatsApp encontrado em employees: {} (CPF: {})", whatsappNumber, cpf);
+                        
+                        // Se user existe mas não tem WhatsApp, atualizar o user com o WhatsApp do employee
+                        if (user != null) {
+                            log.info("🔄 Atualizando WhatsApp do user com o número do employee");
+                            user.setWhatsapp(whatsappNumber);
+                            userRepository.save(user);
+                            log.info("✅ WhatsApp atualizado na tabela users");
+                        }
+                    } else {
+                        log.warn("⚠️ WhatsApp não encontrado nem em users nem em employees para CPF: {}", cpf);
+                    }
+                }
+                
+                // Validação final
+                if (whatsappNumber == null || whatsappNumber.trim().isEmpty()) {
+                    detalhe.setErro("WhatsApp não cadastrado na tabela users nem na tabela employees para CPF: " + cpf);
                     registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     return detalhe;
                 }
                 
-                User user = userOpt.get();
-                String whatsappNumber = user.getWhatsapp();
-                
-                if (whatsappNumber == null || whatsappNumber.trim().isEmpty()) {
-                    detalhe.setErro("WhatsApp não cadastrado na tabela users para CPF: " + cpf);
+                // Se user não foi encontrado, ainda precisamos dele para verificar consentimento
+                if (user == null) {
+                    detalhe.setErro("Usuário não encontrado na tabela users para CPF: " + cpf + ". É necessário criar o usuário primeiro.");
                     registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     return detalhe;
                 }
@@ -515,11 +607,16 @@ public class EnvioService {
                 
                 final String normalizedFinal = normalized;
                 log.info("📤 Enviando via Baileys: phone={}, path={}", normalizedFinal, absolutePath);
-                boolean sent = sendWhatsAppMessage(normalizedFinal, message, absolutePath);
+                String[] sendResult = sendWhatsAppMessageWithError(normalizedFinal, message, absolutePath);
+                boolean sent = Boolean.parseBoolean(sendResult[0]);
+                String errorMessage = sendResult.length > 1 ? sendResult[1] : null;
                 detalhe.setEnviado(sent);
                 if (!sent) {
-                    detalhe.setErro("Falha no envio via WhatsApp");
-                    registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
+                    String erroDetalhado = errorMessage != null && !errorMessage.isEmpty() 
+                        ? "Falha no envio via WhatsApp: " + errorMessage 
+                        : "Falha no envio via WhatsApp. Verifique se o serviço Baileys está ativo e conectado.";
+                    detalhe.setErro(erroDetalhado);
+                    registrarLog(cpf, payslip.getMonth(), payslip.getYear(), DeliveryChannel.WHATSAPP, false, 1, erroDetalhado);
                     // Retry em 5 minutos, apenas 1 vez
                     scheduler.schedule(() -> retryWhatsApp(normalizedFinal, message, absolutePath, cpf, payslip.getMonth(), payslip.getYear()), 5, TimeUnit.MINUTES);
                 } else {
@@ -547,6 +644,7 @@ public class EnvioService {
                 .month(month != null ? month : 0)
                 .year(year != null ? year : 0)
                 .channel(channel)
+                .documentType(DocumentType.HOLERITE)
                 .success(success)
                 .attempts(attempts)
                 .errorMessage(error)
@@ -575,6 +673,36 @@ public class EnvioService {
         }
         
         return baileysRestService.sendFileMessage(phoneNumber, message, filePath);
+    }
+    
+    /**
+     * Envia mensagem via WhatsApp e retorna resultado com mensagem de erro (se houver)
+     * @return Array com [sucesso (boolean como string), mensagemErro]
+     */
+    private String[] sendWhatsAppMessageWithError(String phoneNumber, String message, String filePath) {
+        log.info("📤 Enviando via Baileys REST API (porta 3333)");
+        
+        if (baileysRestService == null) {
+            log.error("❌ BaileysRestService não disponível!");
+            return new String[]{"false", "Serviço Baileys não disponível"};
+        }
+        
+        try {
+            boolean sent = baileysRestService.sendFileMessage(phoneNumber, message, filePath);
+            if (sent) {
+                return new String[]{"true", null};
+            } else {
+                // Tentar obter detalhes do erro do Baileys
+                String errorDetail = baileysRestService.getLastErrorMessage();
+                if (errorDetail != null && !errorDetail.isEmpty()) {
+                    return new String[]{"false", errorDetail};
+                }
+                return new String[]{"false", "Serviço Baileys retornou erro sem detalhes"};
+            }
+        } catch (Exception e) {
+            log.error("❌ Exceção ao enviar via Baileys: {}", e.getMessage(), e);
+            return new String[]{"false", "Erro ao comunicar com serviço Baileys: " + e.getMessage()};
+        }
     }
     
     private void retryWhatsApp(String phone, String message, String filePath, String cpf, Integer month, Integer year) {
@@ -677,5 +805,52 @@ public class EnvioService {
         }
         
         return userOpt.get().getWhatsapp();
+    }
+
+    private Optional<User> findUserByCpf(String cpf) {
+        if (cpf == null || cpf.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        String normalized = normalizeCpf(cpf);
+
+        Optional<User> userOpt = userRepository.findByUsername(normalized);
+        if (userOpt.isPresent()) {
+            return userOpt;
+        }
+
+        userOpt = userRepository.findByEmployeeCpf(cpf);
+        if (userOpt.isPresent()) {
+            return userOpt;
+        }
+
+        if (!normalized.equals(cpf)) {
+            userOpt = userRepository.findByEmployeeCpf(normalized);
+            if (userOpt.isPresent()) {
+                return userOpt;
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private String normalizeCpf(String cpf) {
+        if (cpf == null) {
+            return "";
+        }
+        return cpf.replaceAll("[^0-9]", "");
+    }
+
+    private boolean namesMatch(String nameA, String nameB) {
+        if (nameA == null || nameB == null) {
+            return false;
+        }
+        return normalizeName(nameA).equals(normalizeName(nameB));
+    }
+
+    private String normalizeName(String name) {
+        return Normalizer.normalize(name.toUpperCase(), Normalizer.Form.NFD)
+                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+                .replaceAll("[^A-Z0-9]", "")
+                .trim();
     }
 } 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import paymentReceiptService, { type PaymentReceipt } from '@/services/paymentReceiptService';
-import holeriteService, { Holerite } from '@/services/holeriteService';
+import holeriteService, { Holerite, HoleriteOrganizationResponse, HoleriteOrganizedEntry, HoleriteCompanyGroup, HoleriteSectorGroup, HoleritePeriodGroup } from '@/services/holeriteService';
 import { getApiUrl } from '@/config/environment';
 import { PaymentReceiptViewModal } from '@/components/paymentReceipts/PaymentReceiptViewModal';
 import { 
@@ -34,7 +34,10 @@ import {
   AlertTriangle,
   ExternalLink,
   Receipt,
-  GripVertical
+  GripVertical,
+  ChevronDown,
+  ChevronRight,
+  Building2
 } from 'lucide-react';
 import HoleriteUpload from '@/components/HoleriteUpload';
 import { HoleriteViewModal } from '@/components/holerites/HoleriteViewModal';
@@ -56,15 +59,15 @@ import api from '@/lib/axios';
 import { contactValidationService, type ContactValidationDetail } from '@/services/contactValidationService';
 import { QuickUserFormModal } from '@/components/contact-validation/QuickUserFormModal';
 import { WhatsAppUpdateModal } from '@/components/contact-validation/WhatsAppUpdateModal';
+import { WhatsAppConsentConfirmationModal } from '@/components/contact-validation/WhatsAppConsentConfirmationModal';
 import { ContactValidationModal } from '@/components/contact-validation/ContactValidationModal';
 import { employeeService } from '@/services/employeeService';
+import { userValidationService, type UserValidationResult } from '@/services/userValidationService';
 
 const Holerites: React.FC = () => {
   const { user } = useAuth();
   const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '').toUpperCase();
-  if (normalizedRole === 'COLABORADOR' && user) {
-    return <CollaboratorHolerites user={user} />;
-  }
+  const isCollaborator = normalizedRole === 'COLABORADOR' && !!user;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -75,6 +78,7 @@ const Holerites: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedHolerites, setSelectedHolerites] = useState<string[]>([]);
+  const [organizationEntryMap, setOrganizationEntryMap] = useState<Record<string, HoleriteOrganizedEntry>>({});
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filters, setFilters] = useState<any>({});
   const { toast } = useToast();
@@ -92,6 +96,7 @@ const Holerites: React.FC = () => {
   const [deletingReceipts, setDeletingReceipts] = useState(false);
   const [showReceiptDeleteModal, setShowReceiptDeleteModal] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<any>(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(null);
 
 
   // Estados para template de recibo
@@ -164,6 +169,9 @@ const Holerites: React.FC = () => {
 
   // Modais de ação individual (criar usuário / atualizar WhatsApp)
   const [selectedValidationDetail, setSelectedValidationDetail] = useState<ContactValidationDetail | null>(null);
+  const [showSingleConsentModal, setShowSingleConsentModal] = useState(false);
+  const [pendingConsentContext, setPendingConsentContext] = useState<{ payslip: Holerite; employeeId?: string } | null>(null);
+  const [pendingWhatsappContext, setPendingWhatsappContext] = useState<{ payslip: Holerite; employeeId?: string } | null>(null);
   const [showSingleUserModal, setShowSingleUserModal] = useState(false);
   const [showSingleWhatsappModal, setShowSingleWhatsappModal] = useState(false);
   
@@ -321,6 +329,14 @@ const Holerites: React.FC = () => {
   const [selectedPaymentReceiptForView, setSelectedPaymentReceiptForView] = useState<PaymentReceipt | null>(null);
   const [showPaymentReceiptViewModal, setShowPaymentReceiptViewModal] = useState(false);
 
+  // Estados para organização por empresas
+  const [organizationData, setOrganizationData] = useState<HoleriteOrganizationResponse | null>(null);
+  const [loadingOrganization, setLoadingOrganization] = useState(false);
+  const [organizationError, setOrganizationError] = useState<string | null>(null);
+  const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
+  const [expandedSectors, setExpandedSectors] = useState<Record<string, boolean>>({});
+  const [expandedPeriods, setExpandedPeriods] = useState<Record<string, boolean>>({});
+
   // Estados para modal de aviso de período duplicado
   const [showDuplicatePeriodModal, setShowDuplicatePeriodModal] = useState(false);
   const [duplicatePeriodInfo, setDuplicatePeriodInfo] = useState<{
@@ -382,6 +398,213 @@ const Holerites: React.FC = () => {
     setActivePeriodTab('mes');
     setSelectedMonth('');
   };
+
+  const filterRecordByPrefix = useCallback((record: Record<string, boolean>, prefix: string) => {
+    return Object.fromEntries(
+      Object.entries(record).filter(([key]) => !key.startsWith(prefix))
+    );
+  }, []);
+
+  const getCompanyKey = (company: { companySigla?: string; companyCnpj?: string; companyName?: string }) => {
+    const sigla = (company?.companySigla || 'OUTROS').toUpperCase();
+    const identifier = company?.companyCnpj || company?.companyName || 'SEM_IDENTIFICACAO';
+    return `${sigla}|${identifier}`;
+  };
+
+  const getSectorKey = (companyKey: string, sector: { normalizedSectorName?: string; sectorName?: string }) => {
+    const normalized = (sector?.normalizedSectorName || sector?.sectorName || 'SETOR_NAO_INFORMADO').toUpperCase();
+    return `${companyKey}|${normalized}`;
+  };
+
+  const getPeriodKey = (sectorKey: string, period: { year?: number; month?: number }) => {
+    const yearValue = period?.year ?? 0;
+    const monthValue = period?.month ?? 0;
+    return `${sectorKey}|${yearValue}-${monthValue}`;
+  };
+
+  const collectPeriodEntryIds = (period?: HoleritePeriodGroup): string[] => {
+    if (!period?.payslips) {
+      return [];
+    }
+    return period.payslips
+      .map(p => p.id)
+      .filter((id): id is string => Boolean(id));
+  };
+
+  const collectSectorEntryIds = (sector?: HoleriteSectorGroup): string[] => {
+    if (!sector?.periods) {
+      return [];
+    }
+    return Array.from(new Set(sector.periods.flatMap(collectPeriodEntryIds)));
+  };
+
+  const collectCompanyEntryIds = (company?: HoleriteCompanyGroup): string[] => {
+    if (!company?.sectors) {
+      return [];
+    }
+    return Array.from(new Set(company.sectors.flatMap(collectSectorEntryIds)));
+  };
+
+  const getSelectedSubset = useCallback(
+    (ids: string[]) => ids.filter(id => selectedHolerites.includes(id)),
+    [selectedHolerites]
+  );
+
+  const areIdsFullySelected = useCallback(
+    (ids: string[]) => ids.length > 0 && getSelectedSubset(ids).length === ids.length,
+    [getSelectedSubset]
+  );
+
+  const hasIdsSelected = useCallback(
+    (ids: string[]) => getSelectedSubset(ids).length > 0,
+    [getSelectedSubset]
+  );
+
+  const handleSelectMultipleHolerites = useCallback((ids: string[], select: boolean) => {
+    setSelectedHolerites(prev => {
+      const set = new Set(prev);
+      ids.forEach(id => {
+        if (!id) {
+          return;
+        }
+        if (select) {
+          set.add(id);
+        } else {
+          set.delete(id);
+        }
+      });
+      return Array.from(set);
+    });
+  }, []);
+
+  const resolveHoleriteFromEntry = useCallback((entry: HoleriteOrganizedEntry): Holerite => {
+    const existing = holerites.find(h => h.id === entry.id);
+    if (existing) {
+      return existing;
+    }
+    return {
+      id: entry.id,
+      employeeName: entry.employeeName,
+      cpf: entry.cpf,
+      month: entry.month ?? 0,
+      year: entry.year ?? 0,
+      fileName: entry.fileName,
+      status: 'PROCESSED',
+      processedAt: entry.processedAt || '',
+      companyName: entry.companyName,
+      companyCnpj: entry.companyCnpj,
+      companySigla: entry.companySigla,
+      workPostName: entry.workPostName || entry.sectorName,
+    } as Holerite;
+  }, [holerites]);
+
+  const formatCpf = (cpf?: string) => {
+    if (!cpf) return 'CPF não informado';
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) {
+      return cpf;
+    }
+    return `${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}`;
+  };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return '';
+    try {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return value;
+      }
+      return date.toLocaleString('pt-BR');
+    } catch {
+      return value;
+    }
+  };
+
+  const toggleCompanyExpansion = useCallback((companyKey: string) => {
+    setExpandedCompanies(prev => {
+      const isExpanded = !!prev[companyKey];
+      const next = { ...prev, [companyKey]: !isExpanded };
+      if (isExpanded) {
+        setExpandedSectors(prevSectors => filterRecordByPrefix(prevSectors, `${companyKey}|`));
+        setExpandedPeriods(prevPeriods => filterRecordByPrefix(prevPeriods, `${companyKey}|`));
+      }
+      return next;
+    });
+  }, [filterRecordByPrefix]);
+
+  const toggleSectorExpansion = useCallback((sectorKey: string) => {
+    setExpandedSectors(prev => {
+      const isExpanded = !!prev[sectorKey];
+      const next = { ...prev, [sectorKey]: !isExpanded };
+      if (isExpanded) {
+        setExpandedPeriods(prevPeriods => filterRecordByPrefix(prevPeriods, `${sectorKey}|`));
+      }
+      return next;
+    });
+  }, [filterRecordByPrefix]);
+
+  const togglePeriodExpansion = useCallback((periodKey: string) => {
+    setExpandedPeriods(prev => ({
+      ...prev,
+      [periodKey]: !prev[periodKey]
+    }));
+  }, []);
+
+  const fetchOrganizationData = useCallback(async (forceReload = false) => {
+    if (loadingOrganization) {
+      return;
+    }
+    if (!forceReload && organizationData) {
+      return;
+    }
+
+    setLoadingOrganization(true);
+    setOrganizationError(null);
+    setExpandedCompanies({});
+    setExpandedSectors({});
+    setExpandedPeriods({});
+
+    try {
+      const data = await holeriteService.getOrganizationByCompany();
+      setOrganizationData(data);
+
+      const map: Record<string, HoleriteOrganizedEntry> = {};
+      data?.companies?.forEach(company => {
+        company?.sectors?.forEach(sector => {
+          sector?.periods?.forEach(period => {
+            period?.payslips?.forEach(entry => {
+              if (entry?.id) {
+                map[entry.id] = entry;
+              }
+            });
+          });
+        });
+      });
+      setOrganizationEntryMap(map);
+    } catch (error: any) {
+      console.error('Erro ao carregar organização de holerites:', error);
+      const message = error?.response?.data?.message || error?.message || 'Erro ao carregar organização de holerites.';
+      setOrganizationError(message);
+      setOrganizationEntryMap({});
+      toast({
+        title: 'Erro ao carregar organização',
+        description: message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingOrganization(false);
+    }
+  }, [loadingOrganization, organizationData, toast]);
+
+  const handleRefreshOrganization = useCallback(() => {
+    fetchOrganizationData(true);
+  }, [fetchOrganizationData]);
+
+  useEffect(() => {
+    if (activeTab === 'processados') {
+      fetchOrganizationData();
+    }
+  }, [activeTab, fetchOrganizationData]);
 
   // Função para obter holerites filtrados pelo período selecionado
   const getFilteredHoleritesByPeriod = () => {
@@ -657,24 +880,20 @@ const Holerites: React.FC = () => {
   };
 
   const handleSelectAllHolerites = (checked: boolean) => {
-    const filtered = getFilteredHolerites();
-    if (checked) {
-      const newSelected = [...new Set([...selectedHolerites, ...filtered.map(h => h.id)])];
-      setSelectedHolerites(newSelected);
-    } else {
-      const filteredIds = filtered.map(h => h.id);
-      setSelectedHolerites(selectedHolerites.filter(id => !filteredIds.includes(id)));
-    }
+    const filteredIds = getFilteredHolerites().map(h => h.id);
+    handleSelectMultipleHolerites(filteredIds, checked);
+  };
+
+  const handleSelectHolerite = (payslipId: string, checked: boolean | 'indeterminate') => {
+    handleSelectMultipleHolerites([payslipId], checked === true);
   };
 
   const handleBatchEmailHolerites = () => {
-    // Implementar envio em lote por email
-    console.log('Enviando holerites por email:', selectedHolerites);
+    handleBatchSendHoleritesForIds(selectedHolerites, 'email');
   };
 
   const handleBatchWhatsAppHolerites = () => {
-    // Implementar envio em lote por WhatsApp
-    console.log('Enviando holerites por WhatsApp:', selectedHolerites);
+    handleBatchSendHoleritesForIds(selectedHolerites, 'whatsapp');
   };
 
   const handleBatchDeleteHolerites = () => {
@@ -687,14 +906,7 @@ const Holerites: React.FC = () => {
       return;
     }
 
-    console.log('🗑️ Preparando exclusão em lote');
-    console.log('📋 IDs selecionados:', selectedHolerites);
-    console.log('📊 Dados dos holerites selecionados:', selectedHolerites.map(id => {
-      const holerite = holerites.find(h => h.id === id);
-      return { id, holerite: holerite ? { id: holerite.id, employeeName: holerite.employeeName, fileName: holerite.fileName } : 'Não encontrado' };
-    }));
-
-    // Mostrar modal de confirmação
+    setPendingDeleteIds(null);
     setShowBatchDeleteModal(true);
   };
 
@@ -702,11 +914,19 @@ const Holerites: React.FC = () => {
     try {
       setIsDeleting(true);
       
+      const idsToDelete = pendingDeleteIds ?? selectedHolerites;
+
+      if (idsToDelete.length === 0) {
+        toast({ title: 'Nenhum holerite selecionado', description: 'Selecione pelo menos um holerite para excluir.', variant: 'destructive' });
+        setIsDeleting(false);
+        return;
+      }
+
       console.log('🗑️ Iniciando exclusão em lote de holerites');
-      console.log('📋 IDs selecionados:', selectedHolerites);
-      console.log('📊 Quantidade selecionada:', selectedHolerites.length);
+      console.log('📋 IDs selecionados:', idsToDelete);
+      console.log('📊 Quantidade selecionada:', idsToDelete.length);
       
-      const result = await holeriteService.deleteMultipleHolerites(selectedHolerites);
+      const result = await holeriteService.deleteMultipleHolerites(idsToDelete);
       
       console.log('✅ Resultado da exclusão:', result);
       
@@ -726,10 +946,12 @@ const Holerites: React.FC = () => {
       }
       
       // Limpar seleção
-      setSelectedHolerites([]);
+      setSelectedHolerites(prev => prev.filter(id => !idsToDelete.includes(id)));
+      setPendingDeleteIds(null);
       
-      // Recarregar lista
+      // Recarregar lista e organização
       await loadHolerites();
+      await fetchOrganizationData(true);
       
       // Fechar modal
       setShowBatchDeleteModal(false);
@@ -822,15 +1044,39 @@ const Holerites: React.FC = () => {
   }, []);
 
   // Função para filtrar documentos unificados
-  const getFilteredUnifiedDocuments = () => {
-    if (!unifiedSearchTerm) return unifiedDocuments;
-    
-    const searchLower = unifiedSearchTerm.toLowerCase();
-    return unifiedDocuments.filter(doc => 
-      doc.employeeName?.toLowerCase().includes(searchLower) ||
-      doc.fileName?.toLowerCase().includes(searchLower)
-    );
-  };
+  const getFilteredUnifiedDocuments = useCallback(() => {
+    let docs = [...unifiedDocuments];
+
+    // Filtrar por ano/mês selecionados (caso existam)
+    if (selectedYear || selectedMonth) {
+      docs = docs.filter(doc => {
+        const docYear = (doc.year ?? '').toString();
+        const docMonth = (doc.month ?? '').toString();
+
+        const fallbackYearMatch = doc.fileName?.match(/_(\d{4})\.pdf$/);
+        const fallbackMonthMatch = doc.fileName?.match(/UNIFICADO_.*?_(\d{1,2})_\d{4}\.pdf$/);
+
+        const resolvedYear = docYear || (fallbackYearMatch ? fallbackYearMatch[1] : '');
+        const resolvedMonth = docMonth || (fallbackMonthMatch ? fallbackMonthMatch[1] : '');
+
+        const matchesYear = !selectedYear || resolvedYear === selectedYear;
+        const matchesMonth = !selectedMonth || resolvedMonth === selectedMonth;
+
+        return matchesYear && matchesMonth;
+      });
+    }
+
+    // Filtrar por termo de busca (caso preenchido)
+    if (unifiedSearchTerm) {
+      const searchLower = unifiedSearchTerm.toLowerCase();
+      docs = docs.filter(doc =>
+        doc.employeeName?.toLowerCase().includes(searchLower) ||
+        doc.fileName?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return docs;
+  }, [unifiedDocuments, unifiedSearchTerm, selectedYear, selectedMonth]);
 
   // Funções para gerenciar seleção de documentos
   const toggleDocumentSelection = (index: number) => {
@@ -1706,19 +1952,7 @@ const Holerites: React.FC = () => {
 
   // Seleção mÃºltipla
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedHolerites(filteredHolerites.map(p => p.id));
-    } else {
-      setSelectedHolerites([]);
-    }
-  };
-
-  const handleSelectHolerite = (payslipId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedHolerites([...selectedHolerites, payslipId]);
-    } else {
-      setSelectedHolerites(selectedHolerites.filter(id => id !== payslipId));
-    }
+    handleSelectMultipleHolerites(getFilteredHoleritesByPeriod().map(h => h.id), checked);
   };
 
   const isAllSelected = filteredHolerites.length > 0 && selectedHolerites.length === filteredHolerites.length;
@@ -2455,6 +2689,99 @@ const Holerites: React.FC = () => {
     }
   };
 
+  const consentKeywords = ['consentimento', 'não autorizou', 'nao autorizou', 'autorizar whatsapp', 'whatsapp consent'];
+  const shouldTriggerConsentModal = (message?: string) => {
+    if (!message) return false;
+    const normalized = message.toLowerCase();
+    return consentKeywords.some(keyword => normalized.includes(keyword));
+  };
+
+const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => {
+  if (!detail) return false;
+  const whatsappError = (detail.whatsappError || '').toLowerCase();
+  return (
+    detail.needsWhatsAppConsent === true ||
+    (!detail.canSendWhatsApp && whatsappError.includes('consent'))
+  );
+};
+
+  const buildConsentDetailFromUserValidation = (
+    validation: UserValidationResult | null,
+    cpf: string,
+    employeeName?: string
+  ): ContactValidationDetail | null => {
+    if (!validation) {
+      return null;
+    }
+
+    const normalizedCpf = validation.cpf ? validation.cpf.replace(/\D/g, '') : cpf;
+
+    const detail: ContactValidationDetail = {
+      employeeId: validation.userId || normalizedCpf,
+      employeeName: validation.name || employeeName || 'Funcionário',
+      employeeCpf: normalizedCpf,
+      employeeEmail: validation.email,
+      employeePhone: undefined,
+      hasUser: Boolean(validation.exists && validation.userId),
+      userId: validation.userId,
+      userEmail: validation.email,
+      userWhatsapp: validation.whatsapp,
+      hasWhatsAppConsent: Boolean(validation.whatsappConsent),
+      needsWhatsAppConsent: Boolean(
+        validation.needsWhatsAppConsent ||
+        (!validation.whatsappConsent && validation.hasWhatsApp)
+      ),
+      whatsappConsentDate: undefined,
+      canSendEmail: Boolean(validation.canSendEmail),
+      canSendWhatsApp: Boolean(
+        validation.canSendWhatsApp ??
+        ((validation.hasWhatsApp || !!validation.whatsapp) && (validation.whatsappConsent ?? false))
+      ),
+      needsUserCreation: !validation.exists,
+      needsWhatsAppUpdate: !validation.hasWhatsApp,
+      needsEmailUpdate: !validation.hasEmail,
+      emailError: validation.hasEmail ? undefined : 'Email não cadastrado',
+      whatsappError: validation.whatsappConsent ? undefined : 'Consentimento WhatsApp não registrado',
+      generalError: validation.message,
+      status: validation.isReady ? 'ready' : 'needs_action',
+      statusMessage: validation.message || '',
+    };
+
+    if (!detailNeedsWhatsAppConsent(detail) && detail.canSendWhatsApp) {
+      detail.status = 'ready';
+      detail.statusMessage = 'Pronto para envio';
+    }
+
+    return detail;
+  };
+
+  const openConsentModalForDetail = (detail: ContactValidationDetail, payslip: Holerite, employeeId?: string) => {
+    setSelectedValidationDetail(detail);
+    setPendingConsentContext({ payslip, employeeId });
+    setShowSingleConsentModal(true);
+  };
+
+  const openWhatsappUpdateModal = (detail: ContactValidationDetail, payslip: Holerite, employeeId?: string) => {
+    setSelectedValidationDetail(detail);
+    setPendingWhatsappContext({ payslip, employeeId });
+    setShowSingleWhatsappModal(true);
+  };
+
+  const tryOpenConsentModalFromCpf = async (cpf: string, payslip: Holerite, employeeIdHint?: string) => {
+    try {
+      const normalizedCpf = cpf.replace(/\D/g, '');
+      const validation = await userValidationService.validateByCpf(normalizedCpf);
+      const detail = buildConsentDetailFromUserValidation(validation, normalizedCpf, payslip.employeeName);
+      if (detail && detail.userId && detailNeedsWhatsAppConsent(detail)) {
+        openConsentModalForDetail(detail, payslip, employeeIdHint || detail.userId);
+        return true;
+      }
+    } catch (cpfValidationError) {
+      console.error('Erro ao buscar validação por CPF para consentimento:', cpfValidationError);
+    }
+    return false;
+  };
+
   // Envio individual via WhatsApp
   const handleSendWhatsAppIndividual = async (payslip: Holerite) => {
     try {
@@ -2493,6 +2820,14 @@ const Holerites: React.FC = () => {
         const detail = validation?.details?.[0];
         if (detail) {
           console.log('📋 Detalhe da validação:', detail);
+          setSelectedValidationDetail(detail);
+
+          const pendingConsent = detailNeedsWhatsAppConsent(detail);
+          if (pendingConsent && detail.hasUser && detail.userId) {
+            console.log('🛑 Consentimento WhatsApp pendente - abrindo modal de confirmação.');
+            openConsentModalForDetail(detail, payslip, funcionarioId);
+            return;
+          }
           
           if (detail.status === 'ready') {
             // Pode enviar agora
@@ -2518,7 +2853,6 @@ const Holerites: React.FC = () => {
           }
           // Necessita ação: abrir modal adequado
           console.log('⚠️ Status não é READY, abrindo modal apropriado...');
-          setSelectedValidationDetail(detail);
           if (detail.needsUserCreation) {
             console.log('👤 Abrindo modal de criação de usuário');
             setShowSingleUserModal(true);
@@ -2526,13 +2860,19 @@ const Holerites: React.FC = () => {
           }
           if (detail.needsWhatsAppUpdate && detail.hasUser) {
             console.log('📱 Abrindo modal de atualização de WhatsApp');
-            setShowSingleWhatsappModal(true);
+            openWhatsappUpdateModal(detail, payslip, funcionarioId);
             return;
           }
         }
       }
 
       // Sem ID resolvido ou sem detail: tentar por CPF mesmo (backend validará novamente)
+      const consentOpenedByCpf = await tryOpenConsentModalFromCpf(cpf, payslip, funcionarioId);
+      if (consentOpenedByCpf) {
+        return;
+      }
+
+      // Se ainda assim precisar, tenta envio por CPF (backend validará novamente)
       console.log('⚠️ Tentando envio por CPF (sem ID ou validação)');
       const payload = {
         tipo: 'whatsapp',
@@ -2576,17 +2916,58 @@ const Holerites: React.FC = () => {
           const detail = validation?.details?.[0];
           if (detail) {
             setSelectedValidationDetail(detail);
-            if (msg?.toLowerCase().includes('usuário não encontrado') || detail.needsUserCreation) {
+            const lowerMsg = msg?.toLowerCase() || '';
+            const requiresConsent = detailNeedsWhatsAppConsent(detail);
+            if (requiresConsent && detail.hasUser && detail.userId) {
+              console.log('🛑 Consentimento pendente detectado após erro - abrindo modal de confirmação.');
+              openConsentModalForDetail(detail, payslip, employeeIdToValidate);
+              return;
+            }
+            if (shouldTriggerConsentModal(msg) && detail.hasUser && detail.userId && detailNeedsWhatsAppConsent(detail)) {
+              openConsentModalForDetail(detail, payslip, employeeIdToValidate);
+              return;
+            }
+            if (lowerMsg.includes('usuário não encontrado') || detail.needsUserCreation) {
               setShowSingleUserModal(true);
               return;
             }
-            if (msg?.toLowerCase().includes('whatsapp') || detail.needsWhatsAppUpdate) {
-              setShowSingleWhatsappModal(true);
+            if (lowerMsg.includes('whatsapp') || detail.needsWhatsAppUpdate) {
+              openWhatsappUpdateModal(detail, payslip, employeeIdToValidate);
               return;
             }
           }
+          if (!detail && shouldTriggerConsentModal(msg)) {
+            const opened = await tryOpenConsentModalFromCpf(cpf, payslip, employeeIdToValidate);
+            if (opened) return;
+          }
         }
+        const openedByCpf = shouldTriggerConsentModal(msg)
+          ? await tryOpenConsentModalFromCpf(cpf, payslip, employeeIdToValidate)
+          : false;
+        if (openedByCpf) return;
       } catch (_) {}
+    }
+  };
+
+  const handleConsentModalClose = () => {
+    setShowSingleConsentModal(false);
+    setPendingConsentContext(null);
+    setSelectedValidationDetail(null);
+  };
+
+  const handleConsentGranted = async () => {
+    const context = pendingConsentContext;
+    setShowSingleConsentModal(false);
+    setSelectedValidationDetail(null);
+
+    if (context?.payslip) {
+      try {
+        await handleSendWhatsAppIndividual(context.payslip);
+      } finally {
+        setPendingConsentContext(null);
+      }
+    } else {
+      setPendingConsentContext(null);
     }
   };
 
@@ -3069,58 +3450,6 @@ const Holerites: React.FC = () => {
       }
   };
 
-  
-
-  // Verificar autenticaÃ§Ã£o
-  if (!user) {
-    return (
-      <StandardLayout>
-        <div className="flex items-center justify-center h-64 px-4">
-          <div className="text-center">
-            <AlertCircle className="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-red-500 mb-4" />
-            <p className="text-seguranca-lightgray mb-4 text-sm sm:text-base">Usuário não autenticado.</p>
-            <p className="text-gray-400 text-sm">Faça login para acessar esta pÃ¡gina.</p>
-          </div>
-        </div>
-      </StandardLayout>
-    );
-  }
-
-  // Loading state
-  if (loading && holerites.length === 0) {
-    return (
-      <StandardLayout>
-        <div className="flex items-center justify-center h-64 px-4">
-          <div className="text-center">
-            <Loader2 className="mx-auto h-6 w-6 sm:h-8 sm:w-8 animate-spin text-seguranca-red mb-4" />
-            <p className="text-seguranca-lightgray text-sm sm:text-base">Carregando holerites...</p>
-          </div>
-        </div>
-      </StandardLayout>
-    );
-  }
-
-  // Error state
-  if (error && holerites.length === 0) {
-    return (
-      <StandardLayout>
-        <div className="flex items-center justify-center h-64 px-4">
-          <div className="text-center">
-            <AlertCircle className="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-red-500 mb-4" />
-            <p className="text-seguranca-lightgray mb-4 text-sm sm:text-base">{error}</p>
-            <Button 
-              onClick={() => loadHolerites()}
-              className="bg-seguranca-red hover:bg-seguranca-darkred text-sm"
-            >
-              Tentar Novamente
-            </Button>
-          </div>
-        </div>
-      </StandardLayout>
-    );
-  }
-
-
 
 
   // Função para excluir unificação individual
@@ -3159,7 +3488,555 @@ const Holerites: React.FC = () => {
     }
   };
 
-  
+  const getHoleriteById = useCallback((id: string): Holerite | null => {
+    const fromList = holerites.find(h => h.id === id);
+    if (fromList) {
+      return fromList;
+    }
+    const entry = organizationEntryMap[id];
+    if (entry) {
+      return resolveHoleriteFromEntry(entry);
+    }
+    return null;
+  }, [holerites, organizationEntryMap, resolveHoleriteFromEntry]);
+
+  const getHoleritesByIds = useCallback((ids: string[]): Holerite[] => {
+    const uniqueIds = Array.from(new Set(ids));
+    return uniqueIds
+      .map(getHoleriteById)
+      .filter((item): item is Holerite => Boolean(item));
+  }, [getHoleriteById]);
+
+  const resolveEmployeeIdsForHolerites = useCallback(async (items: Holerite[]) => {
+    console.log('🔍 Iniciando resolução de funcionários para holerites:', items.length);
+    const ids: string[] = [];
+
+    for (const holerite of items) {
+      console.log('📋 Processando holerite:', {
+        id: holerite.id,
+        cpf: holerite.cpf,
+        employeeName: holerite.employeeName,
+        fileName: holerite.fileName
+      });
+      
+      const cpf = holerite.cpf?.replace(/\D/g, '');
+      let found = false;
+      
+      // PASSO 1: Buscar por CPF exato (normalizado) usando endpoint específico
+      if (cpf && cpf.length >= 11) {
+        console.log(`🔍 Buscando funcionário por CPF: ${cpf}`);
+        try {
+          // Primeiro tentar busca exata por CPF
+          const exactMatch = await employeeService.searchEmployeeByCpf(cpf);
+          if (exactMatch) {
+            ids.push(exactMatch.id);
+            console.log(`✅ Funcionário encontrado por CPF exato: ${exactMatch.name} (CPF: ${cpf}, ID: ${exactMatch.id})`);
+            found = true;
+            continue;
+          }
+          
+          console.log(`⚠️ Busca exata por CPF não retornou resultado, tentando busca parcial...`);
+          // Se não encontrou, tentar busca parcial como fallback
+          const byCpf = await employeeService.searchEmployees(cpf);
+          console.log(`📊 Resultados da busca parcial por CPF:`, byCpf?.length || 0);
+          
+          if (byCpf && byCpf.length > 0) {
+            // Filtrar para encontrar correspondência exata do CPF normalizado
+            const exactMatchPartial = byCpf.find((emp: any) => {
+              const empCpf = (emp.document || emp.cpf || '').replace(/\D/g, '');
+              return empCpf === cpf;
+            });
+            
+            if (exactMatchPartial) {
+              ids.push(exactMatchPartial.id);
+              console.log(`✅ Funcionário encontrado por CPF exato (busca parcial): ${exactMatchPartial.name} (CPF: ${cpf}, ID: ${exactMatchPartial.id})`);
+              found = true;
+              continue;
+            }
+            
+            // Se houver apenas 1 resultado e o CPF corresponder parcialmente, aceitar
+            if (byCpf.length === 1) {
+              const empCpf = (byCpf[0].document || byCpf[0].cpf || '').replace(/\D/g, '');
+              if (empCpf.includes(cpf) || cpf.includes(empCpf)) {
+                ids.push(byCpf[0].id);
+                console.log(`✅ Funcionário encontrado por CPF parcial: ${byCpf[0].name} (CPF: ${cpf}, ID: ${byCpf[0].id})`);
+                found = true;
+                continue;
+              }
+            }
+            
+            // Log dos resultados encontrados para debug
+            console.log('📊 Resultados encontrados (mas sem match exato):', byCpf.map((emp: any) => ({
+              name: emp.name,
+              cpf: emp.cpf,
+              document: emp.document,
+              id: emp.id
+            })));
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar funcionário pelo CPF', cpf, error);
+        }
+      } else {
+        console.warn(`⚠️ CPF inválido ou ausente: "${holerite.cpf}" (normalizado: "${cpf}")`);
+      }
+
+      // PASSO 2: Se não encontrou por CPF, tentar por nome (apenas se não encontrou)
+      if (!found && holerite.employeeName) {
+        console.log(`🔍 Buscando funcionário por nome: "${holerite.employeeName}"`);
+        try {
+          const byName = await employeeService.searchEmployeesByName(holerite.employeeName);
+          console.log(`📊 Resultados da busca por nome:`, byName?.length || 0);
+          
+          if (byName && byName.length > 0) {
+            // Filtrar para encontrar correspondência exata do nome
+            const exactNameMatch = byName.find((emp: any) => {
+              const empName = (emp.name || '').trim().toLowerCase();
+              const holeriteName = holerite.employeeName?.trim().toLowerCase() || '';
+              return empName === holeriteName;
+            });
+            
+            if (exactNameMatch) {
+              ids.push(exactNameMatch.id);
+              console.log(`✅ Funcionário encontrado por nome exato: ${exactNameMatch.name} (ID: ${exactNameMatch.id})`);
+              found = true;
+              continue;
+            }
+            
+            // Se houver apenas 1 resultado, aceitar
+            if (byName.length === 1) {
+              ids.push(byName[0].id);
+              console.log(`✅ Funcionário encontrado por nome (único resultado): ${byName[0].name} (ID: ${byName[0].id})`);
+              found = true;
+              continue;
+            }
+            
+            // Log dos resultados encontrados para debug
+            console.log('📊 Resultados encontrados por nome (mas sem match exato):', byName.map((emp: any) => ({
+              name: emp.name,
+              cpf: emp.cpf,
+              document: emp.document,
+              id: emp.id
+            })));
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar funcionário pelo nome', holerite.employeeName, error);
+        }
+      } else if (!found) {
+        console.warn(`⚠️ Nome do funcionário ausente no holerite`);
+      }
+      
+      if (!found) {
+        console.error(`❌ Funcionário NÃO encontrado para holerite:`, {
+          id: holerite.id,
+          cpf: cpf || 'AUSENTE',
+          employeeName: holerite.employeeName || 'AUSENTE',
+          fileName: holerite.fileName
+        });
+      }
+    }
+
+    console.log(`✅ Resolução concluída: ${ids.length} funcionário(s) encontrado(s) de ${items.length} holerite(s)`);
+    return Array.from(new Set(ids));
+  }, []);
+
+  const handleBatchSendHoleritesForIds = useCallback(async (ids: string[], type: 'email' | 'whatsapp') => {
+    console.log('🚀 Iniciando envio em lote:', { ids, type, count: ids.length });
+    
+    if (!ids.length) {
+      toast({ title: 'Nenhum holerite selecionado', description: 'Selecione pelo menos um holerite para enviar.', variant: 'destructive' });
+      return;
+    }
+
+    const holeritesToSend = getHoleritesByIds(ids);
+    console.log('📋 Holerites encontrados:', holeritesToSend.length, 'de', ids.length);
+    console.log('📋 Detalhes dos holerites:', holeritesToSend.map(h => ({
+      id: h.id,
+      cpf: h.cpf,
+      employeeName: h.employeeName,
+      fileName: h.fileName
+    })));
+    
+    if (holeritesToSend.length === 0) {
+      toast({ title: 'Holerites não encontrados', description: 'Não foi possível localizar os holerites selecionados.', variant: 'destructive' });
+      return;
+    }
+
+    const employeeIds = await resolveEmployeeIdsForHolerites(holeritesToSend);
+    console.log('👥 Funcionários resolvidos:', employeeIds.length, 'de', holeritesToSend.length);
+    
+    if (employeeIds.length === 0) {
+      const missingDetails = holeritesToSend.map(h => `- ${h.employeeName || 'Sem nome'} (CPF: ${h.cpf || 'Sem CPF'})`).join('\n');
+      toast({ 
+        title: 'Funcionários não encontrados', 
+        description: `Não foi possível identificar funcionários para os holerites selecionados.\n\nDetalhes:\n${missingDetails}\n\nVerifique se os funcionários estão cadastrados no sistema. Abra o console do navegador (F12) para mais detalhes.`, 
+        variant: 'destructive',
+        duration: 10000
+      });
+      return;
+    }
+
+    setResolvedEmployeeIds(employeeIds);
+    setValidationSendType(type);
+    setShowValidationModal(true);
+  }, [getHoleritesByIds, resolveEmployeeIdsForHolerites, toast]);
+
+  const handleBatchDeleteHoleritesByIds = useCallback((ids: string[]) => {
+    if (!ids.length) {
+      toast({ title: 'Nenhum holerite selecionado', description: 'Selecione pelo menos um holerite para excluir.', variant: 'destructive' });
+      return;
+    }
+    setPendingDeleteIds(ids);
+    setShowBatchDeleteModal(true);
+  }, [toast]);
+
+  const idsPendingDeletion = pendingDeleteIds ?? selectedHolerites;
+
+  const renderOrganizationCompanies = () => {
+    if (!organizationData?.companies?.length) {
+  return (
+        <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
+          Nenhum dado organizado encontrado. Importe holerites para visualizar as empresas.
+                </div>
+      );
+    }
+
+    return organizationData.companies.map(company => {
+                        const companyKey = getCompanyKey(company);
+                        const companyExpanded = !!expandedCompanies[companyKey];
+                        const companyIds = collectCompanyEntryIds(company);
+                        const companySelectedIds = getSelectedSubset(companyIds);
+                        const companySelectedCount = companySelectedIds.length;
+                        const companyCheckboxState: boolean | 'indeterminate' = companyIds.length === 0
+                          ? false
+                          : areIdsFullySelected(companyIds)
+                            ? true
+                            : companySelectedCount > 0
+                              ? 'indeterminate'
+                              : false;
+
+                         return (
+        <div
+          key={companyKey}
+          className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
+        >
+          <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 sm:py-6">
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                                     {company.companySigla}
+                                   </Badge>
+                  <p className="text-lg font-semibold text-white leading-tight">
+                                     {company.companyName}
+                                   </p>
+                                 </div>
+                <p className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
+                  <Building2 className="h-4 w-4 text-seguranca-yellow" />
+                                   CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} holerite(s) · {company.sectors.length} setor(es)
+                                 </p>
+                               </div>
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+                {/* Checkbox "Selecionar empresa" - só aparece se a empresa NÃO estiver expandida (sem setores visíveis) */}
+                {!companyExpanded && (
+                  <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                    <Checkbox
+                      checked={companyCheckboxState}
+                      onCheckedChange={(checked) => handleSelectMultipleHolerites(companyIds, checked === true)}
+                      className="border-blue-400"
+                    />
+                    <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {/* Botões de ação em massa - só aparecem quando "Selecionar empresa" está marcado E a empresa NÃO está expandida */}
+                  {companySelectedCount > 0 && !companyExpanded && (
+                    <>
+                      <Button
+                        size="sm"
+                        className="bg-green-600/90 text-white hover:bg-green-600"
+                        onClick={() => handleBatchSendHoleritesForIds(companySelectedIds, 'email')}
+                      >
+                        <Mail className="h-4 w-4 mr-1" />
+                        Email ({companySelectedCount})
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-blue-600/90 text-white hover:bg-blue-600"
+                        onClick={() => handleBatchSendHoleritesForIds(companySelectedIds, 'whatsapp')}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        WhatsApp ({companySelectedCount})
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                        onClick={() => handleBatchDeleteHoleritesByIds(companySelectedIds)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Excluir ({companySelectedCount})
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleCompanyExpansion(companyKey)}
+                    className="w-full sm:w-auto text-seguranca-lightgray hover:text-white"
+                  >
+                    {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                    {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
+                  </Button>
+                </div>
+              </div>
+                             </div>
+                             {companyExpanded && (
+              <div className="space-y-4">
+                                 {company.sectors && company.sectors.length > 0 ? (
+                                   company.sectors.map(sector => {
+                                     const sectorKey = getSectorKey(companyKey, sector);
+                                     const sectorExpanded = !!expandedSectors[sectorKey];
+                                     const sectorIds = collectSectorEntryIds(sector);
+                                     const sectorSelectedIds = getSelectedSubset(sectorIds);
+                                     const sectorSelectedCount = sectorSelectedIds.length;
+                                     const sectorCheckboxState: boolean | 'indeterminate' = sectorIds.length === 0
+                                       ? false
+                                       : areIdsFullySelected(sectorIds)
+                                         ? true
+                                         : sectorSelectedCount > 0
+                                           ? 'indeterminate'
+                                           : false;
+
+                                     return (
+                      <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                                           <div>
+                                             <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
+                                             <p className="text-xs text-gray-400">
+                                               {sector.totalPayslips} holerite(s) · {sector.periods?.length ?? 0} período(s)
+                                             </p>
+                                           </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            {/* Checkbox "Selecionar setor" - só aparece se o setor NÃO estiver expandido (sem botões individuais visíveis) */}
+                            {!sectorExpanded && (
+                              <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                <Checkbox
+                                  checked={sectorCheckboxState}
+                                  onCheckedChange={(checked) => handleSelectMultipleHolerites(sectorIds, checked === true)}
+                                  className="border-blue-400"
+                                />
+                                <span className="text-xs text-gray-300">Selecionar setor</span>
+                              </div>
+                            )}
+                            {/* Botões de ação em massa - só aparecem quando "Selecionar setor" está marcado E o setor NÃO está expandido */}
+                            {sectorSelectedCount > 0 && !sectorExpanded && (
+                              <div className="flex flex-wrap gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600/90 text-white hover:bg-green-600"
+                                  onClick={() => handleBatchSendHoleritesForIds(sectorSelectedIds, 'email')}
+                                >
+                                  <Mail className="h-4 w-4 mr-1" />
+                                  Email ({sectorSelectedCount})
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                  onClick={() => handleBatchSendHoleritesForIds(sectorSelectedIds, 'whatsapp')}
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-1" />
+                                  WhatsApp ({sectorSelectedCount})
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                  onClick={() => handleBatchDeleteHoleritesByIds(sectorSelectedIds)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Excluir ({sectorSelectedCount})
+                                </Button>
+                              </div>
+                            )}
+                                             <Button
+                                               variant="ghost"
+                                               size="sm"
+                                               onClick={() => toggleSectorExpansion(sectorKey)}
+                                               className="text-seguranca-lightgray hover:text-white"
+                                             >
+                                               {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                               {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                                             </Button>
+                                           </div>
+                                         </div>
+                                         {sectorExpanded && (
+                          <div className="space-y-3 px-4 py-4 bg-gray-900/70">
+                                             {sector.periods && sector.periods.length > 0 ? (
+                                               sector.periods.map(period => {
+                                                 const periodKey = getPeriodKey(sectorKey, period);
+                                                 const periodExpanded = !!expandedPeriods[periodKey];
+
+                                                 return (
+                                  <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                                                       <div>
+                                                         <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
+                                                         <p className="text-xs text-gray-400">{period.totalPayslips} holerite(s)</p>
+                                                       </div>
+                                                       <Button
+                                                         variant="ghost"
+                                                         size="sm"
+                                                         onClick={() => togglePeriodExpansion(periodKey)}
+                                                         className="text-seguranca-lightgray hover:text-white"
+                                                       >
+                                                         {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                         {periodExpanded ? 'Ocultar holerites' : 'Ver holerites'}
+                                                       </Button>
+                                                     </div>
+                                                     {periodExpanded && (
+                                      <div className="divide-y divide-gray-800 bg-gray-950/60">
+                                                         {period.payslips.map(entry => {
+                                                           const holeriteData = resolveHoleriteFromEntry(entry);
+
+                                                           return (
+                                            <div
+                                              key={entry.id}
+                                              className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
+                                            >
+                                                               <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                                 <Checkbox
+                                                                   checked={selectedHolerites.includes(entry.id)}
+                                                                   onCheckedChange={(checked) => handleSelectHolerite(entry.id, checked)}
+                                                                   className="border-blue-400 mt-1"
+                                                                 />
+                                                                 <div className="flex-1 min-w-0">
+                                                                   <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
+                                                                   <p className="text-xs text-gray-400">
+                                                                     CPF: {formatCpf(entry.cpf)} · Arquivo: {entry.fileName}
+                                                                   </p>
+                                                                 </div>
+                                                               </div>
+                                                               {/* Botões individuais - só aparecem se NÃO houver seleção em massa ativa (setor/empresa não selecionados) */}
+                                                               {!areIdsFullySelected(sectorIds) && !areIdsFullySelected(companyIds) && (
+                                                                 <div className="flex flex-wrap gap-2">
+                                                                   <Button
+                                                                     size="sm"
+                                                                     variant="outline"
+                                                                     className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                     onClick={() => handleViewHolerite(holeriteData)}
+                                                                   >
+                                                                     <Eye className="h-4 w-4 mr-1" />
+                                                                     Visualizar
+                                                                   </Button>
+                                                                   <Button
+                                                                     size="sm"
+                                                                     variant="outline"
+                                                                     className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                     onClick={() => handleEmailHolerite(holeriteData)}
+                                                                   >
+                                                                     <Mail className="h-4 w-4 mr-1" />
+                                                                     E-mail
+                                                                   </Button>
+                                                                   <Button
+                                                                     size="sm"
+                                                                     variant="outline"
+                                                                     className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                     onClick={() => handleSendWhatsAppIndividual(holeriteData)}
+                                                                   >
+                                                                     <MessageSquare className="h-4 w-4 mr-1" />
+                                                                     WhatsApp
+                                                                   </Button>
+                                                                   <Button
+                                                                     size="sm"
+                                                                     variant="destructive"
+                                                                     className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                                     onClick={() => handleDeleteHolerite(holeriteData)}
+                                                                   >
+                                                                     <Trash2 className="h-4 w-4 mr-1" />
+                                                                     Excluir
+                                                                   </Button>
+                                                                 </div>
+                                                               )}
+                                                             </div>
+                                                           );
+                                                         })}
+                                                       </div>
+                                                     )}
+                                                   </div>
+                                                 );
+                                               })
+                                             ) : (
+                              <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                                 Nenhum período encontrado para este setor.
+                                               </div>
+                                             )}
+                                           </div>
+                                         )}
+                                       </div>
+                                     );
+                                   })
+                                 ) : (
+                  <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                     Nenhum setor encontrado para esta empresa.
+                                   </div>
+                                 )}
+                               </div>
+                             )}
+          </div>
+                           </div>
+                        );
+    });
+  };
+
+  if (!user) {
+    return (
+      <StandardLayout>
+        <div className="flex items-center justify-center h-64 px-4">
+          <div className="text-center">
+            <AlertCircle className="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-red-500 mb-4" />
+            <p className="text-seguranca-lightgray mb-4 text-sm sm:text-base">Usuário não autenticado.</p>
+            <p className="text-gray-400 text-sm">Faça login para acessar esta página.</p>
+          </div>
+        </div>
+      </StandardLayout>
+    );
+  }
+
+  if (isCollaborator && user) {
+    return <CollaboratorHolerites user={user} />;
+  }
+
+  if (loading && holerites.length === 0) {
+    return (
+      <StandardLayout>
+        <div className="flex items-center justify-center h-64 px-4">
+          <div className="text-center">
+            <Loader2 className="mx-auto h-6 w-6 sm:h-8 sm:w-8 animate-spin text-seguranca-red mb-4" />
+            <p className="text-seguranca-lightgray text-sm sm:text-base">Carregando holerites...</p>
+          </div>
+        </div>
+      </StandardLayout>
+    );
+  }
+
+  if (error && holerites.length === 0) {
+    return (
+      <StandardLayout>
+        <div className="flex items-center justify-center h-64 px-4">
+          <div className="text-center">
+            <AlertCircle className="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-red-500 mb-4" />
+            <p className="text-seguranca-lightgray mb-4 text-sm sm:text-base">{error}</p>
+            <Button
+              onClick={() => loadHolerites()}
+              className="bg-seguranca-red hover:bg-seguranca-darkred text-sm"
+            >
+              Tentar Novamente
+            </Button>
+          </div>
+        </div>
+      </StandardLayout>
+    );
+  }
 
   return (
     <StandardLayout>
@@ -3215,380 +4092,159 @@ const Holerites: React.FC = () => {
           </TabsList>
             
           <TabsContent value="processados" className="space-y-6 mt-6">
-            {/* Cards de Estatísticas - PADRÃO SST */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="bg-seguranca-graphite border-gray-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Total de Holerites</CardTitle>
-                  <FileText className="h-4 w-4 text-seguranca-yellow" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-seguranca-lightgray">{holerites.length}</div>
-                  <p className="text-xs text-gray-400 mt-1">Documentos processados</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-seguranca-graphite border-gray-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Comprovantes</CardTitle>
-                  <Receipt className="h-4 w-4 text-green-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-seguranca-lightgray">{Array.isArray(receipts) ? receipts.length : 0}</div>
-                  <p className="text-xs text-gray-400 mt-1">Recibos de pagamento</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-seguranca-graphite border-gray-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-seguranca-lightgray">Processados Hoje</CardTitle>
-                  <Calendar className="h-4 w-4 text-blue-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-seguranca-lightgray">{getHoleritesProcessedToday()}</div>
-                  <p className="text-xs text-gray-400 mt-1">Neste dia</p>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+              <div className="group relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-br from-seguranca-yellow/20 via-yellow-500/5 to-transparent p-5 shadow-[0_20px_45px_-35px_rgba(251,191,36,0.75)] transition-all duration-300 hover:border-yellow-400/60 hover:shadow-[0_25px_60px_-30px_rgba(251,191,36,0.65)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-seguranca-yellow/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-yellow-200/80">Total de Holerites</p>
+                    <p className="mt-2 text-3xl font-bold text-white">{holerites.length}</p>
+                    <p className="text-xs text-gray-300 mt-1">Documentos processados</p>
                   </div>
-                  
-            {/* Botão de Importação - PADRÃO SST */}
-            <div className="mt-6">
-                  <Button 
-                      onClick={() => setShowUploadModal(true)}
-                      disabled={loading}
-                className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
-                    >
-                      {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Importar Holerites
-                  </>
-                )}
-                  </Button>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-500/20 text-seguranca-yellow">
+                    <FileText className="h-6 w-6" />
+                  </div>
                 </div>
+              </div>
 
-            {/* Sistema de Abas Hierárquico para Períodos */}
-            <Card className="bg-seguranca-graphite border border-gray-600 rounded-lg p-3 md:p-6 lg:p-8">
-              <div className="space-y-4 md:space-y-8">
-                <div>
-                  <h4 className="text-base md:text-xl lg:text-2xl font-bold text-white mb-1 md:mb-2">Holerites por Período</h4>
-                  <p className="text-gray-400 text-xs md:text-sm hidden md:block">Navegue pelos anos e meses para visualizar os holerites</p>
+              <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent p-5 shadow-[0_20px_45px_-35px_rgba(16,185,129,0.55)] transition-all duration-300 hover:border-emerald-400/60 hover:shadow-[0_25px_60px_-30px_rgba(16,185,129,0.5)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200/80">Comprovantes</p>
+                    <p className="mt-2 text-3xl font-bold text-white">{Array.isArray(receipts) ? receipts.length : 0}</p>
+                    <p className="text-xs text-gray-300 mt-1">Recibos de pagamento vinculados</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                    <Receipt className="h-6 w-6" />
+                  </div>
                 </div>
-                
-                {/* Navegação de Abas */}
-                <div className="flex items-center justify-center space-x-2 mb-6">
-                  <Button
-                    onClick={handleBackToYears}
-                    variant={activePeriodTab === 'ano' ? "default" : "outline"}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      activePeriodTab === 'ano'
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                        : 'bg-seguranca-black/50 border-gray-600 text-gray-300 hover:bg-gray-700/50'
-                    }`}
-                  >
-                    📅 Anos
-                  </Button>
-                  
-                  {selectedYear && (
-                    <Button
-                      onClick={handleBackToMonths}
-                      variant={activePeriodTab === 'mes' ? "default" : "outline"}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                        activePeriodTab === 'mes'
-                          ? 'bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-lg'
-                          : 'bg-seguranca-black/50 border-gray-600 text-gray-300 hover:bg-gray-700/50'
-                      }`}
-                    >
-                      📆 {selectedYear}
-                    </Button>
-                  )}
-                  
-                  {selectedYear && selectedMonth && (
-                    <Button
-                      onClick={() => setActivePeriodTab('conteudo')}
-                      variant={activePeriodTab === 'conteudo' ? "default" : "outline"}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                        activePeriodTab === 'conteudo'
-                          ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg'
-                          : 'bg-seguranca-black/50 border-gray-600 text-gray-300 hover:bg-gray-700/50'
-                      }`}
-                    >
-                      📄 {getMonthName(parseInt(selectedMonth))} {selectedYear}
-                    </Button>
-                  )}
-                </div>
+              </div>
 
-                {/* Conteúdo das Abas */}
-                {activePeriodTab === 'ano' && (
-                <div className="space-y-6">
-                    <div>
-                    <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
-                      <div className="flex flex-wrap gap-3">
-                        {holeriteAvailableYears.map(year => (
-                <Button 
-                          key={year}
-                            onClick={() => handleYearSelection(year)}
-                            variant="outline"
-                            className="px-6 py-3 rounded-xl font-semibold transition-all duration-200 bg-seguranca-black/50 border-gray-600 text-gray-300 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white hover:border-transparent hover:shadow-lg"
-                          >
-                            📅 {year}
+              <div className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/20 via-blue-500/5 to-transparent p-5 shadow-[0_20px_45px_-35px_rgba(59,130,246,0.55)] transition-all duration-300 hover:border-blue-400/60 hover:shadow-[0_25px_60px_-30px_rgba(59,130,246,0.5)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-200/80">Processados Hoje</p>
+                    <p className="mt-2 text-3xl font-bold text-white">{getHoleritesProcessedToday()}</p>
+                    <p className="text-xs text-gray-300 mt-1">Holerites organizados nas últimas horas</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
+                    <CheckCircle className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-seguranca-red/15 via-red-500/10 to-transparent border border-red-600/40 rounded-3xl p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-[0_25px_60px_-45px_rgba(220,38,38,0.75)]">
+              <div className="flex items-start gap-3">
+                <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/20 text-seguranca-red">
+                  <Upload className="h-6 w-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-white">Importar novos holerites</h3>
+                  <p className="text-sm text-red-100/80 max-w-xl">
+                    Faça upload de arquivos em lote e mantenha a base sempre atualizada para todos os setores.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <Button
+                  onClick={() => setShowUploadModal(true)}
+                  disabled={loading}
+                  className="w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred shadow-lg shadow-red-900/40"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Importar Holerites
+                    </>
+                  )}
                 </Button>
-                      ))}
-                    </div>
-              </div>
-                  </div>
-                )}
-
-                {activePeriodTab === 'mes' && selectedYear && (
-                  <div className="space-y-6">
-                    <div>
-                      <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">
-                        Meses disponíveis para {selectedYear}
-                      </h5>
-                      <div className="flex flex-wrap gap-3">
-                        {getAvailableMonthsForYear(selectedYear).map(month => (
-                          <Button
-                            key={month}
-                            onClick={() => handleMonthSelection(month.toString())}
-                            variant="outline"
-                            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-seguranca-black/50 border-gray-600 text-gray-300 hover:bg-gradient-to-r hover:from-green-500 hover:to-teal-600 hover:text-white hover:border-transparent hover:shadow-lg"
-                          >
-                            📆 {getMonthName(month)}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activePeriodTab === 'conteudo' && selectedYear && (
-                  <div className="space-y-6">
-                    <div>
-                      <h5 className="text-lg font-semibold text-white mb-4">
-                        {selectedMonth ? `Holerites de ${getMonthName(parseInt(selectedMonth))} ${selectedYear}` : `Todos os holerites de ${selectedYear}`}
-                      </h5>
-                      
-                      {/* Barra de Ações - PADRÃO SST SIMPLIFICADO */}
-                      <div className="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
-                        {/* Checkbox Selecionar Todos */}
-                        <div className="flex items-center gap-2 mb-3">
-                          <Checkbox
-                            id="select-all-holerites"
-                            checked={selectedHolerites.length === getFilteredHoleritesByPeriod().length && getFilteredHoleritesByPeriod().length > 0}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                const allIds = getFilteredHoleritesByPeriod().map(h => h.id);
-                                setSelectedHolerites(allIds);
-                              } else {
-                                setSelectedHolerites([]);
-                              }
-                            }}
-                            className="border-blue-400"
-                          />
-                          <Label htmlFor="select-all-holerites" className="text-white text-sm font-medium cursor-pointer">
-                            Selecionar todos
-                          </Label>
-                        </div>
-                        
-                        {/* Botões de ação em massa - só aparecem quando "Selecionar todos" está marcado */}
-                        {selectedHolerites.length === getFilteredHoleritesByPeriod().length && getFilteredHoleritesByPeriod().length > 0 && (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Button
-                              onClick={async () => {
-                                if (selectedHolerites.length === 0) return;
-                                const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
-                                const ids: string[] = [];
-                                for (const h of selected) {
-                                  if (h.cpf) {
-                                    try {
-                                      const byCpf = await employeeService.searchEmployees(h.cpf);
-                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                    } catch {}
-                                  }
-                                  try {
-                                    const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                  } catch {}
-                                }
-                                const uniqueIds = Array.from(new Set(ids));
-                                if (uniqueIds.length === 0) {
-                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                  return;
-                                }
-                                setResolvedEmployeeIds(uniqueIds);
-                                setValidationSendType('email');
-                                setShowValidationModal(true);
-                              }}
-                              size="sm"
-                              className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
-                            >
-                              <Mail size={16} className="mr-2" />
-                              Email ({selectedHolerites.length})
-                            </Button>
-                            
-                            <Button
-                              onClick={async () => {
-                                if (selectedHolerites.length === 0) return;
-                                const selected = getFilteredHoleritesByPeriod().filter(h => selectedHolerites.includes(h.id));
-                                const ids: string[] = [];
-                                for (const h of selected) {
-                                  if (h.cpf) {
-                                    try {
-                                      const byCpf = await employeeService.searchEmployees(h.cpf);
-                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                    } catch {}
-                                  }
-                                  try {
-                                    const byName = await employeeService.searchEmployeesByName(h.employeeName);
-                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                  } catch {}
-                                }
-                                const uniqueIds = Array.from(new Set(ids));
-                                if (uniqueIds.length === 0) {
-                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                  return;
-                                }
-                                setResolvedEmployeeIds(uniqueIds);
-                                setValidationSendType('whatsapp');
-                                setShowValidationModal(true);
-                              }}
-                              size="sm"
-                              className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
-                            >
-                              <MessageSquare size={16} className="mr-2" />
-                              WhatsApp ({selectedHolerites.length})
-                            </Button>
-                            
-                            <Button
-                              onClick={handleDownloadSelectedHolerites}
-                              size="sm"
-                              className="w-full sm:w-auto bg-gray-600 text-white hover:bg-gray-700"
-                            >
-                              <Download size={16} className="mr-2" />
-                              Baixar ({selectedHolerites.length})
-                            </Button>
-                            
-                            <Button
-                              onClick={handleBatchDeleteHolerites}
-                              size="sm"
-                              className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
-                            >
-                              <Trash2 size={16} className="mr-2" />
-                              Excluir ({selectedHolerites.length})
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Lista de Holerites - SIMPLIFICADA */}
-                      <div className="space-y-3">
-                          <p className="text-gray-400 text-sm">
-                            {getFilteredHoleritesByPeriod().length} holerite(s) encontrado(s)
-                          </p>
-                        
-                        {getFilteredHoleritesByPeriod().length > 0 ? (
-                          <div className="space-y-2">
-                            {getFilteredHoleritesByPeriod().map((holerite) => (
-                              <Card key={holerite.id} className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors">
-                                <CardContent className="p-4">
-                                  <div className="flex items-start gap-3">
-                                    <Checkbox
-                                      checked={selectedHolerites.includes(holerite.id)}
-                                      onCheckedChange={(checked) => {
-                                        if (checked) {
-                                          setSelectedHolerites(prev => [...prev, holerite.id]);
-                                        } else {
-                                          setSelectedHolerites(prev => prev.filter(id => id !== holerite.id));
-                                        }
-                                      }}
-                                    />
-                                    
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <FileText className="h-4 w-4 text-seguranca-yellow flex-shrink-0" />
-                                        <p className="text-white font-medium truncate">{holerite.employeeName}</p>
-                                    </div>
-                                    
-                                      <div className="flex flex-wrap gap-2 text-xs text-gray-400">
-                                            <span>CPF: {holerite.cpf || 'N/A'}</span>
-                                        <span>•</span>
-                                        <span>{holerite.month}/{holerite.year}</span>
-                                        <span>•</span>
-                                            <span>{new Date(holerite.createdAt || holerite.processedAt).toLocaleDateString('pt-BR')}</span>
-                                  </div>
-                                  
-                                      {/* Botões de Ação Individual - PADRÃO SST */}
-                                      <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
-                                    <Button
-                                      onClick={() => handleViewHolerite(holerite)}
-                                      size="sm"
-                                          className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                                    >
-                                      <Eye size={14} className="mr-1" />
-                                          Ver
-                                    </Button>
-                                    
-                                    <Button
-                                      onClick={() => handleEmailHolerite(holerite)}
-                                      size="sm"
-                                          className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
-                                    >
-                                          <Mail size={14} className="mr-1" />
-                                          Email
-                                    </Button>
-                                    
-                                    <Button
-                                      onClick={() => handleSendWhatsAppIndividual(holerite)}
-                                      size="sm"
-                                          className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                                    >
-                                          <MessageSquare size={14} className="mr-1" />
-                                          WhatsApp
-                                    </Button>
-                                    
-                                    <Button
-                                      onClick={() => handleDownloadHolerite(holerite)}
-                                      size="sm"
-                                          className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
-                                    >
-                                      <Download size={14} className="mr-1" />
-                                      Baixar
-                                    </Button>
-                                    
-                                    <Button
-                                      onClick={() => handleDeleteHolerite(holerite)}
-                                      size="sm"
-                                          className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
-                                    >
-                                      <Trash2 size={14} className="mr-1" />
-                                      Excluir
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                                </CardContent>
-                              </Card>
-                        ))}
-                      </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <FileText className="mx-auto h-12 w-12 text-gray-500 mb-3" />
-                            <p className="text-gray-400">
-                              Nenhum holerite encontrado para este período
-                            </p>
-                    </div>
+                <Button
+                  variant="outline"
+                  onClick={refreshHolerites}
+                  disabled={refreshing}
+                  className="w-full sm:w-auto border-red-500/40 text-red-200 hover:bg-red-500/10"
+                >
+                  {refreshing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Atualizar lista
+                    </>
                   )}
-                </div>
-                    </div>
+                </Button>
+                      </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-black/70 via-gray-900/80 to-gray-900/60 border border-gray-700/60 rounded-3xl p-4 sm:p-6 lg:p-8 space-y-6 shadow-[0_30px_65px_-50px_rgba(15,23,42,0.9)]">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-seguranca-yellow/20 text-seguranca-yellow">
+                    <FileText className="h-6 w-6" />
                   </div>
+                  <div>
+                    <h4 className="text-lg sm:text-xl font-semibold text-white">Holerites por Empresa/Setor/Período</h4>
+                    <p className="text-sm text-gray-400 max-w-2xl">
+                      Navegue pela estrutura organizada de empresas, setores e períodos para localizar e gerenciar rapidamente os holerites.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  {organizationError && (
+                    <Badge className="bg-red-600/20 text-red-200 border border-red-500/40 px-3 py-1 rounded-xl">
+                      Problemas na última atualização
+                    </Badge>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={handleRefreshOrganization}
+                    disabled={loadingOrganization}
+                    className="border-gray-600/60 text-seguranca-lightgray hover:bg-seguranca-black"
+                  >
+                    {loadingOrganization ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Atualizando
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Recarregar dados
+                  </>
                 )}
+                  </Button>
               </div>
-            </Card>
+              </div>
+
+              {organizationError && (
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border border-red-500/30 bg-red-500/10 text-red-100 px-4 py-4 rounded-2xl">
+                  <div className="flex items-center gap-2 text-red-200">
+                    <AlertCircle className="h-5 w-5" />
+                    <p className="text-sm font-semibold">Não foi possível carregar a organização</p>
+                  </div>
+                  <p className="text-sm">{organizationError}</p>
+                </div>
+              )}
+
+              {loadingOrganization ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-10 w-10 animate-spin text-seguranca-yellow" />
+                </div>
+              ) : (
+                renderOrganizationCompanies()
+              )}
+            </div>
 
           </TabsContent>
 
@@ -4523,18 +5179,7 @@ const Holerites: React.FC = () => {
                                       <span className="ml-2 text-gray-400">Carregando documentos...</span>
                                   </div>
                               ) : (() => {
-                                  const filteredDocs = unifiedDocuments.filter(doc => {
-                                      const yearMatch = doc.fileName.match(/_(\d{4})\.pdf$/);
-                                      const monthMatch = doc.fileName.match(/UNIFICADO_.*?_(\d{1,2})_\d{4}\.pdf$/);
-                                      
-                                      const docYear = yearMatch ? yearMatch[1] : '';
-                                      const docMonth = monthMatch ? monthMatch[1] : '';
-                                      
-                                      const matchesYear = !selectedYear || docYear === selectedYear;
-                                      const matchesMonth = !selectedMonth || docMonth === selectedMonth;
-                                      
-                                      return matchesYear && matchesMonth;
-                                  });
+                                  const filteredDocs = getFilteredUnifiedDocuments();
                                   
                                   return filteredDocs.length === 0 ? (
                                       <div className="text-center py-8">
@@ -4589,54 +5234,52 @@ const Holerites: React.FC = () => {
                                                                   
                                                                   return (
                                                               <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
-                                          {/* Botão Ver - sempre disponível */}
                                                                   <Button
-                                              onClick={() => openUnifiedViewer(doc, index)}
-                                              size="sm"
+                                                                      onClick={() => openUnifiedViewer(doc, index)}
+                                                                      size="sm"
                                                                       className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
                                                                   >
                                                                       <Eye className="h-4 w-4 mr-1" />
                                                                       Ver
                                                                   </Button>
-                                          
-                                          {/* Botões de ação - só aparecem quando item está selecionado */}
-                                          {selectedUnifiedDocuments.has(index) && (
-                                              <>
-                                                                  <Button
-                                                                      onClick={() => sendSingleDocument('email', index)}
-                                                                      size="sm"
-                                                                      className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
-                                                                  >
-                                                                      <Mail className="h-4 w-4 mr-1" />
-                                                                      Email
-                                                                  </Button>
-                                                                  <Button
-                                                                      onClick={() => sendSingleDocument('whatsapp', index)}
-                                                                      size="sm"
-                                                                      className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                                                                  >
-                                                                      <MessageSquare className="h-4 w-4 mr-1" />
-                                                                      WhatsApp
-                                          </Button>
-                                          <Button
-                                              onClick={() => downloadUnifiedDocument(doc)}
-                                              size="sm"
-                                                                      className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
-                                                                  >
-                                                                      <Download className="h-4 w-4 mr-1" />
-                                                                      Baixar
-                                          </Button>
-                                          <Button
-                                              onClick={() => handleDeleteDocuments('individual', index)}
-                                              size="sm"
-                                                                      className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
-                                          >
-                                                                      <Trash2 className="h-4 w-4 mr-1" />
-                                                                      Excluir
-                                          </Button>
-                                          </>
-                                          )}
-                                      </div>
+
+                                                                  {selectedUnifiedDocuments.has(index) && (
+                                                                      <>
+                                                                          <Button
+                                                                              onClick={() => sendSingleDocument('email', index)}
+                                                                              size="sm"
+                                                                              className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
+                                                                          >
+                                                                              <Mail className="h-4 w-4 mr-1" />
+                                                                              Email
+                                                                          </Button>
+                                                                          <Button
+                                                                              onClick={() => sendSingleDocument('whatsapp', index)}
+                                                                              size="sm"
+                                                                              className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                                                                          >
+                                                                              <MessageSquare className="h-4 w-4 mr-1" />
+                                                                              WhatsApp
+                                                                          </Button>
+                                                                          <Button
+                                                                              onClick={() => downloadUnifiedDocument(doc)}
+                                                                              size="sm"
+                                                                              className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
+                                                                          >
+                                                                              <Download className="h-4 w-4 mr-1" />
+                                                                              Baixar
+                                                                          </Button>
+                                                                          <Button
+                                                                              onClick={() => handleDeleteDocuments('individual', index)}
+                                                                              size="sm"
+                                                                              className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
+                                                                          >
+                                                                              <Trash2 className="h-4 w-4 mr-1" />
+                                                                              Excluir
+                                                                          </Button>
+                                                                      </>
+                                                                  )}
+                                                              </div>
                                                                   );
                                                               })()}
                                   </div>
@@ -4650,18 +5293,7 @@ const Holerites: React.FC = () => {
 
                       {/* Botões de Ação em Massa - PADRÃO SST - só aparecem quando "Selecionar Todos" está marcado */}
                       {(() => {
-                          const filteredDocs = unifiedDocuments.filter(doc => {
-                              const yearMatch = doc.fileName.match(/_(\d{4})\.pdf$/);
-                              const monthMatch = doc.fileName.match(/UNIFICADO_.*?_(\d{1,2})_\d{4}\.pdf$/);
-                              
-                              const docYear = yearMatch ? yearMatch[1] : '';
-                              const docMonth = monthMatch ? monthMatch[1] : '';
-                              
-                              const matchesYear = !selectedYear || docYear === selectedYear;
-                              const matchesMonth = !selectedMonth || docMonth === selectedMonth;
-                              
-                              return matchesYear && matchesMonth;
-                          });
+                          const filteredDocs = getFilteredUnifiedDocuments();
                           
                           // Verifica se todos os documentos filtrados estão selecionados
                           const allSelected = filteredDocs.length > 0 && 
@@ -4905,7 +5537,15 @@ const Holerites: React.FC = () => {
         />
 
         {/* Modal de Confirmação para Exclusão em Lote */}
-        <Dialog open={showBatchDeleteModal} onOpenChange={setShowBatchDeleteModal}>
+        <Dialog
+          open={showBatchDeleteModal}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingDeleteIds(null);
+            }
+            setShowBatchDeleteModal(open);
+          }}
+        >
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -4913,7 +5553,7 @@ const Holerites: React.FC = () => {
                 Confirmar Exclusão em Lote
               </DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir <strong>{selectedHolerites.length} holerite(s)</strong> selecionado(s)?
+                Tem certeza que deseja excluir <strong>{idsPendingDeletion.length} holerite(s)</strong> selecionado(s)?
                 <br /><br />
                 Esta ação não pode ser desfeita e todos os holerites selecionados serão permanentemente removidos.
               </DialogDescription>
@@ -4938,7 +5578,7 @@ const Holerites: React.FC = () => {
             {/* Lista dos holerites selecionados */}
             <div className="space-y-2 max-h-32 overflow-y-auto">
               <p className="text-sm text-gray-600 mb-2">Holerites selecionados:</p>
-              {selectedHolerites.map((holeriteId) => {
+              {idsPendingDeletion.map((holeriteId) => {
                 const holerite = holerites.find(h => h.id === holeriteId);
                 return holerite ? (
                   <div key={holeriteId} className="flex items-center space-x-2 text-sm p-2 bg-gray-50 rounded">
@@ -4971,7 +5611,7 @@ const Holerites: React.FC = () => {
                 ) : (
                   <>
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Excluir {selectedHolerites.length} Holerite(s)
+                    Excluir {idsPendingDeletion.length} Holerite(s)
                   </>
                 )}
                     </Button>
@@ -5308,26 +5948,34 @@ const Holerites: React.FC = () => {
         {/* Modal de Validação de Contatos */}
         {showValidationModal && (
           <ContactValidationModal
-            isOpen={showValidationModal}
+            open={showValidationModal}
             onClose={() => setShowValidationModal(false)}
             employeeIds={resolvedEmployeeIds}
             sendType={validationSendType}
+            onValidated={handleValidated}
           />
         )}
 
         {/* Modal de Atualização de WhatsApp */}
-        {showSingleWhatsappModal && selectedValidationDetail && (
+        {showSingleWhatsappModal && (
           <WhatsAppUpdateModal
-            isOpen={showSingleWhatsappModal}
+            open={showSingleWhatsappModal}
             onClose={() => {
+            setShowSingleWhatsappModal(false);
+            setSelectedValidationDetail(null);
+            setPendingWhatsappContext(null);
+          }}
+            employeeDetail={selectedValidationDetail}
+            onSuccess={async () => {
+              const context = pendingWhatsappContext;
               setShowSingleWhatsappModal(false);
               setSelectedValidationDetail(null);
-            }}
-            employeeId={selectedValidationDetail.employeeId}
-            currentWhatsApp={selectedValidationDetail.whatsapp || ''}
-            onSuccess={() => {
-              setShowSingleWhatsappModal(false);
-              setSelectedValidationDetail(null);
+              if (context?.payslip) {
+                setPendingWhatsappContext(null);
+                await handleSendWhatsAppIndividual(context.payslip);
+              } else {
+                setPendingWhatsappContext(null);
+              }
             }}
           />
         )}
@@ -5346,6 +5994,15 @@ const Holerites: React.FC = () => {
               setShowSingleUserModal(false);
               setSelectedValidationDetail(null);
             }}
+          />
+        )}
+
+        {showSingleConsentModal && selectedValidationDetail && (
+          <WhatsAppConsentConfirmationModal
+            open={showSingleConsentModal}
+            onClose={handleConsentModalClose}
+            employeeDetail={selectedValidationDetail}
+            onConsentGranted={handleConsentGranted}
           />
         )}
 
@@ -5699,72 +6356,71 @@ const Holerites: React.FC = () => {
                       if (duplicatePeriodInfo.type === 'comprovante') {
                         // Excluir todos os comprovantes do período
                         const receiptsToDelete = paymentReceipts.filter(r => 
-                          r.year === parseInt(activeYear) && r.month === parseInt(activeMonth)
-                        );
-                        
-                        console.log(`🗑️ Excluindo ${receiptsToDelete.length} comprovante(s) do período ${activeMonth}/${activeYear}...`);
-                        
+                          r.year === parseInt(batchUnificationYear) && r.month === parseInt(batchUnificationMonth));
                         for (const receipt of receiptsToDelete) {
                           try {
                             await paymentReceiptService.deletePaymentReceipt(receipt.id);
                           } catch (err) {
-                            console.error('Erro ao excluir comprovante:', err);
+                            console.warn('Erro ao excluir duplicado existente:', err);
                           }
                         }
-                        
-                        // Aguardar um pouco para garantir que as exclusões foram processadas
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Processar o novo arquivo
-                        await handlePaymentReceiptUpload(pendingUploadFile);
-                        
-                        toast({
-                          title: "✅ Sucesso",
-                          description: `${receiptsToDelete.length} comprovante(s) antigo(s) substituído(s) pelos novos.`,
-                        });
-                        
-                      } else if (duplicatePeriodInfo.type === 'holerite') {
-                        // Excluir todos os holerites existentes
-                        console.log(`🗑️ Excluindo ${holerites.length} holerite(s)...`);
-                        
-                        for (const holerite of holerites) {
-                          try {
-                            await holeriteService.deleteHolerite(holerite.id);
-                          } catch (err) {
-                            console.error('Erro ao excluir holerite:', err);
-                          }
-                        }
-                        
-                        // Aguardar um pouco
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Recarregar a lista
-                        await loadHolerites();
-                        
-                        // Abrir modal para continuar o upload
-                        setShowUploadModal(true);
                       }
                       
-                      // Limpar o arquivo pendente
-                      setPendingUploadFile(null);
+                      // Adicionar novos comprovantes
+                      for (const newReceipt of processedReceipts) {
+                        try {
+                          await paymentReceiptService.createPaymentReceipt(newReceipt);
+                        } catch (err) {
+                          console.warn('Erro ao criar novo comprovante:', err);
+                        }
+                      }
                       
+                      // Adicionar novos holerites
+                      for (const newHolerite of holerites) {
+                        try {
+                          await holeriteService.createHolerite(newHolerite);
+                        } catch (err) {
+                          console.warn('Erro ao criar novo holerite:', err);
+                        }
+                      }
+                      
+                      // Adicionar novos recibos
+                      for (const newRecibo of recibosProcessados) {
+                        try {
+                          await holeriteService.createReceipt(newRecibo);
+                        } catch (err) {
+                          console.warn('Erro ao criar novo recibo:', err);
+                        }
+                      }
+                      
+                      // Adicionar novos documentos unificados
+                      for (const newUnification of individualUnifications) {
+                        try {
+                          await unifiedDocumentService.createUnifiedDocument(newUnification);
+                        } catch (err) {
+                          console.warn('Erro ao criar novo documento unificado:', err);
+                        }
+                      }
+                      
+                      // Atualizar lista de documentos unificados
+                      await fetchUnifiedDocuments(true);
+                      
+                      toast({
+                        title: "Sucesso",
+                        description: `Novos documentos importados com sucesso!`,
+                      });
                     } catch (error) {
-                      console.error('Erro no processo de sobrescrita:', error);
+                      console.error('Erro ao processar importação:', error);
                       toast({
                         title: "Erro",
-                        description: "Erro ao sobrescrever documentos. Tente novamente.",
+                        description: "Erro ao processar importação. Tente novamente.",
                         variant: "destructive"
                       });
-                    } finally {
-                      setOverwritingPeriod(false);
-                      setDuplicatePeriodInfo(null);
                     }
-                  } else {
-                    setDuplicatePeriodInfo(null);
                   }
                 }}
                 disabled={overwritingPeriod}
-                className="bg-orange-600 hover:bg-orange-700"
+                className="bg-green-500 hover:bg-green-600 text-white"
               >
                 {overwritingPeriod ? (
                   <>
@@ -5773,15 +6429,14 @@ const Holerites: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    Continuar e Sobrescrever
+                    <Plus size={20} className="mr-2" />
+                    Importar Novos Documentos
                   </>
                 )}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
       </div>
     </StandardLayout>
   );

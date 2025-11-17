@@ -130,6 +130,9 @@ public class ContactValidationService {
         detail.setUserId(user.getId());
         detail.setUserEmail(user.getEmail());
         detail.setUserWhatsapp(user.getWhatsapp());
+        boolean hasWhatsAppConsent = Boolean.TRUE.equals(user.getWhatsappConsent());
+        detail.setHasWhatsAppConsent(hasWhatsAppConsent);
+        detail.setWhatsappConsentDate(user.getWhatsappConsentDate());
         
         // Validar Email
         if ("email".equals(type) || "both".equals(type)) {
@@ -142,19 +145,41 @@ public class ContactValidationService {
             }
         }
         
-        // Validar WhatsApp
+        // Validar WhatsApp: primeiro em users, depois em employees
         if ("whatsapp".equals(type) || "both".equals(type)) {
             String whatsapp = user.getWhatsapp();
             
+            // Se não encontrou em users, verificar em employees
+            if (whatsapp == null || whatsapp.trim().isEmpty()) {
+                String employeeWhatsapp = emp.getPhone();
+                if (employeeWhatsapp != null && !employeeWhatsapp.trim().isEmpty()) {
+                    whatsapp = employeeWhatsapp;
+                    log.info("✅ WhatsApp encontrado em employees para CPF {}: {}", emp.getDocument(), whatsapp);
+                    // Atualizar o user com o WhatsApp do employee
+                    user.setWhatsapp(whatsapp);
+                    userRepository.save(user);
+                    log.info("✅ WhatsApp atualizado na tabela users");
+                    // Atualizar o detail também
+                    detail.setUserWhatsapp(whatsapp);
+                }
+            }
+            
             if (whatsapp == null || whatsapp.trim().isEmpty()) {
                 detail.setCanSendWhatsApp(false);
-                detail.setWhatsappError("WhatsApp não cadastrado");
+                detail.setWhatsappError("WhatsApp não cadastrado em users nem em employees");
                 detail.setNeedsWhatsAppUpdate(true);
             } else {
                 // Validar formato
                 String normalized = whatsapp.replaceAll("[^0-9]", "");
                 if (normalized.length() >= 10 && normalized.length() <= 13) {
-                    detail.setCanSendWhatsApp(true);
+                    if (hasWhatsAppConsent) {
+                        detail.setCanSendWhatsApp(true);
+                        detail.setNeedsWhatsAppConsent(false);
+                    } else {
+                        detail.setCanSendWhatsApp(false);
+                        detail.setNeedsWhatsAppConsent(true);
+                        detail.setWhatsappError("Consentimento WhatsApp não registrado");
+                    }
                 } else {
                     detail.setCanSendWhatsApp(false);
                     detail.setWhatsappError("Número de WhatsApp em formato inválido");
@@ -177,12 +202,13 @@ public class ContactValidationService {
         if (isReady) {
             detail.setStatus("ready");
             detail.setStatusMessage("Pronto para envio");
-        } else if (detail.isNeedsUserCreation() || detail.isNeedsWhatsAppUpdate() || detail.isNeedsEmailUpdate()) {
+        } else if (detail.isNeedsUserCreation() || detail.isNeedsWhatsAppUpdate() || detail.isNeedsWhatsAppConsent() || detail.isNeedsEmailUpdate()) {
             detail.setStatus("needs_action");
             
             List<String> actions = new ArrayList<>();
             if (detail.isNeedsUserCreation()) actions.add("criar usuário");
             if (detail.isNeedsWhatsAppUpdate()) actions.add("adicionar WhatsApp");
+            if (detail.isNeedsWhatsAppConsent()) actions.add("confirmar consentimento WhatsApp");
             if (detail.isNeedsEmailUpdate()) actions.add("adicionar email");
             
             detail.setStatusMessage("Ação necessária: " + String.join(", ", actions));

@@ -519,4 +519,33 @@ public class EmployeeController {
             throw new RuntimeException("Erro ao buscar funcionários: " + e.getMessage());
         }
     }
+    
+    @GetMapping("/search/cpf/{cpf}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
+    @Operation(summary = "Buscar funcionário por CPF exato", description = "Busca funcionário por CPF normalizado (remove caracteres não numéricos)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Funcionário encontrado"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<EmployeeDTO> findByCpfExact(@PathVariable String cpf) {
+        try {
+            System.out.println("[DEBUG] EmployeeController.findByCpfExact - CPF recebido: " + cpf);
+            
+            java.util.Optional<Employee> employeeOpt = employeeService.findByCpfExact(cpf);
+            
+            if (employeeOpt.isPresent()) {
+                EmployeeDTO dto = employeeService.toDTO(employeeOpt.get());
+                System.out.println("[DEBUG] EmployeeController.findByCpfExact - Funcionário encontrado: " + dto.getName());
+                return ResponseEntity.ok(dto);
+            } else {
+                System.out.println("[DEBUG] EmployeeController.findByCpfExact - Funcionário não encontrado para CPF: " + cpf);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] EmployeeController.findByCpfExact - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar funcionário por CPF: " + e.getMessage());
+        }
+    }
 } 
