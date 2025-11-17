@@ -32,19 +32,71 @@ public class BaileysRestService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final com.z7design.secured_guard.config.WhatsAppTestConfig testConfig;
+    private String lastErrorMessage;
     
     public BaileysRestService(RestTemplate restTemplate, ObjectMapper objectMapper,
                              com.z7design.secured_guard.config.WhatsAppTestConfig testConfig) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
         this.testConfig = testConfig;
+        this.lastErrorMessage = null;
+    }
+    
+    /**
+     * Retorna a última mensagem de erro registrada
+     */
+    public String getLastErrorMessage() {
+        return lastErrorMessage;
+    }
+    
+    /**
+     * Faz logout e limpa a sessão do Baileys REST API
+     * Isso força uma nova conexão que gerará um novo QR Code
+     */
+    public boolean resetInstance() {
+        try {
+            String url = baileysRestUrl + "/instance/logout?key=" + instanceKey;
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<String> request = new HttpEntity<>(headers);
+            
+            logger.info("🔄 Fazendo logout e resetando instância Baileys REST: {}", instanceKey);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            
+            // Aguardar um pouco para garantir que a sessão foi limpa
+            Thread.sleep(1000);
+            
+            logger.info("✅ Instância Baileys REST resetada com sucesso");
+            return true;
+            
+        } catch (Exception e) {
+            logger.warn("⚠️ Erro ao resetar instância (pode não existir): {}", e.getMessage());
+            // Não retornar false, pois a instância pode não existir
+            return true;
+        }
     }
     
     /**
      * Inicializa uma nova instância do Baileys REST API
+     * Se a conexão estiver fechada, deleta a instância antes de criar uma nova
      */
     public boolean initializeInstance() {
         try {
+            // Verificar se a conexão está fechada
+            String connectionState = checkConnectionState();
+            if ("closed".equals(connectionState) || "close".equals(connectionState)) {
+                logger.info("🔄 Conexão está fechada. Resetando instância antes de recriar...");
+                resetInstance();
+                // Aguardar um pouco para garantir que a sessão foi limpa
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            
             String url = baileysRestUrl + "/instance/init";
             if (!baileysToken.isEmpty()) {
                 url += "?key=" + instanceKey + "&token=" + baileysToken;
@@ -57,20 +109,49 @@ public class BaileysRestService {
             
             HttpEntity<String> request = new HttpEntity<>(headers);
             
-            logger.info("Inicializando instância Baileys REST: {}", instanceKey);
+            logger.info("🔄 Inicializando instância Baileys REST: {}", instanceKey);
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
-                logger.info("Instância Baileys REST inicializada com sucesso");
+                logger.info("✅ Instância Baileys REST inicializada com sucesso");
                 return true;
             } else {
-                logger.error("Erro ao inicializar instância. Status: {}", response.getStatusCode());
+                logger.error("❌ Erro ao inicializar instância. Status: {}", response.getStatusCode());
                 return false;
             }
             
         } catch (Exception e) {
-            logger.error("Erro ao inicializar instância Baileys REST", e);
+            logger.error("❌ Erro ao inicializar instância Baileys REST", e);
             return false;
+        }
+    }
+    
+    /**
+     * Verifica o estado da conexão (open, close, connecting)
+     */
+    private String checkConnectionState() {
+        try {
+            String url = baileysRestUrl + "/instance/connectionState?key=" + instanceKey;
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    JsonNode jsonNode = mapper.readTree(response.getBody());
+                    String state = jsonNode.get("state").asText();
+                    logger.info("📊 Estado da conexão: {}", state);
+                    return state;
+                } catch (Exception e) {
+                    logger.warn("⚠️ Não foi possível fazer parse do estado da conexão");
+                    return "unknown";
+                }
+            }
+            
+            return "unknown";
+            
+        } catch (Exception e) {
+            logger.warn("⚠️ Erro ao verificar estado da conexão: {}", e.getMessage());
+            return "unknown";
         }
     }
     
@@ -144,32 +225,56 @@ public class BaileysRestService {
      * Envia mensagem de texto via Baileys REST API
      */
     public boolean sendTextMessage(String phoneNumber, String message) {
+        lastErrorMessage = null; // Limpar erro anterior
+        
         try {
+            // Verificar se está conectado
+            if (!checkConnection()) {
+                lastErrorMessage = "WhatsApp não está conectado. Verifique a conexão e tente novamente.";
+                logger.error("❌ Tentativa de envio com WhatsApp desconectado");
+                return false;
+            }
+            
             // Normalizar número com DDI
             String normalizedNumber = normalizePhoneNumber(phoneNumber);
             
             String url = baileysRestUrl + "/message/text?key=" + instanceKey;
             
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.setContentType(MediaType.APPLICATION_JSON);
             
-            String body = "id=" + normalizedNumber + "&message=" + message;
+            // Criar body JSON
+            ObjectNode body = objectMapper.createObjectNode();
+            body.put("id", normalizedNumber);
+            body.put("message", message);
             
-            HttpEntity<String> request = new HttpEntity<>(body, headers);
+            HttpEntity<String> request = new HttpEntity<>(body.toString(), headers);
             
-            logger.info("📤 Enviando mensagem via Baileys REST para: {}", normalizedNumber);
+            logger.info("📤 Enviando mensagem via Baileys REST para: {} (normalizado: {})", phoneNumber, normalizedNumber);
+            logger.info("📝 Mensagem: {}", message);
+            
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
-                logger.info("Mensagem enviada com sucesso via Baileys REST");
+                logger.info("✅ Mensagem enviada com sucesso via Baileys REST para: {}", normalizedNumber);
+                lastErrorMessage = null; // Limpar erro em caso de sucesso
                 return true;
             } else {
-                logger.error("Erro ao enviar mensagem. Status: {}", response.getStatusCode());
+                String errorMsg = String.format("Erro HTTP %s: %s", response.getStatusCode(), response.getBody());
+                lastErrorMessage = errorMsg;
+                logger.error("❌ Erro ao enviar mensagem. Status: {}, Body: {}", response.getStatusCode(), response.getBody());
                 return false;
             }
             
+        } catch (org.springframework.web.client.RestClientException e) {
+            lastErrorMessage = "Erro ao comunicar com serviço Baileys: " + e.getMessage() + ". Verifique se o serviço está rodando na porta 3333.";
+            logger.error("❌ Erro ao enviar mensagem via Baileys REST", e);
+            logger.error("💥 Erro detalhe: {}", e.getMessage());
+            return false;
         } catch (Exception e) {
-            logger.error("Erro ao enviar mensagem via Baileys REST", e);
+            lastErrorMessage = "Erro inesperado: " + e.getMessage();
+            logger.error("❌ Erro ao enviar mensagem via Baileys REST", e);
+            logger.error("💥 Erro detalhe: {}", e.getMessage());
             return false;
         }
     }
@@ -203,8 +308,11 @@ public class BaileysRestService {
      * CORRIGIDO: Adiciona DDI 55 para evitar redirecionamento
      */
     public boolean sendFileMessage(String phoneNumber, String message, String filePath) {
+        lastErrorMessage = null; // Limpar erro anterior
+        
         // ⚠️ PROTEÇÃO: Verificar limite de envios (modo teste Baileys)
         if (!testConfig.canSendMessage(phoneNumber)) {
+            lastErrorMessage = "Limite de testes atingido. Migre para WhatsApp Cloud API oficial.";
             logger.error("🚫 Envio bloqueado - Limite de testes atingido");
             logger.warn("💡 SOLUÇÃO: Migre para WhatsApp Cloud API (oficial)");
             logger.warn("📄 Guia: MIGRACAO_WHATSAPP_BUSINESS_API_OFICIAL.md");
@@ -215,6 +323,7 @@ public class BaileysRestService {
             // Verificar se arquivo existe
             File file = new File(filePath);
             if (!file.exists()) {
+                lastErrorMessage = "Arquivo não encontrado: " + filePath;
                 logger.error("❌ Arquivo não existe: {}", filePath);
                 return false;
             }
@@ -262,14 +371,23 @@ public class BaileysRestService {
                     testConfig.showMigrationWarning();
                 }
                 
+                lastErrorMessage = null; // Limpar erro em caso de sucesso
                 return true;
             } else {
+                String errorMsg = String.format("Erro HTTP %s: %s", response.getStatusCode(), response.getBody());
+                lastErrorMessage = errorMsg;
                 logger.error("❌ Erro ao enviar arquivo. Status: {}", response.getStatusCode());
                 logger.error("📋 Response body: {}", response.getBody());
                 return false;
             }
             
+        } catch (org.springframework.web.client.RestClientException e) {
+            lastErrorMessage = "Erro ao comunicar com serviço Baileys: " + e.getMessage() + ". Verifique se o serviço está rodando na porta 3333.";
+            logger.error("❌ Erro ao enviar arquivo via Baileys REST", e);
+            logger.error("💥 Erro detalhe: {}", e.getMessage());
+            return false;
         } catch (Exception e) {
+            lastErrorMessage = "Erro inesperado: " + e.getMessage();
             logger.error("❌ Erro ao enviar arquivo via Baileys REST", e);
             logger.error("💥 Erro detalhe: {}", e.getMessage());
             return false;
