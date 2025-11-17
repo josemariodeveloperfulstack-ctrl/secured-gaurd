@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -28,6 +29,9 @@ public class ContactValidationDetail {
     private UUID userId;
     private String userEmail;
     private String userWhatsapp;
+    private boolean hasWhatsAppConsent;
+    private boolean needsWhatsAppConsent;
+    private LocalDateTime whatsappConsentDate;
     
     // Status de validação
     private boolean canSendEmail;
