@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.AccessLevel;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -13,6 +15,7 @@ import java.util.UUID;
  */
 @Data
 @Builder
+@Setter(AccessLevel.PUBLIC)
 @NoArgsConstructor
 @AllArgsConstructor
 public class ContactValidationDetail {
