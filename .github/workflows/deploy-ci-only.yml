@@ -247,14 +247,88 @@ jobs:
             
             cd /var/www/secured_guard/ci
             
-            # Iniciar containers com force-recreate para aplicar novas labels do Traefik
+            # Criar diretórios de dados se não existirem
+            mkdir -p /var/www/secured_guard/ci/postgres_data
+            mkdir -p /var/www/secured_guard/ci/redis_data
+            chmod 755 /var/www/secured_guard/ci/postgres_data
+            chmod 755 /var/www/secured_guard/ci/redis_data
+            
+            # Iniciar primeiro PostgreSQL e Redis
+            echo "🔄 Iniciando PostgreSQL e Redis..."
+            docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
+            
+            # Aguardar PostgreSQL ficar saudável
+            echo "⏳ Aguardando PostgreSQL iniciar..."
+            MAX_RETRIES=30
+            RETRY=0
+            while [ $RETRY -lt $MAX_RETRIES ]; do
+              if docker-compose -f docker-compose.ci.yml ps postgres-ci | grep -q "Up"; then
+                echo "✅ PostgreSQL está rodando"
+                break
+              fi
+              RETRY=$((RETRY + 1))
+              sleep 2
+            done
+            
+            if [ $RETRY -eq $MAX_RETRIES ]; then
+              echo "❌ PostgreSQL não iniciou! Verificando logs..."
+              docker logs --tail 50 secured-guard-db-ci 2>&1 || echo "Container não encontrado"
+            fi
+            
+            # Aguardar Redis ficar saudável
+            echo "⏳ Aguardando Redis iniciar..."
+            RETRY=0
+            while [ $RETRY -lt $MAX_RETRIES ]; do
+              if docker-compose -f docker-compose.ci.yml ps redis-ci | grep -q "Up"; then
+                echo "✅ Redis está rodando"
+                break
+              fi
+              RETRY=$((RETRY + 1))
+              sleep 2
+            done
+            
+            if [ $RETRY -eq $MAX_RETRIES ]; then
+              echo "❌ Redis não iniciou! Verificando logs..."
+              docker logs --tail 50 secured-guard-redis-ci 2>&1 || echo "Container não encontrado"
+            fi
+            
+            # Verificar se PostgreSQL e Redis estão realmente rodando
+            if ! docker-compose -f docker-compose.ci.yml ps postgres-ci | grep -q "Up"; then
+              echo "❌ PostgreSQL não está rodando! Tentando reiniciar..."
+              docker-compose -f docker-compose.ci.yml restart postgres-ci || docker-compose -f docker-compose.ci.yml up -d postgres-ci
+              sleep 10
+            fi
+            
+            if ! docker-compose -f docker-compose.ci.yml ps redis-ci | grep -q "Up"; then
+              echo "❌ Redis não está rodando! Tentando reiniciar..."
+              docker-compose -f docker-compose.ci.yml restart redis-ci || docker-compose -f docker-compose.ci.yml up -d redis-ci
+              sleep 10
+            fi
+            
+            # Agora iniciar os outros containers
+            echo "🔄 Iniciando outros containers..."
             docker-compose -f docker-compose.ci.yml up -d --force-recreate
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
             
             # Verificar status
+            echo ""
+            echo "📋 Status dos containers:"
             docker-compose -f docker-compose.ci.yml ps
+            
+            # Verificar logs do PostgreSQL e Redis se não estiverem rodando
+            if ! docker-compose -f docker-compose.ci.yml ps postgres-ci | grep -q "Up"; then
+              echo ""
+              echo "❌ PostgreSQL não está rodando! Logs:"
+              docker logs --tail 50 secured-guard-db-ci 2>&1 || echo "Container não encontrado"
+            fi
+            
+            if ! docker-compose -f docker-compose.ci.yml ps redis-ci | grep -q "Up"; then
+              echo ""
+              echo "❌ Redis não está rodando! Logs:"
+              docker logs --tail 50 secured-guard-redis-ci 2>&1 || echo "Container não encontrado"
+            fi
             
             # Verificar se WhatsApp service está rodando
             echo ""
