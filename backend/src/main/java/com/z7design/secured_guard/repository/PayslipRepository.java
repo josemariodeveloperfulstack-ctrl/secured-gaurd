@@ -38,4 +38,19 @@ public interface PayslipRepository extends JpaRepository<Payslip, java.util.UUID
 
     @Query("SELECT p FROM Payslip p WHERE p.cpf = :cpf AND p.month = :month AND p.year = :year ORDER BY p.processedAt DESC")
     Payslip findFirstByCpfAndMonthAndYear(@Param("cpf") String cpf, @Param("month") Integer month, @Param("year") Integer year);
+
+    // Buscar holerites por CPF, CNPJ, setor e período para verificação de alterações
+    @Query("SELECT p FROM Payslip p WHERE " +
+           "(:companyCnpj IS NULL OR p.companyCnpj = :companyCnpj) AND " +
+           "p.cpf = :cpf AND " +
+           "(:workPostName IS NULL OR p.workPostName = :workPostName) AND " +
+           "p.month = :month AND p.year = :year " +
+           "ORDER BY p.processedAt DESC")
+    List<Payslip> findByCompanyCnpjAndCpfAndWorkPostNameAndMonthAndYear(
+        @Param("companyCnpj") String companyCnpj,
+        @Param("cpf") String cpf,
+        @Param("workPostName") String workPostName,
+        @Param("month") Integer month,
+        @Param("year") Integer year
+    );
 } 
