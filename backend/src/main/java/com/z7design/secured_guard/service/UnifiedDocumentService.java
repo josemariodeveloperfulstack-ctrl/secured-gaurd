@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.model.PaymentReceiptStatus;
 import com.z7design.secured_guard.model.Payslip;
+import com.z7design.secured_guard.model.UnifiedDocument;
 import com.z7design.secured_guard.dto.PayslipOrganizationResponse;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import com.z7design.secured_guard.repository.UserRepository;
@@ -16,10 +17,13 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1907,6 +1911,19 @@ public class UnifiedDocumentService {
                     payslip.getYear());
                 payslipMap.put(key, payslip);
             }
+            
+            // Buscar todos os unified documents do banco para obter relacionamento com payslip
+            List<UnifiedDocument> unifiedDocumentsFromDb = unifiedDocumentRepository.findAll();
+            Map<String, Payslip> unifiedDocPayslipMap = new HashMap<>();
+            for (UnifiedDocument ud : unifiedDocumentsFromDb) {
+                if (ud.getPayslip() != null && ud.getEmployeeName() != null && ud.getMonth() != null && ud.getYear() != null) {
+                    String key = String.format("%s|%d|%d", 
+                        normalizeName(ud.getEmployeeName()), 
+                        ud.getMonth(), 
+                        ud.getYear());
+                    unifiedDocPayslipMap.put(key, ud.getPayslip());
+                }
+            }
 
             // Converter documentos unificados em "payslips" para usar a mesma lógica de organização
             List<Payslip> payslipsForOrganization = new ArrayList<>();
@@ -1915,19 +1932,48 @@ public class UnifiedDocumentService {
                 String employeeName = (String) doc.get("employeeName");
                 Integer month = (Integer) doc.get("month");
                 Integer year = (Integer) doc.get("year");
+                String filePath = (String) doc.get("filePath");
                 
                 if (employeeName == null || month == null || year == null) {
                     continue;
                 }
                 
-                // Buscar payslip correspondente
+                Payslip payslip = null;
+                
+                // Estratégia 1: Buscar payslip correspondente por nome/mês/ano no mapa de payslips
                 String key = String.format("%s|%d|%d", normalizeName(employeeName), month, year);
-                Payslip payslip = payslipMap.get(key);
+                payslip = payslipMap.get(key);
+                
+                // Estratégia 2: Se não encontrou, buscar pelo unified document do banco
+                if (payslip == null) {
+                    payslip = unifiedDocPayslipMap.get(key);
+                }
+                
+                // Estratégia 3: Se ainda não encontrou, tentar extrair do PDF do documento unificado
+                if (payslip == null && filePath != null) {
+                    try {
+                        log.info("🔍 Payslip não encontrado para documento unificado {}. Tentando extrair do PDF...", filePath);
+                        Payslip extractedPayslip = extractPayslipInfoFromUnifiedDocument(filePath, employeeName, month, year, (String) doc.getOrDefault("cpf", ""));
+                        if (extractedPayslip != null) {
+                            payslip = extractedPayslip;
+                            log.info("✅ Informações extraídas do PDF: Empresa={}, CNPJ={}, Setor={}", 
+                                payslip.getCompanyName(), payslip.getCompanyCnpj(), payslip.getWorkPostName());
+                        }
+                    } catch (Exception e) {
+                        log.warn("⚠️ Erro ao extrair informações do PDF unificado {}: {}", filePath, e.getMessage());
+                    }
+                }
                 
                 if (payslip != null) {
+                    // Garantir que o nome do arquivo está definido
+                    if (payslip.getFileName() == null || payslip.getFileName().isEmpty()) {
+                        payslip.setFileName((String) doc.getOrDefault("fileName", ""));
+                    }
                     payslipsForOrganization.add(payslip);
                 } else {
                     // Se não encontrar payslip, criar um temporário com dados do documento
+                    log.warn("⚠️ Não foi possível obter informações de empresa/setor para documento unificado: {}", 
+                        (String) doc.getOrDefault("fileName", ""));
                     Payslip tempPayslip = Payslip.builder()
                         .employeeName(employeeName)
                         .cpf((String) doc.getOrDefault("cpf", ""))
@@ -1954,5 +2000,204 @@ public class UnifiedDocumentService {
             response.setTotalSectors(0);
             return response;
         }
+    }
+    
+    /**
+     * Extrai informações de empresa e setor do PDF do documento unificado
+     */
+    private Payslip extractPayslipInfoFromUnifiedDocument(String filePath, String employeeName, Integer month, Integer year, String cpf) {
+        log.info("📄 Extraindo informações do PDF unificado: {}", filePath);
+        
+        try {
+            File pdfFile = new File(filePath);
+            if (!pdfFile.exists()) {
+                log.warn("⚠️ Arquivo não encontrado: {}", filePath);
+                return null;
+            }
+            
+            try (PDDocument document = PDDocument.load(pdfFile)) {
+                // Extrair texto da primeira página (onde geralmente está o holerite)
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(1);
+                stripper.setEndPage(1);
+                String pageText = stripper.getText(document);
+                
+                if (pageText == null || pageText.trim().isEmpty()) {
+                    log.warn("⚠️ Não foi possível extrair texto da primeira página do PDF unificado");
+                    return null;
+                }
+                
+                String[] linhas = pageText.split("\r?\n");
+                String empresaNome = null;
+                String empresaCnpj = null;
+                String workPostName = null;
+                
+                // Extrair CNPJ da empresa (mesma lógica do PayslipService)
+                Pattern cnpjPattern = Pattern.compile("CNPJ[:\\s]*([0-9]{2}\\.?[0-9]{3}\\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2}|[0-9]{14})");
+                for (String linha : linhas) {
+                    Matcher cnpjMatcher = cnpjPattern.matcher(linha);
+                    if (cnpjMatcher.find()) {
+                        empresaCnpj = cnpjMatcher.group(1).replaceAll("[^0-9]", "");
+                        log.info("✅ CNPJ da empresa encontrado: {}", empresaCnpj);
+                        
+                        // Tentar extrair nome da empresa da mesma linha ou linha anterior
+                        int cnpjIndex = linha.toUpperCase().indexOf("CNPJ");
+                        if (cnpjIndex > 10) {
+                            String possibleName = linha.substring(0, cnpjIndex).trim();
+                            possibleName = possibleName.replaceAll("(?i)(EMPRESA|RAZÃO SOCIAL|EMPREGADOR)[:\\s]*", "").trim();
+                            if (possibleName.length() > 5 && !possibleName.matches(".*\\d{3}.*")) {
+                                empresaNome = possibleName;
+                                log.info("✅ Nome da empresa encontrado (mesma linha CNPJ): {}", empresaNome);
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                // Fallback: buscar CNPJ sem rótulo
+                if (empresaCnpj == null) {
+                    Pattern fallbackCnpjPattern = Pattern.compile("(?<!\\d)(\\d{14})(?!\\d)");
+                    int limiteLinhas = Math.min(15, linhas.length);
+                    for (int i = 0; i < limiteLinhas; i++) {
+                        String linha = linhas[i];
+                        Matcher fallbackMatcher = fallbackCnpjPattern.matcher(linha.replaceAll("\\s+", ""));
+                        if (fallbackMatcher.find()) {
+                            empresaCnpj = fallbackMatcher.group(1);
+                            log.info("✅ CNPJ (fallback) encontrado: {}", empresaCnpj);
+                            
+                            if (empresaNome == null) {
+                                String possibleName = linha.replaceAll("\\d", " ").replaceAll("\\s+", " ").trim();
+                                if (possibleName.length() > 5) {
+                                    empresaNome = possibleName;
+                                    log.info("✅ Nome da empresa (fallback) identificado: {}", empresaNome);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                // Extrair nome da empresa (mesma lógica do PayslipService)
+                if (empresaNome == null) {
+                    for (int i = 0; i < linhas.length; i++) {
+                        String linha = linhas[i].trim();
+                        String linhaUpper = linha.toUpperCase();
+                        
+                        // Procurar por linhas com "LTDA", "S.A", "ME", etc.
+                        if ((linhaUpper.contains("LTDA") || linhaUpper.contains("S.A") || 
+                            linhaUpper.contains(" ME ") || linhaUpper.contains("EIRELI")) &&
+                            !linhaUpper.contains("FUNCIONARIO") && !linhaUpper.contains("CPF") &&
+                            linha.length() > 10 && linha.length() < 150) {
+                            empresaNome = linha;
+                            log.info("✅ Nome da empresa encontrado (por sufixo empresarial): {}", empresaNome);
+                            break;
+                        }
+                    }
+                }
+                
+                // Extrair setor (workPostName) - mesma lógica do PayslipService
+                // Procurar por padrões de período que geralmente têm setor ao lado
+                Pattern periodoPattern = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+(?:a|à)\\s+(\\d{2})/(\\d{2})/(\\d{4})");
+                for (int idx = 0; idx < linhas.length; idx++) {
+                    String linha = linhas[idx];
+                    Matcher periodoMatcher = periodoPattern.matcher(linha);
+                    if (periodoMatcher.find()) {
+                        String trailingText = linha.substring(periodoMatcher.end()).trim();
+                        if (trailingText.length() > 3) {
+                            workPostName = sanitizeWorkPostCandidate(trailingText);
+                            if (workPostName != null) {
+                                log.info("✅ Setor encontrado (após período): {}", workPostName);
+                                break;
+                            }
+                        }
+                        
+                        // Verificar linhas seguintes
+                        for (int offset = 1; offset <= 2; offset++) {
+                            int idx2 = idx + offset;
+                            if (idx2 < linhas.length) {
+                                workPostName = sanitizeWorkPostCandidate(linhas[idx2]);
+                                if (workPostName != null) {
+                                    log.info("✅ Setor encontrado (linha após período): {}", workPostName);
+                                    break;
+                                }
+                            }
+                        }
+                        if (workPostName != null) break;
+                    }
+                }
+                
+                // Buscar por rótulo de setor
+                if (workPostName == null) {
+                    Pattern labeledPattern = Pattern.compile("(?i)(setor|posto|local(?: de trabalho)?)[:\\s]+(.{3,})");
+                    for (String line : linhas) {
+                        Matcher matcher = labeledPattern.matcher(line);
+                        if (matcher.find()) {
+                            workPostName = sanitizeWorkPostCandidate(matcher.group(2));
+                            if (workPostName != null) {
+                                log.info("✅ Setor encontrado (por rótulo): {}", workPostName);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Criar Payslip com informações extraídas
+                return Payslip.builder()
+                    .employeeName(employeeName != null ? employeeName : "Desconhecido")
+                    .cpf(cpf != null && !cpf.isEmpty() ? cpf : "")
+                    .companyName(empresaNome)
+                    .companyCnpj(empresaCnpj)
+                    .workPostName(workPostName)
+                    .month(month)
+                    .year(year)
+                    .fileName(new File(filePath).getName())
+                    .build();
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao extrair informações do PDF unificado {}: {}", filePath, e.getMessage(), e);
+            return null;
+        }
+    }
+    
+    /**
+     * Sanitiza candidato a setor (mesma lógica do PayslipService)
+     */
+    private String sanitizeWorkPostCandidate(String candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        String cleaned = candidate.replaceAll("[\\p{Cntrl}]", " ").trim();
+        if (cleaned.isEmpty()) {
+            return null;
+        }
+
+        // Se houver rótulo "SETOR: ..." manter apenas o que vem depois dos dois pontos
+        int colonIndex = cleaned.indexOf(':');
+        if (colonIndex >= 0 && colonIndex < cleaned.length() - 1) {
+            cleaned = cleaned.substring(colonIndex + 1).trim();
+        }
+
+        cleaned = cleaned.replaceAll("[•·]+", " ");
+        cleaned = cleaned.replaceAll("[\\s]+", " ").trim();
+        cleaned = cleaned.replaceAll("[.,;]+$", "").trim();
+        
+        // Validar se parece um setor válido (mais de 2 caracteres, não é apenas números)
+        if (cleaned.length() < 3) {
+            return null;
+        }
+        if (cleaned.matches("^\\d+$")) {
+            return null;
+        }
+        
+        // Remover palavras comuns que não são setor
+        String upper = cleaned.toUpperCase();
+        if (upper.contains("PERÍODO") || upper.contains("REFERÊNCIA") || 
+            upper.contains("COMPETÊNCIA") || upper.contains("FUNCIONÁRIO") ||
+            upper.contains("CPF") || upper.contains("CNPJ") ||
+            upper.contains("EMPRESA") || upper.contains("NOME")) {
+            return null;
+        }
+        
+        return cleaned;
     }
 } 
