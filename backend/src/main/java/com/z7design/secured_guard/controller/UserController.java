@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,11 +22,13 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Usuários", description = "Endpoints para gestão de usuários")
 public class UserController {
     
@@ -51,28 +55,66 @@ public class UserController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Buscar usuário por ID", description = "Retorna um usuário específico pelo ID")
-    public ResponseEntity<UserListResponseDTO> getUserById(@PathVariable String id) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isColaborador = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
-        
-        User user = userService.findById(UUID.fromString(id))
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-        
-        // Colaborador só pode ver seu próprio perfil
-        if (isColaborador && !auth.getName().equals(user.getUsername())) {
-            return ResponseEntity.status(403).build();
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        try {
+            // Validar ID
+            if (id == null || id.trim().isEmpty()) {
+                log.warn("ID de usuário inválido: {}", id);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "ID de usuário inválido"));
+            }
+            
+            UUID userId;
+            try {
+                userId = UUID.fromString(id);
+            } catch (IllegalArgumentException e) {
+                log.warn("ID de usuário inválido (formato UUID): {}", id);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "ID de usuário inválido"));
+            }
+            
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null) {
+                log.error("Autenticação é null");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Não autenticado"));
+            }
+            
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            
+            User user = userService.findById(userId)
+                    .orElse(null);
+            
+            if (user == null) {
+                log.warn("Usuário não encontrado: {}", id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Usuário não encontrado"));
+            }
+            
+            // Colaborador só pode ver seu próprio perfil
+            if (isColaborador && !auth.getName().equals(user.getUsername())) {
+                log.warn("Acesso negado: colaborador {} tentou acessar usuário {}", auth.getName(), user.getUsername());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Acesso negado"));
+            }
+            
+            UserListResponseDTO dto = new UserListResponseDTO();
+            dto.setId(user.getId().toString());
+            dto.setName(user.getName());
+            dto.setUsername(user.getUsername());
+            dto.setEmail(user.getEmail());
+            dto.setActive(user.isActive());
+            dto.setRoles(user.getRoles().stream()
+                .map(role -> role.getName())
+                .collect(java.util.stream.Collectors.toList()));
+            
+            return ResponseEntity.ok(dto);
+        } catch (Exception e) {
+            log.error("Erro ao buscar usuário por ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erro ao buscar usuário: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido")));
         }
-        
-        UserListResponseDTO dto = new UserListResponseDTO();
-        dto.setId(user.getId().toString());
-        dto.setName(user.getName());
-        dto.setUsername(user.getUsername());
-        dto.setEmail(user.getEmail());
-        dto.setActive(user.isActive());
-        dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-        
-        return ResponseEntity.ok(dto);
     }
     
     @GetMapping("/username/{username}")
@@ -212,18 +254,58 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<UserListResponseDTO> update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest request) {
-        User updatedUser = userService.updateFromRequest(UUID.fromString(id), request);
-        
-        UserListResponseDTO dto = new UserListResponseDTO();
-        dto.setId(updatedUser.getId().toString());
-        dto.setName(updatedUser.getName());
-        dto.setUsername(updatedUser.getUsername());
-        dto.setEmail(updatedUser.getEmail());
-        dto.setActive(updatedUser.isActive());
-        dto.setRoles(updatedUser.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-        
-        return ResponseEntity.ok(dto);
+    public ResponseEntity<?> update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest request) {
+        try {
+            // Validar ID
+            if (id == null || id.trim().isEmpty()) {
+                log.warn("ID de usuário inválido: {}", id);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "ID de usuário inválido"));
+            }
+            
+            UUID userId;
+            try {
+                userId = UUID.fromString(id);
+            } catch (IllegalArgumentException e) {
+                log.warn("ID de usuário inválido (formato UUID): {}", id);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "ID de usuário inválido"));
+            }
+            
+            if (request == null) {
+                log.warn("Request body é null para atualização de usuário {}", id);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Dados de atualização não fornecidos"));
+            }
+            
+            User updatedUser = userService.updateFromRequest(userId, request);
+            
+            if (updatedUser == null) {
+                log.warn("Usuário não encontrado para atualização: {}", id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Usuário não encontrado"));
+            }
+            
+            UserListResponseDTO dto = new UserListResponseDTO();
+            dto.setId(updatedUser.getId().toString());
+            dto.setName(updatedUser.getName());
+            dto.setUsername(updatedUser.getUsername());
+            dto.setEmail(updatedUser.getEmail());
+            dto.setActive(updatedUser.isActive());
+            dto.setRoles(updatedUser.getRoles().stream()
+                .map(role -> role.getName())
+                .collect(java.util.stream.Collectors.toList()));
+            
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            log.warn("Erro de validação ao atualizar usuário {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Dados inválidos"));
+        } catch (Exception e) {
+            log.error("Erro ao atualizar usuário {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erro ao atualizar usuário: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido")));
+        }
     }
     
     @DeleteMapping("/{id}")
