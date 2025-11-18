@@ -287,6 +287,24 @@ jobs:
             echo ""
             echo "🔌 Verificando se backend está escutando na porta 8081..."
             timeout 5 bash -c 'until nc -z localhost 8081; do sleep 1; done' && echo "✅ Backend está escutando" || echo "⚠️ Backend ainda não está escutando"
+            
+            # Verificar WhatsApp service
+            echo ""
+            echo "📱 Verificando WhatsApp service..."
+            if docker ps | grep -q whatsapp-service-ci; then
+              echo "✅ Container WhatsApp está rodando"
+              echo "📋 Últimas 20 linhas dos logs:"
+              docker logs --tail 20 secured-guard-whatsapp-ci 2>&1
+              echo ""
+              echo "🔌 Testando health endpoint..."
+              curl -s -f http://localhost:3333/health && echo "✅ WhatsApp service está respondendo" || echo "⚠️ WhatsApp service não está respondendo"
+            else
+              echo "❌ Container WhatsApp NÃO está rodando!"
+              echo "🔄 Tentando iniciar..."
+              docker-compose -f docker-compose.ci.yml up -d whatsapp-service-ci
+              sleep 10
+              docker logs --tail 30 secured-guard-whatsapp-ci 2>&1
+            fi
           EOF
 
       # ============================================
