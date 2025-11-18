@@ -294,15 +294,52 @@ jobs:
             
             # Verificar se PostgreSQL e Redis estão realmente rodando
             if ! docker-compose -f docker-compose.ci.yml ps postgres-ci | grep -q "Up"; then
-              echo "❌ PostgreSQL não está rodando! Tentando reiniciar..."
-              docker-compose -f docker-compose.ci.yml restart postgres-ci || docker-compose -f docker-compose.ci.yml up -d postgres-ci
-              sleep 10
+              echo "❌ PostgreSQL não está rodando! Verificando logs..."
+              docker logs secured-guard-db-ci 2>&1 | tail -50 || echo "Container não existe"
+              echo ""
+              echo "🔄 Tentando remover e recriar PostgreSQL..."
+              docker-compose -f docker-compose.ci.yml rm -f postgres-ci 2>&1 || true
+              docker rm -f secured-guard-db-ci 2>&1 || true
+              # Limpar containers órfãos com prefixo
+              docker ps -a | grep "secured-guard-db-ci" | awk '{print $1}' | xargs -r docker rm -f 2>&1 || true
+              echo "🔄 Recriando PostgreSQL..."
+              docker-compose -f docker-compose.ci.yml up -d postgres-ci
+              sleep 15
+              docker logs secured-guard-db-ci 2>&1 | tail -50 || echo "Container ainda não existe"
             fi
             
             if ! docker-compose -f docker-compose.ci.yml ps redis-ci | grep -q "Up"; then
-              echo "❌ Redis não está rodando! Tentando reiniciar..."
-              docker-compose -f docker-compose.ci.yml restart redis-ci || docker-compose -f docker-compose.ci.yml up -d redis-ci
-              sleep 10
+              echo "❌ Redis não está rodando! Verificando logs..."
+              docker logs secured-guard-redis-ci 2>&1 | tail -50 || echo "Container não existe"
+              echo ""
+              echo "🔄 Tentando remover e recriar Redis..."
+              docker-compose -f docker-compose.ci.yml rm -f redis-ci 2>&1 || true
+              docker rm -f secured-guard-redis-ci 2>&1 || true
+              # Limpar containers órfãos com prefixo
+              docker ps -a | grep "secured-guard-redis-ci" | awk '{print $1}' | xargs -r docker rm -f 2>&1 || true
+              echo "🔄 Recriando Redis..."
+              docker-compose -f docker-compose.ci.yml up -d redis-ci
+              sleep 15
+              docker logs secured-guard-redis-ci 2>&1 | tail -50 || echo "Container ainda não existe"
+            fi
+            
+            # Verificar novamente se estão rodando antes de continuar
+            if ! docker-compose -f docker-compose.ci.yml ps postgres-ci | grep -q "Up"; then
+              echo "❌❌❌ PostgreSQL ainda não está rodando após tentativa de recriar!"
+              echo "📋 Verificando portas em uso..."
+              netstat -tlnp | grep :5432 || ss -tlnp | grep :5432 || echo "Comando netstat/ss não disponível"
+              echo "📋 Verificando volumes..."
+              ls -la /var/www/secured_guard/ci/postgres_data/ | head -10 || echo "Diretório não existe ou sem permissão"
+              exit 1
+            fi
+            
+            if ! docker-compose -f docker-compose.ci.yml ps redis-ci | grep -q "Up"; then
+              echo "❌❌❌ Redis ainda não está rodando após tentativa de recriar!"
+              echo "📋 Verificando portas em uso..."
+              netstat -tlnp | grep :6379 || ss -tlnp | grep :6379 || echo "Comando netstat/ss não disponível"
+              echo "📋 Verificando volumes..."
+              ls -la /var/www/secured_guard/ci/redis_data/ | head -10 || echo "Diretório não existe ou sem permissão"
+              exit 1
             fi
             
             # Agora iniciar os outros containers
@@ -458,13 +495,25 @@ jobs:
           
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && echo '📋 Status dos containers:' && docker-compose -f docker-compose.ci.yml ps" || true
           
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do PostgreSQL (últimas 30 linhas):' && docker logs --tail 30 secured-guard-db-ci 2>&1 || echo 'Container PostgreSQL não encontrado'" || true
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Todos os containers relacionados:' && docker ps -a | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" || true
           
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do Redis (últimas 30 linhas):' && docker logs --tail 30 secured-guard-redis-ci 2>&1 || echo 'Container Redis não encontrado'" || true
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Tentando encontrar container PostgreSQL (qualquer nome):' && docker ps -a | grep postgres || echo 'Nenhum container PostgreSQL encontrado'" || true
           
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do backend (últimas 50 linhas):' && docker logs --tail 50 secured-guard-backend-ci 2>&1 || echo 'Container não encontrado'" || true
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Tentando encontrar container Redis (qualquer nome):' && docker ps -a | grep redis || echo 'Nenhum container Redis encontrado'" || true
           
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do nginx (últimas 30 linhas):' && docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo 'Container nginx não encontrado'" || true
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do PostgreSQL (tentando todos os containers possíveis):' && (docker logs \$(docker ps -a | grep postgres | grep -v CONTAINER | awk '{print \$1}' | head -1) 2>&1 | tail -50 || echo 'Nenhum container PostgreSQL encontrado para logs')" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do Redis (tentando todos os containers possíveis):' && (docker logs \$(docker ps -a | grep redis | grep -v CONTAINER | awk '{print \$1}' | head -1) 2>&1 | tail -50 || echo 'Nenhum container Redis encontrado para logs')" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Verificando volumes PostgreSQL:' && ls -la /var/www/secured_guard/ci/postgres_data/ 2>&1 | head -10 || echo 'Diretório não existe ou sem permissão'" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Verificando volumes Redis:' && ls -la /var/www/secured_guard/ci/redis_data/ 2>&1 | head -10 || echo 'Diretório não existe ou sem permissão'" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Verificando portas em uso:' && (netstat -tlnp | grep -E ':(5432|6379|8081)' || ss -tlnp | grep -E ':(5432|6379|8081)' || echo 'Comando netstat/ss não disponível')" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do backend (tentando encontrar):' && (docker logs \$(docker ps -a | grep backend | grep -v CONTAINER | awk '{print \$1}' | head -1) 2>&1 | tail -50 || echo 'Container backend não encontrado')" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do nginx (tentando encontrar):' && (docker logs \$(docker ps -a | grep nginx | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1) 2>&1 | tail -30 || echo 'Container nginx não encontrado')" || true
           
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '🌐 Testando conectividade interna:' && (curl -s -o /dev/null -w 'Backend (localhost:8081): %{http_code}\n' http://localhost:8081/api/health || echo 'Backend não responde'); exit 0" || true
           
