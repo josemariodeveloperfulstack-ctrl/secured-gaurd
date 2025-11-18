@@ -32,6 +32,15 @@ http:
         accessControlAllowCredentials: true
         accessControlMaxAge: 3600
         addVaryHeader: true
+    
+    # Middleware de timeout aumentado para uploads (5 minutos)
+    ci-timeout:
+      buffering:
+        maxRequestBodyBytes: 52428800  # 50MB
+        maxResponseBodyBytes: 52428800  # 50MB
+        memRequestBodyBytes: 2097152  # 2MB
+        memResponseBodyBytes: 2097152  # 2MB
+        retryExpression: "IsNetworkError() && Attempts() < 2"
 
   routers:
     # Router específico para o ambiente CI
@@ -43,6 +52,7 @@ http:
       middlewares:
         - ci-cors
         - allow-all-methods
+        - ci-timeout
       tls:
         certResolver: letsencryptresolver
       priority: 1000
@@ -53,3 +63,11 @@ http:
         servers:
           - url: "http://secured-guard-nginx-ci:80"
         passHostHeader: true
+        # Timeouts aumentados para uploads grandes (5 minutos)
+        responseForwarding:
+          flushInterval: 100ms
+      # Health check
+      healthCheck:
+        path: /health
+        interval: 30s
+        timeout: 10s
