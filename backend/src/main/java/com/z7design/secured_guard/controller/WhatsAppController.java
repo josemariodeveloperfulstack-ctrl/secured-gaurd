@@ -79,19 +79,49 @@ public class WhatsAppController {
     @PostMapping("/connection/create")
     public ResponseEntity<?> createConnection(@RequestBody Map<String, Object> request) {
         try {
-            String instanceName = (String) request.get("instanceName");
-            boolean qrcode = Boolean.TRUE.equals(request.get("qrcode"));
+            String instanceName = request != null ? (String) request.get("instanceName") : "securedguard";
+            boolean qrcode = Boolean.TRUE.equals(request != null ? request.get("qrcode") : false);
             
             log.info("🔄 Criando conexão WhatsApp. Instance: {}, QRCode solicitado: {}", instanceName, qrcode);
             
-            boolean initialized = baileysRestService.initializeInstance();
-            log.info("📱 Instância inicializada: {}", initialized);
+            // Verificar se o serviço está disponível antes de tentar inicializar
+            boolean serviceAvailable = false;
+            try {
+                serviceAvailable = baileysRestService.checkConnection();
+            } catch (Exception e) {
+                log.warn("⚠️ Não foi possível verificar conexão com Baileys REST: {}", e.getMessage());
+            }
+            
+            if (!serviceAvailable) {
+                log.error("❌ Baileys REST não disponível");
+                // Retornar 200 OK com erro na resposta para não quebrar o frontend
+                return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "error", "Serviço WhatsApp não disponível. Verifique se o container Docker do Baileys REST está rodando.",
+                    "instance", instanceName != null ? instanceName : "unknown",
+                    "serviceAvailable", false
+                ));
+            }
+            
+            boolean initialized = false;
+            try {
+                initialized = baileysRestService.initializeInstance();
+                log.info("📱 Instância inicializada: {}", initialized);
+            } catch (Exception e) {
+                log.error("❌ Erro ao inicializar instância: {}", e.getMessage(), e);
+                return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "error", "Erro ao inicializar instância: " + (e.getMessage() != null ? e.getMessage() : "Serviço indisponível"),
+                    "instance", instanceName != null ? instanceName : "unknown"
+                ));
+            }
             
             if (!initialized) {
                 log.error("❌ Baileys REST não disponível ou falhou ao inicializar");
-                return ResponseEntity.status(503).body(Map.of(
+                return ResponseEntity.ok(Map.of(
                     "success", false,
-                    "error", "Serviço WhatsApp não disponível. Verifique se o Baileys REST está rodando em http://localhost:3333"
+                    "error", "Serviço WhatsApp não disponível. Verifique se o Baileys REST está rodando em http://localhost:3333",
+                    "instance", instanceName != null ? instanceName : "unknown"
                 ));
             }
             
@@ -107,10 +137,14 @@ public class WhatsAppController {
                 String qrCodeData = null;
                 int maxAttempts = 5;
                 for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                    qrCodeData = baileysRestService.getQRCode();
-                    if (qrCodeData != null && !qrCodeData.isEmpty()) {
-                        log.info("✅ QR Code obtido na tentativa {}/{}", attempt, maxAttempts);
-                        break;
+                    try {
+                        qrCodeData = baileysRestService.getQRCode();
+                        if (qrCodeData != null && !qrCodeData.isEmpty()) {
+                            log.info("✅ QR Code obtido na tentativa {}/{}", attempt, maxAttempts);
+                            break;
+                        }
+                    } catch (Exception e) {
+                        log.warn("⚠️ Erro ao obter QR Code na tentativa {}: {}", attempt, e.getMessage());
                     }
                     log.info("⏳ Aguardando QR Code... Tentativa {}/{}", attempt, maxAttempts);
                     if (attempt < maxAttempts) {
@@ -127,9 +161,10 @@ public class WhatsAppController {
                 
                 if (qrCodeData == null || qrCodeData.isEmpty()) {
                     log.error("❌ QR Code não foi gerado pelo Baileys REST após {} tentativas", maxAttempts);
-                    return ResponseEntity.status(503).body(Map.of(
+                    return ResponseEntity.ok(Map.of(
                         "success", false,
-                        "error", "Não foi possível gerar o QR Code. Aguarde alguns segundos e tente novamente. Se o problema persistir, verifique se o serviço Baileys REST está rodando corretamente."
+                        "error", "Não foi possível gerar o QR Code. Aguarde alguns segundos e tente novamente. Se o problema persistir, verifique se o serviço Baileys REST está rodando corretamente.",
+                        "instance", instanceName != null ? instanceName : "unknown"
                     ));
                 }
                 
@@ -145,15 +180,20 @@ public class WhatsAppController {
                 log.info("✅ QR Code preparado para envio ao frontend");
                 return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "instance", instanceName,
+                    "instance", instanceName != null ? instanceName : "unknown",
                     "qrcode", Map.of("base64", base64QR)
                 ));
             }
             
-            return ResponseEntity.ok(Map.of("success", true, "instance", instanceName));
+            return ResponseEntity.ok(Map.of("success", true, "instance", instanceName != null ? instanceName : "unknown"));
         } catch (Exception e) {
             log.error("❌ Erro ao criar instância: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+            // Retornar 200 OK com erro na resposta para não quebrar o frontend
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "error", e.getMessage() != null ? e.getMessage() : "Erro ao criar conexão WhatsApp. Verifique se o serviço está disponível.",
+                "instance", request != null && request.get("instanceName") != null ? (String) request.get("instanceName") : "unknown"
+            ));
         }
     }
 
