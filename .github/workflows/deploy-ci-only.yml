@@ -296,16 +296,22 @@ jobs:
             if docker ps | grep -q whatsapp-service-ci; then
               echo "✅ Container WhatsApp está rodando"
               echo "📋 Últimas 20 linhas dos logs:"
-              docker logs --tail 20 secured-guard-whatsapp-ci 2>&1
+              docker logs --tail 20 secured-guard-whatsapp-ci 2>&1 || true
               echo ""
               echo "🔌 Testando health endpoint..."
               curl -s -f http://localhost:3333/health && echo "✅ WhatsApp service está respondendo" || echo "⚠️ WhatsApp service não está respondendo"
             else
               echo "❌ Container WhatsApp NÃO está rodando!"
+              echo "🔄 Removendo container antigo se existir..."
+              docker rm -f secured-guard-whatsapp-ci 2>&1 || echo "⚠️ Nenhum container antigo encontrado para remover"
               echo "🔄 Tentando iniciar..."
-              docker-compose -f docker-compose.ci.yml up -d whatsapp-service-ci
+              docker-compose -f docker-compose.ci.yml up -d whatsapp-service-ci || {
+                echo "❌ Erro ao iniciar container. Tentando recriar..."
+                docker-compose -f docker-compose.ci.yml rm -f whatsapp-service-ci 2>&1 || true
+                docker-compose -f docker-compose.ci.yml up -d --force-recreate whatsapp-service-ci || echo "⚠️ Falha ao recriar container WhatsApp"
+              }
               sleep 10
-              docker logs --tail 30 secured-guard-whatsapp-ci 2>&1
+              docker logs --tail 30 secured-guard-whatsapp-ci 2>&1 || echo "⚠️ Não foi possível ler logs do container WhatsApp"
             fi
           EOF
 
