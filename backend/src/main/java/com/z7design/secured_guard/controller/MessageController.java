@@ -79,22 +79,38 @@ public class MessageController {
             Pageable pageable) {
         
         try {
+            // Garantir que pageable não seja null ou unpaged
+            Pageable safePageable = (pageable == null || pageable.isUnpaged()) 
+                ? PageRequest.of(0, 10) 
+                : pageable;
+            
+            if (authentication == null) {
+                log.error("Autenticação é null");
+                return ResponseEntity.ok(new PageImpl<>(List.of(), safePageable, 0));
+            }
+            
             String username = authentication.getName();
+            if (username == null || username.isEmpty()) {
+                log.error("Username é null ou vazio");
+                return ResponseEntity.ok(new PageImpl<>(List.of(), safePageable, 0));
+            }
+            
             UUID userId = getUserIdFromUsername(username);
             
             if (userId == null) {
                 log.error("Usuário não encontrado para username: {}", username);
                 // Retornar página vazia ao invés de erro 400
-                Pageable safePageable = pageable.isUnpaged() ? PageRequest.of(0, 10) : pageable;
                 return ResponseEntity.ok(new PageImpl<>(List.of(), safePageable, 0));
             }
             
-            Page<MessageResponseDTO> messages = messageService.getReceivedMessages(userId, pageable);
+            Page<MessageResponseDTO> messages = messageService.getReceivedMessages(userId, safePageable);
             return ResponseEntity.ok(messages);
         } catch (Exception e) {
             log.error("Erro ao buscar mensagens recebidas: {}", e.getMessage(), e);
             // Retornar página vazia ao invés de erro 500 para não quebrar o frontend
-            Pageable safePageable = pageable.isUnpaged() ? PageRequest.of(0, 10) : pageable;
+            Pageable safePageable = (pageable == null || pageable.isUnpaged()) 
+                ? PageRequest.of(0, 10) 
+                : pageable;
             return ResponseEntity.ok(new PageImpl<>(List.of(), safePageable, 0));
         }
     }
@@ -155,7 +171,17 @@ public class MessageController {
     @GetMapping("/unread/count")
     public ResponseEntity<Long> countUnreadMessages(Authentication authentication) {
         try {
+            if (authentication == null) {
+                log.error("Autenticação é null");
+                return ResponseEntity.ok(0L);
+            }
+            
             String username = authentication.getName();
+            if (username == null || username.isEmpty()) {
+                log.error("Username é null ou vazio");
+                return ResponseEntity.ok(0L);
+            }
+            
             UUID userId = getUserIdFromUsername(username);
             
             if (userId == null) {
@@ -165,7 +191,7 @@ public class MessageController {
             }
             
             Long count = messageService.countUnreadMessages(userId);
-            return ResponseEntity.ok(count);
+            return ResponseEntity.ok(count != null ? count : 0L);
         } catch (Exception e) {
             log.error("Erro ao contar mensagens não lidas: {}", e.getMessage(), e);
             // Retornar 0 ao invés de erro 500 para não quebrar o frontend

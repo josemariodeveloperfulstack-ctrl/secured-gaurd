@@ -1195,18 +1195,31 @@ public class PayslipService {
         PayslipOrganizationResponse response = new PayslipOrganizationResponse();
         response.setGeneratedAt(LocalDateTime.now());
 
-        List<Payslip> effectivePayslips = payslips != null ? payslips : Collections.emptyList();
-        response.setTotalPayslips(effectivePayslips.size());
+        try {
+            List<Payslip> effectivePayslips = payslips != null ? payslips : Collections.emptyList();
+            response.setTotalPayslips(effectivePayslips.size());
 
-        if (effectivePayslips.isEmpty()) {
-            response.setCompanies(Collections.emptyList());
-            response.setTotalCompanies(0);
-            response.setTotalSectors(0);
-            return response;
-        }
+            if (effectivePayslips.isEmpty()) {
+                response.setCompanies(Collections.emptyList());
+                response.setTotalCompanies(0);
+                response.setTotalSectors(0);
+                return response;
+            }
 
-        Map<String, List<Payslip>> companyGroups = effectivePayslips.stream()
-            .collect(Collectors.groupingBy(this::buildCompanyKey, LinkedHashMap::new, Collectors.toList()));
+            // Filtrar payslips null antes de processar
+            List<Payslip> validPayslips = effectivePayslips.stream()
+                .filter(p -> p != null)
+                .collect(Collectors.toList());
+
+            if (validPayslips.isEmpty()) {
+                response.setCompanies(Collections.emptyList());
+                response.setTotalCompanies(0);
+                response.setTotalSectors(0);
+                return response;
+            }
+
+            Map<String, List<Payslip>> companyGroups = validPayslips.stream()
+                .collect(Collectors.groupingBy(this::buildCompanyKey, LinkedHashMap::new, Collectors.toList()));
 
         Set<String> uniqueSectorKeys = new HashSet<>();
         List<PayslipOrganizationResponse.CompanyGroup> companyResponses = new ArrayList<>();
@@ -1297,12 +1310,21 @@ public class PayslipService {
             companyResponses.add(companyGroup);
         }
 
-        companyResponses.sort(this::compareCompanyGroups);
+            companyResponses.sort(this::compareCompanyGroups);
 
-        response.setCompanies(companyResponses);
-        response.setTotalCompanies(companyResponses.size());
-        response.setTotalSectors(uniqueSectorKeys.size());
-        return response;
+            response.setCompanies(companyResponses);
+            response.setTotalCompanies(companyResponses.size());
+            response.setTotalSectors(uniqueSectorKeys.size());
+            return response;
+        } catch (Exception e) {
+            log.error("Erro ao organizar holerites por empresa: {}", e.getMessage(), e);
+            // Retornar resposta vazia em caso de erro
+            response.setCompanies(Collections.emptyList());
+            response.setTotalCompanies(0);
+            response.setTotalSectors(0);
+            response.setTotalPayslips(0);
+            return response;
+        }
     }
 
     private String buildCompanyKey(Payslip payslip) {
