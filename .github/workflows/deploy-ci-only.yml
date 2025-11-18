@@ -316,10 +316,7 @@ jobs:
             if [ $((ATTEMPT % 3)) -eq 0 ]; then
               echo ""
               echo "🔍 Verificando logs do backend (últimas 20 linhas)..."
-              sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-                cd /var/www/secured_guard/ci
-                docker logs --tail 20 secured-guard-backend-ci 2>&1 | tail -20
-              EOF
+              sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && docker logs --tail 20 secured-guard-backend-ci 2>&1 | tail -20"
             fi
             
             echo "⏳ Aguardando 15 segundos antes da próxima tentativa..."
@@ -332,23 +329,13 @@ jobs:
           echo ""
           echo "🔍 Coletando informações de diagnóstico..."
           
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "📋 Status dos containers:"
-            cd /var/www/secured_guard/ci
-            docker-compose -f docker-compose.ci.yml ps
-            
-            echo ""
-            echo "📋 Logs do backend (últimas 50 linhas):"
-            docker logs --tail 50 secured-guard-backend-ci 2>&1 || echo "Container não encontrado"
-            
-            echo ""
-            echo "📋 Logs do nginx (últimas 30 linhas):"
-            docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo "Container nginx não encontrado"
-            
-            echo ""
-            echo "🌐 Testando conectividade interna:"
-            curl -s -o /dev/null -w "Backend (localhost:8081): %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
-          EOF
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && echo '📋 Status dos containers:' && docker-compose -f docker-compose.ci.yml ps"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do backend (últimas 50 linhas):' && docker logs --tail 50 secured-guard-backend-ci 2>&1 || echo 'Container não encontrado'"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do nginx (últimas 30 linhas):' && docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo 'Container nginx não encontrado'"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '🌐 Testando conectividade interna:' && curl -s -o /dev/null -w 'Backend (localhost:8081): %{http_code}\n' http://localhost:8081/api/health || echo 'Backend não responde'"
           
           exit 1
 
