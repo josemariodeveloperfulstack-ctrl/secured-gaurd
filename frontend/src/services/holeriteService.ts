@@ -86,6 +86,24 @@ export interface HoleriteOrganizationResponse {
   companies: HoleriteCompanyGroup[];
 }
 
+export interface CompanyTypeOrganizationResponse {
+  generatedAt?: string;
+  totalPayslips: number;
+  totalCompanies: number;
+  totalSectors: number;
+  terceirizacao: CompanyTypeGroup;
+  vigilanciaAdm: CompanyTypeGroup;
+}
+
+export interface CompanyTypeGroup {
+  typeName: string;
+  typeCode: string;
+  totalCompanies: number;
+  totalPayslips: number;
+  totalSectors: number;
+  companies: HoleriteCompanyGroup[];
+}
+
 export interface ProcessingResult {
   fileName: string;
   startTime: string;
@@ -354,6 +372,17 @@ class HoleriteService {
       return response.data as HoleriteOrganizationResponse;
     } catch (error) {
       console.error('❌ Erro ao carregar organização de holerites:', error);
+      throw error;
+    }
+  }
+
+  async getOrganizationByCompanyType(): Promise<CompanyTypeOrganizationResponse> {
+    try {
+      console.log('📊 Buscando organização de holerites por tipo de empresa...');
+      const response = await api.get('/payslips/organization-by-type');
+      return response.data as CompanyTypeOrganizationResponse;
+    } catch (error) {
+      console.error('❌ Erro ao carregar organização de holerites por tipo:', error);
       throw error;
     }
   }

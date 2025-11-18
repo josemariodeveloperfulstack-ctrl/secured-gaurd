@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import paymentReceiptService, { type PaymentReceipt } from '@/services/paymentReceiptService';
-import holeriteService, { Holerite, HoleriteOrganizationResponse, HoleriteOrganizedEntry, HoleriteCompanyGroup, HoleriteSectorGroup, HoleritePeriodGroup } from '@/services/holeriteService';
+import holeriteService, { Holerite, HoleriteOrganizationResponse, HoleriteOrganizedEntry, HoleriteCompanyGroup, HoleriteSectorGroup, HoleritePeriodGroup, CompanyTypeOrganizationResponse, CompanyTypeGroup } from '@/services/holeriteService';
 import { getApiUrl } from '@/config/environment';
 import { PaymentReceiptViewModal } from '@/components/paymentReceipts/PaymentReceiptViewModal';
 import { 
@@ -342,6 +342,13 @@ const Holerites: React.FC = () => {
   const [loadingOrganization, setLoadingOrganization] = useState(false);
   const [organizationError, setOrganizationError] = useState<string | null>(null);
   const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
+  
+  // Estados para organização por tipo de empresa (TASK 04)
+  const [companyTypeOrganizationData, setCompanyTypeOrganizationData] = useState<CompanyTypeOrganizationResponse | null>(null);
+  const [loadingCompanyTypeOrganization, setLoadingCompanyTypeOrganization] = useState(false);
+  const [companyTypeOrganizationError, setCompanyTypeOrganizationError] = useState<string | null>(null);
+  const [expandedCompanyTypeCompanies, setExpandedCompanyTypeCompanies] = useState<Record<string, boolean>>({});
+  const [activeCompanyTypeTab, setActiveCompanyTypeTab] = useState<'terceirizacao' | 'vigilancia-adm'>('terceirizacao');
   const [expandedSectors, setExpandedSectors] = useState<Record<string, boolean>>({});
   const [expandedPeriods, setExpandedPeriods] = useState<Record<string, boolean>>({});
 
@@ -4136,6 +4143,236 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     });
   };
 
+  // Renderizar organizações por tipo de empresa (TASK 04)
+  const renderCompanyTypeOrganizations = (typeGroup: CompanyTypeGroup | undefined, typePrefix: string) => {
+    if (!typeGroup || !typeGroup.companies || typeGroup.companies.length === 0) {
+      return (
+        <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
+          Nenhuma empresa encontrada para este tipo. Importe holerites para visualizar as empresas.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Estatísticas do tipo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-blue-500/20 via-blue-500/5 to-transparent border-blue-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-blue-200/80">Empresas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{typeGroup.totalCompanies}</div>
+              <p className="text-xs text-gray-400 mt-1">Empresas deste tipo</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-500/20 via-purple-500/5 to-transparent border-purple-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-purple-200/80">Setores</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{typeGroup.totalSectors}</div>
+              <p className="text-xs text-gray-400 mt-1">Setores únicos</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-500/20 via-green-500/5 to-transparent border-green-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-green-200/80">Holerites</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{typeGroup.totalPayslips}</div>
+              <p className="text-xs text-gray-400 mt-1">Total de holerites</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Lista de empresas */}
+        {typeGroup.companies.map(company => {
+          const companyKey = `${typePrefix}-${getCompanyKey(company)}`;
+          const companyExpanded = !!expandedCompanyTypeCompanies[companyKey];
+
+          return (
+            <div
+              key={companyKey}
+              className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
+            >
+              <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 sm:py-6">
+                <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                        {company.companySigla}
+                      </Badge>
+                      <p className="text-lg font-semibold text-white leading-tight">
+                        {company.companyName}
+                      </p>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
+                      <Building2 className="h-4 w-4 text-seguranca-yellow" />
+                      CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} holerite(s) · {company.totalSectors} setor(es)
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setExpandedCompanyTypeCompanies(prev => ({
+                          ...prev,
+                          [companyKey]: !prev[companyKey]
+                        }));
+                      }}
+                      className="w-full sm:w-auto text-seguranca-lightgray hover:text-white"
+                    >
+                      {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                      {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
+                    </Button>
+                  </div>
+                </div>
+                {companyExpanded && (
+                  <div className="space-y-4">
+                    {company.sectors && company.sectors.length > 0 ? (
+                      company.sectors.map(sector => {
+                        const sectorKey = `${companyKey}-${getSectorKey(companyKey, sector)}`;
+                        const sectorExpanded = !!expandedSectors[sectorKey];
+
+                        return (
+                          <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                              <div>
+                                <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
+                                <p className="text-xs text-gray-400">
+                                  {sector.totalPayslips} holerite(s) · {sector.periods?.length ?? 0} período(s)
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleSectorExpansion(sectorKey)}
+                                className="text-seguranca-lightgray hover:text-white"
+                              >
+                                {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                              </Button>
+                            </div>
+                            {sectorExpanded && (
+                              <div className="space-y-3 px-4 py-4 bg-gray-900/70">
+                                {sector.periods && sector.periods.length > 0 ? (
+                                  sector.periods.map(period => {
+                                    const periodKey = `${sectorKey}-${getPeriodKey(sectorKey, period)}`;
+                                    const periodExpanded = !!expandedPeriods[periodKey];
+
+                                    return (
+                                      <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                                          <div>
+                                            <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
+                                            <p className="text-xs text-gray-400">{period.totalPayslips} holerite(s)</p>
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => togglePeriodExpansion(periodKey)}
+                                            className="text-seguranca-lightgray hover:text-white"
+                                          >
+                                            {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                            {periodExpanded ? 'Ocultar holerites' : 'Ver holerites'}
+                                          </Button>
+                                        </div>
+                                        {periodExpanded && (
+                                          <div className="divide-y divide-gray-800 bg-gray-950/60">
+                                            {period.payslips.map(entry => {
+                                              const holeriteData = resolveHoleriteFromEntry(entry);
+
+                                              return (
+                                                <div
+                                                  key={entry.id}
+                                                  className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
+                                                >
+                                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                    <Checkbox
+                                                      checked={selectedHolerites.includes(entry.id)}
+                                                      onCheckedChange={(checked) => handleSelectHolerite(entry.id, checked)}
+                                                      className="border-blue-400 mt-1"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                      <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
+                                                      <p className="text-xs text-gray-400">
+                                                        CPF: {formatCpf(entry.cpf)} · Arquivo: {entry.fileName}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex flex-wrap gap-2">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                      onClick={() => handleViewHolerite(holeriteData)}
+                                                    >
+                                                      <Eye className="h-4 w-4 mr-1" />
+                                                      Visualizar
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                      onClick={() => handleEmailHolerite(holeriteData)}
+                                                    >
+                                                      <Mail className="h-4 w-4 mr-1" />
+                                                      E-mail
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                      onClick={() => handleSendWhatsAppIndividual(holeriteData)}
+                                                    >
+                                                      <MessageSquare className="h-4 w-4 mr-1" />
+                                                      WhatsApp
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="destructive"
+                                                      className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                      onClick={() => handleDeleteHolerite(holeriteData)}
+                                                    >
+                                                      <Trash2 className="h-4 w-4 mr-1" />
+                                                      Excluir
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                    Nenhum período encontrado para este setor.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                        Nenhum setor encontrado para esta empresa.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (!user) {
     return (
       <StandardLayout>
@@ -4221,7 +4458,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
         {/* Tabs - COPIADO DO PADRÃO SST (que funciona bem!) */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-seguranca-graphite border-gray-600">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-seguranca-graphite border-gray-600">
             <TabsTrigger value="processados" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Holerites
             </TabsTrigger>
@@ -4236,6 +4473,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             </TabsTrigger>
             <TabsTrigger value="unificados-por-setor" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Por Setor
+            </TabsTrigger>
+            <TabsTrigger value="empresas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Empresas
             </TabsTrigger>
           </TabsList>
             
@@ -5653,6 +5893,54 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           {/* Nova Aba: Unificados por Setor */}
           <TabsContent value="unificados-por-setor" className="space-y-6 mt-6">
             <UnificadosPorSetor />
+          </TabsContent>
+
+          {/* Nova Aba: Empresas (TASK 04) */}
+          <TabsContent value="empresas" className="space-y-6 mt-6">
+            {loadingCompanyTypeOrganization ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-seguranca-red" />
+                <span className="ml-3 text-gray-300">Carregando organização por tipo de empresa...</span>
+              </div>
+            ) : companyTypeOrganizationError ? (
+              <div className="rounded-2xl border border-red-600/60 bg-red-900/20 p-6 text-center">
+                <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+                <p className="text-red-300 font-semibold">Erro ao carregar organização</p>
+                <p className="text-red-200 text-sm mt-1">{companyTypeOrganizationError}</p>
+                <Button
+                  variant="outline"
+                  className="mt-4 border-red-600 text-red-300 hover:bg-red-900/40"
+                  onClick={() => fetchCompanyTypeOrganizationData(true)}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Sub-abas: Terceirização e Vigilância e ADM */}
+                <Tabs value={activeCompanyTypeTab} onValueChange={(value) => setActiveCompanyTypeTab(value as 'terceirizacao' | 'vigilancia-adm')} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border-gray-600">
+                    <TabsTrigger value="terceirizacao" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                      Terceirização
+                    </TabsTrigger>
+                    <TabsTrigger value="vigilancia-adm" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                      Vigilância e ADM
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Conteúdo: Terceirização */}
+                  <TabsContent value="terceirizacao" className="space-y-6 mt-6">
+                    {renderCompanyTypeOrganizations(companyTypeOrganizationData?.terceirizacao, 'terceirizacao')}
+                  </TabsContent>
+
+                  {/* Conteúdo: Vigilância e ADM */}
+                  <TabsContent value="vigilancia-adm" className="space-y-6 mt-6">
+                    {renderCompanyTypeOrganizations(companyTypeOrganizationData?.vigilanciaAdm, 'vigilancia-adm')}
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
           </TabsContent>
 
         </Tabs>

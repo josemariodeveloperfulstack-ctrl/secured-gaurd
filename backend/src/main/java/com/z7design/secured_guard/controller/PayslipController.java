@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.CompanyTypeOrganizationResponse;
 import com.z7design.secured_guard.dto.EnvioRequest;
 import com.z7design.secured_guard.dto.PayslipOrganizationResponse;
 import com.z7design.secured_guard.dto.PayslipProcessedFileResponse;
@@ -264,6 +265,157 @@ public class PayslipController {
             emptyResponse.setTotalSectors(0);
             emptyResponse.setTotalPayslips(0);
             emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+            return ResponseEntity.ok(emptyResponse);
+        }
+    }
+
+    @GetMapping("/organization-by-type")
+    @Operation(summary = "Organizar holerites por tipo de empresa", description = "Organiza holerites por tipo (Terceirização vs Vigilância e ADM), depois por empresa, setor e período")
+    public ResponseEntity<CompanyTypeOrganizationResponse> getPayslipOrganizationByType() {
+        try {
+            log.info("📊 Iniciando organização de holerites por tipo de empresa...");
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth == null) {
+                log.error("Autenticação é null ao organizar holerites por tipo");
+                CompanyTypeOrganizationResponse emptyResponse = new CompanyTypeOrganizationResponse();
+                emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+                emptyResponse.setTotalPayslips(0);
+                emptyResponse.setTotalCompanies(0);
+                emptyResponse.setTotalSectors(0);
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyTerceirizacao = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyTerceirizacao.setTypeName("Terceirização");
+                emptyTerceirizacao.setTypeCode("TERCEIRIZACAO");
+                emptyTerceirizacao.setTotalCompanies(0);
+                emptyTerceirizacao.setTotalPayslips(0);
+                emptyTerceirizacao.setTotalSectors(0);
+                emptyTerceirizacao.setCompanies(Collections.emptyList());
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
+                emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
+                emptyVigilanciaAdm.setTotalCompanies(0);
+                emptyVigilanciaAdm.setTotalPayslips(0);
+                emptyVigilanciaAdm.setTotalSectors(0);
+                emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+                
+                emptyResponse.setTerceirizacao(emptyTerceirizacao);
+                emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+                return ResponseEntity.ok(emptyResponse);
+            }
+            
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+
+            List<Payslip> payslips;
+            try {
+                if (isColaborador) {
+                    if (resolvedCpf.isEmpty()) {
+                        log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização por tipo", auth.getName());
+                        payslips = Collections.emptyList();
+                    } else {
+                        log.info("👤 Usuário colaborador, organizando holerites por CPF: {}", resolvedCpf.get());
+                        payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+                    }
+                } else {
+                    log.info("👑 Usuário admin, organizando todos os holerites por tipo");
+                    payslips = payslipService.getAllPayslips();
+                }
+            } catch (org.springframework.dao.DataAccessException e) {
+                log.error("Erro de acesso ao banco de dados ao buscar holerites por tipo: {}", e.getMessage(), e);
+                payslips = Collections.emptyList();
+            } catch (Exception e) {
+                log.error("Erro ao buscar holerites por tipo: {}", e.getMessage(), e);
+                payslips = Collections.emptyList();
+            }
+
+            try {
+                CompanyTypeOrganizationResponse response = payslipService.organizePayslipsByCompanyType(payslips);
+                log.info("✅ Organização por tipo concluída: {} holerites, {} empresas, {} setores",
+                    response.getTotalPayslips(), response.getTotalCompanies(), response.getTotalSectors());
+                return ResponseEntity.ok(response);
+            } catch (org.springframework.dao.DataAccessException e) {
+                log.error("Erro de acesso ao banco de dados ao organizar holerites por tipo: {}", e.getMessage(), e);
+                CompanyTypeOrganizationResponse emptyResponse = new CompanyTypeOrganizationResponse();
+                emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+                emptyResponse.setTotalPayslips(0);
+                emptyResponse.setTotalCompanies(0);
+                emptyResponse.setTotalSectors(0);
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyTerceirizacao = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyTerceirizacao.setTypeName("Terceirização");
+                emptyTerceirizacao.setTypeCode("TERCEIRIZACAO");
+                emptyTerceirizacao.setTotalCompanies(0);
+                emptyTerceirizacao.setTotalPayslips(0);
+                emptyTerceirizacao.setTotalSectors(0);
+                emptyTerceirizacao.setCompanies(Collections.emptyList());
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
+                emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
+                emptyVigilanciaAdm.setTotalCompanies(0);
+                emptyVigilanciaAdm.setTotalPayslips(0);
+                emptyVigilanciaAdm.setTotalSectors(0);
+                emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+                
+                emptyResponse.setTerceirizacao(emptyTerceirizacao);
+                emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+                return ResponseEntity.ok(emptyResponse);
+            } catch (Exception e) {
+                log.error("Erro ao organizar holerites por tipo: {}", e.getMessage(), e);
+                CompanyTypeOrganizationResponse emptyResponse = new CompanyTypeOrganizationResponse();
+                emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+                emptyResponse.setTotalPayslips(0);
+                emptyResponse.setTotalCompanies(0);
+                emptyResponse.setTotalSectors(0);
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyTerceirizacao = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyTerceirizacao.setTypeName("Terceirização");
+                emptyTerceirizacao.setTypeCode("TERCEIRIZACAO");
+                emptyTerceirizacao.setTotalCompanies(0);
+                emptyTerceirizacao.setTotalPayslips(0);
+                emptyTerceirizacao.setTotalSectors(0);
+                emptyTerceirizacao.setCompanies(Collections.emptyList());
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
+                emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
+                emptyVigilanciaAdm.setTotalCompanies(0);
+                emptyVigilanciaAdm.setTotalPayslips(0);
+                emptyVigilanciaAdm.setTotalSectors(0);
+                emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+                
+                emptyResponse.setTerceirizacao(emptyTerceirizacao);
+                emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+                return ResponseEntity.ok(emptyResponse);
+            }
+        } catch (Exception e) {
+            log.error("Erro geral ao organizar holerites por tipo: {}", e.getMessage(), e);
+            CompanyTypeOrganizationResponse emptyResponse = new CompanyTypeOrganizationResponse();
+            emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+            emptyResponse.setTotalPayslips(0);
+            emptyResponse.setTotalCompanies(0);
+            emptyResponse.setTotalSectors(0);
+            
+            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyTerceirizacao = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            emptyTerceirizacao.setTypeName("Terceirização");
+            emptyTerceirizacao.setTypeCode("TERCEIRIZACAO");
+            emptyTerceirizacao.setTotalCompanies(0);
+            emptyTerceirizacao.setTotalPayslips(0);
+            emptyTerceirizacao.setTotalSectors(0);
+            emptyTerceirizacao.setCompanies(Collections.emptyList());
+            
+            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
+            emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
+            emptyVigilanciaAdm.setTotalCompanies(0);
+            emptyVigilanciaAdm.setTotalPayslips(0);
+            emptyVigilanciaAdm.setTotalSectors(0);
+            emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+            
+            emptyResponse.setTerceirizacao(emptyTerceirizacao);
+            emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
             return ResponseEntity.ok(emptyResponse);
         }
     }
