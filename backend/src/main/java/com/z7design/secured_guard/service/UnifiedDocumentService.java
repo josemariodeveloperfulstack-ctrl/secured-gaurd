@@ -3,7 +3,13 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.model.PaymentReceiptStatus;
 import com.z7design.secured_guard.model.Payslip;
+import com.z7design.secured_guard.dto.PayslipOrganizationResponse;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
+import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.UnifiedDocumentRepository;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.Employee;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -23,6 +29,13 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
+import java.text.Normalizer;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +46,9 @@ public class UnifiedDocumentService {
     private final ReceiptProcessingService receiptProcessingService;
     private final PayslipService payslipService;
     private final PaymentReceiptRepository receiptRepository;
+    private final UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
+    private final UnifiedDocumentRepository unifiedDocumentRepository;
     private static final String UNIFIED_DIR = "uploads/unified/";
 
     /**
@@ -374,7 +390,7 @@ public class UnifiedDocumentService {
         String holeritePath = findHoleriteOriginalFileByNameAndPeriod(cleanEmployeeName, month, year);
         if (holeritePath == null || !Files.exists(Paths.get(holeritePath))) {
             log.error("❌ Holerite não encontrado para {} {}/{}", cleanEmployeeName, month, year);
-            throw new IOException("Holerite original não encontrado para o período informado");
+            throw new IOException(String.format("Holerite original não encontrado para o funcionário '%s' no período %d/%d. Verifique se o holerite foi importado corretamente.", employeeName, month, year));
         }
         log.info("📄 Holerite encontrado: {}", holeritePath);
 
@@ -389,7 +405,7 @@ public class UnifiedDocumentService {
         if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
             log.error("❌ Comprovante não encontrado para {} {}/{} (holerite {}/{})", 
                 cleanEmployeeName, receiptMonth, receiptYear, month, year);
-            throw new IOException("Comprovante original não encontrado para o período informado");
+            throw new IOException(String.format("Comprovante original não encontrado para o funcionário '%s' no período %d/%d (mês seguinte ao holerite %d/%d). Verifique se o comprovante foi importado corretamente.", employeeName, receiptMonth, receiptYear, month, year));
         }
         log.info("📄 Comprovante encontrado: {}", receiptPath);
 
@@ -753,11 +769,67 @@ public class UnifiedDocumentService {
      */
     public List<Map<String, Object>> listUnifiedDocumentsByCpf(String cpf) throws IOException {
         log.info("🔍 Buscando documentos unificados para CPF: {}", cpf);
-        
-        // Por enquanto, retornar lista vazia pois não temos a relação CPF -> UnifiedDocument
-        // TODO: Implementar busca real quando tivermos a estrutura correta
-        log.warn("⚠️ Método listUnifiedDocumentsByCpf ainda não implementado completamente. Retornando lista vazia.");
-        return new ArrayList<>();
+
+        String sanitizedCpf = sanitizeCpf(cpf);
+        if (sanitizedCpf.isEmpty()) {
+            log.warn("⚠️ CPF informado vazio ou inválido. Retornando lista vazia.");
+            return Collections.emptyList();
+        }
+
+        Optional<User> userOptional = userRepository.findByUsername(sanitizedCpf);
+        Optional<Employee> employeeOptional = employeeRepository.findByDocument(sanitizedCpf);
+
+        Set<String> normalizedNames = new HashSet<>();
+        userOptional.map(User::getName).map(this::normalizeName).ifPresent(normalizedNames::add);
+        employeeOptional.map(Employee::getName).map(this::normalizeName).ifPresent(normalizedNames::add);
+
+        List<Map<String, Object>> allDocuments = listAllUnifiedDocuments();
+        List<Map<String, Object>> filteredDocuments = allDocuments.stream()
+                .filter(doc -> matchesDocumentForUser(doc, sanitizedCpf, normalizedNames))
+                .collect(Collectors.toList());
+
+        log.info("✅ Encontrados {} documentos unificados para CPF: {}", filteredDocuments.size(), cpf);
+        return filteredDocuments;
+    }
+
+    private boolean matchesDocumentForUser(Map<String, Object> doc, String sanitizedCpf, Set<String> normalizedNames) {
+        if (doc == null) {
+            return false;
+        }
+
+        String fileName = String.valueOf(doc.getOrDefault("fileName", ""));
+        String documentCpf = sanitizeCpf(String.valueOf(doc.getOrDefault("cpf", "")));
+
+        if (!sanitizedCpf.isEmpty() && (fileName.contains(sanitizedCpf) || documentCpf.contains(sanitizedCpf))) {
+            return true;
+        }
+
+        String employeeName = String.valueOf(doc.getOrDefault("employeeName", ""));
+        String normalizedEmployeeName = normalizeName(employeeName);
+
+        return normalizedNames.stream()
+                .filter(name -> !name.isEmpty())
+                .anyMatch(name ->
+                        normalizedEmployeeName.equals(name) ||
+                                normalizedEmployeeName.contains(name) ||
+                                name.contains(normalizedEmployeeName));
+    }
+
+    private String sanitizeCpf(String cpf) {
+        if (cpf == null) {
+            return "";
+        }
+        return cpf.replaceAll("\\D", "");
+    }
+
+    private String normalizeName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return withoutAccents.replaceAll("[^a-zA-Z0-9]", "")
+                .toLowerCase();
     }
 
     /**
@@ -1491,11 +1563,17 @@ public class UnifiedDocumentService {
                     List<PaymentReceipt> matchingReceipts = allReceipts.stream()
                         .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptMonth))
                         .filter(r -> r.getYear() != null && r.getYear().equals(receiptYear))
-                        .toList();
+                        .collect(Collectors.toList());
+
+                    List<PaymentReceipt> uniqueReceipts = deduplicateReceiptsByDateCompanyAndEmployee(matchingReceipts);
+                    if (matchingReceipts.size() != uniqueReceipts.size()) {
+                        log.info("♻️ Removidos {} comprovante(s) duplicado(s) para {} {}/{} com base em data/nome/empresa",
+                            matchingReceipts.size() - uniqueReceipts.size(), employeeName, receiptMonth, receiptYear);
+                    }
                     
-                    detail.setReceiptFound(matchingReceipts.isEmpty() ? "❌ Não" : "✅ Sim (" + matchingReceipts.size() + ")");
+                    detail.setReceiptFound(uniqueReceipts.isEmpty() ? "❌ Não" : "✅ Sim (" + uniqueReceipts.size() + ")");
                     
-                    if (matchingReceipts.isEmpty()) {
+                    if (uniqueReceipts.isEmpty()) {
                         detail.setStatus("FALHA");
                         detail.setMessage("Nenhum comprovante encontrado para o período");
                         result.getFailureList().add(detail);
@@ -1505,7 +1583,7 @@ public class UnifiedDocumentService {
                     }
                     
                     // 4.3. Verificar se os nomes coincidem (VALIDAÇÃO CRÍTICA)
-                    boolean allNamesMatch = matchingReceipts.stream()
+                    boolean allNamesMatch = uniqueReceipts.stream()
                         .allMatch(receipt -> isExactNameMatch(employeeName, receipt.getEmployeeName()));
                     
                     detail.setNamesMatch(allNamesMatch);
@@ -1513,7 +1591,7 @@ public class UnifiedDocumentService {
                     if (!allNamesMatch && (request.getForceUnification() == null || !request.getForceUnification())) {
                         detail.setStatus("FALHA");
                         detail.setMessage("Nomes não coincidem - Holerite: '" + employeeName + "' vs Comprovante(s): " + 
-                            matchingReceipts.stream()
+                            uniqueReceipts.stream()
                                 .map(PaymentReceipt::getEmployeeName)
                                 .distinct()
                                 .collect(Collectors.joining(", ", "'", "'")));
@@ -1526,7 +1604,7 @@ public class UnifiedDocumentService {
                     // 4.4. Buscar arquivos PDF dos comprovantes (usando o mês do pagamento)
                     List<String> receiptPaths = new ArrayList<>();
                     
-                    for (PaymentReceipt receipt : matchingReceipts) {
+                    for (PaymentReceipt receipt : uniqueReceipts) {
                         String receiptPath = findReceiptOriginalFileByNameAndPeriod(
                             receipt.getEmployeeName(), 
                             receiptMonth,  // Usar o mês do pagamento (mês seguinte)
@@ -1594,6 +1672,83 @@ public class UnifiedDocumentService {
         return result;
     }
     
+    /**
+     * Remove comprovantes duplicados considerando data, funcionário e empresa
+     */
+    private List<PaymentReceipt> deduplicateReceiptsByDateCompanyAndEmployee(List<PaymentReceipt> receipts) {
+        if (receipts == null || receipts.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, PaymentReceipt> uniqueReceipts = new LinkedHashMap<>();
+
+        for (PaymentReceipt receipt : receipts) {
+            if (receipt == null) {
+                continue;
+            }
+
+            String normalizedCompany = normalizeKeyText(receipt.getDebitedName());
+            String employeeNameForKey = emptyToNull(receipt.getCreditedName());
+            if (employeeNameForKey == null) {
+                employeeNameForKey = emptyToNull(receipt.getEmployeeName());
+            }
+            String normalizedEmployee = normalizeKeyText(employeeNameForKey);
+            String normalizedDate = normalizeTransferDateKey(receipt);
+
+            boolean canDeduplicate = !normalizedCompany.isEmpty() && !normalizedEmployee.isEmpty() && !normalizedDate.isEmpty();
+            String dedupKey;
+
+            if (canDeduplicate) {
+                dedupKey = normalizedDate + "|" + normalizedCompany + "|" + normalizedEmployee;
+            } else {
+                dedupKey = "FALLBACK-" + uniqueReceipts.size() + "-" +
+                    Objects.toString(receipt.getId(), receipt.getFileName());
+            }
+
+            if (uniqueReceipts.containsKey(dedupKey)) {
+                log.info("🔁 Ignorando comprovante duplicado (chave {}): {}", dedupKey, receipt.getFileName());
+                continue;
+            }
+
+            uniqueReceipts.put(dedupKey, receipt);
+        }
+
+        return new ArrayList<>(uniqueReceipts.values());
+    }
+
+    private String normalizeKeyText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(trimmed, Normalizer.Form.NFD)
+            .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+            .replaceAll("\\s+", " ")
+            .toUpperCase();
+        return normalized.trim();
+    }
+
+    private String normalizeTransferDateKey(PaymentReceipt receipt) {
+        if (receipt.getTransferDate() != null && !receipt.getTransferDate().isBlank()) {
+            return receipt.getTransferDate().replaceAll("[^0-9]", "");
+        }
+        if (receipt.getPaymentDate() != null) {
+            return receipt.getPaymentDate().toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE);
+        }
+        return "";
+    }
+
+    private String emptyToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     /**
      * Cria PDF unificado usando PDFMergerUtility para preservar layout original
      */
@@ -1708,5 +1863,96 @@ public class UnifiedDocumentService {
         }
         
         return result;
+    }
+
+    /**
+     * Organiza documentos unificados por Empresa/Setor/Ano/Mês
+     * Similar à organização de holerites
+     */
+    public PayslipOrganizationResponse organizeUnifiedDocumentsByCompany() {
+        PayslipOrganizationResponse response = new PayslipOrganizationResponse();
+        response.setGeneratedAt(LocalDateTime.now());
+
+        try {
+            // Buscar todos os documentos unificados
+            List<Map<String, Object>> unifiedDocs;
+            try {
+                unifiedDocs = listAllUnifiedDocuments();
+            } catch (IOException e) {
+                log.error("❌ Erro ao listar documentos unificados: {}", e.getMessage(), e);
+                response.setTotalPayslips(0);
+                response.setCompanies(Collections.emptyList());
+                response.setTotalCompanies(0);
+                response.setTotalSectors(0);
+                return response;
+            }
+            
+            if (unifiedDocs.isEmpty()) {
+                response.setTotalPayslips(0);
+                response.setCompanies(Collections.emptyList());
+                response.setTotalCompanies(0);
+                response.setTotalSectors(0);
+                return response;
+            }
+
+            // Buscar todos os payslips para obter informações de empresa/setor
+            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            
+            // Criar um mapa de payslips por chave (nome, mês, ano)
+            Map<String, Payslip> payslipMap = new HashMap<>();
+            for (Payslip payslip : allPayslips) {
+                String key = String.format("%s|%d|%d", 
+                    normalizeName(payslip.getEmployeeName()), 
+                    payslip.getMonth(), 
+                    payslip.getYear());
+                payslipMap.put(key, payslip);
+            }
+
+            // Converter documentos unificados em "payslips" para usar a mesma lógica de organização
+            List<Payslip> payslipsForOrganization = new ArrayList<>();
+            
+            for (Map<String, Object> doc : unifiedDocs) {
+                String employeeName = (String) doc.get("employeeName");
+                Integer month = (Integer) doc.get("month");
+                Integer year = (Integer) doc.get("year");
+                
+                if (employeeName == null || month == null || year == null) {
+                    continue;
+                }
+                
+                // Buscar payslip correspondente
+                String key = String.format("%s|%d|%d", normalizeName(employeeName), month, year);
+                Payslip payslip = payslipMap.get(key);
+                
+                if (payslip != null) {
+                    payslipsForOrganization.add(payslip);
+                } else {
+                    // Se não encontrar payslip, criar um temporário com dados do documento
+                    Payslip tempPayslip = Payslip.builder()
+                        .employeeName(employeeName)
+                        .cpf((String) doc.getOrDefault("cpf", ""))
+                        .month(month)
+                        .year(year)
+                        .fileName((String) doc.getOrDefault("fileName", ""))
+                        .companyName((String) doc.getOrDefault("companyName", ""))
+                        .companyCnpj((String) doc.getOrDefault("companyCnpj", ""))
+                        .companySigla((String) doc.getOrDefault("companySigla", ""))
+                        .workPostName((String) doc.getOrDefault("sector", ""))
+                        .build();
+                    payslipsForOrganization.add(tempPayslip);
+                }
+            }
+
+            // Usar o método de organização de payslips
+            return payslipService.organizePayslipsByCompany(payslipsForOrganization);
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao organizar documentos unificados: {}", e.getMessage(), e);
+            response.setTotalPayslips(0);
+            response.setCompanies(Collections.emptyList());
+            response.setTotalCompanies(0);
+            response.setTotalSectors(0);
+            return response;
+        }
     }
 } 

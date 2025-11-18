@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.EnvioRequest;
+import com.z7design.secured_guard.dto.PayslipOrganizationResponse;
+import com.z7design.secured_guard.dto.PayslipProcessedFileResponse;
 import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.service.PayslipProcessingService;
 import com.z7design.secured_guard.service.PayslipService;
@@ -179,6 +181,58 @@ public class PayslipController {
                 payslips.get(0).getCpf(), payslips.get(0).getMonth(), payslips.get(0).getYear());
         }
         return ResponseEntity.ok(payslips);
+    }
+
+    @GetMapping("/organization")
+    public ResponseEntity<PayslipOrganizationResponse> getPayslipOrganization() {
+        log.info("📊 Iniciando organização de holerites por empresa/setor/período...");
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+        Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+
+        List<Payslip> payslips;
+        if (isColaborador) {
+            if (resolvedCpf.isEmpty()) {
+                log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização de holerites", auth.getName());
+                payslips = Collections.emptyList();
+            } else {
+                log.info("👤 Usuário colaborador, organizando holerites por CPF: {}", resolvedCpf.get());
+                payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+            }
+        } else {
+            log.info("👑 Usuário admin, organizando todos os holerites por empresa");
+            payslips = payslipService.getAllPayslips();
+        }
+
+        PayslipOrganizationResponse response = payslipService.organizePayslipsByCompany(payslips);
+        log.info("✅ Organização concluída: {} empresas, {} setores, {} holerites",
+            response.getTotalCompanies(), response.getTotalSectors(), response.getTotalPayslips());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/processed-files")
+    public ResponseEntity<Map<String, Object>> getProcessedPayslipFiles() {
+        log.info("📂 Solicitando lista de holerites processados");
+        try {
+            List<PayslipProcessedFileResponse> files = payslipService.getProcessedPayslipFiles();
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("total", files.size());
+            body.put("files", files);
+
+            log.info("📂 Retornando {} holerites processados", files.size());
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("❌ Erro ao listar holerites processados: {}", e.getMessage(), e);
+
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", "Erro ao listar holerites processados");
+            error.put("details", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
     }
 
     @GetMapping("/download/{fileName}")

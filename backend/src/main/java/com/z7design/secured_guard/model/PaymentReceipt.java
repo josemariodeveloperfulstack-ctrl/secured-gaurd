@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,6 +28,20 @@ public class PaymentReceipt {
     
     @Column(name = "employee_name", length = 255)
     private String employeeName;
+
+    @Column(name = "company_name", length = 255)
+    private String companyName;
+
+    @Column(name = "company_cnpj", length = 20)
+    private String companyCnpj;
+
+    @Column(name = "company_sigla", length = 10)
+    private String companySigla;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
     
     @Column(name = "month", nullable = false)
     private Integer month;
@@ -153,6 +169,38 @@ public class PaymentReceipt {
     
     public void setEmployeeName(String employeeName) {
         this.employeeName = employeeName;
+    }
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
+
+    public String getCompanyCnpj() {
+        return companyCnpj;
+    }
+
+    public void setCompanyCnpj(String companyCnpj) {
+        this.companyCnpj = companyCnpj;
+    }
+
+    public String getCompanySigla() {
+        return companySigla;
+    }
+
+    public void setCompanySigla(String companySigla) {
+        this.companySigla = companySigla;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
     
     public Integer getMonth() {
@@ -387,6 +435,11 @@ public class PaymentReceipt {
     public void setStatementIdentification(String statementIdentification) {
         this.statementIdentification = statementIdentification;
     }
+
+    @JsonProperty("companyId")
+    public UUID getCompanyId() {
+        return company != null ? company.getId() : null;
+    }
     
     // Métodos de callback
     @PrePersist
@@ -410,6 +463,9 @@ public class PaymentReceipt {
                 "id=" + id +
                 ", employeeId=" + employeeId +
                 ", employeeName='" + employeeName + '\'' +
+                ", companyName='" + companyName + '\'' +
+                ", companySigla='" + companySigla + '\'' +
+                ", companyCnpj='" + companyCnpj + '\'' +
                 ", month=" + month +
                 ", year=" + year +
                 ", receiptNumber='" + receiptNumber + '\'' +

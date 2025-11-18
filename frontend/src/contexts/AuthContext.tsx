@@ -53,10 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userData = JSON.parse(savedUser);
           console.log('🔍 Usuário carregado:', userData.name, userData.role);
           
-          // TEMPORARIAMENTE: Não carregar grupos para evitar loop
-          console.log('🔍 Pulando carregamento de grupos para evitar loop');
-          
-          // Gerar permissões apenas do role
+          // Gerar permissões a partir do role principal
           const rolePermissions = generatePermissions(userData.role);
           const userWithPermissions = { ...userData, permissions: rolePermissions };
           
@@ -70,8 +67,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           setUser(userWithPermissions);
           console.log('🔍 Usuário definido no estado');
+          localStorage.setItem('user', JSON.stringify(userWithPermissions));
           
           setRefreshToken(token);
+
+          const roleKey = (userWithPermissions.role ?? '').toUpperCase();
+          if (!['COLABORADOR', 'ROLE_COLABORADOR'].includes(roleKey) && userWithPermissions.id) {
+            void loadUserGroups(userWithPermissions.id);
+          }
         } else {
           console.log('🔍 Nenhum token ou usuário encontrado');
         }
@@ -104,11 +107,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userWithPermissions);
         localStorage.setItem('user', JSON.stringify(userWithPermissions));
       }
-    } catch (error: any) {
-      console.error('Erro ao carregar grupos do usuário:', error);
-      
-      // Se for erro de permissão, não mostrar toast (usuário pode não ter grupos)
-      if (error.response?.status !== 403 && error.response?.status !== 401) {
+    } catch (error: unknown) {
+      const status = error?.response?.status;
+      if (status === 403) {
+        console.info('[AuthContext] Grupo não carregado (403) - usuário sem permissão para /groups, continuando sem grupos.');
+      } else if (status === 401) {
+        console.info('[AuthContext] Grupo não carregado (401) - sessão inválida, sem impacto crítico.');
+      } else {
+        console.error('Erro ao carregar grupos do usuário:', error);
         console.warn('Não foi possível carregar grupos do usuário. Continuando sem grupos.');
       }
     }
@@ -166,6 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: response.data.user?.id || 'fe812a92-90ee-4a2a-b846-4476a35ea9b9',
         name: response.data.user?.fullName || response.data.user?.name || 'Usuário Teste',
         email: response.data.user?.email || email,
+        username: response.data.user?.username || email, // CPF usado no login
         role: userRole,
         roles: userRoles, // Adicionar a propriedade roles
         groups: userGroups,
@@ -188,6 +195,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setUser(userData);
       setRefreshToken(response.data.token);
+
+      const roleKey = (userData.role ?? '').toUpperCase();
+      if (!['COLABORADOR', 'ROLE_COLABORADOR'].includes(roleKey) && userData.id) {
+        await loadUserGroups(userData.id);
+      }
 
       // Navegar apenas após login bem-sucedido
       navigate('/dashboard');
@@ -221,7 +233,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshUser = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) return null;
 
       // Buscar dados atualizados do usuário
       const response = await api.get('/api/users/profile');
@@ -235,9 +247,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(updatedUser);
         setProfile(response.data);
         localStorage.setItem('user', JSON.stringify(updatedUser));
+        return updatedUser;
       }
     } catch (error) {
       console.error('Erro ao atualizar dados do usuário:', error);
+      return null;
     }
   };
 

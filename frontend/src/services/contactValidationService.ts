@@ -18,6 +18,9 @@ export interface ContactValidationDetail {
   userId?: string;
   userEmail?: string;
   userWhatsapp?: string;
+  hasWhatsAppConsent?: boolean;
+  needsWhatsAppConsent?: boolean;
+  whatsappConsentDate?: string;
   canSendEmail: boolean;
   canSendWhatsApp: boolean;
   needsUserCreation: boolean;
@@ -52,6 +55,18 @@ export interface UpdateWhatsAppRequest {
 }
 
 export const contactValidationService = {
+  /**
+   * Registra consentimento WhatsApp para um usuário
+   */
+  async grantWhatsAppConsent(userId: string, whatsappNumber?: string): Promise<any> {
+    const payload: any = { userId };
+    if (whatsappNumber) {
+      payload.whatsappNumber = whatsappNumber.replace(/\D/g, '');
+    }
+    const response = await api.post('/api/whatsapp-consent/grant', payload);
+    return response.data;
+  },
+
   /**
    * Valida contatos de funcionários antes do envio
    */

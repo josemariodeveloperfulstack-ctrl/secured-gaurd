@@ -2,9 +2,11 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.TwoFactorCode;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -57,6 +59,8 @@ public interface TwoFactorCodeRepository extends JpaRepository<TwoFactorCode, UU
     /**
      * Invalida (marca como expirados) todos os códigos antigos de um usuário
      */
+    @Modifying
+    @Transactional
     @Query("UPDATE TwoFactorCode tfc " +
            "SET tfc.isExpired = TRUE " +
            "WHERE tfc.user.id = :userId " +
@@ -66,6 +70,8 @@ public interface TwoFactorCodeRepository extends JpaRepository<TwoFactorCode, UU
     /**
      * Deleta códigos expirados há mais de 7 dias
      */
+    @Modifying
+    @Transactional
     @Query("DELETE FROM TwoFactorCode tfc " +
            "WHERE tfc.expiresAt < :cutoffDate")
     void deleteExpiredCodes(@Param("cutoffDate") LocalDateTime cutoffDate);

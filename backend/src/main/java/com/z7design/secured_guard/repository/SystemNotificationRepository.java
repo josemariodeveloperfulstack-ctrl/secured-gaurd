@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,11 +65,13 @@ public interface SystemNotificationRepository extends JpaRepository<SystemNotifi
     
     // Marcar notificação como lida
     @Modifying
+    @Transactional
     @Query("UPDATE SystemNotification n SET n.read = true WHERE n.id = :id")
     void markAsRead(@Param("id") UUID id);
     
     // Marcar todas as notificações de um destinatário como lidas
     @Modifying
+    @Transactional
     @Query("UPDATE SystemNotification n SET n.read = true WHERE n.recipient.id = :recipientId")
     void markAllAsReadByRecipient(@Param("recipientId") UUID recipientId);
     

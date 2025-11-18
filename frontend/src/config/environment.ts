@@ -89,8 +89,8 @@ function getBackendHost(): string {
 const environments: Record<string, EnvironmentConfig> = {
   local: {
     name: 'Desenvolvimento Local',
-    apiUrl: `http://${getBackendHost()}:8081/api`,
-    wsUrl: `ws://${getBackendHost()}:8081/ws`,
+    apiUrl: `http://${getBackendHost()}:8083/api`,
+    wsUrl: `ws://${getBackendHost()}:8083/ws`,
     debug: true,
     features: {
       notifications: true,

@@ -146,9 +146,7 @@ public class RoleFunctionalityService {
                 new Functionality("dashboard", "Meu Painel", "Dashboard pessoal", "LayoutDashboard", "/dashboard-colaborador", "primary", 1),
                 new Functionality("profile", "Meu Perfil", "Meus dados pessoais", "User", "/perfil", "personal", 2),
                 new Functionality("payslips", "Meus Holerites", "Consultar holerites", "Receipt", "/meus-holerites", "personal", 3),
-                new Functionality("vacations", "Minhas Férias", "Consultar férias", "Palmtree", "/minhas-ferias", "personal", 4),
-                new Functionality("documents", "Meus Documentos", "Documentos pessoais", "FileText", "/meus-documentos", "personal", 5),
-                new Functionality("messages", "Mensagens", "Central de mensagens", "MessageSquare", "/mensagens", "communication", 6)
+                new Functionality("messages", "Mensagens", "Central de mensagens", "MessageSquare", "/mensagens", "communication", 4)
             );
             
             case "VIGILANTE" -> Arrays.asList(

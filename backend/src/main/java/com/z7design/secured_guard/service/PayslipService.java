@@ -1,7 +1,11 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.PayslipOrganizationResponse;
+import com.z7design.secured_guard.dto.PayslipProcessedFileResponse;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.repository.PayslipRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sourceforge.tess4j.TesseractException;
@@ -18,20 +22,31 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.Month;
 
 @Service
 @RequiredArgsConstructor
@@ -41,11 +56,13 @@ public class PayslipService {
     private final PayslipRepository payslipRepository;
     private final TesseractService tesseractService;
     private final ExtractDataHoleritesService extractDataHoleritesService;
+    private final CompanyRepository companyRepository;
     private final EmployeeRepository employeeRepository;
     private final UserService userService;
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private static final String OUTPUT_DIR = "backend/holerites";
+    private static final List<String> COMPANY_SIGLA_PRIORITY = List.of("TERC", "ADM", "VIG");
 
     public List<Payslip> processPayslipPDF(MultipartFile file) throws IOException {
         log.info("Iniciando processamento do arquivo: {}", file.getOriginalFilename());
@@ -94,6 +111,8 @@ public class PayslipService {
                         log.info("Extração via PDFBox falhou, tentando OCR para página {}", i);
                         payslip = extractPayslipInfoWithOCR(document, i);
                     }
+
+                    enrichCompanyData(payslip);
 
                     if (payslip != null && !payslip.getEmployeeName().equals("Desconhecido") && payslip.getCpf() != null) {
                         // Evitar duplicidade de holerite para a mesma empresa (CNPJ), CPF, mês e ano
@@ -191,6 +210,7 @@ public class PayslipService {
         String ano = null;
         String empresaNome = null;
         String empresaCnpj = null;
+        String workPostName = null;
 
         // 1. EXTRAÇÃO DE CPF PRIMEIRO (mais confiável)
         Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})");
@@ -243,6 +263,30 @@ public class PayslipService {
                 // Padrão comum: NOME_DA_EMPRESA + CNPJ
                 // Ou em linhas separadas
                 break;
+            }
+        }
+
+        // Fallback: alguns holerites trazem o CNPJ sem o rótulo "CNPJ"
+        if (empresaCnpj == null) {
+            Pattern fallbackCnpjPattern = Pattern.compile("(?<!\\d)(\\d{14})(?!\\d)");
+            int limiteLinhas = Math.min(15, linhas.length);
+            for (int i = 0; i < limiteLinhas; i++) {
+                String linha = linhas[i];
+                Matcher fallbackMatcher = fallbackCnpjPattern.matcher(linha.replaceAll("\\s+", ""));
+                if (fallbackMatcher.find()) {
+                    empresaCnpj = fallbackMatcher.group(1);
+                    log.info("✅ CNPJ (fallback) encontrado: {} na linha {}", empresaCnpj, linha.trim());
+
+                    // Tentar capturar o nome da empresa na mesma linha (removendo números)
+                    if (empresaNome == null) {
+                        String possibleName = linha.replaceAll("\\d", " ").replaceAll("\\s+", " ").trim();
+                        if (possibleName.length() > 5) {
+                            empresaNome = possibleName;
+                            log.info("✅ Nome da empresa (fallback) identificado: {}", empresaNome);
+                        }
+                    }
+                    break;
+                }
             }
         }
         
@@ -345,12 +389,14 @@ public class PayslipService {
         
         // Padrão 1: "DD/MM/AAAA a DD/MM/AAAA" (período completo)
         Pattern periodoPattern1 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+a\\s+(\\d{2})/(\\d{2})/(\\d{4})");
-        for (String linha : linhas) {
+        for (int idx = 0; idx < linhas.length; idx++) {
+            String linha = linhas[idx];
             Matcher periodoMatcher = periodoPattern1.matcher(linha);
             if (periodoMatcher.find()) {
                 mes = periodoMatcher.group(5); // mês da data final (período de referência)
                 ano = periodoMatcher.group(6); // ano da data final (período de referência)
                 log.info("✅ Período de referência encontrado (padrão 1): {}/{} - Linha: {}", mes, ano, linha.trim());
+                workPostName = findWorkPostName(linhas, idx, linha.substring(periodoMatcher.end()));
                 break;
             }
         }
@@ -358,12 +404,16 @@ public class PayslipService {
         // Padrão 2: "DD/MM/AAAA a DD/MM/AAAA" com espaços diferentes
         if (mes == null || ano == null) {
             Pattern periodoPattern1b = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+à\\s+(\\d{2})/(\\d{2})/(\\d{4})");
-            for (String linha : linhas) {
+            for (int idx = 0; idx < linhas.length; idx++) {
+                String linha = linhas[idx];
                 Matcher periodoMatcher = periodoPattern1b.matcher(linha);
                 if (periodoMatcher.find()) {
                     mes = periodoMatcher.group(5);
                     ano = periodoMatcher.group(6);
                     log.info("✅ Período de referência encontrado (padrão 1b): {}/{} - Linha: {}", mes, ano, linha.trim());
+                    if (workPostName == null) {
+                        workPostName = findWorkPostName(linhas, idx, linha.substring(periodoMatcher.end()));
+                    }
                     break;
                 }
             }
@@ -372,12 +422,16 @@ public class PayslipService {
         // Padrão 3: "MM/AAAA" direto
         if (mes == null || ano == null) {
             Pattern periodoPattern2 = Pattern.compile("(\\d{2})/(\\d{4})");
-            for (String linha : linhas) {
+            for (int idx = 0; idx < linhas.length; idx++) {
+                String linha = linhas[idx];
                 Matcher periodoMatcher = periodoPattern2.matcher(linha);
                 if (periodoMatcher.find()) {
                     mes = periodoMatcher.group(1);
                     ano = periodoMatcher.group(2);
                     log.info("✅ Período de referência encontrado (padrão 2): {}/{} - Linha: {}", mes, ano, linha.trim());
+                    if (workPostName == null) {
+                        workPostName = findWorkPostName(linhas, idx, linha.substring(periodoMatcher.end()));
+                    }
                     break;
                 }
             }
@@ -386,12 +440,16 @@ public class PayslipService {
         // Padrão 4: "DD/MM/AAAA" (data única - usar o mês/ano dessa data)
         if (mes == null || ano == null) {
             Pattern periodoPattern3 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})");
-            for (String linha : linhas) {
+            for (int idx = 0; idx < linhas.length; idx++) {
+                String linha = linhas[idx];
                 Matcher periodoMatcher = periodoPattern3.matcher(linha);
                 if (periodoMatcher.find()) {
                     mes = periodoMatcher.group(2);
                     ano = periodoMatcher.group(3);
                     log.info("✅ Período de referência encontrado (padrão 3): {}/{} - Linha: {}", mes, ano, linha.trim());
+                    if (workPostName == null) {
+                        workPostName = findWorkPostName(linhas, idx, linha.substring(periodoMatcher.end()));
+                    }
                     break;
                 }
             }
@@ -420,7 +478,8 @@ public class PayslipService {
         // Padrão 6: Buscar por "PERÍODO" ou "REFERÊNCIA" no texto
         if ((mes == null || ano == null)) {
             log.info("🔍 Procurando por palavras-chave de período...");
-            for (String linha : linhas) {
+            for (int idx = 0; idx < linhas.length; idx++) {
+                String linha = linhas[idx];
                 String linhaUpper = linha.toUpperCase();
                 if (linhaUpper.contains("PERÍODO") || linhaUpper.contains("REFERÊNCIA") || 
                     linhaUpper.contains("COMPETÊNCIA") || linhaUpper.contains("MÊS")) {
@@ -432,10 +491,17 @@ public class PayslipService {
                         mes = dataMatcher.group(2);
                         ano = dataMatcher.group(3);
                         log.info("✅ Período de referência encontrado por palavra-chave: {}/{} - Linha: {}", mes, ano, linha.trim());
+                        if (workPostName == null) {
+                            workPostName = findWorkPostName(linhas, idx, linha.substring(dataMatcher.end()));
+                        }
                         break;
                     }
                 }
             }
+        }
+        
+        if (workPostName == null) {
+            workPostName = searchForLabeledWorkPost(linhas);
         }
 
         // 4. VALIDAÇÕES FINAIS
@@ -477,6 +543,7 @@ public class PayslipService {
                     .cpf(cpf)
                     .companyName(empresaNome)
                     .companyCnpj(empresaCnpj)
+                    .workPostName(workPostName)
                     .month(mesInt)
                     .year(anoInt)
                     .build();
@@ -485,6 +552,125 @@ public class PayslipService {
             log.warn("❌ Erro ao converter mês/ano para número - Mês: {}, Ano: {}, Página: {}", mes, ano, pageNumber);
             return null;
         }
+    }
+
+    private void enrichCompanyData(Payslip payslip) {
+        if (payslip == null) {
+            return;
+        }
+
+        String normalizedCnpj = normalizeCnpj(payslip.getCompanyCnpj());
+        payslip.setCompanyCnpj(normalizedCnpj);
+
+        if (normalizedCnpj == null || normalizedCnpj.isEmpty()) {
+            return;
+        }
+
+        try {
+            Optional<Company> companyOpt = companyRepository.findByNormalizedCnpj(normalizedCnpj);
+            if (companyOpt.isEmpty()) {
+                log.debug("Nenhuma empresa encontrada para o CNPJ normalizado {}", normalizedCnpj);
+                return;
+            }
+
+            Company company = companyOpt.get();
+            payslip.setCompany(company);
+            payslip.setCompanySigla(company.getSigla());
+
+            if (payslip.getCompanyName() == null || payslip.getCompanyName().isBlank()) {
+                payslip.setCompanyName(company.getName());
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao vincular empresa para CNPJ {}: {}", normalizedCnpj, e.getMessage());
+        }
+    }
+
+    private String normalizeCnpj(String rawCnpj) {
+        if (rawCnpj == null) {
+            return null;
+        }
+        String digitsOnly = rawCnpj.replaceAll("\\D", "");
+        return digitsOnly.length() == 14 ? digitsOnly : null;
+    }
+
+    private String findWorkPostName(String[] lines, int currentIndex, String trailingText) {
+        String candidate = sanitizeWorkPostCandidate(trailingText);
+        if (candidate != null) {
+            return candidate;
+        }
+
+        for (int offset = 1; offset <= 2; offset++) {
+            int idx = currentIndex + offset;
+            if (idx < lines.length) {
+                candidate = sanitizeWorkPostCandidate(lines[idx]);
+                if (candidate != null) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String searchForLabeledWorkPost(String[] lines) {
+        Pattern labeledPattern = Pattern.compile("(?i)(setor|posto|local(?: de trabalho)?)[:\\s]+(.{3,})");
+        for (String line : lines) {
+            Matcher matcher = labeledPattern.matcher(line);
+            if (matcher.find()) {
+                String candidate = sanitizeWorkPostCandidate(matcher.group(2));
+                if (candidate != null) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String sanitizeWorkPostCandidate(String candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        String cleaned = candidate.replaceAll("[\\p{Cntrl}]", " ").trim();
+        if (cleaned.isEmpty()) {
+            return null;
+        }
+
+        // Se houver rótulo "SETOR: ..." manter apenas o que vem depois dos dois pontos
+        int colonIndex = cleaned.indexOf(':');
+        if (colonIndex >= 0 && colonIndex < cleaned.length() - 1) {
+            cleaned = cleaned.substring(colonIndex + 1).trim();
+        }
+
+        cleaned = cleaned.replaceAll("[•·]+", " ");
+        cleaned = cleaned.replaceAll("[\\s]+", " ").trim();
+        cleaned = cleaned.replaceAll("[.,;]+$", "").trim();
+
+        if (cleaned.length() < 3) {
+            return null;
+        }
+
+        String upper = cleaned.toUpperCase(java.util.Locale.ROOT);
+
+        String[] invalidTokens = {
+            "CPF", "CNPJ", "DEMONSTRATIVO", "PAGAMENTO", "FOLHA", "HOLERITE",
+            "EMPRESA", "ENDERECO", "ENDEREÇO", "RUA", "AVENIDA", "LTDA",
+            "ME", "EIRELI", "S.A", "PROMOVER", "VIGILANCIA", "PATRIMONIAL"
+        };
+
+        for (String token : invalidTokens) {
+            if (upper.contains(token)) {
+                return null;
+            }
+        }
+
+        if (upper.contains(",") || upper.contains("*")) {
+            return null;
+        }
+
+        if (!upper.matches(".*[A-Z].*")) {
+            return null;
+        }
+
+        return upper;
     }
 
     private boolean isValidEmployeeName(String name) {
@@ -693,6 +879,39 @@ public class PayslipService {
         fileName.append(".pdf");
         
         return fileName.toString();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PayslipProcessedFileResponse> getProcessedPayslipFiles() {
+        List<Payslip> payslips = payslipRepository.findAll();
+
+        if (payslips.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return payslips.stream()
+            .sorted(Comparator.comparing(Payslip::getProcessedAt).reversed())
+            .map(payslip -> {
+                String directory = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
+                Path path = Paths.get(OUTPUT_DIR, directory, payslip.getFileName());
+                String normalizedPath = path.toString().replace('\\', '/');
+
+                return PayslipProcessedFileResponse.builder()
+                    .id(payslip.getId())
+                    .fileName(payslip.getFileName())
+                    .employeeName(payslip.getEmployeeName())
+                    .cpf(payslip.getCpf())
+                    .month(payslip.getMonth())
+                    .year(payslip.getYear())
+                    .companyName(payslip.getCompanyName())
+                    .companySigla(payslip.getCompanySigla())
+                    .companyCnpj(payslip.getCompanyCnpj())
+                    .companyId(payslip.getCompanyId())
+                    .path(normalizedPath)
+                    .processedAt(payslip.getProcessedAt())
+                    .build();
+            })
+            .collect(Collectors.toList());
     }
 
     private String organizarEmPastas(PDDocument document, int pageNumber, Payslip payslip) throws IOException {
@@ -970,5 +1189,250 @@ public class PayslipService {
         result.put("failed", failed);
         result.put("errors", errors);
         return result;
+    }
+
+    public PayslipOrganizationResponse organizePayslipsByCompany(List<Payslip> payslips) {
+        PayslipOrganizationResponse response = new PayslipOrganizationResponse();
+        response.setGeneratedAt(LocalDateTime.now());
+
+        List<Payslip> effectivePayslips = payslips != null ? payslips : Collections.emptyList();
+        response.setTotalPayslips(effectivePayslips.size());
+
+        if (effectivePayslips.isEmpty()) {
+            response.setCompanies(Collections.emptyList());
+            response.setTotalCompanies(0);
+            response.setTotalSectors(0);
+            return response;
+        }
+
+        Map<String, List<Payslip>> companyGroups = effectivePayslips.stream()
+            .collect(Collectors.groupingBy(this::buildCompanyKey, LinkedHashMap::new, Collectors.toList()));
+
+        Set<String> uniqueSectorKeys = new HashSet<>();
+        List<PayslipOrganizationResponse.CompanyGroup> companyResponses = new ArrayList<>();
+
+        for (List<Payslip> companyPayslips : companyGroups.values()) {
+            if (companyPayslips.isEmpty()) {
+                continue;
+            }
+
+            Payslip sample = companyPayslips.get(0);
+            PayslipOrganizationResponse.CompanyGroup companyGroup = new PayslipOrganizationResponse.CompanyGroup();
+            String companySigla = resolveCompanySigla(sample);
+            companyGroup.setCompanySigla(companySigla);
+            companyGroup.setCompanyName(defaultString(sample.getCompanyName(), "Empresa não informada"));
+            companyGroup.setCompanyCnpj(defaultString(sample.getCompanyCnpj(), ""));
+            companyGroup.setCompanyId(sample.getCompanyId());
+            companyGroup.setTotalPayslips(companyPayslips.size());
+
+            Map<String, List<Payslip>> sectorGroups = companyPayslips.stream()
+                .collect(Collectors.groupingBy(this::buildSectorKey, LinkedHashMap::new, Collectors.toList()));
+
+            List<PayslipOrganizationResponse.SectorGroup> sectors = new ArrayList<>();
+
+            for (Map.Entry<String, List<Payslip>> sectorEntry : sectorGroups.entrySet()) {
+                List<Payslip> sectorPayslips = sectorEntry.getValue();
+                if (sectorPayslips.isEmpty()) {
+                    continue;
+                }
+
+                PayslipOrganizationResponse.SectorGroup sectorGroup = new PayslipOrganizationResponse.SectorGroup();
+                String sectorDisplayName = resolveSectorName(sectorPayslips.get(0));
+                sectorGroup.setSectorName(sectorDisplayName);
+                sectorGroup.setNormalizedSectorName(sectorEntry.getKey());
+                sectorGroup.setTotalPayslips(sectorPayslips.size());
+
+                uniqueSectorKeys.add(companySigla + "|" + sectorEntry.getKey());
+
+                Map<String, List<Payslip>> periodGroups = sectorPayslips.stream()
+                    .collect(Collectors.groupingBy(this::buildPeriodKey, LinkedHashMap::new, Collectors.toList()));
+
+                List<String> sortedPeriods = new ArrayList<>(periodGroups.keySet());
+                sortedPeriods.sort(Comparator.reverseOrder());
+
+                List<PayslipOrganizationResponse.PeriodGroup> periods = new ArrayList<>();
+                for (String periodKey : sortedPeriods) {
+                    List<Payslip> periodPayslips = periodGroups.get(periodKey);
+                    if (periodPayslips == null || periodPayslips.isEmpty()) {
+                        continue;
+                    }
+
+                    int year = extractYear(periodKey);
+                    int month = extractMonth(periodKey);
+
+                    List<Payslip> consistentPayslips = periodPayslips.stream()
+                        .filter(p -> Objects.equals(p.getYear(), year) && Objects.equals(p.getMonth(), month))
+                        .collect(Collectors.toList());
+
+                    if (consistentPayslips.isEmpty()) {
+                        log.warn("⚠️ Nenhum holerite com mês/ano ({}/{}) consistente no período {}. Ignorando grupo.", month, year, periodKey);
+                        continue;
+                    }
+
+                    PayslipOrganizationResponse.PeriodGroup periodGroup = new PayslipOrganizationResponse.PeriodGroup();
+                    periodGroup.setYear(year);
+                    periodGroup.setMonth(month);
+                    periodGroup.setFormattedPeriod(formatPeriodLabel(month, year));
+
+                    List<PayslipOrganizationResponse.PayslipEntry> entries = consistentPayslips.stream()
+                        .sorted(Comparator.comparing(p -> defaultString(p.getEmployeeName(), ""), String.CASE_INSENSITIVE_ORDER))
+                        .map(payslip -> {
+                            PayslipOrganizationResponse.PayslipEntry entry = toPayslipEntry(payslip);
+                            entry.setSectorName(sectorDisplayName);
+                            return entry;
+                        })
+                        .collect(Collectors.toList());
+
+                    periodGroup.setPayslips(entries);
+                    periodGroup.setTotalPayslips(entries.size());
+                    periods.add(periodGroup);
+                }
+
+                sectorGroup.setPeriods(periods);
+                sectors.add(sectorGroup);
+            }
+
+            sectors.sort(Comparator.comparing(PayslipOrganizationResponse.SectorGroup::getSectorName, String.CASE_INSENSITIVE_ORDER));
+            companyGroup.setSectors(sectors);
+            companyResponses.add(companyGroup);
+        }
+
+        companyResponses.sort(this::compareCompanyGroups);
+
+        response.setCompanies(companyResponses);
+        response.setTotalCompanies(companyResponses.size());
+        response.setTotalSectors(uniqueSectorKeys.size());
+        return response;
+    }
+
+    private String buildCompanyKey(Payslip payslip) {
+        String sigla = resolveCompanySigla(payslip);
+        String name = defaultString(payslip.getCompanyName(), "Empresa não informada");
+        String cnpj = defaultString(payslip.getCompanyCnpj(), "");
+        String companyId = payslip.getCompanyId() != null ? payslip.getCompanyId().toString() : "";
+        return String.join("|", sigla, name, cnpj, companyId);
+    }
+
+    private String resolveCompanySigla(Payslip payslip) {
+        String sigla = defaultString(payslip.getCompanySigla(), "");
+        if (!StringUtils.hasText(sigla) && payslip.getCompany() != null) {
+            sigla = defaultString(payslip.getCompany().getSigla(), "");
+        }
+        if (!StringUtils.hasText(sigla)) {
+            sigla = "OUTROS";
+        }
+        return sigla.trim().toUpperCase();
+    }
+
+    private String buildSectorKey(Payslip payslip) {
+        return normalizeSectorName(resolveSectorName(payslip));
+    }
+
+    private String resolveSectorName(Payslip payslip) {
+        if (payslip == null) {
+            return "Setor não informado";
+        }
+        String sector = payslip.getWorkPostName();
+        if (!StringUtils.hasText(sector)) {
+            return "Setor não informado";
+        }
+        return sector.trim();
+    }
+
+    private String normalizeSectorName(String sector) {
+        if (!StringUtils.hasText(sector)) {
+            return "SETOR_NAO_INFORMADO";
+        }
+        String upper = sector.trim().toUpperCase();
+        String normalized = Normalizer.normalize(upper, Normalizer.Form.NFD)
+            .replaceAll("[\\p{M}]", "")
+            .replaceAll("[^A-Z0-9]+", "_")
+            .replaceAll("^_+", "")
+            .replaceAll("_+$", "");
+        return StringUtils.hasText(normalized) ? normalized : "SETOR_NAO_INFORMADO";
+    }
+
+    private String buildPeriodKey(Payslip payslip) {
+        Integer year = payslip != null ? payslip.getYear() : null;
+        Integer month = payslip != null ? payslip.getMonth() : null;
+        if (year == null || month == null) {
+            return "0000-00";
+        }
+        return String.format("%04d-%02d", year, month);
+    }
+
+    private int extractYear(String periodKey) {
+        try {
+            return Integer.parseInt(periodKey.substring(0, 4));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private int extractMonth(String periodKey) {
+        try {
+            return Integer.parseInt(periodKey.substring(5, 7));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private String formatPeriodLabel(int month, int year) {
+        if (month <= 0 || year <= 0) {
+            return "Período não informado";
+        }
+        try {
+            Month monthEnum = Month.of(month);
+            String monthName = monthEnum.getDisplayName(java.time.format.TextStyle.FULL, new Locale("pt", "BR"));
+            return String.format("%s %d", capitalize(monthName), year);
+        } catch (Exception e) {
+            return String.format("%02d/%04d", month, year);
+        }
+    }
+
+    private PayslipOrganizationResponse.PayslipEntry toPayslipEntry(Payslip payslip) {
+        PayslipOrganizationResponse.PayslipEntry entry = new PayslipOrganizationResponse.PayslipEntry();
+        entry.setId(payslip.getId());
+        entry.setEmployeeName(defaultString(payslip.getEmployeeName(), "Funcionário não informado"));
+        entry.setCpf(defaultString(payslip.getCpf(), ""));
+        entry.setMonth(payslip.getMonth());
+        entry.setYear(payslip.getYear());
+        entry.setFileName(payslip.getFileName());
+        entry.setCompanySigla(resolveCompanySigla(payslip));
+        entry.setCompanyName(defaultString(payslip.getCompanyName(), "Empresa não informada"));
+        entry.setCompanyCnpj(defaultString(payslip.getCompanyCnpj(), ""));
+        entry.setWorkPostName(payslip.getWorkPostName());
+        entry.setSectorName(resolveSectorName(payslip));
+        entry.setProcessedAt(payslip.getProcessedAt());
+        return entry;
+    }
+
+    private int compareCompanyGroups(PayslipOrganizationResponse.CompanyGroup a, PayslipOrganizationResponse.CompanyGroup b) {
+        int orderA = resolveCompanyPriority(a.getCompanySigla());
+        int orderB = resolveCompanyPriority(b.getCompanySigla());
+        if (orderA != orderB) {
+            return Integer.compare(orderA, orderB);
+        }
+        return defaultString(a.getCompanyName(), "").compareToIgnoreCase(defaultString(b.getCompanyName(), ""));
+    }
+
+    private int resolveCompanyPriority(String sigla) {
+        String normalized = sigla != null ? sigla.toUpperCase() : "";
+        int index = COMPANY_SIGLA_PRIORITY.indexOf(normalized);
+        return index >= 0 ? index : COMPANY_SIGLA_PRIORITY.size();
+    }
+
+    private String defaultString(String value, String fallback) {
+        if (StringUtils.hasText(value)) {
+            return value.trim();
+        }
+        return fallback != null ? fallback : "";
+    }
+
+    private String capitalize(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        return value.substring(0, 1).toUpperCase() + value.substring(1);
     }
 } 

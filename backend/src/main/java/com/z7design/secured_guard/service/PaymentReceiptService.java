@@ -2,9 +2,13 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.CreatePaymentReceiptDTO;
 import com.z7design.secured_guard.dto.PaymentReceiptDTO;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.model.PaymentReceiptStatus;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
+import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -15,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.extern.slf4j.Slf4j;
 
+import java.text.Normalizer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +32,13 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.stream.Collectors;
+import java.text.Normalizer;
+
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.Employee;
+
+import java.util.Set;
+import java.util.HashSet;
 
 @Service
 @Transactional
@@ -35,6 +47,15 @@ public class PaymentReceiptService {
 
     @Autowired
     private PaymentReceiptRepository paymentReceiptRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private CompanyRepository companyRepository;
     
     public PaymentReceiptDTO createPaymentReceipt(CreatePaymentReceiptDTO createDTO) {
         PaymentReceipt paymentReceipt = new PaymentReceipt(
@@ -55,6 +76,12 @@ public class PaymentReceiptService {
         paymentReceipt.setFileSize(createDTO.getFileSize());
         paymentReceipt.setNotes(createDTO.getNotes());
         paymentReceipt.setCreatedBy(createDTO.getCreatedBy());
+        paymentReceipt.setCompanyName(createDTO.getCompanyName());
+        paymentReceipt.setCompanyCnpj(createDTO.getCompanyCnpj());
+        paymentReceipt.setCompanySigla(createDTO.getCompanySigla());
+        if (createDTO.getCompanyId() != null) {
+            companyRepository.findById(createDTO.getCompanyId()).ifPresent(paymentReceipt::setCompany);
+        }
         
         // Campos bancários
         paymentReceipt.setDebitedAgency(createDTO.getDebitedAgency());
@@ -70,6 +97,8 @@ public class PaymentReceiptService {
         paymentReceipt.setBankName(createDTO.getBankName());
         paymentReceipt.setTransactionType(createDTO.getTransactionType());
         paymentReceipt.setStatementIdentification(createDTO.getStatementIdentification());
+
+        applyCompanyHierarchy(paymentReceipt);
         
         PaymentReceipt savedReceipt = paymentReceiptRepository.save(paymentReceipt);
         return convertToDTO(savedReceipt);
@@ -86,11 +115,107 @@ public class PaymentReceiptService {
     @Transactional(readOnly = true)
     public List<PaymentReceiptDTO> findByUserCpf(String cpf) {
         log.info("🔍 Buscando comprovantes para CPF: {}", cpf);
-        
-        // Por enquanto, retornar lista vazia pois não temos a relação CPF -> PaymentReceipt
-        // TODO: Implementar busca real quando tivermos a estrutura correta
-        log.warn("⚠️ Método findByUserCpf ainda não implementado completamente. Retornando lista vazia.");
-        return List.of();
+
+        String sanitizedCpf = sanitizeCpf(cpf);
+        if (sanitizedCpf.isEmpty()) {
+            log.warn("⚠️ CPF informado vazio ou inválido. Retornando lista vazia.");
+            return List.of();
+        }
+
+        Optional<User> userOptional = userRepository.findByUsername(sanitizedCpf);
+        Optional<Employee> employeeOptional = employeeRepository.findByDocument(sanitizedCpf);
+
+        UUID userId = userOptional.map(User::getId).orElse(null);
+        UUID employeeId = employeeOptional.map(Employee::getId).orElse(null);
+
+        Set<String> normalizedNames = new HashSet<>();
+        userOptional.map(User::getName).map(this::normalizeName).ifPresent(normalizedNames::add);
+        employeeOptional.map(Employee::getName).map(this::normalizeName).ifPresent(normalizedNames::add);
+
+        List<PaymentReceiptDTO> receipts = paymentReceiptRepository.findAll()
+                .stream()
+                .filter(receipt -> matchesReceiptForUser(receipt, sanitizedCpf, normalizedNames, userId, employeeId))
+                .sorted((r1, r2) -> {
+                    int yearCompare = r2.getYear().compareTo(r1.getYear());
+                    if (yearCompare != 0) {
+                        return yearCompare;
+                    }
+                    return r2.getMonth().compareTo(r1.getMonth());
+                })
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+
+        log.info("✅ Comprovantes encontrados para CPF {}: {}", cpf, receipts.size());
+        return receipts;
+    }
+
+    private boolean matchesReceiptForUser(PaymentReceipt receipt, String sanitizedCpf, Set<String> normalizedNames, UUID userId, UUID employeeId) {
+        if (receipt == null) {
+            return false;
+        }
+
+        if (userId != null && receipt.getEmployeeId() != null && receipt.getEmployeeId().equals(userId)) {
+            return true;
+        }
+
+        if (employeeId != null && receipt.getEmployeeId() != null && receipt.getEmployeeId().equals(employeeId)) {
+            return true;
+        }
+
+        String receiptFileName = Optional.ofNullable(receipt.getFileName()).orElse("");
+        if (!sanitizedCpf.isEmpty() && receiptFileName.contains(sanitizedCpf)) {
+            return true;
+        }
+
+        String receiptFilePath = Optional.ofNullable(receipt.getFilePath()).orElse("");
+        if (!sanitizedCpf.isEmpty() && receiptFilePath.contains(sanitizedCpf)) {
+            return true;
+        }
+
+        String receiptEmployeeName = Optional.ofNullable(receipt.getEmployeeName()).orElse("");
+        String receiptCreditedName = Optional.ofNullable(receipt.getCreditedName()).orElse("");
+
+        String normalizedReceiptEmployeeName = normalizeName(receiptEmployeeName);
+        String normalizedReceiptCreditedName = normalizeName(receiptCreditedName);
+
+        if (!normalizedNames.isEmpty()) {
+            for (String normalizedName : normalizedNames) {
+                if (normalizedName.isEmpty()) {
+                    continue;
+                }
+                if (normalizedName.equals(normalizedReceiptEmployeeName) ||
+                        normalizedName.equals(normalizedReceiptCreditedName)) {
+                    return true;
+                }
+                if (!normalizedReceiptEmployeeName.isEmpty() &&
+                        (normalizedReceiptEmployeeName.contains(normalizedName) || normalizedName.contains(normalizedReceiptEmployeeName))) {
+                    return true;
+                }
+                if (!normalizedReceiptCreditedName.isEmpty() &&
+                        (normalizedReceiptCreditedName.contains(normalizedName) || normalizedName.contains(normalizedReceiptCreditedName))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private String sanitizeCpf(String cpf) {
+        if (cpf == null) {
+            return "";
+        }
+        return cpf.replaceAll("\\D", "");
+    }
+
+    private String normalizeName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return withoutAccents.replaceAll("[^a-zA-Z0-9]", "")
+                .toLowerCase();
     }
     
     @Transactional(readOnly = true)
@@ -188,6 +313,9 @@ public class PaymentReceiptService {
             paymentReceipt.setFilePath(filePath.toString());
             paymentReceipt.setFileSize(file.getSize());
             paymentReceipt.setStatus(PaymentReceiptStatus.PENDING);
+            paymentReceipt.setCompanyName(paymentReceipt.getDebitedName());
+            paymentReceipt.setCompanySigla(null);
+            paymentReceipt.setCompanyCnpj(null);
 
             // Ajustar datas: usar primeiro dia do mês/ano da pasta
             try {
@@ -207,6 +335,7 @@ public class PaymentReceiptService {
             savedReceipt.setStatus(PaymentReceiptStatus.PROCESSED);
             savedReceipt.setNetSalary(java.math.BigDecimal.ZERO); // Será preenchido após processamento
             savedReceipt.setGrossSalary(java.math.BigDecimal.ZERO);
+            applyCompanyHierarchy(savedReceipt);
             
             PaymentReceipt finalReceipt = paymentReceiptRepository.save(savedReceipt);
             
@@ -291,6 +420,10 @@ public class PaymentReceiptService {
         dto.setId(paymentReceipt.getId());
         dto.setEmployeeId(paymentReceipt.getEmployeeId());
         dto.setEmployeeName(paymentReceipt.getEmployeeName());
+        dto.setCompanyId(paymentReceipt.getCompanyId());
+        dto.setCompanyName(paymentReceipt.getCompanyName());
+        dto.setCompanyCnpj(paymentReceipt.getCompanyCnpj());
+        dto.setCompanySigla(paymentReceipt.getCompanySigla());
         dto.setMonth(paymentReceipt.getMonth());
         dto.setYear(paymentReceipt.getYear());
         dto.setReceiptNumber(paymentReceipt.getReceiptNumber());
@@ -324,6 +457,66 @@ public class PaymentReceiptService {
         dto.setStatementIdentification(paymentReceipt.getStatementIdentification());
         
         return dto;
+    }
+
+    public void applyCompanyHierarchy(PaymentReceipt paymentReceipt) {
+        if (paymentReceipt == null) {
+            return;
+        }
+
+        if (!hasText(paymentReceipt.getCompanyName()) && hasText(paymentReceipt.getDebitedName())) {
+            paymentReceipt.setCompanyName(paymentReceipt.getDebitedName());
+        }
+
+        String normalizedCnpj = normalizeCnpj(paymentReceipt.getCompanyCnpj());
+        if (normalizedCnpj != null) {
+            paymentReceipt.setCompanyCnpj(normalizedCnpj);
+            companyRepository.findByNormalizedCnpj(normalizedCnpj).ifPresent(company -> applyCompanyLink(paymentReceipt, company));
+        }
+
+        if (paymentReceipt.getCompany() == null && hasText(paymentReceipt.getCompanySigla())) {
+            companyRepository.findFirstBySiglaIgnoreCase(paymentReceipt.getCompanySigla().trim())
+                    .ifPresent(company -> applyCompanyLink(paymentReceipt, company));
+        }
+
+        if (paymentReceipt.getCompany() == null && hasText(paymentReceipt.getCompanyName())) {
+            String normalizedName = normalizeText(paymentReceipt.getCompanyName());
+            companyRepository.findByNormalizedName(normalizedName)
+                    .ifPresent(company -> applyCompanyLink(paymentReceipt, company));
+        }
+    }
+
+    private void applyCompanyLink(PaymentReceipt receipt, Company company) {
+        receipt.setCompany(company);
+        if (!hasText(receipt.getCompanyName())) {
+            receipt.setCompanyName(company.getName());
+        }
+        receipt.setCompanySigla(company.getSigla());
+        String normalizedCompanyCnpj = normalizeCnpj(company.getCnpj());
+        if (normalizedCompanyCnpj != null) {
+            receipt.setCompanyCnpj(normalizedCompanyCnpj);
+        }
+    }
+
+    private String normalizeCnpj(String cnpj) {
+        if (!hasText(cnpj)) {
+            return null;
+        }
+        String digits = cnpj.replaceAll("\\D", "");
+        return digits.length() == 14 ? digits : digits;
+    }
+
+    private String normalizeText(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        String noAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return noAccents.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
     
     // Excluir comprovante por ID

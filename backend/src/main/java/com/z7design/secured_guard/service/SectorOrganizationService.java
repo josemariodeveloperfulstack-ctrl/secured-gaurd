@@ -1,12 +1,16 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +30,7 @@ import java.util.stream.Collectors;
 public class SectorOrganizationService {
 
     private final UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
     
     private static final String SOURCE_DIR = "uploads/unified/expanded/";
     private static final String TARGET_DIR = "uploads/unified/por_setor/";
@@ -652,7 +657,102 @@ public class SectorOrganizationService {
         response.put("totalDocuments", totalDocs);
         response.put("totalSectors", sectors.size());
         
+        applyCollaboratorFilter(response);
+        
         return response;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private void applyCollaboratorFilter(Map<String, Object> response) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return;
+        }
+        
+        boolean isColaborador = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_COLABORADOR".equals(authority.getAuthority()));
+        if (!isColaborador) {
+            return;
+        }
+        
+        String cpf = sanitizeCpfValue(authentication.getName());
+        if (cpf.isEmpty()) {
+            return;
+        }
+        
+        Set<String> normalizedNames = new HashSet<>();
+        userRepository.findByUsername(cpf)
+                .map(User::getName)
+                .map(this::normalizeName)
+                .ifPresent(normalizedNames::add);
+        employeeRepository.findByDocument(cpf)
+                .map(Employee::getName)
+                .map(this::normalizeName)
+                .ifPresent(normalizedNames::add);
+        
+        List<Map<String, Object>> sectors = (List<Map<String, Object>>) response.getOrDefault("sectors", new ArrayList<>());
+        List<Map<String, Object>> filteredSectors = new ArrayList<>();
+        int totalDocuments = 0;
+        
+        for (Map<String, Object> sector : sectors) {
+            List<Map<String, Object>> periods = (List<Map<String, Object>>) sector.getOrDefault("periods", new ArrayList<>());
+            List<Map<String, Object>> filteredPeriods = new ArrayList<>();
+            int sectorDocumentCount = 0;
+            
+            for (Map<String, Object> period : periods) {
+                List<Map<String, Object>> documents = (List<Map<String, Object>>) period.getOrDefault("documents", new ArrayList<>());
+                List<Map<String, Object>> filteredDocuments = documents.stream()
+                        .filter(doc -> matchesSectorDocument(doc, cpf, normalizedNames))
+                        .collect(Collectors.toList());
+                
+                if (!filteredDocuments.isEmpty()) {
+                    period.put("documents", filteredDocuments);
+                    period.put("documentCount", filteredDocuments.size());
+                    filteredPeriods.add(period);
+                    sectorDocumentCount += filteredDocuments.size();
+                }
+            }
+            
+            if (!filteredPeriods.isEmpty()) {
+                sector.put("periods", filteredPeriods);
+                sector.put("documentCount", sectorDocumentCount);
+                filteredSectors.add(sector);
+                totalDocuments += sectorDocumentCount;
+            }
+        }
+        
+        response.put("sectors", filteredSectors);
+        response.put("totalSectors", filteredSectors.size());
+        response.put("totalDocuments", totalDocuments);
+    }
+    
+    private boolean matchesSectorDocument(Map<String, Object> doc, String cpf, Set<String> normalizedNames) {
+        if (doc == null) {
+            return false;
+        }
+        
+        String docCpf = sanitizeCpfValue(String.valueOf(doc.getOrDefault("cpf", "")));
+        String fileName = String.valueOf(doc.getOrDefault("fileName", ""));
+        
+        if (!cpf.isEmpty() && (docCpf.contains(cpf) || fileName.contains(cpf))) {
+            return true;
+        }
+        
+        String employeeName = normalizeName(String.valueOf(doc.getOrDefault("employeeName", "")));
+        if (employeeName.isEmpty()) {
+            return false;
+        }
+        
+        return normalizedNames.stream()
+                .filter(name -> !name.isEmpty())
+                .anyMatch(name -> employeeName.equals(name) || employeeName.contains(name) || name.contains(employeeName));
+    }
+    
+    private String sanitizeCpfValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("\\D", "");
     }
 
     /**
@@ -675,6 +775,13 @@ public class SectorOrganizationService {
                 .replaceAll("[\u0300-\u036f]", "")  // Remove acentos
                 .replaceAll("[^A-Z0-9]", "")         // Remove tudo exceto letras e números
                 .trim();
+    }
+
+    private String normalizeCpf(String cpf) {
+        if (cpf == null) {
+            return "";
+        }
+        return cpf.replaceAll("[^0-9]", "");
     }
 
     /**
@@ -818,7 +925,7 @@ public class SectorOrganizationService {
     /**
      * Envia documento por email
      */
-    public Map<String, Object> sendDocumentByEmail(String filePath, String cpf) {
+    public Map<String, Object> sendDocumentByEmail(String filePath, String cpf, String employeeName) {
         Map<String, Object> response = new HashMap<>();
         
         try {
@@ -833,6 +940,13 @@ public class SectorOrganizationService {
             // Buscar usuário pelo CPF do funcionário
             Optional<User> userOpt = userRepository.findByEmployeeCpf(cpf);
             if (userOpt.isEmpty()) {
+                String normalizedCpf = normalizeCpf(cpf);
+                userOpt = userRepository.findByEmployeeCpf(normalizedCpf);
+                if (userOpt.isEmpty()) {
+                    userOpt = userRepository.findByUsername(normalizedCpf);
+                }
+            }
+            if (userOpt.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Usuário não encontrado com CPF: " + cpf);
                 return response;
@@ -840,19 +954,45 @@ public class SectorOrganizationService {
             
             User user = userOpt.get();
             
-            if (user.getEmail() == null || user.getEmail().isEmpty()) {
+            String email = user.getEmail() != null ? user.getEmail().trim() : "";
+            if (email.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Usuário não possui email cadastrado");
                 return response;
             }
             
+            // Garantir que o email está vinculado ao mesmo usuário/CPF
+            Optional<User> ownerByEmail = userRepository.findByEmail(email);
+            if (ownerByEmail.isPresent() && !ownerByEmail.get().getId().equals(user.getId())) {
+                response.put("success", false);
+                response.put("message", "Email associado a outro usuário. Verifique cadastro na tabela users.");
+                return response;
+            }
+
+            // Validar CPF do usuário
+            String userCpf = normalizeCpf(user.getUsername());
+            if (!userCpf.isEmpty() && !normalizeCpf(cpf).equals(userCpf)) {
+                response.put("success", false);
+                response.put("message", "CPF do usuário não coincide com o CPF do documento.");
+                return response;
+            }
+
+            // Validar nome (quando disponível)
+            if (employeeName != null && !employeeName.isBlank()) {
+                if (!compareNames(user.getName(), employeeName)) {
+                    response.put("success", false);
+                    response.put("message", "Nome do usuário na tabela users não coincide com o funcionário do holerite.");
+                    return response;
+                }
+            }
+            
             // TODO: Integrar com EnvioService para envio real
             // Por enquanto, apenas simular sucesso
-            log.info("📧 Email enviado para: {} ({})", user.getName(), user.getEmail());
+            log.info("📧 Email enviado para: {} ({})", user.getName(), email);
             
             response.put("success", true);
-            response.put("message", "Email enviado com sucesso para " + user.getEmail());
-            response.put("email", user.getEmail());
+            response.put("message", "Email enviado com sucesso para " + email);
+            response.put("email", email);
             
         } catch (Exception e) {
             log.error("❌ Erro ao enviar email: {}", e.getMessage(), e);

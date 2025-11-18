@@ -11,6 +11,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/whatsapp")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080", "http://localhost:5173"}, allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 @RequiredArgsConstructor
 @Slf4j
 public class WhatsAppController {
@@ -92,14 +93,40 @@ public class WhatsAppController {
             }
             
             if (qrcode) {
-                String qrCodeData = baileysRestService.getQRCode();
+                // Aguardar um pouco para o QR Code ser gerado após inicialização
+                try {
+                    Thread.sleep(2000); // 2 segundos
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                
+                // Tentar obter QR Code até 5 vezes com intervalo de 1 segundo
+                String qrCodeData = null;
+                int maxAttempts = 5;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                    qrCodeData = baileysRestService.getQRCode();
+                    if (qrCodeData != null && !qrCodeData.isEmpty()) {
+                        log.info("✅ QR Code obtido na tentativa {}/{}", attempt, maxAttempts);
+                        break;
+                    }
+                    log.info("⏳ Aguardando QR Code... Tentativa {}/{}", attempt, maxAttempts);
+                    if (attempt < maxAttempts) {
+                        try {
+                            Thread.sleep(1000); // 1 segundo entre tentativas
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+                
                 log.info("📸 QR Code obtido. Tamanho: {} caracteres", qrCodeData != null ? qrCodeData.length() : 0);
                 
                 if (qrCodeData == null || qrCodeData.isEmpty()) {
-                    log.error("❌ QR Code não foi gerado pelo Baileys REST");
+                    log.error("❌ QR Code não foi gerado pelo Baileys REST após {} tentativas", maxAttempts);
                     return ResponseEntity.status(503).body(Map.of(
                         "success", false,
-                        "error", "Não foi possível gerar o QR Code. O serviço Baileys REST pode estar indisponível ou já conectado."
+                        "error", "Não foi possível gerar o QR Code. Aguarde alguns segundos e tente novamente. Se o problema persistir, verifique se o serviço Baileys REST está rodando corretamente."
                     ));
                 }
                 

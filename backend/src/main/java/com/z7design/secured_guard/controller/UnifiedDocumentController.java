@@ -75,11 +75,26 @@ public class UnifiedDocumentController {
             
             return ResponseEntity.ok(response);
             
+        } catch (IOException e) {
+            log.error("💥 Erro de I/O ao criar documento unificado: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", e.getMessage());
+            response.put("erro", e.getClass().getSimpleName());
+            response.put("detalhes", e.getMessage());
+            // Retornar 400 (Bad Request) para erros de arquivo não encontrado
+            if (e.getMessage() != null && (e.getMessage().contains("não encontrado") || e.getMessage().contains("not found"))) {
+                return ResponseEntity.badRequest().body(response);
+            }
+            return ResponseEntity.internalServerError().body(response);
         } catch (Exception e) {
-            log.error("💥 Erro ao criar documento unificado: {}", e.getMessage(), e);
+            log.error("💥 Erro inesperado ao criar documento unificado: {}", e.getMessage(), e);
             response.put("sucesso", false);
             response.put("mensagem", "Erro ao criar documento unificado: " + e.getMessage());
             response.put("erro", e.getClass().getSimpleName());
+            response.put("detalhes", e.getMessage());
+            if (e.getCause() != null) {
+                response.put("causa", e.getCause().getMessage());
+            }
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -1215,6 +1230,22 @@ public class UnifiedDocumentController {
             response.put("mensagem", "Erro na unificação em lote: " + e.getMessage());
             response.put("erro", e.getClass().getSimpleName());
             return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Organiza documentos unificados por Empresa/Setor/Ano/Mês
+     */
+    @GetMapping("/organization")
+    public ResponseEntity<com.z7design.secured_guard.dto.PayslipOrganizationResponse> getUnifiedDocumentsOrganization() {
+        try {
+            log.info("📋 Organizando documentos unificados por Empresa/Setor/Ano/Mês...");
+            com.z7design.secured_guard.dto.PayslipOrganizationResponse response = 
+                unifiedDocumentService.organizeUnifiedDocumentsByCompany();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("💥 Erro ao organizar documentos unificados: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 

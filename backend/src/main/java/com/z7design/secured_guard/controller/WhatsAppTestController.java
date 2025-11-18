@@ -1,11 +1,12 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.service.BaileysRestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -14,9 +15,7 @@ import java.util.Map;
 @Slf4j
 public class WhatsAppTestController {
     
-    // TODO: Implementar serviços de WhatsApp
-    // private final WhatsAppService whatsAppService;
-    // private final N8nWebhookService n8nWebhookService;
+    private final BaileysRestService baileysRestService;
     
     @PostMapping("/test")
     public ResponseEntity<Map<String, Object>> testConnection() {
@@ -52,27 +51,51 @@ public class WhatsAppTestController {
         log.info("📤 Enviando mensagem de teste para: {}", request.getTelefone());
         
         try {
-            // TODO: Implementar envio de mensagem simples
-            log.info("📱 Mensagem de teste solicitada para {}: {} - Implementação pendente", 
-                request.getTelefone(), request.getMensagem());
+            // Validar campos obrigatórios
+            if (request.getTelefone() == null || request.getTelefone().trim().isEmpty()) {
+                Map<String, Object> errorResult = new HashMap<>();
+                errorResult.put("sucesso", false);
+                errorResult.put("telefone", request.getTelefone());
+                errorResult.put("timestamp", java.time.LocalDateTime.now().toString());
+                errorResult.put("message", "Número de telefone é obrigatório");
+                return ResponseEntity.badRequest().body(errorResult);
+            }
             
-            Map<String, Object> result = Map.of(
-                "sucesso", true,
-                "telefone", request.getTelefone(),
-                "timestamp", java.time.LocalDateTime.now().toString(),
-                "message", "Mensagem de teste enviada com sucesso"
-            );
+            String mensagem = request.getMensagem() != null && !request.getMensagem().trim().isEmpty()
+                ? request.getMensagem()
+                : "✅ Teste SecuredGuard - WhatsApp conectado e funcionando!";
+            
+            log.info("📱 Enviando mensagem de teste via Baileys REST para: {} - Mensagem: {}", 
+                request.getTelefone(), mensagem);
+            
+            // Enviar mensagem via Baileys REST Service
+            boolean success = baileysRestService.sendTextMessage(request.getTelefone(), mensagem);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("sucesso", success);
+            result.put("telefone", request.getTelefone());
+            result.put("timestamp", java.time.LocalDateTime.now().toString());
+            
+            if (success) {
+                result.put("message", "Mensagem de teste enviada com sucesso");
+                log.info("✅ Mensagem de teste enviada com sucesso para: {}", request.getTelefone());
+            } else {
+                String errorMsg = baileysRestService.getLastErrorMessage();
+                result.put("message", errorMsg != null ? errorMsg : "Erro ao enviar mensagem de teste");
+                log.error("❌ Falha ao enviar mensagem de teste para: {}. Erro: {}", 
+                    request.getTelefone(), errorMsg);
+            }
             
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
-            log.error("❌ Erro ao enviar mensagem de teste: {}", e.getMessage());
-            return ResponseEntity.ok(Map.of(
-                "sucesso", false,
-                "telefone", request.getTelefone(),
-                "timestamp", java.time.LocalDateTime.now().toString(),
-                "message", "Erro: " + e.getMessage()
-            ));
+            log.error("❌ Erro ao enviar mensagem de teste: {}", e.getMessage(), e);
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("sucesso", false);
+            errorResult.put("telefone", request.getTelefone());
+            errorResult.put("timestamp", java.time.LocalDateTime.now().toString());
+            errorResult.put("message", "Erro ao enviar mensagem: " + e.getMessage());
+            return ResponseEntity.ok(errorResult);
         }
     }
     

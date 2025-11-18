@@ -2,9 +2,11 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.PasswordResetToken;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -42,6 +44,8 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     /**
      * Invalida todos os tokens antigos de um usuário
      */
+    @Modifying
+    @Transactional
     @Query("UPDATE PasswordResetToken prt " +
            "SET prt.isExpired = TRUE " +
            "WHERE prt.user.id = :userId " +
@@ -51,6 +55,8 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     /**
      * Deleta tokens expirados há mais de 7 dias
      */
+    @Modifying
+    @Transactional
     @Query("DELETE FROM PasswordResetToken prt " +
            "WHERE prt.expiresAt < :cutoffDate")
     void deleteExpiredTokens(@Param("cutoffDate") LocalDateTime cutoffDate);

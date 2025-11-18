@@ -6,6 +6,10 @@ export interface Receipt {
   cpf: string;
   month: number;
   year: number;
+  companyId?: string;
+  companyName?: string;
+  companyCnpj?: string;
+  companySigla?: string;
   fileName: string;
   filePath: string;
   transferDate: string;
@@ -19,6 +23,20 @@ export const receiptService = {
    */
   async getAllReceipts(): Promise<Receipt[]> {
     try {
+      // Verificar se é um colaborador e filtrar por CPF
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log('👤 ReceiptService - Usuário logado:', user.name, 'Role:', user.role);
+        
+        // Se for COLABORADOR, filtrar por CPF (username é o CPF)
+        if (user.role === 'COLABORADOR' && user.username) {
+          console.log('🔒 ReceiptService - Filtrando por CPF:', user.username);
+          const response = await api.get(`/receipts?cpf=${user.username}`);
+          return response.data;
+        }
+      }
+      
       const response = await api.get('/receipts');
       return response.data;
     } catch (error) {
@@ -43,9 +61,13 @@ export const receiptService = {
   /**
    * Baixa um comprovante
    */
-  async downloadReceipt(fileName: string): Promise<void> {
+  async downloadReceipt(receiptId: string, fileName?: string): Promise<void> {
     try {
-      const response = await api.get(`/receipts/download/${fileName}`, {
+      if (!receiptId) {
+        throw new Error('ID do comprovante não informado.');
+      }
+
+      const response = await api.get(`/receipts/${encodeURIComponent(receiptId)}/download`, {
         responseType: 'blob'
       });
 
@@ -53,7 +75,7 @@ export const receiptService = {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', fileName);
+      link.setAttribute('download', fileName || `comprovante_${receiptId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -67,9 +89,13 @@ export const receiptService = {
   /**
    * Visualiza um comprovante em nova aba
    */
-  async viewReceipt(fileName: string): Promise<void> {
+  async viewReceipt(receiptId: string): Promise<void> {
     try {
-      const response = await api.get(`/receipts/view/${fileName}`, {
+      if (!receiptId) {
+        throw new Error('ID do comprovante não informado.');
+      }
+
+      const response = await api.get(`/receipts/${encodeURIComponent(receiptId)}/view`, {
         responseType: 'blob'
       });
 
@@ -130,7 +156,7 @@ export const receiptService = {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.post('/receipts/upload', formData, {
+      const response = await api.post('/receipts/process-automatic', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

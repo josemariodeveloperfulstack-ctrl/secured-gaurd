@@ -91,10 +91,12 @@ const Usuarios: React.FC = () => {
 
     // Filtro por busca
     if (searchTerm) {
+      const normalizedTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(user =>
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        extractRoleNames(user.roles).some((r: string) => r.toLowerCase().includes(searchTerm.toLowerCase()))
+        (user.name && user.name.toLowerCase().includes(normalizedTerm)) ||
+        (user.email && user.email.toLowerCase().includes(normalizedTerm)) ||
+        (user.username && user.username.toLowerCase().includes(normalizedTerm)) ||
+        extractRoleNames(user.roles).some((r: string) => r.toLowerCase().includes(normalizedTerm))
       );
     }
 

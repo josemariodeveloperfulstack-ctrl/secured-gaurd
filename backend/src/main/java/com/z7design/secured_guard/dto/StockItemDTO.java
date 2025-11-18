@@ -68,13 +68,13 @@ public class StockItemDTO {
         entity.setCategory(dto.getCategory());
         entity.setSizeVariation(dto.getSizeVariation());
         entity.setDescription(dto.getDescription());
-        entity.setCurrentQuantity(dto.getCurrentQuantity());
-        entity.setMinimumQuantity(dto.getMinimumQuantity());
+        entity.setCurrentQuantity(dto.getCurrentQuantity() != null ? dto.getCurrentQuantity() : 0);
+        entity.setMinimumQuantity(dto.getMinimumQuantity() != null ? dto.getMinimumQuantity() : 0);
         entity.setUnitCost(dto.getUnitCost());
         entity.setSupplier(dto.getSupplier());
         entity.setBarcode(dto.getBarcode());
         entity.setQrCode(dto.getQrCode());
-        entity.setActive(dto.getActive());
+        entity.setActive(dto.getActive() != null ? dto.getActive() : Boolean.TRUE);
         entity.setNotes(dto.getNotes());
         return entity;
     }

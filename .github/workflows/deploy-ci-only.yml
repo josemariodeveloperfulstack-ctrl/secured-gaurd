@@ -254,33 +254,106 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣5️⃣ HEALTH CHECK
+      # 1️⃣5️⃣ VERIFICAR STATUS DOS CONTAINERS ANTES DO HEALTH CHECK
+      # ============================================
+      - name: 🔍 Verify containers are running
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔍 Verificando status dos containers..."
+            cd /var/www/secured_guard/ci
+            
+            # Verificar se containers estão rodando
+            docker-compose -f docker-compose.ci.yml ps
+            
+            # Verificar logs do backend para ver se iniciou
+            echo ""
+            echo "📋 Últimas 30 linhas dos logs do backend:"
+            docker logs --tail 30 secured-guard-backend-ci 2>&1 || echo "⚠️ Container backend não encontrado"
+            
+            # Verificar se o backend está escutando na porta
+            echo ""
+            echo "🔌 Verificando se backend está escutando na porta 8081..."
+            timeout 5 bash -c 'until nc -z localhost 8081; do sleep 1; done' && echo "✅ Backend está escutando" || echo "⚠️ Backend ainda não está escutando"
+          EOF
+
+      # ============================================
+      # 1️⃣6️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
       # ============================================
       - name: 🏥 Health check
         run: |
           echo "🏥 Verificando saúde da aplicação CI..."
+          echo "⏳ Aguardando 60 segundos para aplicação inicializar completamente..."
+          sleep 60
           
-          MAX_ATTEMPTS=10
+          MAX_ATTEMPTS=15
           ATTEMPT=1
           
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "Tentativa $ATTEMPT de $MAX_ATTEMPTS..."
             
-            if curl -f -s -o /dev/null -w "%{http_code}" https://ci.z7botsolutions.com.br/api/health | grep -q "200"; then
+            # Tentar health check com timeout maior
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --connect-timeout 5 https://ci.z7botsolutions.com.br/api/health 2>&1 || echo "000")
+            
+            echo "HTTP Code recebido: $HTTP_CODE"
+            
+            if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health check passou! Aplicação CI está respondendo."
+              
+              # Verificar resposta completa
+              RESPONSE=$(curl -s --max-time 10 https://ci.z7botsolutions.com.br/api/health)
+              echo "Resposta completa: $RESPONSE"
+              
               exit 0
+            elif [ "$HTTP_CODE" = "000" ]; then
+              echo "⚠️ Timeout ou erro de conexão. Aplicação ainda pode estar iniciando..."
+            else
+              echo "⚠️ HTTP Code: $HTTP_CODE (esperado: 200)"
             fi
             
-            echo "⏳ Aguardando 10 segundos..."
-            sleep 10
+            # A cada 3 tentativas, verificar logs do backend
+            if [ $((ATTEMPT % 3)) -eq 0 ]; then
+              echo ""
+              echo "🔍 Verificando logs do backend (últimas 20 linhas)..."
+              sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+                cd /var/www/secured_guard/ci
+                docker logs --tail 20 secured-guard-backend-ci 2>&1 | tail -20
+              EOF
+            fi
+            
+            echo "⏳ Aguardando 15 segundos antes da próxima tentativa..."
+            sleep 15
             ATTEMPT=$((ATTEMPT + 1))
           done
           
-          echo "❌ Health check falhou!"
+          echo ""
+          echo "❌ Health check falhou após $MAX_ATTEMPTS tentativas!"
+          echo ""
+          echo "🔍 Coletando informações de diagnóstico..."
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "📋 Status dos containers:"
+            cd /var/www/secured_guard/ci
+            docker-compose -f docker-compose.ci.yml ps
+            
+            echo ""
+            echo "📋 Logs do backend (últimas 50 linhas):"
+            docker logs --tail 50 secured-guard-backend-ci 2>&1 || echo "Container não encontrado"
+            
+            echo ""
+            echo "📋 Logs do nginx (últimas 30 linhas):"
+            docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo "Container nginx não encontrado"
+            
+            echo ""
+            echo "🌐 Testando conectividade interna:"
+            curl -s -o /dev/null -w "Backend (localhost:8081): %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
+          EOF
+          
           exit 1
 
       # ============================================
-      # 1️⃣6️⃣ VALIDAR CORREÇÃO DO ERRO 405
+      # 1️⃣7️⃣ VALIDAR CORREÇÃO DO ERRO 405
       # ============================================
       - name: 🧪 Validate 405 fix
         run: |
@@ -306,7 +379,7 @@ jobs:
           fi
 
       # ============================================
-      # 1️⃣7️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 1️⃣8️⃣ NOTIFICAÇÃO DE SUCESSO
       # ============================================
       - name: 🎉 CI Deployment successful
         if: success()

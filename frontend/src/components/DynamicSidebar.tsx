@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
+import { UserRole } from '@/types/user';
 
 interface MenuItem {
   icon: React.ComponentType<unknown>;
@@ -71,6 +72,16 @@ interface MenuItem {
   role?: string;
   color?: string;
 }
+
+const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
+  COLABORADOR: new Set([
+    'dashboard',
+    'holerites',
+    'meus-holerites',
+    'mensagens',
+    'chat-interno',
+  ]),
+};
 
 export function DynamicSidebar() {
   const location = useLocation();
@@ -285,6 +296,14 @@ export function DynamicSidebar() {
       to: '/holerites',
       id: 'holerites',
       requiredPermission: 'PAYSLIPS_READ'
+    },
+    {
+      icon: Receipt,
+      text: 'Meus Holerites',
+      to: '/meus-holerites',
+      id: 'meus-holerites',
+      requiredPermission: 'PAYSLIPS_READ',
+      role: 'COLABORADOR'
     },
     {
       icon: Files,
@@ -562,7 +581,14 @@ export function DynamicSidebar() {
 
   // Organizar itens em grupos para melhor navegação
   const getMenuGroups = () => {
-    const filteredItems = getFilteredMenuItems();
+    let filteredItems = getFilteredMenuItems();
+
+    if (user) {
+      const allowedSet = ROLE_ALLOWED_ITEM_IDS[user.role as UserRole];
+      if (allowedSet) {
+        filteredItems = filteredItems.filter((item) => allowedSet.has(item.id));
+      }
+    }
 
     const groups = {
       principal: filteredItems.filter(item =>
@@ -596,7 +622,7 @@ export function DynamicSidebar() {
         ['frota'].includes(item.id)
       ),
       holerites: filteredItems.filter(item =>
-        ['holerites', 'documentos-unificados', 'unificados-por-setor', 'payrolls'].includes(item.id)
+        ['holerites', 'meus-holerites', 'documentos-unificados', 'unificados-por-setor', 'payrolls'].includes(item.id)
       ),
       mensagens: filteredItems.filter(item =>
         ['mensagens', 'chat-interno', 'gestao-mensagens', 'gestao-mensagens-internas', 'gestao-mensagens-internas-enviar', 'gestao-mensagens-internas-notificacoes', 'gestao-mensagens-internas-grupos'].includes(item.id)
@@ -667,7 +693,15 @@ export function DynamicSidebar() {
     }
 
     // Para outros usuários, filtrar por permissões
-    return allMenuItems.filter(item => {
+    const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '') as UserRole;
+    const allowedSet = ROLE_ALLOWED_ITEM_IDS[normalizedRole];
+
+    const filtered = allMenuItems.filter(item => {
+      if (allowedSet && !allowedSet.has(item.id)) {
+        console.log(`⚠️ ${normalizedRole} - removendo item não permitido: ${item.id}`);
+        return false;
+      }
+
       // Se tem role específico, verificar se o usuário tem esse role
       if (item.role && item.role !== user.role) {
         console.log(`🔍 Item ${item.text} - Role não confere: ${item.role} !== ${user.role}`);
@@ -685,6 +719,8 @@ export function DynamicSidebar() {
 
       return true;
     });
+
+    return filtered;
   };
 
   const menuGroups = getMenuGroups();

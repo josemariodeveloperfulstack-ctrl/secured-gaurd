@@ -11,9 +11,20 @@ public class PaymentReceiptDTO {
     private UUID id;
     
     private UUID employeeId;
+
+    private UUID companyId;
     
     @Size(max = 255, message = "Nome do funcionário deve ter no máximo 255 caracteres")
     private String employeeName;
+
+    @Size(max = 255, message = "Nome da empresa deve ter no máximo 255 caracteres")
+    private String companyName;
+
+    @Size(max = 20, message = "CNPJ da empresa deve ter no máximo 20 caracteres")
+    private String companyCnpj;
+
+    @Size(max = 10, message = "Sigla da empresa deve ter no máximo 10 caracteres")
+    private String companySigla;
     
     @NotNull(message = "Mês é obrigatório")
     @Min(value = 1, message = "Mês deve ser entre 1 e 12")
@@ -132,6 +143,14 @@ public class PaymentReceiptDTO {
     public void setEmployeeId(UUID employeeId) {
         this.employeeId = employeeId;
     }
+
+    public UUID getCompanyId() {
+        return companyId;
+    }
+
+    public void setCompanyId(UUID companyId) {
+        this.companyId = companyId;
+    }
     
     public String getEmployeeName() {
         return employeeName;
@@ -139,6 +158,30 @@ public class PaymentReceiptDTO {
     
     public void setEmployeeName(String employeeName) {
         this.employeeName = employeeName;
+    }
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
+
+    public String getCompanyCnpj() {
+        return companyCnpj;
+    }
+
+    public void setCompanyCnpj(String companyCnpj) {
+        this.companyCnpj = companyCnpj;
+    }
+
+    public String getCompanySigla() {
+        return companySigla;
+    }
+
+    public void setCompanySigla(String companySigla) {
+        this.companySigla = companySigla;
     }
     
     public Integer getMonth() {
@@ -379,7 +422,11 @@ public class PaymentReceiptDTO {
         return "PaymentReceiptDTO{" +
                 "id=" + id +
                 ", employeeId=" + employeeId +
+                ", companyId=" + companyId +
                 ", employeeName='" + employeeName + '\'' +
+                ", companyName='" + companyName + '\'' +
+                ", companyCnpj='" + companyCnpj + '\'' +
+                ", companySigla='" + companySigla + '\'' +
                 ", month=" + month +
                 ", year=" + year +
                 ", receiptNumber='" + receiptNumber + '\'' +

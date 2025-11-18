@@ -104,6 +104,19 @@ export const unifiedDocumentService = {
       console.error('Erro ao visualizar documento unificado:', error);
       throw error;
     }
+  },
+
+  /**
+   * Busca organização de documentos unificados por Empresa/Setor/Ano/Mês
+   */
+  async getOrganization(): Promise<any> {
+    try {
+      const response = await api.get('/api/unified-documents/organization');
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar organização de documentos unificados:', error);
+      throw error;
+    }
   }
 };
 
@@ -133,6 +146,7 @@ function normalizeDocuments(data: unknown): UnifiedDocument[] {
       const normalized: UnifiedDocument = {
         ...doc,
         fileName: candidateFileName,
+        unifiedFileName: doc?.unifiedFileName ?? candidateFileName,
         filePath: doc?.filePath,
         employeeName: doc?.employeeName,
         cpf: doc?.cpf,

@@ -15,6 +15,11 @@ export interface Holerite {
   updatedAt?: string;
   createdBy?: string;
   updatedBy?: string;
+  companyName?: string;
+  companyCnpj?: string;
+  companySigla?: string;
+  companyId?: string;
+  workPostName?: string;
   // Campos adicionais específicos de holerites
   grossSalary?: number;
   netSalary?: number;
@@ -32,6 +37,53 @@ export interface HoleriteFilters {
   month?: number;
   year?: number;
   status?: string;
+}
+
+export interface HoleriteOrganizedEntry {
+  id: string;
+  employeeName: string;
+  cpf: string;
+  month: number;
+  year: number;
+  fileName: string;
+  companySigla: string;
+  companyName: string;
+  companyCnpj: string;
+  sectorName: string;
+  workPostName?: string;
+  processedAt?: string;
+}
+
+export interface HoleritePeriodGroup {
+  month: number;
+  year: number;
+  formattedPeriod: string;
+  totalPayslips: number;
+  payslips: HoleriteOrganizedEntry[];
+}
+
+export interface HoleriteSectorGroup {
+  sectorName: string;
+  normalizedSectorName: string;
+  totalPayslips: number;
+  periods: HoleritePeriodGroup[];
+}
+
+export interface HoleriteCompanyGroup {
+  companyId?: string;
+  companySigla: string;
+  companyName: string;
+  companyCnpj: string;
+  totalPayslips: number;
+  sectors: HoleriteSectorGroup[];
+}
+
+export interface HoleriteOrganizationResponse {
+  generatedAt?: string;
+  totalPayslips: number;
+  totalCompanies: number;
+  totalSectors: number;
+  companies: HoleriteCompanyGroup[];
 }
 
 export interface ProcessingResult {
@@ -85,8 +137,25 @@ class HoleriteService {
   async getAllHolerites(): Promise<Holerite[]> {
     try {
       console.log('🔍 Buscando todos os holerites...');
+      
+      // Verificar se é um colaborador e filtrar por CPF
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log('👤 Usuário logado:', user.name, 'Role:', user.role);
+        
+        // Se for COLABORADOR, filtrar por CPF (username é o CPF)
+        if (user.role === 'COLABORADOR' && user.username) {
+          console.log('🔒 Filtrando holerites por CPF:', user.username);
+          const response = await api.get(`/payslips?cpf=${user.username}`);
+          console.log('✅ Holerites do colaborador carregados:', response.data.length);
+          return response.data;
+        }
+      }
+      
+      // Para outros roles, buscar todos
       const response = await api.get('/payslips');
-      console.log('✅ Holerites carregados:', response.data);
+      console.log('✅ Holerites carregados:', response.data.length);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao carregar holerites:', error);
@@ -278,6 +347,17 @@ class HoleriteService {
     }
   }
 
+  async getOrganizationByCompany(): Promise<HoleriteOrganizationResponse> {
+    try {
+      console.log('📊 Buscando organização de holerites por empresa/setor/período...');
+      const response = await api.get('/payslips/organization');
+      return response.data as HoleriteOrganizationResponse;
+    } catch (error) {
+      console.error('❌ Erro ao carregar organização de holerites:', error);
+      throw error;
+    }
+  }
+
   // Buscar holerites por CPF
   async getHoleritesByCpf(cpf: string): Promise<Holerite[]> {
     try {
@@ -327,7 +407,7 @@ class HoleriteService {
   }
 
   // Verificar status de processamento assíncrono
-  async getProcessingStatus(sessionId: string): Promise<any> {
+  async getProcessingStatus(sessionId: string): Promise<unknown> {
     try {
       console.log('🔍 Verificando status de processamento:', sessionId);
       

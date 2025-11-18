@@ -2,9 +2,11 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.FacialEmbedding;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -77,6 +79,8 @@ public interface FacialEmbeddingRepository extends JpaRepository<FacialEmbedding
     /**
      * Desativa embeddings expirados
      */
+    @Modifying
+    @Transactional
     @Query("UPDATE FacialEmbedding fe SET fe.isActive = false WHERE fe.lastUsed < :expiryDate AND fe.isActive = true")
     void deactivateExpiredEmbeddings(@Param("expiryDate") java.time.LocalDateTime expiryDate);
 }

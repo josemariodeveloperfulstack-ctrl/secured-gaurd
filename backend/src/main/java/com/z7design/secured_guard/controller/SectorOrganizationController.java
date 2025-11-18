@@ -244,10 +244,11 @@ public class SectorOrganizationController {
         try {
             String filePath = (String) request.get("filePath");
             String cpf = (String) request.get("cpf");
+            String employeeName = (String) request.get("employeeName");
             
             log.info("📧 Solicitação de envio por email: CPF={}, Arquivo={}", cpf, filePath);
             
-            Map<String, Object> result = sectorOrganizationService.sendDocumentByEmail(filePath, cpf);
+            Map<String, Object> result = sectorOrganizationService.sendDocumentByEmail(filePath, cpf, employeeName);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);

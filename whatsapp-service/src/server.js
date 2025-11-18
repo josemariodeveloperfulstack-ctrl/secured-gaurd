@@ -171,6 +171,15 @@ app.post('/instance/logout', async (req, res) => {
     if (fs.existsSync(authPath)) {
       fs.rmSync(authPath, { recursive: true, force: true });
     }
+    
+    // Forçar reconexão após logout para gerar novo QR Code
+    console.log('🔄 Forçando reconexão após logout...');
+    setTimeout(() => {
+      connectToWhatsApp().catch(err => {
+        console.error('Failed to reconnect after logout:', err);
+      });
+    }, 1000);
+    
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -180,24 +189,41 @@ app.post('/instance/logout', async (req, res) => {
 // Send text message
 app.post('/message/text', async (req, res) => {
   try {
-    const id = (req.body.id || '').trim();
-    const message = (req.body.message || '').trim();
+    // Suportar tanto JSON quanto form-urlencoded
+    let id, message;
+    if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
+      // Parse form-urlencoded
+      const querystring = require('querystring');
+      const body = querystring.parse(req.body);
+      id = (body.id || '').trim();
+      message = (body.message || '').trim();
+    } else {
+      // JSON
+      id = (req.body.id || '').trim();
+      message = (req.body.message || '').trim();
+    }
+    
+    console.log('[SEND TEXT] Recebido - id:', id, 'message:', message?.substring(0, 50));
     
     if (!ready || !sock) {
+      console.log('[SEND TEXT] Erro: Client not ready');
       return res.status(503).json({ success: false, error: 'Client not ready' });
     }
     
     if (!id || !message) {
+      console.log('[SEND TEXT] Erro: id or message missing');
       return res.status(400).json({ success: false, error: 'id and message required' });
     }
     
-      const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-      console.log('[SEND TEXT] id:', id, '-> jid:', jid);
+    const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+    console.log('[SEND TEXT] Enviando - id:', id, '-> jid:', jid, 'message length:', message.length);
     
     await sock.sendMessage(jid, { text: message });
     
-      res.json({ success: true, jid });
+    console.log('[SEND TEXT] ✅ Mensagem enviada com sucesso para:', jid);
+    res.json({ success: true, jid });
   } catch (e) {
+    console.error('[SEND TEXT] ❌ Erro:', e.message);
     res.status(500).json({ success: false, error: e.message });
   }
 });

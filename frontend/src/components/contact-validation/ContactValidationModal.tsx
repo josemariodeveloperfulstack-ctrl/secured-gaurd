@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, AlertCircle, XCircle, UserPlus, Phone, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, XCircle, UserPlus, Phone, Loader2, Edit } from 'lucide-react';
 import { contactValidationService, ContactValidationDetail, ContactValidationResponse } from '@/services/contactValidationService';
 import { useToast } from '@/hooks/use-toast';
 import { QuickUserFormModal } from './QuickUserFormModal';
 import { WhatsAppUpdateModal } from './WhatsAppUpdateModal';
+import { WhatsAppConsentConfirmationModal } from './WhatsAppConsentConfirmationModal';
 
 interface ContactValidationModalProps {
   open: boolean;
@@ -36,6 +37,9 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
   const [selectedForAction, setSelectedForAction] = useState<ContactValidationDetail | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [consentDetail, setConsentDetail] = useState<ContactValidationDetail | null>(null);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [bulkConsentLoading, setBulkConsentLoading] = useState(false);
 
   useEffect(() => {
     if (open && employeeIds.length > 0) {
@@ -74,6 +78,21 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
   const handleAddWhatsApp = (detail: ContactValidationDetail) => {
     setSelectedForAction(detail);
     setShowWhatsAppModal(true);
+  };
+
+  const handleEditOrCreateUser = (detail: ContactValidationDetail) => {
+    // Se não tem usuário, abre modal de criação
+    if (detail.needsUserCreation || !detail.hasUser) {
+      handleCreateUser(detail);
+    } else if (detail.hasUser) {
+      // Se tem usuário mas precisa de atualização, verifica o que falta
+      if (detail.needsWhatsAppUpdate && (sendType === 'whatsapp' || sendType === 'both')) {
+        handleAddWhatsApp(detail);
+      } else {
+        // Se tem usuário mas precisa de cadastro completo, abre modal de criação (que permitirá editar)
+        handleCreateUser(detail);
+      }
+    }
   };
 
   const handleUserCreated = () => {
@@ -136,6 +155,80 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
     }
   };
 
+  const isWhatsAppFlow = sendType === 'whatsapp' || sendType === 'both';
+  const consentPendingDetails = isWhatsAppFlow && validationData
+    ? validationData.details.filter((detail) => {
+        const whatsappError = detail.whatsappError?.toLowerCase() || '';
+        return detail.hasUser && (detail.needsWhatsAppConsent || whatsappError.includes('consent'));
+      })
+    : [];
+  const consentEligibleDetails = consentPendingDetails?.filter((detail) => detail.userId);
+
+  // Funcionários não encontrados (precisam de cadastro ou edição)
+  const notFoundDetails = validationData
+    ? validationData.details.filter((detail) => {
+        const needsCreation = detail.needsUserCreation || !detail.hasUser;
+        const hasError = detail.status === 'error' && 
+          (detail.generalError?.toLowerCase().includes('não encontrado') ||
+           detail.generalError?.toLowerCase().includes('não cadastrado') ||
+           detail.generalError?.toLowerCase().includes('não existe'));
+        return needsCreation || hasError;
+      })
+    : [];
+
+  const openConsentModal = (detail: ContactValidationDetail) => {
+    setConsentDetail(detail);
+    setShowConsentModal(true);
+  };
+
+  const handleConsentModalClose = () => {
+    if (!bulkConsentLoading) {
+      setShowConsentModal(false);
+      setConsentDetail(null);
+    }
+  };
+
+  const handleConsentGranted = async () => {
+    setShowConsentModal(false);
+    setConsentDetail(null);
+    await validateContacts();
+    toast({
+      title: 'Consentimento registrado',
+      description: 'O colaborador foi autorizado a receber mensagens via WhatsApp.',
+    });
+  };
+
+  const handleBulkConsent = async () => {
+    if (!consentEligibleDetails || consentEligibleDetails.length === 0) {
+      toast({
+        title: 'Nenhum usuário elegível',
+        description: 'Não há usuários com cadastro válido para registrar consentimento.',
+      });
+      return;
+    }
+    setBulkConsentLoading(true);
+    try {
+      for (const detail of consentEligibleDetails) {
+        if (!detail.userId) continue;
+        await contactValidationService.grantWhatsAppConsent(detail.userId, detail.userWhatsapp);
+      }
+      toast({
+        title: 'Consentimento atualizado',
+        description: `${consentEligibleDetails.length} colaborador(es) marcados como autorizados.`,
+      });
+      await validateContacts();
+    } catch (error: any) {
+      console.error('Erro ao registrar consentimentos:', error);
+      toast({
+        title: 'Erro ao registrar consentimento',
+        description: error?.response?.data?.message || 'Falha ao registrar consentimento em massa.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkConsentLoading(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
@@ -180,6 +273,119 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
                     {validationData.message}
                   </AlertDescription>
                 </Alert>
+              )}
+
+              {/* Funcionários não encontrados */}
+              {notFoundDetails && notFoundDetails.length > 0 && (
+                <div className="rounded-lg border border-red-600 bg-red-900/20 p-4 space-y-3">
+                  <div>
+                    <p className="text-red-200 font-semibold flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-red-400" />
+                      {notFoundDetails.length} funcionário(s) não encontrado(s) no banco de dados
+                    </p>
+                    <p className="text-sm text-red-100/80 mt-1">
+                      É necessário cadastrar ou editar os dados desses funcionários antes do envio.
+                    </p>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {notFoundDetails.map((detail) => (
+                      <div
+                        key={detail.employeeId}
+                        className="flex items-center justify-between border border-red-700/40 rounded-lg px-4 py-3 bg-seguranca-black/60"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-seguranca-lightgray">
+                            {detail.employeeName || 'Nome não informado'}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">CPF: {detail.employeeCpf}</p>
+                          {detail.employeeEmail && (
+                            <p className="text-xs text-gray-400">Email: {detail.employeeEmail}</p>
+                          )}
+                          {detail.employeePhone && (
+                            <p className="text-xs text-gray-400">Telefone: {detail.employeePhone}</p>
+                          )}
+                          {detail.statusMessage && (
+                            <p className="text-xs text-red-300 mt-1">{detail.statusMessage}</p>
+                          )}
+                          {detail.generalError && (
+                            <p className="text-xs text-red-400 mt-1">⚠️ {detail.generalError}</p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-green-500 text-green-300 hover:bg-green-500/10 ml-4"
+                          onClick={() => handleEditOrCreateUser(detail)}
+                        >
+                          {detail.needsUserCreation || !detail.hasUser ? (
+                            <>
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              Cadastrar
+                            </>
+                          ) : (
+                            <>
+                              <Edit className="h-4 w-4 mr-1" />
+                              Editar
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Consentimento pendente */}
+              {isWhatsAppFlow && consentPendingDetails && consentPendingDetails.length > 0 && (
+                <div className="rounded-lg border border-yellow-600 bg-yellow-900/20 p-4 space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-yellow-200 font-semibold">
+                        {consentPendingDetails.length} colaborador(es) sem consentimento WhatsApp
+                      </p>
+                      <p className="text-sm text-yellow-100/80">
+                        Eles não serão enviados até que o consentimento seja registrado.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleBulkConsent}
+                      disabled={bulkConsentLoading}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {bulkConsentLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Registrando...
+                        </>
+                      ) : (
+                        <>Aceitar consentimento para todos</>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {consentPendingDetails.map((detail) => (
+                      <div
+                        key={detail.employeeId}
+                        className="flex items-center justify-between border border-yellow-700/40 rounded-lg px-3 py-2 bg-seguranca-black/60"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-seguranca-lightgray">
+                            {detail.employeeName}
+                          </p>
+                          <p className="text-xs text-gray-400">{detail.employeeCpf}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-yellow-500 text-yellow-300 hover:bg-yellow-500/10"
+                          onClick={() => openConsentModal(detail)}
+                        >
+                          Aceitar consentimento
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* Lista de funcionários */}
@@ -260,6 +466,16 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
                               Adicionar WhatsApp
                             </Button>
                           )}
+                          {isWhatsAppFlow && detail.hasUser && (detail.needsWhatsAppConsent || (detail.whatsappError || '').toLowerCase().includes('consent')) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openConsentModal(detail)}
+                              className="border-yellow-500 text-yellow-300 hover:bg-yellow-500/10"
+                            >
+                              Aceitar consentimento
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -300,6 +516,15 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
             onSuccess={handleWhatsAppUpdated}
           />
         </>
+      )}
+
+      {consentDetail && (
+        <WhatsAppConsentConfirmationModal
+          open={showConsentModal}
+          onClose={handleConsentModalClose}
+          employeeDetail={consentDetail}
+          onConsentGranted={handleConsentGranted}
+        />
       )}
     </>
   );

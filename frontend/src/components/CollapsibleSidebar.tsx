@@ -5,6 +5,7 @@ import { useScrollPreservation } from '@/hooks/useScrollPreservation';
 import { Button } from '@/components/ui/button';
 import { ScrollPreservingLink } from './ScrollPreservingLink';
 import UserProfileModal from './UserProfileModal';
+import { UserRole } from '@/types/user';
 import {
   BarChart3,
   FileText,
@@ -245,6 +246,17 @@ const sistemaMenuItems = [
   { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
 ];
 
+const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
+  COLABORADOR: new Set([
+    'dashboard',
+    'holerites',
+    'chat-interno',
+    'gestao-mensagens-enviar',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+  ]),
+};
+
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   collapsed,
   isMobile,
@@ -254,6 +266,19 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   const { user } = useAuth();
   const { forceScrollToTop } = useScrollPreservation();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const normalizedRole = useMemo(
+    () => (user?.role ?? '').replace(/^ROLE_/, '').toUpperCase() as UserRole,
+    [user?.role]
+  );
+  const allowedItemIds = useMemo(() => ROLE_ALLOWED_ITEM_IDS[normalizedRole], [normalizedRole]);
+
+  const filterItemsForRole = useCallback(<T extends { id: string }>(items: T[]): T[] => {
+    if (!allowedItemIds) {
+      return items;
+    }
+    return items.filter(item => allowedItemIds.has(item.id));
+  }, [allowedItemIds]);
 
   const handleProfileClick = () => {
     setIsProfileModalOpen(true);
@@ -298,6 +323,19 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     if (!requiredPermission) return true;
     return hasPermission(requiredPermission);
   }, [hasPermission]);
+
+  const filteredMainMenuItems = useMemo(() => filterItemsForRole(mainMenuItems), [filterItemsForRole]);
+  const filteredFinanceiroItems = useMemo(() => filterItemsForRole(financeiroMenuItems), [filterItemsForRole]);
+  const filteredOperacionalItems = useMemo(() => filterItemsForRole(operacionalMenuItems), [filterItemsForRole]);
+  const filteredRhItems = useMemo(() => filterItemsForRole(rhMenuItems), [filterItemsForRole]);
+  const filteredSstItems = useMemo(() => filterItemsForRole(sstMenuItems), [filterItemsForRole]);
+  const filteredDepartamentoPessoalItems = useMemo(() => filterItemsForRole(departamentoPessoalMenuItems), [filterItemsForRole]);
+  const filteredComercialItems = useMemo(() => filterItemsForRole(comercialMenuItems), [filterItemsForRole]);
+  const filteredEstoqueItems = useMemo(() => filterItemsForRole(estoqueMenuItems), [filterItemsForRole]);
+  const filteredComprasItems = useMemo(() => filterItemsForRole(comprasMenuItems), [filterItemsForRole]);
+  const filteredComunicacaoInternaItems = useMemo(() => filterItemsForRole(comunicacaoInternaMenuItems), [filterItemsForRole]);
+  const filteredAtendimentoItems = useMemo(() => filterItemsForRole(atendimentoMenuItems), [filterItemsForRole]);
+  const filteredSistemaItems = useMemo(() => filterItemsForRole(sistemaMenuItems), [filterItemsForRole]);
 
   const getActiveId = () => {
     const path = location.pathname;
@@ -407,15 +445,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               </div>
             )}
             <nav className="space-y-1 px-4">
-              {mainMenuItems
-                .filter(item => {
-                  // Se for COLABORADOR, mostra apenas Dashboard
-                  if (user?.role === 'ROLE_COLABORADOR' || user?.role === 'COLABORADOR') {
-                    return item.id === 'dashboard';
-                  }
-                  return true;
-                })
-                .map((item) => (
+              {filteredMainMenuItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -441,7 +471,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           </div>
 
           {/* Módulo Financeiro */}
-          {shouldShowModule('FINANCIAL_READ') && (
+          {shouldShowModule('FINANCIAL_READ') && filteredFinanceiroItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -449,7 +479,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {financeiroMenuItems.map((item) => (
+                {filteredFinanceiroItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -476,7 +506,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Operacional */}
-          {shouldShowModule() && (
+          {shouldShowModule() && filteredOperacionalItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -484,7 +514,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {operacionalMenuItems.map((item) => (
+                {filteredOperacionalItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -511,7 +541,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo RH */}
-          {shouldShowModule('EMPLOYEES_READ') && (
+          {shouldShowModule('EMPLOYEES_READ') && filteredRhItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -519,7 +549,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {rhMenuItems.map((item) => (
+                {filteredRhItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -546,7 +576,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo SST */}
-          {shouldShowModule('EMPLOYEES_READ') && (
+          {shouldShowModule('EMPLOYEES_READ') && filteredSstItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -554,7 +584,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {sstMenuItems.map((item) => (
+                {filteredSstItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -581,7 +611,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Departamento Pessoal */}
-          {shouldShowModule('EMPLOYEES_READ') && (
+          {shouldShowModule('EMPLOYEES_READ') && filteredDepartamentoPessoalItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider ml-4">
@@ -589,7 +619,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {departamentoPessoalMenuItems.map((item) => (
+                {filteredDepartamentoPessoalItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -616,103 +646,109 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Comercial */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Comercial
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-              {comercialMenuItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  className={`
-                    flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive(item.id) 
-                      ? 'bg-seguranca-black text-seguranca-yellow' 
-                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                    }
-                  `}
-                >
-                  <item.icon 
-                    size={18} 
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
-            </nav>
-          </div>
+          {filteredComercialItems.length > 0 && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Comercial
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {filteredComercialItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    preserveScroll={true}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
 
           {/* Grupo Estoque Simplificado */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Estoque
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-              {estoqueMenuItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  className={`
-                    flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive(item.id) 
-                      ? 'bg-seguranca-black text-seguranca-yellow' 
-                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                    }
-                  `}
-                >
-                  <item.icon 
-                    size={18} 
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
-            </nav>
-          </div>
+          {filteredEstoqueItems.length > 0 && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Estoque
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {filteredEstoqueItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    preserveScroll={true}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
 
           {/* Grupo Compras */}
-          <div className="mb-6">
-            {!collapsed && (
-              <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                Compras
-              </div>
-            )}
-            <nav className="space-y-1 px-4">
-              {comprasMenuItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  className={`
-                    flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive(item.id) 
-                      ? 'bg-seguranca-black text-seguranca-yellow' 
-                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                    }
-                  `}
-                >
-                  <item.icon 
-                    size={18} 
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
-            </nav>
-          </div>
+          {filteredComprasItems.length > 0 && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Compras
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {filteredComprasItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    preserveScroll={true}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id) 
+                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon 
+                      size={18} 
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
 
           {/* Grupo Suporte - REMOVIDO (substituído por Gestão de Atendimento) */}
           {/* {shouldShowModule('SUPPORT_READ') && (
@@ -750,7 +786,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )} */}
 
           {/* Grupo Comunicação Interna (Unificado) */}
-          {shouldShowModule('MESSAGES_READ') && (
+          {shouldShowModule('MESSAGES_READ') && filteredComunicacaoInternaItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -758,7 +794,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {comunicacaoInternaMenuItems.map((item) => (
+                {filteredComunicacaoInternaItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -785,7 +821,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Atendimento */}
-          {shouldShowModule('ATTENDANCE_READ') && (
+          {shouldShowModule('ATTENDANCE_READ') && filteredAtendimentoItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -793,7 +829,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {atendimentoMenuItems.map((item) => (
+                {filteredAtendimentoItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}
@@ -820,7 +856,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Módulo Sistema - SUPER_ADMIN */}
-          {user?.role === 'SUPER_ADMIN' && (
+          {user?.role === 'SUPER_ADMIN' && filteredSistemaItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -828,7 +864,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {sistemaMenuItems.map((item) => (
+                {filteredSistemaItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}

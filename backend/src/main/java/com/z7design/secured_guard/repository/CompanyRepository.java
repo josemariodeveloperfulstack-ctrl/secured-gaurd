@@ -19,6 +19,8 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
      * Busca empresa por sigla
      */
     Optional<Company> findBySigla(String sigla);
+
+    Optional<Company> findFirstBySiglaIgnoreCase(String sigla);
     
     /**
      * Verifica se existe empresa com a sigla
@@ -29,6 +31,18 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
      * Busca empresa por CNPJ
      */
     Optional<Company> findByCnpj(String cnpj);
+    
+    /**
+     * Busca empresa por CNPJ normalizado (apenas dígitos)
+     */
+    @Query("SELECT c FROM Company c " +
+           "WHERE REPLACE(REPLACE(REPLACE(c.cnpj, '.', ''), '-', ''), '/', '') = :cnpj")
+    Optional<Company> findByNormalizedCnpj(@Param("cnpj") String cnpj);
+
+    @Query("SELECT c FROM Company c " +
+           "WHERE LOWER(REPLACE(REPLACE(REPLACE(c.name, ' ', ''), '.', ''), '-', '')) = " +
+           "LOWER(REPLACE(REPLACE(REPLACE(:normalizedName, ' ', ''), '.', ''), '-', ''))")
+    Optional<Company> findByNormalizedName(@Param("normalizedName") String normalizedName);
     
     /**
      * Verifica se existe empresa com o CNPJ

@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -33,6 +35,17 @@ public class Payslip {
     @Column(length = 20)
     private String companyCnpj;
     
+    @Column(name = "company_sigla", length = 10)
+    private String companySigla;
+    
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
+    
+    @Column(name = "work_post_name", length = 150)
+    private String workPostName;
+    
     @Column(nullable = false)
     private Integer month;
     
@@ -48,5 +61,10 @@ public class Payslip {
     @PrePersist
     protected void onCreate() {
         processedAt = LocalDateTime.now();
+    }
+
+    @JsonProperty("companyId")
+    public UUID getCompanyId() {
+        return company != null ? company.getId() : null;
     }
 } 

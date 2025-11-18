@@ -34,6 +34,7 @@ import java.util.function.Function;
 public class ReceiptProcessingService {
 
     private final PaymentReceiptRepository receiptRepository;
+    private final PaymentReceiptService paymentReceiptService;
     private final String UPLOAD_DIR = "uploads/receipts/";
 
     @Transactional
@@ -84,7 +85,7 @@ public class ReceiptProcessingService {
                 }
                 
                 // Extrair informações do recibo
-                PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1, new java.io.ByteArrayInputStream(fileBytes));
+            PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1, new java.io.ByteArrayInputStream(fileBytes));
                 if (receipt != null) {
                     log.info("✅ Recibo extraído da página {}: {}", pageNum + 1, receipt.getEmployeeName());
                     extractedReceipts.add(receipt);
@@ -177,6 +178,8 @@ public class ReceiptProcessingService {
 
             PaymentReceipt receipt = PaymentReceipt.builder()
                     .employeeName(receiptData.employeeName != null ? receiptData.employeeName.trim() : "Nome não extraído")
+                    .companyName(receiptData.companyName != null ? receiptData.companyName.trim() : null)
+                    .companyCnpj(receiptData.companyCnpj != null ? receiptData.companyCnpj : null)
                     .month(receiptData.month)
                     .year(receiptData.year)
                     .grossSalary(receiptData.amount != null ? java.math.BigDecimal.valueOf(receiptData.amount) : java.math.BigDecimal.ZERO)
@@ -201,6 +204,8 @@ public class ReceiptProcessingService {
                     .statementIdentification("SISPAG SALARIOS")
                     .build();
 
+            paymentReceiptService.applyCompanyHierarchy(receipt);
+
             log.info("Recibo criado com sucesso para: {} (Mês: {}, Ano: {}, Valor: {})", 
                     receipt.getEmployeeName(), receipt.getMonth(), receipt.getYear(), receipt.getGrossSalary());
             return receipt;
@@ -217,6 +222,7 @@ public class ReceiptProcessingService {
         String agency;
         String account;
         String companyName;
+        String companyCnpj;
         String creditedAgency;
         String creditedAccount;
         Double amount;
@@ -382,6 +388,15 @@ public class ReceiptProcessingService {
             }
             
             data.companyName = companyName;
+
+            // Extrair CNPJ se houver
+            Pattern cnpjPattern = Pattern.compile("(\\d{2}[\\.\\s]?\\d{3}[\\.\\s]?\\d{3}[\\/\\s]?\\d{4}[-\\s]?\\d{2})");
+            Matcher cnpjMatcher = cnpjPattern.matcher(text);
+            if (cnpjMatcher.find()) {
+                String cnpj = cnpjMatcher.group(1);
+                data.companyCnpj = cnpj != null ? cnpj.trim() : null;
+                log.info("✅ CNPJ encontrado: {}", data.companyCnpj);
+            }
 
             // Extrair dados da conta creditada (funcionário)
             String creditedAgency = null;

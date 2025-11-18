@@ -102,9 +102,7 @@ const getFunctionalitiesForRole = (role: string): Functionality[] => {
       { id: 'dashboard', name: 'Meu Painel', description: 'Dashboard pessoal', icon: 'LayoutDashboard', route: '/dashboard-colaborador', category: 'primary', order: 1 },
       { id: 'profile', name: 'Meu Perfil', description: 'Meus dados pessoais', icon: 'User', route: '/perfil', category: 'personal', order: 2 },
       { id: 'payslips', name: 'Meus Holerites', description: 'Consultar holerites', icon: 'Receipt', route: '/meus-holerites', category: 'personal', order: 3 },
-      { id: 'vacations', name: 'Minhas Férias', description: 'Consultar férias', icon: 'Palmtree', route: '/minhas-ferias', category: 'personal', order: 4 },
-      { id: 'documents', name: 'Meus Documentos', description: 'Documentos pessoais', icon: 'FileText', route: '/meus-documentos', category: 'personal', order: 5 },
-      { id: 'messages', name: 'Mensagens', description: 'Central de mensagens', icon: 'MessageSquare', route: '/mensagens', category: 'communication', order: 6 }
+      { id: 'messages', name: 'Mensagens', description: 'Central de mensagens', icon: 'MessageSquare', route: '/mensagens', category: 'communication', order: 4 }
     ],
 
     VIGILANTE: [

@@ -4,6 +4,10 @@ export interface PaymentReceipt {
   id: string;
   employeeId?: string;
   employeeName: string;
+  companyId?: string;
+  companyName?: string;
+  companyCnpj?: string;
+  companySigla?: string;
   month: number;
   year: number;
   receiptNumber?: string;
@@ -37,6 +41,10 @@ export interface PaymentReceipt {
 export interface CreatePaymentReceiptDTO {
   employeeId?: string;
   employeeName: string;
+  companyId?: string;
+  companyName?: string;
+  companyCnpj?: string;
+  companySigla?: string;
   month: number;
   year: number;
   fileName: string;
@@ -161,7 +169,7 @@ class PaymentReceiptService {
       formData.append('year', year.toString());
       
       // Fazer upload via endpoint específico
-      const response = await api.post('/receipts/upload', formData, {
+      const response = await api.post('/receipts/process-automatic', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

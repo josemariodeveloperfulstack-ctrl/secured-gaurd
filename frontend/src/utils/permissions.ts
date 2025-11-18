@@ -459,20 +459,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         PROFILE_READ: true,
         PROFILE_WRITE: true,
         PAYSLIPS_READ: true,
-        REPORTS_READ: true,
-        LEADS_READ: true,
-        LEADS_WRITE: true,
-        LEADS_CREATE: true,
-        PROPOSALS_READ: true,
-        PROPOSALS_WRITE: true,
-        PROPOSALS_CREATE: true,
-        QUOTES_READ: true,
-        QUOTES_WRITE: true,
-        QUOTES_CREATE: true,
         
         // Permissões de Mensagens
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
+        MESSAGES_DELETE: true,
         MESSAGES_CREATE: true,
       };
 

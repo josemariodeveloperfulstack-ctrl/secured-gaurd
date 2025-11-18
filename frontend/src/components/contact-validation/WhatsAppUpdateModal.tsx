@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 interface WhatsAppUpdateModalProps {
   open: boolean;
   onClose: () => void;
-  employeeDetail: ContactValidationDetail;
+  employeeDetail?: ContactValidationDetail | null;
   onSuccess: () => void;
 }
 
@@ -24,6 +24,7 @@ export const WhatsAppUpdateModal: React.FC<WhatsAppUpdateModalProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [whatsapp, setWhatsapp] = useState('');
+  const isReady = Boolean(employeeDetail?.userId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +49,7 @@ export const WhatsAppUpdateModal: React.FC<WhatsAppUpdateModalProps> = ({
       return;
     }
 
-    if (!employeeDetail.userId) {
+    if (!employeeDetail?.userId) {
       toast({
         title: '❌ Erro',
         description: 'ID do usuário não encontrado',
@@ -103,6 +104,14 @@ export const WhatsAppUpdateModal: React.FC<WhatsAppUpdateModalProps> = ({
     setWhatsapp(formatted);
   };
 
+  useEffect(() => {
+    if (employeeDetail?.userWhatsapp) {
+      setWhatsapp(formatWhatsApp(employeeDetail.userWhatsapp));
+    } else {
+      setWhatsapp('');
+    }
+  }, [employeeDetail, open]);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md bg-seguranca-black border-gray-700">
@@ -112,22 +121,31 @@ export const WhatsAppUpdateModal: React.FC<WhatsAppUpdateModalProps> = ({
             Adicionar WhatsApp
           </DialogTitle>
           <DialogDescription className="text-gray-400">
-            {employeeDetail.employeeName}
+            {employeeDetail?.employeeName ?? 'Funcionário não identificado'}
           </DialogDescription>
         </DialogHeader>
+
+        {!isReady && (
+          <Alert className="bg-yellow-900/20 border-yellow-600 mb-4">
+            <Info className="h-4 w-4 text-yellow-400" />
+            <AlertDescription className="text-yellow-200 text-sm">
+              Não foi possível carregar os dados completos do colaborador. Verifique se existe um cadastro associado.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Informações do usuário */}
           <Alert className="bg-blue-900/20 border-blue-600">
             <Info className="h-4 w-4 text-blue-400" />
             <AlertDescription className="text-blue-200 text-sm">
-              <strong>CPF:</strong> {employeeDetail.employeeCpf}<br />
-              <strong>Email:</strong> {employeeDetail.userEmail || 'Não cadastrado'}
+              <strong>CPF:</strong> {employeeDetail?.employeeCpf ?? 'Não informado'}<br />
+              <strong>Email:</strong> {employeeDetail?.userEmail || 'Não cadastrado'}
             </AlertDescription>
           </Alert>
 
           {/* WhatsApp atual */}
-          {employeeDetail.userWhatsapp && (
+          {employeeDetail?.userWhatsapp && (
             <div className="p-3 bg-gray-800 rounded border border-gray-700">
               <p className="text-sm text-gray-400">WhatsApp atual:</p>
               <p className="text-seguranca-lightgray font-mono">{employeeDetail.userWhatsapp}</p>
@@ -149,6 +167,7 @@ export const WhatsAppUpdateModal: React.FC<WhatsAppUpdateModalProps> = ({
               maxLength={15}
               required
               autoFocus
+              disabled={!isReady}
             />
             <p className="text-xs text-gray-500">
               Digite apenas números com DDD (ex: 11999999999)
@@ -169,7 +188,7 @@ export const WhatsAppUpdateModal: React.FC<WhatsAppUpdateModalProps> = ({
             </Button>
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isReady}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {loading ? (

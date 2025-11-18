@@ -137,6 +137,14 @@ const Holerites: React.FC = () => {
   const [unifiedMonthFilter, setUnifiedMonthFilter] = useState<string>('');
   const [unifiedYearFilter, setUnifiedYearFilter] = useState<string>('');
   
+  // Estados para organização de documentos unificados por empresa/setor
+  const [unifiedOrganizationData, setUnifiedOrganizationData] = useState<HoleriteOrganizationResponse | null>(null);
+  const [loadingUnifiedOrganization, setLoadingUnifiedOrganization] = useState(false);
+  const [unifiedOrganizationError, setUnifiedOrganizationError] = useState<string | null>(null);
+  const [expandedUnifiedCompanies, setExpandedUnifiedCompanies] = useState<Record<string, boolean>>({});
+  const [expandedUnifiedSectors, setExpandedUnifiedSectors] = useState<Record<string, boolean>>({});
+  const [expandedUnifiedPeriods, setExpandedUnifiedPeriods] = useState<Record<string, boolean>>({});
+  
   // Estados para seleção de documentos
   const [selectedUnifiedDocuments, setSelectedUnifiedDocuments] = useState<Set<number>>(new Set());
   const [showSendModal, setShowSendModal] = useState(false);
@@ -677,6 +685,7 @@ const Holerites: React.FC = () => {
         // ✅ RECARREGAR lista de documentos unificados
         console.log('🔄 Recarregando lista de documentos unificados após unificação em massa...');
         await fetchUnifiedDocuments(true);
+        await loadUnifiedOrganization();
         
         toast({
           title: "✅ Unificação concluída",
@@ -1430,6 +1439,7 @@ const Holerites: React.FC = () => {
         
         // Recarregar a lista de documentos unificados para garantir sincronização
         await fetchUnifiedDocuments(true);
+        await loadUnifiedOrganization();
         
       } else if (deleteType === 'batch') {
         const selected = getSelectedDocuments();
@@ -1498,6 +1508,7 @@ const Holerites: React.FC = () => {
       
       // Recarregar a lista de documentos unificados para garantir sincronização
       await fetchUnifiedDocuments(true);
+      await loadUnifiedOrganization();
       
       setShowUnifiedDeleteModal(false);
       
@@ -2426,6 +2437,7 @@ const Holerites: React.FC = () => {
       
       // Atualizar lista de documentos unificados
       await fetchUnifiedDocuments(true);
+      await loadUnifiedOrganization();
       
       return unifiedPdfUrl;
     } catch (error: any) {
@@ -3043,10 +3055,146 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     }
   }, [activeTab, user]);
 
+  // Função para carregar organização de documentos unificados
+  const loadUnifiedOrganization = async () => {
+    try {
+      setLoadingUnifiedOrganization(true);
+      setUnifiedOrganizationError(null);
+      const data = await unifiedDocumentService.getOrganization();
+      setUnifiedOrganizationData(data);
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar organização de documentos unificados:', error);
+      setUnifiedOrganizationError(error.message || 'Erro ao carregar organização');
+      toast({
+        title: "Erro ao carregar organização",
+        description: error.message || 'Erro desconhecido',
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingUnifiedOrganization(false);
+    }
+  };
+
+  // Funções auxiliares para chaves de organização
+  const getUnifiedCompanyKey = (company: HoleriteCompanyGroup): string => {
+    return `${company.companyCnpj || company.companyName || ''}`;
+  };
+
+  const getUnifiedSectorKey = (companyKey: string, sector: HoleriteSectorGroup): string => {
+    return `${companyKey}|${sector.sectorName || ''}`;
+  };
+
+  const getUnifiedPeriodKey = (sectorKey: string, period: HoleritePeriodGroup): string => {
+    return `${sectorKey}|${period.year || ''}|${period.month || ''}`;
+  };
+
+  // Funções para expandir/colapsar
+  const toggleUnifiedCompanyExpansion = (companyKey: string) => {
+    setExpandedUnifiedCompanies(prev => {
+      const next = { ...prev, [companyKey]: !prev[companyKey] };
+      if (next[companyKey]) {
+        setExpandedUnifiedSectors(prevSectors => {
+          const filtered: Record<string, boolean> = {};
+          Object.keys(prevSectors).forEach(key => {
+            if (!key.startsWith(`${companyKey}|`)) {
+              filtered[key] = prevSectors[key];
+            }
+          });
+          return filtered;
+        });
+      }
+      return next;
+    });
+  };
+
+  const toggleUnifiedSectorExpansion = (sectorKey: string) => {
+    setExpandedUnifiedSectors(prev => {
+      const next = { ...prev, [sectorKey]: !prev[sectorKey] };
+      if (next[sectorKey]) {
+        setExpandedUnifiedPeriods(prevPeriods => {
+          const filtered: Record<string, boolean> = {};
+          Object.keys(prevPeriods).forEach(key => {
+            if (!key.startsWith(`${sectorKey}|`)) {
+              filtered[key] = prevPeriods[key];
+            }
+          });
+          return filtered;
+        });
+      }
+      return next;
+    });
+  };
+
+  const toggleUnifiedPeriodExpansion = (periodKey: string) => {
+    setExpandedUnifiedPeriods(prev => ({
+      ...prev,
+      [periodKey]: !prev[periodKey]
+    }));
+  };
+
+  // Funções auxiliares para seleção de documentos unificados
+  const collectUnifiedCompanyDocumentIndices = (company: HoleriteCompanyGroup): number[] => {
+    const indices: number[] = [];
+    company.sectors.forEach(sector => {
+      sector.periods?.forEach(period => {
+        period.payslips.forEach(entry => {
+          const docIndex = unifiedDocuments.findIndex(d => d.fileName === entry.fileName);
+          if (docIndex !== -1) {
+            indices.push(docIndex);
+          }
+        });
+      });
+    });
+    return indices;
+  };
+
+  const collectUnifiedSectorDocumentIndices = (sector: HoleriteSectorGroup): number[] => {
+    const indices: number[] = [];
+    sector.periods?.forEach(period => {
+      period.payslips.forEach(entry => {
+        const docIndex = unifiedDocuments.findIndex(d => d.fileName === entry.fileName);
+        if (docIndex !== -1) {
+          indices.push(docIndex);
+        }
+      });
+    });
+    return indices;
+  };
+
+  const collectUnifiedPeriodDocumentIndices = (period: HoleritePeriodGroup): number[] => {
+    const indices: number[] = [];
+    period.payslips.forEach(entry => {
+      const docIndex = unifiedDocuments.findIndex(d => d.fileName === entry.fileName);
+      if (docIndex !== -1) {
+        indices.push(docIndex);
+      }
+    });
+    return indices;
+  };
+
+  const areUnifiedIndicesFullySelected = (indices: number[]): boolean => {
+    return indices.length > 0 && indices.every(idx => selectedUnifiedDocuments.has(idx));
+  };
+
+  const getSelectedUnifiedIndices = (indices: number[]): number[] => {
+    return indices.filter(idx => selectedUnifiedDocuments.has(idx));
+  };
+
+  const handleSelectUnifiedDocuments = (indices: number[], checked: boolean) => {
+    const newSelected = new Set(selectedUnifiedDocuments);
+    if (checked) {
+      indices.forEach(idx => newSelected.add(idx));
+    } else {
+      indices.forEach(idx => newSelected.delete(idx));
+    }
+    setSelectedUnifiedDocuments(newSelected);
+  };
+
   // Carregar documentos unificados quando a aba de unificação for ativada
   useEffect(() => {
     if (activeTab === 'unificacao-individual' && user) {
       fetchUnifiedDocuments();
+      loadUnifiedOrganization();
     }
   }, [activeTab, user, unifiedMonthFilter, unifiedYearFilter]);
 
@@ -4421,83 +4569,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                             </label>
                           </div>
                           
-                          {/* Botões de ação em massa - só aparecem quando "Selecionar todos" está marcado */}
+                          {/* Botão de ação em massa - Excluir - só aparece quando "Selecionar todos" está marcado */}
                           {areAllPaymentReceiptsSelected() && (
                           <div className="flex flex-col sm:flex-row gap-2">
-                            <Button
-                              onClick={async () => {
-                                const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
-                                const ids: string[] = [];
-                                for (const r of selected) {
-                                  let cpf: string | null = null;
-                                  if ((r as any).cpf) cpf = (r as any).cpf;
-                                  if (!cpf && r.fileName) {
-                                    const m = r.fileName.match(/(\d{11})/);
-                                    if (m) cpf = m[1];
-                                  }
-                                  if (cpf) {
-                                    try {
-                                      const byCpf = await employeeService.searchEmployees(cpf);
-                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                    } catch {}
-                                  }
-                                  try {
-                                    const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
-                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                  } catch {}
-                                }
-                                const uniqueIds = Array.from(new Set(ids));
-                                if (uniqueIds.length === 0) {
-                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                  return;
-                                }
-                                setResolvedEmployeeIds(uniqueIds);
-                                setValidationSendType('email');
-                                setShowValidationModal(true);
-                              }}
-                              className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
-                            >
-                              <Mail size={16} className="mr-2" />
-                              Email ({selectedPaymentReceipts.length})
-                            </Button>
-                            
-                            <Button
-                              onClick={async () => {
-                                const selected = getFilteredPaymentReceipts().filter(r => selectedPaymentReceipts.includes(r.id));
-                                const ids: string[] = [];
-                                for (const r of selected) {
-                                  let cpf: string | null = null;
-                                  if ((r as any).cpf) cpf = (r as any).cpf;
-                                  if (!cpf && r.fileName) {
-                                    const m = r.fileName.match(/(\d{11})/);
-                                    if (m) cpf = m[1];
-                                  }
-                                  if (cpf) {
-                                    try {
-                                      const byCpf = await employeeService.searchEmployees(cpf);
-                                      if (byCpf && byCpf.length === 1) { ids.push(byCpf[0].id); continue; }
-                                    } catch {}
-                                  }
-                                  try {
-                                    const byName = await employeeService.searchEmployeesByName(r.employeeName || '');
-                                    if (byName && byName.length === 1) { ids.push(byName[0].id); continue; }
-                                  } catch {}
-                                }
-                                const uniqueIds = Array.from(new Set(ids));
-                                if (uniqueIds.length === 0) {
-                                  toast({ title: 'Não foi possível identificar funcionários', description: 'Verifique CPF no nome do PDF ou o cadastro.', variant: 'destructive' });
-                                  return;
-                                }
-                                setResolvedEmployeeIds(uniqueIds);
-                                setValidationSendType('whatsapp');
-                                setShowValidationModal(true);
-                              }}
-                              className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
-                            >
-                              <MessageSquare size={16} className="mr-2" />
-                              WhatsApp ({selectedPaymentReceipts.length})
-                            </Button>
-                            
                             <Button
                               onClick={handleDeleteMultiplePaymentReceipts}
                               className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
@@ -4570,78 +4644,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                 Ver
                               </Button>
                               
-                              <Button
-                                size="sm"
-                                onClick={async () => {
-                                  let cpf: string | null = null;
-                                  if ((receipt as any).cpf) cpf = (receipt as any).cpf;
-                                  if (!cpf && receipt.fileName) {
-                                    const m = receipt.fileName.match(/(\d{11})/);
-                                    if (m) cpf = m[1];
-                                  }
-                                  let employeeId: string | null = null;
-                                  if (cpf) {
-                                    try {
-                                      const byCpf = await employeeService.searchEmployees(cpf);
-                                      if (byCpf && byCpf.length === 1) employeeId = byCpf[0].id;
-                                    } catch {}
-                                  }
-                                  if (!employeeId) {
-                                    try {
-                                      const byName = await employeeService.searchEmployeesByName(receipt.employeeName || '');
-                                      if (byName && byName.length === 1) employeeId = byName[0].id;
-                                    } catch {}
-                                  }
-                                  if (!employeeId) {
-                                    toast({ title: 'Funcionário não encontrado', description: 'Não foi possível identificar o funcionário.', variant: 'destructive' });
-                                    return;
-                                  }
-                                  setResolvedEmployeeIds([employeeId]);
-                                  setValidationSendType('email');
-                                  setShowValidationModal(true);
-                                }}
-                                className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
-                              >
-                                <Mail size={14} className="mr-1" />
-                                Email
-                              </Button>
-                              
-                              <Button
-                                size="sm"
-                                onClick={async () => {
-                                  let cpf: string | null = null;
-                                  if ((receipt as any).cpf) cpf = (receipt as any).cpf;
-                                  if (!cpf && receipt.fileName) {
-                                    const m = receipt.fileName.match(/(\d{11})/);
-                                    if (m) cpf = m[1];
-                                  }
-                                  let employeeId: string | null = null;
-                                  if (cpf) {
-                                    try {
-                                      const byCpf = await employeeService.searchEmployees(cpf);
-                                      if (byCpf && byCpf.length === 1) employeeId = byCpf[0].id;
-                                    } catch {}
-                                  }
-                                  if (!employeeId) {
-                                    try {
-                                      const byName = await employeeService.searchEmployeesByName(receipt.employeeName || '');
-                                      if (byName && byName.length === 1) employeeId = byName[0].id;
-                                    } catch {}
-                                  }
-                                  if (!employeeId) {
-                                    toast({ title: 'Funcionário não encontrado', description: 'Não foi possível identificar o funcionário.', variant: 'destructive' });
-                                    return;
-                                  }
-                                  setResolvedEmployeeIds([employeeId]);
-                                  setValidationSendType('whatsapp');
-                                  setShowValidationModal(true);
-                                }}
-                                className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                              >
-                                <MessageSquare size={14} className="mr-1" />
-                                WhatsApp
-                              </Button>
-                              
+                              {/* Botão Excluir */}
                               <Button
                                 size="sm"
                                 onClick={() => handleDeletePaymentReceipt(receipt.id)}
@@ -5015,7 +5018,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   </CardContent>
               </Card>
 
-              {/* Sistema de Abas Hierárquico para Documentos Unificados */}
+              {/* Documentos Unificados Organizados por Empresa/Setor/Período */}
               <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
                   <CardHeader className="pb-4">
                       <div className="flex items-center justify-between">
@@ -5028,307 +5031,454 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                       Documentos Unificados
                                   </CardTitle>
                                   <p className="text-gray-400 text-sm mt-1">
-                                      Documentos processados e organizados por período
+                                      Documentos organizados por Empresa/Setor/Período
                                   </p>
                               </div>
                           </div>
                           <div className="flex items-center space-x-3">
+                              <Button
+                                  variant="outline"
+                                  onClick={loadUnifiedOrganization}
+                                  disabled={loadingUnifiedOrganization}
+                                  className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50"
+                              >
+                                  {loadingUnifiedOrganization ? (
+                                      <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Atualizando
+                                      </>
+                                  ) : (
+                                      <>
+                                          <RefreshCw className="h-4 w-4 mr-2" />
+                                          Recarregar
+                                      </>
+                                  )}
+                              </Button>
                               <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1">
-                                  {unifiedDocuments.length} documento(s)
+                                  {unifiedOrganizationData?.totalPayslips || 0} documento(s)
                               </Badge>
                           </div>
                       </div>
-                      
-                      {/* Navegação de Abas Hierárquica */}
-                      <div className="flex items-center justify-center space-x-2 mt-6">
-                          <Button
-                              onClick={handleBackToYears}
-                              variant={activePeriodTab === 'ano' ? "default" : "outline"}
-                              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                                  activePeriodTab === 'ano'
-                                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                                      : 'bg-purple-900/50 border-purple-500/50 text-purple-300 hover:bg-purple-800/50'
-                              }`}
-                          >
-                              📅 Anos
-                          </Button>
-                          
-                          {selectedYear && (
-                              <Button
-                                  onClick={handleBackToMonths}
-                                  variant={activePeriodTab === 'mes' ? "default" : "outline"}
-                                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                                      activePeriodTab === 'mes'
-                                          ? 'bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-lg'
-                                          : 'bg-purple-900/50 border-purple-500/50 text-purple-300 hover:bg-purple-800/50'
-                                  }`}
-                              >
-                                  📆 {selectedYear}
-                              </Button>
-                          )}
-                          
-                          {selectedYear && selectedMonth && (
-                              <Button
-                                  onClick={() => setActivePeriodTab('conteudo')}
-                                  variant={activePeriodTab === 'conteudo' ? "default" : "outline"}
-                                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                                      activePeriodTab === 'conteudo'
-                                          ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg'
-                                          : 'bg-purple-900/50 border-purple-500/50 text-purple-300 hover:bg-purple-800/50'
-                                  }`}
-                              >
-                                  📄 {getMonthName(parseInt(selectedMonth))} {selectedYear}
-                              </Button>
-                          )}
-                      </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                      {/* Conteúdo das Abas Hierárquicas */}
-                      {activePeriodTab === 'ano' && (
-                          <div className="space-y-6">
-                              <div>
-                                  <h5 className="text-lg font-semibold text-purple-300 mb-4">Selecione o Ano</h5>
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                      {Array.from(new Set(unifiedDocuments.map(doc => {
-                                          const yearMatch = doc.fileName.match(/_(\d{4})\.pdf$/);
-                                          return yearMatch ? yearMatch[1] : null;
-                                      }).filter(Boolean))).sort().map(year => (
-                                          <Button
-                                              key={year}
-                                              onClick={() => handleYearSelection(year)}
-                                              variant="outline"
-                                              className="px-4 py-3 rounded-lg font-medium transition-all duration-200 bg-purple-900/30 border-purple-500/50 text-purple-300 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white hover:border-transparent hover:shadow-lg"
-                                          >
-                                              📅 {year}
-                                          </Button>
-                                      ))}
-                                  </div>
+                      {unifiedOrganizationError && (
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border border-red-500/30 bg-red-500/10 text-red-100 px-4 py-4 rounded-2xl">
+                              <div className="flex items-center gap-2 text-red-200">
+                                  <AlertTriangle className="h-5 w-5" />
+                                  <p className="text-sm font-semibold">Não foi possível carregar a organização</p>
                               </div>
+                              <p className="text-sm">{unifiedOrganizationError}</p>
                           </div>
                       )}
 
-                      {activePeriodTab === 'mes' && selectedYear && (
-                          <div className="space-y-6">
-                              <div>
-                                  <h5 className="text-lg font-semibold text-purple-300 mb-4">
-                                      Meses disponíveis para {selectedYear}
-                                  </h5>
-                                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                                      {Array.from(new Set(unifiedDocuments
-                                          .filter(doc => {
-                                              const yearMatch = doc.fileName.match(/_(\d{4})\.pdf$/);
-                                              return yearMatch && yearMatch[1] === selectedYear;
-                                          })
-                                          .map(doc => {
-                                              const monthMatch = doc.fileName.match(/UNIFICADO_.*?_(\d{1,2})_\d{4}\.pdf$/);
-                                              return monthMatch ? parseInt(monthMatch[1]) : null;
-                                          })
-                                          .filter(Boolean)
-                                      )).sort((a, b) => a - b).map(month => (
-                                          <Button
-                                              key={month}
-                                              onClick={() => handleMonthSelection(month.toString())}
-                                              variant="outline"
-                                              className="px-3 py-2 rounded-lg font-medium transition-all duration-200 bg-purple-900/30 border-purple-500/50 text-purple-300 hover:bg-gradient-to-r hover:from-green-500 hover:to-teal-600 hover:text-white hover:border-transparent hover:shadow-lg"
-                                          >
-                                              📆 {getMonthName(month)}
-                                          </Button>
-                                      ))}
-                                  </div>
-                              </div>
+                      {loadingUnifiedOrganization ? (
+                          <div className="flex items-center justify-center py-16">
+                              <Loader2 className="h-10 w-10 animate-spin text-purple-400" />
                           </div>
-                      )}
+                      ) : !unifiedOrganizationData?.companies?.length ? (
+                          <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
+                              Nenhum documento unificado encontrado. Crie documentos unificados para visualizar a organização.
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              {unifiedOrganizationData.companies.map(company => {
+                                  const companyKey = getUnifiedCompanyKey(company);
+                                  const companyExpanded = !!expandedUnifiedCompanies[companyKey];
+                                  const companyIndices = collectUnifiedCompanyDocumentIndices(company);
+                                  const companySelectedIndices = getSelectedUnifiedIndices(companyIndices);
+                                  const companySelectedCount = companySelectedIndices.length;
+                                  const companyCheckboxState: boolean | 'indeterminate' = companyIndices.length === 0
+                                    ? false
+                                    : areUnifiedIndicesFullySelected(companyIndices)
+                                      ? true
+                                      : companySelectedCount > 0
+                                        ? 'indeterminate'
+                                        : false;
 
-                      {activePeriodTab === 'conteudo' && selectedYear && (
-                          <div className="space-y-6">
-                              {/* Controles de Ação */}
-                              <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                      <Button
-                                          onClick={selectAllDocuments}
-                                          variant="outline"
-                                          className="border-white/30 text-white hover:bg-white/10"
+                                  return (
+                                      <div
+                                          key={companyKey}
+                                          className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
                                       >
-                                          <CheckCircle className="mr-2 h-4 w-4" />
-                                          Selecionar Todos
-                                      </Button>
-                                      {selectedUnifiedDocuments.size > 0 && (
-                                          <Button
-                                              onClick={deselectAllDocuments}
-                                              variant="outline"
-                                              className="border-red-500/30 text-red-300 hover:bg-red-500/10"
-                                          >
-                                              <Square className="mr-2 h-4 w-4" />
-                                              Desselecionar
-                                          </Button>
-                                      )}
-                                  </div>
-                                  
-                                  {selectedUnifiedDocuments.size > 0 && (
-                                      <div className="flex items-center gap-2 text-sm text-purple-300">
-                                          <CheckCircle size={16} />
-                                          <span>{selectedUnifiedDocuments.size} documento(s) selecionado(s)</span>
-                                      </div>
-                                  )}
-                              </div>
-
-                              {/* Lista de Documentos Filtrados por Período */}
-                              {loadingUnifiedDocuments ? (
-                                  <div className="flex items-center justify-center py-8">
-                                      <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
-                                      <span className="ml-2 text-gray-400">Carregando documentos...</span>
-                                  </div>
-                              ) : (() => {
-                                  const filteredDocs = getFilteredUnifiedDocuments();
-                                  
-                                  return filteredDocs.length === 0 ? (
-                                      <div className="text-center py-8">
-                                          <FileText className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                                          <p className="text-gray-400">
-                                              {selectedYear && selectedMonth 
-                                                  ? `Nenhum documento encontrado para ${getMonthName(parseInt(selectedMonth))} ${selectedYear}`
-                                                  : selectedYear 
-                                                      ? `Nenhum documento encontrado para ${selectedYear}`
-                                                      : 'Nenhum documento unificado encontrado.'
-                                              }
-                                          </p>
-                                      </div>
-                                  ) : (
-                                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                                          {filteredDocs.map((doc, index) => (
-                                              <Card key={index} className="bg-seguranca-black border-gray-600 hover:border-gray-500 transition-colors">
-                                                  <CardContent className="p-3">
-                                                      <div className="flex items-start gap-3">
-                                                          <Checkbox
-                                              checked={selectedUnifiedDocuments.has(index)}
-                                                              onCheckedChange={() => toggleDocumentSelection(index)}
-                                          />
-                                                          
-                                          <div className="flex-1 min-w-0">
-                                                              <div className="flex items-center gap-2 mb-1">
-                                                                  <FileText className="h-4 w-4 text-seguranca-yellow flex-shrink-0" />
-                                                                  <p className="text-white text-sm font-medium truncate">
-                                                  {doc.employeeName || 'N/A'}
-                                              </p>
-                                                              </div>
-                                                              
-                                                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mb-2">
-                                                                  <span>{doc.month || '?'}/{doc.year || '?'}</span>
-                                                  {doc.fileSize && (
-                                                                      <>
-                                                                          <span>•</span>
-                                                                          <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
-                                                                      </>
-                                                                  )}
-                                      </div>
-                                      
-                                                              {/* Botões de Ação Individual - PADRÃO SST */}
-                                                              {(() => {
-                                                                  // Verifica se "Selecionar Todos" está ativo
-                                                                  const allSelected = filteredDocs.length > 0 && 
-                                                                                     filteredDocs.length === selectedUnifiedDocuments.size &&
-                                                                                     filteredDocs.every((_, idx) => selectedUnifiedDocuments.has(idx));
-                                                                  
-                                                                  // Se "Selecionar Todos" está ativo, não mostra botões individuais
-                                                                  if (allSelected) return null;
-                                                                  
-                                                                  return (
-                                                              <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
-                                                                  <Button
-                                                                      onClick={() => openUnifiedViewer(doc, index)}
-                                                                      size="sm"
-                                                                      className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                                                                  >
-                                                                      <Eye className="h-4 w-4 mr-1" />
-                                                                      Ver
-                                                                  </Button>
-
-                                                                  {selectedUnifiedDocuments.has(index) && (
-                                                                      <>
-                                                                          <Button
-                                                                              onClick={() => sendSingleDocument('email', index)}
-                                                                              size="sm"
-                                                                              className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
-                                                                          >
-                                                                              <Mail className="h-4 w-4 mr-1" />
-                                                                              Email
-                                                                          </Button>
-                                                                          <Button
-                                                                              onClick={() => sendSingleDocument('whatsapp', index)}
-                                                                              size="sm"
-                                                                              className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                                                                          >
-                                                                              <MessageSquare className="h-4 w-4 mr-1" />
-                                                                              WhatsApp
-                                                                          </Button>
-                                                                          <Button
-                                                                              onClick={() => downloadUnifiedDocument(doc)}
-                                                                              size="sm"
-                                                                              className="w-full sm:flex-1 bg-gray-600 text-white hover:bg-gray-700"
-                                                                          >
-                                                                              <Download className="h-4 w-4 mr-1" />
-                                                                              Baixar
-                                                                          </Button>
-                                                                          <Button
-                                                                              onClick={() => handleDeleteDocuments('individual', index)}
-                                                                              size="sm"
-                                                                              className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
-                                                                          >
-                                                                              <Trash2 className="h-4 w-4 mr-1" />
-                                                                              Excluir
-                                                                          </Button>
-                                                                      </>
-                                                                  )}
-                                                              </div>
-                                                                  );
-                                                              })()}
-                                  </div>
+                                          <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 sm:py-6">
+                                              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                                                  <div className="space-y-2">
+                                                      <div className="flex flex-wrap items-center gap-3">
+                                                          <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                                                              {company.companySigla}
+                                                          </Badge>
+                                                          <p className="text-lg font-semibold text-white leading-tight">
+                                                              {company.companyName}
+                                                          </p>
                                                       </div>
-                                                  </CardContent>
-                                              </Card>
-                                          ))}
+                                                      <p className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
+                                                          <Building2 className="h-4 w-4 text-seguranca-yellow" />
+                                                          CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} documento(s) · {company.sectors.length} setor(es)
+                                                      </p>
+                                                  </div>
+                                                  <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+                                                      {/* Checkbox "Selecionar empresa" - só aparece se a empresa NÃO estiver expandida */}
+                                                      {!companyExpanded && (
+                                                          <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                                                              <Checkbox
+                                                                  checked={companyCheckboxState}
+                                                                  onCheckedChange={(checked) => handleSelectUnifiedDocuments(companyIndices, checked === true)}
+                                                                  className="border-blue-400"
+                                                              />
+                                                              <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
+                                                          </div>
+                                                      )}
+                                                      <div className="flex flex-wrap gap-2 justify-end">
+                                                          {/* Botões de ação em massa - só aparecem quando "Selecionar empresa" está marcado E a empresa NÃO está expandida */}
+                                                          {companySelectedCount > 0 && !companyExpanded && (
+                                                              <>
+                                                                  <Button
+                                                                      size="sm"
+                                                                      className="bg-green-600/90 text-white hover:bg-green-600"
+                                                                      onClick={() => {
+                                                                          const selected = companySelectedIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
+                                                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
+                                                                          handleSendDocuments('email');
+                                                                      }}
+                                                                  >
+                                                                      <Mail className="h-4 w-4 mr-1" />
+                                                                      Email ({companySelectedCount})
+                                                                  </Button>
+                                                                  <Button
+                                                                      size="sm"
+                                                                      className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                                                      onClick={() => {
+                                                                          const selected = companySelectedIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
+                                                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
+                                                                          handleSendDocuments('whatsapp');
+                                                                      }}
+                                                                  >
+                                                                      <MessageSquare className="h-4 w-4 mr-1" />
+                                                                      WhatsApp ({companySelectedCount})
+                                                                  </Button>
+                                                                  <Button
+                                                                      size="sm"
+                                                                      variant="destructive"
+                                                                      className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                                      onClick={() => {
+                                                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
+                                                                          handleDeleteDocuments('batch');
+                                                                      }}
+                                                                  >
+                                                                      <Trash2 className="h-4 w-4 mr-1" />
+                                                                      Excluir ({companySelectedCount})
+                                                                  </Button>
+                                                              </>
+                                                          )}
+                                                          <Button
+                                                              variant="ghost"
+                                                              size="sm"
+                                                              onClick={() => toggleUnifiedCompanyExpansion(companyKey)}
+                                                              className="w-full sm:w-auto text-seguranca-lightgray hover:text-white"
+                                                          >
+                                                              {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                              {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
+                                                          </Button>
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                              {companyExpanded && (
+                                                  <div className="space-y-4">
+                                                      {company.sectors && company.sectors.length > 0 ? (
+                                                          company.sectors.map(sector => {
+                                                              const sectorKey = getUnifiedSectorKey(companyKey, sector);
+                                                              const sectorExpanded = !!expandedUnifiedSectors[sectorKey];
+                                                              const sectorIndices = collectUnifiedSectorDocumentIndices(sector);
+                                                              const sectorSelectedIndices = getSelectedUnifiedIndices(sectorIndices);
+                                                              const sectorSelectedCount = sectorSelectedIndices.length;
+                                                              const sectorCheckboxState: boolean | 'indeterminate' = sectorIndices.length === 0
+                                                                ? false
+                                                                : areUnifiedIndicesFullySelected(sectorIndices)
+                                                                  ? true
+                                                                  : sectorSelectedCount > 0
+                                                                    ? 'indeterminate'
+                                                                    : false;
+
+                                                              return (
+                                                                  <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
+                                                                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                                                                          <div>
+                                                                              <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
+                                                                              <p className="text-xs text-gray-400">
+                                                                                  {sector.totalPayslips} documento(s) · {sector.periods?.length ?? 0} período(s)
+                                                                              </p>
+                                                                          </div>
+                                                                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                                                              {/* Checkbox "Selecionar setor" - só aparece se o setor NÃO estiver expandido */}
+                                                                              {!sectorExpanded && (
+                                                                                  <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                                                                      <Checkbox
+                                                                                          checked={sectorCheckboxState}
+                                                                                          onCheckedChange={(checked) => handleSelectUnifiedDocuments(sectorIndices, checked === true)}
+                                                                                          className="border-blue-400"
+                                                                                      />
+                                                                                      <span className="text-xs text-gray-300">Selecionar setor</span>
+                                                                                  </div>
+                                                                              )}
+                                                                              {/* Botões de ação em massa - só aparecem quando "Selecionar setor" está marcado E o setor NÃO está expandido */}
+                                                                              {sectorSelectedCount > 0 && !sectorExpanded && (
+                                                                                  <div className="flex flex-wrap gap-2 justify-end">
+                                                                                      <Button
+                                                                                          size="sm"
+                                                                                          className="bg-green-600/90 text-white hover:bg-green-600"
+                                                                                          onClick={() => {
+                                                                                              setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
+                                                                                              handleSendDocuments('email');
+                                                                                          }}
+                                                                                      >
+                                                                                          <Mail className="h-4 w-4 mr-1" />
+                                                                                          Email ({sectorSelectedCount})
+                                                                                      </Button>
+                                                                                      <Button
+                                                                                          size="sm"
+                                                                                          className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                                                                          onClick={() => {
+                                                                                              setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
+                                                                                              handleSendDocuments('whatsapp');
+                                                                                          }}
+                                                                                      >
+                                                                                          <MessageSquare className="h-4 w-4 mr-1" />
+                                                                                          WhatsApp ({sectorSelectedCount})
+                                                                                      </Button>
+                                                                                      <Button
+                                                                                          size="sm"
+                                                                                          variant="destructive"
+                                                                                          className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                                                          onClick={() => {
+                                                                                              setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
+                                                                                              handleDeleteDocuments('batch');
+                                                                                          }}
+                                                                                      >
+                                                                                          <Trash2 className="h-4 w-4 mr-1" />
+                                                                                          Excluir ({sectorSelectedCount})
+                                                                                      </Button>
+                                                                                  </div>
+                                                                              )}
+                                                                              <Button
+                                                                                  variant="ghost"
+                                                                                  size="sm"
+                                                                                  onClick={() => toggleUnifiedSectorExpansion(sectorKey)}
+                                                                                  className="text-seguranca-lightgray hover:text-white"
+                                                                              >
+                                                                                  {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                                                  {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                                                                              </Button>
+                                                                          </div>
+                                                                      </div>
+                                                                      {sectorExpanded && (
+                                                                          <div className="space-y-3 px-4 py-4 bg-gray-900/70">
+                                                                              {sector.periods && sector.periods.length > 0 ? (
+                                                                                  sector.periods.map(period => {
+                                                                                      const periodKey = getUnifiedPeriodKey(sectorKey, period);
+                                                                                      const periodExpanded = !!expandedUnifiedPeriods[periodKey];
+                                                                                      const periodIndices = collectUnifiedPeriodDocumentIndices(period);
+                                                                                      const periodSelectedIndices = getSelectedUnifiedIndices(periodIndices);
+                                                                                      const periodSelectedCount = periodSelectedIndices.length;
+                                                                                      const periodCheckboxState: boolean | 'indeterminate' = periodIndices.length === 0
+                                                                                        ? false
+                                                                                        : areUnifiedIndicesFullySelected(periodIndices)
+                                                                                          ? true
+                                                                                          : periodSelectedCount > 0
+                                                                                            ? 'indeterminate'
+                                                                                            : false;
+
+                                                                                      return (
+                                                                                          <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                                                                              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                                                                                                  <div>
+                                                                                                      <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
+                                                                                                      <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
+                                                                                                  </div>
+                                                                                                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                                                                                      {/* Checkbox "Selecionar período" - só aparece se o período NÃO estiver expandido */}
+                                                                                                      {!periodExpanded && (
+                                                                                                          <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                                                                                              <Checkbox
+                                                                                                                  checked={periodCheckboxState}
+                                                                                                                  onCheckedChange={(checked) => handleSelectUnifiedDocuments(periodIndices, checked === true)}
+                                                                                                                  className="border-blue-400"
+                                                                                                              />
+                                                                                                              <span className="text-xs text-gray-300">Selecionar período</span>
+                                                                                                          </div>
+                                                                                                      )}
+                                                                                                      {/* Botões de ação em massa - só aparecem quando "Selecionar período" está marcado E o período NÃO está expandido */}
+                                                                                                      {periodSelectedCount > 0 && !periodExpanded && (
+                                                                                                          <div className="flex flex-wrap gap-2 justify-end">
+                                                                                                              <Button
+                                                                                                                  size="sm"
+                                                                                                                  className="bg-green-600/90 text-white hover:bg-green-600"
+                                                                                                                  onClick={() => {
+                                                                                                                      setSelectedUnifiedDocuments(new Set(periodSelectedIndices));
+                                                                                                                      handleSendDocuments('email');
+                                                                                                                  }}
+                                                                                                              >
+                                                                                                                  <Mail className="h-4 w-4 mr-1" />
+                                                                                                                  Email ({periodSelectedCount})
+                                                                                                              </Button>
+                                                                                                              <Button
+                                                                                                                  size="sm"
+                                                                                                                  className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                                                                                                  onClick={() => {
+                                                                                                                      setSelectedUnifiedDocuments(new Set(periodSelectedIndices));
+                                                                                                                      handleSendDocuments('whatsapp');
+                                                                                                                  }}
+                                                                                                              >
+                                                                                                                  <MessageSquare className="h-4 w-4 mr-1" />
+                                                                                                                  WhatsApp ({periodSelectedCount})
+                                                                                                              </Button>
+                                                                                                              <Button
+                                                                                                                  size="sm"
+                                                                                                                  variant="destructive"
+                                                                                                                  className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                                                                                  onClick={() => {
+                                                                                                                      setSelectedUnifiedDocuments(new Set(periodSelectedIndices));
+                                                                                                                      handleDeleteDocuments('batch');
+                                                                                                                  }}
+                                                                                                              >
+                                                                                                                  <Trash2 className="h-4 w-4 mr-1" />
+                                                                                                                  Excluir ({periodSelectedCount})
+                                                                                                              </Button>
+                                                                                                          </div>
+                                                                                                      )}
+                                                                                                      <Button
+                                                                                                          variant="ghost"
+                                                                                                          size="sm"
+                                                                                                          onClick={() => toggleUnifiedPeriodExpansion(periodKey)}
+                                                                                                          className="text-seguranca-lightgray hover:text-white"
+                                                                                                      >
+                                                                                                          {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                                                                          {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
+                                                                                                      </Button>
+                                                                                                  </div>
+                                                                                              </div>
+                                                                                              {periodExpanded && (
+                                                                                                  <div className="divide-y divide-gray-800 bg-gray-950/60">
+                                                                                                      {period.payslips.map(entry => {
+                                                                                                          const docIndex = unifiedDocuments.findIndex(d => d.fileName === entry.fileName);
+                                                                                                          const isSelected = docIndex !== -1 && selectedUnifiedDocuments.has(docIndex);
+                                                                                                          const doc = docIndex !== -1 ? unifiedDocuments[docIndex] : null;
+
+                                                                                                          return (
+                                                                                                              <div
+                                                                                                                  key={entry.id}
+                                                                                                                  className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
+                                                                                                              >
+                                                                                                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                                                                                      <Checkbox
+                                                                                                                          checked={isSelected}
+                                                                                                                          onCheckedChange={(checked) => {
+                                                                                                                              if (docIndex !== -1) {
+                                                                                                                                  handleSelectUnifiedDocuments([docIndex], checked === true);
+                                                                                                                              }
+                                                                                                                          }}
+                                                                                                                          className="border-blue-400 mt-1"
+                                                                                                                      />
+                                                                                                                      <div className="flex-1 min-w-0">
+                                                                                                                          <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
+                                                                                                                          <p className="text-xs text-gray-400">
+                                                                                                                              CPF: {entry.cpf ? entry.cpf.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : 'Não informado'} · Arquivo: {entry.fileName}
+                                                                                                                          </p>
+                                                                                                                      </div>
+                                                                                                                  </div>
+                                                                                                                  <div className="flex flex-wrap gap-2">
+                                                                                                                      {doc && (
+                                                                                                                          <>
+                                                                                                                              <Button
+                                                                                                                                  size="sm"
+                                                                                                                                  variant="outline"
+                                                                                                                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                                                                                  onClick={() => openUnifiedViewer(doc, docIndex)}
+                                                                                                                              >
+                                                                                                                                  <Eye className="h-4 w-4 mr-1" />
+                                                                                                                                  Visualizar
+                                                                                                                              </Button>
+                                                                                                                              <Button
+                                                                                                                                  size="sm"
+                                                                                                                                  variant="outline"
+                                                                                                                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                                                                                  onClick={() => downloadUnifiedDocument(doc)}
+                                                                                                                              >
+                                                                                                                                  <Download className="h-4 w-4 mr-1" />
+                                                                                                                                  Download
+                                                                                                                              </Button>
+                                                                                                                              {isSelected && (
+                                                                                                                                  <>
+                                                                                                                                      <Button
+                                                                                                                                          size="sm"
+                                                                                                                                          variant="outline"
+                                                                                                                                          className="border-green-600 text-green-300 hover:bg-green-600/20"
+                                                                                                                                          onClick={() => {
+                                                                                                                                              setSelectedUnifiedDocuments(new Set([docIndex]));
+                                                                                                                                              handleSendDocuments('email');
+                                                                                                                                          }}
+                                                                                                                                      >
+                                                                                                                                          <Mail className="h-4 w-4 mr-1" />
+                                                                                                                                          Email
+                                                                                                                                      </Button>
+                                                                                                                                      <Button
+                                                                                                                                          size="sm"
+                                                                                                                                          variant="outline"
+                                                                                                                                          className="border-blue-600 text-blue-300 hover:bg-blue-600/20"
+                                                                                                                                          onClick={() => {
+                                                                                                                                              setSelectedUnifiedDocuments(new Set([docIndex]));
+                                                                                                                                              handleSendDocuments('whatsapp');
+                                                                                                                                          }}
+                                                                                                                                      >
+                                                                                                                                          <MessageSquare className="h-4 w-4 mr-1" />
+                                                                                                                                          WhatsApp
+                                                                                                                                      </Button>
+                                                                                                                                  </>
+                                                                                                                              )}
+                                                                                                                              <Button
+                                                                                                                                  size="sm"
+                                                                                                                                  variant="outline"
+                                                                                                                                  className="border-red-600 text-red-300 hover:bg-red-600/20"
+                                                                                                                                  onClick={() => {
+                                                                                                                                      if (docIndex !== -1) {
+                                                                                                                                          handleDeleteDocuments('individual', docIndex);
+                                                                                                                                      }
+                                                                                                                                  }}
+                                                                                                                              >
+                                                                                                                                  <Trash2 className="h-4 w-4 mr-1" />
+                                                                                                                                  Excluir
+                                                                                                                              </Button>
+                                                                                                                          </>
+                                                                                                                      )}
+                                                                                                                  </div>
+                                                                                                              </div>
+                                                                                                          );
+                                                                                                      })}
+                                                                                                  </div>
+                                                                                              )}
+                                                                                          </div>
+                                                                                      );
+                                                                                  })
+                                                                              ) : (
+                                                                                  <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                                                                      Nenhum período encontrado para este setor.
+                                                                                  </div>
+                                                                              )}
+                                                                          </div>
+                                                                      )}
+                                                                  </div>
+                                                              );
+                                                          })
+                                                      ) : (
+                                                          <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                                              Nenhum setor encontrado para esta empresa.
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              )}
+                                          </div>
                                       </div>
                                   );
-                              })()}
-
-                      {/* Botões de Ação em Massa - PADRÃO SST - só aparecem quando "Selecionar Todos" está marcado */}
-                      {(() => {
-                          const filteredDocs = getFilteredUnifiedDocuments();
-                          
-                          // Verifica se todos os documentos filtrados estão selecionados
-                          const allSelected = filteredDocs.length > 0 && 
-                                             filteredDocs.length === selectedUnifiedDocuments.size &&
-                                             filteredDocs.every((_, index) => selectedUnifiedDocuments.has(index));
-                          
-                          return allSelected;
-                      })() && (
-                          <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-white/10">
-                              <Button
-                                  onClick={() => handleSendDocuments('email')}
-                                  size="sm"
-                                  className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
-                              >
-                                  <Mail className="mr-2 h-4 w-4" />
-                                  Email ({selectedUnifiedDocuments.size})
-                              </Button>
-                              <Button
-                                  onClick={() => handleSendDocuments('whatsapp')}
-                                  size="sm"
-                                  className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
-                              >
-                                  <MessageSquare className="mr-2 h-4 w-4" />
-                                  WhatsApp ({selectedUnifiedDocuments.size})
-                              </Button>
-                              <Button
-                                  onClick={() => handleDeleteDocuments('batch')}
-                                  size="sm"
-                                  className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
-                              >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Excluir ({selectedUnifiedDocuments.size})
-                                      </Button>
-                                  </div>
-                              )}
+                              })}
                           </div>
                       )}
                   </CardContent>
@@ -5732,12 +5882,29 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 {batchUnificationResult.failureList.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-red-800 mb-2">âŒ Falhas ({batchUnificationResult.failureList.length})</h4>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
                       {batchUnificationResult.failureList.map((item, index) => (
-                        <div key={index} className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                          <div className="font-medium text-red-800">{item.employeeName}</div>
-                          <div className="text-red-600">{item.error}</div>
-                                 </div>
+                        <div key={index} className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
+                          <div className="font-semibold text-red-900 mb-1">{item.employeeName}</div>
+                          {item.month && item.year && (
+                            <div className="text-xs text-gray-600 mb-1">
+                              Período: {item.month}/{item.year}
+                            </div>
+                          )}
+                          <div className="text-red-700 font-medium mb-1">
+                            {item.message || item.error || 'Erro desconhecido'}
+                          </div>
+                          {(item.holeriteFound || item.receiptFound) && (
+                            <div className="text-xs text-gray-600 mt-1 space-y-0.5">
+                              {item.holeriteFound && (
+                                <div>Holerite: {item.holeriteFound}</div>
+                              )}
+                              {item.receiptFound && (
+                                <div>Comprovante: {item.receiptFound}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ))}
                                </div>
                              </div>
@@ -6404,6 +6571,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                       
                       // Atualizar lista de documentos unificados
                       await fetchUnifiedDocuments(true);
+                      await loadUnifiedOrganization();
                       
                       toast({
                         title: "Sucesso",
