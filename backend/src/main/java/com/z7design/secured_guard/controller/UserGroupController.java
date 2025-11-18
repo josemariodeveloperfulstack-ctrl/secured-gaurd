@@ -40,6 +40,12 @@ public class UserGroupController {
         } catch (IllegalArgumentException e) {
             // Se não for um UUID válido, retornar lista vazia
             return ResponseEntity.ok(List.of());
+        } catch (Exception e) {
+            // Log do erro para debug
+            System.err.println("Erro ao buscar grupos do usuário " + userId + ": " + e.getMessage());
+            e.printStackTrace();
+            // Retornar lista vazia em caso de erro para não quebrar o frontend
+            return ResponseEntity.ok(List.of());
         }
     }
     
@@ -51,6 +57,12 @@ public class UserGroupController {
             return ResponseEntity.ok(permissions);
         } catch (IllegalArgumentException e) {
             // Se não for um UUID válido, retornar conjunto vazio
+            return ResponseEntity.ok(Set.of());
+        } catch (Exception e) {
+            // Log do erro para debug
+            System.err.println("Erro ao buscar permissões do usuário " + userId + ": " + e.getMessage());
+            e.printStackTrace();
+            // Retornar conjunto vazio em caso de erro para não quebrar o frontend
             return ResponseEntity.ok(Set.of());
         }
     }

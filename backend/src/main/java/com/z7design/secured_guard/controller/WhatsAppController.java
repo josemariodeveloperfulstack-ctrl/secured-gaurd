@@ -61,11 +61,14 @@ public class WhatsAppController {
                 "state", connected ? "open" : "close"
             ));
         } catch (Exception e) {
-            log.error("❌ Erro ao verificar status: {}", e.getMessage());
+            log.error("❌ Erro ao verificar status: {}", e.getMessage(), e);
+            // Retornar sempre OK com estado desconectado, mesmo em caso de erro
+            // Isso evita que o frontend quebre se o serviço não estiver disponível
             return ResponseEntity.ok(Map.of(
                 "connected", false,
                 "instance", instanceName,
-                "state", "close"
+                "state", "close",
+                "error", e.getMessage() != null ? e.getMessage() : "Serviço WhatsApp indisponível"
             ));
         }
     }
