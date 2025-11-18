@@ -436,43 +436,51 @@ jobs:
       - name: 🔍 Pre-health check diagnostics
         continue-on-error: true
         run: |
+          set -x  # Ativar modo verbose
+          set -e  # Parar em erro (mas continue-on-error permite continuar)
+          
           echo "🔍 ========================================="
           echo "📋 DIAGNÓSTICO ANTES DO HEALTH CHECK"
           echo "========================================="
           echo ""
           
           echo "📋 Verificando status dos containers..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && docker-compose -f docker-compose.ci.yml ps" || echo "❌ Erro ao verificar status dos containers"
-          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && docker-compose -f docker-compose.ci.yml ps 2>&1" || { echo "❌ Erro ao verificar status dos containers"; exit 0; }
           echo ""
+          
           echo "📋 Verificando containers rodando..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" || echo "❌ Erro ao verificar containers rodando"
-          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1 | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" || { echo "❌ Erro ao verificar containers rodando"; exit 0; }
           echo ""
+          
           echo "📋 Verificando todos os containers (incluindo parados)..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" || echo "❌ Erro ao verificar todos os containers"
-          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1 | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" || { echo "❌ Erro ao verificar todos os containers"; exit 0; }
           echo ""
+          
           echo "📋 Logs do PostgreSQL (últimas 30 linhas)..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(POSTGRES_ID=\$(docker ps -a | grep postgres | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$POSTGRES_ID\" ]; then echo 'Container ID: '\$POSTGRES_ID; docker logs \$POSTGRES_ID 2>&1 | tail -30; else echo '⚠️ Container PostgreSQL não encontrado'; fi)" || echo "❌ Erro ao obter logs do PostgreSQL"
-          
+          POSTGRES_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "POSTGRES_ID=\$(docker ps -a 2>&1 | grep postgres | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$POSTGRES_ID\" ]; then echo 'Container ID: '\$POSTGRES_ID; docker logs \$POSTGRES_ID 2>&1 | tail -30; else echo '⚠️ Container PostgreSQL não encontrado'; docker ps -a 2>&1 | grep postgres || echo 'Nenhum container PostgreSQL no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$POSTGRES_OUTPUT"
           echo ""
+          
           echo "📋 Logs do Redis (últimas 30 linhas)..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(REDIS_ID=\$(docker ps -a | grep redis | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$REDIS_ID\" ]; then echo 'Container ID: '\$REDIS_ID; docker logs \$REDIS_ID 2>&1 | tail -30; else echo '⚠️ Container Redis não encontrado'; fi)" || echo "❌ Erro ao obter logs do Redis"
-          
+          REDIS_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "REDIS_ID=\$(docker ps -a 2>&1 | grep redis | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$REDIS_ID\" ]; then echo 'Container ID: '\$REDIS_ID; docker logs \$REDIS_ID 2>&1 | tail -30; else echo '⚠️ Container Redis não encontrado'; docker ps -a 2>&1 | grep redis || echo 'Nenhum container Redis no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$REDIS_OUTPUT"
           echo ""
+          
           echo "📋 Logs do Backend (últimas 50 linhas)..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(BACKEND_ID=\$(docker ps -a | grep backend | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$BACKEND_ID\" ]; then echo 'Container ID: '\$BACKEND_ID; docker logs \$BACKEND_ID 2>&1 | tail -50; else echo '⚠️ Container Backend não encontrado'; fi)" || echo "❌ Erro ao obter logs do Backend"
-          
+          BACKEND_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "BACKEND_ID=\$(docker ps -a 2>&1 | grep backend | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$BACKEND_ID\" ]; then echo 'Container ID: '\$BACKEND_ID; docker logs \$BACKEND_ID 2>&1 | tail -50; else echo '⚠️ Container Backend não encontrado'; docker ps -a 2>&1 | grep backend || echo 'Nenhum container Backend no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$BACKEND_OUTPUT"
           echo ""
+          
           echo "📋 Logs do Nginx (últimas 30 linhas)..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(NGINX_ID=\$(docker ps -a | grep nginx | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$NGINX_ID\" ]; then echo 'Container ID: '\$NGINX_ID; docker logs \$NGINX_ID 2>&1 | tail -30; else echo '⚠️ Container Nginx não encontrado'; fi)" || echo "❌ Erro ao obter logs do Nginx"
-          
+          NGINX_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "NGINX_ID=\$(docker ps -a 2>&1 | grep nginx | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$NGINX_ID\" ]; then echo 'Container ID: '\$NGINX_ID; docker logs \$NGINX_ID 2>&1 | tail -30; else echo '⚠️ Container Nginx não encontrado'; docker ps -a 2>&1 | grep nginx || echo 'Nenhum container Nginx no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$NGINX_OUTPUT"
           echo ""
+          
           echo "📋 Testando conectividade interna..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'Testando porta 8081...' && (curl -s -o /dev/null -w 'Backend (localhost:8081): %{http_code}\n' http://localhost:8081/api/health || echo 'Backend não responde')" || echo "❌ Erro ao testar conectividade"
-          
+          CONNECTIVITY_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'Testando porta 8081...' && (curl -s -o /dev/null -w 'Backend (localhost:8081): %{http_code}\n' http://localhost:8081/api/health 2>&1 || echo 'Backend não responde')" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$CONNECTIVITY_OUTPUT"
           echo ""
+          
           echo "✅ Diagnóstico pré-health check concluído"
           echo "========================================="
 
@@ -602,6 +610,8 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
+          set -x  # Ativar modo verbose
+          
           echo ""
           echo "🔍 ========================================="
           echo "📋 DIAGNÓSTICO FINAL (SEMPRE EXECUTA)"
@@ -609,37 +619,45 @@ jobs:
           echo ""
           
           echo "📋 Status final dos containers..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && docker-compose -f docker-compose.ci.yml ps" || echo "❌ Erro ao verificar status final"
-          
+          STATUS_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && docker-compose -f docker-compose.ci.yml ps 2>&1" 2>&1 || echo "❌ Erro ao verificar status final")
+          echo "$STATUS_OUTPUT"
           echo ""
+          
           echo "📋 Containers relacionados..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.ExitCode}}' | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" || echo "❌ Erro ao listar containers"
-          
+          CONTAINERS_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.ExitCode}}' 2>&1 | grep -E '(secured-guard|postgres|redis)' || echo 'Nenhum container encontrado'" 2>&1 || echo "❌ Erro ao listar containers")
+          echo "$CONTAINERS_OUTPUT"
           echo ""
+          
           echo "📋 Logs completos do PostgreSQL..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(POSTGRES_ID=\$(docker ps -a | grep postgres | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$POSTGRES_ID\" ]; then echo 'Container ID: '\$POSTGRES_ID; docker logs \$POSTGRES_ID 2>&1 | tail -100; else echo '⚠️ Container PostgreSQL não encontrado'; docker ps -a | grep postgres || echo 'Nenhum container PostgreSQL encontrado'; fi)" || echo "❌ Erro ao obter logs do PostgreSQL"
-          
+          POSTGRES_FULL=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "POSTGRES_ID=\$(docker ps -a 2>&1 | grep postgres | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$POSTGRES_ID\" ]; then echo 'Container ID: '\$POSTGRES_ID; docker logs \$POSTGRES_ID 2>&1 | tail -100; else echo '⚠️ Container PostgreSQL não encontrado'; docker ps -a 2>&1 | grep postgres || echo 'Nenhum container PostgreSQL no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$POSTGRES_FULL"
           echo ""
+          
           echo "📋 Logs completos do Redis..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(REDIS_ID=\$(docker ps -a | grep redis | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$REDIS_ID\" ]; then echo 'Container ID: '\$REDIS_ID; docker logs \$REDIS_ID 2>&1 | tail -100; else echo '⚠️ Container Redis não encontrado'; docker ps -a | grep redis || echo 'Nenhum container Redis encontrado'; fi)" || echo "❌ Erro ao obter logs do Redis"
-          
+          REDIS_FULL=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "REDIS_ID=\$(docker ps -a 2>&1 | grep redis | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$REDIS_ID\" ]; then echo 'Container ID: '\$REDIS_ID; docker logs \$REDIS_ID 2>&1 | tail -100; else echo '⚠️ Container Redis não encontrado'; docker ps -a 2>&1 | grep redis || echo 'Nenhum container Redis no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$REDIS_FULL"
           echo ""
+          
           echo "📋 Logs completos do Backend..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(BACKEND_ID=\$(docker ps -a | grep backend | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$BACKEND_ID\" ]; then echo 'Container ID: '\$BACKEND_ID; docker logs \$BACKEND_ID 2>&1 | tail -100; else echo '⚠️ Container Backend não encontrado'; docker ps -a | grep backend || echo 'Nenhum container Backend encontrado'; fi)" || echo "❌ Erro ao obter logs do Backend"
-          
+          BACKEND_FULL=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "BACKEND_ID=\$(docker ps -a 2>&1 | grep backend | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$BACKEND_ID\" ]; then echo 'Container ID: '\$BACKEND_ID; docker logs \$BACKEND_ID 2>&1 | tail -100; else echo '⚠️ Container Backend não encontrado'; docker ps -a 2>&1 | grep backend || echo 'Nenhum container Backend no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$BACKEND_FULL"
           echo ""
+          
           echo "📋 Logs completos do Nginx..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(NGINX_ID=\$(docker ps -a | grep nginx | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$NGINX_ID\" ]; then echo 'Container ID: '\$NGINX_ID; docker logs \$NGINX_ID 2>&1 | tail -100; else echo '⚠️ Container Nginx não encontrado'; docker ps -a | grep nginx || echo 'Nenhum container Nginx encontrado'; fi)" || echo "❌ Erro ao obter logs do Nginx"
-          
+          NGINX_FULL=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "NGINX_ID=\$(docker ps -a 2>&1 | grep nginx | grep secured-guard | grep -v CONTAINER | awk '{print \$1}' | head -1); if [ -n \"\$NGINX_ID\" ]; then echo 'Container ID: '\$NGINX_ID; docker logs \$NGINX_ID 2>&1 | tail -100; else echo '⚠️ Container Nginx não encontrado'; docker ps -a 2>&1 | grep nginx || echo 'Nenhum container Nginx no sistema'; fi" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$NGINX_FULL"
           echo ""
+          
           echo "📋 Verificando portas em uso..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(lsof -i :5432 2>/dev/null || lsof -i :6379 2>/dev/null || lsof -i :8081 2>/dev/null || netstat -tlnp 2>/dev/null | grep -E ':(5432|6379|8081)' || ss -tlnp 2>/dev/null | grep -E ':(5432|6379|8081)' || echo 'Comando de verificação de porta não disponível')" || echo "❌ Erro ao verificar portas"
-          
+          PORTS_OUTPUT=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "(lsof -i :5432 2>/dev/null || lsof -i :6379 2>/dev/null || lsof -i :8081 2>/dev/null || netstat -tlnp 2>/dev/null | grep -E ':(5432|6379|8081)' || ss -tlnp 2>/dev/null | grep -E ':(5432|6379|8081)' || echo 'Comando de verificação de porta não disponível') 2>&1" 2>&1 || echo "❌ Erro ao verificar portas")
+          echo "$PORTS_OUTPUT"
           echo ""
+          
           echo "📋 Testando conectividade final..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'Testando porta 8081...' && (curl -v http://localhost:8081/api/health 2>&1 | head -20 || echo 'Backend não responde'); echo ''; echo 'Testando porta 80 (nginx)...' && (curl -v http://localhost:80/api/health 2>&1 | head -20 || echo 'Nginx não responde')" || echo "❌ Erro ao testar conectividade final"
-          
+          CONNECTIVITY_FULL=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'Testando porta 8081...' && (curl -v http://localhost:8081/api/health 2>&1 | head -20 || echo 'Backend não responde'); echo ''; echo 'Testando porta 80 (nginx)...' && (curl -v http://localhost:80/api/health 2>&1 | head -20 || echo 'Nginx não responde')" 2>&1 || echo "Erro ao executar comando SSH")
+          echo "$CONNECTIVITY_FULL"
           echo ""
+          
           echo "✅ Diagnóstico final concluído"
           echo "========================================="
 
