@@ -25,6 +25,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Autenticação", description = "Endpoints para registro, login e renovação de tokens.")
 public class AuthenticationController {
 
@@ -57,11 +59,11 @@ public class AuthenticationController {
                     schema = @Schema(implementation = AuthenticationRequest.class),
                     examples = @ExampleObject(value = "{\"username\": \"testuser\", \"password\": \"Password123!\"}")))
     @PostMapping("/login")
-    public ResponseEntity<AuthenticationResponse> login(@RequestBody AuthenticationRequest request) {
+    public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
         try {
             AuthenticationResponse response = authenticationService.authenticate(request);
             
-            // Log da atividade de login bem-sucedido (comentado temporariamente para debug)
+            // Log da atividade de login bem-sucedido
             try {
                 logService.logUserActivity(request.getUsername(), "LOGIN", 
                     "Login realizado com sucesso via " + request.getUsername());
@@ -70,15 +72,27 @@ public class AuthenticationController {
             }
             
             return ResponseEntity.ok(response);
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            // Exceções de autenticação devem retornar 401, não 500
+            log.warn("Tentativa de login falhou para usuário {}: {}", request.getUsername(), e.getMessage());
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Unauthorized", "message", "Invalid username or password."));
         } catch (Exception e) {
-            // Log da tentativa de login falhada (comentado temporariamente para debug)
+            // Log da tentativa de login falhada
+            log.error("Erro ao processar login para usuário {}: {}", request.getUsername(), e.getMessage(), e);
+            
+            // Retornar erro 500 como último recurso, mas garantir que seja tratado
             try {
-                logService.logUserActivity(request.getUsername(), "LOGIN_FAILED", 
+                logService.logUserActivity(request != null ? request.getUsername() : "unknown", "LOGIN_FAILED", 
                     "Tentativa de login falhou: " + e.getMessage());
             } catch (Exception logError) {
                 System.err.println("Erro no log service ao falhar: " + logError.getMessage());
             }
-            throw e;
+            
+            // Retornar erro estruturado em vez de lançar exceção
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Internal Server Error", 
+                           "message", "Erro ao processar login. Tente novamente mais tarde."));
         }
     }
 
