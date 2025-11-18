@@ -458,6 +458,10 @@ jobs:
           
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && echo '📋 Status dos containers:' && docker-compose -f docker-compose.ci.yml ps" || true
           
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do PostgreSQL (últimas 30 linhas):' && docker logs --tail 30 secured-guard-db-ci 2>&1 || echo 'Container PostgreSQL não encontrado'" || true
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do Redis (últimas 30 linhas):' && docker logs --tail 30 secured-guard-redis-ci 2>&1 || echo 'Container Redis não encontrado'" || true
+          
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do backend (últimas 50 linhas):' && docker logs --tail 50 secured-guard-backend-ci 2>&1 || echo 'Container não encontrado'" || true
           
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo '' && echo '📋 Logs do nginx (últimas 30 linhas):' && docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo 'Container nginx não encontrado'" || true
