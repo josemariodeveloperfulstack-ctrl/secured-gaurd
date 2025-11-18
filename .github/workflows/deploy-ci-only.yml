@@ -77,6 +77,7 @@ jobs:
           echo "🐳 Construindo imagens Docker..."
           docker build -t z7design/secured-guard-backend:ci -f backend/Dockerfile.prod ./backend
           docker build -t z7design/secured-guard-frontend:ci -f frontend/Dockerfile.prod ./frontend
+          docker build -t z7design/secured-guard-whatsapp:ci -f whatsapp-service/Dockerfile ./whatsapp-service
           echo "✅ Imagens construídas!"
 
       # ============================================
@@ -93,6 +94,7 @@ jobs:
           echo "📤 Enviando imagens..."
           docker push z7design/secured-guard-backend:ci
           docker push z7design/secured-guard-frontend:ci
+          docker push z7design/secured-guard-whatsapp:ci
           echo "✅ Imagens enviadas!"
 
       # ============================================
@@ -121,6 +123,7 @@ jobs:
             mkdir -p /var/www/secured_guard/ci/logs
             mkdir -p /var/www/secured_guard/ci/postgres_data
             mkdir -p /var/www/secured_guard/ci/redis_data
+            mkdir -p /var/www/secured_guard/ci/whatsapp_sessions
             mkdir -p /var/www/secured_guard/traefik/dynamic
           EOF
           
@@ -227,6 +230,7 @@ jobs:
             # Pull das imagens
             docker pull z7design/secured-guard-backend:ci
             docker pull z7design/secured-guard-frontend:ci
+            docker pull z7design/secured-guard-whatsapp:ci
             
             echo "✅ Imagens atualizadas!"
           EOF
@@ -249,6 +253,15 @@ jobs:
             
             # Verificar status
             docker-compose -f docker-compose.ci.yml ps
+            
+            # Verificar se WhatsApp service está rodando
+            echo ""
+            echo "📱 Verificando WhatsApp service..."
+            docker logs --tail 20 secured-guard-whatsapp-ci 2>&1 || echo "⚠️ Container WhatsApp ainda não iniciou"
+            
+            # Testar health do WhatsApp service
+            sleep 5
+            curl -f http://localhost:3333/health 2>&1 && echo "✅ WhatsApp service está respondendo" || echo "⚠️ WhatsApp service ainda não está respondendo"
             
             echo "✅ Containers CI iniciados!"
           EOF
