@@ -190,8 +190,16 @@ public class MessageController {
                 return ResponseEntity.ok(0L);
             }
             
-            Long count = messageService.countUnreadMessages(userId);
-            return ResponseEntity.ok(count != null ? count : 0L);
+            try {
+                Long count = messageService.countUnreadMessages(userId);
+                return ResponseEntity.ok(count != null ? count : 0L);
+            } catch (org.springframework.dao.DataAccessException e) {
+                log.error("Erro de acesso ao banco de dados ao contar mensagens não lidas para usuário {}: {}", userId, e.getMessage(), e);
+                return ResponseEntity.ok(0L);
+            } catch (Exception e) {
+                log.error("Erro inesperado ao contar mensagens não lidas para usuário {}: {}", userId, e.getMessage(), e);
+                return ResponseEntity.ok(0L);
+            }
         } catch (Exception e) {
             log.error("Erro ao contar mensagens não lidas: {}", e.getMessage(), e);
             // Retornar 0 ao invés de erro 500 para não quebrar o frontend

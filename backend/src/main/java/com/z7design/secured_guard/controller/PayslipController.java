@@ -194,29 +194,69 @@ public class PayslipController {
         try {
             log.info("📊 Iniciando organização de holerites por empresa/setor/período...");
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth == null) {
+                log.error("Autenticação é null ao organizar holerites");
+                PayslipOrganizationResponse emptyResponse = new PayslipOrganizationResponse();
+                emptyResponse.setCompanies(Collections.emptyList());
+                emptyResponse.setTotalCompanies(0);
+                emptyResponse.setTotalSectors(0);
+                emptyResponse.setTotalPayslips(0);
+                emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+                return ResponseEntity.ok(emptyResponse);
+            }
+            
             boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
 
             List<Payslip> payslips;
-            if (isColaborador) {
-                if (resolvedCpf.isEmpty()) {
-                    log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização de holerites", auth.getName());
-                    payslips = Collections.emptyList();
+            try {
+                if (isColaborador) {
+                    if (resolvedCpf.isEmpty()) {
+                        log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização de holerites", auth.getName());
+                        payslips = Collections.emptyList();
+                    } else {
+                        log.info("👤 Usuário colaborador, organizando holerites por CPF: {}", resolvedCpf.get());
+                        payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+                    }
                 } else {
-                    log.info("👤 Usuário colaborador, organizando holerites por CPF: {}", resolvedCpf.get());
-                    payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+                    log.info("👑 Usuário admin, organizando todos os holerites por empresa");
+                    payslips = payslipService.getAllPayslips();
                 }
-            } else {
-                log.info("👑 Usuário admin, organizando todos os holerites por empresa");
-                payslips = payslipService.getAllPayslips();
+            } catch (org.springframework.dao.DataAccessException e) {
+                log.error("Erro de acesso ao banco de dados ao buscar holerites: {}", e.getMessage(), e);
+                payslips = Collections.emptyList();
+            } catch (Exception e) {
+                log.error("Erro ao buscar holerites: {}", e.getMessage(), e);
+                payslips = Collections.emptyList();
             }
 
-            PayslipOrganizationResponse response = payslipService.organizePayslipsByCompany(payslips);
-            log.info("✅ Organização concluída: {} empresas, {} setores, {} holerites",
-                response.getTotalCompanies(), response.getTotalSectors(), response.getTotalPayslips());
-            return ResponseEntity.ok(response);
+            try {
+                PayslipOrganizationResponse response = payslipService.organizePayslipsByCompany(payslips);
+                log.info("✅ Organização concluída: {} empresas, {} setores, {} holerites",
+                    response.getTotalCompanies(), response.getTotalSectors(), response.getTotalPayslips());
+                return ResponseEntity.ok(response);
+            } catch (org.springframework.dao.DataAccessException e) {
+                log.error("Erro de acesso ao banco de dados ao organizar holerites: {}", e.getMessage(), e);
+                PayslipOrganizationResponse emptyResponse = new PayslipOrganizationResponse();
+                emptyResponse.setCompanies(Collections.emptyList());
+                emptyResponse.setTotalCompanies(0);
+                emptyResponse.setTotalSectors(0);
+                emptyResponse.setTotalPayslips(0);
+                emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+                return ResponseEntity.ok(emptyResponse);
+            } catch (Exception e) {
+                log.error("Erro ao organizar holerites: {}", e.getMessage(), e);
+                PayslipOrganizationResponse emptyResponse = new PayslipOrganizationResponse();
+                emptyResponse.setCompanies(Collections.emptyList());
+                emptyResponse.setTotalCompanies(0);
+                emptyResponse.setTotalSectors(0);
+                emptyResponse.setTotalPayslips(0);
+                emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+                return ResponseEntity.ok(emptyResponse);
+            }
         } catch (Exception e) {
-            log.error("Erro ao organizar holerites: {}", e.getMessage(), e);
+            log.error("Erro geral ao organizar holerites: {}", e.getMessage(), e);
             // Retornar resposta vazia ao invés de erro 500 para não quebrar o frontend
             PayslipOrganizationResponse emptyResponse = new PayslipOrganizationResponse();
             emptyResponse.setCompanies(Collections.emptyList());
