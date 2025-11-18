@@ -116,8 +116,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/financial/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de invoices (contas a pagar)
                 .requestMatchers("/api/invoices/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
-                // Endpoints de suppliers (fornecedores) - temporariamente permitir para SUPER_ADMIN
-                .requestMatchers("/api/suppliers/**").hasAnyAuthority("ROLE_SUPER_ADMIN")
+                // Endpoints de suppliers (fornecedores) - requerem permissões administrativas ou financeiras
+                .requestMatchers("/api/suppliers/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO", "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE")
                 // Endpoints de accounts-receivable (contas a receber) - requerem permissões específicas
                 .requestMatchers("/api/accounts-receivable/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de scheduled-payments (pagamentos agendados) - requerem permissões específicas
