@@ -63,6 +63,8 @@ jobs:
         env:
           VITE_API_URL: https://ci.z7botsolutions.com.br/api
           VITE_ENVIRONMENT: ci
+          # Pular instalação do Cypress binário no CI (não necessário para build)
+          CYPRESS_INSTALL_BINARY: 0
         run: |
           echo "🎨 Compilando frontend para CI..."
           npm ci
