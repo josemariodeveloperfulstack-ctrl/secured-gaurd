@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.PaymentReceiptDTO;
+import com.z7design.secured_guard.dto.ReceiptProcessingResponse;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.model.PaymentReceiptStatus;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
@@ -15,18 +17,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +42,20 @@ public class ReceiptProcessingService {
 
     @Transactional
     public List<PaymentReceipt> processReceiptFile(MultipartFile file) throws IOException {
-        log.info("=== INÍCIO DO PROCESSAMENTO DE RECIBOS ===");
+        ReceiptProcessingResponse response = processReceiptFileWithSummary(file);
+        // Converter DTOs de volta para entidades (para compatibilidade com código existente)
+        return response.getReceipts().stream()
+            .map(dto -> {
+                PaymentReceipt receipt = receiptRepository.findById(dto.getId()).orElse(null);
+                return receipt;
+            })
+            .filter(receipt -> receipt != null)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional
+    public ReceiptProcessingResponse processReceiptFileWithSummary(MultipartFile file) throws IOException {
+        log.info("=== INÍCIO DO PROCESSAMENTO DE COMPROVANTES ===");
         log.info("Arquivo: {} ({} bytes)", file.getOriginalFilename(), file.getSize());
         log.info("Tipo de conteúdo: {}", file.getContentType());
         log.info("Arquivo vazio: {}", file.isEmpty());
@@ -57,18 +73,26 @@ public class ReceiptProcessingService {
         }
 
         List<PaymentReceipt> extractedReceipts = new ArrayList<>();
+        int pageCount = 0;
+        int paginasProcessadas = 0;
+        int paginasComErro = 0;
+        int paginasPuladas = 0;
+        
+        // Mapa para contar comprovantes por funcionário
+        Map<String, Integer> employeesCount = new HashMap<>();
         
         // Ler o arquivo em bytes para poder reutilizar
         byte[] fileBytes = file.getBytes();
         
         try (PDDocument document = PDDocument.load(new java.io.ByteArrayInputStream(fileBytes))) {
-            int pageCount = document.getNumberOfPages();
-            log.info("📄 Arquivo contém {} páginas", pageCount);
+            pageCount = document.getNumberOfPages();
+            log.info("📄 Arquivo contém {} página(s) - Cada página contém 1 comprovante", pageCount);
+            log.info("📋 Expectativa: {} comprovante(s) processado(s) (1 comprovante por página)", pageCount);
 
             PDFTextStripper stripper = new PDFTextStripper();
             
             for (int pageNum = 0; pageNum < pageCount; pageNum++) {
-                log.info("=== PROCESSANDO PÁGINA {} DE {} ===", pageNum + 1, pageCount);
+                log.info("=== PROCESSANDO PÁGINA {}/{} ===", pageNum + 1, pageCount);
                 
                 stripper.setStartPage(pageNum + 1);
                 stripper.setEndPage(pageNum + 1);
@@ -76,21 +100,41 @@ public class ReceiptProcessingService {
                 String pageText = stripper.getText(document);
                 log.info("📝 Texto extraído da página {}: {} caracteres", pageNum + 1, pageText.length());
                 
-                // Mostrar primeiros 200 caracteres para debug
+                // Log do texto extraído para debug (primeiros 200 caracteres)
                 if (pageText.length() > 0) {
                     String preview = pageText.substring(0, Math.min(200, pageText.length()));
-                    log.info("🔍 Preview da página {}: {}", pageNum + 1, preview);
+                    log.debug("🔍 Preview da página {}: {}", pageNum + 1, preview);
                 } else {
                     log.warn("⚠️ Página {} está vazia!", pageNum + 1);
                 }
                 
-                // Extrair informações do recibo
-            PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1, new java.io.ByteArrayInputStream(fileBytes));
-                if (receipt != null) {
-                    log.info("✅ Recibo extraído da página {}: {}", pageNum + 1, receipt.getEmployeeName());
-                    extractedReceipts.add(receipt);
-                } else {
-                    log.warn("❌ Nenhum recibo extraído da página {}", pageNum + 1);
+                try {
+                    // IMPORTANTE: Cada página deve gerar APENAS 1 comprovante
+                    // Extrair informações do comprovante
+                    PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1, new java.io.ByteArrayInputStream(fileBytes));
+                    
+                    if (receipt != null && receipt.getEmployeeName() != null && !receipt.getEmployeeName().trim().isEmpty()) {
+                        log.info("✅ Comprovante extraído da página {}/{}: {} (CPF/Período: {}/{})", 
+                            pageNum + 1, pageCount, receipt.getEmployeeName(), 
+                            receipt.getMonth(), receipt.getYear());
+                        
+                        extractedReceipts.add(receipt);
+                        paginasProcessadas++;
+                        
+                        // Contar por funcionário
+                        String employeeName = receipt.getEmployeeName().trim().toUpperCase();
+                        employeesCount.put(employeeName, employeesCount.getOrDefault(employeeName, 0) + 1);
+                    } else {
+                        paginasComErro++;
+                        log.warn("❌ Nenhum comprovante extraído da página {}/{} - dados inválidos", pageNum + 1, pageCount);
+                        log.debug("Dados extraídos da página {}: Nome={}", pageNum + 1, 
+                                 receipt != null ? receipt.getEmployeeName() : "null");
+                    }
+                } catch (Exception pageException) {
+                    paginasComErro++;
+                    log.error("❌ Erro ao processar página {}/{}: {}", pageNum + 1, pageCount, pageException.getMessage());
+                    log.debug("Stack trace da página {}: ", pageNum + 1, pageException);
+                    // Continuar processando próximas páginas
                 }
             }
         } catch (Exception e) {
@@ -98,21 +142,137 @@ public class ReceiptProcessingService {
             throw new IOException("Erro ao processar arquivo PDF: " + e.getMessage());
         }
 
-        // Salvar recibos no banco e retornar apenas os salvos (com IDs)
+        // Salvar comprovantes no banco e retornar apenas os salvos (com IDs)
         List<PaymentReceipt> savedReceipts = new ArrayList<>();
-        log.info("Salvando {} recibos no banco de dados", extractedReceipts.size());
+        log.info("💾 Salvando {} comprovantes no banco de dados", extractedReceipts.size());
         for (PaymentReceipt receipt : extractedReceipts) {
             try {
                 PaymentReceipt savedReceipt = receiptRepository.save(receipt);
-                log.info("Recibo salvo com ID: {}", savedReceipt.getId());
+                log.info("✅ Comprovante salvo com ID: {} - {}", savedReceipt.getId(), savedReceipt.getEmployeeName());
                 savedReceipts.add(savedReceipt);
             } catch (Exception e) {
-                log.error("Erro ao salvar recibo: {}", e.getMessage(), e);
+                log.error("❌ Erro ao salvar comprovante: {}", e.getMessage(), e);
             }
         }
 
-        log.info("Processamento concluído. {} recibos extraídos, {} salvos", extractedReceipts.size(), savedReceipts.size());
-        return savedReceipts;
+        // VALIDAÇÃO: Verificar se quantidade de comprovantes processados corresponde à quantidade de páginas
+        int comprovantesProcessados = extractedReceipts.size();
+        int comprovantesSalvos = savedReceipts.size();
+        boolean validationOk = comprovantesProcessados == pageCount;
+        String validationMessage = "";
+        
+        log.info("");
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log.info("📊 RESUMO DO PROCESSAMENTO DE COMPROVANTES:");
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log.info("📄 Total de páginas no arquivo: {}", pageCount);
+        log.info("✅ Páginas processadas com sucesso: {}", paginasProcessadas);
+        log.info("❌ Páginas com erro na extração: {}", paginasComErro);
+        log.info("⏭️  Páginas puladas: {}", paginasPuladas);
+        log.info("📋 Comprovantes extraídos: {}", comprovantesProcessados);
+        log.info("💾 Comprovantes salvos no banco: {}", comprovantesSalvos);
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        // Validação principal: comprovantes processados devem ser igual a páginas
+        if (validationOk) {
+            validationMessage = String.format("✅ VALIDAÇÃO OK: Quantidade de comprovantes processados (%d) corresponde à quantidade de páginas (%d)",
+                comprovantesProcessados, pageCount);
+            log.info(validationMessage);
+        } else {
+            validationMessage = String.format("⚠️ ATENÇÃO: Quantidade de comprovantes processados (%d) não corresponde à quantidade esperada (%d páginas)",
+                comprovantesProcessados, pageCount);
+            log.warn(validationMessage);
+            log.warn("⚠️ Diferença: {} comprovante(s) a mais/menos do esperado", Math.abs(comprovantesProcessados - pageCount));
+            
+            if (comprovantesProcessados > pageCount) {
+                log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas podem ter gerado múltiplos comprovantes");
+                log.warn("⚠️ SOLUÇÃO: Verificar se o extractReceiptInfo está extraindo apenas 1 comprovante por página");
+            } else if (comprovantesProcessados < pageCount) {
+                log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas não geraram comprovante (erro na extração ou dados inválidos)");
+                log.warn("⚠️ SOLUÇÃO: Verificar logs de erro acima para identificar páginas problemáticas");
+            }
+        }
+        
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        // Lista de funcionários processados com suas quantidades
+        log.info("");
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log.info("📋 LISTA DE FUNCIONÁRIOS PROCESSADOS:");
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        if (employeesCount.isEmpty()) {
+            log.warn("⚠️ Nenhum funcionário foi processado");
+        } else {
+            // Ordenar por quantidade (decrescente) e depois por nome
+            List<Map.Entry<String, Integer>> sortedEmployees = employeesCount.entrySet().stream()
+                .sorted((e1, e2) -> {
+                    int countCompare = Integer.compare(e2.getValue(), e1.getValue()); // Decrescente por quantidade
+                    if (countCompare != 0) return countCompare;
+                    return e1.getKey().compareToIgnoreCase(e2.getKey()); // Crescente por nome
+                })
+                .collect(Collectors.toList());
+            
+            for (Map.Entry<String, Integer> entry : sortedEmployees) {
+                log.info("👤 {}: {} comprovante(s)", entry.getKey(), entry.getValue());
+            }
+            
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📊 Total de funcionários únicos processados: {}", employeesCount.size());
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        }
+
+        log.info("🎉 Processamento concluído. {} comprovante(s) extraído(s), {} salvo(s) de {} página(s) do arquivo", 
+            comprovantesProcessados, comprovantesSalvos, pageCount);
+        
+        // Converter para DTOs
+        List<PaymentReceiptDTO> receiptDTOs = savedReceipts.stream()
+            .map(receipt -> {
+                PaymentReceiptDTO dto = new PaymentReceiptDTO();
+                dto.setId(receipt.getId());
+                dto.setEmployeeName(receipt.getEmployeeName());
+                dto.setMonth(receipt.getMonth());
+                dto.setYear(receipt.getYear());
+                dto.setGrossSalary(receipt.getGrossSalary());
+                dto.setNetSalary(receipt.getNetSalary());
+                dto.setFileName(receipt.getFileName());
+                dto.setFilePath(receipt.getFilePath());
+                dto.setStatus(receipt.getStatus());
+                dto.setCreatedAt(receipt.getCreatedAt());
+                dto.setProcessedAt(receipt.getProcessedAt());
+                return dto;
+            })
+            .collect(Collectors.toList());
+        
+        // Construir lista de funcionários com contagem
+        List<ReceiptProcessingResponse.EmployeeProcessingCount> employeesByCount = employeesCount.entrySet().stream()
+            .sorted((e1, e2) -> {
+                int countCompare = Integer.compare(e2.getValue(), e1.getValue());
+                if (countCompare != 0) return countCompare;
+                return e1.getKey().compareToIgnoreCase(e2.getKey());
+            })
+            .map(entry -> ReceiptProcessingResponse.EmployeeProcessingCount.builder()
+                .employeeName(entry.getKey())
+                .count(entry.getValue())
+                .build())
+            .collect(Collectors.toList());
+        
+        // Construir resumo
+        ReceiptProcessingResponse.ProcessingSummary summary = ReceiptProcessingResponse.ProcessingSummary.builder()
+            .totalPages(pageCount)
+            .receiptsProcessed(comprovantesProcessados)
+            .receiptsSaved(comprovantesSalvos)
+            .pagesWithError(paginasComErro)
+            .pagesSkipped(paginasPuladas)
+            .validationOk(validationOk)
+            .validationMessage(validationMessage)
+            .build();
+        
+        return ReceiptProcessingResponse.builder()
+            .receipts(receiptDTOs)
+            .summary(summary)
+            .employeesByCount(employeesByCount)
+            .build();
     }
 
     private PaymentReceipt extractReceiptInfo(String pageText, int pageNumber, java.io.InputStream originalInputStream) {

@@ -3,8 +3,8 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.CreatePaymentReceiptDTO;
 import com.z7design.secured_guard.dto.PaymentReceiptDTO;
 import com.z7design.secured_guard.service.PaymentReceiptService;
+import com.z7design.secured_guard.dto.ReceiptProcessingResponse;
 import com.z7design.secured_guard.service.ReceiptProcessingService;
-import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -183,7 +183,7 @@ public class PaymentReceiptController {
     
     // Processamento automático de comprovantes (NOVO ENDPOINT)
     @PostMapping("/process-automatic")
-    public ResponseEntity<List<PaymentReceiptDTO>> processReceiptsAutomatic(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ReceiptProcessingResponse> processReceiptsAutomatic(@RequestParam("file") MultipartFile file) {
         try {
             // Validar arquivo
             if (file.isEmpty()) {
@@ -195,31 +195,13 @@ public class PaymentReceiptController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
             
-            // Processar arquivo automaticamente
-            List<PaymentReceipt> processedReceipts = receiptProcessingService.processReceiptFile(file);
+            // Processar arquivo automaticamente com resumo detalhado
+            ReceiptProcessingResponse response = receiptProcessingService.processReceiptFileWithSummary(file);
             
-            // Converter para DTOs
-            List<PaymentReceiptDTO> receiptDTOs = processedReceipts.stream()
-                .map(receipt -> {
-                    PaymentReceiptDTO dto = new PaymentReceiptDTO();
-                    dto.setId(receipt.getId());
-                    dto.setEmployeeName(receipt.getEmployeeName());
-                    dto.setMonth(receipt.getMonth());
-                    dto.setYear(receipt.getYear());
-                    dto.setGrossSalary(receipt.getGrossSalary());
-                    dto.setNetSalary(receipt.getNetSalary());
-                    dto.setFileName(receipt.getFileName());
-                    dto.setFilePath(receipt.getFilePath());
-                    dto.setStatus(receipt.getStatus());
-                    dto.setCreatedAt(receipt.getCreatedAt());
-                    dto.setProcessedAt(receipt.getProcessedAt());
-                    return dto;
-                })
-                .collect(java.util.stream.Collectors.toList());
-            
-            return ResponseEntity.ok(receiptDTOs);
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
+            log.error("Erro ao processar comprovantes: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
