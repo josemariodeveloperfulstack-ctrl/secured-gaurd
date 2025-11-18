@@ -278,7 +278,25 @@ public class UserController {
                     .body(Map.of("error", "Dados de atualização não fornecidos"));
             }
             
-            User updatedUser = userService.updateFromRequest(userId, request);
+            // Validar campos obrigatórios antes de chamar o service
+            if (request.getName() == null || request.getName().trim().isEmpty()) {
+                log.warn("Nome é obrigatório para atualização de usuário {}", id);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Nome é obrigatório"));
+            }
+            
+            User updatedUser;
+            try {
+                updatedUser = userService.updateFromRequest(userId, request);
+            } catch (RuntimeException e) {
+                // RuntimeException geralmente indica usuário não encontrado
+                if (e.getMessage() != null && e.getMessage().contains("não encontrado")) {
+                    log.warn("Usuário não encontrado para atualização: {}", id);
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", e.getMessage()));
+                }
+                throw e; // Re-throw para ser tratado pelo catch genérico
+            }
             
             if (updatedUser == null) {
                 log.warn("Usuário não encontrado para atualização: {}", id);
@@ -292,15 +310,31 @@ public class UserController {
             dto.setUsername(updatedUser.getUsername());
             dto.setEmail(updatedUser.getEmail());
             dto.setActive(updatedUser.isActive());
-            dto.setRoles(updatedUser.getRoles().stream()
-                .map(role -> role.getName())
-                .collect(java.util.stream.Collectors.toList()));
+            
+            // Tratar roles null
+            if (updatedUser.getRoles() != null && !updatedUser.getRoles().isEmpty()) {
+                dto.setRoles(updatedUser.getRoles().stream()
+                    .map(role -> role.getName())
+                    .collect(java.util.stream.Collectors.toList()));
+            } else {
+                dto.setRoles(java.util.Collections.emptyList());
+            }
             
             return ResponseEntity.ok(dto);
         } catch (IllegalArgumentException e) {
             log.warn("Erro de validação ao atualizar usuário {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Dados inválidos"));
+        } catch (RuntimeException e) {
+            log.error("Erro de runtime ao atualizar usuário {}: {}", id, e.getMessage(), e);
+            // Retornar erro específico baseado na mensagem
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Erro ao atualizar usuário";
+            if (errorMessage.contains("não encontrado") || errorMessage.contains("not found")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", errorMessage));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", errorMessage));
         } catch (Exception e) {
             log.error("Erro ao atualizar usuário {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
