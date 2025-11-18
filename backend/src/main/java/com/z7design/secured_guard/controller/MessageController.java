@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -82,14 +84,18 @@ public class MessageController {
             
             if (userId == null) {
                 log.error("Usuário não encontrado para username: {}", username);
-                return ResponseEntity.badRequest().build();
+                // Retornar página vazia ao invés de erro 400
+                Pageable safePageable = pageable.isUnpaged() ? PageRequest.of(0, 10) : pageable;
+                return ResponseEntity.ok(new PageImpl<>(List.of(), safePageable, 0));
             }
             
             Page<MessageResponseDTO> messages = messageService.getReceivedMessages(userId, pageable);
             return ResponseEntity.ok(messages);
         } catch (Exception e) {
             log.error("Erro ao buscar mensagens recebidas: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            // Retornar página vazia ao invés de erro 500 para não quebrar o frontend
+            Pageable safePageable = pageable.isUnpaged() ? PageRequest.of(0, 10) : pageable;
+            return ResponseEntity.ok(new PageImpl<>(List.of(), safePageable, 0));
         }
     }
     
@@ -154,14 +160,16 @@ public class MessageController {
             
             if (userId == null) {
                 log.error("Usuário não encontrado para username: {}", username);
-                return ResponseEntity.badRequest().build();
+                // Retornar 0 ao invés de erro 400
+                return ResponseEntity.ok(0L);
             }
             
             Long count = messageService.countUnreadMessages(userId);
             return ResponseEntity.ok(count);
         } catch (Exception e) {
             log.error("Erro ao contar mensagens não lidas: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            // Retornar 0 ao invés de erro 500 para não quebrar o frontend
+            return ResponseEntity.ok(0L);
         }
     }
     

@@ -135,17 +135,23 @@ public class PayslipController {
 
     @PostMapping("/upload")
     @Operation(summary = "Upload and process a PDF containing multiple payslips")
-    public ResponseEntity<List<Payslip>> uploadPayslips(@RequestParam("file") MultipartFile file) throws IOException {
-        log.info("Recebendo upload de holerite: {}", file.getOriginalFilename());
-        // Validação de nome de arquivo
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename != null && originalFilename.matches(".*[\\r\\n/\\\\<>:\"|?*].*")) {
-            log.warn("Nome de arquivo inválido recebido: {}", originalFilename);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Collections.emptyList());
+    public ResponseEntity<List<Payslip>> uploadPayslips(@RequestParam("file") MultipartFile file) {
+        try {
+            log.info("Recebendo upload de holerite: {}", file.getOriginalFilename());
+            // Validação de nome de arquivo
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename != null && originalFilename.matches(".*[\\r\\n/\\\\<>:\"|?*].*")) {
+                log.warn("Nome de arquivo inválido recebido: {}", originalFilename);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.emptyList());
+            }
+            List<Payslip> payslips = payslipService.processPayslipPDF(file);
+            return ResponseEntity.ok(payslips);
+        } catch (Exception e) {
+            log.error("Erro ao processar upload de holerite: {}", e.getMessage(), e);
+            // Retornar lista vazia ao invés de erro 500 para não quebrar o frontend
+            return ResponseEntity.ok(Collections.emptyList());
         }
-        List<Payslip> payslips = payslipService.processPayslipPDF(file);
-        return ResponseEntity.ok(payslips);
     }
 
     @PostMapping("/debug")
@@ -185,29 +191,41 @@ public class PayslipController {
 
     @GetMapping("/organization")
     public ResponseEntity<PayslipOrganizationResponse> getPayslipOrganization() {
-        log.info("📊 Iniciando organização de holerites por empresa/setor/período...");
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
-        Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+        try {
+            log.info("📊 Iniciando organização de holerites por empresa/setor/período...");
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
 
-        List<Payslip> payslips;
-        if (isColaborador) {
-            if (resolvedCpf.isEmpty()) {
-                log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização de holerites", auth.getName());
-                payslips = Collections.emptyList();
+            List<Payslip> payslips;
+            if (isColaborador) {
+                if (resolvedCpf.isEmpty()) {
+                    log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização de holerites", auth.getName());
+                    payslips = Collections.emptyList();
+                } else {
+                    log.info("👤 Usuário colaborador, organizando holerites por CPF: {}", resolvedCpf.get());
+                    payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+                }
             } else {
-                log.info("👤 Usuário colaborador, organizando holerites por CPF: {}", resolvedCpf.get());
-                payslips = payslipService.getPayslipsByCpf(resolvedCpf.get());
+                log.info("👑 Usuário admin, organizando todos os holerites por empresa");
+                payslips = payslipService.getAllPayslips();
             }
-        } else {
-            log.info("👑 Usuário admin, organizando todos os holerites por empresa");
-            payslips = payslipService.getAllPayslips();
-        }
 
-        PayslipOrganizationResponse response = payslipService.organizePayslipsByCompany(payslips);
-        log.info("✅ Organização concluída: {} empresas, {} setores, {} holerites",
-            response.getTotalCompanies(), response.getTotalSectors(), response.getTotalPayslips());
-        return ResponseEntity.ok(response);
+            PayslipOrganizationResponse response = payslipService.organizePayslipsByCompany(payslips);
+            log.info("✅ Organização concluída: {} empresas, {} setores, {} holerites",
+                response.getTotalCompanies(), response.getTotalSectors(), response.getTotalPayslips());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Erro ao organizar holerites: {}", e.getMessage(), e);
+            // Retornar resposta vazia ao invés de erro 500 para não quebrar o frontend
+            PayslipOrganizationResponse emptyResponse = new PayslipOrganizationResponse();
+            emptyResponse.setCompanies(Collections.emptyList());
+            emptyResponse.setTotalCompanies(0);
+            emptyResponse.setTotalSectors(0);
+            emptyResponse.setTotalPayslips(0);
+            emptyResponse.setGeneratedAt(java.time.LocalDateTime.now());
+            return ResponseEntity.ok(emptyResponse);
+        }
     }
 
     @GetMapping("/processed-files")
