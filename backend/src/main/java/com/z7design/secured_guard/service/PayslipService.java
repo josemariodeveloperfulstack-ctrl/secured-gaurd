@@ -77,6 +77,7 @@ public class PayslipService {
         }
 
         List<Payslip> processedPayslips = new ArrayList<>();
+        int pageCount = 0;
         
         // Create output directory if it doesn't exist
         Path outputPath = Paths.get(OUTPUT_DIR);
@@ -90,11 +91,16 @@ public class PayslipService {
             }
 
             PDFTextStripper stripper = new PDFTextStripper();
-            int pageCount = document.getNumberOfPages();
-            log.info("PDF contém {} páginas", pageCount);
+            pageCount = document.getNumberOfPages();
+            log.info("📄 PDF contém {} página(s) - Cada página contém as duas vias do holerite (frente e verso)", pageCount);
+            log.info("📋 Expectativa: {} holerite(s) processado(s) (1 holerite por página)", pageCount);
+
+            int paginasProcessadas = 0;
+            int paginasComErro = 0;
+            int paginasPuladasPorDuplicidade = 0;
 
             for (int i = 1; i <= pageCount; i++) {
-                log.info("=== Processando página {} ===", i);
+                log.info("=== Processando página {}/{} ===", i, pageCount);
                 stripper.setStartPage(i);
                 stripper.setEndPage(i);
                 String pageText = stripper.getText(document);
@@ -103,6 +109,7 @@ public class PayslipService {
                 log.debug("Texto extraído da página {}: {}", i, pageText.substring(0, Math.min(500, pageText.length())));
 
                 try {
+                    // IMPORTANTE: Cada página deve gerar APENAS 1 holerite (mesmo que contenha frente e verso)
                     // Try to extract information using PDFBox first
                     Payslip payslip = extractPayslipInfo(pageText, i);
                     
@@ -134,6 +141,8 @@ public class PayslipService {
                                     i
                                 );
                                 log.warn(msg);
+                                paginasPuladasPorDuplicidade++;
+                                paginasProcessadas++; // Contar como processada (mesmo que pulada)
                                 continue; // Pular para próxima página ao invés de falhar
                             } else {
                                 log.info("✅ Holerite não duplicado - permitindo importação (Empresa CNPJ: {}, CPF: {}, Período: {}/{})",
@@ -146,6 +155,7 @@ public class PayslipService {
                         } catch (Exception e) {
                             log.warn("⚠️ Erro ao verificar duplicidade, continuando processamento: {}", e.getMessage());
                         }
+                        
                         // Organizar em pastas e salvar PDF individual
                         String caminhoPdf = organizarEmPastas(document, i, payslip);
                         
@@ -169,23 +179,62 @@ public class PayslipService {
                             // Não interromper processamento por erro na criação de usuário
                         }
 
-                        log.info("✅ Página {} processada com sucesso: {}", i, payslip.getEmployeeName());
+                        paginasProcessadas++;
+                        log.info("✅ Página {}/{} processada com sucesso: {} (CPF: {})", i, pageCount, payslip.getEmployeeName(), payslip.getCpf());
                     } else {
-                        log.warn("⚠️ Não foi possível extrair informações válidas da página {}", i);
+                        paginasComErro++;
+                        log.warn("⚠️ Não foi possível extrair informações válidas da página {}/{}", i, pageCount);
                         log.debug("Dados extraídos da página {}: Nome={}, CPF={}", i, 
                                  payslip != null ? payslip.getEmployeeName() : "null", 
                                  payslip != null ? payslip.getCpf() : "null");
                     }
                 } catch (Exception pageException) {
-                    log.error("❌ Erro ao processar página {}: {}", i, pageException.getMessage());
+                    paginasComErro++;
+                    log.error("❌ Erro ao processar página {}/{}: {}", i, pageCount, pageException.getMessage());
                     log.debug("Stack trace da página {}: ", i, pageException);
                     // Continuar processando próximas páginas
                     continue;
                 }
             }
+            
+            // VALIDAÇÃO: Verificar se quantidade de holerites processados corresponde à quantidade de páginas
+            int paginasEsperadasProcessadas = pageCount - paginasPuladasPorDuplicidade;
+            int holeritesProcessados = processedPayslips.size();
+            
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📊 RESUMO DO PROCESSAMENTO:");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📄 Total de páginas no arquivo: {}", pageCount);
+            log.info("✅ Páginas processadas com sucesso: {}", paginasProcessadas);
+            log.info("❌ Páginas com erro na extração: {}", paginasComErro);
+            log.info("⏭️  Páginas puladas (duplicidade): {}", paginasPuladasPorDuplicidade);
+            log.info("📋 Holerites salvos no banco: {}", holeritesProcessados);
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            // Validação principal: holerites processados devem ser igual a páginas (menos duplicidades)
+            if (holeritesProcessados != paginasEsperadasProcessadas) {
+                log.warn("⚠️ ATENÇÃO: Quantidade de holerites processados ({}) não corresponde à quantidade esperada ({} páginas - {} duplicidades = {} esperados)",
+                    holeritesProcessados, pageCount, paginasPuladasPorDuplicidade, paginasEsperadasProcessadas);
+                log.warn("⚠️ Diferença: {} holerite(s) a mais/menos do esperado", Math.abs(holeritesProcessados - paginasEsperadasProcessadas));
+                
+                if (holeritesProcessados > paginasEsperadasProcessadas) {
+                    log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas podem ter gerado múltiplos holerites (frente e verso extraídos separadamente)");
+                    log.warn("⚠️ SOLUÇÃO: Verificar se o extractPayslipInfo está extraindo apenas 1 holerite por página");
+                } else if (holeritesProcessados < paginasEsperadasProcessadas) {
+                    log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas não geraram holerite (erro na extração ou dados inválidos)");
+                    log.warn("⚠️ SOLUÇÃO: Verificar logs de erro acima para identificar páginas problemáticas");
+                }
+            } else {
+                log.info("✅ VALIDAÇÃO OK: Quantidade de holerites processados ({}) corresponde à quantidade de páginas processadas ({})",
+                    holeritesProcessados, paginasEsperadasProcessadas);
+            }
+            
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         }
 
-        log.info("🎉 Processamento concluído. {} holerites processados com sucesso", processedPayslips.size());
+        log.info("🎉 Processamento concluído. {} holerite(s) processado(s) com sucesso de {} página(s) do arquivo", 
+            processedPayslips.size(), pageCount);
         return processedPayslips;
     }
 
@@ -213,42 +262,63 @@ public class PayslipService {
         String workPostName = null;
 
         // 1. EXTRAÇÃO DE CPF PRIMEIRO (mais confiável)
+        // IMPORTANTE: Cada página contém as duas vias do holerite (frente e verso do mesmo funcionário)
+        // Portanto, deve haver apenas 1 CPF único por página. Se houver múltiplos, usar apenas o primeiro.
         Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})");
+        
+        // Contar quantos CPFs diferentes foram encontrados na página
+        Set<String> cpfsEncontrados = new HashSet<>();
+        
         for (String linha : linhas) {
             Matcher cpfMatcher = cpfPattern.matcher(linha);
             if (cpfMatcher.find()) {
-                cpf = cpfMatcher.group(1).replaceAll("[^0-9]", "");
-                log.info("✅ CPF encontrado: {} na linha: {}", cpf, linha.trim());
+                String cpfEncontrado = cpfMatcher.group(1).replaceAll("[^0-9]", "");
+                cpfsEncontrados.add(cpfEncontrado);
                 
-                // Na linha do CPF, tentar extrair código e nome
-                String linhaCpf = linha.trim();
-                
-                // Padrão 1: CODIGO NOME CPF (ex: 000044 ELAINE APARECIDA SOARES PEREIRA CPF: 073.495.276-75)
-                Pattern linhaCompleta1 = Pattern.compile("(\\d{6})\\s+(.+?)\\s+CPF");
-                Matcher lineMatch1 = linhaCompleta1.matcher(linhaCpf);
-                if (lineMatch1.find()) {
-                    codigo = lineMatch1.group(1).trim();
-                    String nomeCandidate = lineMatch1.group(2).trim();
-                    if (isValidEmployeeName(nomeCandidate)) {
-                        nome = nomeCandidate;
-                        log.info("✅ Padrão 1 - Código: {}, Nome: {}", codigo, nome);
-                        break;
+                // Usar apenas o PRIMEIRO CPF encontrado (frente e verso têm o mesmo CPF)
+                if (cpf == null) {
+                    cpf = cpfEncontrado;
+                    log.info("✅ CPF encontrado (primeiro): {} na linha: {}", cpf, linha.trim());
+                    
+                    // Na linha do CPF, tentar extrair código e nome
+                    String linhaCpf = linha.trim();
+                    
+                    // Padrão 1: CODIGO NOME CPF (ex: 000044 ELAINE APARECIDA SOARES PEREIRA CPF: 073.495.276-75)
+                    Pattern linhaCompleta1 = Pattern.compile("(\\d{6})\\s+(.+?)\\s+CPF");
+                    Matcher lineMatch1 = linhaCompleta1.matcher(linhaCpf);
+                    if (lineMatch1.find()) {
+                        codigo = lineMatch1.group(1).trim();
+                        String nomeCandidate = lineMatch1.group(2).trim();
+                        if (isValidEmployeeName(nomeCandidate)) {
+                            nome = nomeCandidate;
+                            log.info("✅ Padrão 1 - Código: {}, Nome: {}", codigo, nome);
+                            break;
+                        }
+                    }
+                    
+                    // Padrão 2: NOME CPF (sem código no início)
+                    Pattern linhaCompleta2 = Pattern.compile("([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ ]{5,})\\s+CPF");
+                    Matcher lineMatch2 = linhaCompleta2.matcher(linhaCpf);
+                    if (lineMatch2.find()) {
+                        String nomeCandidate = lineMatch2.group(1).trim();
+                        if (isValidEmployeeName(nomeCandidate)) {
+                            nome = nomeCandidate;
+                            log.info("✅ Padrão 2 - Nome: {} (sem código)", nome);
+                            break;
+                        }
                     }
                 }
-                
-                // Padrão 2: NOME CPF (sem código no início)
-                Pattern linhaCompleta2 = Pattern.compile("([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ ]{5,})\\s+CPF");
-                Matcher lineMatch2 = linhaCompleta2.matcher(linhaCpf);
-                if (lineMatch2.find()) {
-                    String nomeCandidate = lineMatch2.group(1).trim();
-                    if (isValidEmployeeName(nomeCandidate)) {
-                        nome = nomeCandidate;
-                        log.info("✅ Padrão 2 - Nome: {} (sem código)", nome);
-                        break;
-                    }
-                }
-                break;
             }
+        }
+        
+        // Validação: Se foram encontrados múltiplos CPFs diferentes na mesma página, avisar
+        if (cpfsEncontrados.size() > 1) {
+            log.warn("⚠️ ATENÇÃO: Foram encontrados {} CPF(s) diferente(s) na página {}: {}", 
+                cpfsEncontrados.size(), pageNumber, cpfsEncontrados);
+            log.warn("⚠️ Usando apenas o primeiro CPF encontrado: {} (frente e verso devem ter o mesmo CPF)", cpf);
+            log.warn("⚠️ Esta página pode conter múltiplos holerites ou formato inesperado");
+        } else if (cpfsEncontrados.size() == 1 && cpf != null) {
+            log.info("✅ Validação OK: Apenas 1 CPF único encontrado na página {}: {}", pageNumber, cpf);
         }
 
         // 1.5. EXTRAÇÃO DO CNPJ DA EMPRESA
