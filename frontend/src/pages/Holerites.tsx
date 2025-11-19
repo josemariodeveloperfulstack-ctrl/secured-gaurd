@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import paymentReceiptService, { type PaymentReceipt } from '@/services/paymentReceiptService';
+import paymentReceiptService, { type PaymentReceipt, type ReceiptProcessingResponse } from '@/services/paymentReceiptService';
 import holeriteService, { Holerite, HoleriteOrganizationResponse, HoleriteOrganizedEntry, HoleriteCompanyGroup, HoleriteSectorGroup, HoleritePeriodGroup, CompanyTypeOrganizationResponse, CompanyTypeGroup } from '@/services/holeriteService';
 import { getApiUrl } from '@/config/environment';
 import { PaymentReceiptViewModal } from '@/components/paymentReceipts/PaymentReceiptViewModal';
@@ -1594,12 +1594,28 @@ const Holerites: React.FC = () => {
           timeout: 60000, // 60 segundos para processamento
         });
         
-        const processedReceipts: PaymentReceipt[] = response.data;
-        console.log('✅ Comprovantes processados automaticamente:', processedReceipts);
+        const responseData: ReceiptProcessingResponse = response.data;
+        
+        // Garantir que receipts seja sempre um array válido
+        let processedReceipts: PaymentReceipt[] = [];
+        if (responseData && responseData.receipts) {
+          if (Array.isArray(responseData.receipts)) {
+            processedReceipts = responseData.receipts;
+          } else {
+            console.warn('⚠️ Receipts não é um array:', responseData.receipts);
+            processedReceipts = [];
+          }
+        }
+        
+        const summary = responseData?.summary;
+        
+        console.log('✅ Comprovantes processados automaticamente:', responseData);
+        console.log('📋 Processed receipts (array):', processedReceipts);
+        console.log('📊 Total de comprovantes:', processedReceipts.length);
         
         // Se for sobrescrita, remover do estado (e do backend) os existentes que
         // colidirem com os novos por (empresa quando disponível) + funcionário + período
-        if (options?.overwriteExisting) {
+        if (options?.overwriteExisting && Array.isArray(processedReceipts) && processedReceipts.length > 0) {
           try {
             for (const newRec of processedReceipts) {
               // Localizar recebimentos existentes que batem com funcionário + período
@@ -1625,11 +1641,22 @@ const Holerites: React.FC = () => {
         }
 
         // Adicionar todos os comprovantes processados ao estado
-        setPaymentReceipts(prev => [...prev, ...processedReceipts]);
+        if (Array.isArray(processedReceipts) && processedReceipts.length > 0) {
+          setPaymentReceipts(prev => {
+            // Garantir que prev seja sempre um array válido
+            const prevArray = Array.isArray(prev) ? prev : [];
+            return [...prevArray, ...processedReceipts];
+          });
+        }
+        
+        // Mensagem de sucesso com informações do resumo
+        const successMessage = summary?.validationOk 
+          ? `${processedReceipts.length} comprovante(s) processado(s) automaticamente! ${summary.validationMessage || ''}`
+          : `${processedReceipts.length} comprovante(s) processado(s) automaticamente. ${summary?.validationMessage || ''}`;
         
         toast({
           title: "Sucesso",
-          description: `${processedReceipts.length} comprovante(s) processado(s) automaticamente!`,
+          description: successMessage,
         });
         
       } catch (backendError) {

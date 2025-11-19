@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Upload, FileText, Loader2, Download, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
@@ -138,6 +138,9 @@ const HoleriteUpload: React.FC<HoleriteUploadProps> = ({ isOpen, onClose, onUplo
       <DialogContent className="sm:max-w-[800px] bg-seguranca-graphite border-gray-600">
         <DialogHeader>
           <DialogTitle className="text-seguranca-lightgray">Upload de Holerites em PDF</DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Importe holerites em PDF para processamento automático
+          </DialogDescription>
         </DialogHeader>
         
         {!showResults ? (

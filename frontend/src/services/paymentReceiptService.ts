@@ -38,6 +38,23 @@ export interface PaymentReceipt {
   statementIdentification?: string;
 }
 
+export interface ReceiptProcessingResponse {
+  receipts: PaymentReceipt[];
+  summary: {
+    totalPages: number;
+    receiptsProcessed: number;
+    receiptsSaved: number;
+    pagesWithError: number;
+    pagesSkipped: number;
+    validationOk: boolean;
+    validationMessage: string;
+  };
+  employeesByCount: Array<{
+    employeeName: string;
+    count: number;
+  }>;
+}
+
 export interface CreatePaymentReceiptDTO {
   employeeId?: string;
   employeeName: string;
@@ -157,7 +174,7 @@ class PaymentReceiptService {
   }
 
   // Upload de arquivo real
-  async uploadPaymentReceipt(file: File, employeeName: string, month: number, year: number): Promise<PaymentReceipt> {
+  async uploadPaymentReceipt(file: File, employeeName: string, month: number, year: number): Promise<ReceiptProcessingResponse> {
     try {
       console.log('📤 Iniciando upload real do comprovante:', file.name);
       
@@ -177,7 +194,7 @@ class PaymentReceiptService {
       });
       
       console.log('✅ Upload realizado com sucesso:', response.data);
-      return response.data;
+      return response.data as ReceiptProcessingResponse;
     } catch (error) {
       console.error('❌ Erro ao fazer upload do comprovante:', error);
       throw error;
