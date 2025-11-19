@@ -621,6 +621,42 @@ const Holerites: React.FC = () => {
     }
   }, [activeTab, fetchOrganizationData]);
 
+  // Buscar organização por tipo de empresa (TASK 04)
+  const fetchCompanyTypeOrganizationData = useCallback(async (forceReload = false) => {
+    if (loadingCompanyTypeOrganization) {
+      return;
+    }
+
+    if (!forceReload && companyTypeOrganizationData) {
+      return;
+    }
+
+    setLoadingCompanyTypeOrganization(true);
+    setCompanyTypeOrganizationError(null);
+
+    try {
+      const data = await holeriteService.getOrganizationByCompanyType();
+      setCompanyTypeOrganizationData(data);
+      console.log('📊 Organização por tipo carregada:', data);
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar organização por tipo:', error);
+      setCompanyTypeOrganizationError(error.message || 'Erro ao carregar organização por tipo');
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar a organização por tipo de empresa.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingCompanyTypeOrganization(false);
+    }
+  }, [loadingCompanyTypeOrganization, companyTypeOrganizationData, toast]);
+
+  useEffect(() => {
+    if (activeTab === 'empresas' && user) {
+      fetchCompanyTypeOrganizationData();
+    }
+  }, [activeTab, user, fetchCompanyTypeOrganizationData]);
+
   // Função para obter holerites filtrados pelo período selecionado
   const getFilteredHoleritesByPeriod = () => {
     if (!selectedYear) return [];
