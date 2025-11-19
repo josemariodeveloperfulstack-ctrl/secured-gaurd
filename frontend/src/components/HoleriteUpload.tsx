@@ -175,6 +175,14 @@ const HoleriteUpload: React.FC<HoleriteUploadProps> = ({ isOpen, onClose, onUplo
                 Cancelar
               </Button>
               <Button 
+                variant="outline"
+                onClick={handleClose} 
+                disabled={true}
+                className="border-gray-600 text-seguranca-lightgray"
+              >
+                Fechar
+              </Button>
+              <Button 
                 onClick={processarPDF} 
                 disabled={!file || isProcessing}
                 className="bg-seguranca-red hover:bg-seguranca-darkred"
@@ -237,7 +245,12 @@ const HoleriteUpload: React.FC<HoleriteUploadProps> = ({ isOpen, onClose, onUplo
             </div>
             
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={handleClose} className="border-gray-600 text-seguranca-lightgray">
+              <Button 
+                variant="outline" 
+                onClick={handleClose} 
+                disabled={false}
+                className="border-gray-600 text-seguranca-lightgray"
+              >
                 Fechar
               </Button>
               <Button 
