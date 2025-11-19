@@ -19,7 +19,6 @@ import com.z7design.secured_guard.dto.RefreshTokenRequest;
 import com.z7design.secured_guard.dto.UserResponse;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.Role;
-import com.z7design.secured_guard.model.enums.UserRole;
 import com.z7design.secured_guard.model.enums.UserStatus;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.RoleRepository;
@@ -121,39 +120,90 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-        
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        String jwtToken = jwtService.generateToken(user);
-        String refreshToken = jwtService.generateRefreshToken(user);
-        
-        // Buscar permissões customizadas
-        java.util.List<String> customPermissions = customPermissionService.getActivePermissions(user.getId());
-        
-        // Verificar status de LGPD e segurança
-        boolean requiresLgpdConsent = !lgpdConsentService.hasAcceptedAllRequiredConsents(user.getId());
-        boolean requires2FA = twoFactorAuthService.is2FAEnabled(user.getId());
-        boolean requiresPasswordChange = user.getRequirePasswordChange() != null && user.getRequirePasswordChange();
-        boolean firstAccessCompleted = user.getFirstAccessCompleted() != null && user.getFirstAccessCompleted();
-        
-        return AuthenticationResponse.builder()
-                .token(jwtToken)
-                .refreshToken(refreshToken)
-                .user(UserResponse.builder()
-                        .username(user.getUsername())
-                        .email(user.getEmail())
-                        .fullName(user.getName())
-                        .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
-                        .customPermissions(customPermissions)
-                        .build())
-                .requiresLgpdConsent(requiresLgpdConsent)
-                .requires2FA(requires2FA)
-                .requiresPasswordChange(requiresPasswordChange)
-                .firstAccessCompleted(firstAccessCompleted)
-                .build();
+        try {
+            log.info("🔐 Tentando autenticar usuário: {}", request.getUsername());
+            
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+            
+            User user = userRepository.findByUsername(request.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            log.info("✅ Usuário encontrado: {} (ID: {})", user.getUsername(), user.getId());
+            
+            String jwtToken = jwtService.generateToken(user);
+            String refreshToken = jwtService.generateRefreshToken(user);
+            
+            log.info("🔑 Tokens gerados com sucesso");
+            
+            // Buscar permissões customizadas (com tratamento de erro)
+            java.util.List<String> customPermissions = java.util.Collections.emptyList();
+            try {
+                customPermissions = customPermissionService.getActivePermissions(user.getId());
+                log.info("✅ Permissões customizadas carregadas: {}", customPermissions.size());
+            } catch (Exception e) {
+                log.error("⚠️ Erro ao buscar permissões customizadas (usando lista vazia): {}", e.getMessage());
+            }
+            
+            // Buscar roles (com verificação de null)
+            java.util.List<String> roles = java.util.Collections.emptyList();
+            try {
+                if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+                    roles = user.getRoles().stream()
+                            .map(Role::getName)
+                            .collect(Collectors.toList());
+                    log.info("✅ Roles do usuário: {}", roles);
+                } else {
+                    log.warn("⚠️ Usuário {} não possui roles cadastradas", user.getUsername());
+                }
+            } catch (Exception e) {
+                log.error("⚠️ Erro ao buscar roles (usando lista vazia): {}", e.getMessage());
+            }
+            
+            // Verificar status de LGPD e segurança (com tratamento de erro)
+            boolean requiresLgpdConsent = false;
+            try {
+                requiresLgpdConsent = !lgpdConsentService.hasAcceptedAllRequiredConsents(user.getId());
+                log.info("✅ Status LGPD verificado: requiresConsent={}", requiresLgpdConsent);
+            } catch (Exception e) {
+                log.error("⚠️ Erro ao verificar consentimento LGPD (assumindo false): {}", e.getMessage());
+            }
+            
+            boolean requires2FA = false;
+            try {
+                requires2FA = twoFactorAuthService.is2FAEnabled(user.getId());
+                log.info("✅ Status 2FA verificado: enabled={}", requires2FA);
+            } catch (Exception e) {
+                log.error("⚠️ Erro ao verificar 2FA (assumindo false): {}", e.getMessage());
+            }
+            
+            boolean requiresPasswordChange = user.getRequirePasswordChange() != null && user.getRequirePasswordChange();
+            boolean firstAccessCompleted = user.getFirstAccessCompleted() != null && user.getFirstAccessCompleted();
+            
+            log.info("✅ Autenticação concluída com sucesso para usuário: {}", user.getUsername());
+            
+            return AuthenticationResponse.builder()
+                    .token(jwtToken)
+                    .refreshToken(refreshToken)
+                    .user(UserResponse.builder()
+                            .username(user.getUsername())
+                            .email(user.getEmail())
+                            .fullName(user.getName())
+                            .roles(roles)
+                            .customPermissions(customPermissions)
+                            .build())
+                    .requiresLgpdConsent(requiresLgpdConsent)
+                    .requires2FA(requires2FA)
+                    .requiresPasswordChange(requiresPasswordChange)
+                    .firstAccessCompleted(firstAccessCompleted)
+                    .build();
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            log.warn("❌ Falha na autenticação para usuário {}: {}", request.getUsername(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("💥 ERRO CRÍTICO NO LOGIN para usuário {}: {}", request.getUsername(), e.getMessage(), e);
+            throw new RuntimeException("Erro ao processar autenticação: " + e.getMessage(), e);
+        }
     }
 
     @Override
