@@ -1268,36 +1268,19 @@ public class PayslipService {
     }
 
     private String generateFileName(Payslip payslip, String versionSuffix) {
-        // Tentar extrair código do texto original do PDF se disponível
-        String codigo = null;
-        
-        // Se o CPF for na verdade um código, usar ele
-        if (payslip.getCpf().startsWith("COD")) {
-            codigo = payslip.getCpf().substring(3);
-        } else {
-            // Tentar encontrar um código padrão de 6 dígitos
-            // Isso será implementado quando tivermos o código disponível
-            codigo = ""; // Por enquanto vazio
-        }
-        
-        // Gerar nome do arquivo: NOME_FUNCIONARIO_CODIGO_CPF_MES_ANO[_VERSÃO].pdf
+        // Gerar nome do arquivo: NOME_FUNCIONARIO_CPF_MES_ANO[_VERSÃO].pdf
+        // O nome do funcionário e CPF são obrigatórios para identificar o holerite
         StringBuilder fileName = new StringBuilder();
         
-        // Nome do funcionário (limpar e substituir espaços)
-        String nomeArquivo = payslip.getEmployeeName()
-                .replaceAll("[^A-Za-z0-9\\s]", "") // Remove caracteres especiais
-                .replaceAll("\\s+", "_") // Substitui espaços por underscore
-                .toUpperCase();
+        // Normalizar nome do funcionário para uso em nome de arquivo
+        String nomeFuncionario = normalizeFolderName(payslip.getEmployeeName() != null ? payslip.getEmployeeName() : "FUNCIONARIO_NAO_INFORMADO");
+        String cpf = payslip.getCpf() != null ? payslip.getCpf() : "CPF_NAO_INFORMADO";
         
-        fileName.append(nomeArquivo);
-        
-        // Adicionar código se disponível
-        if (codigo != null && !codigo.isEmpty()) {
-            fileName.append("_").append(codigo);
-        }
+        // Adicionar nome do funcionário
+        fileName.append(nomeFuncionario);
         
         // Adicionar CPF
-        fileName.append("_").append(payslip.getCpf());
+        fileName.append("_").append(cpf);
         
         // Adicionar período
         fileName.append("_").append(payslip.getMonth());
