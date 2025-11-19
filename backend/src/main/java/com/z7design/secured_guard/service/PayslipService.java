@@ -428,9 +428,12 @@ public class PayslipService {
             log.warn("⚠️ ATENÇÃO: Foram encontrados {} CPF(s) diferente(s) na página {}: {}", 
                 cpfsEncontrados.size(), pageNumber, cpfsEncontrados);
             log.warn("⚠️ Usando apenas o primeiro CPF encontrado: {} (frente e verso devem ter o mesmo CPF)", cpf);
-            log.warn("⚠️ Esta página pode conter múltiplos holerites ou formato inesperado");
+            log.warn("⚠️ Esta página pode conter múltiplos holerites de funcionários diferentes ou formato inesperado");
+            log.warn("⚠️ VERIFICAÇÃO: Cada página deve conter apenas as duas vias (frente e verso) do MESMO funcionário");
         } else if (cpfsEncontrados.size() == 1 && cpf != null) {
-            log.info("✅ Validação OK: Apenas 1 CPF único encontrado na página {}: {}", pageNumber, cpf);
+            log.info("✅ Validação OK: Apenas 1 CPF único encontrado na página {}: {} (confirma que a página contém apenas as duas vias do mesmo funcionário)", pageNumber, cpf);
+        } else if (cpfsEncontrados.size() == 0) {
+            log.warn("⚠️ Nenhum CPF encontrado na página {} - pode indicar problema na extração do texto", pageNumber);
         }
 
         // 1.5. EXTRAÇÃO DO CNPJ DA EMPRESA
