@@ -98,8 +98,10 @@ public class PayslipService {
 
             PDFTextStripper stripper = new PDFTextStripper();
             pageCount = document.getNumberOfPages();
-            log.info("📄 PDF contém {} página(s) - Cada página contém as duas vias do holerite (frente e verso)", pageCount);
-            log.info("📋 Expectativa: {} holerite(s) processado(s) (1 holerite por página)", pageCount);
+            log.info("📄 PDF contém {} página(s)", pageCount);
+            log.info("📋 FORMATO ESPERADO: Cada página contém as duas vias do holerite (frente e verso) do MESMO funcionário");
+            log.info("📋 Expectativa: {} holerite(s) processado(s) (1 holerite por página, mesmo que a página tenha frente e verso)", pageCount);
+            log.info("🔍 VERIFICAÇÃO: O sistema irá validar se cada página contém apenas 1 CPF único (confirmando que é o mesmo funcionário nas duas vias)");
 
             int paginasProcessadas = 0;
             int paginasComErro = 0;
