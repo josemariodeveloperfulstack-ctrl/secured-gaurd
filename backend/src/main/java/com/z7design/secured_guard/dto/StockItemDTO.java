@@ -62,7 +62,9 @@ public class StockItemDTO {
 
     public static StockItem toEntity(StockItemDTO dto) {
         StockItem entity = new StockItem();
-        entity.setId(dto.getId());
+        if (dto.getId() != null) {
+            entity.setId(dto.getId());
+        }
         entity.setCode(dto.getCode());
         entity.setName(dto.getName());
         entity.setCategory(dto.getCategory());

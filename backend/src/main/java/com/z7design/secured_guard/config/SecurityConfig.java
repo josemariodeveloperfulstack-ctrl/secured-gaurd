@@ -195,8 +195,8 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/measurements/**").hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/measurements/**").hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/measurements/**").hasAnyAuthority("FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
-                // Endpoints de estoque - requerem permissões específicas
-                .requestMatchers("/api/stock/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                // Endpoints de estoque - requerem permissões específicas ou autenticação
+                .requestMatchers("/api/stock/**").hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_CREATE", "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "STOCK_READ", "STOCK_WRITE", "STOCK_CREATE", "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR")
                 // Endpoints de modelos de documentos - temporariamente público para teste
                 .requestMatchers("/api/modelos-documentos/**").permitAll()
                 // Endpoints de documentos gerados - temporariamente público para teste

@@ -68,6 +68,12 @@ public class Payslip {
     @Column(name = "net_value", precision = 15, scale = 2)
     private java.math.BigDecimal netValue;
     
+    // Dados detalhados da tabela de vencimentos/descontos (JSON)
+    // Armazenado como JSONB no PostgreSQL
+    @Column(name = "table_details", columnDefinition = "jsonb")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    private java.util.List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails;
+    
     @PrePersist
     protected void onCreate() {
         processedAt = LocalDateTime.now();

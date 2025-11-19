@@ -135,7 +135,12 @@ public class StockService {
         existingItem.setCategory(dto.getCategory());
         existingItem.setSizeVariation(dto.getSizeVariation());
         existingItem.setDescription(dto.getDescription());
-        existingItem.setMinimumQuantity(dto.getMinimumQuantity());
+        if (dto.getCurrentQuantity() != null) {
+            existingItem.setCurrentQuantity(dto.getCurrentQuantity());
+        }
+        if (dto.getMinimumQuantity() != null) {
+            existingItem.setMinimumQuantity(dto.getMinimumQuantity());
+        }
         existingItem.setUnitCost(dto.getUnitCost());
         existingItem.setSupplier(dto.getSupplier());
         existingItem.setBarcode(dto.getBarcode());

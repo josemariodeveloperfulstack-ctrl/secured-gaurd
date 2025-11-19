@@ -285,12 +285,41 @@ public class UnifiedDocumentController {
         } catch (Exception e) {
             log.error("💥 Erro no teste de criação de documento unificado: {}", e.getMessage(), e);
             response.put("sucesso", false);
-            response.put("mensagem", "Erro no teste: " + e.getMessage());
-            response.put("erro", e.getClass().getSimpleName());
             
-            // Se for erro de dados não encontrados, sugerir usar dados existentes
-            if (e.getMessage().contains("não encontrado")) {
-                response.put("sugestao", "Use o botão 'Analisar Dados' para ver quais holerites existem no sistema");
+            // Extrair informações da mensagem de erro
+            String errorMessage = e.getMessage();
+            if (errorMessage != null && errorMessage.contains("COMPROVANTE NÃO ENCONTRADO")) {
+                // Parsear a mensagem estruturada
+                String[] lines = errorMessage.split("\n");
+                String errorEmployeeName = "";
+                String holeritePeriod = "";
+                String receiptPeriod = "";
+                
+                for (String line : lines) {
+                    if (line.startsWith("Funcionário: ")) {
+                        errorEmployeeName = line.replace("Funcionário: ", "").trim();
+                    } else if (line.startsWith("Período do Holerite: ")) {
+                        holeritePeriod = line.replace("Período do Holerite: ", "").trim();
+                    } else if (line.startsWith("Período do Comprovante: ")) {
+                        receiptPeriod = line.replace("Período do Comprovante: ", "").split("\\(")[0].trim();
+                    }
+                }
+                
+                response.put("mensagem", "Comprovante de Pagamento Não Encontrado");
+                response.put("tipoErro", "COMPROVANTE_NAO_ENCONTRADO");
+                response.put("funcionario", errorEmployeeName);
+                response.put("periodoHolerite", holeritePeriod);
+                response.put("periodoComprovante", receiptPeriod);
+                response.put("acao", "Por favor, importe apenas o comprovante de pagamento que está faltando.");
+                response.put("detalhes", errorMessage);
+            } else {
+                response.put("mensagem", "Erro no teste: " + errorMessage);
+                response.put("erro", e.getClass().getSimpleName());
+                
+                // Se for erro de dados não encontrados, sugerir usar dados existentes
+                if (errorMessage != null && errorMessage.contains("não encontrado")) {
+                    response.put("sugestao", "Use o botão 'Analisar Dados' para ver quais holerites existem no sistema");
+                }
             }
             
             return ResponseEntity.ok(response); // Retornar 200 com erro para mostrar a mensagem

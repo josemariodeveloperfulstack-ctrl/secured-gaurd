@@ -39,7 +39,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Building2,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +49,7 @@ import { userService, User } from '@/services/userService';
 import { securitySettingsService, SecuritySettings } from '@/services/securitySettingsService';
 import { notificationSettingsService, NotificationSettings } from '@/services/notificationSettingsService';
 import UserFormModal from '@/components/UserFormModal';
+import api from '@/lib/axios';
 
 const Configuracoes = () => {
   const { user } = useAuth();
@@ -64,6 +66,12 @@ const Configuracoes = () => {
   const [userModalMode, setUserModalMode] = useState<'create' | 'edit'>('create');
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings | null>(null);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
+  
+  // Estados para teste de email
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailConfig, setEmailConfig] = useState<any>(null);
+  const [loadingEmailConfig, setLoadingEmailConfig] = useState(false);
 
   const [empresaForm, setEmpresaForm] = useState({
     id: '',
@@ -435,6 +443,67 @@ const Configuracoes = () => {
     });
   };
 
+  // Funções para teste de email
+  const loadEmailConfig = async () => {
+    try {
+      setLoadingEmailConfig(true);
+      const response = await api.get('/api/email/config');
+      setEmailConfig(response.data);
+      toast({
+        title: "Configuração carregada",
+        description: "Configuração de email carregada com sucesso.",
+      });
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar configuração de email:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível carregar a configuração de email.",
+        variant: "destructive"
+      });
+      setEmailConfig(null);
+    } finally {
+      setLoadingEmailConfig(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmailAddress || !testEmailAddress.includes('@')) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor, digite um endereço de email válido.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setTestingEmail(true);
+      const response = await api.post(`/api/email/test?toEmail=${encodeURIComponent(testEmailAddress)}`);
+
+      if (response.data.success) {
+        toast({
+          title: "Email enviado com sucesso!",
+          description: `Email de teste enviado para ${testEmailAddress}. Verifique sua caixa de entrada.`,
+        });
+      } else {
+        toast({
+          title: "Falha no envio",
+          description: response.data.message || "Não foi possível enviar o email de teste.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Erro ao enviar email de teste:', error);
+      toast({
+        title: "Erro ao enviar email",
+        description: error.response?.data?.message || "Não foi possível enviar o email de teste. Verifique os logs do backend.",
+        variant: "destructive"
+      });
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   // Funções para gerenciar usuários
   const loadUsers = async () => {
     try {
@@ -575,13 +644,14 @@ const Configuracoes = () => {
         </div>
 
         <Tabs defaultValue="empresa" className="w-full">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full bg-seguranca-graphite border-gray-600 p-1 rounded-lg">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 w-full bg-seguranca-graphite border-gray-600 p-1 rounded-lg">
             <TabsTrigger value="empresa" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Empresa</TabsTrigger>
             <TabsTrigger value="usuarios" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Usuários</TabsTrigger>
             <TabsTrigger value="seguranca" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Segurança</TabsTrigger>
             <TabsTrigger value="notificacoes" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Notificações</TabsTrigger>
             <TabsTrigger value="integracao" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Integrações</TabsTrigger>
             <TabsTrigger value="operacional" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Operacional</TabsTrigger>
+            <TabsTrigger value="testes" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Testes</TabsTrigger>
           </TabsList>
           
           {/* Aba Dados da Empresa */}
@@ -1367,6 +1437,135 @@ const Configuracoes = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Aba Testes */}
+          <TabsContent value="testes" className="mt-6">
+            <div className="space-y-6">
+              {/* Teste de Email */}
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Teste de Envio de Email
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Teste a configuração SMTP enviando um email de teste
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Configuração Atual */}
+                  <div className="bg-seguranca-black/50 p-4 rounded-lg border border-gray-700">
+                    <h3 className="text-sm font-semibold text-seguranca-lightgray mb-3">Configuração Atual</h3>
+                    {loadingEmailConfig ? (
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Carregando configuração...</span>
+                      </div>
+                    ) : emailConfig ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-400">Servidor SMTP:</span>
+                          <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.host}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Porta:</span>
+                          <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.port}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Usuário:</span>
+                          <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.username}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">SSL/TLS:</span>
+                          <span className="ml-2 text-seguranca-lightgray">{emailConfig.ssl === 'true' ? 'Habilitado' : 'Desabilitado'}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-sm">Clique em "Carregar Configuração" para ver os detalhes</p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadEmailConfig}
+                      disabled={loadingEmailConfig}
+                      className="mt-3 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                    >
+                      {loadingEmailConfig ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Carregando...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Carregar Configuração
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Formulário de Teste */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="testEmail" className="text-seguranca-lightgray">
+                        Email de Destino
+                      </Label>
+                      <Input
+                        id="testEmail"
+                        type="email"
+                        placeholder="seu-email@exemplo.com"
+                        value={testEmailAddress}
+                        onChange={(e) => setTestEmailAddress(e.target.value)}
+                        className="mt-2 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                        disabled={testingEmail}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Digite o endereço de email onde deseja receber o email de teste
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={handleTestEmail}
+                      disabled={!testEmailAddress || testingEmail}
+                      className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
+                    >
+                      {testingEmail ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="h-4 w-4 mr-2" />
+                          Enviar Email de Teste
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Resultado do Teste */}
+                  {emailConfig && (
+                    <Alert className={`border ${emailConfig.configured ? 'border-green-500/50 bg-green-500/10' : 'border-red-500/50 bg-red-500/10'}`}>
+                      <div className="flex items-start gap-3">
+                        {emailConfig.configured ? (
+                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                        )}
+                        <div>
+                          <AlertDescription className={emailConfig.configured ? 'text-green-200' : 'text-red-200'}>
+                            {emailConfig.configured 
+                              ? 'Configuração de email detectada e pronta para uso'
+                              : 'Configuração de email não encontrada ou incompleta'}
+                          </AlertDescription>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 

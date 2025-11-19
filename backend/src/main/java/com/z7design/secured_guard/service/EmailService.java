@@ -58,10 +58,31 @@ public class EmailService {
             return true;
 
         } catch (MailException e) {
-            log.error("💥 Erro ao enviar email: {}", e.getMessage(), e);
+            Throwable cause = e.getCause();
+            if (cause instanceof jakarta.mail.AuthenticationFailedException) {
+                log.error("❌ Erro de autenticação ao enviar email para {}: {}", toEmail, cause.getMessage());
+                log.error("Verifique as credenciais SMTP (usuário e senha) nas configurações");
+            } else if (cause instanceof jakarta.mail.MessagingException) {
+                log.error("❌ Erro de mensagem ao enviar email para {}: {}", toEmail, cause.getMessage());
+                log.error("Causa: {}", cause.getCause() != null ? cause.getCause().getMessage() : "Desconhecida");
+                if (cause.getMessage() != null && cause.getMessage().contains("Could not connect to SMTP host")) {
+                    log.error("⚠️ Não foi possível conectar ao servidor SMTP. Verifique:");
+                    log.error("   - Host e porta estão corretos?");
+                    log.error("   - Firewall/antivírus está bloqueando?");
+                    log.error("   - Servidor SMTP está acessível?");
+                }
+            } else {
+                log.error("💥 Erro ao enviar email para {}: {}", toEmail, e.getMessage(), e);
+                if (cause != null) {
+                    log.error("Causa raiz: {}", cause.getMessage());
+                }
+            }
             return false;
         } catch (Exception e) {
-            log.error("💥 Erro inesperado ao enviar email: {}", e.getMessage(), e);
+            log.error("💥 Erro inesperado ao enviar email para {}: {}", toEmail, e.getMessage(), e);
+            if (e.getCause() != null) {
+                log.error("Causa raiz: {}", e.getCause().getMessage());
+            }
             return false;
         }
     }
@@ -72,17 +93,50 @@ public class EmailService {
     public boolean sendEmailWithAttachment(String toEmail, String subject, String htmlBody, byte[] attachmentBytes, String attachmentFileName) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            // Se não há anexo, não precisa de multipart
+            boolean hasAttachment = attachmentBytes != null && attachmentBytes.length > 0 && attachmentFileName != null && !attachmentFileName.trim().isEmpty();
+            MimeMessageHelper helper = new MimeMessageHelper(message, hasAttachment, "UTF-8");
             helper.setFrom(fromEmail);
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
-            helper.addAttachment(attachmentFileName, new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+            
+            // Adicionar anexo apenas se fornecido
+            if (hasAttachment && attachmentBytes != null && attachmentFileName != null) {
+                helper.addAttachment(attachmentFileName, new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+                log.info("✅ Email com anexo enviado para {} ({} bytes)", toEmail, attachmentBytes.length);
+            } else {
+                log.info("✅ Email enviado para {} (sem anexo)", toEmail);
+            }
+            
             mailSender.send(message);
-            log.info("✅ Email com anexo enviado para {} ({} bytes)", toEmail, attachmentBytes != null ? attachmentBytes.length : 0);
             return true;
+        } catch (MailException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof jakarta.mail.AuthenticationFailedException) {
+                log.error("❌ Erro de autenticação ao enviar email com anexo para {}: {}", toEmail, cause.getMessage());
+                log.error("Verifique as credenciais SMTP (usuário e senha) nas configurações");
+            } else if (cause instanceof jakarta.mail.MessagingException) {
+                log.error("❌ Erro de mensagem ao enviar email com anexo para {}: {}", toEmail, cause.getMessage());
+                log.error("Causa: {}", cause.getCause() != null ? cause.getCause().getMessage() : "Desconhecida");
+                if (cause.getMessage() != null && cause.getMessage().contains("Could not connect to SMTP host")) {
+                    log.error("⚠️ Não foi possível conectar ao servidor SMTP. Verifique:");
+                    log.error("   - Host e porta estão corretos?");
+                    log.error("   - Firewall/antivírus está bloqueando?");
+                    log.error("   - Servidor SMTP está acessível?");
+                }
+            } else {
+                log.error("💥 Erro ao enviar email com anexo para {}: {}", toEmail, e.getMessage(), e);
+                if (cause != null) {
+                    log.error("Causa raiz: {}", cause.getMessage());
+                }
+            }
+            return false;
         } catch (Exception e) {
-            log.error("💥 Erro ao enviar email com anexo: {}", e.getMessage(), e);
+            log.error("💥 Erro ao enviar email com anexo para {}: {}", toEmail, e.getMessage(), e);
+            if (e.getCause() != null) {
+                log.error("Causa raiz: {}", e.getCause().getMessage());
+            }
             return false;
         }
     }
@@ -148,6 +202,8 @@ public class EmailService {
     public boolean testEmailConfiguration() {
         try {
             log.info("🧪 Testando configuração de email...");
+            log.info("📧 Host: {}", mailSender);
+            log.info("📧 From: {}", fromEmail);
             
             SimpleMailMessage testMessage = new SimpleMailMessage();
             testMessage.setFrom(fromEmail);
@@ -159,8 +215,32 @@ public class EmailService {
             log.info("✅ Configuração de email funcionando");
             return true;
             
+        } catch (MailException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof jakarta.mail.AuthenticationFailedException) {
+                log.error("❌ Erro de autenticação na configuração de email: {}", cause.getMessage());
+                log.error("Verifique as credenciais SMTP (usuário e senha) nas configurações");
+            } else if (cause instanceof jakarta.mail.MessagingException) {
+                log.error("❌ Erro de mensagem na configuração de email: {}", cause.getMessage());
+                log.error("Causa: {}", cause.getCause() != null ? cause.getCause().getMessage() : "Desconhecida");
+                if (cause.getMessage() != null && cause.getMessage().contains("Could not connect to SMTP host")) {
+                    log.error("⚠️ Não foi possível conectar ao servidor SMTP. Verifique:");
+                    log.error("   - Host e porta estão corretos?");
+                    log.error("   - Firewall/antivírus está bloqueando?");
+                    log.error("   - Servidor SMTP está acessível?");
+                }
+            } else {
+                log.error("❌ Erro na configuração de email: {}", e.getMessage(), e);
+                if (cause != null) {
+                    log.error("Causa raiz: {}", cause.getMessage());
+                }
+            }
+            return false;
         } catch (Exception e) {
-            log.error("❌ Erro na configuração de email: {}", e.getMessage());
+            log.error("❌ Erro na configuração de email: {}", e.getMessage(), e);
+            if (e.getCause() != null) {
+                log.error("Causa raiz: {}", e.getCause().getMessage());
+            }
             return false;
         }
     }

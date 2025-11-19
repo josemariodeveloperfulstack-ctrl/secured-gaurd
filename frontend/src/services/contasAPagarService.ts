@@ -46,7 +46,9 @@ export interface Supplier {
   address?: string;
   city?: string;
   state?: string;
+  zipCode?: string;
   category?: string;
+  notes?: string;
   isActive: boolean;
 }
 

@@ -142,15 +142,16 @@ export function HoleriteViewModal({
         <DialogHeader className="bg-gradient-to-r from-red-500/10 to-pink-500/10 border-b border-red-500/20 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Eye size={20} className="sm:hidden text-white" />
-                <Eye size={24} className="hidden sm:block text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20">
+                <FileText size={20} className="sm:hidden text-white" />
+                <FileText size={24} className="hidden sm:block text-white" />
               </div>
               <div>
-                <DialogTitle className="text-lg sm:text-2xl font-bold text-white leading-tight">
-                  Visualização do Holerite
-            </DialogTitle>
-                <p className="text-red-300/90 text-xs sm:text-sm font-medium mt-0 truncate max-w-[200px] sm:max-w-none">
+                <DialogTitle className="text-lg sm:text-2xl font-bold text-white leading-tight flex items-center gap-2">
+                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
+                  <span>Visualização do Holerite</span>
+                </DialogTitle>
+                <p className="text-red-300/90 text-xs sm:text-sm font-medium mt-1 truncate max-w-[200px] sm:max-w-none">
                   {holerite.employeeName}
                 </p>
               </div>

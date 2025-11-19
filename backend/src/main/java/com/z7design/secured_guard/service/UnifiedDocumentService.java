@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.UUID;
 import java.text.Normalizer;
 import java.util.stream.Collectors;
 
@@ -409,7 +410,17 @@ public class UnifiedDocumentService {
         if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
             log.error("❌ Comprovante não encontrado para {} {}/{} (holerite {}/{})", 
                 cleanEmployeeName, receiptMonth, receiptYear, month, year);
-            throw new IOException(String.format("Comprovante original não encontrado para o funcionário '%s' no período %d/%d (mês seguinte ao holerite %d/%d). Verifique se o comprovante foi importado corretamente.", employeeName, receiptMonth, receiptYear, month, year));
+            String errorMessage = String.format(
+                "COMPROVANTE NÃO ENCONTRADO\n\n" +
+                "Funcionário: %s\n" +
+                "Período do Holerite: %d/%d\n" +
+                "Período do Comprovante: %d/%d (mês seguinte)\n\n" +
+                "AÇÃO NECESSÁRIA:\n" +
+                "Por favor, importe o comprovante de pagamento para o funcionário '%s' referente ao período %d/%d.\n\n" +
+                "O holerite já está importado e processado. Apenas o comprovante precisa ser importado.",
+                employeeName, month, year, receiptMonth, receiptYear, employeeName, receiptMonth, receiptYear
+            );
+            throw new IOException(errorMessage);
         }
         log.info("📄 Comprovante encontrado: {}", receiptPath);
 
@@ -509,15 +520,90 @@ public class UnifiedDocumentService {
      * Procura o arquivo PDF do comprovante por nome e período em locais conhecidos
      */
     private String findReceiptOriginalFileByNameAndPeriod(String employeeName, int month, int year) {
+        return findReceiptOriginalFileByNameAndPeriod(employeeName, month, year, null);
+    }
+    
+    /**
+     * Busca comprovante apenas pelo nome do funcionário, sem período
+     */
+    private String findReceiptOriginalFileByNameOnly(String employeeName, java.util.List<String> searchedPaths) {
+        try {
+            log.info("🔍 Procurando comprovante apenas pelo nome: {}", employeeName);
+            
+            // Candidatos de diretórios conhecidos (buscar em todas as pastas possíveis)
+            java.util.List<Path> candidates = java.util.List.of(
+                Paths.get("uploads", "receipts"),  // Raiz
+                Paths.get("uploads", "payment-receipts")  // Alternativa
+            );
+            
+            // Normalizar nome para busca
+            String nameTokenLower = employeeName
+                .replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "")
+                .replaceAll("\\s+", "_")
+                .toLowerCase();
+            
+            String nameTokenUpper = nameTokenLower.toUpperCase();
+            
+            for (Path base : candidates) {
+                Path absoluteBase = base.toAbsolutePath();
+                String pathStr = absoluteBase.toString();
+                
+                if (searchedPaths != null) {
+                    searchedPaths.add(pathStr);
+                }
+                
+                if (!Files.exists(base)) {
+                    log.debug("⏭️ Diretório não existe: {}", absoluteBase);
+                    continue;
+                }
+                
+                log.info("📂 Procurando em: {}", absoluteBase);
+                
+                try (var stream = Files.walk(base, 3)) {  // Buscar recursivamente até 3 níveis
+                    var match = stream
+                        .filter(Files::isRegularFile)
+                        .filter(p -> p.toString().toLowerCase().endsWith(".pdf"))
+                        .filter(p -> {
+                            String fileName = p.getFileName().toString();
+                            String fileNameLower = fileName.toLowerCase();
+                            String fileNameUpper = fileName.toUpperCase();
+                            
+                            // Buscar apenas por nome (case insensitive)
+                            return fileNameLower.contains(nameTokenLower) || 
+                                   fileNameUpper.contains(nameTokenUpper);
+                        })
+                        .map(Path::toString)
+                        .findFirst();
+                    
+                    if (match.isPresent()) {
+                        log.info("✅ Comprovante encontrado (apenas por nome): {}", match.get());
+                        return match.get();
+                    }
+                }
+            }
+            
+            log.warn("❌ Comprovante não encontrado apenas pelo nome: {}", employeeName);
+        } catch (Exception e) {
+            log.error("💥 Erro ao procurar comprovante apenas por nome: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+    
+    private String findReceiptOriginalFileByNameAndPeriod(String employeeName, int month, int year, java.util.List<String> searchedPaths) {
         try {
             log.info("🔍 Procurando comprovante para: {} - {}/{}", employeeName, month, year);
             
             // Candidatos de diretórios conhecidos (baseado em ReceiptProcessingService UPLOAD_DIR)
+            // ADICIONADAS MAIS PASTAS PARA AUMENTAR A EFICIÊNCIA
             java.util.List<Path> candidates = java.util.List.of(
-                Paths.get("uploads", "receipts", String.format("%02d_%04d", month, year)),  // Padrão principal
-                Paths.get("uploads", "payment-receipts", String.valueOf(year), String.valueOf(month)),
-                Paths.get("uploads", "receipts", String.format("%d_%d", month, year)),
-                Paths.get("uploads", "receipts")
+                Paths.get("uploads", "receipts", String.format("%02d_%04d", month, year)),  // Padrão principal: 10_2025
+                Paths.get("uploads", "receipts", String.format("%d_%d", month, year)),      // Sem zero: 10_2025
+                Paths.get("uploads", "receipts", String.format("%02d/%04d", month, year)),  // Com barra: 10/2025
+                Paths.get("uploads", "receipts", String.format("%d/%d", month, year)),      // Sem zero com barra
+                Paths.get("uploads", "payment-receipts", String.valueOf(year), String.format("%02d", month)), // YYYY/MM
+                Paths.get("uploads", "payment-receipts", String.valueOf(year), String.valueOf(month)),       // YYYY/M
+                Paths.get("uploads", "payment-receipts", String.format("%04d", year), String.format("%02d", month)), // YYYY/MM (com zeros)
+                Paths.get("uploads", "receipts")  // Raiz (última tentativa)
             );
 
             // Normalizar nome para busca - lowercase com underscores
@@ -529,14 +615,24 @@ public class UnifiedDocumentService {
             String nameTokenUpper = nameTokenLower.toUpperCase();
             
             log.info("🔍 Tokens de busca: lower='{}', upper='{}'", nameTokenLower, nameTokenUpper);
+            
+            java.util.List<String> pathsChecked = new java.util.ArrayList<>();
 
             for (Path base : candidates) {
+                Path absoluteBase = base.toAbsolutePath();
+                String pathStr = absoluteBase.toString();
+                pathsChecked.add(pathStr);
+                
+                if (searchedPaths != null) {
+                    searchedPaths.add(pathStr);
+                }
+                
                 if (!Files.exists(base)) {
-                    log.debug("⏭️ Diretório não existe: {}", base);
+                    log.debug("⏭️ Diretório não existe: {}", absoluteBase);
                     continue;
                 }
                 
-                log.info("📂 Procurando em: {}", base.toAbsolutePath());
+                log.info("📂 Procurando em: {}", absoluteBase);
                 
                 try (var stream = Files.walk(base, 2)) {  // Limitar profundidade
                     var match = stream
@@ -575,7 +671,8 @@ public class UnifiedDocumentService {
                 }
             }
             
-            log.warn("❌ Comprovante não encontrado para {} - {}/{}", employeeName, month, year);
+            log.warn("❌ Comprovante não encontrado para {} - {}/{} nas pastas: {}", 
+                employeeName, month, year, String.join(", ", pathsChecked));
         } catch (Exception e) {
             log.error("💥 Erro ao procurar comprovante: {}", e.getMessage(), e);
         }
@@ -641,16 +738,19 @@ public class UnifiedDocumentService {
             if (!Files.exists(unifiedPath)) {
                 log.warn("⚠️ Pasta unificada não existe: {}", unifiedPath);
                 Files.createDirectories(unifiedPath);
-                return documents;
+                // Não retornar vazio imediatamente - tentar buscar também no banco de dados
+                log.info("📋 Pasta não existe, buscando documentos unificados no banco de dados...");
+            } else {
+                log.info("📂 Buscando em: {}", unifiedPath);
             }
             
-            log.info("📂 Buscando em: {}", unifiedPath);
-            
-            // Buscar recursivamente em todos os subdiretórios
-            Files.walk(unifiedPath, 3)  // Profundidade máxima de 3 níveis
-                .filter(Files::isRegularFile)
-                .filter(path -> path.toString().toLowerCase().endsWith(".pdf"))
-                .forEach(path -> {
+            // ESTRATÉGIA 1: Buscar arquivos físicos na pasta
+            if (Files.exists(unifiedPath)) {
+                // Buscar recursivamente em todos os subdiretórios (aumentar profundidade para 5 níveis)
+                Files.walk(unifiedPath, 5)  // Profundidade máxima de 5 níveis
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().toLowerCase().endsWith(".pdf"))
+                    .forEach(path -> {
                     try {
                         String fileName = path.getFileName().toString();
                         Map<String, Object> doc = new HashMap<>();
@@ -699,8 +799,51 @@ public class UnifiedDocumentService {
                         log.warn("⚠️ Erro ao processar arquivo {}: {}", path, e.getMessage());
                     }
                 });
+            }
             
-            log.info("✅ Encontrados {} documentos unificados", documents.size());
+            // ESTRATÉGIA 2: Buscar também no banco de dados (UnifiedDocument)
+            try {
+                List<UnifiedDocument> unifiedDocsFromDb = unifiedDocumentRepository.findAll();
+                log.info("📋 Encontrados {} documentos unificados no banco de dados", unifiedDocsFromDb.size());
+                
+                for (UnifiedDocument ud : unifiedDocsFromDb) {
+                    // Verificar se já não foi adicionado pela busca de arquivos
+                    boolean alreadyAdded = documents.stream()
+                        .anyMatch(doc -> {
+                            String docFileName = (String) doc.get("fileName");
+                            String docEmployeeName = (String) doc.get("employeeName");
+                            Integer docMonth = (Integer) doc.get("month");
+                            Integer docYear = (Integer) doc.get("year");
+                            
+                            return (docFileName != null && ud.getFilePath() != null && ud.getFilePath().contains(docFileName)) ||
+                                   (docEmployeeName != null && ud.getEmployeeName() != null && 
+                                    docEmployeeName.equals(ud.getEmployeeName()) &&
+                                    docMonth != null && docYear != null &&
+                                    docMonth.equals(ud.getMonth()) && docYear.equals(ud.getYear()));
+                        });
+                    
+                    if (!alreadyAdded && ud.getFilePath() != null && Files.exists(Paths.get(ud.getFilePath()))) {
+                        Map<String, Object> doc = new HashMap<>();
+                        doc.put("type", "UNIFICADO");
+                        doc.put("fileName", ud.getFilePath().substring(ud.getFilePath().lastIndexOf(java.io.File.separator) + 1));
+                        doc.put("filePath", ud.getFilePath());
+                        doc.put("fileSize", getFileSize(Paths.get(ud.getFilePath())));
+                        doc.put("createdAt", ud.getCreatedAt() != null ? ud.getCreatedAt().toString() : getFileCreationTime(Paths.get(ud.getFilePath())));
+                        doc.put("employeeName", ud.getEmployeeName());
+                        doc.put("month", ud.getMonth());
+                        doc.put("year", ud.getYear());
+                        if (ud.getPayslip() != null && ud.getPayslip().getCpf() != null) {
+                            doc.put("cpf", ud.getPayslip().getCpf());
+                        }
+                        documents.add(doc);
+                        log.debug("📄 Adicionado do banco: {}", ud.getFilePath());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao buscar documentos unificados no banco: {}", e.getMessage());
+            }
+            
+            log.info("✅ Encontrados {} documentos unificados (arquivos + banco)", documents.size());
             return documents;
             
         } catch (Exception e) {
@@ -888,7 +1031,7 @@ public class UnifiedDocumentService {
     }
 
     /**
-     * Verifica se os nomes dos funcionários coincidem
+     * Verifica se os nomes dos funcionários coincidem (com suporte a nomes truncados)
      */
     private boolean verifyEmployeeNames(String holeriteName, String receiptName) {
         if (holeriteName == null || receiptName == null) {
@@ -896,12 +1039,9 @@ public class UnifiedDocumentService {
             return false;
         }
         
-        // Normalizar nomes (remover espaços extras, converter para minúsculas)
-        String normalizedHolerite = holeriteName.trim().toLowerCase()
-            .replaceAll("\\s+", " "); // Múltiplos espaços para um só
-        
-        String normalizedReceipt = receiptName.trim().toLowerCase()
-            .replaceAll("\\s+", " ");
+        // Normalizar nomes (remover espaços extras, converter para minúsculas, remover acentos)
+        String normalizedHolerite = normalizeNameForSearch(holeriteName);
+        String normalizedReceipt = normalizeNameForSearch(receiptName);
         
         log.info("🔍 Comparando nomes (verificação flexível):");
         log.info("  Holerite original: '{}'", holeriteName);
@@ -916,7 +1056,7 @@ public class UnifiedDocumentService {
         boolean partialMatch = normalizedHolerite.contains(normalizedReceipt) || 
                               normalizedReceipt.contains(normalizedHolerite);
         
-        // Verificação por palavras-chave (primeiro e último nome)
+        // Verificação por palavras-chave (primeiro e último nome) - com suporte a truncamentos
         boolean keywordMatch = checkKeywordMatch(normalizedHolerite, normalizedReceipt);
         
         // Verificação limpa (removendo palavras comuns)
@@ -936,25 +1076,30 @@ public class UnifiedDocumentService {
         
         boolean cleanMatch = cleanHolerite.equals(cleanReceipt);
         
+        // Verificação por prefixo do último nome (para lidar com truncamentos: PEREIRA vs PERE)
+        boolean truncatedLastMatch = checkTruncatedLastName(normalizedHolerite, normalizedReceipt);
+        
         log.info("🔍 Resultados da verificação flexível:");
         log.info("  Match exato: {}", exactMatch);
         log.info("  Match parcial: {}", partialMatch);
         log.info("  Match por palavras-chave: {}", keywordMatch);
         log.info("  Match limpo: {}", cleanMatch);
+        log.info("  Match por último nome truncado: {}", truncatedLastMatch);
         
         // Retorna true se qualquer verificação passar
-        return exactMatch || partialMatch || keywordMatch || cleanMatch;
+        return exactMatch || partialMatch || keywordMatch || cleanMatch || truncatedLastMatch;
     }
 
     /**
-     * Verifica match por palavras-chave (primeiro e último nome)
+     * Verifica match por palavras-chave (primeiro e último nome) - com suporte a truncamentos
      */
     private boolean checkKeywordMatch(String name1, String name2) {
         String[] words1 = name1.split("\\s+");
         String[] words2 = name2.split("\\s+");
         
         if (words1.length < 2 || words2.length < 2) {
-            return false;
+            // Se não tem pelo menos 2 palavras, usar matching por contenção
+            return name1.contains(name2) || name2.contains(name1);
         }
         
         // Verificar primeiro e último nome
@@ -963,14 +1108,69 @@ public class UnifiedDocumentService {
         String first2 = words2[0];
         String last2 = words2[words2.length - 1];
         
-        boolean firstMatch = first1.equals(first2);
-        boolean lastMatch = last1.equals(last2);
+        // Primeiro nome: exato ou um contém o outro (para lidar com abreviações)
+        boolean firstMatch = first1.equals(first2) || 
+                            (first1.length() >= 3 && first2.length() >= 3 && 
+                             (first1.contains(first2) || first2.contains(first1)));
+        
+        // Último nome: exato, um contém o outro, ou um é prefixo do outro (para truncamentos: PEREIRA vs PERE)
+        boolean lastMatch = last1.equals(last2) || 
+                           (last1.length() >= 3 && last2.length() >= 3 && 
+                            (last1.contains(last2) || last2.contains(last1))) ||
+                           (last1.length() >= 4 && last2.length() >= 4 && 
+                            (last1.startsWith(last2) || last2.startsWith(last1)));
         
         log.info("🔍 Verificação por palavras-chave:");
         log.info("  Primeiro nome: '{}' = '{}' ? {}", first1, first2, firstMatch);
         log.info("  Último nome: '{}' = '{}' ? {}", last1, last2, lastMatch);
         
         return firstMatch && lastMatch;
+    }
+    
+    /**
+     * Verifica match por último nome truncado (ex: PEREIRA vs PERE, SOARES PEREIRA vs SOARES PERE)
+     */
+    private boolean checkTruncatedLastName(String name1, String name2) {
+        String[] words1 = name1.split("\\s+");
+        String[] words2 = name2.split("\\s+");
+        
+        if (words1.length < 2 || words2.length < 2) {
+            return false;
+        }
+        
+        // Pegar último nome de cada
+        String last1 = words1[words1.length - 1];
+        String last2 = words2[words2.length - 1];
+        
+        // Verificar se um último nome é prefixo do outro (com pelo menos 4 caracteres)
+        boolean truncatedMatch = false;
+        if (last1.length() >= 4 && last2.length() >= 4) {
+            // Verificar se um começa com o outro (truncamento)
+            truncatedMatch = last1.startsWith(last2) || last2.startsWith(last1);
+            
+            if (truncatedMatch) {
+                log.info("🔍 Match por último nome truncado encontrado:");
+                log.info("  Último nome 1: '{}' ({} caracteres)", last1, last1.length());
+                log.info("  Último nome 2: '{}' ({} caracteres)", last2, last2.length());
+                log.info("  Match: {}", truncatedMatch);
+            }
+        }
+        
+        // Também verificar se os primeiros nomes batem
+        if (truncatedMatch) {
+            String first1 = words1[0];
+            String first2 = words2[0];
+            boolean firstMatches = first1.equals(first2) || 
+                                  (first1.length() >= 3 && first2.length() >= 3 && 
+                                   (first1.contains(first2) || first2.contains(first1)));
+            
+            if (firstMatches) {
+                log.info("✅ Match completo por último nome truncado: primeiro nome também bate");
+                return true;
+            }
+        }
+        
+        return truncatedMatch;
     }
 
     /**
@@ -1115,7 +1315,6 @@ public class UnifiedDocumentService {
             
             // Para cada funcionário, buscar recibos correspondentes e criar holerite expandido
             for (Map.Entry<String, List<Payslip>> entry : payslipsByEmployee.entrySet()) {
-                String key = entry.getKey();
                 List<Payslip> employeePayslips = entry.getValue();
                 
                 if (employeePayslips.isEmpty()) continue;
@@ -1128,65 +1327,214 @@ public class UnifiedDocumentService {
                 log.info("🔍 Processando funcionário: '{}' - {}/{}", employeeName, month, year);
                 
                 try {
-                    // REGRA DE NEGÓCIO: O comprovante de pagamento é do mês SEGUINTE ao holerite
-                    int receiptMonth = month == 12 ? 1 : month + 1;
-                    int receiptYear = month == 12 ? year + 1 : year;
+                    // REGRA DE NEGÓCIO MELHORADA: O comprovante pode ser do mês ANTERIOR, MESMO mês ou SEGUINTE
+                    // Ex: Holerite de setembro -> Comprovante de agosto, setembro ou outubro
+                    int receiptMonthPrev = month == 1 ? 12 : month - 1;
+                    int receiptYearPrev = month == 1 ? year - 1 : year;
+                    int receiptMonthNext = month == 12 ? 1 : month + 1;
+                    int receiptYearNext = month == 12 ? year + 1 : year;
                     
-                    log.info("🔍 Buscando comprovante para holerite {}/{} -> comprovante {}/{}", 
-                        month, year, receiptMonth, receiptYear);
+                    log.info("🔍 Buscando comprovante para holerite {}/{} -> tentando comprovantes: {}/{} (anterior), {}/{} (mesmo), {}/{} (seguinte)", 
+                        month, year, receiptMonthPrev, receiptYearPrev, month, year, receiptMonthNext, receiptYearNext);
                     
-                    // Buscar recibos por nome do funcionário (busca mais flexível)
-                    log.info("🔍 Buscando recibos para funcionário: '{}'", employeeName);
-                    List<PaymentReceipt> allReceipts = receiptRepository.findByEmployeeNameContainingIgnoreCase(employeeName);
-                    log.info("📄 Total de recibos encontrados para '{}': {}", employeeName, allReceipts.size());
+                    // Usar Set para evitar duplicatas
+                    java.util.Set<PaymentReceipt> allReceiptsSet = new java.util.HashSet<>();
                     
-                    // Mostrar detalhes dos recibos encontrados
-                    if (!allReceipts.isEmpty()) {
-                        log.info("📋 Detalhes dos recibos encontrados para '{}':", employeeName);
-                        for (PaymentReceipt receipt : allReceipts) {
-                            log.info("  - ID: {}, Nome: '{}', Mês: {}, Ano: {}", 
-                                receipt.getId(), 
-                                receipt.getEmployeeName(), 
-                                receipt.getMonth(), 
-                                receipt.getYear());
+                    // ESTRATÉGIA 1: Buscar por CPF via Employee (mais preciso)
+                    String payslipCpf = firstPayslip.getCpf();
+                    if (payslipCpf != null && !payslipCpf.trim().isEmpty()) {
+                        try {
+                            String normalizedCpf = payslipCpf.replaceAll("[^0-9]", "");
+                            log.info("🔍 Estratégia 1: Buscando Employee por CPF: {}", normalizedCpf);
+                            
+                            Optional<com.z7design.secured_guard.model.Employee> employeeOpt = employeeRepository.findByCpf(normalizedCpf);
+                            if (employeeOpt.isPresent()) {
+                                UUID employeeId = employeeOpt.get().getId();
+                                log.info("✅ Employee encontrado por CPF: {} (ID: {})", employeeOpt.get().getName(), employeeId);
+                                
+                                // Buscar comprovantes por employeeId
+                                List<PaymentReceipt> receiptsByEmployeeId = receiptRepository.findByEmployeeId(employeeId);
+                                allReceiptsSet.addAll(receiptsByEmployeeId);
+                                log.info("📋 Encontrados {} comprovante(s) por employeeId", receiptsByEmployeeId.size());
+                            } else {
+                                log.warn("⚠️ Employee não encontrado por CPF: {}", normalizedCpf);
+                            }
+                        } catch (Exception e) {
+                            log.warn("⚠️ Erro ao buscar Employee por CPF: {}", e.getMessage());
                         }
                     }
                     
-                    // Filtrar por mês do PAGAMENTO (mês seguinte), ano E NOME EXATO
-                    List<PaymentReceipt> matchingReceipts = allReceipts.stream()
-                        .filter(receipt -> {
-                            boolean monthMatch = receipt.getMonth() != null && receipt.getMonth().equals(receiptMonth);
-                            boolean yearMatch = receipt.getYear() != null && receipt.getYear().equals(receiptYear);
-                            boolean nameMatch = isExactNameMatch(employeeName, receipt.getEmployeeName());
-                            
-                            log.info("🔍 Filtro para recibo {}: Mês={} ({}), Ano={} ({}), Nome={} ({})", 
-                                receipt.getId(), monthMatch, receiptMonth, yearMatch, receiptYear, nameMatch, receipt.getEmployeeName());
-                            
-                            return monthMatch && yearMatch && nameMatch;
-                        })
+                    // ESTRATÉGIA 2: Buscar por nome completo (contains ignore case)
+                    String normalizedName = normalizeNameForSearch(employeeName);
+                    log.info("🔍 Estratégia 2: Buscando comprovantes por nome completo '{}' (normalizado: '{}')", employeeName, normalizedName);
+                    
+                    List<PaymentReceipt> receiptsByName = receiptRepository
+                        .findByEmployeeNameContainingIgnoreCase(employeeName);
+                    allReceiptsSet.addAll(receiptsByName);
+                    log.info("📋 Encontrados {} comprovante(s) por nome completo", receiptsByName.size());
+                    
+                    // ESTRATÉGIA 3: Buscar por partes do nome (primeiro e último nome)
+                    String[] nameParts = employeeName.trim().toUpperCase().split("\\s+");
+                    if (nameParts.length >= 2) {
+                        String firstName = nameParts[0];
+                        String lastName = nameParts[nameParts.length - 1];
+                        log.info("🔍 Estratégia 3: Buscando por primeiro nome '{}' e último nome '{}'", firstName, lastName);
+                        
+                        // Buscar por primeiro nome
+                        List<PaymentReceipt> receiptsByFirst = receiptRepository
+                            .findByEmployeeNameContainingIgnoreCase(firstName);
+                        for (PaymentReceipt receipt : receiptsByFirst) {
+                            if (receipt.getEmployeeName() != null) {
+                                String receiptNameUpper = receipt.getEmployeeName().toUpperCase();
+                                // Verificar se contém o último nome
+                                if (receiptNameUpper.contains(lastName)) {
+                                    allReceiptsSet.add(receipt);
+                                }
+                            }
+                        }
+                        log.info("📋 Encontrados {} comprovante(s) adicionais por partes do nome", 
+                            allReceiptsSet.size() - receiptsByName.size());
+                    }
+                    
+                    // ESTRATÉGIA 4: Buscar por nome normalizado (sem acentos) - mais flexível
+                    if (!normalizedName.equals(employeeName.trim().toLowerCase())) {
+                        String[] normalizedParts = normalizedName.split("\\s+");
+                        if (normalizedParts.length > 0 && normalizedParts[0].length() >= 3) {
+                            log.info("🔍 Estratégia 4: Buscando por nome normalizado (primeira parte: '{}')", normalizedParts[0]);
+                            List<PaymentReceipt> receiptsByNormalized = receiptRepository
+                                .findByEmployeeNameContainingIgnoreCase(normalizedParts[0]);
+                            for (PaymentReceipt receipt : receiptsByNormalized) {
+                                String receiptNormalized = normalizeNameForSearch(receipt.getEmployeeName());
+                                // Verificar se há overlap significativo entre os nomes normalizados
+                                if (normalizedName.contains(receiptNormalized) || 
+                                    receiptNormalized.contains(normalizedName) ||
+                                    calculateNameSimilarity(normalizedName, receiptNormalized) >= 0.6) {
+                                    allReceiptsSet.add(receipt);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // ESTRATÉGIA 5: Buscar por último nome apenas (para casos de nomes muito diferentes)
+                    if (nameParts.length >= 2) {
+                        String lastName = nameParts[nameParts.length - 1];
+                        if (lastName.length() >= 4) {
+                            log.info("🔍 Estratégia 5: Buscando por último nome '{}' (apenas se >= 4 caracteres)", lastName);
+                            List<PaymentReceipt> receiptsByLast = receiptRepository
+                                .findByEmployeeNameContainingIgnoreCase(lastName);
+                            for (PaymentReceipt receipt : receiptsByLast) {
+                                // Verificar se o primeiro nome também bate (pelo menos parcialmente)
+                                String receiptNameUpper = receipt.getEmployeeName() != null ? 
+                                    receipt.getEmployeeName().toUpperCase() : "";
+                                if (receiptNameUpper.contains(nameParts[0].substring(0, Math.min(3, nameParts[0].length())))) {
+                                    allReceiptsSet.add(receipt);
+                                }
+                            }
+                        }
+                    }
+                    
+                    List<PaymentReceipt> allReceipts = new ArrayList<>(allReceiptsSet);
+                    log.info("📊 Total de comprovantes únicos encontrados (todas as estratégias): {}", allReceipts.size());
+                    
+                    // Mostrar detalhes dos recibos encontrados
+                    if (!allReceipts.isEmpty()) {
+                        log.info("📋 Detalhes dos comprovantes encontrados para '{}':", employeeName);
+                        for (PaymentReceipt receipt : allReceipts) {
+                            log.info("  - ID: {}, Nome: '{}', Mês: {}, Ano: {}, EmployeeId: {}", 
+                                receipt.getId(), 
+                                receipt.getEmployeeName(), 
+                                receipt.getMonth(), 
+                                receipt.getYear(),
+                                receipt.getEmployeeId());
+                        }
+                    }
+                    
+                    // Filtrar por período - EXPANDIDO: mês anterior, mesmo mês e mês seguinte
+                    List<PaymentReceipt> matchingReceipts = new ArrayList<>();
+                    
+                    // Tentativa 1: Mês seguinte (pagamento típico) - PRIORIDADE ALTA
+                    List<PaymentReceipt> receiptsNextMonth = allReceipts.stream()
+                        .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptMonthNext))
+                        .filter(r -> r.getYear() != null && r.getYear().equals(receiptYearNext))
                         .collect(Collectors.toList());
                     
-                    log.info("📄 Recibos filtrados por período {}/{} (pagamento) e nome exato: {}", receiptMonth, receiptYear, matchingReceipts.size());
+                    if (!receiptsNextMonth.isEmpty()) {
+                        matchingReceipts.addAll(receiptsNextMonth);
+                        log.info("✅ Encontrados {} comprovante(s) no mês seguinte {}/{}", 
+                            receiptsNextMonth.size(), receiptMonthNext, receiptYearNext);
+                    }
                     
-                    if (!matchingReceipts.isEmpty()) {
-                        log.info("✅ Encontrados {} recibos com nome EXATO para {} - {}/{}", matchingReceipts.size(), employeeName, month, year);
+                    // Tentativa 2: Mesmo mês - PRIORIDADE MÉDIA
+                    List<PaymentReceipt> receiptsSameMonth = allReceipts.stream()
+                        .filter(r -> r.getMonth() != null && r.getMonth().equals(month))
+                        .filter(r -> r.getYear() != null && r.getYear().equals(year))
+                        .filter(r -> !matchingReceipts.contains(r)) // Evitar duplicatas
+                        .collect(Collectors.toList());
+                    
+                    if (!receiptsSameMonth.isEmpty()) {
+                        matchingReceipts.addAll(receiptsSameMonth);
+                        log.info("✅ Encontrados {} comprovante(s) no mesmo mês {}/{}", 
+                            receiptsSameMonth.size(), month, year);
+                    }
+                    
+                    // Tentativa 3: Mês anterior - PRIORIDADE BAIXA (fallback)
+                    if (matchingReceipts.isEmpty()) {
+                        List<PaymentReceipt> receiptsPrevMonth = allReceipts.stream()
+                            .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptMonthPrev))
+                            .filter(r -> r.getYear() != null && r.getYear().equals(receiptYearPrev))
+                            .collect(Collectors.toList());
+                        
+                        if (!receiptsPrevMonth.isEmpty()) {
+                            matchingReceipts.addAll(receiptsPrevMonth);
+                            log.info("✅ Encontrados {} comprovante(s) no mês anterior {}/{} (fallback)", 
+                                receiptsPrevMonth.size(), receiptMonthPrev, receiptYearPrev);
+                        }
+                    }
+                    
+                    // Filtrar por matching de nome usando verificação flexível
+                    List<PaymentReceipt> matchedByName = matchingReceipts.stream()
+                        .filter(receipt -> verifyEmployeeNames(employeeName, receipt.getEmployeeName()))
+                        .collect(Collectors.toList());
+                    
+                    log.info("📋 Comprovantes após filtro de nome: {} (de {} por período)", 
+                        matchedByName.size(), matchingReceipts.size());
+                    
+                    // Se não encontrou com verificação flexível, usar os que passaram pelo período
+                    if (matchedByName.isEmpty() && !matchingReceipts.isEmpty()) {
+                        log.warn("⚠️ Nenhum comprovante passou na verificação de nome, mas {} comprovante(s) encontrado(s) no período. Usando verificação mais flexível...", 
+                            matchingReceipts.size());
+                        
+                        // Tentar matching mais flexível (primeiro e último nome)
+                        matchedByName = matchingReceipts.stream()
+                            .filter(receipt -> isFlexibleNameMatch(employeeName, receipt.getEmployeeName()))
+                            .collect(Collectors.toList());
+                        
+                        if (!matchedByName.isEmpty()) {
+                            log.info("✅ Encontrados {} comprovante(s) com matching flexível", matchedByName.size());
+                        } else {
+                            // Última tentativa: usar todos os que estão no período se não houver nenhum match
+                            log.warn("⚠️ Nenhum match de nome encontrado, mas usando {} comprovante(s) do período como fallback", matchingReceipts.size());
+                            matchedByName = matchingReceipts;
+                        }
+                    }
+                    
+                    if (!matchedByName.isEmpty()) {
+                        log.info("✅ Encontrados {} comprovante(s) para {} - {}/{}", matchedByName.size(), employeeName, month, year);
                         
                         // Criar holerite expandido com todos os recibos
-                        String expandedPath = createExpandedHolerite(firstPayslip, matchingReceipts);
+                        String expandedPath = createExpandedHolerite(firstPayslip, matchedByName);
                         createdDocuments.add(expandedPath);
                         
                         log.info("✅ Holerite expandido criado: {}", expandedPath);
                     } else {
-                        log.warn("⚠️ Nenhum recibo com nome EXATO encontrado para {} - holerite {}/{} (procurando comprovante {}/{})", 
-                            employeeName, month, year, receiptMonth, receiptYear);
-                        log.info("ℹ️ Nomes de recibos encontrados para o período de pagamento {}/{}:", receiptMonth, receiptYear);
-                        allReceipts.stream()
-                            .filter(receipt -> receipt.getMonth() != null && 
-                                             receipt.getMonth().equals(receiptMonth) &&
-                                             receipt.getYear() != null && 
-                                             receipt.getYear().equals(receiptYear))
-                            .forEach(receipt -> log.info("  - Recibo: '{}' vs Holerite: '{}'", 
-                                receipt.getEmployeeName(), employeeName));
+                        log.warn("⚠️ Nenhum comprovante encontrado para {} - holerite {}/{} (procurando comprovante {}/{} ou {}/{})", 
+                            employeeName, month, year, receiptMonthNext, receiptYearNext, month, year);
+                        log.warn("   Total de comprovantes no banco para nome '{}': {}", employeeName, allReceipts.size());
+                        if (!allReceipts.isEmpty()) {
+                            log.warn("   Períodos dos comprovantes encontrados:");
+                            allReceipts.forEach(r -> log.warn("     - {}: {}/{}", 
+                                r.getEmployeeName(), r.getMonth(), r.getYear()));
+                        }
                     }
                     
                 } catch (Exception e) {
@@ -1267,6 +1615,146 @@ public class UnifiedDocumentService {
         }
         
         return exactMatch;
+    }
+
+    /**
+     * Normaliza nome para busca (remove acentos, normaliza espaços, converte para minúsculas)
+     */
+    private String normalizeNameForSearch(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "";
+        }
+        
+        // Remover acentos
+        String withoutAccents = Normalizer.normalize(name.trim(), Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "");
+        
+        // Normalizar espaços e converter para minúsculas
+        String normalized = withoutAccents
+            .replaceAll("\\s+", " ")
+            .trim()
+            .toLowerCase();
+        
+        return normalized;
+    }
+
+    /**
+     * Calcula similaridade entre dois nomes (0.0 a 1.0)
+     * Usa algoritmo de similaridade baseado em palavras comuns
+     */
+    private double calculateNameSimilarity(String name1, String name2) {
+        if (name1 == null || name2 == null || name1.isEmpty() || name2.isEmpty()) {
+            return 0.0;
+        }
+        
+        String[] words1 = name1.split("\\s+");
+        String[] words2 = name2.split("\\s+");
+        
+        if (words1.length == 0 || words2.length == 0) {
+            return 0.0;
+        }
+        
+        int commonWords = 0;
+        int totalWords = Math.max(words1.length, words2.length);
+        
+        for (String word1 : words1) {
+            if (word1.length() >= 3) { // Ignorar palavras muito curtas
+                for (String word2 : words2) {
+                    if (word2.length() >= 3) {
+                        // Verificar match exato ou por prefixo (para truncamentos)
+                        if (word1.equals(word2) || 
+                            (word1.length() >= 4 && word2.length() >= 4 && 
+                             (word1.startsWith(word2) || word2.startsWith(word1)))) {
+                            commonWords++;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return totalWords > 0 ? (double) commonWords / totalWords : 0.0;
+    }
+
+    /**
+     * Matching flexível baseado em primeiro e último nome - com suporte a truncamentos
+     */
+    private boolean isFlexibleNameMatch(String name1, String name2) {
+        if (name1 == null || name2 == null || name1.trim().isEmpty() || name2.trim().isEmpty()) {
+            return false;
+        }
+        
+        String normalized1 = normalizeNameForSearch(name1);
+        String normalized2 = normalizeNameForSearch(name2);
+        
+        // Se já são iguais após normalização, retornar true
+        if (normalized1.equals(normalized2)) {
+            return true;
+        }
+        
+        // Dividir em palavras
+        String[] words1 = normalized1.split("\\s+");
+        String[] words2 = normalized2.split("\\s+");
+        
+        if (words1.length < 2 || words2.length < 2) {
+            // Se não tem pelo menos 2 palavras, usar matching por contenção
+            return normalized1.contains(normalized2) || normalized2.contains(normalized1);
+        }
+        
+        // Verificar primeiro nome
+        String first1 = words1[0];
+        String first2 = words2[0];
+        boolean firstMatches = first1.equals(first2) || 
+                              first1.length() >= 3 && first2.length() >= 3 && 
+                              (first1.contains(first2) || first2.contains(first1));
+        
+        // Verificar último nome - com suporte a truncamentos (PEREIRA vs PERE)
+        String last1 = words1[words1.length - 1];
+        String last2 = words2[words2.length - 1];
+        boolean lastMatches = last1.equals(last2) || 
+                              (last1.length() >= 3 && last2.length() >= 3 && 
+                               (last1.contains(last2) || last2.contains(last1))) ||
+                              (last1.length() >= 4 && last2.length() >= 4 && 
+                               (last1.startsWith(last2) || last2.startsWith(last1)));
+        
+        // Se primeiro E último nome batem, considerar match
+        if (firstMatches && lastMatches) {
+            log.info("✅ Match flexível encontrado: '{}' <-> '{}' (primeiro: '{}'='{}', último: '{}'='{}')", 
+                name1, name2, first1, first2, last1, last2);
+            return true;
+        }
+        
+        // Verificar se um nome contém o outro (após normalização)
+        if (normalized1.length() >= 10 && normalized2.length() >= 10) {
+            // Se ambos são longos, verificar se há overlap significativo
+            int minLength = Math.min(normalized1.length(), normalized2.length());
+            int overlap = 0;
+            
+            // Verificar overlap por palavras
+            for (String word1 : words1) {
+                if (word1.length() >= 3) {
+                    for (String word2 : words2) {
+                        if (word2.length() >= 3) {
+                            // Verificar match exato ou por prefixo (truncamento)
+                            if (word1.equals(word2) || 
+                                (word1.length() >= 4 && word2.length() >= 4 && 
+                                 (word1.startsWith(word2) || word2.startsWith(word1)))) {
+                                overlap += Math.min(word1.length(), word2.length());
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Se overlap é pelo menos 50% do nome menor, considerar match
+            if (overlap >= minLength * 0.5) {
+                log.info("✅ Match flexível por overlap: '{}' <-> '{}' (overlap: {})", 
+                    name1, name2, overlap);
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**
@@ -1551,44 +2039,151 @@ public class UnifiedDocumentService {
                         continue;
                     }
                     
-                    // 4.2. Buscar comprovantes para o funcionário
-                    List<PaymentReceipt> allReceipts = receiptRepository
+                    // 4.2. Buscar comprovantes para o funcionário usando múltiplas estratégias
+                    // ESTRATÉGIA 1: Buscar por nome normalizado (sem acentos, espaços normalizados)
+                    String normalizedName = normalizeNameForSearch(employeeName);
+                    log.info("🔍 Buscando comprovantes para '{}' (normalizado: '{}')", employeeName, normalizedName);
+                    
+                    // Buscar comprovantes usando múltiplas estratégias
+                    List<PaymentReceipt> allReceipts = new ArrayList<>();
+                    
+                    // Estratégia 1.1: Buscar por nome completo (contains ignore case)
+                    List<PaymentReceipt> receiptsByName = receiptRepository
                         .findByEmployeeNameContainingIgnoreCase(employeeName);
+                    allReceipts.addAll(receiptsByName);
+                    log.info("📋 Encontrados {} comprovante(s) por nome completo '{}'", receiptsByName.size(), employeeName);
                     
-                    // REGRA DE NEGÓCIO: O comprovante de pagamento é do mês SEGUINTE ao holerite
-                    // Ex: Holerite de setembro (mês trabalhado) -> Comprovante de outubro (mês do pagamento)
-                    int receiptMonth = month == 12 ? 1 : month + 1;
-                    int receiptYear = month == 12 ? year + 1 : year;
+                    // Estratégia 1.2: Buscar por partes do nome (primeiro e último nome)
+                    String[] nameParts = employeeName.trim().toUpperCase().split("\\s+");
+                    if (nameParts.length >= 2) {
+                        String firstName = nameParts[0];
+                        String lastName = nameParts[nameParts.length - 1];
+                        log.info("🔍 Buscando por primeiro nome '{}' e último nome '{}'", firstName, lastName);
+                        
+                        // Buscar por primeiro nome
+                        List<PaymentReceipt> receiptsByFirst = receiptRepository
+                            .findByEmployeeNameContainingIgnoreCase(firstName);
+                        for (PaymentReceipt receipt : receiptsByFirst) {
+                            if (receipt.getEmployeeName() != null && 
+                                receipt.getEmployeeName().toUpperCase().contains(lastName)) {
+                                if (!allReceipts.contains(receipt)) {
+                                    allReceipts.add(receipt);
+                                }
+                            }
+                        }
+                        log.info("📋 Encontrados {} comprovante(s) adicionais por partes do nome", 
+                            allReceipts.size() - receiptsByName.size());
+                    }
                     
-                    log.info("🔍 Buscando comprovante para holerite {}/{} -> comprovante {}/{}", 
-                        month, year, receiptMonth, receiptYear);
+                    // Estratégia 1.3: Buscar por nome normalizado (sem acentos)
+                    if (!normalizedName.equals(employeeName.trim().toLowerCase())) {
+                        // Buscar usando nome normalizado parcial
+                        String[] normalizedParts = normalizedName.split("\\s+");
+                        if (normalizedParts.length > 0 && normalizedParts[0].length() >= 3) {
+                            List<PaymentReceipt> receiptsByNormalized = receiptRepository
+                                .findByEmployeeNameContainingIgnoreCase(normalizedParts[0]);
+                            for (PaymentReceipt receipt : receiptsByNormalized) {
+                                String receiptNormalized = normalizeNameForSearch(receipt.getEmployeeName());
+                                if (normalizedName.contains(receiptNormalized) || 
+                                    receiptNormalized.contains(normalizedName)) {
+                                    if (!allReceipts.contains(receipt)) {
+                                        allReceipts.add(receipt);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     
-                    // Filtrar por mês e ano do PAGAMENTO (mês seguinte)
-                    List<PaymentReceipt> matchingReceipts = allReceipts.stream()
-                        .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptMonth))
-                        .filter(r -> r.getYear() != null && r.getYear().equals(receiptYear))
+                    log.info("📊 Total de comprovantes encontrados (todas as estratégias): {}", allReceipts.size());
+                    
+                    // REGRA DE NEGÓCIO: O comprovante de pagamento pode ser do mês SEGUINTE ou do MESMO mês
+                    // Ex: Holerite de setembro -> Comprovante de outubro (mês do pagamento) OU setembro
+                    int receiptMonthNext = month == 12 ? 1 : month + 1;
+                    int receiptYearNext = month == 12 ? year + 1 : year;
+                    
+                    log.info("🔍 Buscando comprovante para holerite {}/{} -> tentando comprovante {}/{} (mês seguinte) ou {}/{} (mesmo mês)", 
+                        month, year, receiptMonthNext, receiptYearNext, month, year);
+                    
+                    // Filtrar por mês e ano - tentar mês seguinte PRIMEIRO, depois mesmo mês
+                    List<PaymentReceipt> matchingReceipts = new ArrayList<>();
+                    
+                    // Tentativa 1: Mês seguinte (pagamento típico)
+                    List<PaymentReceipt> receiptsNextMonth = allReceipts.stream()
+                        .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptMonthNext))
+                        .filter(r -> r.getYear() != null && r.getYear().equals(receiptYearNext))
                         .collect(Collectors.toList());
-
-                    List<PaymentReceipt> uniqueReceipts = deduplicateReceiptsByDateCompanyAndEmployee(matchingReceipts);
-                    if (matchingReceipts.size() != uniqueReceipts.size()) {
+                    
+                    if (!receiptsNextMonth.isEmpty()) {
+                        matchingReceipts.addAll(receiptsNextMonth);
+                        log.info("✅ Encontrados {} comprovante(s) no mês seguinte {}/{}", 
+                            receiptsNextMonth.size(), receiptMonthNext, receiptYearNext);
+                    } else {
+                        // Tentativa 2: Mesmo mês (fallback)
+                        List<PaymentReceipt> receiptsSameMonth = allReceipts.stream()
+                            .filter(r -> r.getMonth() != null && r.getMonth().equals(month))
+                            .filter(r -> r.getYear() != null && r.getYear().equals(year))
+                            .collect(Collectors.toList());
+                        
+                        if (!receiptsSameMonth.isEmpty()) {
+                            matchingReceipts.addAll(receiptsSameMonth);
+                            log.info("✅ Encontrados {} comprovante(s) no mesmo mês {}/{}", 
+                                receiptsSameMonth.size(), month, year);
+                        }
+                    }
+                    
+                    // Filtrar por matching de nome usando verificação flexível
+                    List<PaymentReceipt> matchedByName = matchingReceipts.stream()
+                        .filter(receipt -> verifyEmployeeNames(employeeName, receipt.getEmployeeName()))
+                        .collect(Collectors.toList());
+                    
+                    log.info("📋 Comprovantes após filtro de nome: {} (de {} por período)", 
+                        matchedByName.size(), matchingReceipts.size());
+                    
+                    // Se não encontrou com verificação flexível, usar os que passaram pelo período
+                    if (matchedByName.isEmpty() && !matchingReceipts.isEmpty()) {
+                        log.warn("⚠️ Nenhum comprovante passou na verificação de nome, mas {} comprovante(s) encontrado(s) no período. Usando verificação mais flexível...", 
+                            matchingReceipts.size());
+                        
+                        // Tentar matching mais flexível (primeiro e último nome)
+                        matchedByName = matchingReceipts.stream()
+                            .filter(receipt -> isFlexibleNameMatch(employeeName, receipt.getEmployeeName()))
+                            .collect(Collectors.toList());
+                        
+                        if (!matchedByName.isEmpty()) {
+                            log.info("✅ Encontrados {} comprovante(s) com matching flexível", matchedByName.size());
+                        }
+                    }
+                    
+                    List<PaymentReceipt> uniqueReceipts = deduplicateReceiptsByDateCompanyAndEmployee(matchedByName);
+                    if (matchedByName.size() != uniqueReceipts.size()) {
                         log.info("♻️ Removidos {} comprovante(s) duplicado(s) para {} {}/{} com base em data/nome/empresa",
-                            matchingReceipts.size() - uniqueReceipts.size(), employeeName, receiptMonth, receiptYear);
+                            matchedByName.size() - uniqueReceipts.size(), employeeName, month, year);
                     }
                     
                     detail.setReceiptFound(uniqueReceipts.isEmpty() ? "❌ Não" : "✅ Sim (" + uniqueReceipts.size() + ")");
                     
                     if (uniqueReceipts.isEmpty()) {
+                        // Log detalhado para debug
+                        log.warn("❌ Nenhum comprovante encontrado para {} - {}/{}", employeeName, month, year);
+                        log.warn("   Tentou buscar no período {}/{} (mês seguinte) e {}/{} (mesmo mês)", 
+                            receiptMonthNext, receiptYearNext, month, year);
+                        log.warn("   Total de comprovantes no banco para nome '{}': {}", employeeName, allReceipts.size());
+                        if (!allReceipts.isEmpty()) {
+                            log.warn("   Períodos dos comprovantes encontrados:");
+                            allReceipts.forEach(r -> log.warn("     - {}: {}/{}", 
+                                r.getEmployeeName(), r.getMonth(), r.getYear()));
+                        }
+                        
                         detail.setStatus("FALHA");
                         detail.setMessage("Nenhum comprovante encontrado para o período");
                         result.getFailureList().add(detail);
                         result.setTotalFailed(result.getTotalFailed() + 1);
-                        log.warn("❌ Nenhum comprovante encontrado para {} - {}/{}", employeeName, month, year);
                         continue;
                     }
                     
-                    // 4.3. Verificar se os nomes coincidem (VALIDAÇÃO CRÍTICA)
+                    // 4.3. Verificar se os nomes coincidem (VALIDAÇÃO CRÍTICA) - usando verificação flexível
                     boolean allNamesMatch = uniqueReceipts.stream()
-                        .allMatch(receipt -> isExactNameMatch(employeeName, receipt.getEmployeeName()));
+                        .allMatch(receipt -> verifyEmployeeNames(employeeName, receipt.getEmployeeName()));
                     
                     detail.setNamesMatch(allNamesMatch);
                     
@@ -1605,26 +2200,98 @@ public class UnifiedDocumentService {
                         continue;
                     }
                     
-                    // 4.4. Buscar arquivos PDF dos comprovantes (usando o mês do pagamento)
+                    // 4.4. Buscar arquivos PDF dos comprovantes
+                    // ESTRATÉGIA MELHORADA: Tentar múltiplos períodos e pastas
                     List<String> receiptPaths = new ArrayList<>();
+                    java.util.List<String> searchedPaths = new java.util.ArrayList<>();
                     
                     for (PaymentReceipt receipt : uniqueReceipts) {
-                        String receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                        java.util.List<String> receiptSearchedPaths = new java.util.ArrayList<>();
+                        String receiptPath = null;
+                        
+                        // Tentativa 1: Usar o mês/ano do comprovante encontrado no banco
+                        receiptPath = findReceiptOriginalFileByNameAndPeriod(
                             receipt.getEmployeeName(), 
-                            receiptMonth,  // Usar o mês do pagamento (mês seguinte)
-                            receiptYear    // Usar o ano do pagamento
+                            receipt.getMonth(),
+                            receipt.getYear(),
+                            receiptSearchedPaths
                         );
+                        
+                        // Tentativa 2: Se não encontrou, tentar mês seguinte (caso o arquivo esteja em outra pasta)
+                        if ((receiptPath == null || !Files.exists(Paths.get(receiptPath))) && receipt.getMonth() != null) {
+                            int nextMonth = receipt.getMonth() == 12 ? 1 : receipt.getMonth() + 1;
+                            int nextYear = receipt.getMonth() == 12 ? receipt.getYear() + 1 : receipt.getYear();
+                            log.info("🔍 Tentativa 2: Buscando comprovante no mês seguinte {}/{}", nextMonth, nextYear);
+                            receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                                receipt.getEmployeeName(),
+                                nextMonth,
+                                nextYear,
+                                receiptSearchedPaths
+                            );
+                        }
+                        
+                        // Tentativa 3: Se ainda não encontrou, tentar mês anterior
+                        if ((receiptPath == null || !Files.exists(Paths.get(receiptPath))) && receipt.getMonth() != null) {
+                            int prevMonth = receipt.getMonth() == 1 ? 12 : receipt.getMonth() - 1;
+                            int prevYear = receipt.getMonth() == 1 ? receipt.getYear() - 1 : receipt.getYear();
+                            log.info("🔍 Tentativa 3: Buscando comprovante no mês anterior {}/{}", prevMonth, prevYear);
+                            receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                                receipt.getEmployeeName(),
+                                prevMonth,
+                                prevYear,
+                                receiptSearchedPaths
+                            );
+                        }
+                        
+                        // Tentativa 4: Buscar apenas pelo nome, sem período (última tentativa)
+                        if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
+                            log.info("🔍 Tentativa 4: Buscando comprovante apenas pelo nome (sem período)");
+                            receiptPath = findReceiptOriginalFileByNameOnly(receipt.getEmployeeName(), receiptSearchedPaths);
+                        }
                         
                         if (receiptPath != null && Files.exists(Paths.get(receiptPath))) {
                             receiptPaths.add(receiptPath);
+                            log.info("✅ Comprovante PDF encontrado: {}", receiptPath);
                         } else {
-                            log.warn("⚠️ Comprovante PDF não encontrado: {}", receipt.getFileName());
+                            log.warn("⚠️ Comprovante PDF não encontrado após todas as tentativas: {}", receipt.getFileName());
+                            searchedPaths.addAll(receiptSearchedPaths);
                         }
                     }
                     
                     if (receiptPaths.isEmpty()) {
                         detail.setStatus("FALHA");
-                        detail.setMessage("Arquivos PDF dos comprovantes não encontrados no sistema");
+                        
+                        // Construir mensagem detalhada explicando o problema
+                        int receiptMonth = month == 12 ? 1 : month + 1;
+                        int receiptYear = month == 12 ? year + 1 : year;
+                        
+                        StringBuilder errorMsg = new StringBuilder();
+                        errorMsg.append("Nenhum comprovante encontrado para o período ").append(receiptMonth).append("/").append(receiptYear);
+                        errorMsg.append(" (mês seguinte ao holerite ").append(month).append("/").append(year).append(").\n\n");
+                        errorMsg.append("O sistema procurou os arquivos PDF nas seguintes pastas:\n");
+                        if (searchedPaths.isEmpty()) {
+                            // Listar as pastas padrão que seriam verificadas
+                            errorMsg.append("• uploads/receipts/").append(String.format("%02d_%04d", receiptMonth, receiptYear)).append("\n");
+                            errorMsg.append("• uploads/receipts/").append(receiptMonth).append("_").append(receiptYear).append("\n");
+                            errorMsg.append("• uploads/payment-receipts/").append(receiptYear).append("/").append(String.format("%02d", receiptMonth)).append("\n");
+                            errorMsg.append("• uploads/receipts/\n");
+                        } else {
+                            for (String path : searchedPaths) {
+                                errorMsg.append("• ").append(path).append("\n");
+                            }
+                        }
+                        errorMsg.append("\n");
+                        errorMsg.append("POSSÍVEIS CAUSAS:\n");
+                        errorMsg.append("1. O comprovante ainda não foi importado no sistema\n");
+                        errorMsg.append("2. O arquivo PDF foi salvo em uma pasta diferente da esperada\n");
+                        errorMsg.append("3. O nome do arquivo não contém o nome do funcionário ou período correto\n");
+                        errorMsg.append("4. O comprovante está no banco de dados mas o arquivo físico foi movido ou deletado\n\n");
+                        errorMsg.append("AÇÃO NECESSÁRIA:\n");
+                        errorMsg.append("Por favor, importe o comprovante de pagamento para o funcionário '").append(employeeName);
+                        errorMsg.append("' referente ao período ").append(receiptMonth).append("/").append(receiptYear);
+                        errorMsg.append(" (mês seguinte ao holerite).");
+                        
+                        detail.setMessage(errorMsg.toString());
                         result.getFailureList().add(detail);
                         result.setTotalFailed(result.getTotalFailed() + 1);
                         log.warn("❌ PDFs dos comprovantes não encontrados para {} - {}/{}", employeeName, month, year);
@@ -1815,6 +2482,67 @@ public class UnifiedDocumentService {
             File outputFile = new File(outputPath);
             if (outputFile.exists()) {
                 log.info("✅ Arquivo verificado: {} bytes", outputFile.length());
+                
+                // Salvar no banco de dados
+                try {
+                    // Buscar payslip e receipt relacionados
+                    Payslip payslip = null;
+                    PaymentReceipt receipt = null;
+                    Employee employee = null;
+                    
+                    // Buscar payslip por nome, mês e ano
+                    List<Payslip> payslips = payslipService.getAllPayslips();
+                    for (Payslip p : payslips) {
+                        if (p.getEmployeeName() != null && 
+                            p.getEmployeeName().equalsIgnoreCase(employeeName) &&
+                            p.getMonth() != null && p.getMonth().equals(month) &&
+                            p.getYear() != null && p.getYear().equals(year)) {
+                            payslip = p;
+                            break;
+                        }
+                    }
+                    
+                    // Buscar receipt por nome e período (mês seguinte)
+                    int receiptMonth = month == 12 ? 1 : month + 1;
+                    int receiptYear = month == 12 ? year + 1 : year;
+                    List<PaymentReceipt> receipts = receiptRepository.findAll();
+                    for (PaymentReceipt r : receipts) {
+                        if (r.getEmployeeName() != null && 
+                            r.getEmployeeName().equalsIgnoreCase(employeeName) &&
+                            r.getMonth() != null && r.getMonth().equals(receiptMonth) &&
+                            r.getYear() != null && r.getYear().equals(receiptYear)) {
+                            receipt = r;
+                            break;
+                        }
+                    }
+                    
+                    // Buscar employee por CPF se disponível
+                    if (payslip != null && payslip.getCpf() != null) {
+                        employee = employeeRepository.findByCpf(payslip.getCpf()).orElse(null);
+                    }
+                    
+                    // Criar e salvar UnifiedDocument
+                    UnifiedDocument unifiedDoc = UnifiedDocument.builder()
+                        .employee(employee)
+                        .payslip(payslip)
+                        .receipt(receipt)
+                        .employeeName(employeeName)
+                        .month(month)
+                        .year(year)
+                        .fileName(fileName)
+                        .filePath(outputPath)
+                        .fileSize(outputFile.length())
+                        .status(UnifiedDocument.UnifiedDocumentStatus.PROCESSED)
+                        .build();
+                    
+                    unifiedDocumentRepository.save(unifiedDoc);
+                    log.info("✅ Documento unificado salvo no banco de dados: ID={}", unifiedDoc.getId());
+                    
+                } catch (Exception dbError) {
+                    log.warn("⚠️ Erro ao salvar documento unificado no banco de dados: {}", dbError.getMessage());
+                    // Não falhar a criação do arquivo se houver erro ao salvar no banco
+                }
+                
                 return outputPath;
             } else {
                 throw new IOException("Arquivo unificado não foi criado");
@@ -1913,7 +2641,15 @@ public class UnifiedDocumentService {
             }
             
             // Buscar todos os unified documents do banco para obter relacionamento com payslip
-            List<UnifiedDocument> unifiedDocumentsFromDb = unifiedDocumentRepository.findAll();
+            List<UnifiedDocument> unifiedDocumentsFromDb = new ArrayList<>();
+            try {
+                unifiedDocumentsFromDb = unifiedDocumentRepository.findAll();
+                log.info("📋 Encontrados {} documentos unificados no banco de dados", unifiedDocumentsFromDb.size());
+            } catch (Exception dbError) {
+                log.warn("⚠️ Erro ao buscar documentos unificados do banco de dados (continuando com arquivos físicos): {}", dbError.getMessage());
+                // Continuar mesmo se houver erro ao buscar do banco
+            }
+            
             Map<String, Payslip> unifiedDocPayslipMap = new HashMap<>();
             for (UnifiedDocument ud : unifiedDocumentsFromDb) {
                 if (ud.getPayslip() != null && ud.getEmployeeName() != null && ud.getMonth() != null && ud.getYear() != null) {
@@ -1924,9 +2660,17 @@ public class UnifiedDocumentService {
                     unifiedDocPayslipMap.put(key, ud.getPayslip());
                 }
             }
+            
+            log.info("📊 Total de documentos unificados para organizar: {}", unifiedDocs.size());
+            log.info("📊 Total de payslips encontrados: {}", allPayslips.size());
+            log.info("📊 Total de documentos unificados no banco: {}", unifiedDocumentsFromDb.size());
 
             // Converter documentos unificados em "payslips" para usar a mesma lógica de organização
             List<Payslip> payslipsForOrganization = new ArrayList<>();
+            int processedCount = 0;
+            int skippedCount = 0;
+            int foundPayslipCount = 0;
+            int tempPayslipCount = 0;
             
             for (Map<String, Object> doc : unifiedDocs) {
                 String employeeName = (String) doc.get("employeeName");
@@ -1935,18 +2679,31 @@ public class UnifiedDocumentService {
                 String filePath = (String) doc.get("filePath");
                 
                 if (employeeName == null || month == null || year == null) {
+                    skippedCount++;
+                    log.debug("⏭️ Documento unificado ignorado (dados incompletos): employeeName={}, month={}, year={}", 
+                        employeeName, month, year);
                     continue;
                 }
                 
+                processedCount++;
                 Payslip payslip = null;
                 
                 // Estratégia 1: Buscar payslip correspondente por nome/mês/ano no mapa de payslips
                 String key = String.format("%s|%d|%d", normalizeName(employeeName), month, year);
                 payslip = payslipMap.get(key);
                 
+                if (payslip != null) {
+                    foundPayslipCount++;
+                    log.debug("✅ Payslip encontrado via mapa para: {} - {}/{}", employeeName, month, year);
+                }
+                
                 // Estratégia 2: Se não encontrou, buscar pelo unified document do banco
                 if (payslip == null) {
                     payslip = unifiedDocPayslipMap.get(key);
+                    if (payslip != null) {
+                        foundPayslipCount++;
+                        log.debug("✅ Payslip encontrado via banco de dados para: {} - {}/{}", employeeName, month, year);
+                    }
                 }
                 
                 // Estratégia 3: Se ainda não encontrou, tentar extrair do PDF do documento unificado
@@ -1972,8 +2729,9 @@ public class UnifiedDocumentService {
                     payslipsForOrganization.add(payslip);
                 } else {
                     // Se não encontrar payslip, criar um temporário com dados do documento
-                    log.warn("⚠️ Não foi possível obter informações de empresa/setor para documento unificado: {}", 
-                        (String) doc.getOrDefault("fileName", ""));
+                    tempPayslipCount++;
+                    log.debug("⚠️ Criando payslip temporário para documento unificado: {} - {}/{}", 
+                        employeeName, month, year);
                     Payslip tempPayslip = Payslip.builder()
                         .employeeName(employeeName)
                         .cpf((String) doc.getOrDefault("cpf", ""))
@@ -1988,12 +2746,25 @@ public class UnifiedDocumentService {
                     payslipsForOrganization.add(tempPayslip);
                 }
             }
+            
+            log.info("📊 Estatísticas de processamento: {} processados, {} ignorados, {} com payslip encontrado, {} com payslip temporário", 
+                processedCount, skippedCount, foundPayslipCount, tempPayslipCount);
 
+            log.info("📊 Total de payslips preparados para organização: {}", payslipsForOrganization.size());
+            
             // Usar o método de organização de payslips
-            return payslipService.organizePayslipsByCompany(payslipsForOrganization);
+            PayslipOrganizationResponse organizedResponse = payslipService.organizePayslipsByCompany(payslipsForOrganization);
+            
+            log.info("✅ Organização concluída: {} empresas, {} setores, {} documentos", 
+                organizedResponse.getTotalCompanies(), 
+                organizedResponse.getTotalSectors(),
+                organizedResponse.getTotalPayslips());
+            
+            return organizedResponse;
             
         } catch (Exception e) {
             log.error("❌ Erro ao organizar documentos unificados: {}", e.getMessage(), e);
+            log.error("❌ Stack trace:", e);
             response.setTotalPayslips(0);
             response.setCompanies(Collections.emptyList());
             response.setTotalCompanies(0);

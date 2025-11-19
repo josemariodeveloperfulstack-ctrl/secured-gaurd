@@ -13,6 +13,8 @@ import {
   CreatePurchaseRequestRequest 
 } from '@/services/purchaseRequestService';
 import { PurchaseRequestFormModal } from '@/components/compras/PurchaseRequestFormModal';
+import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
+import { contasAPagarService, Supplier, CreateSupplierRequest } from '@/services/contasAPagarService';
 import { 
   Plus, 
   Search, 
@@ -28,7 +30,10 @@ import {
   Edit,
   Trash2,
   Eye,
-  FileText
+  FileText,
+  Building2,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { MainLayout } from '@/components/MainLayout';
 
@@ -42,7 +47,16 @@ export default function Compras() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeMainTab, setActiveMainTab] = useState('solicitacoes');
+  const [activeRequestTab, setActiveRequestTab] = useState('all');
+  
+  // Estados para Fornecedores
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   
   // Estatísticas
   const [stats, setStats] = useState({
@@ -58,11 +72,16 @@ export default function Compras() {
   useEffect(() => {
     loadPurchaseRequests();
     loadStats();
+    loadSuppliers();
   }, []);
 
   useEffect(() => {
     filterRequests();
-  }, [purchaseRequests, searchTerm, statusFilter, priorityFilter, activeTab]);
+  }, [purchaseRequests, searchTerm, statusFilter, priorityFilter, activeRequestTab]);
+
+  useEffect(() => {
+    filterSuppliers();
+  }, [suppliers, supplierSearchTerm]);
 
   const loadPurchaseRequests = async () => {
     try {
@@ -109,7 +128,7 @@ export default function Compras() {
     let filtered = purchaseRequests;
 
     // Filtro por aba ativa
-    switch (activeTab) {
+    switch (activeRequestTab) {
       case 'pending':
         filtered = filtered.filter(req => req.status === 'PENDING');
         break;
@@ -250,6 +269,122 @@ export default function Compras() {
     setEditingRequest(undefined);
   };
 
+  // Funções para Fornecedores
+  const loadSuppliers = async () => {
+    try {
+      setLoadingSuppliers(true);
+      const data = await contasAPagarService.getFornecedores();
+      setSuppliers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar fornecedores.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
+
+  const filterSuppliers = () => {
+    let filtered = suppliers;
+    
+    if (supplierSearchTerm) {
+      const search = supplierSearchTerm.toLowerCase();
+      filtered = filtered.filter(s => 
+        (s.name || '').toLowerCase().includes(search) ||
+        (s.cnpj || '').toLowerCase().includes(search) ||
+        (s.email || '').toLowerCase().includes(search) ||
+        (s.city || '').toLowerCase().includes(search) ||
+        (s.state || '').toLowerCase().includes(search)
+      );
+    }
+    
+    setFilteredSuppliers(filtered);
+  };
+
+  const handleCreateSupplier = () => {
+    setEditingSupplier(null);
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleEditSupplier = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleSaveSupplier = async (data: CreateSupplierRequest) => {
+    try {
+      if (editingSupplier) {
+        await contasAPagarService.updateFornecedor(editingSupplier.id, data);
+        toast({
+          title: "Sucesso",
+          description: "Fornecedor atualizado com sucesso!",
+        });
+      } else {
+        await contasAPagarService.createFornecedor(data);
+        toast({
+          title: "Sucesso",
+          description: "Fornecedor criado com sucesso!",
+        });
+      }
+      await loadSuppliers();
+      setIsSupplierModalOpen(false);
+      setEditingSupplier(null);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Não foi possível salvar o fornecedor.';
+      toast({
+        title: "Erro",
+        description: msg,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteSupplier = async (supplier: Supplier) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o fornecedor "${supplier.name}"?`)) {
+      return;
+    }
+    
+    try {
+      await contasAPagarService.deleteFornecedor(supplier.id);
+      toast({
+        title: "Sucesso",
+        description: "Fornecedor excluído com sucesso!",
+      });
+      await loadSuppliers();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir fornecedor.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleSupplierStatus = async (supplier: Supplier) => {
+    try {
+      await contasAPagarService.toggleFornecedorStatus(supplier.id);
+      toast({
+        title: "Sucesso",
+        description: `Fornecedor ${supplier.isActive ? 'desativado' : 'ativado'} com sucesso!`,
+      });
+      await loadSuppliers();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar status do fornecedor.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCloseSupplierModal = () => {
+    setIsSupplierModalOpen(false);
+    setEditingSupplier(null);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING': return 'bg-yellow-100 text-yellow-800';
@@ -292,14 +427,31 @@ export default function Compras() {
               Controle completo de solicitações e processos de compra
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Solicitação
-          </Button>
         </div>
 
-        {/* Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Tabs principais */}
+        <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border-gray-600">
+            <TabsTrigger value="solicitacoes" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
+              Solicitações
+            </TabsTrigger>
+            <TabsTrigger value="fornecedores" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
+              <Building2 className="w-4 h-4 mr-2" />
+              Fornecedores
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Aba de Solicitações */}
+          <TabsContent value="solicitacoes" className="space-y-6">
+            <div className="flex justify-end">
+              <Button onClick={() => setIsModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Solicitação
+              </Button>
+            </div>
+
+            {/* Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
@@ -349,8 +501,8 @@ export default function Compras() {
           </Card>
         </div>
 
-        {/* Filtros */}
-        <Card>
+            {/* Filtros */}
+            <Card>
           <CardContent className="p-4">
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1">
@@ -398,23 +550,23 @@ export default function Compras() {
           </CardContent>
         </Card>
 
-        {/* Tabs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Solicitações de Compra</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="all">Todas</TabsTrigger>
-                <TabsTrigger value="pending">Pendentes</TabsTrigger>
-                <TabsTrigger value="approved">Aprovadas</TabsTrigger>
-                <TabsTrigger value="rejected">Rejeitadas</TabsTrigger>
-                <TabsTrigger value="urgent">Urgentes</TabsTrigger>
-                <TabsTrigger value="overdue">Atrasadas</TabsTrigger>
-              </TabsList>
+            {/* Tabs de Solicitações */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Solicitações de Compra</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={activeRequestTab} onValueChange={setActiveRequestTab}>
+                  <TabsList className="grid w-full grid-cols-6">
+                    <TabsTrigger value="all">Todas</TabsTrigger>
+                    <TabsTrigger value="pending">Pendentes</TabsTrigger>
+                    <TabsTrigger value="approved">Aprovadas</TabsTrigger>
+                    <TabsTrigger value="rejected">Rejeitadas</TabsTrigger>
+                    <TabsTrigger value="urgent">Urgentes</TabsTrigger>
+                    <TabsTrigger value="overdue">Atrasadas</TabsTrigger>
+                  </TabsList>
 
-              <TabsContent value={activeTab} className="mt-6">
+                  <TabsContent value={activeRequestTab} className="mt-6">
                 {loading ? (
                   <div className="flex justify-center items-center h-32">
                     <RefreshCw className="w-6 h-6 animate-spin" />
@@ -549,18 +701,162 @@ export default function Compras() {
                     </Table>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Modal de Formulário */}
+          {/* Aba de Fornecedores */}
+          <TabsContent value="fornecedores" className="space-y-6">
+            {/* Header Fornecedores */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Building2 className="w-6 h-6 text-seguranca-red" />
+                  Gestão de Fornecedores
+                </h2>
+                <p className="text-muted-foreground">
+                  Cadastro e gerenciamento de fornecedores
+                </p>
+              </div>
+              <Button onClick={handleCreateSupplier} className="bg-seguranca-red hover:bg-seguranca-darkred">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Fornecedor
+              </Button>
+            </div>
+
+            {/* Filtros Fornecedores */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por nome, CNPJ, email, cidade ou estado..."
+                        value={supplierSearchTerm}
+                        onChange={(e) => setSupplierSearchTerm(e.target.value)}
+                        className="pl-8"
+                      />
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={loadSuppliers} disabled={loadingSuppliers}>
+                    <RefreshCw className={`w-4 h-4 ${loadingSuppliers ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tabela de Fornecedores */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Lista de Fornecedores</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingSuppliers ? (
+                  <div className="flex justify-center items-center h-32">
+                    <RefreshCw className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : filteredSuppliers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum fornecedor encontrado.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>CNPJ</TableHead>
+                          <TableHead>E-mail</TableHead>
+                          <TableHead>Telefone</TableHead>
+                          <TableHead>Cidade/Estado</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSuppliers.map((supplier) => (
+                          <TableRow key={supplier.id}>
+                            <TableCell className="font-medium">
+                              {supplier.name}
+                              {supplier.category && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {supplier.category}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{supplier.cnpj || '—'}</TableCell>
+                            <TableCell>{supplier.email || '—'}</TableCell>
+                            <TableCell>{supplier.phone || '—'}</TableCell>
+                            <TableCell>
+                              {supplier.city || '—'} {supplier.state ? `- ${supplier.state}` : ''}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={supplier.isActive !== false ? "default" : "secondary"}>
+                                {supplier.isActive !== false ? "Ativo" : "Inativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditSupplier(supplier)}
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleSupplierStatus(supplier)}
+                                  title={supplier.isActive !== false ? "Desativar" : "Ativar"}
+                                >
+                                  {supplier.isActive !== false ? (
+                                    <ToggleRight className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <ToggleLeft className="w-4 h-4 text-gray-400" />
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteSupplier(supplier)}
+                                  title="Excluir"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Modal de Formulário de Solicitação */}
         <PurchaseRequestFormModal
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           request={editingRequest}
           onSave={editingRequest ? handleUpdateRequest : handleCreateRequest}
           loading={loading}
+        />
+
+        {/* Modal de Formulário de Fornecedor */}
+        <SupplierFormModal
+          isOpen={isSupplierModalOpen}
+          onClose={handleCloseSupplierModal}
+          supplier={editingSupplier}
+          onSave={handleSaveSupplier}
         />
       </div>
     </MainLayout>

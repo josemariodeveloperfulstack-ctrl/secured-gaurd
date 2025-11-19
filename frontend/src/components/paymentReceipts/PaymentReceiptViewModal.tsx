@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Eye, User, Calendar, FileText, DollarSign, AlertCircle, Loader2, ZoomIn, ZoomOut, RotateCw, Undo2, Redo2, Printer, MoreHorizontal } from 'lucide-react';
+import { Download, Eye, User, Calendar, FileText, DollarSign, AlertCircle, Loader2, ZoomIn, ZoomOut, RotateCw, Undo2, Redo2, Printer, MoreHorizontal, Receipt } from 'lucide-react';
 import type { PaymentReceipt } from '@/services/paymentReceiptService';
 import paymentReceiptService from '@/services/paymentReceiptService';
 import { toast } from 'sonner';
@@ -156,15 +156,16 @@ export function PaymentReceiptViewModal({
         <DialogHeader className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-b border-blue-500/20 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Eye size={20} className="sm:hidden text-white" />
-                <Eye size={24} className="hidden sm:block text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Receipt size={20} className="sm:hidden text-white" />
+                <Receipt size={24} className="hidden sm:block text-white" />
               </div>
               <div>
-                <DialogTitle className="text-lg sm:text-2xl font-bold text-white leading-tight">
-                  Visualização do Comprovante
+                <DialogTitle className="text-lg sm:text-2xl font-bold text-white leading-tight flex items-center gap-2">
+                  <Receipt className="h-5 w-5 sm:h-6 sm:w-6 text-blue-400" />
+                  <span>Visualização do Comprovante</span>
                 </DialogTitle>
-                <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-0 truncate max-w-[200px] sm:max-w-none">
+                <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-1 truncate max-w-[200px] sm:max-w-none">
                   {receipt.employeeName}
                 </p>
               </div>

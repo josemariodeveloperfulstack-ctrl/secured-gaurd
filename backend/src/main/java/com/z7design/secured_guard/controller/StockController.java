@@ -7,6 +7,7 @@ import com.z7design.secured_guard.model.enums.StockCategory;
 import com.z7design.secured_guard.model.enums.MovementType;
 import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.service.StockService;
+import com.z7design.secured_guard.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 public class StockController {
 
     private final StockService stockService;
+    private final UserRepository userRepository;
 
     // ===== ITENS DE ESTOQUE =====
 
@@ -150,17 +152,47 @@ public class StockController {
 
     @PostMapping("/movements")
     @Operation(summary = "Criar movimentação", description = "Registra uma entrada ou saída de estoque")
-    public ResponseEntity<StockMovementDTO> createMovement(
+    public ResponseEntity<?> createMovement(
             @Valid @RequestBody StockMovementDTO movementDTO,
             Authentication authentication) {
         
-        log.info("POST /api/stock/movements - Criando movimentação");
-        
-        // Obter ID do usuário logado (implementar conforme sua autenticação)
-        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111"); // Placeholder
-        
-        StockMovementDTO createdMovement = stockService.createMovement(movementDTO, userId);
-        return ResponseEntity.status(201).body(createdMovement);
+        try {
+            log.info("POST /api/stock/movements - Criando movimentação");
+            log.info("Dados recebidos: {}", movementDTO);
+            
+            // Obter ID do usuário logado
+            UUID userId;
+            if (authentication != null && authentication.getPrincipal() != null) {
+                try {
+                    // Tentar obter o usuário do contexto de autenticação
+                    String username = authentication.getName();
+                    com.z7design.secured_guard.model.User user = userRepository.findByUsername(username)
+                            .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + username));
+                    userId = user.getId();
+                    log.info("Usuário autenticado: {} (ID: {})", username, userId);
+                } catch (Exception e) {
+                    log.warn("Erro ao obter usuário do contexto de autenticação: {}. Usando placeholder.", e.getMessage());
+                    // Fallback para placeholder se não conseguir obter o usuário
+                    userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+                }
+            } else {
+                log.warn("Autenticação não disponível. Usando placeholder.");
+                userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+            }
+            
+            StockMovementDTO createdMovement = stockService.createMovement(movementDTO, userId);
+            log.info("Movimentação criada com sucesso: {}", createdMovement.getId());
+            return ResponseEntity.status(201).body(createdMovement);
+        } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
+            log.error("Recurso não encontrado ao criar movimentação: {}", e.getMessage());
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            log.error("Erro de validação ao criar movimentação: {}", e.getMessage());
+            return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro inesperado ao criar movimentação: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Erro ao criar movimentação: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/movements/search")

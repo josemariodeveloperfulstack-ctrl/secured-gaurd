@@ -513,6 +513,49 @@ const Holerites: React.FC = () => {
     } as Holerite;
   }, [holerites]);
 
+  // Função para filtrar holerites por CPF, nome e período
+  const matchesSearchTerm = useCallback((entry: HoleriteOrganizedEntry, searchTerm: string): boolean => {
+    if (!searchTerm.trim()) {
+      return true; // Se não houver termo de busca, mostra todos
+    }
+
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+    
+    // Buscar por CPF (remove formatação para comparação)
+    const cpfNormalized = entry.cpf?.replace(/\D/g, '').toLowerCase() || '';
+    if (cpfNormalized.includes(normalizedSearch.replace(/\D/g, ''))) {
+      return true;
+    }
+
+    // Buscar por nome do funcionário
+    const employeeName = entry.employeeName?.toLowerCase() || '';
+    if (employeeName.includes(normalizedSearch)) {
+      return true;
+    }
+
+    // Buscar por período (formato: MM/YYYY ou M/YYYY)
+    const periodFormatted = `${String(entry.month).padStart(2, '0')}/${entry.year}`;
+    if (periodFormatted.includes(normalizedSearch)) {
+      return true;
+    }
+
+    // Buscar por mês (ex: "01", "1", "janeiro", etc.)
+    const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
+                        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const monthNumber = entry.month;
+    if (String(monthNumber).includes(normalizedSearch) || 
+        monthNames[monthNumber - 1]?.includes(normalizedSearch)) {
+      return true;
+    }
+
+    // Buscar por ano
+    if (String(entry.year).includes(normalizedSearch)) {
+      return true;
+    }
+
+    return false;
+  }, []);
+
   const formatCpf = (cpf?: string) => {
     if (!cpf) return 'CPF não informado';
     const digits = cpf.replace(/\D/g, '');
@@ -1092,8 +1135,17 @@ const Holerites: React.FC = () => {
 
   // useEffect para carregar documentos unificados ao montar o componente
   useEffect(() => {
-    fetchUnifiedDocuments();
-  }, []);
+    if (user) {
+      console.log('🔄 Carregando documentos unificados na inicialização...');
+      fetchUnifiedDocuments();
+      // Carregar organização se a aba de unificação estiver ativa
+      if (activeTab === 'unificacao-individual') {
+        setTimeout(() => {
+          loadUnifiedOrganization();
+        }, 300);
+      }
+    }
+  }, [user]);
 
   // Função para filtrar documentos unificados
   const getFilteredUnifiedDocuments = useCallback(() => {
@@ -3130,14 +3182,28 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     try {
       setLoadingUnifiedOrganization(true);
       setUnifiedOrganizationError(null);
+      console.log('🔄 Carregando organização de documentos unificados...');
       const data = await unifiedDocumentService.getOrganization();
+      console.log('✅ Dados de organização recebidos:', data);
+      console.log('📊 Total de documentos:', data?.totalPayslips || 0);
+      console.log('📊 Empresas:', data?.companies?.length || 0);
       setUnifiedOrganizationData(data);
+      
+      if (!data || !data.companies || data.companies.length === 0) {
+        console.warn('⚠️ Nenhum documento unificado encontrado na organização');
+      }
     } catch (error: any) {
       console.error('❌ Erro ao carregar organização de documentos unificados:', error);
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       setUnifiedOrganizationError(error.message || 'Erro ao carregar organização');
+      setUnifiedOrganizationData(null);
       toast({
         title: "Erro ao carregar organização",
-        description: error.message || 'Erro desconhecido',
+        description: error.response?.data?.message || error.message || 'Erro desconhecido',
         variant: "destructive"
       });
     } finally {
@@ -3263,8 +3329,12 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   // Carregar documentos unificados quando a aba de unificação for ativada
   useEffect(() => {
     if (activeTab === 'unificacao-individual' && user) {
+      console.log('🎯 Aba de unificação individual ativada - carregando dados...');
       fetchUnifiedDocuments();
-      loadUnifiedOrganization();
+      // Aguardar um pouco antes de carregar a organização para garantir que os documentos foram carregados
+      setTimeout(() => {
+        loadUnifiedOrganization();
+      }, 200);
     }
   }, [activeTab, user, unifiedMonthFilter, unifiedYearFilter]);
 
@@ -3559,34 +3629,34 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       setLoadingProcessedFiles(true);
       try {
           console.log('🎯 Iniciando carregamento de arquivos processados');
-          console.log('🎯 Holerites disponíveis:', holerites.length);
-          console.log('🎯 Recibos disponíveis:', receipts.length);
           
-          // Primeiro, tentar usar os dados já carregados nas outras abas
-          if (holerites.length > 0) {
-              const holeritesProcessados = holerites.map(payslip => ({
-                  id: `hol-${payslip.id}`,
-                  name: payslip.fileName || `holerite_${payslip.employeeName}_${payslip.month}_${payslip.year}.pdf`,
-                  employeeName: payslip.employeeName,
-                  cpf: payslip.cpf,
-                  month: payslip.month.toString(),
-                  year: payslip.year.toString(),
-                  path: `backend/holerites/${payslip.month}-${payslip.year}/${payslip.fileName}`
-              }));
-              setProcessedHolerites(holeritesProcessados);
-              console.log('✅ Holerites carregados dos dados existentes:', holeritesProcessados.length);
-          } else {
-              console.log('⚠️ Nenhum holerite disponível, tentando carregar via API');
-              // Se não houver holerites carregados, tentar carregar via API
-              try {
-                  const holeritesResponse = await api.get('/holerites/processed-files');
-                  if (holeritesResponse.data.success) {
-                      setProcessedHolerites(holeritesResponse.data.files || []);
-                      console.log('✅ Holerites carregados via API:', holeritesResponse.data.files?.length || 0);
-                  }
-              } catch (apiError) {
-                  console.warn('⚠️ Erro ao carregar holerites via API:', apiError);
+          // Limpar estados primeiro para garantir que não há dados antigos
+          setProcessedHolerites([]);
+          setProcessedRecibos([]);
+          
+          // Carregar holerites processados via API (sempre buscar do backend, não usar cache)
+          try {
+              const holeritesResponse = await api.get('/api/payslips/processed-files');
+              if (holeritesResponse.data && holeritesResponse.data.success) {
+                  const files = holeritesResponse.data.files || [];
+                  const holeritesProcessados = files.map((file: any) => ({
+                      id: `hol-${file.id || Math.random()}`,
+                      name: file.fileName || file.name || '',
+                      employeeName: file.employeeName || '',
+                      cpf: file.cpf || '',
+                      month: file.month?.toString() || '',
+                      year: file.year?.toString() || '',
+                      path: file.filePath || file.path || ''
+                  }));
+                  setProcessedHolerites(holeritesProcessados);
+                  console.log('✅ Holerites carregados via API:', holeritesProcessados.length);
+              } else {
+                  console.log('⚠️ Nenhum holerite encontrado na resposta da API');
+                  setProcessedHolerites([]);
               }
+          } catch (apiError: any) {
+              console.warn('⚠️ Erro ao carregar holerites via API:', apiError?.response?.status, apiError?.message);
+              setProcessedHolerites([]);
           }
 
           // Carregar comprovantes processados do backend
@@ -3594,24 +3664,28 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               const processedReceipts = await paymentReceiptService.getProcessedFiles();
               console.log('✅ Comprovantes processados carregados do backend:', processedReceipts);
               
-              if (processedReceipts && processedReceipts.length > 0) {
-                  const comprovantesProcessados = processedReceipts.map(receipt => ({
-                      id: `rec-${receipt.id}`,
-                      name: receipt.fileName,
-                      employeeName: receipt.employeeName,
-                      month: receipt.month.toString(),
-                      year: receipt.year.toString(),
+              if (processedReceipts && Array.isArray(processedReceipts) && processedReceipts.length > 0) {
+                  const comprovantesProcessados = processedReceipts.map((receipt: any) => ({
+                      id: `rec-${receipt.id || Math.random()}`,
+                      name: receipt.fileName || '',
+                      employeeName: receipt.employeeName || '',
+                      month: receipt.month?.toString() || '',
+                      year: receipt.year?.toString() || '',
                       path: receipt.filePath || `uploads/payment-receipts/${receipt.year}/${receipt.month}/${receipt.fileName}`
                   }));
-                  // Processed receipts serÃ£o exibidos junto com os payment receipts
+                  setProcessedRecibos(comprovantesProcessados);
                   console.log('✅ Comprovantes processados carregados:', comprovantesProcessados.length);
+              } else {
+                  console.log('⚠️ Nenhum comprovante encontrado');
+                  setProcessedRecibos([]);
               }
           } catch (backendError) {
               console.warn('⚠️ Erro ao carregar comprovantes do backend, usando dados locais:', backendError);
           }
 
           // Carregar recibos dos dados já disponíveis
-              if (Array.isArray(receipts) && receipts.length > 0) {
+              // REMOVIDO: Código que usava dados em cache - sempre buscar do backend
+              if (false && Array.isArray(receipts) && receipts.length > 0) {
       const recibosProcessados = receipts.map(receipt => ({
                   id: `rec-${receipt.id || Math.random()}`,
                   name: receipt.fileName || `recibo_${receipt.employeeName}_${receipt.month}_${receipt.year}.pdf`,
@@ -3626,10 +3700,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               console.log('⚠️ Nenhum recibo disponível nos dados existentes');
           }
 
-          // Se não houver dados nas outras abas, tentar carregar via API
-          if (holerites.length === 0) {
+          // REMOVIDO: Código duplicado - já carregamos via API acima
+          if (false && holerites.length === 0) {
               try {
-                  const holeritesResponse = await api.get('/holerites/processed-files');
+                  const holeritesResponse = await api.get('/api/payslips/processed-files');
                   if (holeritesResponse.data.success) {
                       setProcessedHolerites(holeritesResponse.data.files || []);
                       console.log('✅ Holerites carregados via API:', holeritesResponse.data.files?.length || 0);
@@ -3641,7 +3715,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
           if (!Array.isArray(receipts) || receipts.length === 0) {
               try {
-                  const recibosResponse = await api.get('/receipts/processed-files');
+                  const recibosResponse = await api.get('/api/payment-receipts/processed-files');
                   if (recibosResponse.data.success) {
                       setProcessedRecibos(recibosResponse.data.files || []);
                       console.log('✅ Comprovantes carregados via API:', recibosResponse.data.files?.length || 0);
@@ -3651,18 +3725,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               }
           }
       } catch (error) {
-          console.error('Erro ao carregar arquivos processados:', error);
-          // Fallback: usar dados simulados baseados na estrutura conhecida
-          setProcessedHolerites([
-              { id: 'hol-1', name: 'ADERBAL_LUCENA_GONCALVES_71987010604_6_2025.pdf', employeeName: 'ADERBAL LUCENA GONCALVES', cpf: '71987010604', month: '6', year: '2025', path: 'backend/holerites/6-2025/ADERBAL_LUCENA_GONCALVES_71987010604_6_2025.pdf' },
-              { id: 'hol-2', name: 'SILVANA_FERREIRA_SELVO_HONORATO_06575259600_6_2025.pdf', employeeName: 'SILVANA FERREIRA SELVO HONORATO', cpf: '06575259600', month: '6', year: '2025', path: 'backend/holerites/6-2025/SILVANA_FERREIRA_SELVO_HONORATO_06575259600_6_2025.pdf' },
-              { id: 'hol-3', name: 'DANILO_IGOR_FREITAS_14224861682_6_2025.pdf', employeeName: 'DANILO IGOR FREITAS', cpf: '14224861682', month: '6', year: '2025', path: 'backend/holerites/6-2025/DANILO_IGOR_FREITAS_14224861682_6_2025.pdf' }
-          ]);
-          setProcessedRecibos([
-              { id: 'rec-1', name: 'recibo_ricardo_xavier_de_andrade_valor_07_2025_pagina_44.pdf', employeeName: 'RICARDO XAVIER DE ANDRADE', month: '07', year: '2025', path: 'uploads/receipts/07_2025/recibo_ricardo_xavier_de_andrade_valor_07_2025_pagina_44.pdf' },
-              { id: 'rec-2', name: 'recibo_vilcleves_francisco_de_freitas_valor_07_2025_pagina_43.pdf', employeeName: 'VILCLEVES FRANCISCO DE FREITAS', month: '07', year: '2025', path: 'uploads/receipts/07_2025/recibo_vilcleves_francisco_de_freitas_valor_07_2025_pagina_43.pdf' },
-              { id: 'rec-3', name: 'recibo_mayara_souza_g_s_nascimento_valor_07_2025_pagina_42.pdf', employeeName: 'MAYARA SOUZA G S NASCIMENTO', month: '07', year: '2025', path: 'uploads/receipts/07_2025/recibo_mayara_souza_g_s_nascimento_valor_07_2025_pagina_42.pdf' }
-          ]);
+          console.error('❌ Erro ao carregar arquivos processados:', error);
+          // Garantir que as listas ficam vazias em caso de erro
+          setProcessedHolerites([]);
+          setProcessedRecibos([]);
       } finally {
           setLoadingProcessedFiles(false);
       }
@@ -4099,7 +4165,12 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
                                                        <div>
                                                          <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
-                                                         <p className="text-xs text-gray-400">{period.totalPayslips} holerite(s)</p>
+                                                         <p className="text-xs text-gray-400">
+                                                           {searchTerm 
+                                                             ? `${period.payslips.filter(entry => matchesSearchTerm(entry, searchTerm)).length} de ${period.totalPayslips} holerite(s)`
+                                                             : `${period.totalPayslips} holerite(s)`
+                                                           }
+                                                         </p>
                                                        </div>
                                                        <Button
                                                          variant="ghost"
@@ -4113,7 +4184,19 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                      </div>
                                                      {periodExpanded && (
                                       <div className="divide-y divide-gray-800 bg-gray-950/60">
-                                                         {period.payslips.map(entry => {
+                                                         {(() => {
+                                                           const filteredPayslips = period.payslips.filter(entry => matchesSearchTerm(entry, searchTerm));
+                                                           
+                                                           if (filteredPayslips.length === 0 && searchTerm) {
+                                                             return (
+                                                               <div className="px-4 py-6 text-center text-gray-400">
+                                                                 <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                                                 <p className="text-sm">Nenhum holerite encontrado para "{searchTerm}" neste período.</p>
+                                                               </div>
+                                                             );
+                                                           }
+                                                           
+                                                           return filteredPayslips.map(entry => {
                                                            const holeriteData = resolveHoleriteFromEntry(entry);
 
                                                            return (
@@ -4177,7 +4260,8 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                )}
                                                              </div>
                                                            );
-                                                         })}
+                                                           });
+                                                         })()}
                                                        </div>
                                                      )}
                                                    </div>
@@ -4688,6 +4772,39 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 </div>
               )}
 
+              {/* Barra de Pesquisa */}
+              {!loadingOrganization && organizationData?.companies?.length > 0 && (
+                <div className="bg-gradient-to-r from-seguranca-yellow/10 via-yellow-500/5 to-transparent border border-yellow-500/30 rounded-2xl p-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="flex items-center gap-2 flex-1 w-full">
+                      <Search className="h-5 w-5 text-seguranca-yellow flex-shrink-0" />
+                      <Input
+                        placeholder="Buscar por CPF, nome do funcionário ou período (ex: 01841134589, João Silva, 01/2024)"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                      />
+                    </div>
+                    {searchTerm && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSearchTerm('')}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  {searchTerm && (
+                    <p className="text-xs text-gray-400 mt-2 ml-7">
+                      Pesquisando por: <span className="text-seguranca-yellow font-semibold">{searchTerm}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
               {loadingOrganization ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="h-10 w-10 animate-spin text-seguranca-yellow" />
@@ -5055,19 +5172,75 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                             description: `${response.data.mensagem} - Funcionário: ${response.data.employeeName} (${response.data.month}/${response.data.year})`,
                           });
                         } else {
-                          toast({
-                            title: "⚠️ Teste de Criação",
-                            description: response.data.mensagem + (response.data.sugestao ? ` - ${response.data.sugestao}` : ''),
-                            variant: "destructive"
-                          });
+                          // Verificar se é erro de comprovante não encontrado
+                          if (response.data.tipoErro === 'COMPROVANTE_NAO_ENCONTRADO') {
+                            toast({
+                              title: "📄 Comprovante Não Encontrado",
+                              description: (
+                                <div className="space-y-2">
+                                  <div className="font-semibold">Funcionário: {response.data.funcionario}</div>
+                                  <div className="text-sm space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-green-400">✓</span>
+                                      <span>Holerite: {response.data.periodoHolerite} (já importado)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-red-400">✗</span>
+                                      <span>Comprovante: {response.data.periodoComprovante} (não encontrado)</span>
+                                    </div>
+                                  </div>
+                                  <div className="pt-2 border-t border-gray-600">
+                                    <div className="font-medium text-yellow-400 mb-1">📥 Ação Necessária:</div>
+                                    <div className="text-sm">
+                                      Importe apenas o comprovante de pagamento para o funcionário <strong>{response.data.funcionario}</strong> referente ao período <strong>{response.data.periodoComprovante}</strong>.
+                                    </div>
+                                  </div>
+                                </div>
+                              ),
+                              variant: "destructive",
+                              duration: 12000
+                            });
+                          } else {
+                            toast({
+                              title: "⚠️ Teste de Criação",
+                              description: response.data.mensagem + (response.data.sugestao ? ` - ${response.data.sugestao}` : ''),
+                              variant: "destructive"
+                            });
+                          }
                         }
                       } catch (error: any) {
                         console.error('❌ Erro no teste de criação:', error);
-                        toast({
-                          title: "❌ Erro no Teste",
-                          description: `Erro ao testar criação: ${error.message}`,
-                          variant: "destructive"
-                        });
+                        
+                        // Verificar se é erro de comprovante não encontrado
+                        const errorData = error?.response?.data;
+                        if (errorData?.tipoErro === 'COMPROVANTE_NAO_ENCONTRADO') {
+                          toast({
+                            title: "📄 Comprovante Não Encontrado",
+                            description: (
+                              <div className="space-y-2">
+                                <div className="font-semibold">Funcionário: {errorData.funcionario}</div>
+                                <div className="text-sm">
+                                  <div>📋 Holerite: {errorData.periodoHolerite} ✓</div>
+                                  <div className="text-red-400">❌ Comprovante: {errorData.periodoComprovante} (faltando)</div>
+                                </div>
+                                <div className="pt-2 border-t border-gray-600">
+                                  <div className="font-medium text-yellow-400">Ação Necessária:</div>
+                                  <div className="text-sm mt-1">
+                                    Por favor, importe apenas o comprovante de pagamento para o período {errorData.periodoComprovante}.
+                                  </div>
+                                </div>
+                              </div>
+                            ),
+                            variant: "destructive",
+                            duration: 10000
+                          });
+                        } else {
+                          toast({
+                            title: "❌ Erro no Teste",
+                            description: errorData?.mensagem || error?.message || "Erro ao testar criação",
+                            variant: "destructive"
+                          });
+                        }
                       }
                     }}
                     variant="outline"
@@ -5150,9 +5323,36 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                   <div className="flex items-center gap-2 mt-1">
                                                       <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
                                                           {holerite.month}/{holerite.year}
-                                              </Badge>
+                                                      </Badge>
                                                   </div>
                                               </div>
+                                              <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      // Converter para o formato esperado pelo modal
+                                                      const holeriteId = holerite.id.replace('hol-', '') || holerite.name || String(Math.random());
+                                                      const holeriteFormatted: Holerite = {
+                                                          id: holeriteId,
+                                                          employeeName: holerite.employeeName || '',
+                                                          cpf: holerite.cpf || '',
+                                                          month: parseInt(holerite.month) || 0,
+                                                          year: parseInt(holerite.year) || 0,
+                                                          fileName: holerite.name || '',
+                                                          status: 'PROCESSED',
+                                                          processedAt: new Date().toISOString(),
+                                                          companyName: '',
+                                                          workPostName: ''
+                                                      };
+                                                      setSelectedHolerite(holeriteFormatted);
+                                                      setShowViewModal(true);
+                                                  }}
+                                                  className="h-8 w-8 p-0 text-seguranca-yellow hover:text-seguranca-yellow hover:bg-seguranca-yellow/10 flex-shrink-0"
+                                                  title="Visualizar Holerite"
+                                              >
+                                                  <FileText size={16} />
+                                              </Button>
                                           </div>
                                       </div>
                                   ))
@@ -5211,9 +5411,35 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                   <div className="flex items-center gap-2 mt-1">
                                                       <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
                                                           {recibo.month}/{recibo.year}
-                                              </Badge>
+                                                      </Badge>
                                                   </div>
                                               </div>
+                                              <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      // Converter para o formato esperado pelo modal
+                                                      const receiptId = recibo.id.replace('rec-', '') || recibo.name || String(Math.random());
+                                                      const now = new Date().toISOString();
+                                                      const receiptFormatted: PaymentReceipt = {
+                                                          id: receiptId,
+                                                          employeeName: recibo.employeeName || '',
+                                                          month: parseInt(recibo.month) || 0,
+                                                          year: parseInt(recibo.year) || 0,
+                                                          fileName: recibo.name || '',
+                                                          processedAt: now,
+                                                          updatedAt: now,
+                                                          createdAt: now,
+                                                          status: 'PROCESSED'
+                                                      };
+                                                      handleViewPaymentReceipt(receiptFormatted);
+                                                  }}
+                                                  className="h-8 w-8 p-0 text-green-400 hover:text-green-400 hover:bg-green-500/10 flex-shrink-0"
+                                                  title="Visualizar Comprovante"
+                                              >
+                                                  <Receipt size={16} />
+                                              </Button>
                                           </div>
                                       </div>
                                   ))
@@ -6241,30 +6467,99 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 {batchUnificationResult.failureList.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-red-800 mb-2">âŒ Falhas ({batchUnificationResult.failureList.length})</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {batchUnificationResult.failureList.map((item, index) => (
-                        <div key={index} className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
-                          <div className="font-semibold text-red-900 mb-1">{item.employeeName}</div>
-                          {item.month && item.year && (
-                            <div className="text-xs text-gray-600 mb-1">
-                              Período: {item.month}/{item.year}
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {batchUnificationResult.failureList.map((item, index) => {
+                        const message = item.message || item.error || 'Erro desconhecido';
+                        const isReceiptNotFound = message.includes('Nenhum comprovante encontrado') || 
+                                                  (message.includes('comprovante') && message.includes('não encontrado'));
+                        
+                        return (
+                          <div key={index} className="p-4 bg-red-50 border border-red-300 rounded-lg text-sm shadow-sm">
+                            {/* Cabeçalho do Item */}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="font-semibold text-red-900 text-base mb-1">
+                                  {item.employeeName}
+                                </div>
+                                {item.month && item.year && (
+                                  <div className="text-xs text-gray-600 mb-2">
+                                    📅 Período do Holerite: {item.month}/{item.year}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
-                          <div className="text-red-700 font-medium mb-1">
-                            {item.message || item.error || 'Erro desconhecido'}
+
+                            {/* Status dos Documentos */}
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              <div className={`p-2 rounded ${item.holeriteFound === '✅ Sim' ? 'bg-green-100 border border-green-300' : 'bg-gray-100 border border-gray-300'}`}>
+                                <div className="text-xs text-gray-600 mb-1">Holerite</div>
+                                <div className={`font-medium ${item.holeriteFound === '✅ Sim' ? 'text-green-700' : 'text-gray-600'}`}>
+                                  {item.holeriteFound === '✅ Sim' ? '✓ Encontrado' : '✗ Não encontrado'}
+                                </div>
+                              </div>
+                              <div className={`p-2 rounded ${item.receiptFound === '✅ Sim' ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'}`}>
+                                <div className="text-xs text-gray-600 mb-1">Comprovante</div>
+                                <div className={`font-medium ${item.receiptFound === '✅ Sim' ? 'text-green-700' : 'text-red-700'}`}>
+                                  {item.receiptFound === '✅ Sim' ? '✓ Encontrado' : '✗ Não encontrado'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Mensagem de Erro Detalhada */}
+                            {isReceiptNotFound && (
+                              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-2">
+                                <div className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                                  <span>⚠️</span>
+                                  <span>Explicação do Problema</span>
+                                </div>
+                                <div className="text-xs text-yellow-900 whitespace-pre-line space-y-2">
+                                  {message.split('\n').map((line, lineIndex) => {
+                                    if (line.startsWith('O sistema procurou')) {
+                                      return (
+                                        <div key={lineIndex} className="font-medium mt-2">
+                                          {line}
+                                        </div>
+                                      );
+                                    } else if (line.startsWith('•')) {
+                                      return (
+                                        <div key={lineIndex} className="ml-4 text-gray-700 font-mono text-xs">
+                                          {line}
+                                        </div>
+                                      );
+                                    } else if (line.startsWith('POSSÍVEIS CAUSAS:') || line.startsWith('AÇÃO NECESSÁRIA:')) {
+                                      return (
+                                        <div key={lineIndex} className="font-semibold mt-2 text-yellow-900">
+                                          {line}
+                                        </div>
+                                      );
+                                    } else if (line.match(/^\d+\./)) {
+                                      return (
+                                        <div key={lineIndex} className="ml-2 text-gray-700">
+                                          {line}
+                                        </div>
+                                      );
+                                    } else if (line.trim()) {
+                                      return (
+                                        <div key={lineIndex} className="text-gray-700">
+                                          {line}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Mensagem de Erro Simples (se não for comprovante não encontrado) */}
+                            {!isReceiptNotFound && (
+                              <div className="text-red-700 font-medium bg-red-100 p-2 rounded">
+                                {message}
+                              </div>
+                            )}
                           </div>
-                          {(item.holeriteFound || item.receiptFound) && (
-                            <div className="text-xs text-gray-600 mt-1 space-y-0.5">
-                              {item.holeriteFound && (
-                                <div>Holerite: {item.holeriteFound}</div>
-                              )}
-                              {item.receiptFound && (
-                                <div>Comprovante: {item.receiptFound}</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                                </div>
                              </div>
                 )}

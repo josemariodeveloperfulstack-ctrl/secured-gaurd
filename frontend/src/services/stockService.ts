@@ -131,11 +131,20 @@ export const stockService = {
 
   async createMovement(movementData: CreateStockMovementDTO): Promise<StockMovement> {
     try {
+      console.log('📤 Enviando requisição para /api/stock/movements:', movementData);
       const response = await api.post('/api/stock/movements', movementData);
+      console.log('✅ Resposta recebida:', response.data);
       return response.data;
-    } catch (error) {
-      console.error('Erro ao criar movimentação:', error);
-      throw new Error('Falha ao criar movimentação');
+    } catch (error: any) {
+      console.error('❌ Erro ao criar movimentação:', error);
+      console.error('❌ Response data:', error?.response?.data);
+      console.error('❌ Response status:', error?.response?.status);
+      console.error('❌ Response headers:', error?.response?.headers);
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.data?.message || 
+                          error?.message || 
+                          'Falha ao criar movimentação';
+      throw new Error(errorMessage);
     }
   },
 

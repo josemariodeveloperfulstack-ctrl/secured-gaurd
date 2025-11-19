@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -120,8 +121,35 @@ public class PayslipService {
                     
                     // If extraction failed, try OCR
                     if (payslip == null || payslip.getEmployeeName().equals("Desconhecido")) {
-                        log.info("Extração via PDFBox falhou, tentando OCR para página {}", i);
+                        log.warn("⚠️ Extração via PDFBox falhou para página {} (payslip={}, nome={}), tentando OCR...", 
+                            i, payslip != null ? "não-nulo" : "null", 
+                            payslip != null ? payslip.getEmployeeName() : "N/A");
+                        
+                        // Verificar se o texto extraído está vazio ou muito curto
+                        if (pageText == null || pageText.trim().length() < 50) {
+                            log.warn("⚠️ Texto extraído via PDFBox está vazio ou muito curto ({} caracteres). PDF pode estar escaneado ou corrompido.", 
+                                pageText != null ? pageText.length() : 0);
+                        }
+                        
                         payslip = extractPayslipInfoWithOCR(document, i);
+                        
+                        if (payslip == null || payslip.getEmployeeName().equals("Desconhecido")) {
+                            log.error("❌ Extração via OCR também falhou para página {}. Holerite não será processado.", i);
+                        } else {
+                            log.info("✅ Extração via OCR bem-sucedida para página {}", i);
+                        }
+                    } else {
+                        // Verificar se os dados da tabela foram extraídos mesmo quando PDFBox funcionou
+                        if (payslip.getTableDetails() == null || payslip.getTableDetails().isEmpty()) {
+                            log.warn("⚠️ PDFBox extraiu dados básicos mas não encontrou dados da tabela. Tentando re-extrair tabela do texto...");
+                            // Tentar re-extrair apenas a tabela do texto já extraído
+                            String[] linhas = pageText.split("\r?\n");
+                            List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails = extractTableDetails(linhas);
+                            if (!tableDetails.isEmpty()) {
+                                payslip.setTableDetails(tableDetails);
+                                log.info("✅ Dados da tabela re-extraídos: {} linha(s)", tableDetails.size());
+                            }
+                        }
                     }
 
                     enrichCompanyData(payslip);
@@ -138,7 +166,8 @@ public class PayslipService {
                             );
                             
                             if (!holeritesExistentes.isEmpty()) {
-                                log.info("🔍 Holerite já processado encontrado para CPF: {}, Empresa: {}, Setor: {}, Período: {}/{}",
+                                log.info("🔍 {} holerite(s) já processado(s) encontrado(s) para CPF: {}, Empresa: {}, Setor: {}, Período: {}/{}",
+                                    holeritesExistentes.size(),
                                     payslip.getCpf(),
                                     payslip.getCompanyCnpj() != null ? payslip.getCompanyCnpj() : "não informado",
                                     payslip.getWorkPostName() != null ? payslip.getWorkPostName() : "não informado",
@@ -150,20 +179,39 @@ public class PayslipService {
                                 String hashPaginaAtual = calculatePageHash(pageText);
                                 log.debug("🔐 Hash do conteúdo da página atual: {}", hashPaginaAtual.substring(0, Math.min(16, hashPaginaAtual.length())) + "...");
                                 
-                                // Comparar com o holerite mais recente
+                                // Comparar com o holerite mais recente (primeiro da lista ordenada por processedAt DESC)
                                 Payslip holeriteExistente = holeritesExistentes.get(0);
+                                log.info("📄 Comparando com holerite existente mais recente: ID={}, Arquivo={}, Processado em: {}", 
+                                    holeriteExistente.getId(), 
+                                    holeriteExistente.getFileName(),
+                                    holeriteExistente.getProcessedAt());
                                 
                                 // Tentar obter hash do arquivo original salvo (se existir)
                                 String hashArquivoOriginal = getPayslipFileHash(holeriteExistente);
                                 
                                 // Comparar dados extraídos e hash do arquivo
+                                log.info("🔍 Iniciando comparação detalhada de holerites...");
+                                log.info("   📊 Holerite EXISTENTE:");
+                                log.info("      - Vencimentos: {}", holeriteExistente.getTotalEarnings());
+                                log.info("      - Descontos: {}", holeriteExistente.getTotalDeductions());
+                                log.info("      - Líquido: {}", holeriteExistente.getNetValue());
+                                log.info("      - TableDetails: {} linha(s)", holeriteExistente.getTableDetails() != null ? holeriteExistente.getTableDetails().size() : 0);
+                                log.info("   📊 Holerite NOVO:");
+                                log.info("      - Vencimentos: {}", payslip.getTotalEarnings());
+                                log.info("      - Descontos: {}", payslip.getTotalDeductions());
+                                log.info("      - Líquido: {}", payslip.getNetValue());
+                                log.info("      - TableDetails: {} linha(s)", payslip.getTableDetails() != null ? payslip.getTableDetails().size() : 0);
+                                
                                 PayslipComparisonResult comparacao = comparePayslips(holeriteExistente, payslip, hashArquivoOriginal, hashPaginaAtual);
                                 
+                                log.info("🔍 Resultado da comparação: hasChanges={}, total de diferenças={}", 
+                                    comparacao.hasChanges(), comparacao.getDifferences().size());
+                                
                                 if (comparacao.hasChanges()) {
-                                    log.info("📝 ALTERAÇÕES DETECTADAS no holerite! Processando nova versão...");
-                                    log.info("📋 Diferenças encontradas:");
-                                    for (String diff : comparacao.getDifferences()) {
-                                        log.info("   - {}", diff);
+                                    log.warn("📝 ⚠️ ALTERAÇÕES DETECTADAS no holerite! Processando nova versão...");
+                                    log.warn("📋 Diferenças encontradas ({}):", comparacao.getDifferences().size());
+                                    for (int idx = 0; idx < comparacao.getDifferences().size(); idx++) {
+                                        log.warn("   {}. {}", idx + 1, comparacao.getDifferences().get(idx));
                                     }
                                     
                                     // Gerar nome de arquivo único com versão/timestamp
@@ -172,6 +220,15 @@ public class PayslipService {
                                     payslip.setFileName(nomeArquivoComVersao); // Definir nome com versão
                                     log.info("🔄 Gerando novo arquivo PDF com versão: {} (arquivo original não será sobrescrito)", nomeArquivoComVersao);
                                 } else {
+                                    log.warn("⚠️ NENHUMA ALTERAÇÃO DETECTADA - Verificando se valores financeiros ou tableDetails estão sendo comparados corretamente...");
+                                    log.warn("   Se houver diferenças visíveis nos valores, pode ser um problema na extração ou comparação");
+                                    log.warn("   Valores comparados:");
+                                    log.warn("      Vencimentos: {} vs {}", holeriteExistente.getTotalEarnings(), payslip.getTotalEarnings());
+                                    log.warn("      Descontos: {} vs {}", holeriteExistente.getTotalDeductions(), payslip.getTotalDeductions());
+                                    log.warn("      Líquido: {} vs {}", holeriteExistente.getNetValue(), payslip.getNetValue());
+                                    log.warn("      TableDetails: {} vs {} linhas", 
+                                        holeriteExistente.getTableDetails() != null ? holeriteExistente.getTableDetails().size() : 0,
+                                        payslip.getTableDetails() != null ? payslip.getTableDetails().size() : 0);
                                     String msg = String.format(
                                         "Holerite idêntico já processado. Não há alterações detectadas. Empresa CNPJ %s, CPF %s, Setor %s, mês %d, ano %d. Pulando página %d.",
                                         payslip.getCompanyCnpj() != null ? payslip.getCompanyCnpj() : "não informado",
@@ -287,10 +344,22 @@ public class PayslipService {
 
     // Nova versão principal com suporte a ocrText
     private Payslip extractPayslipInfo(String text, int pageNumber, String ocrText) {
-        log.info("Tentando extrair informações da página {} via PDFBox", pageNumber);
+        String method = ocrText != null ? "OCR" : "PDFBox";
+        log.info("🔍 Tentando extrair informações da página {} via {}", pageNumber, method);
+
+        // Verificar se o texto está vazio ou muito curto
+        if (text == null || text.trim().isEmpty()) {
+            log.warn("⚠️ Texto extraído está vazio para página {} via {}", pageNumber, method);
+            return null;
+        }
+        
+        if (text.trim().length() < 50) {
+            log.warn("⚠️ Texto extraído é muito curto ({} caracteres) para página {} via {}. Pode indicar PDF escaneado ou corrompido.", 
+                text.length(), pageNumber, method);
+        }
 
         // Log do texto para debug (primeiros 1000 caracteres)
-        log.debug("Texto extraído da página {}: {}", pageNumber, 
+        log.debug("Texto extraído da página {} via {}: {}", pageNumber, method,
                  text.length() > 1000 ? text.substring(0, 1000) + "..." : text);
 
         // Dividir o texto em linhas para facilitar a busca
@@ -624,12 +693,13 @@ public class PayslipService {
         
         // Extrair Total Vencimentos
         // Padrões: "Total Vencimentos: 1.912,65", "TOTAL VENCIMENTOS 1.912,65", "Total Ganhos: 1.912,65"
-        Pattern totalVencimentosPattern = Pattern.compile("(?i)(?:TOTAL\\s+VENCIMENTOS?|VENCIMENTOS?\\s+TOTAL|TOTAL\\s+GANHOS?)\\s*:?\\s*([\\d.]+[,.]\\d{2}|[\\d.]+)", Pattern.CASE_INSENSITIVE);
+        // Melhorado para capturar valores com ou sem separadores
+        Pattern totalVencimentosPattern = Pattern.compile("(?i)(?:TOTAL\\s+VENCIMENTOS?|VENCIMENTOS?\\s+TOTAL|TOTAL\\s+GANHOS?)\\s*:?\\s*([\\d.]+[,.]?\\d{0,2}|[\\d,]+)", Pattern.CASE_INSENSITIVE);
         for (String linha : linhas) {
             Matcher matcher = totalVencimentosPattern.matcher(linha);
             if (matcher.find()) {
                 try {
-                    String valorStr = matcher.group(1);
+                    String valorStr = matcher.group(1).trim();
                     // Formato brasileiro: 1.912,65 -> 1912.65
                     // Se tem ponto e vírgula: remover pontos e substituir vírgula por ponto
                     if (valorStr.contains(",") && valorStr.contains(".")) {
@@ -638,9 +708,13 @@ public class PayslipService {
                         // Apenas vírgula: substituir por ponto
                         valorStr = valorStr.replace(",", ".");
                     }
-                    totalVencimentos = new java.math.BigDecimal(valorStr);
-                    log.info("✅ Total Vencimentos encontrado: {} (linha: {})", totalVencimentos, linha.trim());
-                    break;
+                    // Remover espaços e garantir que é um número válido
+                    valorStr = valorStr.replaceAll("\\s+", "");
+                    if (!valorStr.isEmpty() && valorStr.matches("\\d+(\\.\\d+)?")) {
+                        totalVencimentos = new java.math.BigDecimal(valorStr);
+                        log.info("✅ Total Vencimentos encontrado: {} (linha: {})", totalVencimentos, linha.trim());
+                        break;
+                    }
                 } catch (Exception e) {
                     log.warn("⚠️ Erro ao extrair Total Vencimentos da linha '{}': {}", linha.trim(), e.getMessage());
                 }
@@ -649,21 +723,25 @@ public class PayslipService {
         
         // Extrair Total Descontos
         // Padrões: "Total Descontos: 500,65", "TOTAL DESCONTOS 500,65"
-        Pattern totalDescontosPattern = Pattern.compile("(?i)(?:TOTAL\\s+DESCONTOS?|DESCONTOS?\\s+TOTAL)\\s*:?\\s*([\\d.]+[,.]\\d{2}|[\\d.]+)", Pattern.CASE_INSENSITIVE);
+        Pattern totalDescontosPattern = Pattern.compile("(?i)(?:TOTAL\\s+DESCONTOS?|DESCONTOS?\\s+TOTAL)\\s*:?\\s*([\\d.]+[,.]?\\d{0,2}|[\\d,]+)", Pattern.CASE_INSENSITIVE);
         for (String linha : linhas) {
             Matcher matcher = totalDescontosPattern.matcher(linha);
             if (matcher.find()) {
                 try {
-                    String valorStr = matcher.group(1);
+                    String valorStr = matcher.group(1).trim();
                     // Formato brasileiro: 500,65 -> 500.65
                     if (valorStr.contains(",") && valorStr.contains(".")) {
                         valorStr = valorStr.replace(".", "").replace(",", ".");
                     } else if (valorStr.contains(",") && !valorStr.contains(".")) {
                         valorStr = valorStr.replace(",", ".");
                     }
-                    totalDescontos = new java.math.BigDecimal(valorStr);
-                    log.info("✅ Total Descontos encontrado: {} (linha: {})", totalDescontos, linha.trim());
-                    break;
+                    // Remover espaços e garantir que é um número válido
+                    valorStr = valorStr.replaceAll("\\s+", "");
+                    if (!valorStr.isEmpty() && valorStr.matches("\\d+(\\.\\d+)?")) {
+                        totalDescontos = new java.math.BigDecimal(valorStr);
+                        log.info("✅ Total Descontos encontrado: {} (linha: {})", totalDescontos, linha.trim());
+                        break;
+                    }
                 } catch (Exception e) {
                     log.warn("⚠️ Erro ao extrair Total Descontos da linha '{}': {}", linha.trim(), e.getMessage());
                 }
@@ -672,21 +750,25 @@ public class PayslipService {
         
         // Extrair Valor Líquido
         // Padrões: "Valor Líquido: 1.412,00", "VALOR LÍQUIDO 1.412,00", "Líquido: 1.412,00"
-        Pattern valorLiquidoPattern = Pattern.compile("(?i)(?:VALOR\\s+L[IÍ]QUIDO|L[IÍ]QUIDO|VALOR\\s+FINAL|VALOR\\s+A\\s+RECEBER)\\s*:?\\s*([\\d.]+[,.]\\d{2}|[\\d.]+)", Pattern.CASE_INSENSITIVE);
+        Pattern valorLiquidoPattern = Pattern.compile("(?i)(?:VALOR\\s+L[IÍ]QUIDO|L[IÍ]QUIDO|VALOR\\s+FINAL|VALOR\\s+A\\s+RECEBER)\\s*:?\\s*([\\d.]+[,.]?\\d{0,2}|[\\d,]+)", Pattern.CASE_INSENSITIVE);
         for (String linha : linhas) {
             Matcher matcher = valorLiquidoPattern.matcher(linha);
             if (matcher.find()) {
                 try {
-                    String valorStr = matcher.group(1);
+                    String valorStr = matcher.group(1).trim();
                     // Formato brasileiro: 1.412,00 -> 1412.00
                     if (valorStr.contains(",") && valorStr.contains(".")) {
                         valorStr = valorStr.replace(".", "").replace(",", ".");
                     } else if (valorStr.contains(",") && !valorStr.contains(".")) {
                         valorStr = valorStr.replace(",", ".");
                     }
-                    valorLiquido = new java.math.BigDecimal(valorStr);
-                    log.info("✅ Valor Líquido encontrado: {} (linha: {})", valorLiquido, linha.trim());
-                    break;
+                    // Remover espaços e garantir que é um número válido
+                    valorStr = valorStr.replaceAll("\\s+", "");
+                    if (!valorStr.isEmpty() && valorStr.matches("\\d+(\\.\\d+)?")) {
+                        valorLiquido = new java.math.BigDecimal(valorStr);
+                        log.info("✅ Valor Líquido encontrado: {} (linha: {})", valorLiquido, linha.trim());
+                        break;
+                    }
                 } catch (Exception e) {
                     log.warn("⚠️ Erro ao extrair Valor Líquido da linha '{}': {}", linha.trim(), e.getMessage());
                 }
@@ -738,6 +820,12 @@ public class PayslipService {
                         totalVencimentos, totalDescontos, valorLiquido);
             }
 
+            // Extrair dados detalhados da tabela (Cód, Descrição, Referência, Vencimentos, Descontos)
+            List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails = extractTableDetails(linhas);
+            if (!tableDetails.isEmpty()) {
+                log.info("📋 Dados detalhados da tabela extraídos: {} linha(s)", tableDetails.size());
+            }
+
             return Payslip.builder()
                     .employeeName(nome)
                     .cpf(cpf)
@@ -749,6 +837,7 @@ public class PayslipService {
                     .totalEarnings(totalVencimentos)
                     .totalDeductions(totalDescontos)
                     .netValue(valorLiquido)
+                    .tableDetails(tableDetails)
                     .build();
                     
         } catch (NumberFormatException e) {
@@ -1013,20 +1102,47 @@ public class PayslipService {
     }
 
     private Payslip extractPayslipInfoWithOCR(PDDocument document, int pageNumber) {
-        log.info("Tentando extrair informações da página {} via OCR", pageNumber);
+        log.info("🔍 Tentando extrair informações da página {} via OCR", pageNumber);
         try {
             File imageFile = convertPdfPageToImage(document, pageNumber);
+            log.debug("📸 Imagem criada para OCR: {}", imageFile.getAbsolutePath());
+            
             String text = tesseractService.extractTextFromImage(imageFile);
             
-            log.debug("Texto extraído via OCR da página {}: {}", pageNumber, text.substring(0, Math.min(500, text.length())));
+            if (text == null || text.trim().isEmpty()) {
+                log.warn("⚠️ OCR não extraiu nenhum texto da página {}", pageNumber);
+                imageFile.delete();
+                return null;
+            }
+            
+            log.info("✅ Texto extraído via OCR da página {}: {} caracteres", pageNumber, text.length());
+            log.debug("Primeiros 500 caracteres do texto OCR: {}", text.substring(0, Math.min(500, text.length())));
             
             // Limpar o arquivo temporário
             imageFile.delete();
             
             // Passar o texto OCR como parâmetro para tentar extrair o período se necessário
-            return extractPayslipInfo(text, pageNumber, text);
+            Payslip payslip = extractPayslipInfo(text, pageNumber, text);
+            
+            // Garantir que os dados da tabela foram extraídos
+            if (payslip != null && (payslip.getTableDetails() == null || payslip.getTableDetails().isEmpty())) {
+                log.warn("⚠️ OCR extraiu dados básicos mas não encontrou dados da tabela. Tentando re-extrair...");
+                String[] linhas = text.split("\r?\n");
+                List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails = extractTableDetails(linhas);
+                if (!tableDetails.isEmpty()) {
+                    payslip.setTableDetails(tableDetails);
+                    log.info("✅ Dados da tabela re-extraídos via OCR: {} linha(s)", tableDetails.size());
+                } else {
+                    log.warn("⚠️ Não foi possível extrair dados da tabela mesmo com re-tentativa");
+                }
+            }
+            
+            return payslip;
         } catch (TesseractException | IOException e) {
-            log.error("❌ Falha no processamento OCR da página {}: {}", pageNumber, e.getMessage());
+            log.error("❌ Falha no processamento OCR da página {}: {}", pageNumber, e.getMessage(), e);
+            return null;
+        } catch (Exception e) {
+            log.error("❌ Erro inesperado durante OCR da página {}: {}", pageNumber, e.getMessage(), e);
             return null;
         }
     }
@@ -1835,52 +1951,554 @@ public class PayslipService {
         }
         
         // 4. TASK 02: Comparar valores financeiros (camada adicional de verificação)
+        // Esta é uma verificação CRÍTICA - qualquer diferença nos valores financeiros deve ser detectada
+        log.debug("🔍 Comparando valores financeiros...");
+        
         // Comparar Total Vencimentos
         if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() != null) {
-            if (existing.getTotalEarnings().compareTo(newPayslip.getTotalEarnings()) != 0) {
+            int comparison = existing.getTotalEarnings().compareTo(newPayslip.getTotalEarnings());
+            if (comparison != 0) {
                 result.addDifference("Total Vencimentos", 
                     existing.getTotalEarnings().toString(), 
                     newPayslip.getTotalEarnings().toString());
-                log.info("💰 Diferença detectada em Total Vencimentos: {} vs {}", 
+                log.warn("💰 ALTERAÇÃO DETECTADA em Total Vencimentos: {} -> {}", 
                     existing.getTotalEarnings(), newPayslip.getTotalEarnings());
+            } else {
+                log.debug("✅ Total Vencimentos idêntico: {}", existing.getTotalEarnings());
             }
         } else if (existing.getTotalEarnings() == null && newPayslip.getTotalEarnings() != null) {
             result.addDifference("Total Vencimentos", "não disponível", newPayslip.getTotalEarnings().toString());
+            log.warn("💰 Total Vencimentos adicionado: {}", newPayslip.getTotalEarnings());
         } else if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() == null) {
             result.addDifference("Total Vencimentos", existing.getTotalEarnings().toString(), "não disponível");
+            log.warn("💰 Total Vencimentos removido: {}", existing.getTotalEarnings());
+        } else {
+            log.debug("⚠️ Total Vencimentos não disponível em ambos os holerites");
         }
         
         // Comparar Total Descontos
         if (existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() != null) {
-            if (existing.getTotalDeductions().compareTo(newPayslip.getTotalDeductions()) != 0) {
+            int comparison = existing.getTotalDeductions().compareTo(newPayslip.getTotalDeductions());
+            if (comparison != 0) {
                 result.addDifference("Total Descontos", 
                     existing.getTotalDeductions().toString(), 
                     newPayslip.getTotalDeductions().toString());
-                log.info("💰 Diferença detectada em Total Descontos: {} vs {}", 
+                log.warn("💰 ALTERAÇÃO DETECTADA em Total Descontos: {} -> {}", 
                     existing.getTotalDeductions(), newPayslip.getTotalDeductions());
+            } else {
+                log.debug("✅ Total Descontos idêntico: {}", existing.getTotalDeductions());
             }
         } else if (existing.getTotalDeductions() == null && newPayslip.getTotalDeductions() != null) {
             result.addDifference("Total Descontos", "não disponível", newPayslip.getTotalDeductions().toString());
+            log.warn("💰 Total Descontos adicionado: {}", newPayslip.getTotalDeductions());
         } else if (existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() == null) {
             result.addDifference("Total Descontos", existing.getTotalDeductions().toString(), "não disponível");
+            log.warn("💰 Total Descontos removido: {}", existing.getTotalDeductions());
+        } else {
+            log.debug("⚠️ Total Descontos não disponível em ambos os holerites");
         }
         
         // Comparar Valor Líquido
         if (existing.getNetValue() != null && newPayslip.getNetValue() != null) {
-            if (existing.getNetValue().compareTo(newPayslip.getNetValue()) != 0) {
+            int comparison = existing.getNetValue().compareTo(newPayslip.getNetValue());
+            if (comparison != 0) {
                 result.addDifference("Valor Líquido", 
                     existing.getNetValue().toString(), 
                     newPayslip.getNetValue().toString());
-                log.info("💰 Diferença detectada em Valor Líquido: {} vs {}", 
+                log.warn("💰 ALTERAÇÃO DETECTADA em Valor Líquido: {} -> {}", 
                     existing.getNetValue(), newPayslip.getNetValue());
+            } else {
+                log.debug("✅ Valor Líquido idêntico: {}", existing.getNetValue());
             }
         } else if (existing.getNetValue() == null && newPayslip.getNetValue() != null) {
             result.addDifference("Valor Líquido", "não disponível", newPayslip.getNetValue().toString());
+            log.warn("💰 Valor Líquido adicionado: {}", newPayslip.getNetValue());
         } else if (existing.getNetValue() != null && newPayslip.getNetValue() == null) {
             result.addDifference("Valor Líquido", existing.getNetValue().toString(), "não disponível");
+            log.warn("💰 Valor Líquido removido: {}", existing.getNetValue());
+        } else {
+            log.debug("⚠️ Valor Líquido não disponível em ambos os holerites");
+        }
+        
+        // 5. Comparar dados detalhados da tabela (Cód, Descrição, Referência, Vencimentos, Descontos)
+        // Esta é a verificação mais importante para detectar alterações nos dados da tabela
+        log.debug("🔍 Comparando dados detalhados da tabela...");
+        log.debug("   Holerite existente: {} linhas", existing.getTableDetails() != null ? existing.getTableDetails().size() : 0);
+        log.debug("   Holerite novo: {} linhas", newPayslip.getTableDetails() != null ? newPayslip.getTableDetails().size() : 0);
+        
+        if (existing.getTableDetails() != null && newPayslip.getTableDetails() != null) {
+            boolean tableDetailsChanged = compareTableDetails(existing.getTableDetails(), newPayslip.getTableDetails(), result);
+            if (tableDetailsChanged) {
+                log.warn("📋 ALTERAÇÕES DETECTADAS nos dados detalhados da tabela!");
+            } else {
+                log.debug("✅ Dados da tabela idênticos");
+            }
+        } else if (existing.getTableDetails() == null && newPayslip.getTableDetails() != null && !newPayslip.getTableDetails().isEmpty()) {
+            result.addDifference("Dados da tabela", "não disponível", newPayslip.getTableDetails().size() + " linha(s)");
+            log.warn("📋 Dados da tabela não disponíveis no holerite existente, mas presentes no novo ({} linhas)", 
+                newPayslip.getTableDetails().size());
+        } else if (existing.getTableDetails() != null && !existing.getTableDetails().isEmpty() && 
+                   (newPayslip.getTableDetails() == null || newPayslip.getTableDetails().isEmpty())) {
+            result.addDifference("Dados da tabela", existing.getTableDetails().size() + " linha(s)", "não disponível");
+            log.warn("📋 Dados da tabela presentes no holerite existente ({} linhas), mas não no novo", 
+                existing.getTableDetails().size());
+        } else {
+            log.debug("⚠️ Dados da tabela não disponíveis em ambos os holerites");
+        }
+        
+        // Verificação adicional: Se houver diferenças nos valores financeiros ou tableDetails, 
+        // garantir que hasChanges seja true (pode ter sido perdido em algum caso edge)
+        boolean hasFinancialDifferences = false;
+        if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() != null) {
+            hasFinancialDifferences = existing.getTotalEarnings().compareTo(newPayslip.getTotalEarnings()) != 0;
+        } else if (existing.getTotalEarnings() == null ^ newPayslip.getTotalEarnings() == null) {
+            hasFinancialDifferences = true;
+        }
+        
+        if (!hasFinancialDifferences && existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() != null) {
+            hasFinancialDifferences = existing.getTotalDeductions().compareTo(newPayslip.getTotalDeductions()) != 0;
+        } else if (!hasFinancialDifferences && (existing.getTotalDeductions() == null ^ newPayslip.getTotalDeductions() == null)) {
+            hasFinancialDifferences = true;
+        }
+        
+        if (!hasFinancialDifferences && existing.getNetValue() != null && newPayslip.getNetValue() != null) {
+            hasFinancialDifferences = existing.getNetValue().compareTo(newPayslip.getNetValue()) != 0;
+        } else if (!hasFinancialDifferences && (existing.getNetValue() == null ^ newPayslip.getNetValue() == null)) {
+            hasFinancialDifferences = true;
+        }
+        
+        // Verificar se tableDetails tem diferenças
+        boolean hasTableDetailsDifferences = false;
+        if (existing.getTableDetails() != null && newPayslip.getTableDetails() != null) {
+            if (existing.getTableDetails().size() != newPayslip.getTableDetails().size()) {
+                hasTableDetailsDifferences = true;
+            } else {
+                // Comparar conteúdo das linhas
+                for (int i = 0; i < existing.getTableDetails().size(); i++) {
+                    var existingRow = existing.getTableDetails().get(i);
+                    var newRow = newPayslip.getTableDetails().get(i);
+                    if (!Objects.equals(existingRow.getCodigo(), newRow.getCodigo()) ||
+                        !Objects.equals(existingRow.getDescricao(), newRow.getDescricao()) ||
+                        !Objects.equals(existingRow.getReferencia(), newRow.getReferencia()) ||
+                        (existingRow.getVencimentos() != null && newRow.getVencimentos() != null && 
+                         existingRow.getVencimentos().compareTo(newRow.getVencimentos()) != 0) ||
+                        (existingRow.getDescontos() != null && newRow.getDescontos() != null && 
+                         existingRow.getDescontos().compareTo(newRow.getDescontos()) != 0)) {
+                        hasTableDetailsDifferences = true;
+                        break;
+                    }
+                }
+            }
+        } else if (existing.getTableDetails() == null ^ newPayslip.getTableDetails() == null) {
+            hasTableDetailsDifferences = true;
+        }
+        
+        // Se detectou diferenças financeiras ou em tableDetails mas hasChanges está false, forçar true
+        if ((hasFinancialDifferences || hasTableDetailsDifferences) && !result.hasChanges()) {
+            log.warn("⚠️ DIFERENÇAS DETECTADAS mas hasChanges estava false - FORÇANDO hasChanges=true");
+            if (hasFinancialDifferences) {
+                result.addDifference("Valores financeiros", "diferentes", "detectado na verificação adicional");
+            }
+            if (hasTableDetailsDifferences) {
+                result.addDifference("Dados da tabela", "diferentes", "detectado na verificação adicional");
+            }
+        }
+        
+        // Log final do resultado da comparação
+        log.info("🔍 Comparação concluída: hasChanges={}, total de diferenças={}", 
+            result.hasChanges(), result.getDifferences().size());
+        if (result.hasChanges()) {
+            log.warn("📝 RESUMO DAS ALTERAÇÕES DETECTADAS:");
+            for (int idx = 0; idx < result.getDifferences().size(); idx++) {
+                log.warn("   {}. {}", idx + 1, result.getDifferences().get(idx));
+            }
+        } else {
+            log.info("✅ Nenhuma alteração detectada - holerites são idênticos");
         }
         
         return result;
+    }
+    
+    /**
+     * Compara os dados detalhados da tabela de dois holerites
+     * Retorna true se houver diferenças
+     */
+    private boolean compareTableDetails(
+            List<com.z7design.secured_guard.dto.PayslipTableRow> existingDetails,
+            List<com.z7design.secured_guard.dto.PayslipTableRow> newDetails,
+            PayslipComparisonResult result) {
+        
+        if (existingDetails == null || newDetails == null) {
+            log.debug("⚠️ compareTableDetails: existingDetails ou newDetails é null");
+            return false;
+        }
+        
+        boolean hasChanges = false;
+        
+        log.debug("🔍 Comparando tableDetails: {} linhas existentes vs {} linhas novas", 
+            existingDetails.size(), newDetails.size());
+        
+        // Se o número de linhas é diferente, já há mudanças
+        if (existingDetails.size() != newDetails.size()) {
+            result.addDifference("Número de linhas na tabela", 
+                String.valueOf(existingDetails.size()), 
+                String.valueOf(newDetails.size()));
+            hasChanges = true;
+            log.warn("📋 Número de linhas diferente: {} vs {}", existingDetails.size(), newDetails.size());
+        }
+        
+        // Criar mapas por código para comparação mais eficiente
+        Map<String, com.z7design.secured_guard.dto.PayslipTableRow> existingMap = new HashMap<>();
+        Map<String, com.z7design.secured_guard.dto.PayslipTableRow> newMap = new HashMap<>();
+        
+        for (com.z7design.secured_guard.dto.PayslipTableRow row : existingDetails) {
+            if (row.getCodigo() != null) {
+                existingMap.put(row.getCodigo(), row);
+            }
+        }
+        
+        for (com.z7design.secured_guard.dto.PayslipTableRow row : newDetails) {
+            if (row.getCodigo() != null) {
+                newMap.put(row.getCodigo(), row);
+            }
+        }
+        
+        // Verificar linhas que foram adicionadas ou removidas
+        Set<String> allCodes = new HashSet<>(existingMap.keySet());
+        allCodes.addAll(newMap.keySet());
+        
+        log.debug("🔍 Comparando {} códigos únicos", allCodes.size());
+        
+        for (String codigo : allCodes) {
+            com.z7design.secured_guard.dto.PayslipTableRow existingRow = existingMap.get(codigo);
+            com.z7design.secured_guard.dto.PayslipTableRow newRow = newMap.get(codigo);
+            
+            if (existingRow == null && newRow != null) {
+                result.addDifference("Linha adicionada", 
+                    "não existia", 
+                    String.format("Cód: %s, Desc: %s, Ref: %s, Venc: %s, Desc: %s", 
+                        newRow.getCodigo(), newRow.getDescricao(), newRow.getReferencia(),
+                        newRow.getVencimentos(), newRow.getDescontos()));
+                hasChanges = true;
+                log.warn("📋 Linha ADICIONADA: Código {}", codigo);
+            } else if (existingRow != null && newRow == null) {
+                result.addDifference("Linha removida", 
+                    String.format("Cód: %s, Desc: %s, Ref: %s, Venc: %s, Desc: %s", 
+                        existingRow.getCodigo(), existingRow.getDescricao(), existingRow.getReferencia(),
+                        existingRow.getVencimentos(), existingRow.getDescontos()),
+                    "não existe mais");
+                hasChanges = true;
+                log.warn("📋 Linha REMOVIDA: Código {}", codigo);
+            } else if (existingRow != null && newRow != null) {
+                // Comparar campos da linha
+                boolean rowChanged = false;
+                
+                if (!Objects.equals(normalizeString(existingRow.getDescricao()), normalizeString(newRow.getDescricao()))) {
+                    result.addDifference(String.format("Descrição (Cód: %s)", codigo), 
+                        existingRow.getDescricao() != null ? existingRow.getDescricao() : "null", 
+                        newRow.getDescricao() != null ? newRow.getDescricao() : "null");
+                    hasChanges = true;
+                    rowChanged = true;
+                    log.warn("📋 Descrição alterada para código {}: '{}' -> '{}'", codigo, existingRow.getDescricao(), newRow.getDescricao());
+                }
+                
+                if (!Objects.equals(normalizeString(existingRow.getReferencia()), normalizeString(newRow.getReferencia()))) {
+                    result.addDifference(String.format("Referência (Cód: %s)", codigo), 
+                        existingRow.getReferencia() != null ? existingRow.getReferencia() : "null", 
+                        newRow.getReferencia() != null ? newRow.getReferencia() : "null");
+                    hasChanges = true;
+                    rowChanged = true;
+                    log.warn("📋 Referência alterada para código {}: '{}' -> '{}'", codigo, existingRow.getReferencia(), newRow.getReferencia());
+                }
+                
+                if (existingRow.getVencimentos() != null && newRow.getVencimentos() != null) {
+                    if (existingRow.getVencimentos().compareTo(newRow.getVencimentos()) != 0) {
+                        result.addDifference(String.format("Vencimentos (Cód: %s)", codigo), 
+                            existingRow.getVencimentos().toString(), newRow.getVencimentos().toString());
+                        hasChanges = true;
+                        rowChanged = true;
+                        log.warn("📋 Vencimentos alterados para código {}: {} -> {}", codigo, existingRow.getVencimentos(), newRow.getVencimentos());
+                    }
+                } else if (existingRow.getVencimentos() == null && newRow.getVencimentos() != null) {
+                    result.addDifference(String.format("Vencimentos (Cód: %s)", codigo), 
+                        "não disponível", newRow.getVencimentos().toString());
+                    hasChanges = true;
+                    rowChanged = true;
+                    log.warn("📋 Vencimentos adicionados para código {}: {}", codigo, newRow.getVencimentos());
+                } else if (existingRow.getVencimentos() != null && newRow.getVencimentos() == null) {
+                    result.addDifference(String.format("Vencimentos (Cód: %s)", codigo), 
+                        existingRow.getVencimentos().toString(), "não disponível");
+                    hasChanges = true;
+                    rowChanged = true;
+                    log.warn("📋 Vencimentos removidos para código {}: {}", codigo, existingRow.getVencimentos());
+                }
+                
+                if (existingRow.getDescontos() != null && newRow.getDescontos() != null) {
+                    if (existingRow.getDescontos().compareTo(newRow.getDescontos()) != 0) {
+                        result.addDifference(String.format("Descontos (Cód: %s)", codigo), 
+                            existingRow.getDescontos().toString(), newRow.getDescontos().toString());
+                        hasChanges = true;
+                        rowChanged = true;
+                        log.warn("📋 Descontos alterados para código {}: {} -> {}", codigo, existingRow.getDescontos(), newRow.getDescontos());
+                    }
+                } else if (existingRow.getDescontos() == null && newRow.getDescontos() != null) {
+                    result.addDifference(String.format("Descontos (Cód: %s)", codigo), 
+                        "não disponível", newRow.getDescontos().toString());
+                    hasChanges = true;
+                    rowChanged = true;
+                    log.warn("📋 Descontos adicionados para código {}: {}", codigo, newRow.getDescontos());
+                } else if (existingRow.getDescontos() != null && newRow.getDescontos() == null) {
+                    result.addDifference(String.format("Descontos (Cód: %s)", codigo), 
+                        existingRow.getDescontos().toString(), "não disponível");
+                    hasChanges = true;
+                    rowChanged = true;
+                    log.warn("📋 Descontos removidos para código {}: {}", codigo, existingRow.getDescontos());
+                }
+                
+                if (!rowChanged) {
+                    log.debug("✅ Linha com código {} idêntica", codigo);
+                }
+            }
+        }
+        
+        log.info("📋 Comparação de tableDetails concluída: hasChanges={}", hasChanges);
+        return hasChanges;
+    }
+    
+    /**
+     * Extrai os dados detalhados da tabela de vencimentos/descontos do holerite
+     * Procura por linhas que seguem o padrão: Cód | Descrição | Referência | Vencimentos | Descontos
+     * Funciona tanto com texto extraído via PDFBox quanto via OCR
+     */
+    private List<com.z7design.secured_guard.dto.PayslipTableRow> extractTableDetails(String[] linhas) {
+        List<com.z7design.secured_guard.dto.PayslipTableRow> tableRows = new ArrayList<>();
+        
+        if (linhas == null || linhas.length == 0) {
+            log.warn("⚠️ Nenhuma linha disponível para extrair dados da tabela");
+            return tableRows;
+        }
+        
+        boolean inTableSection = false;
+        int linhaIndex = 0;
+        
+        log.debug("🔍 Iniciando extração de dados da tabela de {} linha(s)", linhas.length);
+        
+        for (String linha : linhas) {
+            linhaIndex++;
+            String linhaTrimmed = linha.trim();
+            
+            // Detectar início da tabela (linha com cabeçalho) - mais flexível
+            String linhaUpper = linhaTrimmed.toUpperCase();
+            if (linhaUpper.contains("CÓD") || linhaUpper.contains("COD") ||
+                linhaUpper.contains("DESCRIÇÃO") || linhaUpper.contains("DESCRICAO") ||
+                linhaUpper.contains("REFERÊNCIA") || linhaUpper.contains("REFERENCIA") ||
+                linhaUpper.contains("VENCIMENTOS") || linhaUpper.contains("VENCIMENTO") ||
+                linhaUpper.contains("DESCONTOS") || linhaUpper.contains("DESCONTO")) {
+                inTableSection = true;
+                log.debug("📋 Início da tabela detectado na linha {}: {}", linhaIndex, linhaTrimmed);
+                continue;
+            }
+            
+            // Detectar fim da tabela (linha com totais)
+            if (inTableSection && (
+                linhaUpper.contains("TOTAL") ||
+                linhaUpper.contains("VALOR LÍQUIDO") || linhaUpper.contains("VALOR LIQUIDO") ||
+                linhaUpper.contains("LÍQUIDO") || linhaUpper.contains("LIQUIDO") ||
+                linhaUpper.contains("SALDO BASE") ||
+                linhaUpper.contains("BASE CÁLC") || linhaUpper.contains("BASE CALC"))) {
+                log.debug("📋 Fim da tabela detectado na linha {}: {}", linhaIndex, linhaTrimmed);
+                break;
+            }
+            
+            if (inTableSection && linhaTrimmed.length() > 5) {
+                // Padrão 1: Código de 3 dígitos no início (mais comum)
+                // Exemplo: "001 Salário Base 30,00 1.649,12" ou "903 INSS Folha 7,62 % 125,65"
+                Pattern pattern1 = Pattern.compile(
+                    "^(\\d{3})\\s+" +                    // Código (3 dígitos)
+                    "([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇa-záàâãäéèêëíìîïóòôõöúùûüç\\s]+?)\\s+" +  // Descrição
+                    "([\\d.,%\\s]+?)\\s+" +             // Referência
+                    "([\\d.,]+)?\\s*" +                  // Vencimentos (opcional)
+                    "([\\d.,]+)?$"                       // Descontos (opcional)
+                );
+                
+                // Padrão 2: Mais flexível para OCR (pode ter espaços extras ou caracteres estranhos)
+                Pattern pattern2 = Pattern.compile(
+                    "^(\\d{3})[\\s|]+" +                 // Código seguido de espaço ou pipe
+                    "([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇa-záàâãäéèêëíìîïóòôõöúùûüç\\s]+?)[\\s|]+" +  // Descrição
+                    "([\\d.,%\\s]+?)[\\s|]+" +          // Referência
+                    "([\\d.,]+)?[\\s|]*" +               // Vencimentos (opcional)
+                    "([\\d.,]+)?$"                       // Descontos (opcional)
+                );
+                
+                // Padrão 3: Ainda mais flexível - apenas código e descrição obrigatórios
+                Pattern pattern3 = Pattern.compile(
+                    "^(\\d{3})\\s+" +                    // Código
+                    "(.+?)\\s+" +                        // Descrição (qualquer coisa)
+                    "([\\d.,%\\s]*?)\\s*" +             // Referência (opcional)
+                    "([\\d.,]+)?\\s*" +                  // Vencimentos (opcional)
+                    "([\\d.,]+)?$"                       // Descontos (opcional)
+                );
+                
+                Matcher matcher = pattern1.matcher(linhaTrimmed);
+                if (!matcher.find()) {
+                    matcher = pattern2.matcher(linhaTrimmed);
+                }
+                if (!matcher.find()) {
+                    matcher = pattern3.matcher(linhaTrimmed);
+                }
+                
+                if (matcher.find()) {
+                    try {
+                        String codigo = matcher.group(1);
+                        String descricao = matcher.group(2).trim();
+                        String referencia = matcher.groupCount() >= 3 && matcher.group(3) != null ? matcher.group(3).trim() : "";
+                        String vencimentosStr = matcher.groupCount() >= 4 && matcher.group(4) != null ? matcher.group(4).trim() : null;
+                        String descontosStr = matcher.groupCount() >= 5 && matcher.group(5) != null ? matcher.group(5).trim() : null;
+                        
+                        // Limpar descrição (remover caracteres estranhos do OCR)
+                        descricao = descricao.replaceAll("[|\\|]", " ").replaceAll("\\s+", " ").trim();
+                        
+                        // Converter valores monetários
+                        java.math.BigDecimal vencimentos = parseMonetaryValue(vencimentosStr);
+                        java.math.BigDecimal descontos = parseMonetaryValue(descontosStr);
+                        
+                        // Validar código (deve ser 3 dígitos)
+                        if (codigo != null && codigo.matches("\\d{3}") && 
+                            descricao != null && !descricao.isEmpty() && descricao.length() >= 3) {
+                            
+                            com.z7design.secured_guard.dto.PayslipTableRow row = 
+                                com.z7design.secured_guard.dto.PayslipTableRow.builder()
+                                    .codigo(codigo)
+                                    .descricao(descricao)
+                                    .referencia(referencia)
+                                    .vencimentos(vencimentos)
+                                    .descontos(descontos)
+                                    .build();
+                            
+                            tableRows.add(row);
+                            log.debug("📋 Linha {} extraída: Cód: {}, Desc: {}, Ref: {}, Venc: {}, Desc: {}", 
+                                linhaIndex, codigo, descricao, referencia, vencimentos, descontos);
+                        } else {
+                            log.debug("⚠️ Linha {} ignorada (validação falhou): {}", linhaIndex, linhaTrimmed);
+                        }
+                    } catch (Exception e) {
+                        log.debug("⚠️ Erro ao extrair linha {} da tabela: {} - {}", linhaIndex, linhaTrimmed, e.getMessage());
+                    }
+                } else {
+                    // Se não encontrou padrão, mas está na seção da tabela e tem código de 3 dígitos, tentar extrair manualmente
+                    if (linhaTrimmed.matches("^\\d{3}.*")) {
+                        log.debug("⚠️ Linha {} na seção da tabela mas não correspondeu ao padrão: {}", linhaIndex, linhaTrimmed);
+                    }
+                }
+            }
+        }
+        
+        if (tableRows.isEmpty() && inTableSection) {
+            log.warn("⚠️ Seção da tabela detectada mas nenhuma linha foi extraída. Verifique o formato do PDF.");
+        } else if (!inTableSection) {
+            log.warn("⚠️ Seção da tabela não foi detectada. Tentando busca alternativa...");
+            // Tentar busca alternativa sem detectar seção
+            tableRows = extractTableDetailsAlternative(linhas);
+        }
+        
+        log.info("📋 Extração da tabela concluída: {} linha(s) extraída(s)", tableRows.size());
+        return tableRows;
+    }
+    
+    /**
+     * Método alternativo para extrair dados da tabela quando a seção não foi detectada
+     * Procura por linhas que começam com código de 3 dígitos em qualquer lugar do texto
+     */
+    private List<com.z7design.secured_guard.dto.PayslipTableRow> extractTableDetailsAlternative(String[] linhas) {
+        List<com.z7design.secured_guard.dto.PayslipTableRow> tableRows = new ArrayList<>();
+        
+        log.debug("🔍 Tentando extração alternativa da tabela...");
+        
+        for (int i = 0; i < linhas.length; i++) {
+            String linha = linhas[i].trim();
+            
+            // Procurar por linhas que começam com código de 3 dígitos seguido de texto
+            Pattern altPattern = Pattern.compile("^(\\d{3})\\s+(.+)$");
+            Matcher matcher = altPattern.matcher(linha);
+            
+            if (matcher.find() && linha.length() > 10) {
+                try {
+                    String codigo = matcher.group(1);
+                    String resto = matcher.group(2);
+                    
+                    // Tentar extrair descrição e valores do resto
+                    String[] partes = resto.split("\\s+");
+                    if (partes.length >= 1) {
+                        StringBuilder descricao = new StringBuilder();
+                        String referencia = "";
+                        String vencimentosStr = null;
+                        String descontosStr = null;
+                        
+                        int idx = 0;
+                        // Primeiras palavras são a descrição
+                        while (idx < partes.length && !partes[idx].matches("^[\\d.,]+$") && !partes[idx].contains("%")) {
+                            if (descricao.length() > 0) descricao.append(" ");
+                            descricao.append(partes[idx]);
+                            idx++;
+                        }
+                        
+                        // Próxima parte pode ser referência
+                        if (idx < partes.length) {
+                            referencia = partes[idx];
+                            idx++;
+                        }
+                        
+                        // Próximas partes podem ser vencimentos e descontos
+                        if (idx < partes.length) {
+                            vencimentosStr = partes[idx];
+                            idx++;
+                        }
+                        if (idx < partes.length) {
+                            descontosStr = partes[idx];
+                        }
+                        
+                        java.math.BigDecimal vencimentos = parseMonetaryValue(vencimentosStr);
+                        java.math.BigDecimal descontos = parseMonetaryValue(descontosStr);
+                        
+                        if (descricao.length() >= 3) {
+                            com.z7design.secured_guard.dto.PayslipTableRow row = 
+                                com.z7design.secured_guard.dto.PayslipTableRow.builder()
+                                    .codigo(codigo)
+                                    .descricao(descricao.toString())
+                                    .referencia(referencia)
+                                    .vencimentos(vencimentos)
+                                    .descontos(descontos)
+                                    .build();
+                            
+                            tableRows.add(row);
+                            log.debug("📋 Linha alternativa extraída: Cód: {}, Desc: {}", codigo, descricao.toString());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("⚠️ Erro na extração alternativa da linha {}: {}", i, e.getMessage());
+                }
+            }
+        }
+        
+        return tableRows;
+    }
+    
+    /**
+     * Converte string monetária brasileira para BigDecimal
+     * Ex: "1.649,12" -> 1649.12
+     */
+    private java.math.BigDecimal parseMonetaryValue(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        
+        try {
+            String cleaned = value.replace(".", "").replace(",", ".");
+            return new java.math.BigDecimal(cleaned);
+        } catch (Exception e) {
+            log.debug("⚠️ Erro ao converter valor monetário: {}", value);
+            return null;
+        }
     }
     
     /**

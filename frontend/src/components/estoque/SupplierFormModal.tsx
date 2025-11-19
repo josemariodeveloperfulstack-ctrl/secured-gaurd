@@ -70,12 +70,12 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
           cnpj: supplier.cnpj || '',
           email: supplier.email || '',
           phone: supplier.phone || '',
-          address: supplier.address,
-          city: supplier.city,
-          state: supplier.state,
-          zipCode: (supplier as any).zipCode,
-          category: (supplier as any).category,
-          notes: supplier.notes,
+          address: supplier.address || '',
+          city: supplier.city || '',
+          state: supplier.state || '',
+          zipCode: supplier.zipCode || '',
+          category: supplier.category || '',
+          notes: supplier.notes || '',
         });
       } else {
         setForm({ name: '', cnpj: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', category: '', notes: '' });
@@ -95,7 +95,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
         cnpj: formatCnpj(form.cnpj || ''),
         email: (form.email || '').trim(),
         phone: formatPhone(form.phone || ''),
-        zipCode: formatZipCode((form as any).zipCode || ''),
+        zipCode: formatZipCode(form.zipCode || ''),
       };
       
       // Validações obrigatórias
@@ -283,8 +283,8 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                 <div className="space-y-2">
                   <Label className="text-gray-300 text-sm sm:text-base">CEP</Label>
                   <Input 
-                    value={(form as any).zipCode || ''} 
-                    onChange={e => update('zipCode' as any, formatZipCode(e.target.value))} 
+                    value={form.zipCode || ''} 
+                    onChange={e => update('zipCode', formatZipCode(e.target.value))} 
                     className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
                     placeholder="00000-000"
                   />
@@ -303,8 +303,8 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
               <div className="space-y-2">
                 <Label className="text-gray-300 text-sm sm:text-base">Categoria</Label>
                 <Input 
-                  value={(form as any).category || ''} 
-                  onChange={e => update('category' as any, e.target.value)} 
+                  value={form.category || ''} 
+                  onChange={e => update('category', e.target.value)} 
                   className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
                   placeholder="Categoria do fornecedor"
                 />
