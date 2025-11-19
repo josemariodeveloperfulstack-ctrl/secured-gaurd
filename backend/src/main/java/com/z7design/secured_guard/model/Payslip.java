@@ -58,6 +58,16 @@ public class Payslip {
     @Column(nullable = false)
     private LocalDateTime processedAt;
     
+    // TASK 02: Campos financeiros para comparação de holerites
+    @Column(name = "total_earnings", precision = 15, scale = 2)
+    private java.math.BigDecimal totalEarnings;
+    
+    @Column(name = "total_deductions", precision = 15, scale = 2)
+    private java.math.BigDecimal totalDeductions;
+    
+    @Column(name = "net_value", precision = 15, scale = 2)
+    private java.math.BigDecimal netValue;
+    
     @PrePersist
     protected void onCreate() {
         processedAt = LocalDateTime.now();

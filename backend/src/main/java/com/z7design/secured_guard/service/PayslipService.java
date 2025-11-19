@@ -617,6 +617,88 @@ public class PayslipService {
             workPostName = searchForLabeledWorkPost(linhas);
         }
 
+        // 3.5. TASK 02: EXTRAÇÃO DE VALORES FINANCEIROS (Total Vencimentos, Total Descontos, Valor Líquido)
+        java.math.BigDecimal totalVencimentos = null;
+        java.math.BigDecimal totalDescontos = null;
+        java.math.BigDecimal valorLiquido = null;
+        
+        // Extrair Total Vencimentos
+        // Padrões: "Total Vencimentos: 1.912,65", "TOTAL VENCIMENTOS 1.912,65", "Total Ganhos: 1.912,65"
+        Pattern totalVencimentosPattern = Pattern.compile("(?i)(?:TOTAL\\s+VENCIMENTOS?|VENCIMENTOS?\\s+TOTAL|TOTAL\\s+GANHOS?)\\s*:?\\s*([\\d.]+[,.]\\d{2}|[\\d.]+)", Pattern.CASE_INSENSITIVE);
+        for (String linha : linhas) {
+            Matcher matcher = totalVencimentosPattern.matcher(linha);
+            if (matcher.find()) {
+                try {
+                    String valorStr = matcher.group(1);
+                    // Formato brasileiro: 1.912,65 -> 1912.65
+                    // Se tem ponto e vírgula: remover pontos e substituir vírgula por ponto
+                    if (valorStr.contains(",") && valorStr.contains(".")) {
+                        valorStr = valorStr.replace(".", "").replace(",", ".");
+                    } else if (valorStr.contains(",") && !valorStr.contains(".")) {
+                        // Apenas vírgula: substituir por ponto
+                        valorStr = valorStr.replace(",", ".");
+                    }
+                    totalVencimentos = new java.math.BigDecimal(valorStr);
+                    log.info("✅ Total Vencimentos encontrado: {} (linha: {})", totalVencimentos, linha.trim());
+                    break;
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao extrair Total Vencimentos da linha '{}': {}", linha.trim(), e.getMessage());
+                }
+            }
+        }
+        
+        // Extrair Total Descontos
+        // Padrões: "Total Descontos: 500,65", "TOTAL DESCONTOS 500,65"
+        Pattern totalDescontosPattern = Pattern.compile("(?i)(?:TOTAL\\s+DESCONTOS?|DESCONTOS?\\s+TOTAL)\\s*:?\\s*([\\d.]+[,.]\\d{2}|[\\d.]+)", Pattern.CASE_INSENSITIVE);
+        for (String linha : linhas) {
+            Matcher matcher = totalDescontosPattern.matcher(linha);
+            if (matcher.find()) {
+                try {
+                    String valorStr = matcher.group(1);
+                    // Formato brasileiro: 500,65 -> 500.65
+                    if (valorStr.contains(",") && valorStr.contains(".")) {
+                        valorStr = valorStr.replace(".", "").replace(",", ".");
+                    } else if (valorStr.contains(",") && !valorStr.contains(".")) {
+                        valorStr = valorStr.replace(",", ".");
+                    }
+                    totalDescontos = new java.math.BigDecimal(valorStr);
+                    log.info("✅ Total Descontos encontrado: {} (linha: {})", totalDescontos, linha.trim());
+                    break;
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao extrair Total Descontos da linha '{}': {}", linha.trim(), e.getMessage());
+                }
+            }
+        }
+        
+        // Extrair Valor Líquido
+        // Padrões: "Valor Líquido: 1.412,00", "VALOR LÍQUIDO 1.412,00", "Líquido: 1.412,00"
+        Pattern valorLiquidoPattern = Pattern.compile("(?i)(?:VALOR\\s+L[IÍ]QUIDO|L[IÍ]QUIDO|VALOR\\s+FINAL|VALOR\\s+A\\s+RECEBER)\\s*:?\\s*([\\d.]+[,.]\\d{2}|[\\d.]+)", Pattern.CASE_INSENSITIVE);
+        for (String linha : linhas) {
+            Matcher matcher = valorLiquidoPattern.matcher(linha);
+            if (matcher.find()) {
+                try {
+                    String valorStr = matcher.group(1);
+                    // Formato brasileiro: 1.412,00 -> 1412.00
+                    if (valorStr.contains(",") && valorStr.contains(".")) {
+                        valorStr = valorStr.replace(".", "").replace(",", ".");
+                    } else if (valorStr.contains(",") && !valorStr.contains(".")) {
+                        valorStr = valorStr.replace(",", ".");
+                    }
+                    valorLiquido = new java.math.BigDecimal(valorStr);
+                    log.info("✅ Valor Líquido encontrado: {} (linha: {})", valorLiquido, linha.trim());
+                    break;
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao extrair Valor Líquido da linha '{}': {}", linha.trim(), e.getMessage());
+                }
+            }
+        }
+        
+        // Se não encontrou Valor Líquido diretamente, calcular como diferença (Total Vencimentos - Total Descontos)
+        if (valorLiquido == null && totalVencimentos != null && totalDescontos != null) {
+            valorLiquido = totalVencimentos.subtract(totalDescontos);
+            log.info("📊 Valor Líquido calculado: {} ({} - {})", valorLiquido, totalVencimentos, totalDescontos);
+        }
+
         // 4. VALIDAÇÕES FINAIS
         if (cpf == null || cpf.length() != 11) {
             log.warn("❌ CPF inválido ou não encontrado - Página: {}, CPF extraído: {}", pageNumber, cpf);
@@ -650,6 +732,11 @@ public class PayslipService {
             
             log.info("✅ Dados extraídos com sucesso - Página: {}, Código: {}, Nome: {}, CPF: {}, Empresa: {} (CNPJ: {}), Período de Referência: {}/{}", 
                     pageNumber, codigo, nome, cpf, empresaNome, empresaCnpj, mes, ano);
+            
+            if (totalVencimentos != null || totalDescontos != null || valorLiquido != null) {
+                log.info("💰 Valores financeiros extraídos - Vencimentos: {}, Descontos: {}, Líquido: {}", 
+                        totalVencimentos, totalDescontos, valorLiquido);
+            }
 
             return Payslip.builder()
                     .employeeName(nome)
@@ -659,6 +746,9 @@ public class PayslipService {
                     .workPostName(workPostName)
                     .month(mesInt)
                     .year(anoInt)
+                    .totalEarnings(totalVencimentos)
+                    .totalDeductions(totalDescontos)
+                    .netValue(valorLiquido)
                     .build();
                     
         } catch (NumberFormatException e) {
@@ -1742,6 +1832,52 @@ public class PayslipService {
                     result.addDifference("Nome do arquivo (base)", baseNameExisting, baseNameNew);
                 }
             }
+        }
+        
+        // 4. TASK 02: Comparar valores financeiros (camada adicional de verificação)
+        // Comparar Total Vencimentos
+        if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() != null) {
+            if (existing.getTotalEarnings().compareTo(newPayslip.getTotalEarnings()) != 0) {
+                result.addDifference("Total Vencimentos", 
+                    existing.getTotalEarnings().toString(), 
+                    newPayslip.getTotalEarnings().toString());
+                log.info("💰 Diferença detectada em Total Vencimentos: {} vs {}", 
+                    existing.getTotalEarnings(), newPayslip.getTotalEarnings());
+            }
+        } else if (existing.getTotalEarnings() == null && newPayslip.getTotalEarnings() != null) {
+            result.addDifference("Total Vencimentos", "não disponível", newPayslip.getTotalEarnings().toString());
+        } else if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() == null) {
+            result.addDifference("Total Vencimentos", existing.getTotalEarnings().toString(), "não disponível");
+        }
+        
+        // Comparar Total Descontos
+        if (existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() != null) {
+            if (existing.getTotalDeductions().compareTo(newPayslip.getTotalDeductions()) != 0) {
+                result.addDifference("Total Descontos", 
+                    existing.getTotalDeductions().toString(), 
+                    newPayslip.getTotalDeductions().toString());
+                log.info("💰 Diferença detectada em Total Descontos: {} vs {}", 
+                    existing.getTotalDeductions(), newPayslip.getTotalDeductions());
+            }
+        } else if (existing.getTotalDeductions() == null && newPayslip.getTotalDeductions() != null) {
+            result.addDifference("Total Descontos", "não disponível", newPayslip.getTotalDeductions().toString());
+        } else if (existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() == null) {
+            result.addDifference("Total Descontos", existing.getTotalDeductions().toString(), "não disponível");
+        }
+        
+        // Comparar Valor Líquido
+        if (existing.getNetValue() != null && newPayslip.getNetValue() != null) {
+            if (existing.getNetValue().compareTo(newPayslip.getNetValue()) != 0) {
+                result.addDifference("Valor Líquido", 
+                    existing.getNetValue().toString(), 
+                    newPayslip.getNetValue().toString());
+                log.info("💰 Diferença detectada em Valor Líquido: {} vs {}", 
+                    existing.getNetValue(), newPayslip.getNetValue());
+            }
+        } else if (existing.getNetValue() == null && newPayslip.getNetValue() != null) {
+            result.addDifference("Valor Líquido", "não disponível", newPayslip.getNetValue().toString());
+        } else if (existing.getNetValue() != null && newPayslip.getNetValue() == null) {
+            result.addDifference("Valor Líquido", existing.getNetValue().toString(), "não disponível");
         }
         
         return result;
