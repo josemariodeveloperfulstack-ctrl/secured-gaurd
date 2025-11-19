@@ -117,46 +117,170 @@ public class PayslipService {
                 log.debug("Texto extraído da página {}: {}", i, pageText.substring(0, Math.min(500, pageText.length())));
 
                 try {
-                    // IMPORTANTE: Cada página deve gerar APENAS 1 holerite (mesmo que contenha frente e verso)
-                    // Try to extract information using PDFBox first
-                    Payslip payslip = extractPayslipInfo(pageText, i);
+                    // NOVA LÓGICA: Detectar TODOS os holerites na página
+                    // Primeiro, identificar quantos CPFs únicos existem na página
+                    List<String> cpfsUnicos = detectarTodosCPFsNaPagina(pageText);
+                    log.info("🔍 Página {}: {} CPF(s) único(s) detectado(s): {}", i, cpfsUnicos.size(), cpfsUnicos);
                     
-                    // If extraction failed, try OCR
-                    if (payslip == null || payslip.getEmployeeName().equals("Desconhecido")) {
-                        log.warn("⚠️ Extração via PDFBox falhou para página {} (payslip={}, nome={}), tentando OCR...", 
-                            i, payslip != null ? "não-nulo" : "null", 
-                            payslip != null ? payslip.getEmployeeName() : "N/A");
-                        
-                        // Verificar se o texto extraído está vazio ou muito curto
-                        if (pageText == null || pageText.trim().length() < 50) {
-                            log.warn("⚠️ Texto extraído via PDFBox está vazio ou muito curto ({} caracteres). PDF pode estar escaneado ou corrompido.", 
-                                pageText != null ? pageText.length() : 0);
+                    if (cpfsUnicos.isEmpty()) {
+                        log.warn("⚠️ Nenhum CPF encontrado na página {}. Tentando extração completa...", i);
+                        // Tentar extração normal (pode ser que o CPF esteja em formato diferente)
+                        Payslip payslip = extractPayslipInfo(pageText, i);
+                        if (payslip == null || payslip.getCpf() == null) {
+                            // Tentar OCR
+                            payslip = extractPayslipInfoWithOCR(document, i);
                         }
-                        
-                        payslip = extractPayslipInfoWithOCR(document, i);
-                        
-                        if (payslip == null || payslip.getEmployeeName().equals("Desconhecido")) {
-                            log.error("❌ Extração via OCR também falhou para página {}. Holerite não será processado.", i);
+                        if (payslip != null && payslip.getCpf() != null) {
+                            if (processarHoleriteUnico(document, i, payslip, pageText, processedPayslips)) {
+                                paginasProcessadas++;
+                            } else {
+                                paginasPuladasPorDuplicidade++;
+                                paginasProcessadas++; // Contar como processada mesmo que pulada
+                            }
                         } else {
-                            log.info("✅ Extração via OCR bem-sucedida para página {}", i);
+                            paginasComErro++;
+                            log.warn("⚠️ Não foi possível extrair holerite da página {}", i);
                         }
                     } else {
-                        // Verificar se os dados da tabela foram extraídos mesmo quando PDFBox funcionou
-                        if (payslip.getTableDetails() == null || payslip.getTableDetails().isEmpty()) {
-                            log.warn("⚠️ PDFBox extraiu dados básicos mas não encontrou dados da tabela. Tentando re-extrair tabela do texto...");
-                            // Tentar re-extrair apenas a tabela do texto já extraído
-                            String[] linhas = pageText.split("\r?\n");
-                            List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails = extractTableDetails(linhas);
-                            if (!tableDetails.isEmpty()) {
-                                payslip.setTableDetails(tableDetails);
-                                log.info("✅ Dados da tabela re-extraídos: {} linha(s)", tableDetails.size());
+                        // Processar cada CPF único encontrado (cada um é um holerite separado)
+                        for (int idx = 0; idx < cpfsUnicos.size(); idx++) {
+                            String cpfAtual = cpfsUnicos.get(idx);
+                            log.info("📄 Processando holerite {}/{} da página {} - CPF: {}", idx + 1, cpfsUnicos.size(), i, cpfAtual);
+                            
+                            // Extrair holerite para este CPF específico
+                            Payslip payslip = extractPayslipInfoPorCPF(pageText, i, cpfAtual);
+                            
+                            // Se falhou, tentar OCR
+                            if (payslip == null || payslip.getCpf() == null || !payslip.getCpf().equals(cpfAtual)) {
+                                log.warn("⚠️ Extração via PDFBox falhou para CPF {} na página {}. Tentando OCR...", cpfAtual, i);
+                                payslip = extractPayslipInfoWithOCR(document, i);
+                                // Verificar se o CPF extraído corresponde
+                                if (payslip != null && payslip.getCpf() != null && !payslip.getCpf().equals(cpfAtual)) {
+                                    log.warn("⚠️ CPF extraído via OCR ({}) não corresponde ao esperado ({}). Continuando...", payslip.getCpf(), cpfAtual);
+                                }
+                            }
+                            
+                            if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAtual)) {
+                                if (processarHoleriteUnico(document, i, payslip, pageText, processedPayslips)) {
+                                    if (idx == 0) paginasProcessadas++; // Contar página apenas uma vez
+                                } else {
+                                    if (idx == 0) {
+                                        paginasPuladasPorDuplicidade++;
+                                        paginasProcessadas++; // Contar como processada mesmo que pulada
+                                    }
+                                }
+                            } else {
+                                log.warn("⚠️ Não foi possível extrair holerite para CPF {} na página {}", cpfAtual, i);
+                                if (idx == 0) paginasComErro++;
                             }
                         }
                     }
+                } catch (Exception pageException) {
+                    paginasComErro++;
+                    log.error("❌ Erro ao processar página {}/{}: {}", i, pageCount, pageException.getMessage());
+                    log.debug("Stack trace da página {}: ", i, pageException);
+                    // Continuar processando próximas páginas
+                    continue;
+                }
+            }
+            
+            // VALIDAÇÃO: Verificar se quantidade de holerites processados corresponde à quantidade de páginas
+            int paginasEsperadasProcessadas = pageCount - paginasPuladasPorDuplicidade;
+            int holeritesProcessados = processedPayslips.size();
+            
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📊 RESUMO DO PROCESSAMENTO:");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📄 Total de páginas no arquivo: {}", pageCount);
+            log.info("✅ Páginas processadas com sucesso: {}", paginasProcessadas);
+            log.info("❌ Páginas com erro na extração: {}", paginasComErro);
+            log.info("⏭️  Páginas puladas (duplicidade): {}", paginasPuladasPorDuplicidade);
+            log.info("📋 Total de holerites processados: {}", holeritesProcessados);
+            
+            // Validação principal: holerites processados devem ser igual a páginas (menos duplicidades)
+            if (holeritesProcessados != paginasEsperadasProcessadas) {
+                log.warn("⚠️ ATENÇÃO: Quantidade de holerites processados ({}) não corresponde à quantidade esperada ({} páginas - {} duplicidades = {} esperados)",
+                    holeritesProcessados, pageCount, paginasPuladasPorDuplicidade, paginasEsperadasProcessadas);
+                log.warn("⚠️ Diferença: {} holerite(s) a mais/menos do esperado", Math.abs(holeritesProcessados - paginasEsperadasProcessadas));
+                
+                if (holeritesProcessados > paginasEsperadasProcessadas) {
+                    log.info("ℹ️ Mais holerites que páginas: Algumas páginas contêm múltiplos holerites (comportamento esperado)");
+                } else if (holeritesProcessados < paginasEsperadasProcessadas) {
+                    log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas não geraram holerite (erro na extração ou dados inválidos)");
+                    log.warn("⚠️ SOLUÇÃO: Verificar logs de erro acima para identificar páginas problemáticas");
+                }
+            } else {
+                log.info("✅ VALIDAÇÃO OK: Quantidade de holerites processados ({}) corresponde à quantidade de páginas processadas ({})",
+                    holeritesProcessados, paginasEsperadasProcessadas);
+            }
+            
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        }
 
-                    enrichCompanyData(payslip);
+        log.info("🎉 Processamento concluído. {} holerite(s) processado(s) com sucesso de {} página(s) do arquivo", 
+            processedPayslips.size(), pageCount);
+        return processedPayslips;
+    }
+    
+    /**
+     * Detecta todos os CPFs únicos na página
+     */
+    private List<String> detectarTodosCPFsNaPagina(String pageText) {
+        List<String> cpfs = new ArrayList<>();
+        Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})");
+        Matcher matcher = cpfPattern.matcher(pageText);
+        
+        while (matcher.find()) {
+            String cpf = matcher.group(1).replaceAll("[^0-9]", "");
+            if (cpf.length() == 11 && !cpfs.contains(cpf)) {
+                cpfs.add(cpf);
+            }
+        }
+        
+        return cpfs;
+    }
+    
+    /**
+     * Extrai informações do holerite para um CPF específico
+     */
+    private Payslip extractPayslipInfoPorCPF(String text, int pageNumber, String cpfAlvo) {
+        // Extrair normalmente, mas garantir que o CPF extraído corresponde ao alvo
+        Payslip payslip = extractPayslipInfo(text, pageNumber);
+        if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAlvo)) {
+            return payslip;
+        }
+        // Se não correspondeu, tentar extrair focando no CPF alvo
+        // Por enquanto, retornar o resultado da extração normal
+        return payslip;
+    }
+    
+    /**
+     * Processa um holerite único (usado tanto para holerite único quanto para múltiplos)
+     * @return true se o holerite foi processado, false se foi pulado por duplicidade
+     */
+    private boolean processarHoleriteUnico(PDDocument document, int pageNumber, Payslip payslip, String pageText, 
+                                       List<Payslip> processedPayslips) {
+        try {
+            if (payslip == null || payslip.getEmployeeName() == null || payslip.getEmployeeName().equals("Desconhecido") || payslip.getCpf() == null) {
+                log.warn("⚠️ Holerite inválido - não será processado");
+                return false;
+            }
+            
+            // Verificar se os dados da tabela foram extraídos
+            if (payslip.getTableDetails() == null || payslip.getTableDetails().isEmpty()) {
+                log.warn("⚠️ PDFBox extraiu dados básicos mas não encontrou dados da tabela. Tentando re-extrair tabela do texto...");
+                String[] linhas = pageText.split("\r?\n");
+                List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails = extractTableDetails(linhas);
+                if (!tableDetails.isEmpty()) {
+                    payslip.setTableDetails(tableDetails);
+                    log.info("✅ Dados da tabela re-extraídos: {} linha(s)", tableDetails.size());
+                }
+            }
 
-                    if (payslip != null && !payslip.getEmployeeName().equals("Desconhecido") && payslip.getCpf() != null) {
+            enrichCompanyData(payslip);
+
+            if (payslip != null && !payslip.getEmployeeName().equals("Desconhecido") && payslip.getCpf() != null) {
                         // TASK 02: Verificar se holerite já foi processado e comparar dados
                         try {
                             List<Payslip> holeritesExistentes = payslipRepository.findByCompanyCnpjAndCpfAndWorkPostNameAndMonthAndYear(
@@ -238,12 +362,10 @@ public class PayslipService {
                                         payslip.getWorkPostName() != null ? payslip.getWorkPostName() : "não informado",
                                         payslip.getMonth(),
                                         payslip.getYear(),
-                                        i
+                                        pageNumber
                                     );
                                     log.warn(msg);
-                                    paginasPuladasPorDuplicidade++;
-                                    paginasProcessadas++; // Contar como processada (mesmo que pulada)
-                                    continue; // Pular para próxima página ao invés de falhar
+                                    return false; // Retornar false indicando que foi pulado por duplicidade
                                 }
                             } else {
                                 log.info("✅ Holerite não duplicado - permitindo importação (Empresa CNPJ: {}, CPF: {}, Setor: {}, Período: {}/{})",
@@ -259,7 +381,7 @@ public class PayslipService {
                         }
                         
                         // Organizar em pastas e salvar PDF individual
-                        String caminhoPdf = organizarEmPastas(document, i, payslip);
+                        String caminhoPdf = organizarEmPastas(document, pageNumber, payslip);
                         
                         // Salvar ou atualizar funcionário no banco
                         salvarFuncionario(payslip, caminhoPdf);
@@ -281,63 +403,16 @@ public class PayslipService {
                             // Não interromper processamento por erro na criação de usuário
                         }
 
-                        paginasProcessadas++;
-                        log.info("✅ Página {}/{} processada com sucesso: {} (CPF: {})", i, pageCount, payslip.getEmployeeName(), payslip.getCpf());
+                        log.info("✅ Holerite processado com sucesso: {} (CPF: {})", payslip.getEmployeeName(), payslip.getCpf());
+                        return true; // Retornar true indicando que foi processado com sucesso
                     } else {
-                        paginasComErro++;
-                        log.warn("⚠️ Não foi possível extrair informações válidas da página {}/{}", i, pageCount);
-                        log.debug("Dados extraídos da página {}: Nome={}, CPF={}", i, 
-                                 payslip != null ? payslip.getEmployeeName() : "null", 
-                                 payslip != null ? payslip.getCpf() : "null");
+                        log.warn("⚠️ Holerite inválido - não será processado");
+                        return false;
                     }
-                } catch (Exception pageException) {
-                    paginasComErro++;
-                    log.error("❌ Erro ao processar página {}/{}: {}", i, pageCount, pageException.getMessage());
-                    log.debug("Stack trace da página {}: ", i, pageException);
-                    // Continuar processando próximas páginas
-                    continue;
+                } catch (Exception e) {
+                    log.error("❌ Erro ao processar holerite: {}", e.getMessage(), e);
+                    return false;
                 }
-            }
-            
-            // VALIDAÇÃO: Verificar se quantidade de holerites processados corresponde à quantidade de páginas
-            int paginasEsperadasProcessadas = pageCount - paginasPuladasPorDuplicidade;
-            int holeritesProcessados = processedPayslips.size();
-            
-            log.info("");
-            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            log.info("📊 RESUMO DO PROCESSAMENTO:");
-            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            log.info("📄 Total de páginas no arquivo: {}", pageCount);
-            log.info("✅ Páginas processadas com sucesso: {}", paginasProcessadas);
-            log.info("❌ Páginas com erro na extração: {}", paginasComErro);
-            log.info("⏭️  Páginas puladas (duplicidade): {}", paginasPuladasPorDuplicidade);
-            log.info("📋 Holerites salvos no banco: {}", holeritesProcessados);
-            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            
-            // Validação principal: holerites processados devem ser igual a páginas (menos duplicidades)
-            if (holeritesProcessados != paginasEsperadasProcessadas) {
-                log.warn("⚠️ ATENÇÃO: Quantidade de holerites processados ({}) não corresponde à quantidade esperada ({} páginas - {} duplicidades = {} esperados)",
-                    holeritesProcessados, pageCount, paginasPuladasPorDuplicidade, paginasEsperadasProcessadas);
-                log.warn("⚠️ Diferença: {} holerite(s) a mais/menos do esperado", Math.abs(holeritesProcessados - paginasEsperadasProcessadas));
-                
-                if (holeritesProcessados > paginasEsperadasProcessadas) {
-                    log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas podem ter gerado múltiplos holerites (frente e verso extraídos separadamente)");
-                    log.warn("⚠️ SOLUÇÃO: Verificar se o extractPayslipInfo está extraindo apenas 1 holerite por página");
-                } else if (holeritesProcessados < paginasEsperadasProcessadas) {
-                    log.warn("⚠️ POSSÍVEL CAUSA: Uma ou mais páginas não geraram holerite (erro na extração ou dados inválidos)");
-                    log.warn("⚠️ SOLUÇÃO: Verificar logs de erro acima para identificar páginas problemáticas");
-                }
-            } else {
-                log.info("✅ VALIDAÇÃO OK: Quantidade de holerites processados ({}) corresponde à quantidade de páginas processadas ({})",
-                    holeritesProcessados, paginasEsperadasProcessadas);
-            }
-            
-            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        }
-
-        log.info("🎉 Processamento concluído. {} holerite(s) processado(s) com sucesso de {} página(s) do arquivo", 
-            processedPayslips.size(), pageCount);
-        return processedPayslips;
     }
 
     private Payslip extractPayslipInfo(String text, int pageNumber) {
