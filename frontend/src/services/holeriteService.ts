@@ -92,7 +92,8 @@ export interface CompanyTypeOrganizationResponse {
   totalCompanies: number;
   totalSectors: number;
   terceirizacao: CompanyTypeGroup;
-  vigilanciaAdm: CompanyTypeGroup;
+  vigilancia: CompanyTypeGroup;
+  administrativo: CompanyTypeGroup;
 }
 
 export interface CompanyTypeGroup {

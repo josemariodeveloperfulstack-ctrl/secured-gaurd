@@ -348,7 +348,7 @@ const Holerites: React.FC = () => {
   const [loadingCompanyTypeOrganization, setLoadingCompanyTypeOrganization] = useState(false);
   const [companyTypeOrganizationError, setCompanyTypeOrganizationError] = useState<string | null>(null);
   const [expandedCompanyTypeCompanies, setExpandedCompanyTypeCompanies] = useState<Record<string, boolean>>({});
-  const [activeCompanyTypeTab, setActiveCompanyTypeTab] = useState<'terceirizacao' | 'vigilancia-adm'>('terceirizacao');
+  const [activeCompanyTypeTab, setActiveCompanyTypeTab] = useState<'terceirizacao' | 'vigilancia' | 'administrativo'>('terceirizacao');
   const [expandedSectors, setExpandedSectors] = useState<Record<string, boolean>>({});
   const [expandedPeriods, setExpandedPeriods] = useState<Record<string, boolean>>({});
 
@@ -4501,6 +4501,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             <TabsTrigger value="recibos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Comprovantes
             </TabsTrigger>
+            <TabsTrigger value="empresas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+              Empresas
+            </TabsTrigger>
             <TabsTrigger value="logs-envio" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Logs
             </TabsTrigger>
@@ -4509,9 +4512,6 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             </TabsTrigger>
             <TabsTrigger value="unificados-por-setor" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
               Por Setor
-            </TabsTrigger>
-            <TabsTrigger value="empresas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-              Empresas
             </TabsTrigger>
           </TabsList>
             
@@ -5954,14 +5954,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Sub-abas: Terceirização e Vigilância e ADM */}
-                <Tabs value={activeCompanyTypeTab} onValueChange={(value) => setActiveCompanyTypeTab(value as 'terceirizacao' | 'vigilancia-adm')} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border-gray-600">
+                {/* Sub-abas: Terceirização, Vigilância e Administrativo */}
+                <Tabs value={activeCompanyTypeTab} onValueChange={(value) => setActiveCompanyTypeTab(value as 'terceirizacao' | 'vigilancia' | 'administrativo')} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border-gray-600">
                     <TabsTrigger value="terceirizacao" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
                       Terceirização
                     </TabsTrigger>
-                    <TabsTrigger value="vigilancia-adm" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                      Vigilância e ADM
+                    <TabsTrigger value="vigilancia" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                      Vigilância
+                    </TabsTrigger>
+                    <TabsTrigger value="administrativo" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                      Administrativo
                     </TabsTrigger>
                   </TabsList>
 
@@ -5970,9 +5973,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     {renderCompanyTypeOrganizations(companyTypeOrganizationData?.terceirizacao, 'terceirizacao')}
                   </TabsContent>
 
-                  {/* Conteúdo: Vigilância e ADM */}
-                  <TabsContent value="vigilancia-adm" className="space-y-6 mt-6">
-                    {renderCompanyTypeOrganizations(companyTypeOrganizationData?.vigilanciaAdm, 'vigilancia-adm')}
+                  {/* Conteúdo: Vigilância */}
+                  <TabsContent value="vigilancia" className="space-y-6 mt-6">
+                    {renderCompanyTypeOrganizations(companyTypeOrganizationData?.vigilancia, 'vigilancia')}
+                  </TabsContent>
+
+                  {/* Conteúdo: Administrativo */}
+                  <TabsContent value="administrativo" className="space-y-6 mt-6">
+                    {renderCompanyTypeOrganizations(companyTypeOrganizationData?.administrativo, 'administrativo')}
                   </TabsContent>
                 </Tabs>
               </div>

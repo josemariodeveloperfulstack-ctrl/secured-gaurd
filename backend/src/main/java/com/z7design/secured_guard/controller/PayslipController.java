@@ -292,16 +292,25 @@ public class PayslipController {
                 emptyTerceirizacao.setTotalSectors(0);
                 emptyTerceirizacao.setCompanies(Collections.emptyList());
                 
-                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
-                emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
-                emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
-                emptyVigilanciaAdm.setTotalCompanies(0);
-                emptyVigilanciaAdm.setTotalPayslips(0);
-                emptyVigilanciaAdm.setTotalSectors(0);
-                emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilancia = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyVigilancia.setTypeName("Vigilância");
+                emptyVigilancia.setTypeCode("VIGILANCIA");
+                emptyVigilancia.setTotalCompanies(0);
+                emptyVigilancia.setTotalPayslips(0);
+                emptyVigilancia.setTotalSectors(0);
+                emptyVigilancia.setCompanies(Collections.emptyList());
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyAdministrativo = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyAdministrativo.setTypeName("Administrativo");
+                emptyAdministrativo.setTypeCode("ADMINISTRATIVO");
+                emptyAdministrativo.setTotalCompanies(0);
+                emptyAdministrativo.setTotalPayslips(0);
+                emptyAdministrativo.setTotalSectors(0);
+                emptyAdministrativo.setCompanies(Collections.emptyList());
                 
                 emptyResponse.setTerceirizacao(emptyTerceirizacao);
-                emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+                emptyResponse.setVigilancia(emptyVigilancia);
+                emptyResponse.setAdministrativo(emptyAdministrativo);
                 return ResponseEntity.ok(emptyResponse);
             }
             
@@ -351,16 +360,25 @@ public class PayslipController {
                 emptyTerceirizacao.setTotalSectors(0);
                 emptyTerceirizacao.setCompanies(Collections.emptyList());
                 
-                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
-                emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
-                emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
-                emptyVigilanciaAdm.setTotalCompanies(0);
-                emptyVigilanciaAdm.setTotalPayslips(0);
-                emptyVigilanciaAdm.setTotalSectors(0);
-                emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilancia = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyVigilancia.setTypeName("Vigilância");
+                emptyVigilancia.setTypeCode("VIGILANCIA");
+                emptyVigilancia.setTotalCompanies(0);
+                emptyVigilancia.setTotalPayslips(0);
+                emptyVigilancia.setTotalSectors(0);
+                emptyVigilancia.setCompanies(Collections.emptyList());
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyAdministrativo = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyAdministrativo.setTypeName("Administrativo");
+                emptyAdministrativo.setTypeCode("ADMINISTRATIVO");
+                emptyAdministrativo.setTotalCompanies(0);
+                emptyAdministrativo.setTotalPayslips(0);
+                emptyAdministrativo.setTotalSectors(0);
+                emptyAdministrativo.setCompanies(Collections.emptyList());
                 
                 emptyResponse.setTerceirizacao(emptyTerceirizacao);
-                emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+                emptyResponse.setVigilancia(emptyVigilancia);
+                emptyResponse.setAdministrativo(emptyAdministrativo);
                 return ResponseEntity.ok(emptyResponse);
             } catch (Exception e) {
                 log.error("Erro ao organizar holerites por tipo: {}", e.getMessage(), e);
@@ -378,16 +396,25 @@ public class PayslipController {
                 emptyTerceirizacao.setTotalSectors(0);
                 emptyTerceirizacao.setCompanies(Collections.emptyList());
                 
-                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
-                emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
-                emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
-                emptyVigilanciaAdm.setTotalCompanies(0);
-                emptyVigilanciaAdm.setTotalPayslips(0);
-                emptyVigilanciaAdm.setTotalSectors(0);
-                emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilancia = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyVigilancia.setTypeName("Vigilância");
+                emptyVigilancia.setTypeCode("VIGILANCIA");
+                emptyVigilancia.setTotalCompanies(0);
+                emptyVigilancia.setTotalPayslips(0);
+                emptyVigilancia.setTotalSectors(0);
+                emptyVigilancia.setCompanies(Collections.emptyList());
+                
+                CompanyTypeOrganizationResponse.CompanyTypeGroup emptyAdministrativo = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+                emptyAdministrativo.setTypeName("Administrativo");
+                emptyAdministrativo.setTypeCode("ADMINISTRATIVO");
+                emptyAdministrativo.setTotalCompanies(0);
+                emptyAdministrativo.setTotalPayslips(0);
+                emptyAdministrativo.setTotalSectors(0);
+                emptyAdministrativo.setCompanies(Collections.emptyList());
                 
                 emptyResponse.setTerceirizacao(emptyTerceirizacao);
-                emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+                emptyResponse.setVigilancia(emptyVigilancia);
+                emptyResponse.setAdministrativo(emptyAdministrativo);
                 return ResponseEntity.ok(emptyResponse);
             }
         } catch (Exception e) {
@@ -406,16 +433,25 @@ public class PayslipController {
             emptyTerceirizacao.setTotalSectors(0);
             emptyTerceirizacao.setCompanies(Collections.emptyList());
             
-            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
-            emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
-            emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
-            emptyVigilanciaAdm.setTotalCompanies(0);
-            emptyVigilanciaAdm.setTotalPayslips(0);
-            emptyVigilanciaAdm.setTotalSectors(0);
-            emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilancia = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            emptyVigilancia.setTypeName("Vigilância");
+            emptyVigilancia.setTypeCode("VIGILANCIA");
+            emptyVigilancia.setTotalCompanies(0);
+            emptyVigilancia.setTotalPayslips(0);
+            emptyVigilancia.setTotalSectors(0);
+            emptyVigilancia.setCompanies(Collections.emptyList());
+            
+            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyAdministrativo = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            emptyAdministrativo.setTypeName("Administrativo");
+            emptyAdministrativo.setTypeCode("ADMINISTRATIVO");
+            emptyAdministrativo.setTotalCompanies(0);
+            emptyAdministrativo.setTotalPayslips(0);
+            emptyAdministrativo.setTotalSectors(0);
+            emptyAdministrativo.setCompanies(Collections.emptyList());
             
             emptyResponse.setTerceirizacao(emptyTerceirizacao);
-            emptyResponse.setVigilanciaAdm(emptyVigilanciaAdm);
+            emptyResponse.setVigilancia(emptyVigilancia);
+            emptyResponse.setAdministrativo(emptyAdministrativo);
             return ResponseEntity.ok(emptyResponse);
         }
     }

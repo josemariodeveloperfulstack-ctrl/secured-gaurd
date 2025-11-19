@@ -17,13 +17,14 @@ public class CompanyTypeOrganizationResponse {
     
     // Organização por tipo de empresa
     private CompanyTypeGroup terceirizacao;
-    private CompanyTypeGroup vigilanciaAdm;
+    private CompanyTypeGroup vigilancia;
+    private CompanyTypeGroup administrativo;
 
     @Data
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class CompanyTypeGroup {
         private String typeName;
-        private String typeCode; // "TERCEIRIZACAO" ou "VIGILANCIA_ADM"
+        private String typeCode; // "TERCEIRIZACAO", "VIGILANCIA" ou "ADMINISTRATIVO"
         private int totalCompanies;
         private long totalPayslips;
         private int totalSectors;

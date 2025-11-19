@@ -1774,19 +1774,23 @@ public class PayslipService {
 
             // Separar empresas por tipo
             List<CompanyTypeOrganizationResponse.CompanyGroup> terceirizacaoCompanies = new ArrayList<>();
-            List<CompanyTypeOrganizationResponse.CompanyGroup> vigilanciaAdmCompanies = new ArrayList<>();
+            List<CompanyTypeOrganizationResponse.CompanyGroup> vigilanciaCompanies = new ArrayList<>();
+            List<CompanyTypeOrganizationResponse.CompanyGroup> administrativoCompanies = new ArrayList<>();
             
             Set<String> terceirizacaoSectorKeys = new HashSet<>();
-            Set<String> vigilanciaAdmSectorKeys = new HashSet<>();
+            Set<String> vigilanciaSectorKeys = new HashSet<>();
+            Set<String> administrativoSectorKeys = new HashSet<>();
             long terceirizacaoTotalPayslips = 0;
-            long vigilanciaAdmTotalPayslips = 0;
+            long vigilanciaTotalPayslips = 0;
+            long administrativoTotalPayslips = 0;
 
             for (PayslipOrganizationResponse.CompanyGroup company : companyOrganization.getCompanies()) {
                 String sigla = company.getCompanySigla() != null ? company.getCompanySigla().toUpperCase() : "";
                 
-                // Determinar tipo de empresa: TERC = Terceirização, ADM/VIG = Vigilância e ADM
+                // Determinar tipo de empresa: TERC = Terceirização, VIG = Vigilância, ADM = Administrativo
                 boolean isTerceirizacao = sigla.equals("TERC");
-                boolean isVigilanciaAdm = sigla.equals("ADM") || sigla.equals("VIG") || sigla.isEmpty() || sigla.equals("OUTROS");
+                boolean isVigilancia = sigla.equals("VIG");
+                boolean isAdministrativo = sigla.equals("ADM") || sigla.isEmpty() || sigla.equals("OUTROS");
                 
                 // Converter para CompanyTypeOrganizationResponse.CompanyGroup
                 CompanyTypeOrganizationResponse.CompanyGroup typeCompanyGroup = convertToCompanyTypeGroup(company);
@@ -1801,15 +1805,26 @@ public class PayslipService {
                             terceirizacaoSectorKeys.add(company.getCompanySigla() + "|" + sector.getNormalizedSectorName());
                         }
                     }
-                } else if (isVigilanciaAdm) {
-                    // Se não for TERC, considerar como Vigilância e ADM (incluindo OUTROS)
-                    vigilanciaAdmCompanies.add(typeCompanyGroup);
-                    vigilanciaAdmTotalPayslips += company.getTotalPayslips();
+                } else if (isVigilancia) {
+                    // VIG = Vigilância
+                    vigilanciaCompanies.add(typeCompanyGroup);
+                    vigilanciaTotalPayslips += company.getTotalPayslips();
                     
                     // Contar setores únicos
                     if (company.getSectors() != null) {
                         for (PayslipOrganizationResponse.SectorGroup sector : company.getSectors()) {
-                            vigilanciaAdmSectorKeys.add(company.getCompanySigla() + "|" + sector.getNormalizedSectorName());
+                            vigilanciaSectorKeys.add(company.getCompanySigla() + "|" + sector.getNormalizedSectorName());
+                        }
+                    }
+                } else if (isAdministrativo) {
+                    // ADM ou OUTROS = Administrativo
+                    administrativoCompanies.add(typeCompanyGroup);
+                    administrativoTotalPayslips += company.getTotalPayslips();
+                    
+                    // Contar setores únicos
+                    if (company.getSectors() != null) {
+                        for (PayslipOrganizationResponse.SectorGroup sector : company.getSectors()) {
+                            administrativoSectorKeys.add(company.getCompanySigla() + "|" + sector.getNormalizedSectorName());
                         }
                     }
                 }
@@ -1822,7 +1837,13 @@ public class PayslipService {
                 return defaultString(a.getCompanyName(), "").compareToIgnoreCase(defaultString(b.getCompanyName(), ""));
             });
 
-            vigilanciaAdmCompanies.sort((a, b) -> {
+            vigilanciaCompanies.sort((a, b) -> {
+                int siglaCompare = defaultString(a.getCompanySigla(), "").compareToIgnoreCase(defaultString(b.getCompanySigla(), ""));
+                if (siglaCompare != 0) return siglaCompare;
+                return defaultString(a.getCompanyName(), "").compareToIgnoreCase(defaultString(b.getCompanyName(), ""));
+            });
+
+            administrativoCompanies.sort((a, b) -> {
                 int siglaCompare = defaultString(a.getCompanySigla(), "").compareToIgnoreCase(defaultString(b.getCompanySigla(), ""));
                 if (siglaCompare != 0) return siglaCompare;
                 return defaultString(a.getCompanyName(), "").compareToIgnoreCase(defaultString(b.getCompanyName(), ""));
@@ -1837,22 +1858,33 @@ public class PayslipService {
             terceirizacaoGroup.setTotalSectors(terceirizacaoSectorKeys.size());
             terceirizacaoGroup.setCompanies(terceirizacaoCompanies);
 
-            CompanyTypeOrganizationResponse.CompanyTypeGroup vigilanciaAdmGroup = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
-            vigilanciaAdmGroup.setTypeName("Vigilância e ADM");
-            vigilanciaAdmGroup.setTypeCode("VIGILANCIA_ADM");
-            vigilanciaAdmGroup.setTotalCompanies(vigilanciaAdmCompanies.size());
-            vigilanciaAdmGroup.setTotalPayslips(vigilanciaAdmTotalPayslips);
-            vigilanciaAdmGroup.setTotalSectors(vigilanciaAdmSectorKeys.size());
-            vigilanciaAdmGroup.setCompanies(vigilanciaAdmCompanies);
+            CompanyTypeOrganizationResponse.CompanyTypeGroup vigilanciaGroup = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            vigilanciaGroup.setTypeName("Vigilância");
+            vigilanciaGroup.setTypeCode("VIGILANCIA");
+            vigilanciaGroup.setTotalCompanies(vigilanciaCompanies.size());
+            vigilanciaGroup.setTotalPayslips(vigilanciaTotalPayslips);
+            vigilanciaGroup.setTotalSectors(vigilanciaSectorKeys.size());
+            vigilanciaGroup.setCompanies(vigilanciaCompanies);
+
+            CompanyTypeOrganizationResponse.CompanyTypeGroup administrativoGroup = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            administrativoGroup.setTypeName("Administrativo");
+            administrativoGroup.setTypeCode("ADMINISTRATIVO");
+            administrativoGroup.setTotalCompanies(administrativoCompanies.size());
+            administrativoGroup.setTotalPayslips(administrativoTotalPayslips);
+            administrativoGroup.setTotalSectors(administrativoSectorKeys.size());
+            administrativoGroup.setCompanies(administrativoCompanies);
 
             response.setTerceirizacao(terceirizacaoGroup);
-            response.setVigilanciaAdm(vigilanciaAdmGroup);
+            response.setVigilancia(vigilanciaGroup);
+            response.setAdministrativo(administrativoGroup);
 
             log.info("📊 Organização por tipo concluída:");
             log.info("   Terceirização: {} empresa(s), {} setor(es), {} holerite(s)", 
                 terceirizacaoGroup.getTotalCompanies(), terceirizacaoGroup.getTotalSectors(), terceirizacaoGroup.getTotalPayslips());
-            log.info("   Vigilância e ADM: {} empresa(s), {} setor(es), {} holerite(s)", 
-                vigilanciaAdmGroup.getTotalCompanies(), vigilanciaAdmGroup.getTotalSectors(), vigilanciaAdmGroup.getTotalPayslips());
+            log.info("   Vigilância: {} empresa(s), {} setor(es), {} holerite(s)", 
+                vigilanciaGroup.getTotalCompanies(), vigilanciaGroup.getTotalSectors(), vigilanciaGroup.getTotalPayslips());
+            log.info("   Administrativo: {} empresa(s), {} setor(es), {} holerite(s)", 
+                administrativoGroup.getTotalCompanies(), administrativoGroup.getTotalSectors(), administrativoGroup.getTotalPayslips());
 
             return response;
         } catch (Exception e) {
@@ -1866,16 +1898,25 @@ public class PayslipService {
             emptyTerceirizacao.setTotalSectors(0);
             emptyTerceirizacao.setCompanies(Collections.emptyList());
 
-            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilanciaAdm = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
-            emptyVigilanciaAdm.setTypeName("Vigilância e ADM");
-            emptyVigilanciaAdm.setTypeCode("VIGILANCIA_ADM");
-            emptyVigilanciaAdm.setTotalCompanies(0);
-            emptyVigilanciaAdm.setTotalPayslips(0);
-            emptyVigilanciaAdm.setTotalSectors(0);
-            emptyVigilanciaAdm.setCompanies(Collections.emptyList());
+            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyVigilancia = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            emptyVigilancia.setTypeName("Vigilância");
+            emptyVigilancia.setTypeCode("VIGILANCIA");
+            emptyVigilancia.setTotalCompanies(0);
+            emptyVigilancia.setTotalPayslips(0);
+            emptyVigilancia.setTotalSectors(0);
+            emptyVigilancia.setCompanies(Collections.emptyList());
+
+            CompanyTypeOrganizationResponse.CompanyTypeGroup emptyAdministrativo = new CompanyTypeOrganizationResponse.CompanyTypeGroup();
+            emptyAdministrativo.setTypeName("Administrativo");
+            emptyAdministrativo.setTypeCode("ADMINISTRATIVO");
+            emptyAdministrativo.setTotalCompanies(0);
+            emptyAdministrativo.setTotalPayslips(0);
+            emptyAdministrativo.setTotalSectors(0);
+            emptyAdministrativo.setCompanies(Collections.emptyList());
 
             response.setTerceirizacao(emptyTerceirizacao);
-            response.setVigilanciaAdm(emptyVigilanciaAdm);
+            response.setVigilancia(emptyVigilancia);
+            response.setAdministrativo(emptyAdministrativo);
             response.setTotalPayslips(0);
             response.setTotalCompanies(0);
             response.setTotalSectors(0);
