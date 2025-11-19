@@ -786,19 +786,44 @@ public class PayslipService {
             log.info("📊 Valor Líquido calculado: {} ({} - {})", valorLiquido, totalVencimentos, totalDescontos);
         }
 
-        // 4. VALIDAÇÕES FINAIS
+        // 4. VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS
+        // Campos obrigatórios: Empresa, CNPJ, Período, Setor, Nome do Funcionário, CPF
+        List<String> camposFaltantes = new ArrayList<>();
+        
         if (cpf == null || cpf.length() != 11) {
+            camposFaltantes.add("CPF");
             log.warn("❌ CPF inválido ou não encontrado - Página: {}, CPF extraído: {}", pageNumber, cpf);
-            return null;
         }
         
         if (nome.equals("Desconhecido") || nome.trim().isEmpty()) {
+            camposFaltantes.add("Nome do Funcionário");
             log.warn("❌ Nome não encontrado - Página: {}", pageNumber);
-            return null;
+        }
+        
+        if (empresaNome == null || empresaNome.trim().isEmpty()) {
+            camposFaltantes.add("Empresa");
+            log.warn("❌ Nome da empresa não encontrado - Página: {}", pageNumber);
+        }
+        
+        if (empresaCnpj == null || empresaCnpj.trim().isEmpty() || empresaCnpj.replaceAll("[^0-9]", "").length() != 14) {
+            camposFaltantes.add("CNPJ");
+            log.warn("❌ CNPJ inválido ou não encontrado - Página: {}, CNPJ extraído: {}", pageNumber, empresaCnpj);
+        }
+        
+        if (workPostName == null || workPostName.trim().isEmpty()) {
+            camposFaltantes.add("Setor/Posto de Trabalho");
+            log.warn("❌ Setor/Posto de trabalho não encontrado - Página: {}", pageNumber);
         }
         
         if (mes == null || ano == null) {
+            camposFaltantes.add("Período (Mês/Ano)");
             log.warn("❌ Mês/ano de referência não encontrados - Página: {}", pageNumber);
+        }
+        
+        // Se algum campo obrigatório estiver faltando, retornar null
+        if (!camposFaltantes.isEmpty()) {
+            log.error("❌ CAMPOS OBRIGATÓRIOS FALTANDO na página {}: {}", pageNumber, String.join(", ", camposFaltantes));
+            log.error("❌ Holerite não será processado. Campos obrigatórios: Empresa, CNPJ, Período, Setor, Nome do Funcionário, CPF");
             return null;
         }
 
@@ -1248,12 +1273,21 @@ public class PayslipService {
     }
 
     private String organizarEmPastas(PDDocument document, int pageNumber, Payslip payslip) throws IOException {
-        // Criar estrutura de pastas: /holerites/MM-YYYY/
-        String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
-        Path pastaMesAno = Paths.get(OUTPUT_DIR, mesAno);
+        // Criar estrutura de pastas: Empresa/Setor/Ano/Mês/Funcionário/
+        // Normalizar nomes para evitar problemas com caracteres especiais
+        String empresaNome = normalizeFolderName(payslip.getCompanyName() != null ? payslip.getCompanyName() : "EMPRESA_NAO_INFORMADA");
+        String setorNome = normalizeFolderName(payslip.getWorkPostName() != null ? payslip.getWorkPostName() : "SETOR_NAO_INFORMADO");
+        String ano = String.valueOf(payslip.getYear());
+        String mes = String.format("%02d", payslip.getMonth());
+        String funcionarioNome = normalizeFolderName(payslip.getEmployeeName() != null ? payslip.getEmployeeName() : "FUNCIONARIO_NAO_INFORMADO");
+        
+        // Criar caminho completo: backend/holerites/Empresa/Setor/Ano/Mês/Funcionário/
+        Path pastaCompleta = Paths.get(OUTPUT_DIR, empresaNome, setorNome, ano, mes, funcionarioNome);
+        
         // Criar diretório se não existir
-        if (!Files.exists(pastaMesAno)) {
-            Files.createDirectories(pastaMesAno);
+        if (!Files.exists(pastaCompleta)) {
+            Files.createDirectories(pastaCompleta);
+            log.info("📁 Estrutura de pastas criada: {}", pastaCompleta);
         }
         
         // Usar nome de arquivo já definido ou gerar novo
@@ -1262,7 +1296,7 @@ public class PayslipService {
             nomeArquivo = generateFileName(payslip);
         }
         
-        Path caminhoCompleto = pastaMesAno.resolve(nomeArquivo);
+        Path caminhoCompleto = pastaCompleta.resolve(nomeArquivo);
         
         // TASK 02: Verificar se arquivo já existe (NUNCA sobrescrever - sempre gerar novo arquivo com versão)
         // Se já existe, adicionar versão automática para evitar sobrescrita
@@ -1283,7 +1317,7 @@ public class PayslipService {
                 nomeArquivo = baseName + "_V" + timestamp + ".pdf";
             }
             
-            caminhoCompleto = pastaMesAno.resolve(nomeArquivo);
+            caminhoCompleto = pastaCompleta.resolve(nomeArquivo);
             payslip.setFileName(nomeArquivo);
             tentativas++;
         }
@@ -1740,6 +1774,34 @@ public class PayslipService {
             .replaceAll("^_+", "")
             .replaceAll("_+$", "");
         return StringUtils.hasText(normalized) ? normalized : "SETOR_NAO_INFORMADO";
+    }
+    
+    /**
+     * Normaliza nome para uso em pastas do sistema de arquivos
+     * Remove acentos, caracteres especiais e limita tamanho
+     */
+    private String normalizeFolderName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "NAO_INFORMADO";
+        }
+        // Remover acentos
+        String normalized = Normalizer.normalize(name.trim(), Normalizer.Form.NFD)
+            .replaceAll("[\\p{M}]", "");
+        // Substituir caracteres especiais por underscore e manter apenas letras, números e espaços
+        normalized = normalized.replaceAll("[^a-zA-Z0-9\\s]", "_");
+        // Substituir múltiplos espaços/underscores por um único underscore
+        normalized = normalized.replaceAll("[\\s_]+", "_");
+        // Remover underscores no início e fim
+        normalized = normalized.replaceAll("^_+", "").replaceAll("_+$", "");
+        // Limitar tamanho (máximo 100 caracteres para evitar problemas com sistemas de arquivos)
+        if (normalized.length() > 100) {
+            normalized = normalized.substring(0, 100);
+        }
+        // Se ficou vazio após normalização, usar valor padrão
+        if (normalized.isEmpty()) {
+            return "NAO_INFORMADO";
+        }
+        return normalized.toUpperCase();
     }
 
     private String buildPeriodKey(Payslip payslip) {
