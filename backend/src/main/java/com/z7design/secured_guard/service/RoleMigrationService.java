@@ -29,7 +29,7 @@ public class RoleMigrationService {
     @Transactional
     public void migrateRolesOnStartup() {
         try {
-        log.info("Iniciando migração de roles do enum para entidades JPA...");
+            log.info("Iniciando migração de roles do enum para entidades JPA...");
             
             // Verificar se existem usuários antes de tentar migrar
             long userCount = userRepository.count();
@@ -38,10 +38,12 @@ public class RoleMigrationService {
                 return;
             }
             
-        migrateExistingUsers();
-        log.info("Migração de roles concluída com sucesso!");
+            migrateExistingUsers();
+            log.info("Migração de roles concluída com sucesso!");
         } catch (Exception e) {
-            log.error("Erro durante migração de roles: {}", e.getMessage(), e);
+            log.error("❌ Erro durante migração de roles: {}", e.getMessage(), e);
+            // Não re-lançar exceção para não crashar a aplicação
+            // A migração de roles não é crítica para o funcionamento básico
         }
     }
 
