@@ -494,71 +494,150 @@ const Treinamentos: React.FC = () => {
         </div>
 
         <Card className="bg-seguranca-graphite border-gray-700">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xl text-white">Mapa de treinamentos obrigatórios</CardTitle>
-              <CardDescription className="text-gray-400">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-lg sm:text-xl text-white">Mapa de treinamentos obrigatórios</CardTitle>
+              <CardDescription className="text-gray-400 text-sm mt-1">
                 Cadastre os cursos exigidos para vigilantes e acompanhe a quantidade de colaboradores cobertos.
               </CardDescription>
             </div>
-            <Button onClick={() => setTrainingModalOpen(true)} className="gap-2">
+            <Button 
+              onClick={() => setTrainingModalOpen(true)} 
+              className="gap-2 w-full sm:w-auto"
+              size="sm"
+            >
               <GraduationCap className="h-4 w-4" />
-              Novo treinamento
+              <span className="hidden sm:inline">Novo treinamento</span>
+              <span className="sm:hidden">Novo</span>
             </Button>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700 text-gray-400">
-                  <th className="py-3 text-left font-medium">Treinamento</th>
-                  <th className="py-3 text-left font-medium">Carga horária</th>
-                  <th className="py-3 text-left font-medium">Renovação</th>
-                  <th className="py-3 text-left font-medium">Cobertura</th>
-                  <th className="py-3 text-left font-medium">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trainings.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center text-gray-400">
-                      Nenhum treinamento cadastrado ainda.
-                    </td>
-                  </tr>
-                )}
-                {trainings.map((training) => {
-                  const stats = trainingStats.get(training.id) ?? { total: 0, expired: 0, dueSoon: 0, compliant: 0 };
-                  return (
-                    <tr key={training.id} className="border-b border-gray-800 last:border-0">
-                      <td className="py-3 align-top">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-white">{training.name}</span>
-                          {training.description && (
-                            <span className="text-xs text-gray-400">{training.description}</span>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            {training.provider && <span>Instrutor/Fornecedor: {training.provider}</span>}
-                            {training.mandatoryForGuards !== false && (
-                              <Badge className="uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                                Obrigatório
-                              </Badge>
+          <CardContent className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-6">
+            <div className="min-w-full">
+              {/* Mobile: Cards */}
+              <div className="block sm:hidden space-y-4">
+                {trainings.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400">
+                    <GraduationCap className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                    <p>Nenhum treinamento cadastrado ainda.</p>
+                  </div>
+                ) : (
+                  trainings.map((training) => {
+                    const stats = trainingStats.get(training.id) ?? { total: 0, expired: 0, dueSoon: 0, compliant: 0 };
+                    return (
+                      <div key={training.id} className="bg-seguranca-black border border-gray-800 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-white text-base mb-1">{training.name}</h3>
+                            {training.description && (
+                              <p className="text-xs text-gray-400 mb-2">{training.description}</p>
                             )}
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              {training.provider && (
+                                <span className="text-gray-400">Instrutor: {training.provider}</span>
+                              )}
+                              {training.mandatoryForGuards !== false && (
+                                <Badge className="uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs">
+                                  Obrigatório
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </td>
-                      <td className="py-3 text-gray-300">{training.duration ?? 0} h</td>
-                      <td className="py-3 text-gray-300">{training.renewalPeriodMonths ?? 12} meses</td>
-                      <td className="py-3 text-gray-300">
-                        <div className="flex flex-col gap-1">
-                          <span>Total certificados: {stats.total}</span>
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            <span className="text-emerald-400">Em dia: {stats.compliant}</span>
-                            <span className="text-amber-400">Em 30 dias: {stats.dueSoon}</span>
-                            <span className="text-red-400">Vencidos: {stats.expired}</span>
+                        
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-800">
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Carga horária</p>
+                            <p className="text-sm font-medium text-gray-300">{training.duration ?? 0} h</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Renovação</p>
+                            <p className="text-sm font-medium text-gray-300">{training.renewalPeriodMonths ?? 12} meses</p>
                           </div>
                         </div>
+                        
+                        <div className="pt-2 border-t border-gray-800">
+                          <p className="text-xs text-gray-400 mb-2">Cobertura</p>
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Total certificados:</span>
+                              <span className="text-gray-300 font-medium">{stats.total}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              <span className="text-emerald-400">Em dia: {stats.compliant}</span>
+                              <span className="text-amber-400">Em 30 dias: {stats.dueSoon}</span>
+                              <span className="text-red-400">Vencidos: {stats.expired}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-gray-600 text-gray-200 text-xs"
+                            onClick={() => openAssignmentModal(training.id)}
+                          >
+                            Registrar reciclagem
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* Desktop: Table */}
+              <table className="hidden sm:table min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700 text-gray-400">
+                    <th className="py-3 px-2 text-left font-medium">Treinamento</th>
+                    <th className="py-3 px-2 text-left font-medium">Carga horária</th>
+                    <th className="py-3 px-2 text-left font-medium">Renovação</th>
+                    <th className="py-3 px-2 text-left font-medium">Cobertura</th>
+                    <th className="py-3 px-2 text-left font-medium">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trainings.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-gray-400">
+                        Nenhum treinamento cadastrado ainda.
                       </td>
-                      <td className="py-3">
-                        <div className="flex gap-2">
+                    </tr>
+                  )}
+                  {trainings.map((training) => {
+                    const stats = trainingStats.get(training.id) ?? { total: 0, expired: 0, dueSoon: 0, compliant: 0 };
+                    return (
+                      <tr key={training.id} className="border-b border-gray-800 last:border-0 hover:bg-seguranca-black/50 transition-colors">
+                        <td className="py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-white">{training.name}</span>
+                            {training.description && (
+                              <span className="text-xs text-gray-400">{training.description}</span>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              {training.provider && <span>Instrutor/Fornecedor: {training.provider}</span>}
+                              {training.mandatoryForGuards !== false && (
+                                <Badge className="uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                  Obrigatório
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 text-gray-300">{training.duration ?? 0} h</td>
+                        <td className="py-3 px-2 text-gray-300">{training.renewalPeriodMonths ?? 12} meses</td>
+                        <td className="py-3 px-2 text-gray-300">
+                          <div className="flex flex-col gap-1">
+                            <span>Total certificados: {stats.total}</span>
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              <span className="text-emerald-400">Em dia: {stats.compliant}</span>
+                              <span className="text-amber-400">Em 30 dias: {stats.dueSoon}</span>
+                              <span className="text-red-400">Vencidos: {stats.expired}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
                           <Button
                             variant="outline"
                             size="sm"
@@ -567,98 +646,167 @@ const Treinamentos: React.FC = () => {
                           >
                             Registrar reciclagem
                           </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="bg-seguranca-graphite border-gray-700">
-          <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle className="text-xl text-white">Agenda de reciclagens</CardTitle>
-              <CardDescription className="text-gray-400">
+          <CardHeader className="flex flex-col gap-4">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-lg sm:text-xl text-white">Agenda de reciclagens</CardTitle>
+              <CardDescription className="text-gray-400 text-sm mt-1">
                 Acompanhe quais vigilantes precisam renovar os cursos obrigatórios.
               </CardDescription>
             </div>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="filter-status" className="text-gray-400 text-sm">
-                  Visualizar
-                </Label>
-                <Select value={filterStatus} onValueChange={(value: CertificationFilter) => setFilterStatus(value)}>
-                  <SelectTrigger id="filter-status" className="w-[180px] bg-seguranca-black border-gray-700 text-gray-200">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100">
-                    <SelectItem value="all">Todos os registros</SelectItem>
-                    <SelectItem value="dueSoon">Válidos por até 30 dias</SelectItem>
-                    <SelectItem value="expired">Já vencidos</SelectItem>
-                    <SelectItem value="compliant">Em dia</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="filter-status" className="text-gray-400 text-sm whitespace-nowrap">
+                    Visualizar
+                  </Label>
+                  <Select value={filterStatus} onValueChange={(value: CertificationFilter) => setFilterStatus(value)}>
+                    <SelectTrigger id="filter-status" className="w-full sm:w-[180px] bg-seguranca-black border-gray-700 text-gray-200">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100">
+                      <SelectItem value="all">Todos os registros</SelectItem>
+                      <SelectItem value="dueSoon">Válidos por até 30 dias</SelectItem>
+                      <SelectItem value="expired">Já vencidos</SelectItem>
+                      <SelectItem value="compliant">Em dia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Input
                   placeholder="Buscar por nome, CPF ou treinamento"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  className="w-full md:w-[240px] bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
+                  className="flex-1 bg-seguranca-black border-gray-700 text-gray-100 placeholder:text-gray-500"
                 />
-                <Button variant="outline" className="border-gray-600 text-gray-200" onClick={() => openAssignmentModal()}>
-                  <Users className="h-4 w-4 mr-2" />
-                  Registrar reciclagem
-                </Button>
               </div>
+              <Button 
+                variant="outline" 
+                className="border-gray-600 text-gray-200 w-full sm:w-auto" 
+                onClick={() => openAssignmentModal()}
+                size="sm"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Registrar reciclagem</span>
+                <span className="sm:hidden">Registrar</span>
+              </Button>
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700 text-gray-400">
-                  <th className="py-3 text-left font-medium">Colaborador</th>
-                  <th className="py-3 text-left font-medium">Treinamento</th>
-                  <th className="py-3 text-left font-medium">Emitido em</th>
-                  <th className="py-3 text-left font-medium">Válido até</th>
-                  <th className="py-3 text-left font-medium">Status</th>
-                  <th className="py-3 text-left font-medium">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCertifications.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-gray-400">
-                      Nenhum registro encontrado para os filtros selecionados.
-                    </td>
-                  </tr>
+          <CardContent className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-6">
+            <div className="min-w-full">
+              {/* Mobile: Cards */}
+              <div className="block sm:hidden space-y-4">
+                {filteredCertifications.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400">
+                    <Users className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                    <p>Nenhum registro encontrado para os filtros selecionados.</p>
+                  </div>
+                ) : (
+                  filteredCertifications.map((cert) => (
+                    <div key={cert.id} className="bg-seguranca-black border border-gray-800 rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white text-base mb-1">{cert.employeeName ?? '—'}</h3>
+                          {cert.employeeDocument && (
+                            <p className="text-xs text-gray-500 mb-2">CPF: {cert.employeeDocument}</p>
+                          )}
+                        </div>
+                        <div>{renderStatusBadge(cert)}</div>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-gray-800 space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-400 mb-1">Treinamento</p>
+                          <p className="text-sm font-medium text-gray-300">{cert.trainingName ?? '—'}</p>
+                          {cert.certificationNumber && (
+                            <p className="text-xs text-gray-500 mt-1">Certificado: {cert.certificationNumber}</p>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Emitido em</p>
+                            <p className="text-sm text-gray-300">{formatDate(cert.issueDate)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Válido até</p>
+                            <p className="text-sm text-gray-300">{formatDate(cert.expirationDate)}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full border-gray-600 text-gray-200 text-xs"
+                          onClick={() => handleRenewCertification(cert)}
+                          disabled={cert.status === 'CANCELLED' || renewingCertificationId === cert.id}
+                        >
+                          {renewingCertificationId === cert.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <RefreshCcw className="h-4 w-4 mr-2" />
+                          )}
+                          Renovar
+                        </Button>
+                      </div>
+                    </div>
+                  ))
                 )}
-                {filteredCertifications.map((cert) => (
-                  <tr key={cert.id} className="border-b border-gray-800 last:border-0">
-                    <td className="py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-white">{cert.employeeName ?? '—'}</span>
-                        {cert.employeeDocument && (
-                          <span className="text-xs text-gray-500">CPF: {cert.employeeDocument}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 text-gray-300">
-                      <div className="flex flex-col gap-1">
-                        <span>{cert.trainingName ?? '—'}</span>
-                        <span className="text-xs text-gray-500">
-                          Certificado: {cert.certificationNumber || '—'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 text-gray-300">{formatDate(cert.issueDate)}</td>
-                    <td className="py-3 text-gray-300">{formatDate(cert.expirationDate)}</td>
-                    <td className="py-3">{renderStatusBadge(cert)}</td>
-                    <td className="py-3">
-                      <div className="flex gap-2">
+              </div>
+              
+              {/* Desktop: Table */}
+              <table className="hidden sm:table min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700 text-gray-400">
+                    <th className="py-3 px-2 text-left font-medium">Colaborador</th>
+                    <th className="py-3 px-2 text-left font-medium">Treinamento</th>
+                    <th className="py-3 px-2 text-left font-medium">Emitido em</th>
+                    <th className="py-3 px-2 text-left font-medium">Válido até</th>
+                    <th className="py-3 px-2 text-left font-medium">Status</th>
+                    <th className="py-3 px-2 text-left font-medium">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCertifications.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-gray-400">
+                        Nenhum registro encontrado para os filtros selecionados.
+                      </td>
+                    </tr>
+                  )}
+                  {filteredCertifications.map((cert) => (
+                    <tr key={cert.id} className="border-b border-gray-800 last:border-0 hover:bg-seguranca-black/50 transition-colors">
+                      <td className="py-3 px-2">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-white">{cert.employeeName ?? '—'}</span>
+                          {cert.employeeDocument && (
+                            <span className="text-xs text-gray-500">CPF: {cert.employeeDocument}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-gray-300">
+                        <div className="flex flex-col gap-1">
+                          <span>{cert.trainingName ?? '—'}</span>
+                          <span className="text-xs text-gray-500">
+                            Certificado: {cert.certificationNumber || '—'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-gray-300">{formatDate(cert.issueDate)}</td>
+                      <td className="py-3 px-2 text-gray-300">{formatDate(cert.expirationDate)}</td>
+                      <td className="py-3 px-2">{renderStatusBadge(cert)}</td>
+                      <td className="py-3 px-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -673,25 +821,25 @@ const Treinamentos: React.FC = () => {
                           )}
                           <span className="ml-2">Renovar</span>
                         </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <Dialog open={isTrainingModalOpen} onOpenChange={setTrainingModalOpen}>
-        <DialogContent className="sm:max-w-lg bg-seguranca-black border-gray-700 text-gray-200">
+        <DialogContent className="w-[95vw] sm:max-w-lg bg-seguranca-black border-gray-700 text-gray-200 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo treinamento obrigatório</DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogTitle className="text-lg sm:text-xl">Novo treinamento obrigatório</DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm">
               Cadastre cursos e reciclagens que devem ser renovados periodicamente pelos vigilantes.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateTraining} className="space-y-5 mt-4">
+          <form onSubmit={handleCreateTraining} className="space-y-4 sm:space-y-5 mt-4">
             <div className="space-y-2">
               <Label htmlFor="training-name" className="text-gray-300">Nome do treinamento</Label>
               <Input
@@ -769,16 +917,21 @@ const Treinamentos: React.FC = () => {
                 Treinamento obrigatório para vigilantes
               </Label>
             </div>
-            <DialogFooter className="flex gap-2 sm:justify-end pt-2">
+            <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
               <Button
                 type="button"
                 variant="outline"
-                className="border-gray-600 text-gray-200"
+                className="border-gray-600 text-gray-200 w-full sm:w-auto"
                 onClick={() => setTrainingModalOpen(false)}
+                disabled={isSavingTraining}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSavingTraining} className="gap-2">
+              <Button 
+                type="submit" 
+                disabled={isSavingTraining} 
+                className="gap-2 w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred"
+              >
                 {isSavingTraining && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar treinamento
               </Button>
@@ -788,14 +941,14 @@ const Treinamentos: React.FC = () => {
       </Dialog>
 
       <Dialog open={isAssignmentModalOpen} onOpenChange={setAssignmentModalOpen}>
-        <DialogContent className="sm:max-w-2xl bg-seguranca-black border-gray-700 text-gray-200 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-2xl bg-seguranca-black border-gray-700 text-gray-200 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white">Registrar reciclagem realizada</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl font-bold text-white">Registrar reciclagem realizada</DialogTitle>
             <DialogDescription className="text-gray-400 text-sm">
               Informe qual vigilante concluiu o treinamento e quando. A validade será calculada automaticamente.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAssignmentSubmit} className="space-y-5 mt-4">
+          <form onSubmit={handleAssignmentSubmit} className="space-y-4 sm:space-y-5 mt-4">
             <div className="space-y-2">
               <Label htmlFor="assignment-employee" className="text-gray-300">Colaborador</Label>
               <Select
@@ -819,13 +972,13 @@ const Treinamentos: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="assignment-training" className="text-gray-300 font-medium">Treinamento</Label>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <Label htmlFor="assignment-training" className="text-gray-300 font-medium text-sm">Treinamento</Label>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-auto py-1.5 px-2 text-xs text-seguranca-red hover:text-seguranca-red/90 hover:bg-seguranca-red/10 border border-seguranca-red/30 rounded-md transition-colors"
+                  className="h-auto py-1.5 px-2 text-xs text-seguranca-red hover:text-seguranca-red/90 hover:bg-seguranca-red/10 border border-seguranca-red/30 rounded-md transition-colors w-full sm:w-auto"
                   onClick={() => {
                     setAssignmentModalOpen(false);
                     setTimeout(() => {
@@ -834,7 +987,8 @@ const Treinamentos: React.FC = () => {
                   }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Cadastrar novo treinamento
+                  <span className="hidden sm:inline">Cadastrar novo treinamento</span>
+                  <span className="sm:hidden">Novo treinamento</span>
                 </Button>
               </div>
               <div className="relative">
@@ -969,16 +1123,21 @@ const Treinamentos: React.FC = () => {
                 />
               </div>
             </div>
-            <DialogFooter className="flex gap-2 sm:justify-end pt-2">
+            <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
               <Button
                 type="button"
                 variant="outline"
-                className="border-gray-600 text-gray-200"
+                className="border-gray-600 text-gray-200 w-full sm:w-auto"
                 onClick={() => setAssignmentModalOpen(false)}
+                disabled={isSavingAssignment}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSavingAssignment} className="gap-2">
+              <Button 
+                type="submit" 
+                disabled={isSavingAssignment} 
+                className="gap-2 w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred"
+              >
                 {isSavingAssignment && <Loader2 className="h-4 w-4 animate-spin" />}
                 Registrar reciclagem
               </Button>
