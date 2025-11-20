@@ -5,8 +5,8 @@
 # Multi-stage build para otimizar tamanho da imagem
 FROM amazoncorretto:17-alpine AS builder
 
-# Instalar Maven
-RUN apk add --no-cache maven
+# Instalar Maven e curl
+RUN apk add --no-cache maven curl
 
 # Definir diretório de trabalho
 WORKDIR /app
@@ -16,8 +16,31 @@ COPY pom.xml .
 COPY mvnw .
 COPY .mvn .mvn
 
-# Baixar dependências (cache layer)
-RUN mvn dependency:go-offline -B
+# Criar settings.xml do Maven com retry e timeout aumentados
+RUN mkdir -p /root/.m2 && \
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \
+    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> /root/.m2/settings.xml && \
+    echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> /root/.m2/settings.xml && \
+    echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">' >> /root/.m2/settings.xml && \
+    echo '  <servers/>' >> /root/.m2/settings.xml && \
+    echo '  <mirrors/>' >> /root/.m2/settings.xml && \
+    echo '  <profiles/>' >> /root/.m2/settings.xml && \
+    echo '  <activeProfiles/>' >> /root/.m2/settings.xml && \
+    echo '</settings>' >> /root/.m2/settings.xml
+
+# Baixar dependências (cache layer) com retry e timeout aumentado
+# Tentar até 3 vezes com delay entre tentativas
+RUN for i in 1 2 3; do \
+      echo "Tentativa $i de download de dependências..." && \
+      mvn dependency:go-offline -B \
+        -Dmaven.wagon.http.retryHandler.count=10 \
+        -Dmaven.wagon.httpconnectionManager.ttlSeconds=300 \
+        -Dmaven.wagon.http.readTimeout=600000 \
+        -Dmaven.wagon.http.connectionTimeout=60000 && \
+      break || \
+      (echo "Tentativa $i falhou. Aguardando 30 segundos antes de tentar novamente..." && \
+       sleep 30); \
+    done
 
 # Copiar código fonte
 COPY src ./src
