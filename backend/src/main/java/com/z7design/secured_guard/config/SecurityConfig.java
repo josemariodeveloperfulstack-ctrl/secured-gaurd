@@ -60,6 +60,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/diagnostic/**").permitAll()
                 .requestMatchers("/api/debug/**").permitAll()
+                .requestMatchers("/api/email/test").authenticated()
+                .requestMatchers("/api/email/config").authenticated()
                 // Endpoints públicos do portal (vagas, etc)
                 .requestMatchers("/api/public/**").permitAll()
                 // WhatsApp controller - público para pareamento/health em dev

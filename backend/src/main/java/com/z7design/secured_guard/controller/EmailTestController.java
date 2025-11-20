@@ -13,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/email")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Email Test", description = "Endpoints para testar envio de emails")
@@ -20,15 +21,24 @@ public class EmailTestController {
 
     private final EmailService emailService;
 
-    @PostMapping("/test")
+    @RequestMapping(value = "/test", method = {RequestMethod.GET, RequestMethod.POST})
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Testar envio de email", description = "Envia um email de teste para verificar configuração SMTP")
-    public ResponseEntity<?> testEmail(@RequestParam String toEmail) {
+    public ResponseEntity<?> testEmail(@RequestParam(required = false) String toEmail) {
         try {
+            if (toEmail == null || toEmail.trim().isEmpty()) {
+                log.warn("⚠️ Email de destino não fornecido");
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Email de destino é obrigatório",
+                    "error", "MISSING_EMAIL_PARAMETER"
+                ));
+            }
+            
             log.info("📧 Testando envio de email para: {}", toEmail);
             
             boolean success = emailService.sendEmailWithAttachment(
-                toEmail,
+                toEmail.trim(),
                 "🧪 Teste de Email - Secured Guard CI",
                 createTestEmailBody(),
                 null, // Sem anexo
@@ -48,7 +58,8 @@ public class EmailTestController {
                 return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Falha ao enviar email. Verifique os logs do backend.",
-                    "to", toEmail
+                    "to", toEmail,
+                    "error", "EMAIL_SEND_FAILED"
                 ));
             }
             
@@ -56,8 +67,9 @@ public class EmailTestController {
             log.error("💥 Erro ao testar envio de email: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
-                "message", "Erro: " + e.getMessage(),
-                "to", toEmail
+                "message", "Erro ao enviar email: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"),
+                "to", toEmail != null ? toEmail : "N/A",
+                "error", e.getClass().getSimpleName()
             ));
         }
     }
