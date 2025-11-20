@@ -466,6 +466,7 @@ const MessageDashboard: React.FC = () => {
                 onEdit={handleEditClick}
                 onView={handleView}
                 loading={loading}
+                activeTab={activeTab}
               />
             </TabsContent>
           </Tabs>
@@ -528,6 +529,7 @@ interface MessageListProps {
   onEdit: (message: SystemMessage) => void;
   onView: (message: SystemMessage) => void;
   loading: boolean;
+  activeTab: string;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -536,7 +538,8 @@ const MessageList: React.FC<MessageListProps> = ({
   onDelete,
   onEdit,
   onView,
-  loading
+  loading,
+  activeTab
 }) => {
   if (loading) {
     return (
@@ -617,20 +620,39 @@ const MessageList: React.FC<MessageListProps> = ({
               </p>
               
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  <span>De: {message.sender.name}</span>
-                </div>
+                {activeTab === 'sent' ? (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      <span>Para: {message.recipients && message.recipients.length > 0 
+                        ? `${message.recipients.length} ${message.recipients.length === 1 ? 'destinatário' : 'destinatários'}`
+                        : message.type === 'GLOBAL' ? 'Todos' : 'N/A'}</span>
+                    </div>
+                    {message.recipients && message.recipients.length > 0 && message.recipients.length <= 3 && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        <span>{message.recipients.map((r: any) => r.name || r.email).join(', ')}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      <span>De: {message.sender.name}</span>
+                    </div>
+                    {message.recipients && message.recipients.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        <span>{message.recipients.length} dest.</span>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   <span>{new Date(message.createdAt).toLocaleDateString('pt-BR')}</span>
                 </div>
-                {message.recipients && message.recipients.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Mail className="w-3 h-3" />
-                    <span>{message.recipients.length} dest.</span>
-                  </div>
-                )}
               </div>
             </div>
             
