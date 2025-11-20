@@ -323,10 +323,10 @@ const Treinamentos: React.FC = () => {
 
   const handleAssignmentSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!assignmentForm.employeeId || !assignmentForm.trainingId || !assignmentForm.issueDate) {
+    if (!assignmentForm.employeeId || !assignmentForm.trainingId || !assignmentForm.issueDate || !assignmentForm.expirationDate) {
       toast({
         title: 'Dados incompletos',
-        description: 'Selecione o colaborador, o treinamento e a data de conclusão.',
+        description: 'Preencha todos os campos obrigatórios: colaborador, treinamento, data de realização e data de validade.',
         variant: 'destructive',
       });
       return;
@@ -1063,8 +1063,11 @@ const Treinamentos: React.FC = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="assignment-issueDate" className="text-gray-300">Data de conclusão</Label>
+                <Label htmlFor="assignment-issueDate" className="text-gray-300 font-medium">
+                  Data de realização <span className="text-red-400">*</span>
+                </Label>
                 <Input
                   id="assignment-issueDate"
                   type="date"
@@ -1083,19 +1086,30 @@ const Treinamentos: React.FC = () => {
                   className="bg-seguranca-black border-gray-700 text-gray-100"
                   required
                 />
+                <p className="text-xs text-gray-500">Data em que o treinamento foi concluído</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="assignment-expirationDate" className="text-gray-300">Validade até</Label>
+                <Label htmlFor="assignment-expirationDate" className="text-gray-300 font-medium">
+                  Data de validade <span className="text-red-400">*</span>
+                </Label>
                 <Input
                   id="assignment-expirationDate"
                   type="date"
                   value={assignmentForm.expirationDate}
+                  min={assignmentForm.issueDate || todayIso}
                   onChange={(event) =>
                     setAssignmentForm((prev) => ({ ...prev, expirationDate: event.target.value }))
                   }
                   className="bg-seguranca-black border-gray-700 text-gray-100"
+                  required
                 />
+                <p className="text-xs text-gray-500">
+                  {assignmentForm.trainingId
+                    ? `Calculada automaticamente (${getTrainingRenewalPeriod(assignmentForm.trainingId)} meses)`
+                    : 'Data até quando o certificado é válido'}
+                </p>
               </div>
+            </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
