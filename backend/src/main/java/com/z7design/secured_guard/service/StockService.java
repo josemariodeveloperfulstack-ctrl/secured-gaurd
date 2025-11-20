@@ -24,9 +24,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -252,9 +254,79 @@ public class StockService {
             log.info("Buscando movimentações com filtros - Item: {}, Funcionário: {}, Tipo: {}", 
                     stockItemId, employeeId, movementType);
             
-            Page<StockMovement> movements = stockMovementRepository.findByFilters(
-                    stockItemId, employeeId, movementType, reason, unitId, 
-                    startDate, endDate, searchTerm, pageable);
+            // Criar Specification dinamicamente
+            Specification<StockMovement> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                
+                // Filtro por item de estoque
+                if (stockItemId != null) {
+                    predicates.add(cb.equal(root.get("stockItem").get("id"), stockItemId));
+                }
+                
+                // Filtro por funcionário
+                if (employeeId != null) {
+                    predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
+                }
+                
+                // Filtro por tipo de movimentação
+                if (movementType != null) {
+                    predicates.add(cb.equal(root.get("movementType"), movementType));
+                }
+                
+                // Filtro por motivo
+                if (reason != null) {
+                    predicates.add(cb.equal(root.get("reason"), reason));
+                }
+                
+                // Filtro por unidade
+                if (unitId != null) {
+                    predicates.add(cb.equal(root.get("unit").get("id"), unitId));
+                }
+                
+                // Filtro por data inicial
+                if (startDate != null) {
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("movementDate"), startDate));
+                }
+                
+                // Filtro por data final
+                if (endDate != null) {
+                    predicates.add(cb.lessThanOrEqualTo(root.get("movementDate"), endDate));
+                }
+                
+                // Filtro por termo de busca
+                if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                    String searchPattern = "%" + searchTerm.toLowerCase() + "%";
+                    Predicate itemNamePred = cb.and(
+                        cb.isNotNull(root.get("stockItem").get("name")),
+                        cb.like(cb.lower(root.get("stockItem").get("name")), searchPattern)
+                    );
+                    Predicate itemCodePred = cb.and(
+                        cb.isNotNull(root.get("stockItem").get("code")),
+                        cb.like(cb.lower(root.get("stockItem").get("code")), searchPattern)
+                    );
+                    Predicate employeeNamePred = cb.and(
+                        cb.isNotNull(root.get("employeeName")),
+                        cb.like(cb.lower(root.get("employeeName")), searchPattern)
+                    );
+                    Predicate userNamePred = cb.and(
+                        cb.isNotNull(root.get("userName")),
+                        cb.like(cb.lower(root.get("userName")), searchPattern)
+                    );
+                    Predicate documentNumberPred = cb.and(
+                        cb.isNotNull(root.get("documentNumber")),
+                        cb.like(cb.lower(root.get("documentNumber")), searchPattern)
+                    );
+                    
+                    predicates.add(cb.or(itemNamePred, itemCodePred, employeeNamePred, userNamePred, documentNumberPred));
+                }
+                
+                // Ordenar por data de movimentação (mais recente primeiro)
+                query.orderBy(cb.desc(root.get("movementDate")));
+                
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+            
+            Page<StockMovement> movements = stockMovementRepository.findAll(spec, pageable);
             
             log.info("Encontradas {} movimentações", movements.getTotalElements());
             
