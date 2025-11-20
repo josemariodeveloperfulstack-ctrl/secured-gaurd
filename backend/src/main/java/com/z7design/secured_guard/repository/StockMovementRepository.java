@@ -32,30 +32,31 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     // Buscar movimentações por unidade
     List<StockMovement> findByUnitIdOrderByMovementDateDesc(UUID unitId);
 
-    // Busca com filtros múltiplos
-    @Query("SELECT sm FROM StockMovement sm WHERE " +
-           "(:stockItemId IS NULL OR sm.stockItem.id = :stockItemId) AND " +
-           "(:employeeId IS NULL OR sm.employee.id = :employeeId) AND " +
-           "(:movementType IS NULL OR sm.movementType = :movementType) AND " +
-           "(:reason IS NULL OR sm.reason = :reason) AND " +
-           "(:unitId IS NULL OR sm.unit.id = :unitId) AND " +
-           "(:startDate IS NULL OR sm.movementDate >= :startDate) AND " +
-           "(:endDate IS NULL OR sm.movementDate <= :endDate) AND " +
-           "(:searchTerm IS NULL OR " +
-           "LOWER(sm.stockItem.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(sm.stockItem.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(sm.employeeName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(sm.userName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(sm.documentNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    // Busca com filtros múltiplos - usando query JPQL que funciona corretamente
+    @Query("SELECT sm FROM StockMovement sm " +
+           "WHERE (:pStockItemId IS NULL OR sm.stockItem.id = :pStockItemId) AND " +
+           "(:pEmployeeId IS NULL OR sm.employee.id = :pEmployeeId) AND " +
+           "(:pMovementType IS NULL OR sm.movementType = :pMovementType) AND " +
+           "(:pReason IS NULL OR sm.reason = :pReason) AND " +
+           "(:pUnitId IS NULL OR sm.unit.id = :pUnitId) AND " +
+           "(:pStartDate IS NULL OR sm.movementDate >= :pStartDate) AND " +
+           "(:pEndDate IS NULL OR sm.movementDate <= :pEndDate) AND " +
+           "(:pSearchTerm IS NULL OR :pSearchTerm = '' OR " +
+           "(sm.stockItem.name IS NOT NULL AND LOWER(sm.stockItem.name) LIKE LOWER(CONCAT('%', :pSearchTerm, '%'))) OR " +
+           "(sm.stockItem.code IS NOT NULL AND LOWER(sm.stockItem.code) LIKE LOWER(CONCAT('%', :pSearchTerm, '%'))) OR " +
+           "(sm.employeeName IS NOT NULL AND LOWER(sm.employeeName) LIKE LOWER(CONCAT('%', :pSearchTerm, '%'))) OR " +
+           "(sm.userName IS NOT NULL AND LOWER(sm.userName) LIKE LOWER(CONCAT('%', :pSearchTerm, '%'))) OR " +
+           "(sm.documentNumber IS NOT NULL AND LOWER(sm.documentNumber) LIKE LOWER(CONCAT('%', :pSearchTerm, '%')))) " +
+           "ORDER BY sm.movementDate DESC")
     Page<StockMovement> findByFilters(
-            @Param("stockItemId") UUID stockItemId,
-            @Param("employeeId") UUID employeeId,
-            @Param("movementType") MovementType movementType,
-            @Param("reason") MovementReason reason,
-            @Param("unitId") UUID unitId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate,
-            @Param("searchTerm") String searchTerm,
+            @Param("pStockItemId") UUID stockItemId,
+            @Param("pEmployeeId") UUID employeeId,
+            @Param("pMovementType") MovementType movementType,
+            @Param("pReason") MovementReason reason,
+            @Param("pUnitId") UUID unitId,
+            @Param("pStartDate") LocalDateTime startDate,
+            @Param("pEndDate") LocalDateTime endDate,
+            @Param("pSearchTerm") String searchTerm,
             Pageable pageable
     );
 

@@ -157,8 +157,21 @@ export const stockService = {
       if (filters.movementType) params.append('movementType', filters.movementType);
       if (filters.reason) params.append('reason', filters.reason);
       if (filters.unitId) params.append('unitId', filters.unitId);
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
+      
+      // Converter datas do formato dd/mm/aaaa para ISO DateTime
+      if (filters.startDate) {
+        const isoStartDate = this.convertDateToISO(filters.startDate, true);
+        if (isoStartDate) {
+          params.append('startDate', isoStartDate);
+        }
+      }
+      if (filters.endDate) {
+        const isoEndDate = this.convertDateToISO(filters.endDate, false);
+        if (isoEndDate) {
+          params.append('endDate', isoEndDate);
+        }
+      }
+      
       if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
       
       params.append('page', page.toString());
@@ -176,6 +189,59 @@ export const stockService = {
         content: [],
         totalElements: 0
       };
+    }
+  },
+
+  // Função auxiliar para converter data dd/mm/aaaa para ISO DateTime
+  convertDateToISO(dateString: string, isStartDate: boolean): string | null {
+    if (!dateString) return null;
+    
+    try {
+      // Tentar parsear formato dd/mm/aaaa
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
+        const year = parseInt(parts[2], 10);
+        
+        const date = new Date(year, month, day);
+        if (isNaN(date.getTime())) {
+          console.warn('Data inválida:', dateString);
+          return null;
+        }
+        
+        // Se for data inicial, usar 00:00:00, se for final, usar 23:59:59
+        if (isStartDate) {
+          date.setHours(0, 0, 0, 0);
+        } else {
+          date.setHours(23, 59, 59, 999);
+        }
+        
+        // Converter para ISO string (formato: YYYY-MM-DDTHH:mm:ss)
+        return date.toISOString();
+      }
+      
+      // Se já estiver no formato ISO, retornar como está
+      if (dateString.includes('T')) {
+        return dateString;
+      }
+      
+      // Tentar parsear como Date ISO
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        if (isStartDate) {
+          date.setHours(0, 0, 0, 0);
+        } else {
+          date.setHours(23, 59, 59, 999);
+        }
+        return date.toISOString();
+      }
+      
+      console.warn('Formato de data não reconhecido:', dateString);
+      return null;
+    } catch (error) {
+      console.error('Erro ao converter data:', error);
+      return null;
     }
   },
 

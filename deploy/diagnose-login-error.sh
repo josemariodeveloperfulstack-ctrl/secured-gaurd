@@ -29,6 +29,17 @@ info() {
 
 log "🔍 Diagnosticando erro 500 no login..."
 
+# Verificar tamanho da chave JWT
+log "0. Verificando configuração JWT..."
+JWT_SECRET=$(grep JWT_SECRET deploy/env.ci | cut -d= -f2)
+SECRET_LEN=${#JWT_SECRET}
+if [ "$SECRET_LEN" -lt 64 ]; then
+    error "CRÍTICO: JWT_SECRET tem apenas $SECRET_LEN caracteres. HS512 requer no mínimo 64 caracteres (512 bits)."
+    warn "Isso causará erro 500 no login (java.lang.IllegalArgumentException: The specified key byte array is 53 bits which is not secure enough for any JWT HMAC-SHA algorithm)."
+else
+    log "✅ JWT_SECRET tem $SECRET_LEN caracteres (mínimo 64 ok)"
+fi
+
 # Verificar se o container está rodando
 if ! docker ps | grep -q "secured-guard-backend-ci"; then
     error "Container backend-ci não está rodando!"

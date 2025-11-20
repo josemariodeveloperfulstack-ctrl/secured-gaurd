@@ -22,6 +22,7 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -257,14 +258,25 @@ public class StockService {
             
             log.info("Encontradas {} movimentações", movements.getTotalElements());
             
-            return movements.map(movement -> {
-                try {
-                    return StockMovementDTO.fromEntity(movement);
-                } catch (Exception e) {
-                    log.error("Erro ao converter movimentação {}: {}", movement.getId(), e.getMessage());
-                    return null;
-                }
-            });
+            // Converter movimentações para DTO, filtrando nulos
+            List<StockMovementDTO> dtos = movements.getContent().stream()
+                    .map(movement -> {
+                        try {
+                            return StockMovementDTO.fromEntity(movement);
+                        } catch (Exception e) {
+                            log.error("Erro ao converter movimentação {}: {}", movement.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(dto -> dto != null)
+                    .collect(Collectors.toList());
+            
+            // Criar nova página com os DTOs convertidos
+            return new PageImpl<>(
+                    dtos,
+                    pageable,
+                    movements.getTotalElements()
+            );
             
         } catch (Exception e) {
             log.error("Erro ao buscar movimentações com filtros: {}", e.getMessage(), e);

@@ -181,11 +181,26 @@ public class JwtService {
             if (jwtConfig.getSecret() == null || jwtConfig.getSecret().trim().isEmpty()) {
                 throw new IllegalStateException("Chave secreta JWT não está configurada");
             }
-            byte[] keyBytes = jwtConfig.getSecret().getBytes();
+            String secret = jwtConfig.getSecret().trim();
+            byte[] keyBytes = secret.getBytes();
+            
+            // HS512 requires at least 64 bytes (512 bits)
+            if (keyBytes.length < 64) {
+                log.error("Chave JWT muito curta: {} bytes. HS512 requer pelo menos 64 bytes (512 bits).", keyBytes.length);
+                throw new IllegalStateException(
+                    String.format("Chave JWT muito curta: %d bytes. HS512 requer pelo menos 64 bytes (512 bits). " +
+                                "Por favor, configure uma chave com pelo menos 64 caracteres ASCII.", keyBytes.length)
+                );
+            }
+            
+            log.debug("Criando chave de assinatura JWT com {} bytes", keyBytes.length);
             return Keys.hmacShaKeyFor(keyBytes);
+        } catch (IllegalStateException e) {
+            log.error("Erro de configuração na chave de assinatura: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
-            log.error("Erro ao criar chave de assinatura: {}", e.getMessage());
-            throw new RuntimeException("Erro ao criar chave de assinatura: " + e.getMessage());
+            log.error("Erro ao criar chave de assinatura: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro ao criar chave de assinatura: " + e.getMessage(), e);
         }
     }
 } 
