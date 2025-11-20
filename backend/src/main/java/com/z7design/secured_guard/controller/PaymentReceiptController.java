@@ -49,8 +49,16 @@ public class PaymentReceiptController {
     
     // Buscar todos os comprovantes
     @GetMapping
-    public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts() {
+    public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts(
+            @RequestParam(required = false) String search) {
         try {
+            // Se houver termo de busca, usar busca filtrada
+            if (search != null && !search.trim().isEmpty() && search.trim().length() >= 4) {
+                log.info("🔍 Buscando comprovantes com termo: '{}'", search);
+                List<PaymentReceiptDTO> receipts = paymentReceiptService.search(search.trim());
+                return ResponseEntity.ok(receipts);
+            }
+            
             log.info("🔍 Iniciando busca de todos os comprovantes...");
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));

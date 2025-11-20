@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.stream.Collectors;
-import java.text.Normalizer;
 
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.Employee;
@@ -262,6 +261,261 @@ public class PaymentReceiptService {
                 .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
+    public List<PaymentReceiptDTO> search(String searchTerm) {
+        if (searchTerm == null || searchTerm.trim().length() < 4) {
+            log.warn("⚠️ Termo de busca muito curto (mínimo 4 caracteres): {}", searchTerm);
+            return List.of();
+        }
+        
+        String trimmedSearch = searchTerm.trim();
+        String normalizedSearch = normalizeName(trimmedSearch);
+        log.info("🔍 Buscando comprovantes com termo: '{}' (normalizado: '{}')", trimmedSearch, normalizedSearch);
+        
+        List<PaymentReceipt> allReceipts = paymentReceiptRepository.findAll();
+        log.info("📊 Total de comprovantes no banco: {}", allReceipts.size());
+        
+        // Debug: mostrar alguns nomes de comprovantes para verificar
+        if (allReceipts.size() > 0 && allReceipts.size() <= 10) {
+            log.info("📋 Nomes dos comprovantes no banco:");
+            allReceipts.forEach(r -> {
+                String name = r.getEmployeeName() != null ? r.getEmployeeName() : "N/A";
+                log.info("   - '{}' (normalizado: '{}')", name, normalizeName(name));
+            });
+        }
+        
+        List<PaymentReceiptDTO> results = allReceipts.stream()
+                .filter(receipt -> {
+                    boolean matches = matchesSearchTerm(receipt, normalizedSearch, trimmedSearch);
+                    if (matches && receipt.getEmployeeName() != null) {
+                        log.debug("✅ Match encontrado: '{}' para busca '{}'", receipt.getEmployeeName(), trimmedSearch);
+                    }
+                    return matches;
+                })
+                .sorted((r1, r2) -> {
+                    // Ordenar por data de transferência (mais recente primeiro)
+                    if (r1.getTransferDate() != null && r2.getTransferDate() != null) {
+                        return r2.getTransferDate().compareTo(r1.getTransferDate());
+                    }
+                    // Se não tiver data, ordenar por ano/mês
+                    int yearCompare = r2.getYear().compareTo(r1.getYear());
+                    if (yearCompare != 0) {
+                        return yearCompare;
+                    }
+                    return r2.getMonth().compareTo(r1.getMonth());
+                })
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        
+        log.info("✅ Comprovantes encontrados: {} registros (de {} total)", results.size(), allReceipts.size());
+        if (results.isEmpty() && !allReceipts.isEmpty()) {
+            log.warn("⚠️ Nenhum comprovante encontrado para '{}'. Verifique se o nome está correto.", trimmedSearch);
+        }
+        return results;
+    }
+    
+    private boolean matchesSearchTerm(PaymentReceipt receipt, String normalizedSearch, String originalSearch) {
+        if (receipt == null) {
+            return false;
+        }
+        
+        String originalSearchLower = originalSearch.toLowerCase().trim();
+        
+        // Buscar por nome do funcionário - MÚLTIPLAS ESTRATÉGIAS
+        String employeeName = Optional.ofNullable(receipt.getEmployeeName()).orElse("");
+        if (!employeeName.isEmpty()) {
+            String employeeNameLower = employeeName.toLowerCase();
+            String normalizedEmployeeName = normalizeName(employeeName);
+            
+            // Estratégia 1: Busca normalizada (sem acentos, sem espaços)
+            if (normalizedEmployeeName.contains(normalizedSearch) || 
+                normalizedSearch.contains(normalizedEmployeeName)) {
+                return true;
+            }
+            
+            // Estratégia 2: Busca case-insensitive simples
+            if (employeeNameLower.contains(originalSearchLower)) {
+                return true;
+            }
+            
+            // Estratégia 3: Busca por palavras individuais (se o termo de busca tiver múltiplas palavras)
+            String[] searchWords = originalSearchLower.split("\\s+");
+            if (searchWords.length > 1) {
+                boolean allWordsMatch = true;
+                for (String word : searchWords) {
+                    if (word.length() >= 3 && !employeeNameLower.contains(word)) {
+                        allWordsMatch = false;
+                        break;
+                    }
+                }
+                if (allWordsMatch) {
+                    return true;
+                }
+            }
+            
+            // Estratégia 4: Busca por primeiro e último nome
+            String[] employeeNameParts = employeeNameLower.split("\\s+");
+            String[] searchParts = originalSearchLower.split("\\s+");
+            if (employeeNameParts.length >= 2 && searchParts.length >= 2) {
+                String employeeFirst = employeeNameParts[0];
+                String employeeLast = employeeNameParts[employeeNameParts.length - 1];
+                String searchFirst = searchParts[0];
+                String searchLast = searchParts[searchParts.length - 1];
+                
+                if (employeeFirst.contains(searchFirst) && employeeLast.contains(searchLast)) {
+                    return true;
+                }
+                if (searchFirst.contains(employeeFirst) && searchLast.contains(employeeLast)) {
+                    return true;
+                }
+            }
+            
+            // Estratégia 5: Busca considerando abreviações de nomes do meio (1-3 caracteres)
+            // Ex: "SILVANA FERREIRA S HONORATO" vs "SILVANA FERREIRA SELVO HONORATO"
+            if (employeeNameParts.length >= 3 && searchParts.length >= 3) {
+                // Verificar primeiro e último nome
+                String employeeFirst = employeeNameParts[0];
+                String employeeLast = employeeNameParts[employeeNameParts.length - 1];
+                String searchFirst = searchParts[0];
+                String searchLast = searchParts[searchParts.length - 1];
+                
+                boolean firstMatches = employeeFirst.contains(searchFirst) || searchFirst.contains(employeeFirst);
+                boolean lastMatches = employeeLast.contains(searchLast) || searchLast.contains(employeeLast);
+                
+                if (firstMatches && lastMatches) {
+                    // Verificar nomes do meio considerando abreviações
+                    List<String> employeeMiddle = new ArrayList<>();
+                    List<String> searchMiddle = new ArrayList<>();
+                    
+                    for (int i = 1; i < employeeNameParts.length - 1; i++) {
+                        employeeMiddle.add(employeeNameParts[i]);
+                    }
+                    for (int i = 1; i < searchParts.length - 1; i++) {
+                        searchMiddle.add(searchParts[i]);
+                    }
+                    
+                    // Verificar se as abreviações correspondem
+                    boolean middleMatches = checkMiddleNamesWithAbbreviations(employeeMiddle, searchMiddle);
+                    if (middleMatches) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Buscar por empresa
+        String companyName = Optional.ofNullable(receipt.getCompanyName()).orElse("");
+        if (!companyName.isEmpty()) {
+            String normalizedCompanyName = normalizeName(companyName);
+            if (normalizedCompanyName.contains(normalizedSearch) || 
+                companyName.toLowerCase().contains(originalSearchLower)) {
+                return true;
+            }
+        }
+        
+        // Buscar por CNPJ da empresa
+        String companyCnpj = Optional.ofNullable(receipt.getCompanyCnpj()).orElse("");
+        if (!companyCnpj.isEmpty()) {
+            String cnpjDigits = companyCnpj.replaceAll("\\D", "");
+            String searchDigits = originalSearch.replaceAll("\\D", "");
+            if (!searchDigits.isEmpty() && cnpjDigits.contains(searchDigits)) {
+                return true;
+            }
+        }
+        
+        // Buscar por data (transferDate é String)
+        if (receipt.getTransferDate() != null) {
+            String dateStr = receipt.getTransferDate().toLowerCase();
+            if (dateStr.contains(originalSearchLower)) {
+                return true;
+            }
+        }
+        
+        // Buscar por mês/ano (formato MM/YYYY ou MM-YYYY)
+        String monthYear1 = String.format("%02d/%d", receipt.getMonth(), receipt.getYear());
+        String monthYear2 = String.format("%02d-%d", receipt.getMonth(), receipt.getYear());
+        if (monthYear1.contains(originalSearch) || monthYear2.contains(originalSearch)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Verifica se os nomes do meio correspondem, considerando abreviações (1-3 caracteres)
+     */
+    private boolean checkMiddleNamesWithAbbreviations(List<String> middle1, List<String> middle2) {
+        if (middle1.isEmpty() && middle2.isEmpty()) {
+            return true;
+        }
+        
+        // Se um não tem nomes do meio e o outro tem, verificar se são abreviações
+        if (middle1.isEmpty() || middle2.isEmpty()) {
+            return false; // Se um tem e outro não, não é match
+        }
+        
+        // Comparar palavra por palavra considerando abreviações
+        for (String w1 : middle1) {
+            boolean found = false;
+            for (String w2 : middle2) {
+                if (wordsMatchWithAbbreviation(w1, w2)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        
+        // E vice-versa
+        for (String w2 : middle2) {
+            boolean found = false;
+            for (String w1 : middle1) {
+                if (wordsMatchWithAbbreviation(w1, w2)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Verifica se uma palavra corresponde a outra, considerando abreviações (1-3 caracteres)
+     */
+    private boolean wordsMatchWithAbbreviation(String word1, String word2) {
+        if (word1.equals(word2)) {
+            return true;
+        }
+        
+        // Se uma palavra tem 1-3 caracteres, pode ser abreviação da outra
+        if (word1.length() >= 1 && word1.length() <= 3 && word2.length() > word1.length()) {
+            // word1 é abreviação? Verificar se word2 começa com word1
+            if (word2.toLowerCase().startsWith(word1.toLowerCase())) {
+                return true;
+            }
+        }
+        if (word2.length() >= 1 && word2.length() <= 3 && word1.length() > word2.length()) {
+            // word2 é abreviação? Verificar se word1 começa com word2
+            if (word1.toLowerCase().startsWith(word2.toLowerCase())) {
+                return true;
+            }
+        }
+        
+        // Verificar se uma contém a outra (para casos como "FERREIRA" vs "FERREIRA")
+        if (word1.length() >= 3 && word2.length() >= 3) {
+            return word1.toLowerCase().contains(word2.toLowerCase()) || 
+                   word2.toLowerCase().contains(word1.toLowerCase());
+        }
+        
+        return false;
+    }
+
     @Transactional
     public PaymentReceiptDTO processUploadedFile(MultipartFile file, String employeeName, Integer month, Integer year) {
         try {

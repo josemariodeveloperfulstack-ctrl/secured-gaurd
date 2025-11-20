@@ -72,10 +72,13 @@ export interface CreatePaymentReceiptDTO {
 }
 
 class PaymentReceiptService {
-  // Buscar todos os comprovantes
-  async getAllPaymentReceipts(): Promise<PaymentReceipt[]> {
+  // Buscar todos os comprovantes (com busca opcional)
+  async getAllPaymentReceipts(searchTerm?: string): Promise<PaymentReceipt[]> {
     try {
-      const response = await api.get('/receipts');
+      const params = searchTerm && searchTerm.trim().length >= 4 
+        ? { search: searchTerm.trim() } 
+        : {};
+      const response = await api.get('/receipts', { params });
       return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar comprovantes:', error);

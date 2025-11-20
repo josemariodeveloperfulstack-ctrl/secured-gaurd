@@ -31,47 +31,74 @@ public class LogService {
         this.userRepository = userRepository;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = Exception.class)
     public void logUserActivity(String username, String action, String details, String ipAddress, String userAgent, String sessionId) {
         try {
+            // Validar parâmetros básicos
+            if (username == null || username.trim().isEmpty()) {
+                System.out.println("⚠️ LogService: Username vazio ou null, pulando log");
+                return;
+            }
+
             System.out.println("🔍 LogService: Buscando usuário: " + username);
 
             UserActivityLog log = new UserActivityLog();
 
-            // Buscar usuário pelo username
-            Optional<User> userOpt = userRepository.findByUsername(username);
-            if (userOpt.isPresent()) {
-                log.setUser(userOpt.get());
+            // Buscar usuário pelo username (com timeout implícito)
+            try {
+                Optional<User> userOpt = userRepository.findByUsername(username);
+                if (userOpt.isPresent()) {
+                    log.setUser(userOpt.get());
+                    log.setUsername(username);
+                    System.out.println("✅ LogService: Usuário encontrado: " + userOpt.get().getId());
+                } else {
+                    System.out.println("⚠️ LogService: Usuário não encontrado: " + username + " - salvando log sem referência de usuário");
+                    // Salvar log mesmo sem usuário para rastreabilidade
+                    log.setUsername(username);
+                }
+            } catch (Exception dbError) {
+                System.err.println("⚠️ LogService: Erro ao buscar usuário no banco (não crítico): " + dbError.getMessage());
+                // Continuar mesmo sem usuário - salvar log com username apenas
                 log.setUsername(username);
-                System.out.println("✅ LogService: Usuário encontrado: " + userOpt.get().getId());
-            } else {
-                System.out.println("⚠️ LogService: Usuário não encontrado: " + username);
-                return; // Não salvar log se usuário não for encontrado
             }
 
-            log.setAction(action);
-            log.setDetails(details);
-            log.setIpAddress(ipAddress);
-            log.setUserAgent(userAgent);
-            log.setSessionId(sessionId);
-            log.setStatus("SUCCESS"); // Status padrão para atividades registradas pelo interceptor
+            log.setAction(action != null ? action : "UNKNOWN");
+            log.setDetails(details != null ? details : "");
+            log.setIpAddress(ipAddress != null ? ipAddress : "127.0.0.1");
+            log.setUserAgent(userAgent != null ? userAgent : "Unknown");
+            log.setSessionId(sessionId != null ? sessionId : "session_unknown");
+            log.setStatus("SUCCESS");
             log.setCreatedAt(LocalDateTime.now());
 
             System.out.println("🔍 LogService: Salvando log - Action: " + action + ", Details: " + details + ", IP: " + ipAddress);
 
-            UserActivityLog savedLog = userActivityLogRepository.save(log);
-
-            System.out.println("✅ LogService: Log salvo com ID: " + savedLog.getId());
+            // Tentar salvar o log (pode falhar silenciosamente)
+            try {
+                UserActivityLog savedLog = userActivityLogRepository.save(log);
+                System.out.println("✅ LogService: Log salvo com ID: " + savedLog.getId());
+            } catch (Exception saveError) {
+                // Se falhar ao salvar, apenas logar o erro mas não propagar
+                System.err.println("⚠️ LogService: Erro ao salvar log no banco (não crítico): " + saveError.getMessage());
+                // Não propagar exceção - o log é opcional
+            }
         } catch (Exception e) {
-            System.err.println("❌ LogService: Erro ao salvar log: " + e.getMessage());
-            e.printStackTrace();
+            // Capturar qualquer exceção não tratada e não propagar
+            System.err.println("❌ LogService: Erro inesperado ao processar log (não crítico): " + e.getMessage());
+            // Não fazer printStackTrace em produção para evitar poluição de logs
+            // e.printStackTrace();
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = Exception.class)
     public void logUserActivity(String username, String action, String details) {
         // Método de compatibilidade - chama o novo método com valores padrão
-        logUserActivity(username, action, details, "127.0.0.1", "Unknown", "session_unknown");
+        // Usar noRollbackFor para garantir que erros não afetem transações principais
+        try {
+            logUserActivity(username, action, details, "127.0.0.1", "Unknown", "session_unknown");
+        } catch (Exception e) {
+            // Garantir que exceções não sejam propagadas
+            System.err.println("⚠️ LogService: Erro no método de compatibilidade (não crítico): " + e.getMessage());
+        }
     }
 
     @Transactional

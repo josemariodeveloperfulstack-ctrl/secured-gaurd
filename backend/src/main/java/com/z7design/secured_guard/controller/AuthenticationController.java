@@ -60,39 +60,66 @@ public class AuthenticationController {
                     examples = @ExampleObject(value = "{\"username\": \"testuser\", \"password\": \"Password123!\"}")))
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
+        String username = request != null ? request.getUsername() : "unknown";
+        log.info("🔐 Iniciando processo de login para usuário: {}", username);
+        
         try {
+            log.debug("🔍 Chamando authenticationService.authenticate para usuário: {}", username);
             AuthenticationResponse response = authenticationService.authenticate(request);
+            log.info("✅ Autenticação bem-sucedida para usuário: {}", username);
             
-            // Log da atividade de login bem-sucedido
+            // Log da atividade de login bem-sucedido (não deve bloquear o login)
             try {
-                logService.logUserActivity(request.getUsername(), "LOGIN", 
-                    "Login realizado com sucesso via " + request.getUsername());
+                logService.logUserActivity(username, "LOGIN", 
+                    "Login realizado com sucesso via " + username);
+                log.debug("✅ Log de atividade registrado para usuário: {}", username);
             } catch (Exception logError) {
-                System.err.println("Erro no log service: " + logError.getMessage());
+                // Log do erro mas não interromper o fluxo
+                log.warn("⚠️ Erro ao registrar log de atividade (não crítico) para usuário {}: {}", 
+                    username, logError.getMessage());
+                // Não propagar o erro - o login foi bem-sucedido
             }
             
             return ResponseEntity.ok(response);
         } catch (org.springframework.security.core.AuthenticationException e) {
             // Exceções de autenticação devem retornar 401, não 500
-            log.warn("Tentativa de login falhou para usuário {}: {}", request.getUsername(), e.getMessage());
+            log.warn("❌ Tentativa de login falhou para usuário {}: {}", username, e.getMessage());
+            
+            // Tentar registrar log de falha (não deve bloquear a resposta)
+            try {
+                logService.logUserActivity(username, "LOGIN_FAILED", 
+                    "Tentativa de login falhou: " + e.getMessage());
+            } catch (Exception logError) {
+                log.debug("⚠️ Erro ao registrar log de falha (não crítico): {}", logError.getMessage());
+            }
+            
             return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
                 .body(Map.of("error", "Unauthorized", "message", "Invalid username or password."));
         } catch (Exception e) {
-            // Log da tentativa de login falhada
-            log.error("Erro ao processar login para usuário {}: {}", request.getUsername(), e.getMessage(), e);
+            // Log detalhado do erro
+            log.error("💥 ERRO CRÍTICO ao processar login para usuário {}: {}", username, e.getMessage(), e);
+            log.error("💥 Stack trace completo:", e);
             
             // Retornar erro 500 como último recurso, mas garantir que seja tratado
             try {
-                logService.logUserActivity(request != null ? request.getUsername() : "unknown", "LOGIN_FAILED", 
-                    "Tentativa de login falhou: " + e.getMessage());
+                logService.logUserActivity(username, "LOGIN_FAILED", 
+                    "Erro ao processar login: " + e.getMessage());
             } catch (Exception logError) {
-                System.err.println("Erro no log service ao falhar: " + logError.getMessage());
+                log.warn("⚠️ Erro ao registrar log de falha (não crítico): {}", logError.getMessage());
             }
             
-            // Retornar erro estruturado em vez de lançar exceção
+            // Retornar erro estruturado com mais detalhes para diagnóstico
+            String errorMessage = "Erro ao processar login. Tente novamente mais tarde.";
+            if (log.isDebugEnabled()) {
+                errorMessage += " Detalhes: " + e.getMessage();
+            }
+            
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Internal Server Error", 
-                           "message", "Erro ao processar login. Tente novamente mais tarde."));
+                .body(Map.of(
+                    "error", "Internal Server Error", 
+                    "message", errorMessage,
+                    "timestamp", java.time.Instant.now().toString()
+                ));
         }
     }
 
