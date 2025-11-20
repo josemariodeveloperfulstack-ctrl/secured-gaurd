@@ -44,6 +44,7 @@ import {
   Users,
   Plus,
   Link as LinkIcon,
+  Calendar,
 } from 'lucide-react';
 
 type CertificationFilter = 'all' | 'dueSoon' | 'expired' | 'compliant';
