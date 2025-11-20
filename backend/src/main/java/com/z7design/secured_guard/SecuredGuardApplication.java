@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import com.z7design.secured_guard.config.JwtConfig;
@@ -16,6 +17,7 @@ import com.z7design.secured_guard.config.JwtConfig;
 @EnableAspectJAutoProxy
 @EnableMethodSecurity
 @EnableScheduling
+@EnableAsync
 @EntityScan("com.z7design.secured_guard.model")
 @EnableJpaRepositories("com.z7design.secured_guard.repository")
 @ComponentScan(basePackages = "com.z7design.secured_guard")
