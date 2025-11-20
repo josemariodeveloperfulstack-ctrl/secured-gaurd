@@ -24,7 +24,8 @@ import {
   Mail,
   Bell,
   Users,
-  Filter
+  Filter,
+  SendHorizontal
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import { useMessageStore, SystemMessage } from '../../stores/messageStore';
@@ -104,7 +105,14 @@ const MessageDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const messagesData = await messageService.getSystemMessages(page, 10);
+      let messagesData;
+      
+      // Buscar mensagens enviadas ou recebidas baseado na aba
+      if (tab === 'sent') {
+        messagesData = await messageService.getSentMessages(page, 10);
+      } else {
+        messagesData = await messageService.getSystemMessages(page, 10);
+      }
       
       if (page === 0) {
         setSystemMessages(messagesData.messages);
@@ -232,6 +240,9 @@ const MessageDashboard: React.FC = () => {
   // Filtrar mensagens baseado na aba ativa
   const getFilteredMessages = () => {
     switch (activeTab) {
+      case 'sent':
+        // Mensagens enviadas já vêm filtradas do backend
+        return systemMessages;
       case 'unread':
         return systemMessages.filter(msg => msg.status === 'UNREAD');
       case 'read':
@@ -239,6 +250,7 @@ const MessageDashboard: React.FC = () => {
       case 'archived':
         return systemMessages.filter(msg => msg.status === 'ARCHIVED');
       default:
+        // 'received' - todas as mensagens recebidas
         return systemMessages;
     }
   };
@@ -403,36 +415,44 @@ const MessageDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 bg-seguranca-black p-2">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 bg-seguranca-black p-2">
               <TabsTrigger 
                 value="received" 
-                className="data-[state='active']:bg-blue-600 data-[state='active']:text-white transition-all"
+                className="data-[state='active']:bg-blue-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
               >
-                <Inbox className="w-4 h-4 mr-2" />
+                <Inbox className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Recebidas</span>
                 <span className="sm:hidden">Inbox</span>
               </TabsTrigger>
               <TabsTrigger 
-                value="unread"
-                className="data-[state='active']:bg-red-600 data-[state='active']:text-white transition-all"
+                value="sent"
+                className="data-[state='active']:bg-cyan-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
               >
-                <Eye className="w-4 h-4 mr-2" />
+                <SendHorizontal className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Enviadas</span>
+                <span className="sm:hidden">Enviadas</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="unread"
+                className="data-[state='active']:bg-red-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
+              >
+                <Eye className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Não Lidas</span>
                 <span className="sm:hidden">Novas</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="read"
-                className="data-[state='active']:bg-green-600 data-[state='active']:text-white transition-all"
+                className="data-[state='active']:bg-green-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
               >
-                <CheckCircle className="w-4 h-4 mr-2" />
+                <CheckCircle className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Lidas</span>
                 <span className="sm:hidden">Lidas</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="archived"
-                className="data-[state='active']:bg-purple-600 data-[state='active']:text-white transition-all"
+                className="data-[state='active']:bg-purple-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
               >
-                <Archive className="w-4 h-4 mr-2" />
+                <Archive className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Arquivadas</span>
                 <span className="sm:hidden">Arquiv.</span>
               </TabsTrigger>

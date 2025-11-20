@@ -105,6 +105,25 @@ export const messageService = {
     }
   },
 
+  async getSentMessages(page = 0, size = 10): Promise<{ messages: SystemMessage[]; totalPages: number; hasNext: boolean }> {
+    try {
+      const response = await api.get('/api/v1/messages/sent', {
+        headers: getAuthHeaders(),
+        params: { page, size, sort: 'createdAt,desc' }
+      });
+
+      // Usar o adaptador para converter a resposta do backend
+      return adaptPaginatedResponse(response.data);
+    } catch (error) {
+      console.warn('[MessageService] Erro ao buscar mensagens enviadas:', error);
+      return {
+        messages: [],
+        totalPages: 0,
+        hasNext: false
+      };
+    }
+  },
+
   async sendSystemMessage(messageData: {
     title: string;
     content: string;
