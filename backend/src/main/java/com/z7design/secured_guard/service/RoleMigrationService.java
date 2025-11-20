@@ -125,8 +125,8 @@ public class RoleMigrationService {
     @Transactional
     public void createDefaultRolesIfNotExist() {
         try {
-        log.info("Verificando e criando roles padrão...");
-        
+            log.info("Verificando e criando roles padrão...");
+            
             // Verificar se já existem roles
             long roleCount = roleRepository.count();
             if (roleCount > 0) {
@@ -137,7 +137,9 @@ public class RoleMigrationService {
             createDefaultRoles();
             log.info("Roles padrão criadas com sucesso!");
         } catch (Exception e) {
-            log.error("Erro durante criação de roles padrão: {}", e.getMessage(), e);
+            log.error("❌ Erro durante criação de roles padrão: {}", e.getMessage(), e);
+            // Não re-lançar exceção para não crashar a aplicação
+            // A criação de roles padrão não é crítica para o funcionamento básico
         }
     }
 

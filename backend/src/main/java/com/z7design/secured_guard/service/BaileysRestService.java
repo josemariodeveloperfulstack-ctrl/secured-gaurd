@@ -84,6 +84,12 @@ public class BaileysRestService {
      */
     public boolean initializeInstance() {
         try {
+            // Se Baileys não estiver habilitado, retornar false sem tentar inicializar
+            if (!baileysEnabled) {
+                logger.debug("Baileys não está habilitado. Não é possível inicializar instância.");
+                return false;
+            }
+            
             // Verificar se a conexão está fechada
             String connectionState = checkConnectionState();
             if ("closed".equals(connectionState) || "close".equals(connectionState)) {
@@ -117,11 +123,18 @@ public class BaileysRestService {
                 return true;
             } else {
                 logger.error("❌ Erro ao inicializar instância. Status: {}", response.getStatusCode());
+                lastErrorMessage = "Erro ao inicializar instância. Status: " + response.getStatusCode();
                 return false;
             }
             
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Serviço não disponível - não é um erro crítico
+            logger.warn("⚠️ Serviço Baileys REST não disponível: {}", e.getMessage());
+            lastErrorMessage = "Serviço WhatsApp não disponível: " + e.getMessage();
+            return false;
         } catch (Exception e) {
-            logger.error("❌ Erro ao inicializar instância Baileys REST", e);
+            logger.error("❌ Erro ao inicializar instância Baileys REST: {}", e.getMessage());
+            lastErrorMessage = "Erro ao inicializar instância: " + e.getMessage();
             return false;
         }
     }
@@ -131,6 +144,11 @@ public class BaileysRestService {
      */
     private String checkConnectionState() {
         try {
+            // Se Baileys não estiver habilitado, retornar "closed"
+            if (!baileysEnabled) {
+                return "closed";
+            }
+            
             String url = baileysRestUrl + "/instance/connectionState?key=" + instanceKey;
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
             
@@ -149,6 +167,10 @@ public class BaileysRestService {
             
             return "unknown";
             
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Serviço não disponível - não é um erro crítico
+            logger.debug("Serviço Baileys REST não disponível ao verificar estado: {}", e.getMessage());
+            return "closed";
         } catch (Exception e) {
             logger.warn("⚠️ Erro ao verificar estado da conexão: {}", e.getMessage());
             return "unknown";
@@ -160,6 +182,12 @@ public class BaileysRestService {
      */
     public boolean checkConnection() {
         try {
+            // Se Baileys não estiver habilitado, retornar false sem tentar conectar
+            if (!baileysEnabled) {
+                logger.debug("Baileys não está habilitado. Retornando false.");
+                return false;
+            }
+            
             String url = baileysRestUrl + "/instance/connectionState?key=" + instanceKey;
             
             HttpHeaders headers = new HttpHeaders();
@@ -167,6 +195,7 @@ public class BaileysRestService {
             
             HttpEntity<String> request = new HttpEntity<>(headers);
             
+            // Timeout curto para não travar a aplicação
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
@@ -177,8 +206,15 @@ public class BaileysRestService {
             
             return false;
             
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Serviço não disponível - não é um erro crítico
+            logger.debug("Serviço Baileys REST não disponível: {}", e.getMessage());
+            lastErrorMessage = "Serviço WhatsApp não disponível: " + e.getMessage();
+            return false;
         } catch (Exception e) {
-            logger.error("Erro ao verificar conexão Baileys REST", e);
+            // Outros erros - logar mas não crashar
+            logger.warn("⚠️ Erro ao verificar conexão Baileys REST: {}", e.getMessage());
+            lastErrorMessage = "Erro ao verificar conexão: " + e.getMessage();
             return false;
         }
     }
