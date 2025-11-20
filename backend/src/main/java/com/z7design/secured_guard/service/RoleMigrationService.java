@@ -62,43 +62,51 @@ public class RoleMigrationService {
         }
     }
 
+    @Transactional
     private void migrateExistingUsers() {
-        List<User> users = userRepository.findAll();
+        // Usar paginação para evitar carregar todos os usuários de uma vez
+        int pageSize = 100;
+        int page = 0;
+        List<User> users;
         
-        for (User user : users) {
-            try {
-                // Se o usuário já tem role_id, pular
-                if (user.getRoles() != null && !user.getRoles().isEmpty()) {
-                    log.debug("Usuário {} já tem role JPA, pulando...", user.getUsername());
-                    continue;
-                }
-
-                // Tentar migrar baseado no campo role enum (se ainda existir)
-                // Como o modelo foi refatorado, vamos buscar o role pelo nome do usuário
-                // ou criar um role padrão
-                
-                String roleName = determineUserRoleName(user);
-                Optional<Role> roleOpt = roleRepository.findByName(roleName);
-                
-                if (roleOpt.isPresent()) {
-                    user.setRoles(new java.util.HashSet<>(java.util.List.of(roleOpt.get())));
-                    userRepository.save(user);
-                    log.info("Usuário {} migrado para role: {}", user.getUsername(), roleName);
-                } else {
-                    // Se não encontrar o role, usar SUPER_ADMIN como padrão
-                    Optional<Role> defaultRole = roleRepository.findByName("SUPER_ADMIN");
-                    if (defaultRole.isPresent()) {
-                        user.setRoles(new java.util.HashSet<>(java.util.List.of(defaultRole.get())));
-                        userRepository.save(user);
-                        log.warn("Usuário {} migrado para role padrão SUPER_ADMIN", user.getUsername());
-                    } else {
-                        log.error("Não foi possível encontrar role SUPER_ADMIN para usuário: {}", user.getUsername());
+        do {
+            users = userRepository.findAll(org.springframework.data.domain.PageRequest.of(page, pageSize)).getContent();
+            page++;
+            
+            for (User user : users) {
+                try {
+                    // Se o usuário já tem role_id, pular
+                    if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+                        log.debug("Usuário {} já tem role JPA, pulando...", user.getUsername());
+                        continue;
                     }
+
+                    // Tentar migrar baseado no campo role enum (se ainda existir)
+                    // Como o modelo foi refatorado, vamos buscar o role pelo nome do usuário
+                    // ou criar um role padrão
+                    
+                    String roleName = determineUserRoleName(user);
+                    Optional<Role> roleOpt = roleRepository.findByName(roleName);
+                    
+                    if (roleOpt.isPresent()) {
+                        user.setRoles(new java.util.HashSet<>(java.util.List.of(roleOpt.get())));
+                        userRepository.save(user);
+                        log.info("Usuário {} migrado para role: {}", user.getUsername(), roleName);
+                    } else {
+                        // Se não encontrar o role, usar SUPER_ADMIN como padrão
+                        Optional<Role> defaultRole = roleRepository.findByName("SUPER_ADMIN");
+                        if (defaultRole.isPresent()) {
+                            user.setRoles(new java.util.HashSet<>(java.util.List.of(defaultRole.get())));
+                            userRepository.save(user);
+                            log.warn("Usuário {} migrado para role padrão SUPER_ADMIN", user.getUsername());
+                        } else {
+                            log.error("Não foi possível encontrar role SUPER_ADMIN para usuário: {}", user.getUsername());
+                        }
+                    }
+                    
+                } catch (Exception e) {
+                    log.error("Erro ao migrar usuário {}: {}", user.getUsername(), e.getMessage(), e);
                 }
-                
-            } catch (Exception e) {
-                log.error("Erro ao migrar usuário {}: {}", user.getUsername(), e.getMessage(), e);
-            }
             }
         } while (!users.isEmpty());
     }
