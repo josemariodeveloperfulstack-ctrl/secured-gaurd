@@ -303,6 +303,68 @@ public class StockController {
         return ResponseEntity.ok(report);
     }
 
+    @GetMapping("/reports/item/{itemId}")
+    @Operation(summary = "Relatório por item", description = "Retorna relatório detalhado de um item específico")
+    public ResponseEntity<com.z7design.secured_guard.dto.StockItemReportDTO> getItemReport(@PathVariable UUID itemId) {
+        log.info("GET /api/stock/reports/item/{} - Gerando relatório do item", itemId);
+        try {
+            com.z7design.secured_guard.dto.StockItemReportDTO report = stockService.getItemReport(itemId);
+            return ResponseEntity.ok(report);
+        } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório do item {}: {}", itemId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/reports/movements")
+    @Operation(summary = "Relatório de movimentações", description = "Retorna relatório detalhado de movimentações com filtros")
+    public ResponseEntity<com.z7design.secured_guard.dto.MovementsReportDTO> getMovementsReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(required = false) UUID itemId,
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) MovementType movementType) {
+        log.info("GET /api/stock/reports/movements - Gerando relatório de movimentações");
+        try {
+            com.z7design.secured_guard.dto.MovementsReportDTO report = stockService.getMovementsReport(
+                    startDate, endDate, itemId, employeeId, movementType);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de movimentações: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/reports/low-stock")
+    @Operation(summary = "Relatório de estoque baixo", description = "Retorna relatório de itens com estoque baixo ou zerado")
+    public ResponseEntity<com.z7design.secured_guard.dto.LowStockReportDTO> getLowStockReport() {
+        log.info("GET /api/stock/reports/low-stock - Gerando relatório de estoque baixo");
+        try {
+            com.z7design.secured_guard.dto.LowStockReportDTO report = stockService.getLowStockReport();
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de estoque baixo: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/reports/date-range")
+    @Operation(summary = "Relatório por período", description = "Retorna relatório detalhado de movimentações por período")
+    public ResponseEntity<com.z7design.secured_guard.dto.DateRangeReportDTO> getDateRangeReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        log.info("GET /api/stock/reports/date-range - Gerando relatório por período de {} até {}", startDate, endDate);
+        try {
+            com.z7design.secured_guard.dto.DateRangeReportDTO report = stockService.getDateRangeReport(startDate, endDate);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório por período: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     // ===== ENUMS PARA FRONTEND =====
 
     @GetMapping("/enums/categories")

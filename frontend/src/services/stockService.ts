@@ -328,6 +328,59 @@ export const stockService = {
     }
   },
 
+  async getItemReport(itemId: string): Promise<any> {
+    try {
+      const response = await api.get(`/api/stock/reports/item/${itemId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório do item:', error);
+      throw new Error('Falha ao gerar relatório do item');
+    }
+  },
+
+  async getMovementsReport(params: {
+    startDate?: string;
+    endDate?: string;
+    itemId?: string;
+    employeeId?: string;
+    movementType?: MovementType;
+  }): Promise<any> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.startDate) queryParams.append('startDate', params.startDate);
+      if (params.endDate) queryParams.append('endDate', params.endDate);
+      if (params.itemId) queryParams.append('itemId', params.itemId);
+      if (params.employeeId) queryParams.append('employeeId', params.employeeId);
+      if (params.movementType) queryParams.append('movementType', params.movementType);
+      
+      const response = await api.get(`/api/stock/reports/movements?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório de movimentações:', error);
+      throw new Error('Falha ao gerar relatório de movimentações');
+    }
+  },
+
+  async getLowStockReport(): Promise<any> {
+    try {
+      const response = await api.get('/api/stock/reports/low-stock');
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório de estoque baixo:', error);
+      throw new Error('Falha ao gerar relatório de estoque baixo');
+    }
+  },
+
+  async getDateRangeReport(startDate: string, endDate: string): Promise<any> {
+    try {
+      const response = await api.get(`/api/stock/reports/date-range?startDate=${startDate}&endDate=${endDate}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório por período:', error);
+      throw new Error('Falha ao gerar relatório por período');
+    }
+  },
+
   // ===== ENUMS =====
 
   async getCategories(): Promise<StockCategory[]> {

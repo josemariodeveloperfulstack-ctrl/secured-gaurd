@@ -3,6 +3,11 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.StockItemDTO;
 import com.z7design.secured_guard.dto.StockMovementDTO;
 import com.z7design.secured_guard.dto.StockAlertDTO;
+import com.z7design.secured_guard.dto.StockItemReportDTO;
+import com.z7design.secured_guard.dto.MovementSummaryDTO;
+import com.z7design.secured_guard.dto.MovementsReportDTO;
+import com.z7design.secured_guard.dto.LowStockReportDTO;
+import com.z7design.secured_guard.dto.DateRangeReportDTO;
 import com.z7design.secured_guard.model.StockItem;
 import com.z7design.secured_guard.model.StockMovement;
 import com.z7design.secured_guard.model.StockAlert;
@@ -29,12 +34,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.criteria.Predicate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -469,6 +473,549 @@ public class StockService {
             "lowStockItems", lowStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList()),
             "outOfStockItems", outOfStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList())
         );
+    }
+
+    // ===== RELATÓRIOS DETALHADOS =====
+
+    @Transactional(readOnly = true)
+    public StockItemReportDTO getItemReport(UUID itemId) {
+        log.info("Gerando relatório detalhado para item: {}", itemId);
+        
+        StockItem item = stockItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: " + itemId));
+        
+        List<StockMovement> movements = stockMovementRepository.findByStockItemIdOrderByMovementDateDesc(itemId);
+        
+        long totalMovements = movements.size();
+        long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
+        long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
+        
+        int totalQuantityEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        int totalQuantityExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        BigDecimal totalCostEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal totalCostExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        LocalDateTime lastMovementDate = movements.isEmpty() ? null : movements.get(0).getMovementDate();
+        
+        // Calcular giro de estoque (quantidade média movimentada por mês nos últimos 6 meses)
+        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
+        List<StockMovement> recentMovements = movements.stream()
+                .filter(m -> m.getMovementDate().isAfter(sixMonthsAgo))
+                .collect(Collectors.toList());
+        
+        int recentQuantityExited = recentMovements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        double turnoverRate = recentQuantityExited > 0 && item.getCurrentQuantity() > 0 
+                ? (double) recentQuantityExited / (6.0 * item.getCurrentQuantity()) 
+                : 0.0;
+        
+        int averageMonthlyConsumption = recentMovements.size() > 0 
+                ? recentQuantityExited / 6 
+                : 0;
+        
+        String status = item.getCurrentQuantity() == 0 ? "OUT" :
+                       item.getCurrentQuantity() <= item.getMinimumQuantity() ? "LOW" :
+                       item.getCurrentQuantity() > (item.getMinimumQuantity() * 3) ? "OVER" : "NORMAL";
+        
+        BigDecimal totalValue = item.getUnitCost() != null && item.getCurrentQuantity() != null
+                ? item.getUnitCost().multiply(BigDecimal.valueOf(item.getCurrentQuantity()))
+                : BigDecimal.ZERO;
+        
+        List<MovementSummaryDTO> recentMovementsDTO = movements.stream()
+                .limit(10)
+                .map(this::convertToMovementSummaryDTO)
+                .collect(Collectors.toList());
+        
+        return StockItemReportDTO.builder()
+                .id(item.getId())
+                .code(item.getCode())
+                .name(item.getName())
+                .category(item.getCategory())
+                .sizeVariation(item.getSizeVariation())
+                .currentQuantity(item.getCurrentQuantity())
+                .minimumQuantity(item.getMinimumQuantity())
+                .unitCost(item.getUnitCost())
+                .totalValue(totalValue)
+                .supplier(item.getSupplier())
+                .unitName(item.getUnit() != null ? item.getUnit().getName() : null)
+                .lastMovementDate(lastMovementDate)
+                .totalMovements(totalMovements)
+                .totalEntries(totalEntries)
+                .totalExits(totalExits)
+                .totalQuantityEntered(totalQuantityEntered)
+                .totalQuantityExited(totalQuantityExited)
+                .totalCostEntered(totalCostEntered)
+                .totalCostExited(totalCostExited)
+                .turnoverRate(turnoverRate)
+                .averageMonthlyConsumption(averageMonthlyConsumption)
+                .status(status)
+                .recentMovements(recentMovementsDTO)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public MovementsReportDTO getMovementsReport(LocalDateTime startDate, LocalDateTime endDate, UUID itemId, UUID employeeId, MovementType movementType) {
+        log.info("Gerando relatório de movimentações de {} até {}", startDate, endDate);
+        
+        Specification<StockMovement> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("movementDate"), startDate));
+            }
+            if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("movementDate"), endDate));
+            }
+            if (itemId != null) {
+                predicates.add(cb.equal(root.get("stockItem").get("id"), itemId));
+            }
+            if (employeeId != null) {
+                predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
+            }
+            if (movementType != null) {
+                predicates.add(cb.equal(root.get("movementType"), movementType));
+            }
+            
+            query.orderBy(cb.desc(root.get("movementDate")));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        
+        List<StockMovement> movements = stockMovementRepository.findAll(spec);
+        
+        long totalMovements = movements.size();
+        long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
+        long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
+        
+        int totalQuantityEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        int totalQuantityExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        BigDecimal totalCostEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal totalCostExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        Map<String, Long> movementsByType = movements.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getMovementType().name(),
+                        Collectors.counting()
+                ));
+        
+        Map<String, Long> movementsByReason = movements.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getReason().name(),
+                        Collectors.counting()
+                ));
+        
+        DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        Map<String, Integer> movementsByDay = movements.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getMovementDate().format(dayFormatter),
+                        Collectors.summingInt(StockMovement::getQuantity)
+                ));
+        
+        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        Map<String, Integer> movementsByMonth = movements.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getMovementDate().format(monthFormatter),
+                        Collectors.summingInt(StockMovement::getQuantity)
+                ));
+        
+        // Top itens mais movimentados
+        Map<UUID, MovementsReportDTO.ItemMovementSummaryDTO> itemMap = new HashMap<>();
+        for (StockMovement m : movements) {
+            UUID itemIdKey = m.getStockItem().getId();
+            MovementsReportDTO.ItemMovementSummaryDTO summary = itemMap.getOrDefault(itemIdKey,
+                    MovementsReportDTO.ItemMovementSummaryDTO.builder()
+                            .itemId(itemIdKey.toString())
+                            .itemName(m.getStockItem().getName())
+                            .itemCode(m.getStockItem().getCode())
+                            .movementCount(0L)
+                            .totalQuantity(0)
+                            .totalCost(BigDecimal.ZERO)
+                            .build());
+            
+            summary.setMovementCount(summary.getMovementCount() + 1);
+            summary.setTotalQuantity(summary.getTotalQuantity() + m.getQuantity());
+            if (m.getTotalCost() != null) {
+                summary.setTotalCost(summary.getTotalCost().add(m.getTotalCost()));
+            }
+            itemMap.put(itemIdKey, summary);
+        }
+        
+        List<MovementsReportDTO.ItemMovementSummaryDTO> topMovedItems = itemMap.values().stream()
+                .sorted((a, b) -> Long.compare(b.getMovementCount(), a.getMovementCount()))
+                .limit(10)
+                .collect(Collectors.toList());
+        
+        // Top funcionários
+        Map<UUID, MovementsReportDTO.EmployeeMovementSummaryDTO> employeeMap = new HashMap<>();
+        for (StockMovement m : movements) {
+            if (m.getEmployee() != null) {
+                UUID empId = m.getEmployee().getId();
+                MovementsReportDTO.EmployeeMovementSummaryDTO summary = employeeMap.getOrDefault(empId,
+                        MovementsReportDTO.EmployeeMovementSummaryDTO.builder()
+                                .employeeId(empId.toString())
+                                .employeeName(m.getEmployeeName())
+                                .movementCount(0L)
+                                .totalQuantity(0)
+                                .itemsReceived(new ArrayList<>())
+                                .build());
+                
+                summary.setMovementCount(summary.getMovementCount() + 1);
+                summary.setTotalQuantity(summary.getTotalQuantity() + m.getQuantity());
+                if (!summary.getItemsReceived().contains(m.getStockItem().getName())) {
+                    summary.getItemsReceived().add(m.getStockItem().getName());
+                }
+                employeeMap.put(empId, summary);
+            }
+        }
+        
+        List<MovementsReportDTO.EmployeeMovementSummaryDTO> topEmployees = employeeMap.values().stream()
+                .sorted((a, b) -> Long.compare(b.getMovementCount(), a.getMovementCount()))
+                .limit(10)
+                .collect(Collectors.toList());
+        
+        List<MovementSummaryDTO> movementsDTO = movements.stream()
+                .map(this::convertToMovementSummaryDTO)
+                .collect(Collectors.toList());
+        
+        return MovementsReportDTO.builder()
+                .startDate(startDate)
+                .endDate(endDate)
+                .totalMovements(totalMovements)
+                .totalEntries(totalEntries)
+                .totalExits(totalExits)
+                .totalQuantityEntered(totalQuantityEntered)
+                .totalQuantityExited(totalQuantityExited)
+                .totalCostEntered(totalCostEntered)
+                .totalCostExited(totalCostExited)
+                .movements(movementsDTO)
+                .movementsByType(movementsByType)
+                .movementsByReason(movementsByReason)
+                .movementsByDay(movementsByDay)
+                .movementsByMonth(movementsByMonth)
+                .topMovedItems(topMovedItems)
+                .topEmployees(topEmployees)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public LowStockReportDTO getLowStockReport() {
+        log.info("Gerando relatório de estoque baixo");
+        
+        List<StockItem> allItems = stockItemRepository.findByActiveTrue();
+        List<StockItem> lowStockItems = stockItemRepository.findLowStockItems();
+        List<StockItem> outOfStockItems = stockItemRepository.findOutOfStockItems();
+        
+        // Itens críticos (estoque <= 10% do mínimo)
+        List<StockItem> criticalItems = allItems.stream()
+                .filter(item -> item.getMinimumQuantity() > 0 && 
+                               item.getCurrentQuantity() <= (item.getMinimumQuantity() * 0.1))
+                .collect(Collectors.toList());
+        
+        BigDecimal totalValueAtRisk = lowStockItems.stream()
+                .filter(item -> item.getUnitCost() != null)
+                .map(item -> item.getUnitCost().multiply(BigDecimal.valueOf(item.getCurrentQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        List<StockItemReportDTO> itemsDTO = lowStockItems.stream()
+                .map(item -> convertToItemReportDTO(item, false))
+                .collect(Collectors.toList());
+        
+        List<StockItemReportDTO> criticalItemsDTO = criticalItems.stream()
+                .map(item -> convertToItemReportDTO(item, false))
+                .collect(Collectors.toList());
+        
+        List<StockItemReportDTO> outOfStockItemsDTO = outOfStockItems.stream()
+                .map(item -> convertToItemReportDTO(item, false))
+                .collect(Collectors.toList());
+        
+        return LowStockReportDTO.builder()
+                .totalItems((long) allItems.size())
+                .lowStockItems((long) lowStockItems.size())
+                .outOfStockItems((long) outOfStockItems.size())
+                .criticalItems((long) criticalItems.size())
+                .totalValueAtRisk(totalValueAtRisk)
+                .items(itemsDTO)
+                .criticalItemsList(criticalItemsDTO)
+                .outOfStockItemsList(outOfStockItemsDTO)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public DateRangeReportDTO getDateRangeReport(LocalDateTime startDate, LocalDateTime endDate) {
+        log.info("Gerando relatório por período de {} até {}", startDate, endDate);
+        
+        List<StockMovement> movements = stockMovementRepository.findByMovementDateBetweenOrderByMovementDateDesc(
+                startDate, endDate);
+        
+        long totalMovements = movements.size();
+        long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
+        long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
+        
+        int totalQuantityEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        int totalQuantityExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        BigDecimal totalCostEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal totalCostExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Resumo diário
+        DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        Map<String, DateRangeReportDTO.DailySummaryDTO> dailySummaries = new HashMap<>();
+        for (StockMovement m : movements) {
+            String dateKey = m.getMovementDate().format(dayFormatter);
+            DateRangeReportDTO.DailySummaryDTO daily = dailySummaries.getOrDefault(dateKey,
+                    DateRangeReportDTO.DailySummaryDTO.builder()
+                            .date(dateKey)
+                            .movements(0L)
+                            .entries(0)
+                            .exits(0)
+                            .costEntered(BigDecimal.ZERO)
+                            .costExited(BigDecimal.ZERO)
+                            .build());
+            
+            daily.setMovements(daily.getMovements() + 1);
+            if (m.getMovementType() == MovementType.ENTRADA) {
+                daily.setEntries(daily.getEntries() + m.getQuantity());
+                if (m.getTotalCost() != null) {
+                    daily.setCostEntered(daily.getCostEntered().add(m.getTotalCost()));
+                }
+            } else {
+                daily.setExits(daily.getExits() + m.getQuantity());
+                if (m.getTotalCost() != null) {
+                    daily.setCostExited(daily.getCostExited().add(m.getTotalCost()));
+                }
+            }
+            dailySummaries.put(dateKey, daily);
+        }
+        
+        // Resumo mensal
+        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        Map<String, DateRangeReportDTO.MonthlySummaryDTO> monthlySummaries = new HashMap<>();
+        for (StockMovement m : movements) {
+            String monthKey = m.getMovementDate().format(monthFormatter);
+            DateRangeReportDTO.MonthlySummaryDTO monthly = monthlySummaries.getOrDefault(monthKey,
+                    DateRangeReportDTO.MonthlySummaryDTO.builder()
+                            .month(monthKey)
+                            .movements(0L)
+                            .entries(0)
+                            .exits(0)
+                            .costEntered(BigDecimal.ZERO)
+                            .costExited(BigDecimal.ZERO)
+                            .build());
+            
+            monthly.setMovements(monthly.getMovements() + 1);
+            if (m.getMovementType() == MovementType.ENTRADA) {
+                monthly.setEntries(monthly.getEntries() + m.getQuantity());
+                if (m.getTotalCost() != null) {
+                    monthly.setCostEntered(monthly.getCostEntered().add(m.getTotalCost()));
+                }
+            } else {
+                monthly.setExits(monthly.getExits() + m.getQuantity());
+                if (m.getTotalCost() != null) {
+                    monthly.setCostExited(monthly.getCostExited().add(m.getTotalCost()));
+                }
+            }
+            monthlySummaries.put(monthKey, monthly);
+        }
+        
+        // Itens com movimentações
+        Set<UUID> itemIds = movements.stream()
+                .map(m -> m.getStockItem().getId())
+                .collect(Collectors.toSet());
+        
+        List<StockItemReportDTO> itemsWithMovements = itemIds.stream()
+                .map(id -> {
+                    StockItem item = stockItemRepository.findById(id).orElse(null);
+                    return item != null ? convertToItemReportDTO(item, true) : null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        
+        // Resumo por categoria
+        Map<StockCategory, DateRangeReportDTO.CategorySummaryDTO> categoryMap = new HashMap<>();
+        for (StockMovement m : movements) {
+            StockCategory category = m.getStockItem().getCategory();
+            DateRangeReportDTO.CategorySummaryDTO summary = categoryMap.getOrDefault(category,
+                    DateRangeReportDTO.CategorySummaryDTO.builder()
+                            .category(category.name())
+                            .totalMovements(0L)
+                            .totalQuantity(0)
+                            .totalCost(BigDecimal.ZERO)
+                            .itemsCount(0L)
+                            .build());
+            
+            summary.setTotalMovements(summary.getTotalMovements() + 1);
+            summary.setTotalQuantity(summary.getTotalQuantity() + m.getQuantity());
+            if (m.getTotalCost() != null) {
+                summary.setTotalCost(summary.getTotalCost().add(m.getTotalCost()));
+            }
+            categoryMap.put(category, summary);
+        }
+        
+        // Contar itens únicos por categoria
+        for (StockCategory category : categoryMap.keySet()) {
+            long uniqueItems = movements.stream()
+                    .filter(m -> m.getStockItem().getCategory() == category)
+                    .map(m -> m.getStockItem().getId())
+                    .distinct()
+                    .count();
+            categoryMap.get(category).setItemsCount(uniqueItems);
+        }
+        
+        List<DateRangeReportDTO.CategorySummaryDTO> categorySummaries = new ArrayList<>(categoryMap.values());
+        
+        return DateRangeReportDTO.builder()
+                .startDate(startDate)
+                .endDate(endDate)
+                .totalMovements(totalMovements)
+                .totalEntries(totalEntries)
+                .totalExits(totalExits)
+                .totalQuantityEntered(totalQuantityEntered)
+                .totalQuantityExited(totalQuantityExited)
+                .totalCostEntered(totalCostEntered)
+                .totalCostExited(totalCostExited)
+                .dailySummaries(dailySummaries)
+                .monthlySummaries(monthlySummaries)
+                .itemsWithMovements(itemsWithMovements)
+                .categorySummaries(categorySummaries)
+                .build();
+    }
+
+    // ===== MÉTODOS AUXILIARES PARA RELATÓRIOS =====
+
+    private MovementSummaryDTO convertToMovementSummaryDTO(StockMovement movement) {
+        return MovementSummaryDTO.builder()
+                .id(movement.getId())
+                .movementDate(movement.getMovementDate())
+                .movementType(movement.getMovementType())
+                .reason(movement.getReason())
+                .quantity(movement.getQuantity())
+                .previousQuantity(movement.getPreviousQuantity())
+                .newQuantity(movement.getNewQuantity())
+                .unitCost(movement.getUnitCost())
+                .totalCost(movement.getTotalCost())
+                .employeeName(movement.getEmployeeName())
+                .userName(movement.getUserName())
+                .documentNumber(movement.getDocumentNumber())
+                .itemName(movement.getStockItem().getName())
+                .itemCode(movement.getStockItem().getCode())
+                .build();
+    }
+
+    private StockItemReportDTO convertToItemReportDTO(StockItem item, boolean includeMovements) {
+        List<StockMovement> movements = includeMovements 
+                ? stockMovementRepository.findByStockItemIdOrderByMovementDateDesc(item.getId())
+                : new ArrayList<>();
+        
+        long totalMovements = movements.size();
+        long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
+        long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
+        
+        int totalQuantityEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        int totalQuantityExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA)
+                .mapToInt(StockMovement::getQuantity)
+                .sum();
+        
+        BigDecimal totalCostEntered = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal totalCostExited = movements.stream()
+                .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
+                .map(StockMovement::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        LocalDateTime lastMovementDate = movements.isEmpty() ? null : movements.get(0).getMovementDate();
+        
+        String status = item.getCurrentQuantity() == 0 ? "OUT" :
+                       item.getCurrentQuantity() <= item.getMinimumQuantity() ? "LOW" :
+                       item.getCurrentQuantity() > (item.getMinimumQuantity() * 3) ? "OVER" : "NORMAL";
+        
+        BigDecimal totalValue = item.getUnitCost() != null && item.getCurrentQuantity() != null
+                ? item.getUnitCost().multiply(BigDecimal.valueOf(item.getCurrentQuantity()))
+                : BigDecimal.ZERO;
+        
+        List<MovementSummaryDTO> recentMovementsDTO = includeMovements 
+                ? movements.stream()
+                        .limit(10)
+                        .map(this::convertToMovementSummaryDTO)
+                        .collect(Collectors.toList())
+                : new ArrayList<>();
+        
+        return StockItemReportDTO.builder()
+                .id(item.getId())
+                .code(item.getCode())
+                .name(item.getName())
+                .category(item.getCategory())
+                .sizeVariation(item.getSizeVariation())
+                .currentQuantity(item.getCurrentQuantity())
+                .minimumQuantity(item.getMinimumQuantity())
+                .unitCost(item.getUnitCost())
+                .totalValue(totalValue)
+                .supplier(item.getSupplier())
+                .unitName(item.getUnit() != null ? item.getUnit().getName() : null)
+                .lastMovementDate(lastMovementDate)
+                .totalMovements(totalMovements)
+                .totalEntries(totalEntries)
+                .totalExits(totalExits)
+                .totalQuantityEntered(totalQuantityEntered)
+                .totalQuantityExited(totalQuantityExited)
+                .totalCostEntered(totalCostEntered)
+                .totalCostExited(totalCostExited)
+                .status(status)
+                .recentMovements(recentMovementsDTO)
+                .build();
     }
 
     // ===== MÉTODOS AUXILIARES =====

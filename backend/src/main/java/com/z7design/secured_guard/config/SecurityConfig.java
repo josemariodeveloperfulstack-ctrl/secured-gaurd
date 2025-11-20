@@ -58,6 +58,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/files/**").permitAll()
                 .requestMatchers("/api/test/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
+                .requestMatchers("/api/diagnostic/**").permitAll()
                 .requestMatchers("/api/debug/**").permitAll()
                 // Endpoints públicos do portal (vagas, etc)
                 .requestMatchers("/api/public/**").permitAll()
