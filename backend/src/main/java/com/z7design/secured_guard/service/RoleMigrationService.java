@@ -2,7 +2,6 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.Role;
 import com.z7design.secured_guard.model.User;
-import com.z7design.secured_guard.model.enums.UserRole;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
