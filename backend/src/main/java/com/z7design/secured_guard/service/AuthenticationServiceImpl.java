@@ -150,14 +150,23 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             try {
                 if (user.getRoles() != null && !user.getRoles().isEmpty()) {
                     roles = user.getRoles().stream()
-                            .map(Role::getName)
+                            .filter(role -> role != null) // Filtrar roles nulas
+                            .map(role -> {
+                                try {
+                                    return role.getName();
+                                } catch (Exception e) {
+                                    log.warn("⚠️ Erro ao obter nome da role: {}", e.getMessage());
+                                    return null;
+                                }
+                            })
+                            .filter(name -> name != null) // Filtrar nomes nulos
                             .collect(Collectors.toList());
                     log.info("✅ Roles do usuário: {}", roles);
                 } else {
-                    log.warn("⚠️ Usuário {} não possui roles cadastradas", user.getUsername());
+                    log.warn("⚠️ Usuário {} não possui roles cadastradas (roles é null ou vazio)", user.getUsername());
                 }
             } catch (Exception e) {
-                log.error("⚠️ Erro ao buscar roles (usando lista vazia): {}", e.getMessage());
+                log.error("⚠️ Erro ao buscar roles (usando lista vazia): {}", e.getMessage(), e);
             }
             
             // Verificar status de LGPD e segurança (com tratamento de erro)

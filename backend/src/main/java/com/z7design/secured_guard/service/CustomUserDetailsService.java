@@ -3,7 +3,6 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -28,7 +27,16 @@ public class CustomUserDetailsService implements UserDetailsService {
                 });
 
         System.out.println("✅ CustomUserDetailsService: Usuário encontrado: " + user.getUsername() + ", Ativo: " + user.isActive());
-        System.out.println("🔍 CustomUserDetailsService: Roles: " + user.getRoles().stream().map(role -> role.getName()).collect(Collectors.toList()));
+        
+        // Verificar roles antes de fazer stream (pode ser null)
+        if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+            System.out.println("🔍 CustomUserDetailsService: Roles: " + user.getRoles().stream()
+                    .filter(role -> role != null)
+                    .map(role -> role.getName())
+                    .collect(Collectors.toList()));
+        } else {
+            System.out.println("⚠️ CustomUserDetailsService: Usuário não possui roles cadastradas");
+        }
 
         // Retornar o próprio User da aplicação que implementa UserDetails
         return user;

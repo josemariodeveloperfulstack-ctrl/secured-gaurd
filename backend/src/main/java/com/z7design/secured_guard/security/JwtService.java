@@ -179,27 +179,36 @@ public class JwtService {
     private Key getSigningKey() {
         try {
             if (jwtConfig.getSecret() == null || jwtConfig.getSecret().trim().isEmpty()) {
+                log.error("❌ Chave secreta JWT não está configurada (null ou vazia)");
                 throw new IllegalStateException("Chave secreta JWT não está configurada");
             }
             String secret = jwtConfig.getSecret().trim();
             byte[] keyBytes = secret.getBytes();
             
+            // Log do tamanho da chave (sem mostrar o valor completo por segurança)
+            log.info("🔑 Configurando chave JWT: tamanho = {} bytes (primeiros 10 caracteres: {}...)", 
+                keyBytes.length, secret.substring(0, Math.min(10, secret.length())));
+            
             // HS512 requires at least 64 bytes (512 bits)
             if (keyBytes.length < 64) {
-                log.error("Chave JWT muito curta: {} bytes. HS512 requer pelo menos 64 bytes (512 bits).", keyBytes.length);
+                log.error("❌ Chave JWT muito curta: {} bytes. HS512 requer pelo menos 64 bytes (512 bits).", keyBytes.length);
+                log.error("❌ Valor da chave (primeiros 20 caracteres): {}", 
+                    secret.substring(0, Math.min(20, secret.length())));
+                log.error("❌ Por favor, verifique a variável de ambiente JWT_SECRET no docker-compose.ci.yml ou no host");
                 throw new IllegalStateException(
                     String.format("Chave JWT muito curta: %d bytes. HS512 requer pelo menos 64 bytes (512 bits). " +
-                                "Por favor, configure uma chave com pelo menos 64 caracteres ASCII.", keyBytes.length)
+                                "Por favor, configure uma chave com pelo menos 64 caracteres ASCII. " +
+                                "Verifique a variável de ambiente JWT_SECRET.", keyBytes.length)
                 );
             }
             
-            log.debug("Criando chave de assinatura JWT com {} bytes", keyBytes.length);
+            log.debug("✅ Criando chave de assinatura JWT com {} bytes", keyBytes.length);
             return Keys.hmacShaKeyFor(keyBytes);
         } catch (IllegalStateException e) {
-            log.error("Erro de configuração na chave de assinatura: {}", e.getMessage());
+            log.error("❌ Erro de configuração na chave de assinatura: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            log.error("Erro ao criar chave de assinatura: {}", e.getMessage(), e);
+            log.error("❌ Erro ao criar chave de assinatura: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao criar chave de assinatura: " + e.getMessage(), e);
         }
     }
