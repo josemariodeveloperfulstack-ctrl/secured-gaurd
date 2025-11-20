@@ -14,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -27,31 +25,20 @@ public class RoleMigrationService {
 
     @EventListener(ApplicationReadyEvent.class)
     @Async
+    @Transactional
     public void migrateRolesOnStartup() {
         try {
             log.info("Iniciando migração de roles do enum para entidades JPA (assíncrono)...");
             
-            // Executar em background com timeout de 30 segundos
-            CompletableFuture<Void> migrationFuture = CompletableFuture.runAsync(() -> {
-                try {
-                    // Verificar se existem usuários antes de tentar migrar
-                    long userCount = userRepository.count();
-                    if (userCount == 0) {
-                        log.info("Nenhum usuário encontrado no banco. Pulando migração de roles.");
-                        return;
-                    }
-                    
-                    migrateExistingUsers();
-                    log.info("Migração de roles concluída com sucesso!");
-                } catch (Exception e) {
-                    log.error("❌ Erro durante migração de roles: {}", e.getMessage(), e);
-                }
-            });
+            // Verificar se existem usuários antes de tentar migrar
+            long userCount = userRepository.count();
+            if (userCount == 0) {
+                log.info("Nenhum usuário encontrado no banco. Pulando migração de roles.");
+                return;
+            }
             
-            // Aguardar no máximo 30 segundos
-            migrationFuture.get(30, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.TimeoutException e) {
-            log.warn("⚠️ Migração de roles demorou mais de 30 segundos. Continuando em background...");
+            migrateExistingUsers();
+            log.info("Migração de roles concluída com sucesso!");
         } catch (Exception e) {
             log.error("❌ Erro durante migração de roles: {}", e.getMessage(), e);
             // Não re-lançar exceção para não crashar a aplicação
@@ -144,31 +131,20 @@ public class RoleMigrationService {
 
     @EventListener(ApplicationReadyEvent.class)
     @Async
+    @Transactional
     public void createDefaultRolesIfNotExist() {
         try {
             log.info("Verificando e criando roles padrão (assíncrono)...");
             
-            // Executar em background com timeout de 10 segundos
-            CompletableFuture<Void> rolesFuture = CompletableFuture.runAsync(() -> {
-                try {
-                    // Verificar se já existem roles
-                    long roleCount = roleRepository.count();
-                    if (roleCount > 0) {
-                        log.info("Roles já existem no banco. Pulando criação de roles padrão.");
-                        return;
-                    }
-                    
-                    createDefaultRoles();
-                    log.info("Roles padrão criadas com sucesso!");
-                } catch (Exception e) {
-                    log.error("❌ Erro durante criação de roles padrão: {}", e.getMessage(), e);
-                }
-            });
+            // Verificar se já existem roles
+            long roleCount = roleRepository.count();
+            if (roleCount > 0) {
+                log.info("Roles já existem no banco. Pulando criação de roles padrão.");
+                return;
+            }
             
-            // Aguardar no máximo 10 segundos
-            rolesFuture.get(10, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.TimeoutException e) {
-            log.warn("⚠️ Criação de roles padrão demorou mais de 10 segundos. Continuando em background...");
+            createDefaultRoles();
+            log.info("Roles padrão criadas com sucesso!");
         } catch (Exception e) {
             log.error("❌ Erro durante criação de roles padrão: {}", e.getMessage(), e);
             // Não re-lançar exceção para não crashar a aplicação

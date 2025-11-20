@@ -196,6 +196,7 @@ public class MessageService {
      * Agenda mensagens para envio
      */
     @Scheduled(fixedRate = 60000) // Executa a cada minuto
+    @Transactional
     public void processScheduledMessages() {
         try {
             log.info("Processando mensagens agendadas");
