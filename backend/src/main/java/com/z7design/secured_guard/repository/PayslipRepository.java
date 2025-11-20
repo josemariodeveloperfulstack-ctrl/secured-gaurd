@@ -31,7 +31,14 @@ public interface PayslipRepository extends JpaRepository<Payslip, java.util.UUID
     );
     
     List<Payslip> findAllByCpf(String cpf);
-    Payslip findByFileName(String fileName);
+    
+    // Retorna lista porque pode haver múltiplos holerites com o mesmo nome de arquivo em diferentes setores/empresas
+    List<Payslip> findAllByFileName(String fileName);
+    
+    // Retorna o primeiro holerite com o nome do arquivo (mais recente)
+    // IMPORTANTE: Usar LIMIT 1 para garantir que retorne apenas 1 resultado
+    @Query(value = "SELECT * FROM payslips WHERE file_name = :fileName ORDER BY processed_at DESC LIMIT 1", nativeQuery = true)
+    Payslip findFirstByFileNameOrderByProcessedAtDesc(@Param("fileName") String fileName);
     
     @Query("SELECT p FROM Payslip p WHERE p.month = :month AND p.year = :year")
     List<Payslip> findByMonthAndYear(@Param("month") Integer month, @Param("year") Integer year);

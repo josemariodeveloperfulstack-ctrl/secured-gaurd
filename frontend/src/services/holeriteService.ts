@@ -294,7 +294,24 @@ class HoleriteService {
     }
   }
 
-  // Download de holerite
+  // Download de holerite por ID (recomendado - mais preciso)
+  async downloadHoleriteById(id: string): Promise<Blob> {
+    try {
+      console.log('📥 Iniciando download do holerite pelo ID:', id);
+      
+      const response = await api.get(`/payslips/download-by-id/${id}`, {
+        responseType: 'blob',
+      });
+      
+      console.log('✅ Download realizado com sucesso');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao fazer download do holerite:', error);
+      throw error;
+    }
+  }
+
+  // Download de holerite por fileName (fallback - pode retornar holerite errado se houver múltiplos)
   async downloadHolerite(fileName: string): Promise<Blob> {
     try {
       console.log('📥 Iniciando download do holerite:', fileName);

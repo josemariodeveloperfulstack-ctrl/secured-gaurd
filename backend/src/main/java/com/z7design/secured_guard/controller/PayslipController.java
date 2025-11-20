@@ -482,32 +482,113 @@ public class PayslipController {
     }
 
     @GetMapping("/download/{fileName}")
-    @Operation(summary = "Download individual payslip file")
+    @Operation(summary = "Download individual payslip file by fileName (deprecated - use /download-by-id/{id})")
     public ResponseEntity<Resource> downloadPayslip(@PathVariable String fileName) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
-        Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
-        Payslip payslip = payslipService.getPayslipByFileName(fileName);
-        if (isColaborador) {
-            Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip != null ? payslip.getCpf() : null);
-            if (payslip == null || resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            }
-        }
         try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+            
+            log.info("📥 Tentando baixar arquivo: {}", fileName);
+            Payslip payslip = payslipService.getPayslipByFileName(fileName);
+            
+            if (payslip == null) {
+                log.error("❌ Payslip não encontrado para o arquivo: {}", fileName);
+                return ResponseEntity.notFound().build();
+            }
+            
+            log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
+                payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
+            
+            if (isColaborador) {
+                Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip.getCpf());
+                if (resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
+                    log.warn("⚠️ Acesso negado: CPF do usuário ({}) não corresponde ao CPF do payslip ({})", 
+                        resolvedCpf.orElse("null"), payslipCpf.orElse("null"));
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+            }
+            
             Path filePath = resolvePayslipPath(payslip, fileName);
+            log.info("📄 Caminho resolvido: {}", filePath.toAbsolutePath());
+            
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
+                log.info("✅ Arquivo encontrado e legível: {}", filePath.toAbsolutePath());
                 return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
                     .body(resource);
             } else {
-                log.warn("Arquivo não encontrado: {} em {}", fileName, filePath);
+                log.error("❌ Arquivo não encontrado ou não legível: {} em {}", fileName, filePath.toAbsolutePath());
                 return ResponseEntity.notFound().build();
             }
         } catch (MalformedURLException e) {
-            log.error("Erro ao acessar arquivo: {}", fileName, e);
+            log.error("❌ Erro ao acessar arquivo: {}", fileName, e);
+            return ResponseEntity.internalServerError().build();
+        } catch (Exception e) {
+            log.error("❌ Erro inesperado ao baixar arquivo: {}", fileName, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @GetMapping("/download-by-id/{id}")
+    @Operation(summary = "Download individual payslip file by ID (recommended)")
+    public ResponseEntity<Resource> downloadPayslipById(@PathVariable String id) {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+            
+            log.info("📥 Tentando baixar payslip pelo ID: {}", id);
+            
+            java.util.UUID payslipId;
+            try {
+                payslipId = java.util.UUID.fromString(id);
+            } catch (IllegalArgumentException e) {
+                log.error("❌ ID inválido: {}", id);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            Payslip payslip = payslipService.getPayslipById(payslipId);
+            
+            if (payslip == null) {
+                log.error("❌ Payslip não encontrado para o ID: {}", id);
+                return ResponseEntity.notFound().build();
+            }
+            
+            log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
+                payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
+            
+            if (isColaborador) {
+                Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip.getCpf());
+                if (resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
+                    log.warn("⚠️ Acesso negado: CPF do usuário ({}) não corresponde ao CPF do payslip ({})", 
+                        resolvedCpf.orElse("null"), payslipCpf.orElse("null"));
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+            }
+            
+            String fileName = payslip.getFileName();
+            Path filePath = resolvePayslipPath(payslip, fileName);
+            log.info("📄 Caminho resolvido: {}", filePath.toAbsolutePath());
+            
+            Resource resource = new UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                log.info("✅ Arquivo encontrado e legível: {}", filePath.toAbsolutePath());
+                return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                    .body(resource);
+            } else {
+                log.error("❌ Arquivo não encontrado ou não legível: {} em {}", fileName, filePath.toAbsolutePath());
+                return ResponseEntity.notFound().build();
+            }
+        } catch (MalformedURLException e) {
+            log.error("❌ Erro ao acessar arquivo: {}", id, e);
+            return ResponseEntity.internalServerError().build();
+        } catch (Exception e) {
+            log.error("❌ Erro inesperado ao baixar arquivo: {}", id, e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -553,6 +634,18 @@ public class PayslipController {
     private Path resolvePayslipPath(Payslip payslip, String fileName) throws MalformedURLException {
         Path filePath = null;
 
+        // PRIORIDADE 1: Usar arquivo_caminho se disponível (mais confiável)
+        if (payslip != null && payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+            filePath = Paths.get(payslip.getArquivoCaminho());
+            if (java.nio.file.Files.exists(filePath)) {
+                log.debug("📄 Usando arquivo_caminho do banco: {}", filePath);
+                return filePath;
+            } else {
+                log.warn("⚠️ arquivo_caminho do banco não existe: {}", payslip.getArquivoCaminho());
+            }
+        }
+
+        // PRIORIDADE 2: Resolver pelo CPF, mês e ano
         if (payslip != null && payslip.getCpf() != null && payslip.getMonth() != null && payslip.getYear() != null) {
             filePath = payslipService.resolvePayslipPathByCpfMonthYear(
                     payslip.getCpf(),
@@ -561,12 +654,14 @@ public class PayslipController {
             ).map(Paths::get).orElse(null);
         }
 
+        // PRIORIDADE 3: Fallback - buscar pelo nome do arquivo
         if (filePath == null || !java.nio.file.Files.exists(filePath)) {
             filePath = findPayslipFile(fileName);
         }
 
         if (filePath == null || !java.nio.file.Files.exists(filePath)) {
-            throw new MalformedURLException("Arquivo não encontrado nos diretórios configurados");
+            log.error("❌ Arquivo não encontrado: {} - Payslip: {}", fileName, payslip != null ? payslip.getId() : "null");
+            throw new MalformedURLException("Arquivo não encontrado nos diretórios configurados: " + fileName);
         }
 
         return filePath;

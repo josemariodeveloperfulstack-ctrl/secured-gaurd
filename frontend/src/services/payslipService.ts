@@ -165,7 +165,22 @@ export const payslipService = {
     return response.data;
   },
 
-  // Baixar holerite
+  // Baixar holerite por ID (recomendado - mais preciso)
+  async downloadPayslipById(id: string): Promise<Blob> {
+    console.log('🔍 PayslipService - Tentando baixar pelo ID:', id);
+    try {
+      const response = await api.get(`/payslips/download-by-id/${id}`, {
+        responseType: 'blob',
+      });
+      console.log('✅ PayslipService - Download bem-sucedido, tamanho:', response.data.size);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ PayslipService - Erro ao baixar pelo ID:', error);
+      throw error;
+    }
+  },
+
+  // Baixar holerite por fileName (fallback - pode retornar holerite errado se houver múltiplos)
   async downloadPayslip(fileName: string): Promise<Blob> {
     console.log('🔍 PayslipService - Tentando baixar:', fileName);
     try {

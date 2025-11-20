@@ -244,9 +244,10 @@ const Holerites: React.FC = () => {
     try {
       const selected = filteredHolerites.filter(h => selectedHolerites.includes(h.id));
       for (const h of selected) {
-        if (!h.fileName) { continue; }
+        if (!h.id) { continue; }
         try {
-          const blob = await holeriteService.downloadHolerite(h.fileName);
+          // Usar ID em vez de fileName para garantir que o holerite correto seja baixado
+          const blob = await holeriteService.downloadHoleriteById(h.id);
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -2691,7 +2692,8 @@ const Holerites: React.FC = () => {
 
   const handleDownloadHolerite = async (payslip: Holerite) => {
     try {
-      const blob = await holeriteService.downloadHolerite(payslip.fileName);
+      // Usar ID em vez de fileName para garantir que o holerite correto seja baixado
+      const blob = await holeriteService.downloadHoleriteById(payslip.id);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

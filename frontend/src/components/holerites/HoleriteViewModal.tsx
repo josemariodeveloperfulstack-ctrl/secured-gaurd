@@ -66,7 +66,8 @@ export function HoleriteViewModal({
     setError(null);
     
     try {
-      const pdfBlob = await payslipService.downloadPayslip(holerite.fileName);
+      // Usar ID em vez de fileName para garantir que o holerite correto seja baixado
+      const pdfBlob = await payslipService.downloadPayslipById(holerite.id);
       const url = URL.createObjectURL(pdfBlob);
       setPdfUrl(url);
     } catch (err) {
@@ -81,7 +82,8 @@ export function HoleriteViewModal({
   const handleDownload = async () => {
     if (holerite) {
       try {
-        const blob = await payslipService.downloadPayslip(holerite.fileName);
+        // Usar ID em vez de fileName para garantir que o holerite correto seja baixado
+        const blob = await payslipService.downloadPayslipById(holerite.id);
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;

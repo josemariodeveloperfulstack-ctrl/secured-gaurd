@@ -74,9 +74,22 @@ public class Payslip {
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     private java.util.List<com.z7design.secured_guard.dto.PayslipTableRow> tableDetails;
     
+    // Campos de versionamento conforme PRD
+    @Column(name = "versao")
+    private Integer versao;
+    
+    @Column(name = "hash_conteudo", length = 64)
+    private String hashConteudo;
+    
+    @Column(name = "arquivo_caminho", length = 500)
+    private String arquivoCaminho;
+    
     @PrePersist
     protected void onCreate() {
         processedAt = LocalDateTime.now();
+        if (versao == null) {
+            versao = 1; // Versão padrão se não especificada
+        }
     }
 
     @JsonProperty("companyId")

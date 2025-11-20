@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sourceforge.tess4j.TesseractException;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import com.z7design.secured_guard.dto.PayslipComparisonResult;
 
 import com.z7design.secured_guard.model.Employee;
@@ -99,88 +99,145 @@ public class PayslipService {
             PDFTextStripper stripper = new PDFTextStripper();
             pageCount = document.getNumberOfPages();
             log.info("📄 PDF contém {} página(s)", pageCount);
-            log.info("📋 FORMATO ESPERADO: Cada página contém as duas vias do holerite (frente e verso) do MESMO funcionário");
-            log.info("📋 Expectativa: {} holerite(s) processado(s) (1 holerite por página, mesmo que a página tenha frente e verso)", pageCount);
-            log.info("🔍 VERIFICAÇÃO: O sistema irá validar se cada página contém apenas 1 CPF único (confirmando que é o mesmo funcionário nas duas vias)");
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("🔍 ETAPA 1: LENDO TODAS AS PÁGINAS E IDENTIFICANDO CPFs");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-            int paginasProcessadas = 0;
-            int paginasComErro = 0;
-            int paginasPuladasPorDuplicidade = 0;
-
+            // Estrutura para armazenar informações de cada holerite encontrado
+            class HoleriteInfo {
+                String cpf;
+                int pagina;
+                int posicaoNaPagina; // Posição do CPF no texto da página
+                String textoCompleto;
+                String secaoTexto; // Seção do texto correspondente a este CPF
+            }
+            
+            List<HoleriteInfo> holeritesEncontrados = new ArrayList<>();
+            Map<Integer, String> textosDasPaginas = new HashMap<>();
+            
+            // ETAPA 1: Ler todas as páginas e identificar todos os CPFs
             for (int i = 1; i <= pageCount; i++) {
-                log.info("=== Processando página {}/{} ===", i, pageCount);
+                log.info("📖 Lendo página {}/{}", i, pageCount);
                 stripper.setStartPage(i);
                 stripper.setEndPage(i);
                 String pageText = stripper.getText(document);
+                textosDasPaginas.put(i, pageText);
                 
-                // Log do texto extraído para debug
-                log.debug("Texto extraído da página {}: {}", i, pageText.substring(0, Math.min(500, pageText.length())));
-
-                try {
-                    // NOVA LÓGICA: Detectar TODOS os holerites na página
-                    // Primeiro, identificar quantos CPFs únicos existem na página
+                // Identificar todos os CPFs nesta página
                     List<String> cpfsUnicos = detectarTodosCPFsNaPagina(pageText);
-                    log.info("🔍 Página {}: {} CPF(s) único(s) detectado(s): {}", i, cpfsUnicos.size(), cpfsUnicos);
+                log.info("   ✅ {} CPF(s) encontrado(s) na página {}: {}", cpfsUnicos.size(), i, cpfsUnicos);
+                
+                // Para cada CPF, encontrar sua posição no texto
+                for (String cpf : cpfsUnicos) {
+                    HoleriteInfo info = new HoleriteInfo();
+                    info.cpf = cpf;
+                    info.pagina = i;
+                    info.textoCompleto = pageText;
                     
-                    if (cpfsUnicos.isEmpty()) {
-                        log.warn("⚠️ Nenhum CPF encontrado na página {}. Tentando extração completa...", i);
-                        // Tentar extração normal (pode ser que o CPF esteja em formato diferente)
-                        Payslip payslip = extractPayslipInfo(pageText, i);
-                        if (payslip == null || payslip.getCpf() == null) {
-                            // Tentar OCR
-                            payslip = extractPayslipInfoWithOCR(document, i);
-                        }
-                        if (payslip != null && payslip.getCpf() != null) {
-                            if (processarHoleriteUnico(document, i, payslip, pageText, processedPayslips)) {
-                                paginasProcessadas++;
-                            } else {
-                                paginasPuladasPorDuplicidade++;
-                                paginasProcessadas++; // Contar como processada mesmo que pulada
-                            }
-                        } else {
-                            paginasComErro++;
-                            log.warn("⚠️ Não foi possível extrair holerite da página {}", i);
-                        }
-                    } else {
-                        // Processar cada CPF único encontrado (cada um é um holerite separado)
-                        for (int idx = 0; idx < cpfsUnicos.size(); idx++) {
-                            String cpfAtual = cpfsUnicos.get(idx);
-                            log.info("📄 Processando holerite {}/{} da página {} - CPF: {}", idx + 1, cpfsUnicos.size(), i, cpfAtual);
-                            
-                            // Extrair holerite para este CPF específico
-                            Payslip payslip = extractPayslipInfoPorCPF(pageText, i, cpfAtual);
-                            
-                            // Se falhou, tentar OCR
-                            if (payslip == null || payslip.getCpf() == null || !payslip.getCpf().equals(cpfAtual)) {
-                                log.warn("⚠️ Extração via PDFBox falhou para CPF {} na página {}. Tentando OCR...", cpfAtual, i);
-                                payslip = extractPayslipInfoWithOCR(document, i);
-                                // Verificar se o CPF extraído corresponde
-                                if (payslip != null && payslip.getCpf() != null && !payslip.getCpf().equals(cpfAtual)) {
-                                    log.warn("⚠️ CPF extraído via OCR ({}) não corresponde ao esperado ({}). Continuando...", payslip.getCpf(), cpfAtual);
-                                }
-                            }
-                            
-                            if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAtual)) {
-                                if (processarHoleriteUnico(document, i, payslip, pageText, processedPayslips)) {
-                                    if (idx == 0) paginasProcessadas++; // Contar página apenas uma vez
-                                } else {
-                                    if (idx == 0) {
-                                        paginasPuladasPorDuplicidade++;
-                                        paginasProcessadas++; // Contar como processada mesmo que pulada
-                                    }
-                                }
-                            } else {
-                                log.warn("⚠️ Não foi possível extrair holerite para CPF {} na página {}", cpfAtual, i);
-                                if (idx == 0) paginasComErro++;
-                            }
+                    // Encontrar posição do CPF no texto
+                    String cpfFormatado = cpf.replaceAll("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4");
+                    Pattern[] cpfPatterns = {
+                        Pattern.compile("CPF[:\\s]*" + cpfFormatado.replace(".", "\\.").replace("-", "\\-"), Pattern.CASE_INSENSITIVE),
+                        Pattern.compile("CPF[:\\s]*" + cpf, Pattern.CASE_INSENSITIVE),
+                        Pattern.compile(cpfFormatado.replace(".", "\\.").replace("-", "\\-")),
+                        Pattern.compile(cpf)
+                    };
+                    
+                    for (Pattern pattern : cpfPatterns) {
+                        Matcher matcher = pattern.matcher(pageText);
+                        if (matcher.find()) {
+                            info.posicaoNaPagina = matcher.start();
+                            break;
                         }
                     }
-                } catch (Exception pageException) {
+                    
+                    holeritesEncontrados.add(info);
+                }
+            }
+            
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📊 RESUMO DA ETAPA 1:");
+            log.info("   Total de holerites encontrados: {}", holeritesEncontrados.size());
+            log.info("   CPFs únicos: {}", holeritesEncontrados.stream().map(h -> h.cpf).distinct().count());
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("🔍 ETAPA 2: IDENTIFICANDO EMPRESA E CNPJ PARA CADA CPF");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            // ETAPA 2: Para cada CPF, identificar empresa e CNPJ
+            for (HoleriteInfo info : holeritesEncontrados) {
+                log.info("🔍 Processando CPF {} (página {})", info.cpf, info.pagina);
+                
+                // Dividir texto em seção correspondente ao CPF
+                String pageText = info.textoCompleto;
+                int posicaoCpf = info.posicaoNaPagina;
+                
+                // Encontrar posição do próximo CPF (ou fim do texto)
+                int posicaoProximoCpf = pageText.length();
+                for (HoleriteInfo outro : holeritesEncontrados) {
+                    if (outro.pagina == info.pagina && !outro.cpf.equals(info.cpf) && outro.posicaoNaPagina > posicaoCpf) {
+                        if (outro.posicaoNaPagina < posicaoProximoCpf) {
+                            posicaoProximoCpf = outro.posicaoNaPagina;
+                        }
+                    }
+                }
+                
+                // Extrair seção do texto (incluir contexto antes do CPF)
+                int inicioSecao = Math.max(0, posicaoCpf - 500);
+                int fimSecao = posicaoProximoCpf;
+                info.secaoTexto = pageText.substring(inicioSecao, fimSecao);
+                
+                log.debug("   Seção extraída: {} caracteres", info.secaoTexto.length());
+            }
+            
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("🔍 ETAPA 3: IDENTIFICANDO SETOR PARA CADA CPF");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            // ETAPA 3: Identificar setor para cada CPF (já está na seção do texto)
+            
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("🔍 ETAPA 4: PROCESSANDO CADA HOLERITE COM SEPARAÇÃO");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            // ETAPA 4: Processar cada holerite
+            int paginasProcessadas = 0;
+            int paginasComErro = 0;
+            int paginasPuladasPorDuplicidade = 0;
+            
+            for (HoleriteInfo info : holeritesEncontrados) {
+                log.info("📄 Processando holerite - CPF: {} (página {})", info.cpf, info.pagina);
+                
+                try {
+                    // Extrair informações do holerite usando a seção do texto
+                    Payslip payslip = extractPayslipInfo(info.secaoTexto, info.pagina);
+                    
+                    // Verificar se o CPF extraído corresponde
+                    if (payslip == null || payslip.getCpf() == null || !payslip.getCpf().equals(info.cpf)) {
+                        log.warn("⚠️ CPF extraído ({}) não corresponde ao esperado ({}). Tentando OCR...", 
+                            payslip != null && payslip.getCpf() != null ? payslip.getCpf() : "null", info.cpf);
+                        payslip = extractPayslipInfoWithOCR(document, info.pagina);
+                    }
+                    
+                    if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(info.cpf)) {
+                        if (processarHoleriteUnico(document, info.pagina, payslip, info.textoCompleto, processedPayslips)) {
+                            paginasProcessadas++;
+                                } else {
+                                        paginasPuladasPorDuplicidade++;
+                                        paginasProcessadas++; // Contar como processada mesmo que pulada
+                                }
+                            } else {
+                        paginasComErro++;
+                        log.warn("⚠️ Não foi possível extrair holerite para CPF {} na página {}", info.cpf, info.pagina);
+                            }
+                } catch (Exception e) {
                     paginasComErro++;
-                    log.error("❌ Erro ao processar página {}/{}: {}", i, pageCount, pageException.getMessage());
-                    log.debug("Stack trace da página {}: ", i, pageException);
-                    // Continuar processando próximas páginas
-                    continue;
+                    log.error("❌ Erro ao processar holerite CPF {} na página {}: {}", info.cpf, info.pagina, e.getMessage());
                 }
             }
             
@@ -225,34 +282,160 @@ public class PayslipService {
     
     /**
      * Detecta todos os CPFs únicos na página
+     * Suporta múltiplos formatos: CPF: 123.456.789-00, CPF 12345678900, etc.
      */
     private List<String> detectarTodosCPFsNaPagina(String pageText) {
         List<String> cpfs = new ArrayList<>();
-        Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})");
-        Matcher matcher = cpfPattern.matcher(pageText);
         
-        while (matcher.find()) {
-            String cpf = matcher.group(1).replaceAll("[^0-9]", "");
+        // Padrão 1: CPF: 123.456.789-00 ou CPF 123.456.789-00
+        Pattern cpfPattern1 = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})", Pattern.CASE_INSENSITIVE);
+        Matcher matcher1 = cpfPattern1.matcher(pageText);
+        
+        while (matcher1.find()) {
+            String cpf = matcher1.group(1).replaceAll("[^0-9]", "");
             if (cpf.length() == 11 && !cpfs.contains(cpf)) {
                 cpfs.add(cpf);
+                log.debug("✅ CPF detectado (padrão 1): {}", cpf);
             }
         }
         
+        // Padrão 2: Apenas números de 11 dígitos (pode ser CPF sem rótulo)
+        // Mas apenas se não estiver dentro de um CNPJ (14 dígitos)
+        Pattern cpfPattern2 = Pattern.compile("(?<!\\d)([0-9]{11})(?!\\d)");
+        Matcher matcher2 = cpfPattern2.matcher(pageText);
+        
+        while (matcher2.find()) {
+            String cpf = matcher2.group(1);
+            // Verificar se não é parte de um CNPJ (14 dígitos)
+            int start = matcher2.start();
+            int end = matcher2.end();
+            if (start > 0 && end < pageText.length()) {
+                // Verificar contexto: se há "CNPJ" próximo, pode ser parte de CNPJ
+                String contexto = pageText.substring(Math.max(0, start - 20), Math.min(pageText.length(), end + 20));
+                if (!contexto.toUpperCase().contains("CNPJ") && !cpfs.contains(cpf)) {
+                    // Validar se parece um CPF válido (não todos zeros, não sequencial)
+                    if (!cpf.matches("0{11}|1{11}|2{11}|3{11}|4{11}|5{11}|6{11}|7{11}|8{11}|9{11}")) {
+                        cpfs.add(cpf);
+                        log.debug("✅ CPF detectado (padrão 2 - sem rótulo): {}", cpf);
+                    }
+                }
+            }
+        }
+        
+        // Padrão 3: CPF formatado com pontos e traço: 123.456.789-00 (sem rótulo CPF)
+        Pattern cpfPattern3 = Pattern.compile("([0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2})");
+        Matcher matcher3 = cpfPattern3.matcher(pageText);
+        
+        while (matcher3.find()) {
+            String cpf = matcher3.group(1).replaceAll("[^0-9]", "");
+            if (cpf.length() == 11 && !cpfs.contains(cpf)) {
+                cpfs.add(cpf);
+                log.debug("✅ CPF detectado (padrão 3 - formatado): {}", cpf);
+            }
+        }
+        
+        log.info("🔍 Total de CPFs únicos detectados na página: {}", cpfs.size());
         return cpfs;
     }
     
     /**
      * Extrai informações do holerite para um CPF específico
+     * Quando há múltiplos holerites na mesma página, divide o texto em seções
+     * e extrai apenas a seção correspondente ao CPF alvo
      */
     private Payslip extractPayslipInfoPorCPF(String text, int pageNumber, String cpfAlvo) {
-        // Extrair normalmente, mas garantir que o CPF extraído corresponde ao alvo
+        log.info("🔍 Extraindo holerite para CPF específico: {} na página {}", cpfAlvo, pageNumber);
+        
+        // Se o texto contém múltiplos CPFs, dividir em seções
+        List<String> cpfsEncontrados = detectarTodosCPFsNaPagina(text);
+        
+        if (cpfsEncontrados.size() > 1) {
+            log.info("📄 Múltiplos CPFs detectados na página {}: {}. Dividindo texto em seções...", pageNumber, cpfsEncontrados);
+            
+            // Encontrar a posição do CPF alvo no texto
+            String cpfAlvoFormatado = cpfAlvo.replaceAll("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4");
+            String cpfAlvoSemFormatacao = cpfAlvo;
+            
+            // Procurar por diferentes formatos do CPF
+            Pattern[] cpfPatterns = {
+                Pattern.compile("CPF[:\\s]*" + cpfAlvoFormatado.replace(".", "\\.").replace("-", "\\-")),
+                Pattern.compile("CPF[:\\s]*" + cpfAlvoSemFormatacao),
+                Pattern.compile(cpfAlvoFormatado.replace(".", "\\.").replace("-", "\\-")),
+                Pattern.compile(cpfAlvoSemFormatacao)
+            };
+            
+            int posicaoCpfAlvo = -1;
+            for (Pattern pattern : cpfPatterns) {
+                Matcher matcher = pattern.matcher(text);
+                if (matcher.find()) {
+                    posicaoCpfAlvo = matcher.start();
+                    log.debug("✅ CPF alvo encontrado na posição {} usando padrão: {}", posicaoCpfAlvo, pattern.pattern());
+                    break;
+                }
+            }
+            
+            if (posicaoCpfAlvo == -1) {
+                log.warn("⚠️ CPF alvo {} não encontrado no texto. Tentando extração completa...", cpfAlvo);
         Payslip payslip = extractPayslipInfo(text, pageNumber);
+                // Verificar se o CPF extraído corresponde
         if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAlvo)) {
             return payslip;
         }
-        // Se não correspondeu, tentar extrair focando no CPF alvo
-        // Por enquanto, retornar o resultado da extração normal
+                return null;
+            }
+            
+            // Encontrar a posição do próximo CPF (ou fim do texto)
+            int posicaoProximoCpf = text.length();
+            for (String outroCpf : cpfsEncontrados) {
+                if (!outroCpf.equals(cpfAlvo)) {
+                    String outroCpfFormatado = outroCpf.replaceAll("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4");
+                    Pattern outroCpfPattern = Pattern.compile("CPF[:\\s]*" + outroCpfFormatado.replace(".", "\\.").replace("-", "\\-"));
+                    Matcher outroMatcher = outroCpfPattern.matcher(text);
+                    while (outroMatcher.find()) {
+                        int pos = outroMatcher.start();
+                        if (pos > posicaoCpfAlvo && pos < posicaoProximoCpf) {
+                            posicaoProximoCpf = pos;
+                        }
+                    }
+                }
+            }
+            
+            // Extrair apenas a seção do texto correspondente ao CPF alvo
+            // Incluir um pouco antes do CPF para pegar contexto (ex: nome, código)
+            int inicioSecao = Math.max(0, posicaoCpfAlvo - 500);
+            int fimSecao = posicaoProximoCpf;
+            String secaoTexto = text.substring(inicioSecao, fimSecao);
+            
+            log.info("📄 Seção extraída para CPF {}: {} caracteres (posição {} a {})", 
+                cpfAlvo, secaoTexto.length(), inicioSecao, fimSecao);
+            log.debug("📄 Conteúdo da seção (primeiros 500 chars): {}", 
+                secaoTexto.length() > 500 ? secaoTexto.substring(0, 500) + "..." : secaoTexto);
+            
+            // Extrair informações apenas desta seção
+            Payslip payslip = extractPayslipInfo(secaoTexto, pageNumber);
+            
+            // Verificar se o CPF extraído corresponde ao alvo
+            if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAlvo)) {
+                log.info("✅ Holerite extraído com sucesso para CPF {}", cpfAlvo);
+                return payslip;
+            } else {
+                log.warn("⚠️ CPF extraído ({}) não corresponde ao alvo ({}). Tentando extração completa...", 
+                    payslip != null && payslip.getCpf() != null ? payslip.getCpf() : "null", cpfAlvo);
+                // Fallback: tentar extração completa mas verificar CPF
+                payslip = extractPayslipInfo(text, pageNumber);
+                if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAlvo)) {
         return payslip;
+                }
+                return null;
+            }
+        } else {
+            // Apenas um CPF na página, extrair normalmente
+            Payslip payslip = extractPayslipInfo(text, pageNumber);
+            if (payslip != null && payslip.getCpf() != null && payslip.getCpf().equals(cpfAlvo)) {
+                return payslip;
+            }
+            return payslip;
+        }
     }
     
     /**
@@ -301,19 +484,52 @@ public class PayslipService {
                                     payslip.getYear()
                                 );
                                 
-                                // Calcular hash do conteúdo da página atual para comparar com arquivo original
-                                String hashPaginaAtual = calculatePageHash(pageText);
-                                log.debug("🔐 Hash do conteúdo da página atual: {}", hashPaginaAtual.substring(0, Math.min(16, hashPaginaAtual.length())) + "...");
+                                // Calcular hash do arquivo PDF da página atual para comparar com arquivo original
+                                // IMPORTANTE: Usar hash do PDF (bytes) em vez de hash do texto para comparação mais confiável
+                                String hashPaginaAtual = calculatePagePdfHash(document, pageNumber);
+                                if (hashPaginaAtual == null) {
+                                    // Fallback: usar hash do texto se não conseguir calcular do PDF
+                                    log.warn("⚠️ Não foi possível calcular hash do PDF, usando hash do texto como fallback");
+                                    hashPaginaAtual = calculatePageHash(pageText);
+                                }
+                                log.debug("🔐 Hash da página atual (PDF): {}", hashPaginaAtual != null ? hashPaginaAtual.substring(0, Math.min(16, hashPaginaAtual.length())) + "..." : "null");
                                 
                                 // Comparar com o holerite mais recente (primeiro da lista ordenada por processedAt DESC)
                                 Payslip holeriteExistente = holeritesExistentes.get(0);
-                                log.info("📄 Comparando com holerite existente mais recente: ID={}, Arquivo={}, Processado em: {}", 
+                                log.info("📄 Comparando com holerite existente mais recente: ID={}, Versão={}, Arquivo={}, Processado em: {}", 
                                     holeriteExistente.getId(), 
+                                    holeriteExistente.getVersao() != null ? holeriteExistente.getVersao() : "N/A",
                                     holeriteExistente.getFileName(),
                                     holeriteExistente.getProcessedAt());
                                 
-                                // Tentar obter hash do arquivo original salvo (se existir)
+                                // IMPORTANTE: Sempre recalcular hash do arquivo PDF salvo para garantir comparação correta
+                                // Não usar hash do banco porque pode ter sido calculado do texto (método antigo)
+                                // Sempre comparar hash do PDF (bytes) com hash do PDF (bytes)
                                 String hashArquivoOriginal = getPayslipFileHash(holeriteExistente);
+                                if (hashArquivoOriginal == null) {
+                                    // Se não conseguir calcular do arquivo, tentar usar do banco como fallback
+                                    hashArquivoOriginal = holeriteExistente.getHashConteudo();
+                                    log.warn("⚠️ Não foi possível calcular hash do arquivo PDF salvo, usando hash do banco como fallback");
+                                } else {
+                                    log.info("🔐 Hash recalculado do arquivo PDF salvo: {}... (garantindo comparação PDF vs PDF)", 
+                                        hashArquivoOriginal.substring(0, Math.min(16, hashArquivoOriginal.length())));
+                                }
+                                
+                                if (hashArquivoOriginal == null || hashArquivoOriginal.isEmpty()) {
+                                    log.warn("⚠️ Hash do arquivo original não disponível - não será possível verificar duplicidade por hash");
+                                } else {
+                                    log.info("🔐 Hash da página atual (PDF): {}...", 
+                                        hashPaginaAtual != null ? hashPaginaAtual.substring(0, Math.min(16, hashPaginaAtual.length())) : "null");
+                                    log.info("🔐 Hash do arquivo original (PDF): {}...", 
+                                        hashArquivoOriginal.substring(0, Math.min(16, hashArquivoOriginal.length())));
+                                    if (hashPaginaAtual != null && hashArquivoOriginal != null) {
+                                        if (hashPaginaAtual.equals(hashArquivoOriginal)) {
+                                            log.info("✅ HASHES IDÊNTICOS - Arquivo PDF não foi modificado");
+                                        } else {
+                                            log.warn("⚠️ HASHES DIFERENTES - Arquivo PDF foi modificado ou há diferença nos metadados");
+                                        }
+                                    }
+                                }
                                 
                                 // Comparar dados extraídos e hash do arquivo
                                 log.info("🔍 Iniciando comparação detalhada de holerites...");
@@ -340,11 +556,9 @@ public class PayslipService {
                                         log.warn("   {}. {}", idx + 1, comparacao.getDifferences().get(idx));
                                     }
                                     
-                                    // Gerar nome de arquivo único com versão/timestamp
-                                    String timestamp = String.valueOf(System.currentTimeMillis()).substring(7); // últimos 6 dígitos
-                                    String nomeArquivoComVersao = generateFileName(payslip, "V" + timestamp);
-                                    payslip.setFileName(nomeArquivoComVersao); // Definir nome com versão
-                                    log.info("🔄 Gerando novo arquivo PDF com versão: {} (arquivo original não será sobrescrito)", nomeArquivoComVersao);
+                                    // A versão será determinada automaticamente em organizarEmPastas()
+                                    // baseada nas versões existentes no mesmo caminho
+                                    log.info("🔄 Nova versão será criada automaticamente durante organização em pastas");
                                 } else {
                                     log.warn("⚠️ NENHUMA ALTERAÇÃO DETECTADA - Verificando se valores financeiros ou tableDetails estão sendo comparados corretamente...");
                                     log.warn("   Se houver diferenças visíveis nos valores, pode ser um problema na extração ou comparação");
@@ -380,7 +594,7 @@ public class PayslipService {
                             log.warn("⚠️ Erro ao verificar duplicidade e comparar holerites, continuando processamento: {}", e.getMessage(), e);
                         }
                         
-                        // Organizar em pastas e salvar PDF individual
+                        // Organizar em pastas e salvar PDF individual (já define versao, hash_conteudo, arquivo_caminho)
                         String caminhoPdf = organizarEmPastas(document, pageNumber, payslip);
                         
                         // Salvar ou atualizar funcionário no banco
@@ -389,11 +603,14 @@ public class PayslipService {
                         // Salvar dados extraídos na tabela tb_extract_data_holerites
                         salvarDadosExtraidos(payslip);
                         
-                        // Save to payslip database - usar apenas o nome do arquivo
-                        String nomeArquivo = Paths.get(caminhoPdf).getFileName().toString();
-                        payslip.setFileName(nomeArquivo);
+                        // Save to payslip database (versao, hash_conteudo e arquivo_caminho já foram definidos em organizarEmPastas)
                         payslip = payslipRepository.save(payslip);
                         processedPayslips.add(payslip);
+                        
+                        log.info("✅ Holerite salvo: ID={}, Versão={}, Hash={}...", 
+                            payslip.getId(), 
+                            payslip.getVersao(),
+                            payslip.getHashConteudo() != null ? payslip.getHashConteudo().substring(0, Math.min(16, payslip.getHashConteudo().length())) : "N/A");
 
                         // === CRIAÇÃO AUTOMÁTICA DE USUÁRIO ===
                         try {
@@ -458,7 +675,8 @@ public class PayslipService {
         // Contar quantos CPFs diferentes foram encontrados na página
         Set<String> cpfsEncontrados = new HashSet<>();
         
-        for (String linha : linhas) {
+        for (int linhaIndex = 0; linhaIndex < linhas.length; linhaIndex++) {
+            String linha = linhas[linhaIndex];
             Matcher cpfMatcher = cpfPattern.matcher(linha);
             if (cpfMatcher.find()) {
                 String cpfEncontrado = cpfMatcher.group(1).replaceAll("[^0-9]", "");
@@ -467,33 +685,129 @@ public class PayslipService {
                 // Usar apenas o PRIMEIRO CPF encontrado (frente e verso têm o mesmo CPF)
                 if (cpf == null) {
                     cpf = cpfEncontrado;
-                    log.info("✅ CPF encontrado (primeiro): {} na linha: {}", cpf, linha.trim());
+                    log.info("✅ CPF encontrado (primeiro): {} na linha {}: {}", cpf, linhaIndex + 1, linha.trim());
                     
                     // Na linha do CPF, tentar extrair código e nome
                     String linhaCpf = linha.trim();
                     
+                    // IMPORTANTE: Se não encontrar nome na mesma linha, tentar linha anterior
+                    // (estrutura comum: linha anterior tem matrícula e nome, linha atual tem CPF)
+                    String linhaAnterior = (linhaIndex > 0) ? linhas[linhaIndex - 1].trim() : null;
+                    
                     // Padrão 1: CODIGO NOME CPF (ex: 000044 ELAINE APARECIDA SOARES PEREIRA CPF: 073.495.276-75)
-                    Pattern linhaCompleta1 = Pattern.compile("(\\d{6})\\s+(.+?)\\s+CPF");
+                    // Melhorado para aceitar CPF: ou CPF (com ou sem dois pontos)
+                    Pattern linhaCompleta1 = Pattern.compile("(\\d{4,6})\\s+(.+?)\\s+CPF[:\\s]", Pattern.CASE_INSENSITIVE);
                     Matcher lineMatch1 = linhaCompleta1.matcher(linhaCpf);
                     if (lineMatch1.find()) {
                         codigo = lineMatch1.group(1).trim();
-                        String nomeCandidate = lineMatch1.group(2).trim();
+                        String nomeCandidate = lineMatch1.group(2).trim().replaceAll("\\s+", " ");
                         if (isValidEmployeeName(nomeCandidate)) {
-                            nome = nomeCandidate;
+                            nome = nomeCandidate.toUpperCase();
                             log.info("✅ Padrão 1 - Código: {}, Nome: {}", codigo, nome);
                             break;
                         }
                     }
                     
-                    // Padrão 2: NOME CPF (sem código no início)
-                    Pattern linhaCompleta2 = Pattern.compile("([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ ]{5,})\\s+CPF");
+                    // Padrão 2a: NOME seguido de CPF (mais flexível, captura tudo antes de CPF)
+                    // Este padrão é para casos como "MARCO TULIO MENEZES  CPF: 11396510648"
+                    // TESTAR PRIMEIRO porque é mais flexível e captura casos com múltiplos espaços
+                    int cpfIndex2 = linhaCpf.toUpperCase().indexOf("CPF");
+                    if (cpfIndex2 > 5) {
+                        String nomeCandidate = linhaCpf.substring(0, cpfIndex2).trim().replaceAll("\\s+", " ");
+                        log.debug("🔍 Padrão 2a - Texto antes de CPF: '{}'", nomeCandidate);
+                        
+                        // Remover possíveis códigos numéricos no início (4-6 dígitos)
+                        String nomeSemCodigo = nomeCandidate.replaceAll("^\\d{4,6}\\s+", "").trim();
+                        if (!nomeSemCodigo.equals(nomeCandidate)) {
+                            log.debug("🔍 Padrão 2a - Código removido: '{}' -> '{}'", nomeCandidate, nomeSemCodigo);
+                            nomeCandidate = nomeSemCodigo;
+                        }
+                        
+                        // Validar se é um nome válido (pelo menos 5 caracteres, contém letras)
+                        if (nomeCandidate.length() >= 5 && nomeCandidate.matches(".*[A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ].*")) {
+                            boolean isValid = isValidEmployeeName(nomeCandidate);
+                            log.debug("🔍 Padrão 2a - Validação do nome '{}': isValid={}", nomeCandidate, isValid);
+                            
+                            if (isValid) {
+                                nome = nomeCandidate.toUpperCase();
+                                log.info("✅ Padrão 2a - Nome extraído: {} (tudo antes de CPF)", nome);
+                                break;
+                            } else {
+                                // Se isValidEmployeeName falhou, mas o nome parece válido (tem pelo menos 2 palavras),
+                                // aceitar mesmo assim (pode ser um caso edge)
+                                String[] palavras = nomeCandidate.split("\\s+");
+                                if (palavras.length >= 2 && palavras[0].length() >= 3 && palavras[1].length() >= 3) {
+                                    nome = nomeCandidate.toUpperCase();
+                                    log.warn("⚠️ Padrão 2a - Nome aceito mesmo com validação falhando (parece válido): {}", nome);
+                                    break;
+                                }
+                            }
+                        } else {
+                            log.debug("🔍 Padrão 2a - Nome candidato rejeitado: comprimento={}, tem letras={}", 
+                                nomeCandidate.length(), nomeCandidate.matches(".*[A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ].*"));
+                        }
+                    }
+                    
+                    // Padrão 2: NOME CPF (sem código no início) - melhorado para capturar melhor
+                    // Aceita múltiplos espaços e diferentes formatos
+                    Pattern linhaCompleta2 = Pattern.compile("([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ][A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ\\s]{4,}?)\\s{1,}CPF", Pattern.CASE_INSENSITIVE);
                     Matcher lineMatch2 = linhaCompleta2.matcher(linhaCpf);
                     if (lineMatch2.find()) {
-                        String nomeCandidate = lineMatch2.group(1).trim();
+                        String nomeCandidate = lineMatch2.group(1).trim().replaceAll("\\s+", " ");
                         if (isValidEmployeeName(nomeCandidate)) {
-                            nome = nomeCandidate;
+                            nome = nomeCandidate.toUpperCase();
                             log.info("✅ Padrão 2 - Nome: {} (sem código)", nome);
                             break;
+                        }
+                    }
+                    
+                    // Padrão 2c: CODIGO NOME CPF (formato: 000224 MARCO TULIO MENEZES CPF: 11396510648)
+                    // Este padrão é mais específico para quando há código antes do nome
+                    Pattern linhaCompleta3 = Pattern.compile("(\\d{4,6})\\s+([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ][A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ\\s]{4,}?)\\s+CPF", Pattern.CASE_INSENSITIVE);
+                    Matcher lineMatch3 = linhaCompleta3.matcher(linhaCpf);
+                    if (lineMatch3.find()) {
+                        codigo = lineMatch3.group(1).trim();
+                        String nomeCandidate = lineMatch3.group(2).trim().replaceAll("\\s+", " ");
+                        if (isValidEmployeeName(nomeCandidate)) {
+                            nome = nomeCandidate.toUpperCase();
+                            log.info("✅ Padrão 2c - Código: {}, Nome: {} (com código antes do nome)", codigo, nome);
+                            break;
+                        }
+                    }
+                    
+                    // Se não encontrou nome na mesma linha, tentar linha anterior
+                    // Estrutura comum: linha anterior = "000224 MARCO TULIO MENEZES", linha atual = "CPF: 11396510648"
+                    if (nome.equals("Desconhecido") && linhaAnterior != null && !linhaAnterior.isEmpty()) {
+                        log.info("🔍 Nome não encontrado na linha do CPF, tentando linha anterior: {}", linhaAnterior);
+                        
+                        // Padrão: MATRÍCULA NOME (ex: 000224 MARCO TULIO MENEZES)
+                        Pattern linhaAnteriorPattern = Pattern.compile("(\\d{4,6})\\s+(.+)", Pattern.CASE_INSENSITIVE);
+                        Matcher linhaAnteriorMatch = linhaAnteriorPattern.matcher(linhaAnterior);
+                        if (linhaAnteriorMatch.find()) {
+                            codigo = linhaAnteriorMatch.group(1).trim();
+                            String nomeCandidate = linhaAnteriorMatch.group(2).trim().replaceAll("\\s+", " ");
+                            // Remover possíveis sufixos como "CPF", "CNPJ", etc.
+                            nomeCandidate = nomeCandidate.replaceAll("\\s+(CPF|CNPJ|MATRICULA|MATRÍCULA).*$", "").trim();
+                            if (nomeCandidate.length() >= 5 && isValidEmployeeName(nomeCandidate)) {
+                                nome = nomeCandidate.toUpperCase();
+                                log.info("✅ Nome encontrado na linha anterior - Código: {}, Nome: {}", codigo, nome);
+                                break;
+                            }
+                        }
+                        
+                        // Padrão alternativo: apenas NOME (sem matrícula)
+                        // Verificar se a linha anterior parece ser um nome
+                        if (nome.equals("Desconhecido")) {
+                            String nomeCandidate = linhaAnterior.replaceAll("\\s+(CPF|CNPJ|MATRICULA|MATRÍCULA).*$", "").trim();
+                            // Verificar se não contém números (exceto se for parte do nome)
+                            if (nomeCandidate.length() >= 5 && 
+                                !nomeCandidate.matches(".*\\d{4,}.*") && // Não deve ter sequências de 4+ dígitos
+                                nomeCandidate.matches(".*[A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ].*") &&
+                                isValidEmployeeName(nomeCandidate)) {
+                                nome = nomeCandidate.toUpperCase();
+                                log.info("✅ Nome encontrado na linha anterior (sem matrícula): {}", nome);
+                                break;
+                            }
                         }
                     }
                 }
@@ -681,18 +995,27 @@ public class PayslipService {
             }
         }
 
-        // Padrão 3: "MM/AAAA" direto
+        // Padrão 3: "MM/AAAA" direto - encontrar a última ocorrência quando há múltiplas datas
         if (mes == null || ano == null) {
             Pattern periodoPattern2 = Pattern.compile("(\\d{2})/(\\d{4})");
             for (int idx = 0; idx < linhas.length; idx++) {
                 String linha = linhas[idx];
                 Matcher periodoMatcher = periodoPattern2.matcher(linha);
-                if (periodoMatcher.find()) {
-                    mes = periodoMatcher.group(1);
-                    ano = periodoMatcher.group(2);
+                String lastMatch = null;
+                int lastEnd = -1;
+                // Encontrar a última ocorrência do padrão na linha
+                while (periodoMatcher.find()) {
+                    lastMatch = periodoMatcher.group(1) + "/" + periodoMatcher.group(2);
+                    lastEnd = periodoMatcher.end();
+                }
+                if (lastMatch != null && lastEnd > 0) {
+                    // Extrair mês e ano da última ocorrência
+                    String[] parts = lastMatch.split("/");
+                    mes = parts[0];
+                    ano = parts[1];
                     log.info("✅ Período de referência encontrado (padrão 2): {}/{} - Linha: {}", mes, ano, linha.trim());
                     if (workPostName == null) {
-                        workPostName = findWorkPostName(linhas, idx, linha.substring(periodoMatcher.end()));
+                        workPostName = findWorkPostName(linhas, idx, linha.substring(lastEnd));
                     }
                     break;
                 }
@@ -991,20 +1314,39 @@ public class PayslipService {
     }
 
     private String findWorkPostName(String[] lines, int currentIndex, String trailingText) {
+        // Primeiro, tentar extrair do texto que vem após o período na mesma linha
+        if (trailingText != null && !trailingText.trim().isEmpty()) {
         String candidate = sanitizeWorkPostCandidate(trailingText);
         if (candidate != null) {
+                log.info("✅ Setor encontrado no texto após o período: {}", candidate);
             return candidate;
-        }
-
-        for (int offset = 1; offset <= 2; offset++) {
-            int idx = currentIndex + offset;
-            if (idx < lines.length) {
-                candidate = sanitizeWorkPostCandidate(lines[idx]);
+            }
+            // Se não encontrou, tentar extrair removendo possíveis prefixos comuns
+            String cleaned = trailingText.trim();
+            // Remover "FOLHA DE PAGAMENTO" se estiver presente
+            cleaned = cleaned.replaceAll("(?i)\\s*FOLHA\\s+DE\\s+PAGAMENTO.*$", "").trim();
+            if (!cleaned.isEmpty()) {
+                candidate = sanitizeWorkPostCandidate(cleaned);
                 if (candidate != null) {
+                    log.info("✅ Setor encontrado após limpeza do texto: {}", candidate);
                     return candidate;
                 }
             }
         }
+
+        // Se não encontrou na mesma linha, procurar nas próximas 2 linhas
+        for (int offset = 1; offset <= 2; offset++) {
+            int idx = currentIndex + offset;
+            if (idx < lines.length) {
+                String candidate = sanitizeWorkPostCandidate(lines[idx]);
+                if (candidate != null) {
+                    log.info("✅ Setor encontrado na linha {} (offset {}): {}", idx, offset, candidate);
+                    return candidate;
+                }
+            }
+        }
+        
+        log.warn("⚠️ Setor não encontrado após o período na linha {}", currentIndex);
         return null;
     }
 
@@ -1037,6 +1379,9 @@ public class PayslipService {
             cleaned = cleaned.substring(colonIndex + 1).trim();
         }
 
+        // Remover "FOLHA DE PAGAMENTO" se estiver no final
+        cleaned = cleaned.replaceAll("(?i)\\s*FOLHA\\s+DE\\s+PAGAMENTO.*$", "").trim();
+
         cleaned = cleaned.replaceAll("[•·]+", " ");
         cleaned = cleaned.replaceAll("[\\s]+", " ").trim();
         cleaned = cleaned.replaceAll("[.,;]+$", "").trim();
@@ -1047,26 +1392,53 @@ public class PayslipService {
 
         String upper = cleaned.toUpperCase(java.util.Locale.ROOT);
 
-        String[] invalidTokens = {
+        // Tokens que SEMPRE invalidam (não devem aparecer em setores)
+        String[] alwaysInvalidTokens = {
             "CPF", "CNPJ", "DEMONSTRATIVO", "PAGAMENTO", "FOLHA", "HOLERITE",
-            "EMPRESA", "ENDERECO", "ENDEREÇO", "RUA", "AVENIDA", "LTDA",
-            "ME", "EIRELI", "S.A", "PROMOVER", "VIGILANCIA", "PATRIMONIAL"
+            "ENDERECO", "ENDEREÇO", "RUA", "AVENIDA", "TELEFONE"
         };
 
-        for (String token : invalidTokens) {
+        for (String token : alwaysInvalidTokens) {
             if (upper.contains(token)) {
                 return null;
             }
         }
 
-        if (upper.contains(",") || upper.contains("*")) {
+        // Tokens da empresa principal que invalidam (PROMOVER VIGILANCIA PATRIMONIAL)
+        String[] empresaPrincipalTokens = {
+            "PROMOVER", "VIGILANCIA", "PATRIMONIAL"
+        };
+        
+        boolean isEmpresaPrincipal = false;
+        for (String token : empresaPrincipalTokens) {
+            if (upper.contains(token)) {
+                isEmpresaPrincipal = true;
+                break;
+            }
+        }
+        
+        // Se contém tokens da empresa principal E "LTDA" ou "EMPRESA", é a empresa principal, não um setor
+        if (isEmpresaPrincipal && (upper.contains("LTDA") || upper.contains("EMPRESA"))) {
             return null;
         }
 
+        // Permitir "LTDA", "S.A", "ME", "EIRELI" em setores (alguns setores são empresas)
+        // Mas rejeitar se for apenas "LTDA" ou "S.A" sozinho
+        if (upper.matches("^(LTDA|S\\.A|ME|EIRELI)$")) {
+            return null;
+        }
+
+        // Rejeitar se contém apenas números ou caracteres especiais
         if (!upper.matches(".*[A-Z].*")) {
             return null;
         }
 
+        // Rejeitar se contém vírgulas ou asteriscos (geralmente são listas ou formatação)
+        if (upper.contains(",") || upper.contains("*")) {
+            return null;
+        }
+
+        // Se passou todas as validações, retornar o setor normalizado
         return upper;
     }
 
@@ -1331,66 +1703,145 @@ public class PayslipService {
     }
 
     private String organizarEmPastas(PDDocument document, int pageNumber, Payslip payslip) throws IOException {
-        // Criar estrutura de pastas: Empresa/Setor/Ano/Mês/Funcionário/
-        // Normalizar nomes para evitar problemas com caracteres especiais
-        String empresaNome = normalizeFolderName(payslip.getCompanyName() != null ? payslip.getCompanyName() : "EMPRESA_NAO_INFORMADA");
-        String setorNome = normalizeFolderName(payslip.getWorkPostName() != null ? payslip.getWorkPostName() : "SETOR_NAO_INFORMADO");
-        String ano = String.valueOf(payslip.getYear());
-        String mes = String.format("%02d", payslip.getMonth());
-        String funcionarioNome = normalizeFolderName(payslip.getEmployeeName() != null ? payslip.getEmployeeName() : "FUNCIONARIO_NAO_INFORMADO");
+        // PRD: Estrutura de pastas: {empresa-cnpj}/{setor-normalizado}/{ano-mes}/{funcionario-cpf}/
         
-        // Criar caminho completo: backend/holerites/Empresa/Setor/Ano/Mês/Funcionário/
-        Path pastaCompleta = Paths.get(OUTPUT_DIR, empresaNome, setorNome, ano, mes, funcionarioNome);
+        // 1. Empresa: usar CNPJ normalizado (apenas números)
+        String empresaCnpj = normalizeCnpj(payslip.getCompanyCnpj());
+        if (empresaCnpj == null || empresaCnpj.isEmpty()) {
+            empresaCnpj = "EMPRESA_NAO_INFORMADA";
+            log.warn("⚠️ CNPJ da empresa não encontrado, usando fallback: {}", empresaCnpj);
+        }
+        
+        // 2. Setor: normalizar removendo acentos e caracteres especiais
+        String setorNome = normalizeSectorName(payslip.getWorkPostName());
+        
+        // 3. Período: formato ano-mes (ex: 2025-10)
+        String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+        
+        // 4. Funcionário: usar NOME e CPF normalizado
+        String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeName(payslip.getEmployeeName()) : null;
+        String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+        
+        if (funcionarioNome == null || funcionarioNome.isEmpty()) {
+            funcionarioNome = "FUNCIONARIO_NAO_INFORMADO";
+            log.warn("⚠️ Nome do funcionário não encontrado, usando fallback: {}", funcionarioNome);
+        }
+        if (funcionarioCpf == null || funcionarioCpf.isEmpty()) {
+            funcionarioCpf = "00000000000";
+            log.warn("⚠️ CPF do funcionário não encontrado, usando fallback: {}", funcionarioCpf);
+        }
+        
+        // Criar pasta do funcionário: nome_funcionario_cpf (ex: MARCO_TULIO_MENEZES_11396510648)
+        String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+        
+        // Criar caminho completo conforme PRD: empresa-cnpj/setor/ano-mes/nome_funcionario_cpf/
+        Path pastaCompleta = Paths.get(OUTPUT_DIR, empresaCnpj, setorNome, periodo, pastaFuncionario);
         
         // Criar diretório se não existir
         if (!Files.exists(pastaCompleta)) {
             Files.createDirectories(pastaCompleta);
-            log.info("📁 Estrutura de pastas criada: {}", pastaCompleta);
+            log.info("📁 Estrutura de pastas criada conforme PRD: {}", pastaCompleta);
         }
         
-        // Usar nome de arquivo já definido ou gerar novo
-        String nomeArquivo = payslip.getFileName();
-        if (nomeArquivo == null || nomeArquivo.isEmpty()) {
-            nomeArquivo = generateFileName(payslip);
-        }
+        // 5. Versionamento: buscar versões existentes no mesmo caminho e determinar próxima versão
+        int proximaVersao = determinarProximaVersao(pastaCompleta, payslip);
+        payslip.setVersao(proximaVersao);
         
+        // 6. Nome do arquivo conforme PRD: holerite_v1.pdf, holerite_v2.pdf, etc.
+        String nomeArquivo = String.format("holerite_v%d.pdf", proximaVersao);
         Path caminhoCompleto = pastaCompleta.resolve(nomeArquivo);
         
-        // TASK 02: Verificar se arquivo já existe (NUNCA sobrescrever - sempre gerar novo arquivo com versão)
-        // Se já existe, adicionar versão automática para evitar sobrescrita
-        int tentativas = 0;
-        while (Files.exists(caminhoCompleto) && tentativas < 10) {
-            log.warn("⚠️ Arquivo já existe: {} - Gerando versão única...", caminhoCompleto);
-            
-            // Sempre adicionar versão única com timestamp
-            String timestamp = String.valueOf(System.currentTimeMillis()).substring(7); // últimos 6 dígitos
-            
-            // Se já tem versão no nome, substituir ou incrementar
-            if (nomeArquivo.contains("_V")) {
-                String baseName = nomeArquivo.substring(0, nomeArquivo.lastIndexOf("_V"));
-                nomeArquivo = baseName + "_V" + timestamp + ".pdf";
-            } else {
-                // Se não tem versão, adicionar
-                String baseName = nomeArquivo.replace(".pdf", "");
-                nomeArquivo = baseName + "_V" + timestamp + ".pdf";
-            }
-            
-            caminhoCompleto = pastaCompleta.resolve(nomeArquivo);
+        // 7. Calcular hash do arquivo PDF antes de salvar (usar hash do PDF, não do texto)
+        // Isso garante comparação mais confiável quando verificar duplicatas
+        String hashConteudo = calculatePagePdfHash(document, pageNumber);
+        if (hashConteudo == null) {
+            // Fallback: usar hash do texto se não conseguir calcular do PDF
+            log.warn("⚠️ Não foi possível calcular hash do PDF, usando hash do texto como fallback");
+            String pageText = extractPageText(document, pageNumber);
+            hashConteudo = calculatePageHash(pageText);
+        }
+        payslip.setHashConteudo(hashConteudo);
             payslip.setFileName(nomeArquivo);
-            tentativas++;
-        }
-        
-        if (tentativas > 0) {
-            log.info("🔄 Nome de arquivo único gerado para evitar sobrescrita: {}", nomeArquivo);
-        }
+        payslip.setArquivoCaminho(caminhoCompleto.toString().replace('\\', '/'));
         
         // Salvar PDF individual
         try (PDDocument newDoc = new PDDocument()) {
             newDoc.addPage(document.getPage(pageNumber - 1));
             newDoc.save(caminhoCompleto.toString());
-            log.info("📄 PDF individual salvo: {}", caminhoCompleto);
+            log.info("📄 PDF salvo conforme PRD: {} (versão {})", caminhoCompleto, proximaVersao);
         }
+        
         return caminhoCompleto.toString();
+    }
+    
+    /**
+     * Determina a próxima versão do holerite verificando arquivos existentes no diretório
+     * Retorna a versão mais alta + 1, ou 1 se não houver versões anteriores
+     */
+    private int determinarProximaVersao(Path pastaCompleta, Payslip payslip) {
+        try {
+            if (!Files.exists(pastaCompleta)) {
+                return 1; // Primeira versão
+            }
+            
+            // Buscar todos os arquivos holerite_v*.pdf no diretório
+            Pattern versaoPattern = Pattern.compile("holerite_v(\\d+)\\.pdf");
+            int versaoMaxima = 0;
+            
+            try (var stream = Files.list(pastaCompleta)) {
+                versaoMaxima = stream
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .map(versaoPattern::matcher)
+                    .filter(Matcher::matches)
+                    .mapToInt(matcher -> Integer.parseInt(matcher.group(1)))
+                    .max()
+                    .orElse(0);
+            }
+            
+            // Buscar também no banco de dados para garantir consistência
+            // (pode haver arquivos que não estão mais no disco mas estão no banco)
+            if (payslip.getCompanyCnpj() != null && payslip.getCpf() != null && payslip.getWorkPostName() != null) {
+                List<Payslip> holeritesExistentes = payslipRepository.findByCompanyCnpjAndCpfAndWorkPostNameAndMonthAndYear(
+                    payslip.getCompanyCnpj(),
+                    payslip.getCpf(),
+                    payslip.getWorkPostName(),
+                    payslip.getMonth(),
+                    payslip.getYear()
+                );
+                
+                int versaoMaximaBanco = holeritesExistentes.stream()
+                    .filter(h -> h.getVersao() != null)
+                    .mapToInt(Payslip::getVersao)
+                    .max()
+                    .orElse(0);
+                
+                versaoMaxima = Math.max(versaoMaxima, versaoMaximaBanco);
+            }
+            
+            int proximaVersao = versaoMaxima + 1;
+            log.info("🔢 Versão determinada: {} (máxima encontrada: {})", proximaVersao, versaoMaxima);
+            return proximaVersao;
+            
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao determinar próxima versão, usando versão 1: {}", e.getMessage());
+            return 1;
+        }
+    }
+    
+    /**
+     * Extrai o texto de uma página específica do documento
+     */
+    private String extractPageText(PDDocument document, int pageNumber) {
+        try {
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setStartPage(pageNumber);
+            stripper.setEndPage(pageNumber);
+            return stripper.getText(document);
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao extrair texto da página {}: {}", pageNumber, e.getMessage());
+            return "";
+        }
     }
     
     private void salvarFuncionario(Payslip payslip, String caminhoPdf) {
@@ -1535,8 +1986,33 @@ public class PayslipService {
         return payslipRepository.findAllByCpf(cpf);
     }
 
+    public Payslip getPayslipById(java.util.UUID id) {
+        log.info("🔍 Buscando payslip pelo ID: {}", id);
+        return payslipRepository.findById(id)
+            .orElse(null);
+    }
+
     public Payslip getPayslipByFileName(String fileName) {
-        return payslipRepository.findByFileName(fileName);
+        log.info("🔍 Buscando payslip pelo nome do arquivo: {}", fileName);
+        // Pode haver múltiplos holerites com o mesmo nome de arquivo (em diferentes setores/empresas)
+        // Retornar o mais recente
+        Payslip payslip = payslipRepository.findFirstByFileNameOrderByProcessedAtDesc(fileName);
+        if (payslip == null) {
+            log.warn("⚠️ Nenhum payslip encontrado para o arquivo: {}", fileName);
+            // Tentar buscar sem a extensão .pdf
+            if (fileName.endsWith(".pdf")) {
+                String fileNameWithoutExt = fileName.substring(0, fileName.length() - 4);
+                log.info("🔍 Tentando buscar sem extensão: {}", fileNameWithoutExt);
+                payslip = payslipRepository.findFirstByFileNameOrderByProcessedAtDesc(fileNameWithoutExt);
+            }
+            if (payslip == null) {
+                log.error("❌ Payslip não encontrado para o arquivo: {} (tentativas esgotadas)", fileName);
+            }
+        } else {
+            log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
+                payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
+        }
+        return payslip;
     }
 
     public Optional<String> resolvePayslipPathByCpfMonthYear(String cpf, Integer month, Integer year) {
@@ -1544,13 +2020,45 @@ public class PayslipService {
         if (payslip == null) {
             return Optional.empty();
         }
-        // Primeiro tentar no diretório padrão do serviço
+        
+        // PRIORIDADE 1: Usar arquivo_caminho se disponível (nova estrutura PRD)
+        if (payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+            Path candidate = Paths.get(payslip.getArquivoCaminho());
+            if (Files.exists(candidate)) {
+                log.debug("📄 Usando arquivo_caminho do banco: {}", candidate);
+                return Optional.of(candidate.toString());
+            } else {
+                log.warn("⚠️ arquivo_caminho do banco não existe: {}", payslip.getArquivoCaminho());
+            }
+        }
+        
+        // PRIORIDADE 2: Tentar construir caminho conforme nova estrutura PRD
+        if (payslip.getCompanyCnpj() != null && payslip.getWorkPostName() != null) {
+            String empresaCnpj = normalizeCnpj(payslip.getCompanyCnpj());
+            String setorNome = normalizeSectorName(payslip.getWorkPostName());
+            String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+            String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeName(payslip.getEmployeeName()) : null;
+            String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+            
+            if (empresaCnpj != null && setorNome != null && funcionarioNome != null && funcionarioCpf != null) {
+                String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                Path candidate = Paths.get(OUTPUT_DIR, empresaCnpj, setorNome, periodo, pastaFuncionario, payslip.getFileName());
+                if (Files.exists(candidate)) {
+                    log.debug("📄 Arquivo encontrado na nova estrutura PRD: {}", candidate);
+                    return Optional.of(candidate.toString());
+                }
+            }
+        }
+        
+        // PRIORIDADE 3: Fallback - estrutura antiga
         String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
         Path candidate = Paths.get(OUTPUT_DIR, mesAno, payslip.getFileName());
         if (Files.exists(candidate)) {
+            log.debug("📄 Arquivo encontrado na estrutura antiga: {}", candidate);
             return Optional.of(candidate.toString());
         }
-        // Fallbacks: caminhos conhecidos usados por PdfService/processadores
+        
+        // PRIORIDADE 4: Outros fallbacks
         String pastaReferencia = String.format("%02d_%d", payslip.getMonth(), payslip.getYear());
         Path alt1 = Paths.get("uploads", "holerites_processados", pastaReferencia, payslip.getFileName());
         if (Files.exists(alt1)) {
@@ -1564,6 +2072,8 @@ public class PayslipService {
         if (Files.exists(alt3)) {
             return Optional.of(alt3.toString());
         }
+        
+        log.warn("⚠️ Arquivo não encontrado em nenhum caminho conhecido para: {}", payslip.getFileName());
         return Optional.empty();
     }
 
@@ -1571,27 +2081,104 @@ public class PayslipService {
     public void deletePayslip(UUID id) {
         Payslip payslip = payslipRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Payslip não encontrado para o ID: " + id));
+        
+        // Usar arquivo_caminho se disponível (nova estrutura PRD)
+        Path arquivo = null;
+        if (payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+            arquivo = Paths.get(payslip.getArquivoCaminho());
+            log.info("🗑️ Usando caminho do banco de dados: {}", arquivo.toAbsolutePath());
+        } else {
+            // Fallback: tentar construir caminho conforme nova estrutura PRD
+            String empresaCnpj = normalizeCnpj(payslip.getCompanyCnpj());
+            String setorNome = normalizeSectorName(payslip.getWorkPostName());
+            String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+            String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeName(payslip.getEmployeeName()) : null;
+            String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+            
+            if (empresaCnpj != null && setorNome != null && funcionarioNome != null && funcionarioCpf != null) {
+                String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                arquivo = Paths.get(OUTPUT_DIR, empresaCnpj, setorNome, periodo, pastaFuncionario, payslip.getFileName());
+                log.info("🗑️ Construindo caminho conforme PRD: {}", arquivo.toAbsolutePath());
+            } else {
+                // Fallback final: estrutura antiga
         String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
         Path pastaMesAno = Paths.get(OUTPUT_DIR, mesAno);
-        String nomeArquivo = generateFileName(payslip);
-        Path arquivo = pastaMesAno.resolve(nomeArquivo);
-        log.info("Tentando remover o arquivo do funcionário: {}", arquivo.toAbsolutePath());
-        try {
-            if (Files.exists(arquivo)) {
-                Files.delete(arquivo);
-                log.info("Arquivo removido com sucesso: {}", arquivo.toAbsolutePath());
-            } else {
-                log.warn("Arquivo não existe: {}", arquivo.toAbsolutePath());
+                arquivo = pastaMesAno.resolve(payslip.getFileName());
+                log.warn("⚠️ Usando estrutura antiga (fallback): {}", arquivo.toAbsolutePath());
             }
-            // Se a pasta do mês ficar vazia, remove também
-            if (Files.exists(pastaMesAno) && Files.list(pastaMesAno).findAny().isEmpty()) {
-                Files.delete(pastaMesAno);
-                log.info("Pasta do mês removida (vazia): {}", pastaMesAno.toAbsolutePath());
+        }
+        
+        log.info("🗑️ Tentando remover o arquivo: {}", arquivo.toAbsolutePath());
+        try {
+            if (arquivo != null && Files.exists(arquivo)) {
+                Files.delete(arquivo);
+                log.info("✅ Arquivo removido com sucesso: {}", arquivo.toAbsolutePath());
+                
+                // Verificar se a pasta do funcionário ficou vazia (nova estrutura)
+                Path pastaFuncionario = arquivo.getParent();
+                if (pastaFuncionario != null && Files.exists(pastaFuncionario)) {
+                    try {
+                        boolean pastaVazia;
+                        try (var stream = Files.list(pastaFuncionario)) {
+                            pastaVazia = stream.findAny().isEmpty();
+                        }
+                        if (pastaVazia) {
+                            log.info("📁 Pasta do funcionário está vazia, removendo: {}", pastaFuncionario.toAbsolutePath());
+                            Files.delete(pastaFuncionario);
+                            
+                            // Verificar se a pasta do período ficou vazia
+                            Path pastaPeriodo = pastaFuncionario.getParent();
+                            if (pastaPeriodo != null && Files.exists(pastaPeriodo)) {
+                                boolean periodoVazio;
+                                try (var stream = Files.list(pastaPeriodo)) {
+                                    periodoVazio = stream.findAny().isEmpty();
+                                }
+                                if (periodoVazio) {
+                                    log.info("📁 Pasta do período está vazia, removendo: {}", pastaPeriodo.toAbsolutePath());
+                                    Files.delete(pastaPeriodo);
+                                    
+                                    // Verificar se a pasta do setor ficou vazia
+                                    Path pastaSetor = pastaPeriodo.getParent();
+                                    if (pastaSetor != null && Files.exists(pastaSetor)) {
+                                        boolean setorVazio;
+                                        try (var stream = Files.list(pastaSetor)) {
+                                            setorVazio = stream.findAny().isEmpty();
+                                        }
+                                        if (setorVazio) {
+                                            log.info("📁 Pasta do setor está vazia, removendo: {}", pastaSetor.toAbsolutePath());
+                                            Files.delete(pastaSetor);
+                                            
+                                            // Verificar se a pasta da empresa ficou vazia
+                                            Path pastaEmpresa = pastaSetor.getParent();
+                                            if (pastaEmpresa != null && Files.exists(pastaEmpresa)) {
+                                                boolean empresaVazia;
+                                                try (var stream = Files.list(pastaEmpresa)) {
+                                                    empresaVazia = stream.findAny().isEmpty();
+                                                }
+                                                if (empresaVazia) {
+                                                    log.info("📁 Pasta da empresa está vazia, removendo: {}", pastaEmpresa.toAbsolutePath());
+                                                    Files.delete(pastaEmpresa);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
             }
         } catch (Exception e) {
-            log.error("Erro ao remover o arquivo ou pasta: {} - {}", arquivo.toAbsolutePath(), e.getMessage());
+                        log.warn("⚠️ Erro ao verificar/remover pastas vazias: {}", e.getMessage());
+                    }
+                }
+            } else {
+                log.warn("⚠️ Arquivo não encontrado: {}", arquivo != null ? arquivo.toAbsolutePath() : "null");
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao remover o arquivo: {} - {}", arquivo != null ? arquivo.toAbsolutePath() : "null", e.getMessage());
         }
+        
+        // Excluir do banco de dados
         payslipRepository.deleteById(id);
+        log.info("✅ Registro excluído do banco de dados: ID {}", id);
     }
 
     // Exclusão em massa de payslips
@@ -1600,54 +2187,102 @@ public class PayslipService {
         int failed = 0;
         List<String> errors = new ArrayList<>();
         List<Path> arquivosParaRemover = new ArrayList<>();
-        List<Path> pastasMes = new ArrayList<>();
+        
+        log.info("🗑️ Iniciando exclusão em massa de {} payslips", ids.size());
+        
+        // Primeiro, coletar informações de todos os payslips
         for (UUID id : ids) {
             try {
                 Payslip payslip = payslipRepository.findById(id)
                     .orElseThrow(() -> new IllegalArgumentException("Payslip não encontrado para o ID: " + id));
+                
+                // Usar arquivo_caminho se disponível (nova estrutura PRD)
+                Path arquivo = null;
+                if (payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+                    arquivo = Paths.get(payslip.getArquivoCaminho());
+                } else {
+                    // Fallback: tentar construir caminho conforme nova estrutura PRD
+                    String empresaCnpj = normalizeCnpj(payslip.getCompanyCnpj());
+                    String setorNome = normalizeSectorName(payslip.getWorkPostName());
+                    String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+                    String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeName(payslip.getEmployeeName()) : null;
+                    String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+                    
+                    if (empresaCnpj != null && setorNome != null && funcionarioNome != null && funcionarioCpf != null) {
+                        String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                        arquivo = Paths.get(OUTPUT_DIR, empresaCnpj, setorNome, periodo, pastaFuncionario, payslip.getFileName());
+                    } else {
+                        // Fallback final: estrutura antiga
                 String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
                 Path pastaMesAno = Paths.get(OUTPUT_DIR, mesAno);
-                String nomeArquivo = generateFileName(payslip);
-                Path arquivo = pastaMesAno.resolve(nomeArquivo);
+                        arquivo = pastaMesAno.resolve(payslip.getFileName());
+                    }
+                }
+                
+                if (arquivo != null) {
                 arquivosParaRemover.add(arquivo);
-                pastasMes.add(pastaMesAno);
+                }
+                
+                // Excluir do banco de dados
                 payslipRepository.deleteById(id);
                 deleted++;
             } catch (Exception e) {
                 failed++;
                 errors.add("ID " + id + ": " + e.getMessage());
+                log.error("❌ Erro ao processar exclusão do payslip {}: {}", id, e.getMessage());
             }
         }
+        
         // Remover todos os arquivos
+        Set<Path> pastasParaVerificar = new HashSet<>();
         for (Path arquivo : arquivosParaRemover) {
-            log.info("Tentando remover o arquivo: {}", arquivo.toAbsolutePath());
+            log.info("🗑️ Tentando remover o arquivo: {}", arquivo.toAbsolutePath());
             try {
                 if (Files.exists(arquivo)) {
                     Files.delete(arquivo);
-                    log.info("Arquivo removido com sucesso: {}", arquivo.toAbsolutePath());
+                    log.info("✅ Arquivo removido com sucesso: {}", arquivo.toAbsolutePath());
+                    
+                    // Coletar pastas para verificar se ficaram vazias
+                    Path pastaAtual = arquivo.getParent();
+                    while (pastaAtual != null && !pastaAtual.equals(Paths.get(OUTPUT_DIR))) {
+                        pastasParaVerificar.add(pastaAtual);
+                        pastaAtual = pastaAtual.getParent();
+                    }
                 } else {
-                    log.warn("Arquivo não existe: {}", arquivo.toAbsolutePath());
+                    log.warn("⚠️ Arquivo não encontrado: {}", arquivo.toAbsolutePath());
                 }
             } catch (Exception e) {
-                log.error("Erro ao remover o arquivo: {} - {}", arquivo.toAbsolutePath(), e.getMessage());
+                log.error("❌ Erro ao remover o arquivo: {} - {}", arquivo.toAbsolutePath(), e.getMessage());
             }
         }
-        // Remover pastas do mês se ficarem vazias
-        Set<Path> pastasMesUnicas = new java.util.HashSet<>(pastasMes);
-        for (Path pastaMes : pastasMesUnicas) {
+        
+        // Verificar e remover pastas vazias (da mais específica para a mais geral)
+        List<Path> pastasOrdenadas = new ArrayList<>(pastasParaVerificar);
+        pastasOrdenadas.sort((a, b) -> Integer.compare(b.getNameCount(), a.getNameCount())); // Mais profunda primeiro
+        
+        for (Path pasta : pastasOrdenadas) {
             try {
-                if (Files.exists(pastaMes) && Files.list(pastaMes).findAny().isEmpty()) {
-                    Files.delete(pastaMes);
-                    log.info("Pasta do mês removida (vazia): {}", pastaMes.toAbsolutePath());
+                if (Files.exists(pasta) && Files.isDirectory(pasta)) {
+                    boolean pastaVazia;
+                    try (var stream = Files.list(pasta)) {
+                        pastaVazia = stream.findAny().isEmpty();
+                    }
+                    if (pastaVazia) {
+                        Files.delete(pasta);
+                        log.info("📁 Pasta vazia removida: {}", pasta.toAbsolutePath());
+                    }
                 }
             } catch (Exception e) {
-                log.warn("Erro ao remover a pasta do mês: {} - {}", pastaMes.toAbsolutePath(), e.getMessage());
+                log.warn("⚠️ Erro ao verificar/remover pasta: {} - {}", pasta.toAbsolutePath(), e.getMessage());
             }
         }
+        
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("deleted", deleted);
         result.put("failed", failed);
         result.put("errors", errors);
+        
+        log.info("✅ Exclusão em massa concluída: {} excluídos, {} falhas", deleted, failed);
         return result;
     }
 
@@ -1835,6 +2470,29 @@ public class PayslipService {
     }
     
     /**
+     * Normaliza nome do funcionário para uso em pastas do sistema de arquivos
+     * Remove acentos, caracteres especiais e limita tamanho
+     */
+    private String normalizeEmployeeName(String name) {
+        if (!StringUtils.hasText(name)) {
+            return "FUNCIONARIO_NAO_INFORMADO";
+        }
+        String upper = name.trim().toUpperCase();
+        String normalized = Normalizer.normalize(upper, Normalizer.Form.NFD)
+            .replaceAll("[\\p{M}]", "")
+            .replaceAll("[^A-Z0-9]+", "_")
+            .replaceAll("^_+", "")
+            .replaceAll("_+$", "");
+        
+        // Limitar tamanho para evitar problemas com sistemas de arquivos (máximo 100 caracteres)
+        if (normalized.length() > 100) {
+            normalized = normalized.substring(0, 100);
+        }
+        
+        return StringUtils.hasText(normalized) ? normalized : "FUNCIONARIO_NAO_INFORMADO";
+    }
+    
+    /**
      * Normaliza nome para uso em pastas do sistema de arquivos
      * Remove acentos, caracteres especiais e limita tamanho
      */
@@ -1949,20 +2607,85 @@ public class PayslipService {
     /**
      * TASK 02: Calcula hash SHA-256 do conteúdo da página para comparação com arquivos anteriores
      */
+    /**
+     * Calcula hash SHA-256 do conteúdo em formato hexadecimal (64 caracteres)
+     * Conforme PRD: hash_conteudo VARCHAR(64)
+     */
+    /**
+     * Calcula hash do texto extraído (método legado - mantido para compatibilidade)
+     * @deprecated Use calculatePagePdfHash para comparação mais confiável
+     */
     private String calculatePageHash(String pageText) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hashBytes = digest.digest(pageText.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(hashBytes);
+            // Converter para hexadecimal (64 caracteres)
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
         } catch (Exception e) {
             log.warn("⚠️ Erro ao calcular hash da página: {}", e.getMessage());
             // Retornar hash simples baseado no tamanho do texto como fallback
-            return String.valueOf(pageText != null ? pageText.hashCode() : 0);
+            return String.format("%064x", pageText != null ? pageText.hashCode() : 0);
+        }
+    }
+
+    /**
+     * Calcula hash do arquivo PDF de uma página específica (método recomendado para comparação)
+     * Este método extrai a página do PDF, cria um documento temporário e calcula o hash dos bytes
+     * Isso garante comparação mais confiável do que comparar apenas o texto extraído
+     */
+    private String calculatePagePdfHash(PDDocument document, int pageNumber) {
+        try {
+            if (document == null || pageNumber < 1 || pageNumber > document.getNumberOfPages()) {
+                log.warn("⚠️ Parâmetros inválidos para calcular hash do PDF: document={}, pageNumber={}", 
+                    document != null, pageNumber);
+                return null;
+            }
+            
+            // Criar um novo documento com apenas a página desejada
+            try (PDDocument singlePageDoc = new PDDocument()) {
+                PDPage page = document.getPage(pageNumber - 1);
+                singlePageDoc.addPage(page);
+                
+                // Salvar em um ByteArrayOutputStream para obter os bytes
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                singlePageDoc.save(baos);
+                byte[] pdfBytes = baos.toByteArray();
+                
+                // Calcular hash SHA-256 dos bytes do PDF
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hashBytes = digest.digest(pdfBytes);
+                
+                // Converter para hexadecimal (64 caracteres)
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : hashBytes) {
+                    String hex = Integer.toHexString(0xff & b);
+                    if (hex.length() == 1) {
+                        hexString.append('0');
+                    }
+                    hexString.append(hex);
+                }
+                
+                String hash = hexString.toString();
+                log.debug("🔐 Hash do PDF da página {} calculado: {}...", pageNumber, hash.substring(0, Math.min(16, hash.length())));
+                return hash;
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao calcular hash do PDF da página {}: {}", pageNumber, e.getMessage());
+            return null;
         }
     }
 
     /**
      * TASK 02: Obtém hash do arquivo PDF salvo (se existir) para comparação
+     * Usa arquivo_caminho se disponível, senão tenta construir o caminho conforme nova estrutura
      */
     private String getPayslipFileHash(Payslip payslip) {
         try {
@@ -1970,33 +2693,72 @@ public class PayslipService {
                 return null;
             }
             
-            // Tentar encontrar o arquivo nas diferentes possíveis localizações
-            String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
-            Path candidatePath = Paths.get(OUTPUT_DIR, mesAno, payslip.getFileName());
+            Path candidatePath = null;
             
-            if (!Files.exists(candidatePath)) {
-                // Tentar fallbacks
-                Optional<String> pathOpt = resolvePayslipPathByCpfMonthYear(payslip.getCpf(), payslip.getMonth(), payslip.getYear());
-                if (pathOpt.isPresent()) {
-                    candidatePath = Paths.get(pathOpt.get());
+            // 1. Tentar usar arquivo_caminho se disponível (nova estrutura)
+            if (payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+                candidatePath = Paths.get(payslip.getArquivoCaminho());
+                if (Files.exists(candidatePath)) {
+                    log.debug("📄 Usando arquivo_caminho do banco: {}", candidatePath);
                 } else {
-                    log.debug("📄 Arquivo PDF não encontrado para calcular hash: {}", payslip.getFileName());
-                    return null;
+                    candidatePath = null; // Tentar outras opções
                 }
             }
             
-            if (!Files.exists(candidatePath)) {
-                log.debug("📄 Arquivo PDF não existe para calcular hash: {}", candidatePath);
+            // 2. Se não encontrou, tentar construir caminho conforme nova estrutura PRD
+            if (candidatePath == null || !Files.exists(candidatePath)) {
+                String empresaCnpj = normalizeCnpj(payslip.getCompanyCnpj());
+                String setorNome = normalizeSectorName(payslip.getWorkPostName());
+                String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+                String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeName(payslip.getEmployeeName()) : null;
+                String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+                
+                if (empresaCnpj != null && setorNome != null && funcionarioNome != null && funcionarioCpf != null) {
+                    String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                    candidatePath = Paths.get(OUTPUT_DIR, empresaCnpj, setorNome, periodo, pastaFuncionario, payslip.getFileName());
+                    if (Files.exists(candidatePath)) {
+                        log.debug("📄 Arquivo encontrado na nova estrutura: {}", candidatePath);
+                    } else {
+                        candidatePath = null;
+                    }
+                }
+            }
+            
+            // 3. Fallback: tentar estrutura antiga
+            if (candidatePath == null || !Files.exists(candidatePath)) {
+                String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
+                candidatePath = Paths.get(OUTPUT_DIR, mesAno, payslip.getFileName());
+                if (Files.exists(candidatePath)) {
+                    log.debug("📄 Arquivo encontrado na estrutura antiga: {}", candidatePath);
+                } else {
+                Optional<String> pathOpt = resolvePayslipPathByCpfMonthYear(payslip.getCpf(), payslip.getMonth(), payslip.getYear());
+                if (pathOpt.isPresent()) {
+                    candidatePath = Paths.get(pathOpt.get());
+                    }
+                }
+            }
+            
+            if (candidatePath == null || !Files.exists(candidatePath)) {
+                log.debug("📄 Arquivo PDF não encontrado para calcular hash: {}", payslip.getFileName());
                 return null;
             }
             
-            // Ler conteúdo do arquivo e calcular hash
+            // Ler conteúdo do arquivo e calcular hash SHA-256 em hexadecimal
             byte[] fileBytes = Files.readAllBytes(candidatePath);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hashBytes = digest.digest(fileBytes);
-            String hash = Base64.getEncoder().encodeToString(hashBytes);
+            // Converter para hexadecimal (64 caracteres)
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            String hash = hexString.toString();
             
-            log.debug("🔐 Hash calculado do arquivo original {}: {}", payslip.getFileName(), hash.substring(0, Math.min(16, hash.length())) + "...");
+            log.debug("🔐 Hash calculado do arquivo original {}: {}...", payslip.getFileName(), hash.substring(0, Math.min(16, hash.length())));
             return hash;
         } catch (Exception e) {
             log.warn("⚠️ Erro ao obter hash do arquivo salvo {}: {}", payslip != null ? payslip.getFileName() : "null", e.getMessage());
@@ -2021,182 +2783,102 @@ public class PayslipService {
         }
         
         // 1. Comparar hash do arquivo (mais confiável para detectar mudanças no PDF original)
+        // IMPORTANTE: Se o hash do PDF for idêntico, não há alterações reais - não criar nova versão
+        boolean hashIdentico = false;
         if (hashArquivoOriginal != null && hashPaginaAtual != null) {
-            if (!hashArquivoOriginal.equals(hashPaginaAtual)) {
-                result.addDifference("Hash do arquivo", "diferente", "arquivo foi modificado");
-                log.info("🔐 Hash do arquivo diferente detectado - arquivo original foi modificado");
+            if (hashArquivoOriginal.equals(hashPaginaAtual)) {
+                hashIdentico = true;
+                log.info("✅ Hash do arquivo PDF idêntico - conteúdo do PDF não mudou. Não será criada nova versão.");
+                // Se o hash é idêntico, não há alterações reais - retornar sem verificar outras coisas
+                return result; // Retorna hasChanges=false
             } else {
-                log.debug("✅ Hash do arquivo idêntico - conteúdo do PDF não mudou");
+                // Hash diferente - mas vamos verificar APENAS os dados financeiros
+                // Não adicionar diferença ainda - vamos verificar os dados financeiros primeiro
+                log.info("🔐 Hash do arquivo diferente detectado - verificando dados financeiros para determinar se cria versão");
             }
         } else if (hashArquivoOriginal == null && hashPaginaAtual != null) {
-            // Se não temos hash do original mas temos do novo, assumir mudança
-            log.warn("⚠️ Hash do arquivo original não disponível - assumindo possível mudança");
-            result.addDifference("Hash do arquivo", "não disponível", "verificação não possível");
+            // Se não temos hash do original mas temos do novo, continuar verificando dados financeiros
+            log.warn("⚠️ Hash do arquivo original não disponível - verificando dados financeiros");
+        } else if (hashArquivoOriginal != null && hashPaginaAtual == null) {
+            log.warn("⚠️ Hash da página atual não disponível - verificando dados financeiros");
         }
         
-        // 2. Comparar dados extraídos (campos críticos)
-        if (!Objects.equals(normalizeString(existing.getEmployeeName()), normalizeString(newPayslip.getEmployeeName()))) {
-            result.addDifference("Nome do funcionário", existing.getEmployeeName(), newPayslip.getEmployeeName());
-        }
-        
-        if (!Objects.equals(normalizeString(existing.getCpf()), normalizeString(newPayslip.getCpf()))) {
-            result.addDifference("CPF", existing.getCpf(), newPayslip.getCpf());
-        }
-        
-        if (!Objects.equals(normalizeString(existing.getCompanyCnpj()), normalizeString(newPayslip.getCompanyCnpj()))) {
-            result.addDifference("CNPJ da empresa", existing.getCompanyCnpj(), newPayslip.getCompanyCnpj());
-        }
-        
-        if (!Objects.equals(normalizeString(existing.getCompanyName()), normalizeString(newPayslip.getCompanyName()))) {
-            result.addDifference("Nome da empresa", existing.getCompanyName(), newPayslip.getCompanyName());
-        }
-        
-        if (!Objects.equals(normalizeString(existing.getWorkPostName()), normalizeString(newPayslip.getWorkPostName()))) {
-            result.addDifference("Setor", existing.getWorkPostName(), newPayslip.getWorkPostName());
-        }
-        
-        if (!Objects.equals(existing.getMonth(), newPayslip.getMonth())) {
-            result.addDifference("Mês", String.valueOf(existing.getMonth()), String.valueOf(newPayslip.getMonth()));
-        }
-        
-        if (!Objects.equals(existing.getYear(), newPayslip.getYear())) {
-            result.addDifference("Ano", String.valueOf(existing.getYear()), String.valueOf(newPayslip.getYear()));
-        }
-        
-        // 3. Comparar nome do arquivo (pode indicar versão diferente)
-        if (!Objects.equals(normalizeString(existing.getFileName()), normalizeString(newPayslip.getFileName()))) {
-            // Não adicionar como diferença crítica se for apenas versão diferente
-            if (existing.getFileName() != null && newPayslip.getFileName() != null) {
-                String baseNameExisting = existing.getFileName().replaceAll("_V\\d+\\.pdf$", ".pdf");
-                String baseNameNew = newPayslip.getFileName().replaceAll("_V\\d+\\.pdf$", ".pdf");
-                if (!baseNameExisting.equals(baseNameNew)) {
-                    result.addDifference("Nome do arquivo (base)", baseNameExisting, baseNameNew);
-                }
-            }
-        }
-        
-        // 4. TASK 02: Comparar valores financeiros (camada adicional de verificação)
+        // 2. REGRA CRÍTICA: Comparar APENAS valores financeiros para determinar se cria versão
+        // NÃO comparar outros campos (nome, CPF, setor, etc.) - esses não devem criar versão
         // Esta é uma verificação CRÍTICA - qualquer diferença nos valores financeiros deve ser detectada
-        log.debug("🔍 Comparando valores financeiros...");
+        log.info("🔍 Comparando APENAS valores financeiros para determinar se cria versão...");
+        
+        // Declarar variáveis para verificar diferenças financeiras
+        boolean hasFinancialDifferences = false;
+        boolean hasTableDetailsDifferences = false;
         
         // Comparar Total Vencimentos
         if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() != null) {
             int comparison = existing.getTotalEarnings().compareTo(newPayslip.getTotalEarnings());
             if (comparison != 0) {
-                result.addDifference("Total Vencimentos", 
-                    existing.getTotalEarnings().toString(), 
-                    newPayslip.getTotalEarnings().toString());
+                hasFinancialDifferences = true;
                 log.warn("💰 ALTERAÇÃO DETECTADA em Total Vencimentos: {} -> {}", 
                     existing.getTotalEarnings(), newPayslip.getTotalEarnings());
             } else {
                 log.debug("✅ Total Vencimentos idêntico: {}", existing.getTotalEarnings());
             }
-        } else if (existing.getTotalEarnings() == null && newPayslip.getTotalEarnings() != null) {
-            result.addDifference("Total Vencimentos", "não disponível", newPayslip.getTotalEarnings().toString());
-            log.warn("💰 Total Vencimentos adicionado: {}", newPayslip.getTotalEarnings());
-        } else if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() == null) {
-            result.addDifference("Total Vencimentos", existing.getTotalEarnings().toString(), "não disponível");
-            log.warn("💰 Total Vencimentos removido: {}", existing.getTotalEarnings());
+        } else if (existing.getTotalEarnings() == null ^ newPayslip.getTotalEarnings() != null) {
+            hasFinancialDifferences = true;
+            log.warn("💰 Total Vencimentos: {} -> {}", 
+                existing.getTotalEarnings() != null ? existing.getTotalEarnings() : "não disponível",
+                newPayslip.getTotalEarnings() != null ? newPayslip.getTotalEarnings() : "não disponível");
         } else {
             log.debug("⚠️ Total Vencimentos não disponível em ambos os holerites");
         }
         
         // Comparar Total Descontos
-        if (existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() != null) {
+        if (!hasFinancialDifferences && existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() != null) {
             int comparison = existing.getTotalDeductions().compareTo(newPayslip.getTotalDeductions());
             if (comparison != 0) {
-                result.addDifference("Total Descontos", 
-                    existing.getTotalDeductions().toString(), 
-                    newPayslip.getTotalDeductions().toString());
+                hasFinancialDifferences = true;
                 log.warn("💰 ALTERAÇÃO DETECTADA em Total Descontos: {} -> {}", 
                     existing.getTotalDeductions(), newPayslip.getTotalDeductions());
             } else {
                 log.debug("✅ Total Descontos idêntico: {}", existing.getTotalDeductions());
             }
-        } else if (existing.getTotalDeductions() == null && newPayslip.getTotalDeductions() != null) {
-            result.addDifference("Total Descontos", "não disponível", newPayslip.getTotalDeductions().toString());
-            log.warn("💰 Total Descontos adicionado: {}", newPayslip.getTotalDeductions());
-        } else if (existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() == null) {
-            result.addDifference("Total Descontos", existing.getTotalDeductions().toString(), "não disponível");
-            log.warn("💰 Total Descontos removido: {}", existing.getTotalDeductions());
-        } else {
+        } else if (!hasFinancialDifferences && (existing.getTotalDeductions() == null ^ newPayslip.getTotalDeductions() != null)) {
+            hasFinancialDifferences = true;
+            log.warn("💰 Total Descontos: {} -> {}", 
+                existing.getTotalDeductions() != null ? existing.getTotalDeductions() : "não disponível",
+                newPayslip.getTotalDeductions() != null ? newPayslip.getTotalDeductions() : "não disponível");
+        } else if (!hasFinancialDifferences) {
             log.debug("⚠️ Total Descontos não disponível em ambos os holerites");
         }
         
         // Comparar Valor Líquido
-        if (existing.getNetValue() != null && newPayslip.getNetValue() != null) {
+        if (!hasFinancialDifferences && existing.getNetValue() != null && newPayslip.getNetValue() != null) {
             int comparison = existing.getNetValue().compareTo(newPayslip.getNetValue());
             if (comparison != 0) {
-                result.addDifference("Valor Líquido", 
-                    existing.getNetValue().toString(), 
-                    newPayslip.getNetValue().toString());
+                hasFinancialDifferences = true;
                 log.warn("💰 ALTERAÇÃO DETECTADA em Valor Líquido: {} -> {}", 
                     existing.getNetValue(), newPayslip.getNetValue());
             } else {
                 log.debug("✅ Valor Líquido idêntico: {}", existing.getNetValue());
             }
-        } else if (existing.getNetValue() == null && newPayslip.getNetValue() != null) {
-            result.addDifference("Valor Líquido", "não disponível", newPayslip.getNetValue().toString());
-            log.warn("💰 Valor Líquido adicionado: {}", newPayslip.getNetValue());
-        } else if (existing.getNetValue() != null && newPayslip.getNetValue() == null) {
-            result.addDifference("Valor Líquido", existing.getNetValue().toString(), "não disponível");
-            log.warn("💰 Valor Líquido removido: {}", existing.getNetValue());
-        } else {
+        } else if (!hasFinancialDifferences && (existing.getNetValue() == null ^ newPayslip.getNetValue() != null)) {
+            hasFinancialDifferences = true;
+            log.warn("💰 Valor Líquido: {} -> {}", 
+                existing.getNetValue() != null ? existing.getNetValue() : "não disponível",
+                newPayslip.getNetValue() != null ? newPayslip.getNetValue() : "não disponível");
+        } else if (!hasFinancialDifferences) {
             log.debug("⚠️ Valor Líquido não disponível em ambos os holerites");
         }
         
-        // 5. Comparar dados detalhados da tabela (Cód, Descrição, Referência, Vencimentos, Descontos)
-        // Esta é a verificação mais importante para detectar alterações nos dados da tabela
+        // Comparar dados detalhados da tabela (Cód, Descrição, Referência, Vencimentos, Descontos)
         log.debug("🔍 Comparando dados detalhados da tabela...");
         log.debug("   Holerite existente: {} linhas", existing.getTableDetails() != null ? existing.getTableDetails().size() : 0);
         log.debug("   Holerite novo: {} linhas", newPayslip.getTableDetails() != null ? newPayslip.getTableDetails().size() : 0);
         
         if (existing.getTableDetails() != null && newPayslip.getTableDetails() != null) {
-            boolean tableDetailsChanged = compareTableDetails(existing.getTableDetails(), newPayslip.getTableDetails(), result);
-            if (tableDetailsChanged) {
-                log.warn("📋 ALTERAÇÕES DETECTADAS nos dados detalhados da tabela!");
-            } else {
-                log.debug("✅ Dados da tabela idênticos");
-            }
-        } else if (existing.getTableDetails() == null && newPayslip.getTableDetails() != null && !newPayslip.getTableDetails().isEmpty()) {
-            result.addDifference("Dados da tabela", "não disponível", newPayslip.getTableDetails().size() + " linha(s)");
-            log.warn("📋 Dados da tabela não disponíveis no holerite existente, mas presentes no novo ({} linhas)", 
-                newPayslip.getTableDetails().size());
-        } else if (existing.getTableDetails() != null && !existing.getTableDetails().isEmpty() && 
-                   (newPayslip.getTableDetails() == null || newPayslip.getTableDetails().isEmpty())) {
-            result.addDifference("Dados da tabela", existing.getTableDetails().size() + " linha(s)", "não disponível");
-            log.warn("📋 Dados da tabela presentes no holerite existente ({} linhas), mas não no novo", 
-                existing.getTableDetails().size());
-        } else {
-            log.debug("⚠️ Dados da tabela não disponíveis em ambos os holerites");
-        }
-        
-        // Verificação adicional: Se houver diferenças nos valores financeiros ou tableDetails, 
-        // garantir que hasChanges seja true (pode ter sido perdido em algum caso edge)
-        boolean hasFinancialDifferences = false;
-        if (existing.getTotalEarnings() != null && newPayslip.getTotalEarnings() != null) {
-            hasFinancialDifferences = existing.getTotalEarnings().compareTo(newPayslip.getTotalEarnings()) != 0;
-        } else if (existing.getTotalEarnings() == null ^ newPayslip.getTotalEarnings() == null) {
-            hasFinancialDifferences = true;
-        }
-        
-        if (!hasFinancialDifferences && existing.getTotalDeductions() != null && newPayslip.getTotalDeductions() != null) {
-            hasFinancialDifferences = existing.getTotalDeductions().compareTo(newPayslip.getTotalDeductions()) != 0;
-        } else if (!hasFinancialDifferences && (existing.getTotalDeductions() == null ^ newPayslip.getTotalDeductions() == null)) {
-            hasFinancialDifferences = true;
-        }
-        
-        if (!hasFinancialDifferences && existing.getNetValue() != null && newPayslip.getNetValue() != null) {
-            hasFinancialDifferences = existing.getNetValue().compareTo(newPayslip.getNetValue()) != 0;
-        } else if (!hasFinancialDifferences && (existing.getNetValue() == null ^ newPayslip.getNetValue() == null)) {
-            hasFinancialDifferences = true;
-        }
-        
-        // Verificar se tableDetails tem diferenças
-        boolean hasTableDetailsDifferences = false;
-        if (existing.getTableDetails() != null && newPayslip.getTableDetails() != null) {
             if (existing.getTableDetails().size() != newPayslip.getTableDetails().size()) {
                 hasTableDetailsDifferences = true;
+                log.warn("📋 Número de linhas diferente: {} vs {}", 
+                    existing.getTableDetails().size(), newPayslip.getTableDetails().size());
             } else {
                 // Comparar conteúdo das linhas
                 for (int i = 0; i < existing.getTableDetails().size(); i++) {
@@ -2210,22 +2892,97 @@ public class PayslipService {
                         (existingRow.getDescontos() != null && newRow.getDescontos() != null && 
                          existingRow.getDescontos().compareTo(newRow.getDescontos()) != 0)) {
                         hasTableDetailsDifferences = true;
+                        log.warn("📋 Linha {} diferente: Cód={}, Desc={}, Venc={}, Desc={}", 
+                            i, existingRow.getCodigo(), existingRow.getDescricao(), 
+                            existingRow.getVencimentos(), existingRow.getDescontos());
                         break;
                     }
                 }
             }
         } else if (existing.getTableDetails() == null ^ newPayslip.getTableDetails() == null) {
             hasTableDetailsDifferences = true;
+            log.warn("📋 TableDetails: {} -> {}", 
+                existing.getTableDetails() != null ? existing.getTableDetails().size() + " linhas" : "não disponível",
+                newPayslip.getTableDetails() != null ? newPayslip.getTableDetails().size() + " linhas" : "não disponível");
+        } else {
+            log.debug("⚠️ Dados da tabela não disponíveis em ambos os holerites");
         }
         
-        // Se detectou diferenças financeiras ou em tableDetails mas hasChanges está false, forçar true
-        if ((hasFinancialDifferences || hasTableDetailsDifferences) && !result.hasChanges()) {
-            log.warn("⚠️ DIFERENÇAS DETECTADAS mas hasChanges estava false - FORÇANDO hasChanges=true");
+        // Verificação final: Se o hash for diferente mas todos os dados extraídos forem idênticos,
+        // provavelmente é apenas diferença em metadados do PDF (data de criação, etc.) - considerar como duplicado
+        if (!hashIdentico && hashArquivoOriginal != null && hashPaginaAtual != null && 
+            !hashArquivoOriginal.equals(hashPaginaAtual)) {
+            // Hash diferente, mas vamos verificar se os dados são realmente idênticos
+            // Verificar diretamente os dados, não através do result.getDifferences() que pode já ter diferenças
+            boolean dadosIdenticos = !hasFinancialDifferences && !hasTableDetailsDifferences;
+            
+            // Verificar também se não há diferenças nos campos básicos (nome, CPF, setor, etc.)
+            boolean camposBasicosIdenticos = 
+                Objects.equals(normalizeString(existing.getEmployeeName()), normalizeString(newPayslip.getEmployeeName())) &&
+                Objects.equals(normalizeString(existing.getCpf()), normalizeString(newPayslip.getCpf())) &&
+                Objects.equals(normalizeString(existing.getCompanyCnpj()), normalizeString(newPayslip.getCompanyCnpj())) &&
+                Objects.equals(normalizeString(existing.getWorkPostName()), normalizeString(newPayslip.getWorkPostName())) &&
+                Objects.equals(existing.getMonth(), newPayslip.getMonth()) &&
+                Objects.equals(existing.getYear(), newPayslip.getYear());
+            
+            if (dadosIdenticos && camposBasicosIdenticos) {
+                log.info("✅ Hash do PDF diferente, mas todos os dados extraídos são idênticos.");
+                log.info("   Provavelmente é apenas diferença em metadados do PDF (data de criação, etc.).");
+                log.info("   Considerando como duplicado - não será criada nova versão.");
+                // Limpar diferenças e retornar sem alterações
+                result = PayslipComparisonResult.builder()
+                    .hasChanges(false)
+                    .differences(new ArrayList<>())
+                    .build();
+                return result;
+            } else {
+                // Hash diferente E dados diferentes - realmente houve alteração
+                if (!result.getDifferences().stream().anyMatch(d -> d.contains("Hash do arquivo"))) {
+                    result.addDifference("Hash do arquivo", "diferente", "arquivo foi modificado");
+                }
+                log.info("🔐 Hash do arquivo diferente E dados diferentes - alteração real detectada");
+                if (!dadosIdenticos) {
+                    log.info("   Diferenças detectadas: financeiras={}, tableDetails={}", hasFinancialDifferences, hasTableDetailsDifferences);
+                }
+                if (!camposBasicosIdenticos) {
+                    log.info("   Diferenças detectadas nos campos básicos");
+                }
+            }
+        }
+        
+        // REGRA CRÍTICA: Só criar versão se houver diferenças nos DADOS FINANCEIROS
+        // Não criar versão por diferenças em outros campos (nome do arquivo, hash, etc.)
+        // Se não há diferenças financeiras, considerar como duplicado mesmo que hash seja diferente
+        if (!hasFinancialDifferences && !hasTableDetailsDifferences) {
+            // Não há diferenças financeiras - não criar nova versão
+            log.info("✅ Nenhuma diferença financeira detectada - não será criada nova versão");
+            log.info("   Total Vencimentos: {} (idêntico)", 
+                existing.getTotalEarnings() != null ? existing.getTotalEarnings() : "N/A");
+            log.info("   Total Descontos: {} (idêntico)", 
+                existing.getTotalDeductions() != null ? existing.getTotalDeductions() : "N/A");
+            log.info("   Valor Líquido: {} (idêntico)", 
+                existing.getNetValue() != null ? existing.getNetValue() : "N/A");
+            log.info("   TableDetails: {} linhas (idêntico)", 
+                existing.getTableDetails() != null ? existing.getTableDetails().size() : 0);
+            
+            // Limpar diferenças e retornar sem alterações
+            result = PayslipComparisonResult.builder()
+                .hasChanges(false)
+                .differences(new ArrayList<>())
+                .build();
+            return result;
+        }
+        
+        // Se detectou diferenças financeiras ou em tableDetails, marcar como alteração
+        if (hasFinancialDifferences || hasTableDetailsDifferences) {
+            if (!result.hasChanges()) {
+                log.warn("⚠️ DIFERENÇAS FINANCEIRAS DETECTADAS - FORÇANDO hasChanges=true");
             if (hasFinancialDifferences) {
                 result.addDifference("Valores financeiros", "diferentes", "detectado na verificação adicional");
             }
             if (hasTableDetailsDifferences) {
                 result.addDifference("Dados da tabela", "diferentes", "detectado na verificação adicional");
+                }
             }
         }
         
