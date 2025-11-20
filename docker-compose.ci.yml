@@ -84,11 +84,11 @@ services:
       - secured-guard-ci-network
       - z7network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/api/health || exit 1"]
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:8081/api/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 180s
+      retries: 10
+      start_period: 240s
     restart: unless-stopped
     # DESABILITADO TRAEFIK - usando Nginx como proxy reverso
     labels:
