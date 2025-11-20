@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Send, Users, Building2, Globe } from 'lucide-react';
+import { Loader2, Send, Users, Building2, Globe, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { messageService } from '@/services/messageService';
 import { userService } from '@/services/userService';
+import { useDebounce } from '@/hooks/use-debounce';
 
 interface MessageFormModalProps {
   isOpen: boolean;
@@ -43,6 +44,8 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
+  const debouncedRecipientSearch = useDebounce(recipientSearchTerm, 300);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -169,19 +172,40 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
         sendNotification: true,
         scheduledAt: ''
       });
+      setRecipientSearchTerm('');
       onClose();
     }
   };
 
+  // Filtrar usuários baseado no termo de busca
+  const filteredUsers = React.useMemo(() => {
+    if (!debouncedRecipientSearch.trim()) {
+      return users;
+    }
+    
+    const searchLower = debouncedRecipientSearch.toLowerCase().trim();
+    return users.filter(user => {
+      const name = (user.name || '').toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      const username = (user.username || '').toLowerCase();
+      
+      return name.includes(searchLower) || 
+             email.includes(searchLower) || 
+             username.includes(searchLower);
+    });
+  }, [users, debouncedRecipientSearch]);
+
+  const selectedUsersCount = formData.recipientIds.length;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
+      <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-seguranca-yellow flex items-center gap-2">
-            <Send className="h-6 w-6" />
+          <DialogTitle className="text-lg sm:text-2xl font-bold text-seguranca-yellow flex items-center gap-2">
+            <Send className="h-5 w-5 sm:h-6 sm:w-6" />
             {mode === 'create' ? 'Nova Mensagem' : 'Editar Mensagem'}
           </DialogTitle>
-          <DialogDescription className="text-gray-300">
+          <DialogDescription className="text-gray-300 text-sm">
             {mode === 'create' 
               ? 'Preencha os dados para enviar uma nova mensagem'
               : 'Atualize as informações da mensagem'
@@ -189,7 +213,7 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="grid gap-6">
             {/* Título */}
             <div className="space-y-2">
@@ -207,7 +231,7 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
             </div>
 
             {/* Tipo e Prioridade */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="type" className="text-seguranca-lightgray flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -280,44 +304,107 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
 
             {/* Destinatários - apenas para tipo INDIVIDUAL */}
             {formData.type === 'INDIVIDUAL' && (
-              <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">
-                  Destinatários *
-                </Label>
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <Label className="text-seguranca-lightgray text-sm font-medium">
+                    Destinatários *
+                  </Label>
+                  {selectedUsersCount > 0 && (
+                    <span className="text-xs text-gray-400">
+                      {selectedUsersCount} {selectedUsersCount === 1 ? 'selecionado' : 'selecionados'}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Campo de busca */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar por nome, email ou usuário..."
+                    value={recipientSearchTerm}
+                    onChange={(e) => setRecipientSearchTerm(e.target.value)}
+                    className="pl-9 pr-9 bg-seguranca-black border-gray-600 text-white placeholder:text-gray-500"
+                  />
+                  {recipientSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setRecipientSearchTerm('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                
                 {loadingUsers ? (
-                  <div className="flex items-center justify-center p-4 bg-seguranca-black rounded-lg">
+                  <div className="flex items-center justify-center p-6 bg-seguranca-black rounded-lg border border-gray-600">
                     <Loader2 className="h-5 w-5 animate-spin text-seguranca-yellow mr-2" />
-                    <span className="text-gray-400">Carregando usuários...</span>
+                    <span className="text-gray-400 text-sm">Carregando usuários...</span>
                   </div>
                 ) : (
-                  <div className="max-h-40 overflow-y-auto bg-seguranca-black rounded-lg p-3 border border-gray-600 space-y-2">
-                    {users.map((user) => (
-                      <div key={user.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`user-${user.id}`}
-                          checked={formData.recipientIds.includes(user.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setFormData({
-                                ...formData,
-                                recipientIds: [...formData.recipientIds, user.id]
-                              });
-                            } else {
-                              setFormData({
-                                ...formData,
-                                recipientIds: formData.recipientIds.filter(id => id !== user.id)
-                              });
-                            }
-                          }}
-                        />
-                        <Label
-                          htmlFor={`user-${user.id}`}
-                          className="text-seguranca-lightgray cursor-pointer flex-1"
-                        >
-                          {user.name} ({user.email})
-                        </Label>
+                  <div className="bg-seguranca-black rounded-lg border border-gray-600 overflow-hidden">
+                    {filteredUsers.length === 0 ? (
+                      <div className="p-6 text-center text-gray-400 text-sm">
+                        {recipientSearchTerm ? (
+                          <>
+                            <Search className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                            <p>Nenhum usuário encontrado para "{recipientSearchTerm}"</p>
+                            <button
+                              type="button"
+                              onClick={() => setRecipientSearchTerm('')}
+                              className="text-seguranca-yellow hover:underline mt-2"
+                            >
+                              Limpar busca
+                            </button>
+                          </>
+                        ) : (
+                          <p>Nenhum usuário disponível</p>
+                        )}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="max-h-60 sm:max-h-80 overflow-y-auto p-3 space-y-2">
+                        {filteredUsers.map((user) => (
+                          <div 
+                            key={user.id} 
+                            className="flex items-start space-x-3 p-2 rounded-lg hover:bg-seguranca-graphite transition-colors"
+                          >
+                            <Checkbox
+                              id={`user-${user.id}`}
+                              checked={formData.recipientIds.includes(user.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setFormData({
+                                    ...formData,
+                                    recipientIds: [...formData.recipientIds, user.id]
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    recipientIds: formData.recipientIds.filter(id => id !== user.id)
+                                  });
+                                }
+                              }}
+                              className="mt-1"
+                            />
+                            <Label
+                              htmlFor={`user-${user.id}`}
+                              className="text-seguranca-lightgray cursor-pointer flex-1 text-sm"
+                            >
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {user.email || user.username}
+                              </div>
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {recipientSearchTerm && filteredUsers.length > 0 && (
+                      <div className="px-3 py-2 border-t border-gray-600 bg-seguranca-graphite text-xs text-gray-400">
+                        Mostrando {filteredUsers.length} de {users.length} usuários
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -325,7 +412,7 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
 
             {/* Conteúdo */}
             <div className="space-y-2">
-              <Label htmlFor="content" className="text-seguranca-lightgray">
+              <Label htmlFor="content" className="text-seguranca-lightgray text-sm font-medium">
                 Mensagem *
               </Label>
               <Textarea
@@ -333,7 +420,7 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
                 value={formData.content}
                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                 placeholder="Digite o conteúdo da mensagem"
-                className="min-h-[150px] bg-seguranca-black border-gray-600 text-white placeholder:text-gray-500"
+                className="min-h-[120px] sm:min-h-[150px] bg-seguranca-black border-gray-600 text-white placeholder:text-gray-500 resize-none"
                 required
               />
             </div>
@@ -348,7 +435,7 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
                     setFormData({ ...formData, sendEmail: checked as boolean })
                   }
                 />
-                <Label htmlFor="sendEmail" className="text-seguranca-lightgray cursor-pointer">
+                <Label htmlFor="sendEmail" className="text-seguranca-lightgray cursor-pointer text-sm">
                   Enviar por email
                 </Label>
               </div>
@@ -361,27 +448,27 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
                     setFormData({ ...formData, sendNotification: checked as boolean })
                   }
                 />
-                <Label htmlFor="sendNotification" className="text-seguranca-lightgray cursor-pointer">
+                <Label htmlFor="sendNotification" className="text-seguranca-lightgray cursor-pointer text-sm">
                   Enviar notificação push
                 </Label>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
               disabled={loading}
-              className="border-gray-600 text-white hover:bg-seguranca-black"
+              className="border-gray-600 text-white hover:bg-seguranca-black w-full sm:w-auto"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="bg-seguranca-red hover:bg-seguranca-darkred"
+              className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
             >
               {loading ? (
                 <>
@@ -391,7 +478,12 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  {mode === 'create' ? 'Enviar Mensagem' : 'Salvar Alterações'}
+                  <span className="hidden sm:inline">
+                    {mode === 'create' ? 'Enviar Mensagem' : 'Salvar Alterações'}
+                  </span>
+                  <span className="sm:hidden">
+                    {mode === 'create' ? 'Enviar' : 'Salvar'}
+                  </span>
                 </>
               )}
             </Button>
