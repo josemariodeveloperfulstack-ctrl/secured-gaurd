@@ -42,6 +42,8 @@ import {
   RefreshCcw,
   ShieldAlert,
   Users,
+  Plus,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 type CertificationFilter = 'all' | 'dueSoon' | 'expired' | 'compliant';
@@ -264,7 +266,7 @@ const Treinamentos: React.FC = () => {
     event.preventDefault();
     setIsSavingTraining(true);
     try {
-      await trainingService.createTraining({
+      const newTraining = await trainingService.createTraining({
         name: trainingForm.name.trim(),
         description: trainingForm.description.trim(),
         provider: trainingForm.provider.trim(),
@@ -276,7 +278,6 @@ const Treinamentos: React.FC = () => {
         title: 'Treinamento cadastrado',
         description: 'O treinamento foi registrado com sucesso.',
       });
-      setTrainingModalOpen(false);
       setTrainingForm({
         name: '',
         description: '',
@@ -286,6 +287,28 @@ const Treinamentos: React.FC = () => {
         mandatoryForGuards: true,
       });
       await loadData();
+      
+      // Se estava vindo do modal de reciclagem, reabrir e selecionar o novo treinamento
+      if (assignmentForm.trainingId === '') {
+        setTrainingModalOpen(false);
+        setTimeout(() => {
+          setAssignmentModalOpen(true);
+          if (newTraining?.id) {
+            const expiration = addMonthsToDate(todayIso, trainingForm.renewalPeriodMonths);
+            const defaultCertification = trainingForm.name
+              ? `${trainingForm.name.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date().getFullYear()}`
+              : '';
+            setAssignmentForm((prev) => ({
+              ...prev,
+              trainingId: newTraining.id,
+              expirationDate: expiration,
+              certificationNumber: defaultCertification,
+            }));
+          }
+        }, 100);
+      } else {
+        setTrainingModalOpen(false);
+      }
     } catch (error) {
       console.error('Erro ao criar treinamento', error);
       toast({
@@ -765,10 +788,10 @@ const Treinamentos: React.FC = () => {
       </Dialog>
 
       <Dialog open={isAssignmentModalOpen} onOpenChange={setAssignmentModalOpen}>
-        <DialogContent className="sm:max-w-xl bg-seguranca-black border-gray-700 text-gray-200">
+        <DialogContent className="sm:max-w-2xl bg-seguranca-black border-gray-700 text-gray-200 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar reciclagem realizada</DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogTitle className="text-xl font-bold text-white">Registrar reciclagem realizada</DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm">
               Informe qual vigilante concluiu o treinamento e quando. A validade será calculada automaticamente.
             </DialogDescription>
           </DialogHeader>
@@ -796,42 +819,94 @@ const Treinamentos: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="assignment-training" className="text-gray-300">Treinamento</Label>
-              <Select
-                value={assignmentForm.trainingId}
-                onValueChange={(value) => {
-                  const expiration = addMonthsToDate(
-                    assignmentForm.issueDate,
-                    getTrainingRenewalPeriod(value),
-                  );
-                  const selectedTraining = trainings.find((training) => training.id === value);
-                  setAssignmentForm((prev) => ({
-                    ...prev,
-                    trainingId: value,
-                    expirationDate: expiration,
-                    certificationNumber: prev.certificationNumber || (selectedTraining
-                      ? `${selectedTraining.name.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date(
-                        prev.issueDate || todayIso,
-                      ).getFullYear()}`
-                      : ''),
-                  }));
-                }}
-                required
-              >
-                <SelectTrigger
-                  id="assignment-training"
-                  className="bg-seguranca-black border-gray-700 text-gray-100"
+              <div className="flex items-center justify-between">
+                <Label htmlFor="assignment-training" className="text-gray-300 font-medium">Treinamento</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto py-1.5 px-2 text-xs text-seguranca-red hover:text-seguranca-red/90 hover:bg-seguranca-red/10 border border-seguranca-red/30 rounded-md transition-colors"
+                  onClick={() => {
+                    setAssignmentModalOpen(false);
+                    setTimeout(() => {
+                      setTrainingModalOpen(true);
+                    }, 100);
+                  }}
                 >
-                  <SelectValue placeholder="Selecione o treinamento" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100 max-h-64">
-                  {trainings.map((training) => (
-                    <SelectItem key={training.id} value={training.id}>
-                      {training.name} ({training.renewalPeriodMonths ?? 12} meses)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Cadastrar novo treinamento
+                </Button>
+              </div>
+              <div className="relative">
+                <Select
+                  value={assignmentForm.trainingId}
+                  onValueChange={(value) => {
+                    const expiration = addMonthsToDate(
+                      assignmentForm.issueDate,
+                      getTrainingRenewalPeriod(value),
+                    );
+                    const selectedTraining = trainings.find((training) => training.id === value);
+                    setAssignmentForm((prev) => ({
+                      ...prev,
+                      trainingId: value,
+                      expirationDate: expiration,
+                      certificationNumber: prev.certificationNumber || (selectedTraining
+                        ? `${selectedTraining.name.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date(
+                          prev.issueDate || todayIso,
+                        ).getFullYear()}`
+                        : ''),
+                    }));
+                  }}
+                  required
+                >
+                  <SelectTrigger
+                    id="assignment-training"
+                    className="bg-seguranca-black border-gray-700 text-gray-100 hover:border-gray-600"
+                  >
+                    <SelectValue placeholder="Selecione o treinamento" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-700 text-gray-100 max-h-64">
+                    {trainings.length === 0 ? (
+                      <div className="px-4 py-8 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <GraduationCap className="h-8 w-8 text-gray-500" />
+                          <p className="text-sm text-gray-400">Nenhum treinamento cadastrado</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 border-seguranca-red/50 text-seguranca-red hover:bg-seguranca-red/10 hover:border-seguranca-red/70"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssignmentModalOpen(false);
+                              setTimeout(() => {
+                                setTrainingModalOpen(true);
+                              }, 100);
+                            }}
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Cadastrar primeiro treinamento
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      trainings.map((training) => (
+                        <SelectItem key={training.id} value={training.id}>
+                          {training.name} ({training.renewalPeriodMonths ?? 12} meses)
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {trainings.length === 0 && (
+                  <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <p className="text-xs text-amber-400 flex items-start gap-2">
+                      <ShieldAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>Nenhum treinamento cadastrado. Clique no botão acima para cadastrar um novo treinamento antes de registrar a reciclagem.</span>
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
