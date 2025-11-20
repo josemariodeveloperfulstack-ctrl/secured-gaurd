@@ -1062,54 +1062,62 @@ const Treinamentos: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="assignment-issueDate" className="text-gray-300 font-medium">
-                  Data de realização <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="assignment-issueDate"
-                  type="date"
-                  value={assignmentForm.issueDate}
-                  max={todayIso}
-                  onChange={(event) => {
-                    const newDate = event.target.value;
-                    setAssignmentForm((prev) => ({
-                      ...prev,
-                      issueDate: newDate,
-                      expirationDate: prev.trainingId
-                        ? addMonthsToDate(newDate, getTrainingRenewalPeriod(prev.trainingId))
-                        : prev.expirationDate,
-                    }));
-                  }}
-                  className="bg-seguranca-black border-gray-700 text-gray-100"
-                  required
-                />
-                <p className="text-xs text-gray-500">Data em que o treinamento foi concluído</p>
+            
+            {/* Datas - Destaque visual */}
+            <div className="bg-seguranca-graphite/50 border border-gray-700 rounded-lg p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-seguranca-yellow" />
+                <h3 className="text-sm font-semibold text-gray-300">Datas do Treinamento</h3>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="assignment-expirationDate" className="text-gray-300 font-medium">
-                  Data de validade <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="assignment-expirationDate"
-                  type="date"
-                  value={assignmentForm.expirationDate}
-                  min={assignmentForm.issueDate || todayIso}
-                  onChange={(event) =>
-                    setAssignmentForm((prev) => ({ ...prev, expirationDate: event.target.value }))
-                  }
-                  className="bg-seguranca-black border-gray-700 text-gray-100"
-                  required
-                />
-                <p className="text-xs text-gray-500">
-                  {assignmentForm.trainingId
-                    ? `Calculada automaticamente (${getTrainingRenewalPeriod(assignmentForm.trainingId)} meses)`
-                    : 'Data até quando o certificado é válido'}
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="assignment-issueDate" className="text-gray-300 font-medium text-sm">
+                    Data de realização <span className="text-red-400">*</span>
+                  </Label>
+                  <Input
+                    id="assignment-issueDate"
+                    type="date"
+                    value={assignmentForm.issueDate}
+                    max={todayIso}
+                    onChange={(event) => {
+                      const newDate = event.target.value;
+                      setAssignmentForm((prev) => ({
+                        ...prev,
+                        issueDate: newDate,
+                        expirationDate: prev.trainingId
+                          ? addMonthsToDate(newDate, getTrainingRenewalPeriod(prev.trainingId))
+                          : prev.expirationDate,
+                      }));
+                    }}
+                    className="bg-seguranca-black border-gray-700 text-gray-100 w-full"
+                    required
+                  />
+                  <p className="text-xs text-gray-400">
+                    Data em que o treinamento foi realizado/concluído
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assignment-expirationDate" className="text-gray-300 font-medium text-sm">
+                    Data de validade <span className="text-red-400">*</span>
+                  </Label>
+                  <Input
+                    id="assignment-expirationDate"
+                    type="date"
+                    value={assignmentForm.expirationDate}
+                    min={assignmentForm.issueDate || todayIso}
+                    onChange={(event) =>
+                      setAssignmentForm((prev) => ({ ...prev, expirationDate: event.target.value }))
+                    }
+                    className="bg-seguranca-black border-gray-700 text-gray-100 w-full"
+                    required
+                  />
+                  <p className="text-xs text-gray-400">
+                    {assignmentForm.trainingId
+                      ? `Calculada automaticamente (${getTrainingRenewalPeriod(assignmentForm.trainingId)} meses após a realização)`
+                      : 'Data até quando o certificado é válido'}
+                  </p>
+                </div>
               </div>
-            </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
