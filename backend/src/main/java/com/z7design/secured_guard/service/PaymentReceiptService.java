@@ -775,39 +775,63 @@ public class PaymentReceiptService {
     
     // Excluir comprovante por ID
     public void deleteById(String id) {
+        if (id == null || id.trim().isEmpty()) {
+            log.warn("ID nulo ou vazio fornecido para exclusão");
+            return;
+        }
+        
         try {
-            UUID receiptId = UUID.fromString(id);
+            UUID receiptId = UUID.fromString(id.trim());
             Optional<PaymentReceipt> receiptOpt = paymentReceiptRepository.findById(receiptId);
             
             if (receiptOpt.isPresent()) {
                 PaymentReceipt receipt = receiptOpt.get();
                 
                 // Excluir arquivo físico se existir
-                if (receipt.getFilePath() != null) {
+                if (receipt.getFilePath() != null && !receipt.getFilePath().trim().isEmpty()) {
                     try {
                         Path filePath = Paths.get(receipt.getFilePath());
                         if (Files.exists(filePath)) {
                             Files.delete(filePath);
                             log.info("Arquivo físico excluído: {}", filePath);
+                        } else {
+                            log.debug("Arquivo físico não encontrado (já foi excluído?): {}", filePath);
                         }
+                    } catch (IOException e) {
+                        log.warn("Erro ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
+                        // Não lançar exceção - continuar com exclusão do banco
                     } catch (Exception e) {
-                        log.warn("Erro ao excluir arquivo físico: {}", e.getMessage());
+                        log.warn("Erro inesperado ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
+                        // Não lançar exceção - continuar com exclusão do banco
                     }
                 }
                 
                 // Excluir do banco de dados
-                paymentReceiptRepository.deleteById(receiptId);
-                log.info("Comprovante excluído do banco: {}", id);
+                try {
+                    paymentReceiptRepository.deleteById(receiptId);
+                    log.info("Comprovante excluído do banco: {}", id);
+                } catch (Exception e) {
+                    log.error("Erro ao excluir comprovante do banco de dados {}: {}", id, e.getMessage(), e);
+                    throw new RuntimeException("Erro ao excluir comprovante do banco de dados: " + e.getMessage(), e);
+                }
             } else {
                 log.warn("Comprovante não encontrado para exclusão: {}", id);
+                // Não lançar exceção - comprovante não existe é um caso válido
             }
+        } catch (IllegalArgumentException e) {
+            log.error("ID inválido fornecido para exclusão: {} - {}", id, e.getMessage());
+            throw new IllegalArgumentException("ID inválido: " + id, e);
+        } catch (RuntimeException e) {
+            // Re-lançar RuntimeException
+            throw e;
         } catch (Exception e) {
-            log.error("Erro ao excluir comprovante: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro ao excluir comprovante", e);
+            log.error("Erro inesperado ao excluir comprovante {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Erro ao excluir comprovante: " + e.getMessage(), e);
         }
     }
     
     // Excluir múltiplos comprovantes
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public Map<String, Object> deleteMultiplePaymentReceipts(List<String> ids) {
         Map<String, Object> result = new HashMap<>();
         int deleted = 0;
@@ -815,11 +839,14 @@ public class PaymentReceiptService {
         List<String> errors = new ArrayList<>();
         
         if (ids == null || ids.isEmpty()) {
+            log.info("📋 Lista de IDs vazia ou nula para exclusão múltipla");
             result.put("deleted", 0);
             result.put("failed", 0);
             result.put("errors", new ArrayList<>());
             return result;
         }
+        
+        log.info("🗑️ Iniciando exclusão de {} comprovantes", ids.size());
         
         for (String id : ids) {
             try {
@@ -827,34 +854,46 @@ public class PaymentReceiptService {
                 if (id == null || id.trim().isEmpty()) {
                     failed++;
                     errors.add("ID vazio ou nulo fornecido");
-                    log.warn("ID vazio ou nulo fornecido para exclusão");
+                    log.warn("⚠️ ID vazio ou nulo fornecido para exclusão");
                     continue;
                 }
+                
+                String trimmedId = id.trim();
                 
                 // Validar formato UUID
                 try {
-                    UUID.fromString(id.trim());
+                    UUID.fromString(trimmedId);
                 } catch (IllegalArgumentException e) {
                     failed++;
-                    String error = "ID inválido (não é um UUID válido): " + id;
+                    String error = "ID inválido (não é um UUID válido): " + trimmedId;
                     errors.add(error);
-                    log.warn(error);
+                    log.warn("⚠️ {}", error);
                     continue;
                 }
                 
-                deleteById(id.trim());
-                deleted++;
-                log.info("Comprovante excluído com sucesso: {}", id);
-            } catch (IllegalArgumentException e) {
-                failed++;
-                String error = "ID inválido " + id + ": " + e.getMessage();
-                errors.add(error);
-                log.error(error, e);
+                // Tentar excluir cada comprovante em sua própria transação
+                try {
+                    deleteByIdInTransaction(trimmedId);
+                    deleted++;
+                    log.info("✅ Comprovante excluído com sucesso: {}", trimmedId);
+                } catch (IllegalArgumentException e) {
+                    failed++;
+                    String error = "ID inválido " + trimmedId + ": " + e.getMessage();
+                    errors.add(error);
+                    log.error("❌ {}", error);
+                } catch (Exception e) {
+                    failed++;
+                    String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                    String error = "Erro ao excluir comprovante " + trimmedId + ": " + errorMsg;
+                    errors.add(error);
+                    log.error("❌ Erro ao excluir comprovante {}: {}", trimmedId, errorMsg, e);
+                }
             } catch (Exception e) {
                 failed++;
-                String error = "Erro ao excluir comprovante " + id + ": " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                String error = "Erro inesperado ao processar ID " + id + ": " + errorMsg;
                 errors.add(error);
-                log.error("Erro ao excluir comprovante {}: {}", id, e.getMessage(), e);
+                log.error("❌ Erro inesperado ao processar ID {}: {}", id, errorMsg, e);
             }
         }
         
@@ -862,7 +901,13 @@ public class PaymentReceiptService {
         result.put("failed", failed);
         result.put("errors", errors);
         
-        log.info("Exclusão múltipla concluída: {} excluídos, {} falharam", deleted, failed);
+        log.info("✅ Exclusão múltipla concluída: {} excluídos, {} falharam", deleted, failed);
         return result;
+    }
+    
+    // Método auxiliar para excluir em transação separada
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    private void deleteByIdInTransaction(String id) {
+        deleteById(id);
     }
 }
