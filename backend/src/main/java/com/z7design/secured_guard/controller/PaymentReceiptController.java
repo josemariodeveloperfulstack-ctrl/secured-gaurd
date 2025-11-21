@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.extern.slf4j.Slf4j;
@@ -227,8 +228,10 @@ public class PaymentReceiptController {
     
     // Excluir múltiplos comprovantes
     @PostMapping("/delete-multiple")
-    public ResponseEntity<Map<String, Object>> deleteMultiplePaymentReceipts(@RequestBody Map<String, List<String>> body) {
+    public ResponseEntity<Map<String, Object>> deleteMultiplePaymentReceipts(@RequestBody(required = false) Map<String, Object> body) {
         try {
+            log.info("📥 Recebida requisição para excluir múltiplos comprovantes");
+            
             if (body == null) {
                 log.warn("⚠️ Request body é nulo");
                 Map<String, Object> result = new HashMap<>();
@@ -238,9 +241,36 @@ public class PaymentReceiptController {
                 return ResponseEntity.badRequest().body(result);
             }
             
-            List<String> idStrings = body.get("ids");
-            if (idStrings == null || idStrings.isEmpty()) {
-                log.info("📋 Lista de IDs vazia ou nula");
+            Object idsObj = body.get("ids");
+            if (idsObj == null) {
+                log.warn("⚠️ Campo 'ids' não encontrado no body");
+                Map<String, Object> result = new HashMap<>();
+                result.put("deleted", 0);
+                result.put("failed", 0);
+                result.put("errors", List.of("Campo 'ids' não encontrado no request body"));
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // Converter para List<String>
+            List<String> idStrings;
+            if (idsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> idsList = (List<Object>) idsObj;
+                idStrings = idsList.stream()
+                    .map(id -> id != null ? id.toString() : null)
+                    .filter(id -> id != null && !id.trim().isEmpty())
+                    .collect(java.util.stream.Collectors.toList());
+            } else {
+                log.warn("⚠️ Campo 'ids' não é uma lista: {}", idsObj.getClass().getSimpleName());
+                Map<String, Object> result = new HashMap<>();
+                result.put("deleted", 0);
+                result.put("failed", 0);
+                result.put("errors", List.of("Campo 'ids' deve ser uma lista"));
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            if (idStrings.isEmpty()) {
+                log.info("📋 Lista de IDs vazia após processamento");
                 Map<String, Object> result = new HashMap<>();
                 result.put("deleted", 0);
                 result.put("failed", 0);
@@ -252,6 +282,13 @@ public class PaymentReceiptController {
             Map<String, Object> result = paymentReceiptService.deleteMultiplePaymentReceipts(idStrings);
             log.info("✅ Exclusão concluída: {} excluídos, {} falharam", result.get("deleted"), result.get("failed"));
             return ResponseEntity.ok(result);
+        } catch (org.springframework.http.converter.HttpMessageNotReadableException e) {
+            log.error("❌ Erro ao ler request body: {}", e.getMessage(), e);
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("deleted", 0);
+            errorResult.put("failed", 0);
+            errorResult.put("errors", List.of("Erro ao processar request body: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(errorResult);
         } catch (Exception e) {
             log.error("❌ Erro ao processar exclusão múltipla: {}", e.getMessage(), e);
             Map<String, Object> errorResult = new HashMap<>();
