@@ -1884,7 +1884,7 @@ const Holerites: React.FC = () => {
   // Funções para seleção em lote de comprovantes
   const handleSelectAllPaymentReceipts = (checked: boolean) => {
     if (checked) {
-      const allIds = getFilteredPaymentReceipts().map(receipt => receipt.id);
+      const allIds = getFilteredPaymentReceipts().map(receipt => String(receipt.id));
       console.log('✅ Selecionando todos os comprovantes:', allIds);
       setSelectedPaymentReceipts(allIds);
     } else {
@@ -1894,10 +1894,16 @@ const Holerites: React.FC = () => {
   };
 
   const handleSelectPaymentReceipt = (receiptId: string, checked: boolean) => {
+    const idStr = String(receiptId);
     if (checked) {
-      setSelectedPaymentReceipts(prev => [...prev, receiptId]);
+      setSelectedPaymentReceipts(prev => {
+        if (prev.includes(idStr)) {
+          return prev; // Já está selecionado
+        }
+        return [...prev, idStr];
+      });
     } else {
-      setSelectedPaymentReceipts(prev => prev.filter(id => id !== receiptId));
+      setSelectedPaymentReceipts(prev => prev.filter(id => String(id) !== idStr));
     }
   };
 
@@ -2052,16 +2058,28 @@ const Holerites: React.FC = () => {
       return;
     }
 
+    // Garantir que todos os IDs são strings
+    const idsToDelete = selectedPaymentReceipts.map(id => String(id)).filter(id => id && id.trim() !== '');
+
+    if (idsToDelete.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Nenhum ID válido encontrado para exclusão.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     console.log('🗑️ Iniciando exclusão em lote de comprovantes');
-    console.log('📋 IDs selecionados:', selectedPaymentReceipts);
-    console.log('📊 Quantidade selecionada:', selectedPaymentReceipts.length);
-    console.log('📋 Dados dos comprovantes selecionados:', selectedPaymentReceipts.map(id => {
-      const receipt = paymentReceipts.find(r => r.id === id);
+    console.log('📋 IDs selecionados:', idsToDelete);
+    console.log('📊 Quantidade selecionada:', idsToDelete.length);
+    console.log('📋 Dados dos comprovantes selecionados:', idsToDelete.map(id => {
+      const receipt = paymentReceipts.find(r => String(r.id) === id);
       return { id, receipt: receipt ? { id: receipt.id, employeeName: receipt.employeeName, fileName: receipt.fileName } : 'Não encontrado' };
     }));
 
     try {
-      const result = await paymentReceiptService.deleteMultiplePaymentReceipts(selectedPaymentReceipts);
+      const result = await paymentReceiptService.deleteMultiplePaymentReceipts(idsToDelete);
       
       console.log('✅ Resultado da exclusão:', result);
       
@@ -5602,8 +5620,8 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                             <div className="flex items-start gap-3">
                               <Checkbox
                                 id={`payment-receipt-${receipt.id}`}
-                                checked={selectedPaymentReceipts.includes(receipt.id)}
-                                onCheckedChange={(checked) => handleSelectPaymentReceipt(receipt.id, checked as boolean)}
+                                checked={selectedPaymentReceipts.includes(String(receipt.id))}
+                                onCheckedChange={(checked) => handleSelectPaymentReceipt(String(receipt.id), checked as boolean)}
                                 className="border-blue-400 mt-1"
                               />
                               <div className="flex-1">
