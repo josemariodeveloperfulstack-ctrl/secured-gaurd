@@ -654,6 +654,38 @@ EOF
             
             echo "✅ PostgreSQL e Redis estão rodando!"
             
+            # Verificar se Frontend e Nginx estão rodando
+            echo ""
+            echo "🔍 Verificando Frontend e Nginx..."
+            if ! docker ps | grep -q "secured-guard-frontend-ci"; then
+              echo "⚠️ Frontend não está rodando! Tentando iniciar..."
+              docker start secured-guard-frontend-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
+              sleep 10
+            fi
+            
+            if ! docker ps | grep -q "secured-guard-nginx-ci"; then
+              echo "⚠️ Nginx não está rodando! Tentando iniciar..."
+              docker start secured-guard-nginx-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
+              sleep 10
+            fi
+            
+            # Verificar novamente
+            if ! docker ps | grep -q "secured-guard-frontend-ci"; then
+              echo "❌ ERRO: Frontend ainda não está rodando!"
+              echo "📋 Logs do Frontend:"
+              docker logs --tail 50 secured-guard-frontend-ci 2>&1 | tail -30 || echo "Container não encontrado"
+            else
+              echo "✅ Frontend está rodando!"
+            fi
+            
+            if ! docker ps | grep -q "secured-guard-nginx-ci"; then
+              echo "❌ ERRO: Nginx ainda não está rodando!"
+              echo "📋 Logs do Nginx:"
+              docker logs --tail 50 secured-guard-nginx-ci 2>&1 | tail -30 || echo "Container não encontrado"
+            else
+              echo "✅ Nginx está rodando!"
+            fi
+            
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
             
