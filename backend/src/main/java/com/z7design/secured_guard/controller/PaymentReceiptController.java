@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -252,12 +253,13 @@ public class PaymentReceiptController {
     // Excluir múltiplos comprovantes
     @PostMapping("/delete-multiple")
     public ResponseEntity<Map<String, Object>> deleteMultiplePaymentReceipts(@RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> result = new HashMap<>();
+        
         try {
             log.info("📥 Recebida requisição para excluir múltiplos comprovantes");
             
             if (body == null) {
                 log.warn("⚠️ Request body é nulo");
-                Map<String, Object> result = new HashMap<>();
                 result.put("deleted", 0);
                 result.put("failed", 0);
                 result.put("errors", List.of("Request body não pode ser nulo"));
@@ -267,7 +269,6 @@ public class PaymentReceiptController {
             Object idsObj = body.get("ids");
             if (idsObj == null) {
                 log.warn("⚠️ Campo 'ids' não encontrado no body");
-                Map<String, Object> result = new HashMap<>();
                 result.put("deleted", 0);
                 result.put("failed", 0);
                 result.put("errors", List.of("Campo 'ids' não encontrado no request body"));
@@ -276,50 +277,80 @@ public class PaymentReceiptController {
             
             // Converter para List<String>
             List<String> idStrings;
-            if (idsObj instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<Object> idsList = (List<Object>) idsObj;
-                idStrings = idsList.stream()
-                    .map(id -> id != null ? id.toString() : null)
-                    .filter(id -> id != null && !id.trim().isEmpty())
-                    .collect(java.util.stream.Collectors.toList());
-            } else {
-                log.warn("⚠️ Campo 'ids' não é uma lista: {}", idsObj.getClass().getSimpleName());
-                Map<String, Object> result = new HashMap<>();
+            try {
+                if (idsObj instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> idsList = (List<Object>) idsObj;
+                    idStrings = idsList.stream()
+                        .map(id -> id != null ? id.toString() : null)
+                        .filter(id -> id != null && !id.trim().isEmpty())
+                        .collect(java.util.stream.Collectors.toList());
+                } else {
+                    log.warn("⚠️ Campo 'ids' não é uma lista: {}", idsObj.getClass().getSimpleName());
+                    result.put("deleted", 0);
+                    result.put("failed", 0);
+                    result.put("errors", List.of("Campo 'ids' deve ser uma lista"));
+                    return ResponseEntity.badRequest().body(result);
+                }
+            } catch (Exception e) {
+                log.error("❌ Erro ao converter lista de IDs: {}", e.getMessage(), e);
                 result.put("deleted", 0);
                 result.put("failed", 0);
-                result.put("errors", List.of("Campo 'ids' deve ser uma lista"));
+                result.put("errors", List.of("Erro ao processar lista de IDs: " + e.getMessage()));
                 return ResponseEntity.badRequest().body(result);
             }
             
             if (idStrings.isEmpty()) {
                 log.info("📋 Lista de IDs vazia após processamento");
-                Map<String, Object> result = new HashMap<>();
                 result.put("deleted", 0);
                 result.put("failed", 0);
-                result.put("errors", List.of());
+                result.put("errors", new ArrayList<>());
                 return ResponseEntity.ok(result);
             }
             
             log.info("🗑️ Iniciando exclusão de {} comprovantes", idStrings.size());
-            Map<String, Object> result = paymentReceiptService.deleteMultiplePaymentReceipts(idStrings);
-            log.info("✅ Exclusão concluída: {} excluídos, {} falharam", result.get("deleted"), result.get("failed"));
-            return ResponseEntity.ok(result);
+            
+            try {
+                result = paymentReceiptService.deleteMultiplePaymentReceipts(idStrings);
+                
+                // Garantir que o resultado sempre tenha os campos necessários
+                if (!result.containsKey("deleted")) {
+                    result.put("deleted", 0);
+                }
+                if (!result.containsKey("failed")) {
+                    result.put("failed", 0);
+                }
+                if (!result.containsKey("errors")) {
+                    result.put("errors", new ArrayList<>());
+                }
+                
+                log.info("✅ Exclusão concluída: {} excluídos, {} falharam", result.get("deleted"), result.get("failed"));
+                return ResponseEntity.ok(result);
+            } catch (Exception e) {
+                log.error("❌ Erro ao executar exclusão múltipla: {}", e.getMessage(), e);
+                result = new HashMap<>();
+                result.put("deleted", 0);
+                result.put("failed", idStrings.size());
+                String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                result.put("errors", List.of("Erro ao excluir comprovantes: " + errorMsg));
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+            }
+            
         } catch (org.springframework.http.converter.HttpMessageNotReadableException e) {
             log.error("❌ Erro ao ler request body: {}", e.getMessage(), e);
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("deleted", 0);
-            errorResult.put("failed", 0);
-            errorResult.put("errors", List.of("Erro ao processar request body: " + e.getMessage()));
-            return ResponseEntity.badRequest().body(errorResult);
+            result = new HashMap<>();
+            result.put("deleted", 0);
+            result.put("failed", 0);
+            result.put("errors", List.of("Erro ao processar request body: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(result);
         } catch (Exception e) {
-            log.error("❌ Erro ao processar exclusão múltipla: {}", e.getMessage(), e);
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("deleted", 0);
-            errorResult.put("failed", 0);
+            log.error("❌ Erro inesperado ao processar exclusão múltipla: {}", e.getMessage(), e);
+            result = new HashMap<>();
+            result.put("deleted", 0);
+            result.put("failed", 0);
             String errorMessage = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            errorResult.put("errors", List.of("Erro interno: " + errorMessage));
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
+            result.put("errors", List.of("Erro interno: " + errorMessage));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
     }
 }
