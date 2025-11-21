@@ -1176,41 +1176,76 @@ const Holerites: React.FC = () => {
         params._t = Date.now();
       }
       
-      const response = await api.get(endpoint, { params });
+      let response;
+      let documents: any[] = [];
       
-      if (response.data.sucesso) {
-        const documents = response.data.documents || [];
-        setUnifiedDocuments(documents);
-        console.log('✅ Documentos unificados carregados:', documents.length);
+      try {
+        // Tentar primeiro o endpoint protegido
+        response = await api.get(endpoint, { params });
+        console.log('📥 Resposta do endpoint protegido:', response.data);
         
-        // Limpar seleções se não há documentos ou se a lista mudou significativamente
-        if (documents.length === 0) {
-          setSelectedUnifiedDocuments(new Set());
-          console.log('🧹 Lista vazia - seleções limpas');
-        } else {
-          // Verificar se os índices selecionados ainda são válidos
-          const filteredDocs = documents;
-          const validSelections = new Set<number>();
-          
-          selectedUnifiedDocuments.forEach(index => {
-            if (index < filteredDocs.length) {
-              validSelections.add(index);
-            }
-          });
-          
-          if (validSelections.size !== selectedUnifiedDocuments.size) {
-            setSelectedUnifiedDocuments(validSelections);
-            console.log(`🧹 SeleÃ§Ãµes ajustadas: ${selectedUnifiedDocuments.size} → ${validSelections.size}`);
+        if (response.data && (response.data.sucesso || response.data.documents)) {
+          documents = response.data.documents || response.data || [];
+          if (Array.isArray(documents)) {
+            setUnifiedDocuments(documents);
+            console.log('✅ Documentos unificados carregados:', documents.length);
+          } else {
+            throw new Error('Formato de resposta inválido');
           }
+        } else {
+          throw new Error(response.data?.mensagem || 'Resposta inválida do servidor');
         }
+      } catch (protectedError: any) {
+        console.warn('⚠️ Endpoint protegido falhou, tentando público:', protectedError.message);
+        
+        // Fallback para endpoint público
+        try {
+          const publicEndpoint = endpoint.replace('/api/unified-documents/', '/api/unified-documents/public/');
+          response = await api.get(publicEndpoint, { params });
+          console.log('📥 Resposta do endpoint público:', response.data);
+          
+          if (response.data && (response.data.sucesso || response.data.documents)) {
+            documents = response.data.documents || response.data || [];
+            if (Array.isArray(documents)) {
+              setUnifiedDocuments(documents);
+              console.log('✅ Documentos unificados carregados (público):', documents.length);
+            } else {
+              throw new Error('Formato de resposta inválido');
+            }
+          } else {
+            throw new Error(response.data?.mensagem || 'Resposta inválida do servidor');
+          }
+        } catch (publicError: any) {
+          console.error('❌ Erro ao buscar documentos unificados (público):', publicError);
+          throw publicError;
+        }
+      }
+      
+      // Limpar seleções se não há documentos ou se a lista mudou significativamente
+      if (documents.length === 0) {
+        setSelectedUnifiedDocuments(new Set());
+        console.log('🧹 Lista vazia - seleções limpas');
       } else {
-        throw new Error(response.data.mensagem || 'Erro ao buscar documentos');
+        // Verificar se os índices selecionados ainda são válidos
+        const filteredDocs = documents;
+        const validSelections = new Set<number>();
+        
+        selectedUnifiedDocuments.forEach(index => {
+          if (index < filteredDocs.length) {
+            validSelections.add(index);
+          }
+        });
+        
+        if (validSelections.size !== selectedUnifiedDocuments.size) {
+          setSelectedUnifiedDocuments(validSelections);
+          console.log(`🧹 Seleções ajustadas: ${selectedUnifiedDocuments.size} → ${validSelections.size}`);
+        }
       }
     } catch (error: any) {
       console.error('âŒ Erro ao buscar documentos unificados:', error);
       toast({
         title: "Erro ao carregar documentos",
-        description: error.response?.data?.mensagem || error.message || 'Erro desconhecido',
+        description: errorMessage,
         variant: "destructive"
       });
       setUnifiedDocuments([]);
@@ -1222,14 +1257,8 @@ const Holerites: React.FC = () => {
   // useEffect para carregar documentos unificados ao montar o componente
   useEffect(() => {
     if (user) {
-      console.log('🔄 Carregando documentos unificados na inicialização...');
-      fetchUnifiedDocuments();
-      // Carregar organização se a aba de unificação estiver ativa
-      if (activeTab === 'unificacao-individual') {
-        setTimeout(() => {
-          loadUnifiedOrganization();
-        }, 300);
-      }
+      // Não carregar automaticamente - apenas quando os botões forem clicados
+      console.log('✅ Usuário autenticado. Use os botões "Recarregar Lista" e "Recarregar Organização" para carregar os dados.');
     }
   }, [user]);
 
@@ -2017,13 +2046,19 @@ const Holerites: React.FC = () => {
       // Remover da seleção se estiver selecionado
       setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => String(id) !== idStr));
       
-      // Recarregar lista de comprovantes de pagamento
-      await loadPaymentReceipts();
-      
+      // Exibir mensagem de sucesso ANTES de recarregar a lista
       toast({
         title: "Comprovante excluído",
         description: "Comprovante excluído com sucesso.",
       });
+      
+      // Recarregar lista de comprovantes de pagamento (silenciosamente, sem exibir erros)
+      try {
+        await loadPaymentReceipts();
+      } catch (loadError) {
+        // Erro ao recarregar não deve afetar a mensagem de sucesso da exclusão
+        console.warn('⚠️ Erro ao recarregar lista após exclusão (não crítico):', loadError);
+      }
     } catch (error: any) {
       console.error('❌ Erro ao excluir comprovante:', error);
       console.error('❌ Detalhes:', {
@@ -2031,6 +2066,23 @@ const Holerites: React.FC = () => {
         response: error.response?.data,
         status: error.response?.status
       });
+      
+      // Verificar se é realmente um erro ou se a exclusão foi bem-sucedida mas houve erro na resposta
+      if (error.response?.status === 200 || error.response?.status === 204) {
+        // Se o status é 200/204, a exclusão foi bem-sucedida, apenas recarregar
+        toast({
+          title: "Comprovante excluído",
+          description: "Comprovante excluído com sucesso.",
+        });
+        setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => String(id) !== idStr));
+        try {
+          await loadPaymentReceipts();
+        } catch (loadError) {
+          console.warn('⚠️ Erro ao recarregar lista após exclusão (não crítico):', loadError);
+        }
+        return;
+      }
+      
       const errorMessage = error.response?.data?.error || error.message || "Erro ao excluir comprovante. Tente novamente.";
       toast({
         title: "Erro",
@@ -2100,6 +2152,7 @@ const Holerites: React.FC = () => {
       
       console.log('✅ Resultado da exclusão:', result);
       
+      // Exibir mensagens de sucesso/erro ANTES de recarregar a lista
       if (result.deleted > 0) {
         toast({
           title: "Comprovantes excluídos",
@@ -2116,7 +2169,14 @@ const Holerites: React.FC = () => {
       }
       
       setSelectedPaymentReceipts([]);
-      await loadPaymentReceipts();
+      
+      // Recarregar lista de comprovantes (silenciosamente, sem exibir erros)
+      try {
+        await loadPaymentReceipts();
+      } catch (loadError) {
+        // Erro ao recarregar não deve afetar a mensagem de sucesso da exclusão
+        console.warn('⚠️ Erro ao recarregar lista após exclusão (não crítico):', loadError);
+      }
     } catch (error: any) {
       console.error('❌ Erro ao excluir comprovantes em lote:', error);
       console.error('❌ Detalhes do erro:', {
@@ -2134,7 +2194,38 @@ const Holerites: React.FC = () => {
             description: `${result.deleted} comprovante${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''}, mas ${result.failed} falharam.`,
           });
           setSelectedPaymentReceipts([]);
-          await loadPaymentReceipts();
+          try {
+            await loadPaymentReceipts();
+          } catch (loadError) {
+            console.warn('⚠️ Erro ao recarregar lista após exclusão (não crítico):', loadError);
+          }
+          return;
+        }
+      }
+      
+      // Se o status é 200, a exclusão foi bem-sucedida, apenas processar resultado
+      if (error.response?.status === 200 && error.response?.data) {
+        const result = error.response.data;
+        if (result.deleted !== undefined) {
+          if (result.deleted > 0) {
+            toast({
+              title: "Comprovantes excluídos",
+              description: `${result.deleted} comprovante${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''} com sucesso.`,
+            });
+          }
+          if (result.failed > 0) {
+            toast({
+              title: "Alguns comprovantes não foram excluídos",
+              description: `${result.failed} comprovante${result.failed > 1 ? 's' : ''} não puderam ser excluído${result.failed > 1 ? 's' : ''}.`,
+              variant: "destructive"
+            });
+          }
+          setSelectedPaymentReceipts([]);
+          try {
+            await loadPaymentReceipts();
+          } catch (loadError) {
+            console.warn('⚠️ Erro ao recarregar lista após exclusão (não crítico):', loadError);
+          }
           return;
         }
       }
@@ -3880,16 +3971,8 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   };
 
   // Carregar documentos unificados quando a aba de unificação for ativada
-  useEffect(() => {
-    if (activeTab === 'unificacao-individual' && user) {
-      console.log('🎯 Aba de unificação individual ativada - carregando dados...');
-      fetchUnifiedDocuments();
-      // Aguardar um pouco antes de carregar a organização para garantir que os documentos foram carregados
-      setTimeout(() => {
-        loadUnifiedOrganization();
-      }, 200);
-    }
-  }, [activeTab, user, unifiedMonthFilter, unifiedYearFilter]);
+  // useEffect removido - não carregar automaticamente quando a aba é ativada
+  // Os dados devem ser carregados apenas quando os botões "Recarregar Lista" e "Recarregar Organização" forem clicados
 
   // Atualizar mês ativo quando os dados dos comprovantes mudarem
   useEffect(() => {
@@ -6164,6 +6247,28 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           <div className="flex items-center space-x-3">
                               <Button
                                   variant="outline"
+                                  onClick={async () => {
+                                    console.log('🔄 Recarregando documentos unificados e organização...');
+                                    await fetchUnifiedDocuments(true);
+                                    await loadUnifiedOrganization();
+                                  }}
+                                  disabled={loadingUnifiedDocuments || loadingUnifiedOrganization}
+                                  className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50"
+                              >
+                                  {loadingUnifiedDocuments || loadingUnifiedOrganization ? (
+                                      <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Atualizando
+                                      </>
+                                  ) : (
+                                      <>
+                                          <RefreshCw className="h-4 w-4 mr-2" />
+                                          Recarregar Lista
+                                      </>
+                                  )}
+                              </Button>
+                              <Button
+                                  variant="outline"
                                   onClick={loadUnifiedOrganization}
                                   disabled={loadingUnifiedOrganization}
                                   className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50"
@@ -6176,12 +6281,12 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                   ) : (
                                       <>
                                           <RefreshCw className="h-4 w-4 mr-2" />
-                                          Recarregar
+                                          Recarregar Organização
                                       </>
                                   )}
                               </Button>
                               <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1">
-                                  {unifiedOrganizationData?.totalPayslips || 0} documento(s)
+                                  {unifiedDocuments.length} documento(s) | {unifiedOrganizationData?.totalPayslips || 0} organizado(s)
                               </Badge>
                           </div>
                       </div>

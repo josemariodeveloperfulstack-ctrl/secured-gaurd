@@ -411,12 +411,26 @@ public class UnifiedDocumentService {
         String normalizedSearchNameHolerite = normalizeNameForSearch(cleanEmployeeName);
         
         log.info("🔍 Buscando holerite com nome normalizado: '{}' (original: '{}')", normalizedSearchNameHolerite, cleanEmployeeName);
+        log.info("📊 Total de holerites no banco para {}/{}: {}", month, year, payslipsInDb.size());
+        
+        // Log de todos os holerites encontrados para debug
+        if (!payslipsInDb.isEmpty()) {
+            log.info("📋 Lista de holerites no banco para {}/{}:", month, year);
+            for (Payslip p : payslipsInDb) {
+                if (p.getEmployeeName() != null) {
+                    String normalizedP = normalizeNameForSearch(p.getEmployeeName());
+                    log.info("  • '{}' (normalizado: '{}')", p.getEmployeeName(), normalizedP);
+                }
+            }
+        }
         
         for (Payslip payslip : payslipsInDb) {
             if (payslip.getEmployeeName() != null) {
                 String normalizedPayslipName = normalizeNameForSearch(payslip.getEmployeeName());
                 
-                log.info("  🔍 Comparando: '{}' (payslip) vs '{}' (search)", normalizedPayslipName, normalizedSearchNameHolerite);
+                log.info("  🔍 Comparando: '{}' (payslip original: '{}') vs '{}' (search original: '{}')", 
+                    normalizedPayslipName, payslip.getEmployeeName(), 
+                    normalizedSearchNameHolerite, cleanEmployeeName);
                 
                 // Verificar se os nomes coincidem (flexível)
                 boolean exactMatch = normalizedPayslipName.equals(normalizedSearchNameHolerite);
@@ -440,7 +454,14 @@ public class UnifiedDocumentService {
         }
         
         if (matchingPayslip == null) {
-            log.warn("❌ Nenhum holerite encontrado no banco que corresponda ao nome '{}'", cleanEmployeeName);
+            log.warn("❌ Nenhum holerite encontrado no banco que corresponda ao nome '{}' (normalizado: '{}')", 
+                cleanEmployeeName, normalizedSearchNameHolerite);
+            log.warn("📋 Holerites disponíveis no banco para {}/{}:", month, year);
+            for (Payslip p : payslipsInDb) {
+                if (p.getEmployeeName() != null) {
+                    log.warn("  • '{}' (normalizado: '{}')", p.getEmployeeName(), normalizeNameForSearch(p.getEmployeeName()));
+                }
+            }
         }
         
         // Se encontrou no banco, usar o arquivoCaminho
@@ -540,19 +561,44 @@ public class UnifiedDocumentService {
             }
         }
         
-        // Buscar comprovante no banco pelo nome (flexível)
+        // Buscar comprovante no banco usando o nome da conta creditada e verificando no PDF do holerite
         PaymentReceipt matchingReceipt = null;
         String normalizedSearchName = normalizeNameForSearch(cleanEmployeeName);
         
-        log.info("🔍 Buscando comprovante com nome normalizado: '{}' (original: '{}')", normalizedSearchName, cleanEmployeeName);
+        log.info("🔍 Buscando comprovante usando nome da conta creditada e verificação no PDF do holerite");
+        log.info("📝 Nome do funcionário (holerite): '{}' (normalizado: '{}')", cleanEmployeeName, normalizedSearchName);
         
+        // NOVA ESTRATÉGIA: Verificar cada comprovante usando o nome da conta creditada e o PDF do holerite
         for (PaymentReceipt receipt : receiptsInDb) {
+            if (receipt.getEmployeeName() == null && receipt.getCreditedName() == null) {
+                log.warn("  ⚠️ Comprovante sem nome de funcionário nem conta creditada: {}/{}", receipt.getMonth(), receipt.getYear());
+                continue;
+            }
+            
+            // Usar o nome da conta creditada (que pode estar abreviado) ou o nome do funcionário
+            String receiptName = receipt.getCreditedName() != null ? receipt.getCreditedName() : receipt.getEmployeeName();
+            
+            log.info("  🔍 Verificando comprovante: '{}' (conta creditada: '{}')", 
+                receipt.getEmployeeName(), receipt.getCreditedName());
+            
+            // Verificar no PDF do holerite se o nome do comprovante aparece na mesma linha do código e CPF
+            if (matchingPayslip != null && matchingPayslip.getArquivoCaminho() != null) {
+                Payslip matchedPayslip = findPayslipByReceiptNameInPDF(receiptName, List.of(matchingPayslip));
+                
+                if (matchedPayslip != null) {
+                    matchingReceipt = receipt;
+                    log.info("✅ Comprovante encontrado! '{}' corresponde ao holerite '{}' (verificado no PDF)", 
+                        receiptName, matchingPayslip.getEmployeeName());
+                    break;
+                }
+            }
+            
+            // Fallback: verificar usando estratégias tradicionais de matching
             if (receipt.getEmployeeName() != null) {
                 String normalizedReceiptName = normalizeNameForSearch(receipt.getEmployeeName());
                 
-                log.info("  🔍 Comparando: '{}' (receipt) vs '{}' (search)", normalizedReceiptName, normalizedSearchName);
+                log.info("  🔍 Comparando (fallback): '{}' (receipt) vs '{}' (search)", normalizedReceiptName, normalizedSearchName);
                 
-                // Verificar se os nomes coincidem (flexível)
                 boolean exactMatch = normalizedReceiptName.equals(normalizedSearchName);
                 boolean containsMatch = normalizedReceiptName.contains(normalizedSearchName) || 
                                        normalizedSearchName.contains(normalizedReceiptName);
@@ -563,13 +609,11 @@ public class UnifiedDocumentService {
                 
                 if (exactMatch || containsMatch || verifyMatch) {
                     matchingReceipt = receipt;
-                    log.info("✅ Comprovante encontrado no banco: {} - {}/{} (filePath: {})", 
+                    log.info("✅ Comprovante encontrado no banco (fallback): {} - {}/{} (filePath: {})", 
                         receipt.getEmployeeName(), receipt.getMonth(), receipt.getYear(),
                         receipt.getFilePath() != null ? receipt.getFilePath() : "N/A");
                     break;
                 }
-            } else {
-                log.warn("  ⚠️ Comprovante sem nome de funcionário: {}/{}", receipt.getMonth(), receipt.getYear());
             }
         }
         
@@ -681,17 +725,78 @@ public class UnifiedDocumentService {
             log.warn("⚠️ Nomes não coincidem (verificação flexível) - prosseguindo mesmo assim");
         }
 
-        // 4) Unificar mantendo holerite na página 1 e comprovante na página 2
-        log.info("🔄 Criando documento unificado individual");
+        // 4) Extrair nome do funcionário do holerite e do comprovante e verificar correspondência
+        String employeeNameFromPayslip = null;
+        String employeeNameFromReceipt = null;
+        
+        // Extrair nome do holerite (do PDF ou do objeto)
+        if (matchingPayslip != null && matchingPayslip.getEmployeeName() != null) {
+            employeeNameFromPayslip = matchingPayslip.getEmployeeName();
+            log.info("📝 Nome do funcionário extraído do holerite: '{}'", employeeNameFromPayslip);
+        } else {
+            // Tentar extrair do PDF do holerite
+            try {
+                employeeNameFromPayslip = extractEmployeeNameFromPayslipPDF(holeritePath);
+                log.info("📝 Nome do funcionário extraído do PDF do holerite: '{}'", employeeNameFromPayslip);
+            } catch (Exception e) {
+                log.warn("⚠️ Não foi possível extrair nome do PDF do holerite: {}", e.getMessage());
+            }
+        }
+        
+        // Extrair nome do comprovante (do PDF ou do objeto)
+        if (matchingReceipt != null) {
+            // Priorizar o nome da conta creditada (que pode estar abreviado)
+            employeeNameFromReceipt = matchingReceipt.getCreditedName() != null ? 
+                matchingReceipt.getCreditedName() : matchingReceipt.getEmployeeName();
+            log.info("📝 Nome do funcionário extraído do comprovante: '{}' (conta creditada: '{}')", 
+                employeeNameFromReceipt, matchingReceipt.getCreditedName());
+        } else {
+            // Tentar extrair do PDF do comprovante
+            try {
+                employeeNameFromReceipt = extractEmployeeNameFromReceiptPDF(receiptPath);
+                log.info("📝 Nome do funcionário extraído do PDF do comprovante: '{}'", employeeNameFromReceipt);
+            } catch (Exception e) {
+                log.warn("⚠️ Não foi possível extrair nome do PDF do comprovante: {}", e.getMessage());
+            }
+        }
+        
+        // Verificar se os nomes correspondem usando as regras de abreviação
+        String finalEmployeeName = cleanEmployeeName; // Fallback para o nome original
+        if (employeeNameFromPayslip != null && employeeNameFromReceipt != null) {
+            boolean namesMatch = verifyEmployeeNames(employeeNameFromPayslip, employeeNameFromReceipt);
+            log.info("🔍 Verificação de nomes: '{}' (holerite) vs '{}' (comprovante) = {}", 
+                employeeNameFromPayslip, employeeNameFromReceipt, namesMatch ? "✅ MATCH" : "❌ NO MATCH");
+            
+            if (namesMatch) {
+                // Usar o nome do holerite (que é o completo) para salvar o arquivo
+                finalEmployeeName = employeeNameFromPayslip;
+                log.info("✅ Nomes correspondem! Usando nome do holerite para salvar arquivo: '{}'", finalEmployeeName);
+            } else {
+                log.warn("⚠️ Nomes não correspondem! Usando nome original: '{}'", finalEmployeeName);
+            }
+        } else if (employeeNameFromPayslip != null) {
+            // Se só temos o nome do holerite, usar ele
+            finalEmployeeName = employeeNameFromPayslip;
+            log.info("✅ Usando nome do holerite para salvar arquivo: '{}'", finalEmployeeName);
+        } else if (employeeNameFromReceipt != null) {
+            // Se só temos o nome do comprovante, tentar encontrar o nome completo no holerite
+            log.warn("⚠️ Apenas nome do comprovante disponível. Tentando encontrar nome completo no holerite...");
+            // Usar o nome original como fallback
+        }
+        
+        // 5) Unificar mantendo holerite na página 1 e comprovante na página 2
+        log.info("🔄 Criando documento unificado individual com nome do funcionário: '{}'", finalEmployeeName);
         List<String> receiptPaths = new ArrayList<>();
         receiptPaths.add(receiptPath);
         
         String unifiedPath = createUnifiedPdfUsingMerger(
             holeritePath, 
             receiptPaths, 
-            cleanEmployeeName, 
+            finalEmployeeName, // Usar o nome verificado
             month, 
-            year
+            year,
+            matchingPayslip, // Passar o payslip para extrair informações adicionais
+            matchingReceipt  // Passar o receipt para extrair informações adicionais
         );
 
         log.info("✅ Documento unificado criado: {}", unifiedPath);
@@ -1363,13 +1468,15 @@ public class UnifiedDocumentService {
         String first2 = words2[0];
         String last2 = words2[words2.length - 1];
         
-        // Primeiro e último nome devem corresponder
-        boolean firstMatch = first1.equals(first2) || 
+        // Primeiro e último nome devem corresponder (com suporte a abreviações)
+        boolean firstMatch = first1.equalsIgnoreCase(first2) || 
+                            wordsMatchWithAbbreviation(first1, first2) ||
                             (first1.length() >= 3 && first2.length() >= 3 && 
-                             (first1.contains(first2) || first2.contains(first1)));
-        boolean lastMatch = last1.equals(last2) || 
+                             (first1.toLowerCase().contains(first2.toLowerCase()) || first2.toLowerCase().contains(first1.toLowerCase())));
+        boolean lastMatch = last1.equalsIgnoreCase(last2) || 
+                           wordsMatchWithAbbreviation(last1, last2) ||
                            (last1.length() >= 3 && last2.length() >= 3 && 
-                            (last1.contains(last2) || last2.contains(last1)));
+                            (last1.toLowerCase().contains(last2.toLowerCase()) || last2.toLowerCase().contains(last1.toLowerCase())));
         
         if (!firstMatch || !lastMatch) {
             return false;
@@ -1381,14 +1488,19 @@ public class UnifiedDocumentService {
 
     /**
      * Verifica match por palavras-chave (primeiro e último nome) - com suporte a truncamentos e abreviações
+     * Trata corretamente nomes com preposições como "DA COSTA", "DE SOUZA", etc.
      */
     private boolean checkKeywordMatch(String name1, String name2) {
-        String[] words1 = name1.split("\\s+");
-        String[] words2 = name2.split("\\s+");
+        // Primeiro, normalizar os nomes para garantir que preposições sejam tratadas corretamente
+        String normalized1 = normalizeNameForSearch(name1);
+        String normalized2 = normalizeNameForSearch(name2);
+        
+        String[] words1 = normalized1.split("\\s+");
+        String[] words2 = normalized2.split("\\s+");
         
         if (words1.length < 2 || words2.length < 2) {
             // Se não tem pelo menos 2 palavras, usar matching por contenção
-            return name1.contains(name2) || name2.contains(name1);
+            return normalized1.contains(normalized2) || normalized2.contains(normalized1);
         }
         
         // Verificar primeiro e último nome
@@ -1397,17 +1509,25 @@ public class UnifiedDocumentService {
         String first2 = words2[0];
         String last2 = words2[words2.length - 1];
         
-        // Primeiro nome: exato ou um contém o outro (para lidar com abreviações)
-        boolean firstMatch = first1.equals(first2) || 
-                            (first1.length() >= 3 && first2.length() >= 3 && 
-                             (first1.contains(first2) || first2.contains(first1)));
+        // Log para debug
+        log.debug("🔍 checkKeywordMatch - name1: '{}' (normalizado: '{}'), name2: '{}' (normalizado: '{}')", 
+            name1, normalized1, name2, normalized2);
+        log.debug("  words1: {}, first1: '{}', last1: '{}'", java.util.Arrays.toString(words1), first1, last1);
+        log.debug("  words2: {}, first2: '{}', last2: '{}'", java.util.Arrays.toString(words2), first2, last2);
         
-        // Último nome: exato, um contém o outro, ou um é prefixo do outro (para truncamentos: PEREIRA vs PERE)
-        boolean lastMatch = last1.equals(last2) || 
+        // Primeiro nome: exato, um contém o outro, ou um é abreviação do outro
+        boolean firstMatch = first1.equalsIgnoreCase(first2) || 
+                            wordsMatchWithAbbreviation(first1, first2) ||
+                            (first1.length() >= 3 && first2.length() >= 3 && 
+                             (first1.toLowerCase().contains(first2.toLowerCase()) || first2.toLowerCase().contains(first1.toLowerCase())));
+        
+        // Último nome: exato, um contém o outro, um é prefixo do outro (truncamentos), ou um é abreviação do outro
+        boolean lastMatch = last1.equalsIgnoreCase(last2) || 
+                           wordsMatchWithAbbreviation(last1, last2) ||
                            (last1.length() >= 3 && last2.length() >= 3 && 
-                            (last1.contains(last2) || last2.contains(last1))) ||
+                            (last1.toLowerCase().contains(last2.toLowerCase()) || last2.toLowerCase().contains(last1.toLowerCase()))) ||
                            (last1.length() >= 4 && last2.length() >= 4 && 
-                            (last1.startsWith(last2) || last2.startsWith(last1)));
+                            (last1.toLowerCase().startsWith(last2.toLowerCase()) || last2.toLowerCase().startsWith(last1.toLowerCase())));
         
         // Verificar nomes do meio com suporte a abreviações (1-3 caracteres)
         boolean middleMatch = checkMiddleNamesWithAbbreviations(words1, words2);
@@ -1472,29 +1592,51 @@ public class UnifiedDocumentService {
     /**
      * Verifica se uma palavra corresponde a outra, considerando abreviações (1-3 caracteres)
      */
+    /**
+     * Verifica se duas palavras correspondem, considerando abreviações (1-3 caracteres)
+     * Exemplos:
+     * - "M" (abreviado) vs "MARIO" (completo) -> true (MARIO começa com M)
+     * - "J" (abreviado) vs "JOSE" (completo) -> true (JOSE começa com J)
+     * - "JOSE" vs "JOSE" -> true (exato)
+     */
     private boolean wordsMatchWithAbbreviation(String word1, String word2) {
-        if (word1.equals(word2)) {
+        if (word1 == null || word2 == null) {
+            return false;
+        }
+        
+        String w1 = word1.trim();
+        String w2 = word2.trim();
+        
+        if (w1.isEmpty() || w2.isEmpty()) {
+            return false;
+        }
+        
+        // Verificação exata (case-insensitive)
+        if (w1.equalsIgnoreCase(w2)) {
             return true;
         }
         
         // Se uma palavra tem 1-3 caracteres, pode ser abreviação da outra
-        if (word1.length() >= 1 && word1.length() <= 3 && word2.length() > word1.length()) {
-            // word1 é abreviação? Verificar se word2 começa com word1
-            if (word2.toLowerCase().startsWith(word1.toLowerCase())) {
+        // Ex: "M" (1 char) é abreviação de "MARIO" (5 chars)
+        if (w1.length() >= 1 && w1.length() <= 3 && w2.length() > w1.length()) {
+            // word1 é abreviação? Verificar se word2 começa com word1 (case-insensitive)
+            if (w2.toLowerCase().startsWith(w1.toLowerCase())) {
+                log.debug("   ✅ Abreviação detectada: '{}' é abreviação de '{}'", w1, w2);
                 return true;
             }
         }
-        if (word2.length() >= 1 && word2.length() <= 3 && word1.length() > word2.length()) {
-            // word2 é abreviação? Verificar se word1 começa com word2
-            if (word1.toLowerCase().startsWith(word2.toLowerCase())) {
+        if (w2.length() >= 1 && w2.length() <= 3 && w1.length() > w2.length()) {
+            // word2 é abreviação? Verificar se word1 começa com word2 (case-insensitive)
+            if (w1.toLowerCase().startsWith(w2.toLowerCase())) {
+                log.debug("   ✅ Abreviação detectada: '{}' é abreviação de '{}'", w2, w1);
                 return true;
             }
         }
         
         // Verificar se uma contém a outra (para casos como "FERREIRA" vs "FERREIRA")
-        if (word1.length() >= 3 && word2.length() >= 3) {
-            return word1.toLowerCase().contains(word2.toLowerCase()) || 
-                   word2.toLowerCase().contains(word1.toLowerCase());
+        if (w1.length() >= 3 && w2.length() >= 3) {
+            return w1.toLowerCase().contains(w2.toLowerCase()) || 
+                   w2.toLowerCase().contains(w1.toLowerCase());
         }
         
         return false;
@@ -2062,6 +2204,8 @@ public class UnifiedDocumentService {
 
     /**
      * Normaliza nome para busca (remove acentos, normaliza espaços, converte para minúsculas)
+     * Trata variações comuns como "DA COSTA" vs "DACOSTA", "DE SOUZA" vs "DESOUZA", etc.
+     * A estratégia é normalizar removendo espaços após preposições comuns para padronizar.
      */
     private String normalizeNameForSearch(String name) {
         if (name == null || name.trim().isEmpty()) {
@@ -2077,6 +2221,47 @@ public class UnifiedDocumentService {
             .replaceAll("\\s+", " ")
             .trim()
             .toLowerCase();
+        
+        // Primeiro, tratar casos onde preposições estão juntas com a palavra seguinte
+        // Ex: "dacosta" -> "da costa", "desouza" -> "de souza"
+        // Isso padroniza para o formato com espaço
+        normalized = normalized
+            .replaceAll("\\bda([a-z]{2,})", "da $1")  // "dacosta" -> "da costa"
+            .replaceAll("\\bde([a-z]{2,})", "de $1")  // "desouza" -> "de souza"
+            .replaceAll("\\bdos([a-z]{2,})", "dos $1") // "dossantos" -> "dos santos"
+            .replaceAll("\\bdas([a-z]{2,})", "das $1") // "dasneves" -> "das neves"
+            .replaceAll("\\bdo([a-z]{2,})", "do $1")   // "donascimento" -> "do nascimento"
+            .replaceAll("\\bdel([a-z]{2,})", "del $1") // "delcastillo" -> "del castillo"
+            .replaceAll("\\bdu([a-z]{2,})", "du $1")   // "dumont" -> "du mont"
+            .replaceAll("\\bvan([a-z]{2,})", "van $1") // "vanderberg" -> "van derberg"
+            .replaceAll("\\bvon([a-z]{2,})", "von $1") // "vonneumann" -> "von neumann"
+            .replaceAll("\\s+", " ")                    // Normalizar espaços
+            .trim();
+        
+        // Agora, remover espaços após preposições para padronizar
+        // Ex: "da costa" -> "dacosta", "de souza" -> "desouza"
+        // Isso garante que ambos os formatos sejam normalizados para o mesmo resultado
+        normalized = normalized
+            .replaceAll("\\bda\\s+", "da")  // "da costa" -> "dacosta"
+            .replaceAll("\\bde\\s+", "de")  // "de souza" -> "desouza"
+            .replaceAll("\\bdos\\s+", "dos") // "dos santos" -> "dossantos"
+            .replaceAll("\\bdas\\s+", "das") // "das neves" -> "dasneves"
+            .replaceAll("\\bdo\\s+", "do")   // "do nascimento" -> "donascimento"
+            .replaceAll("\\bdel\\s+", "del") // "del castillo" -> "delcastillo"
+            .replaceAll("\\bdu\\s+", "du")   // "du mont" -> "dumont"
+            .replaceAll("\\bvan\\s+", "van") // "van der berg" -> "vanderberg"
+            .replaceAll("\\bvon\\s+", "von") // "von neumann" -> "vonneumann"
+            .replaceAll("\\s+", " ")         // Normalizar espaços novamente
+            .trim();
+        
+        // Log mais detalhado para nomes com preposições
+        if (normalized.contains("dacosta") || normalized.contains("desouza") || 
+            normalized.contains("dossantos") || normalized.contains("dasneves") ||
+            name.toLowerCase().contains("da costa") || name.toLowerCase().contains("de souza")) {
+            log.info("🔍 Normalização de nome com preposição: '{}' -> '{}'", name, normalized);
+        } else {
+            log.debug("🔍 Normalização de nome: '{}' -> '{}'", name, normalized);
+        }
         
         return normalized;
     }
@@ -2515,19 +2700,38 @@ public class UnifiedDocumentService {
                         receiptsInPeriod.size(), receiptsNextMonth.size(), receiptsSameMonth.size());
                     
                     // ESTRATÉGIA 2: Verificar se algum comprovante do período corresponde ao nome do funcionário
-                    // Usar verificação flexível de nomes
-                    List<PaymentReceipt> matchedByName = receiptsInPeriod.stream()
-                        .filter(receipt -> {
-                            if (receipt.getEmployeeName() == null) return false;
-                            // Verificar usando múltiplas estratégias de matching
+                    // NOVA ESTRATÉGIA: Usar o nome da conta creditada do comprovante e verificar no PDF do holerite
+                    // se esse nome aparece na mesma linha do código e CPF
+                    List<PaymentReceipt> matchedByName = new ArrayList<>();
+                    
+                    // Primeiro, tentar buscar usando o nome da conta creditada do comprovante
+                    for (PaymentReceipt receipt : receiptsInPeriod) {
+                        if (receipt.getEmployeeName() == null && receipt.getCreditedName() == null) {
+                            continue;
+                        }
+                        
+                        // Usar o nome da conta creditada (que pode estar abreviado) ou o nome do funcionário
+                        String receiptName = receipt.getCreditedName() != null ? receipt.getCreditedName() : receipt.getEmployeeName();
+                        
+                        // Verificar no PDF do holerite se o nome do comprovante aparece na mesma linha do código e CPF
+                        Payslip matchedPayslip = findPayslipByReceiptNameInPDF(receiptName, List.of(payslip));
+                        
+                        if (matchedPayslip != null) {
+                            matchedByName.add(receipt);
+                            log.info("✅ Comprovante '{}' corresponde ao holerite '{}' (verificado no PDF)", 
+                                receiptName, payslip.getEmployeeName());
+                        } else {
+                            // Fallback: verificar usando estratégias tradicionais de matching
                             boolean exactMatch = verifyEmployeeNames(employeeName, receipt.getEmployeeName());
                             boolean flexibleMatch = isFlexibleNameMatch(employeeName, receipt.getEmployeeName());
                             boolean normalizedMatch = normalizeNameForSearch(receipt.getEmployeeName())
                                 .contains(normalizedName) || normalizedName.contains(normalizeNameForSearch(receipt.getEmployeeName()));
                             
-                            return exactMatch || flexibleMatch || normalizedMatch;
-                        })
-                        .collect(Collectors.toList());
+                            if (exactMatch || flexibleMatch || normalizedMatch) {
+                                matchedByName.add(receipt);
+                            }
+                        }
+                    }
                     
                     log.info("📋 Comprovantes após filtro de nome: {} (de {} no período)", 
                         matchedByName.size(), receiptsInPeriod.size());
@@ -2560,17 +2764,35 @@ public class UnifiedDocumentService {
                             }
                         }
                         
-                        // Filtrar por matching de nome usando verificação flexível
-                        matchedByName = receiptsByName.stream()
-                            .filter(receipt -> {
-                                if (receipt.getEmployeeName() == null) return false;
+                        // Filtrar por matching de nome usando verificação no PDF do holerite
+                        matchedByName = new ArrayList<>();
+                        for (PaymentReceipt receipt : receiptsByName) {
+                            if (receipt.getEmployeeName() == null && receipt.getCreditedName() == null) {
+                                continue;
+                            }
+                            
+                            // Usar o nome da conta creditada (que pode estar abreviado) ou o nome do funcionário
+                            String receiptName = receipt.getCreditedName() != null ? receipt.getCreditedName() : receipt.getEmployeeName();
+                            
+                            // Verificar no PDF do holerite se o nome do comprovante aparece na mesma linha do código e CPF
+                            Payslip matchedPayslip = findPayslipByReceiptNameInPDF(receiptName, List.of(payslip));
+                            
+                            if (matchedPayslip != null) {
+                                matchedByName.add(receipt);
+                                log.info("✅ Comprovante '{}' corresponde ao holerite '{}' (verificado no PDF, sem restrição de período)", 
+                                    receiptName, payslip.getEmployeeName());
+                            } else {
+                                // Fallback: verificar usando estratégias tradicionais de matching
                                 boolean exactMatch = verifyEmployeeNames(employeeName, receipt.getEmployeeName());
                                 boolean flexibleMatch = isFlexibleNameMatch(employeeName, receipt.getEmployeeName());
                                 boolean normalizedMatch = normalizeNameForSearch(receipt.getEmployeeName())
                                     .contains(normalizedName) || normalizedName.contains(normalizeNameForSearch(receipt.getEmployeeName()));
-                                return exactMatch || flexibleMatch || normalizedMatch;
-                            })
-                            .collect(Collectors.toList());
+                                
+                                if (exactMatch || flexibleMatch || normalizedMatch) {
+                                    matchedByName.add(receipt);
+                                }
+                            }
+                        }
                         
                         log.info("📋 Comprovantes encontrados por nome (sem restrição de período): {}", matchedByName.size());
                         
@@ -2752,13 +2974,49 @@ public class UnifiedDocumentService {
                         continue;
                     }
                     
-                    // 4.5. Criar documento unificado usando PDFMergerUtility
+                    // 4.5. Extrair nome do funcionário do holerite e do comprovante e verificar correspondência
+                    String employeeNameFromPayslip = matchingPayslip != null ? matchingPayslip.getEmployeeName() : null;
+                    String employeeNameFromReceipt = null;
+                    
+                    // Usar o primeiro receipt da lista para extrair o nome
+                    PaymentReceipt firstReceipt = uniqueReceipts.isEmpty() ? null : uniqueReceipts.get(0);
+                    if (firstReceipt != null) {
+                        employeeNameFromReceipt = firstReceipt.getCreditedName() != null ? 
+                            firstReceipt.getCreditedName() : firstReceipt.getEmployeeName();
+                    }
+                    
+                    // Se não temos os nomes dos objetos, tentar extrair dos PDFs
+                    if (employeeNameFromPayslip == null) {
+                        employeeNameFromPayslip = extractEmployeeNameFromPayslipPDF(holeritePath);
+                    }
+                    if (employeeNameFromReceipt == null && !receiptPaths.isEmpty()) {
+                        employeeNameFromReceipt = extractEmployeeNameFromReceiptPDF(receiptPaths.get(0));
+                    }
+                    
+                    // Verificar correspondência e usar nome do holerite (completo)
+                    String finalEmployeeName = employeeName;
+                    if (employeeNameFromPayslip != null && employeeNameFromReceipt != null) {
+                        boolean namesMatch = verifyEmployeeNames(employeeNameFromPayslip, employeeNameFromReceipt);
+                        if (namesMatch) {
+                            finalEmployeeName = employeeNameFromPayslip;
+                            log.info("✅ Nomes correspondem! Usando nome do holerite: '{}'", finalEmployeeName);
+                        } else {
+                            log.warn("⚠️ Nomes não correspondem. Usando nome original: '{}'", finalEmployeeName);
+                        }
+                    } else if (employeeNameFromPayslip != null) {
+                        finalEmployeeName = employeeNameFromPayslip;
+                        log.info("✅ Usando nome do holerite: '{}'", finalEmployeeName);
+                    }
+                    
+                    // Criar documento unificado usando PDFMergerUtility
                     String unifiedPath = createUnifiedPdfUsingMerger(
                         holeritePath, 
                         receiptPaths, 
-                        employeeName, 
+                        finalEmployeeName, 
                         month, 
-                        year
+                        year,
+                        matchingPayslip,
+                        firstReceipt  // Usar o primeiro receipt da lista
                     );
                     
                     detail.setStatus("SUCESSO");
@@ -2876,9 +3134,11 @@ public class UnifiedDocumentService {
 
     /**
      * Cria PDF unificado usando PDFMergerUtility para preservar layout original
+     * O nome do arquivo será baseado no nome do funcionário extraído do holerite (completo)
      */
     private String createUnifiedPdfUsingMerger(String holeritePath, List<String> receiptPaths, 
-                                               String employeeName, int month, int year) throws IOException {
+                                               String employeeName, int month, int year,
+                                               Payslip payslip, PaymentReceipt receipt) throws IOException {
         // Criar diretório se não existir
         Path unifiedDir = Paths.get(UNIFIED_DIR, "expanded").toAbsolutePath();
         if (!Files.exists(unifiedDir)) {
@@ -2939,51 +3199,53 @@ public class UnifiedDocumentService {
                 
                 // Salvar no banco de dados
                 try {
-                    // Buscar payslip e receipt relacionados
-                    Payslip payslip = null;
-                    PaymentReceipt receipt = null;
+                    // Usar os payslip e receipt passados como parâmetros, ou buscar se não foram fornecidos
+                    Payslip payslipToSave = payslip;
+                    PaymentReceipt receiptToSave = receipt;
                     Employee employee = null;
                     
-                    // Buscar payslip por nome, mês e ano (usando verificação flexível de nomes)
-                    List<Payslip> payslips = payslipService.getAllPayslips();
-                    for (Payslip p : payslips) {
-                        if (p.getMonth() != null && p.getMonth().equals(month) &&
-                            p.getYear() != null && p.getYear().equals(year) &&
-                            p.getEmployeeName() != null) {
-                            // Usar verificação flexível de nomes (suporta abreviações)
-                            if (verifyEmployeeNames(employeeName, p.getEmployeeName())) {
-                                payslip = p;
-                                log.info("✅ Payslip encontrado para documento unificado: {} - {}/{} (Empresa: {}, Setor: {})", 
-                                    employeeName, month, year, p.getCompanyName(), p.getWorkPostName());
+                    // Se payslip ou receipt não foram fornecidos, buscar no banco
+                    if (payslipToSave == null) {
+                        List<Payslip> payslips = payslipService.getAllPayslips();
+                        for (Payslip p : payslips) {
+                            if (p.getMonth() != null && p.getMonth().equals(month) &&
+                                p.getYear() != null && p.getYear().equals(year) &&
+                                p.getEmployeeName() != null) {
+                                if (verifyEmployeeNames(employeeName, p.getEmployeeName())) {
+                                    payslipToSave = p;
+                                    log.info("✅ Payslip encontrado para documento unificado: {} - {}/{}", 
+                                        employeeName, month, year);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (receiptToSave == null) {
+                        int receiptMonth = month == 12 ? 1 : month + 1;
+                        int receiptYear = month == 12 ? year + 1 : year;
+                        List<PaymentReceipt> receipts = receiptRepository.findAll();
+                        for (PaymentReceipt r : receipts) {
+                            if (r.getEmployeeName() != null && 
+                                verifyEmployeeNames(employeeName, r.getEmployeeName()) &&
+                                r.getMonth() != null && r.getMonth().equals(receiptMonth) &&
+                                r.getYear() != null && r.getYear().equals(receiptYear)) {
+                                receiptToSave = r;
                                 break;
                             }
                         }
                     }
                     
-                    // Buscar receipt por nome e período (mês seguinte)
-                    int receiptMonth = month == 12 ? 1 : month + 1;
-                    int receiptYear = month == 12 ? year + 1 : year;
-                    List<PaymentReceipt> receipts = receiptRepository.findAll();
-                    for (PaymentReceipt r : receipts) {
-                        if (r.getEmployeeName() != null && 
-                            r.getEmployeeName().equalsIgnoreCase(employeeName) &&
-                            r.getMonth() != null && r.getMonth().equals(receiptMonth) &&
-                            r.getYear() != null && r.getYear().equals(receiptYear)) {
-                            receipt = r;
-                            break;
-                        }
-                    }
-                    
                     // Buscar employee por CPF se disponível
-                    if (payslip != null && payslip.getCpf() != null) {
-                        employee = employeeRepository.findByCpf(payslip.getCpf()).orElse(null);
+                    if (payslipToSave != null && payslipToSave.getCpf() != null) {
+                        employee = employeeRepository.findByCpf(payslipToSave.getCpf()).orElse(null);
                     }
                     
                     // Criar e salvar UnifiedDocument
                     UnifiedDocument unifiedDoc = UnifiedDocument.builder()
                         .employee(employee)
-                        .payslip(payslip)
-                        .receipt(receipt)
+                        .payslip(payslipToSave)
+                        .receipt(receiptToSave)
                         .employeeName(employeeName)
                         .month(month)
                         .year(year)
@@ -3119,9 +3381,21 @@ public class UnifiedDocumentService {
                     // Buscar payslip relacionado
                     Payslip payslip = null;
                     
-                    // Tentar obter do relacionamento (pode ser LAZY)
+                    // Tentar obter do relacionamento (pode ser LAZY ou referência órfã)
                     try {
                         payslip = ud.getPayslip();
+                        // Verificar se o payslip realmente existe tentando acessar uma propriedade
+                        if (payslip != null) {
+                            try {
+                                payslip.getCompanyName(); // Força o carregamento do proxy
+                            } catch (jakarta.persistence.EntityNotFoundException e) {
+                                log.warn("⚠️ Payslip referenciado não existe mais no banco (ID órfão): {}", e.getMessage());
+                                payslip = null; // Marcar como não encontrado
+                            }
+                        }
+                    } catch (jakarta.persistence.EntityNotFoundException e) {
+                        log.warn("⚠️ Payslip referenciado não existe mais no banco (proxy inválido): {}", e.getMessage());
+                        payslip = null;
                     } catch (Exception e) {
                         log.debug("⚠️ Relacionamento LAZY não carregado, buscando explicitamente: {}", e.getMessage());
                     }
@@ -3129,15 +3403,22 @@ public class UnifiedDocumentService {
                     // Se não encontrou ou é LAZY, buscar explicitamente
                     if (payslip == null) {
                         // Buscar pelo ID do payslip se disponível
-                        if (ud.getPayslip() != null && ud.getPayslip().getId() != null) {
-                            try {
-                                payslip = allPayslips.stream()
-                                    .filter(p -> p.getId() != null && p.getId().equals(ud.getPayslip().getId()))
-                                    .findFirst()
-                                    .orElse(null);
-                            } catch (Exception e) {
-                                log.warn("⚠️ Erro ao buscar payslip por ID: {}", e.getMessage());
+                        try {
+                            Payslip referencedPayslip = ud.getPayslip();
+                            if (referencedPayslip != null && referencedPayslip.getId() != null) {
+                                try {
+                                    payslip = allPayslips.stream()
+                                        .filter(p -> p.getId() != null && p.getId().equals(referencedPayslip.getId()))
+                                        .findFirst()
+                                        .orElse(null);
+                                } catch (Exception e) {
+                                    log.warn("⚠️ Erro ao buscar payslip por ID: {}", e.getMessage());
+                                }
                             }
+                        } catch (jakarta.persistence.EntityNotFoundException e) {
+                            log.debug("⚠️ Payslip referenciado não existe, buscando por nome/mês/ano: {}", e.getMessage());
+                        } catch (Exception e) {
+                            log.debug("⚠️ Erro ao acessar relacionamento payslip: {}", e.getMessage());
                         }
                         
                         // Se ainda não encontrou, buscar por nome/mês/ano usando verificação flexível
@@ -3156,10 +3437,15 @@ public class UnifiedDocumentService {
                     }
                     
                     if (payslip != null) {
-                        unifiedDocPayslipMap.put(key, payslip);
-                        log.debug("✅ Payslip mapeado para documento unificado: {} - {}/{} (Empresa: {}, Setor: {})", 
-                            ud.getEmployeeName(), ud.getMonth(), ud.getYear(),
-                            payslip.getCompanyName(), payslip.getWorkPostName());
+                        try {
+                            unifiedDocPayslipMap.put(key, payslip);
+                            log.debug("✅ Payslip mapeado para documento unificado: {} - {}/{} (Empresa: {}, Setor: {})", 
+                                ud.getEmployeeName(), ud.getMonth(), ud.getYear(),
+                                payslip.getCompanyName(), payslip.getWorkPostName());
+                        } catch (jakarta.persistence.EntityNotFoundException e) {
+                            log.warn("⚠️ Erro ao acessar propriedades do payslip (entidade não existe): {}", e.getMessage());
+                            // Não adicionar ao mapa se a entidade não existe
+                        }
                     } else {
                         log.debug("⚠️ Payslip não encontrado para documento unificado: {} - {}/{}", 
                             ud.getEmployeeName(), ud.getMonth(), ud.getYear());
@@ -3215,14 +3501,19 @@ public class UnifiedDocumentService {
                 // Estratégia 2.1: Se ainda não encontrou, buscar usando verificação flexível de nomes
                 if (payslip == null) {
                     for (Payslip p : allPayslips) {
-                        if (p.getMonth() != null && p.getMonth().equals(month) &&
-                            p.getYear() != null && p.getYear().equals(year) &&
-                            verifyEmployeeNames(employeeName, p.getEmployeeName())) {
-                            payslip = p;
-                            foundPayslipCount++;
-                            log.debug("✅ Payslip encontrado via verificação flexível para: {} - {}/{} (Empresa: {}, Setor: {})", 
-                                employeeName, month, year, p.getCompanyName(), p.getWorkPostName());
-                            break;
+                        try {
+                            if (p.getMonth() != null && p.getMonth().equals(month) &&
+                                p.getYear() != null && p.getYear().equals(year) &&
+                                verifyEmployeeNames(employeeName, p.getEmployeeName())) {
+                                payslip = p;
+                                foundPayslipCount++;
+                                log.debug("✅ Payslip encontrado via verificação flexível para: {} - {}/{} (Empresa: {}, Setor: {})", 
+                                    employeeName, month, year, p.getCompanyName(), p.getWorkPostName());
+                                break;
+                            }
+                        } catch (jakarta.persistence.EntityNotFoundException e) {
+                            log.warn("⚠️ Payslip no loop não existe mais no banco (pulando): {}", e.getMessage());
+                            continue; // Pular este payslip e continuar com o próximo
                         }
                     }
                 }
@@ -3324,110 +3615,101 @@ public class UnifiedDocumentService {
                 String empresaCnpj = null;
                 String workPostName = null;
                 
-                // Extrair CNPJ da empresa (mesma lógica do PayslipService)
-                Pattern cnpjPattern = Pattern.compile("CNPJ[:\\s]*([0-9]{2}\\.?[0-9]{3}\\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2}|[0-9]{14})");
+                // ============================================
+                // EXTRAÇÃO DE EMPRESA: Código + Nome + CNPJ na mesma linha
+                // Exemplo: "0055 PROMOVER VIGILANCIA PATRIMONIAL LTDA  43576260000112"
+                // ============================================
+                Pattern empresaPattern = Pattern.compile("^(\\d{4})\\s+(.+?)\\s+(\\d{14})$");
                 for (String linha : linhas) {
-                    Matcher cnpjMatcher = cnpjPattern.matcher(linha);
-                    if (cnpjMatcher.find()) {
-                        empresaCnpj = cnpjMatcher.group(1).replaceAll("[^0-9]", "");
-                        log.info("✅ CNPJ da empresa encontrado: {}", empresaCnpj);
+                    linha = linha.trim();
+                    Matcher empresaMatcher = empresaPattern.matcher(linha);
+                    if (empresaMatcher.find()) {
+                        String codigo = empresaMatcher.group(1);
+                        empresaNome = empresaMatcher.group(2).trim();
+                        empresaCnpj = empresaMatcher.group(3);
                         
-                        // Tentar extrair nome da empresa da mesma linha ou linha anterior
-                        int cnpjIndex = linha.toUpperCase().indexOf("CNPJ");
-                        if (cnpjIndex > 10) {
-                            String possibleName = linha.substring(0, cnpjIndex).trim();
-                            possibleName = possibleName.replaceAll("(?i)(EMPRESA|RAZÃO SOCIAL|EMPREGADOR)[:\\s]*", "").trim();
-                            if (possibleName.length() > 5 && !possibleName.matches(".*\\d{3}.*")) {
-                                empresaNome = possibleName;
-                                log.info("✅ Nome da empresa encontrado (mesma linha CNPJ): {}", empresaNome);
-                            }
-                        }
+                        log.info("✅ Empresa encontrada (código + nome + CNPJ na mesma linha):");
+                        log.info("   Código: {}, Nome: {}, CNPJ: {}", codigo, empresaNome, empresaCnpj);
                         break;
                     }
                 }
                 
-                // Fallback: buscar CNPJ sem rótulo
-                if (empresaCnpj == null) {
-                    Pattern fallbackCnpjPattern = Pattern.compile("(?<!\\d)(\\d{14})(?!\\d)");
-                    int limiteLinhas = Math.min(15, linhas.length);
-                    for (int i = 0; i < limiteLinhas; i++) {
-                        String linha = linhas[i];
-                        Matcher fallbackMatcher = fallbackCnpjPattern.matcher(linha.replaceAll("\\s+", ""));
-                        if (fallbackMatcher.find()) {
-                            empresaCnpj = fallbackMatcher.group(1);
-                            log.info("✅ CNPJ (fallback) encontrado: {}", empresaCnpj);
+                // Fallback: buscar padrão mais flexível (código + nome + CNPJ, mas com espaços variáveis)
+                if (empresaNome == null || empresaCnpj == null) {
+                    Pattern empresaPatternFlex = Pattern.compile("^(\\d{3,5})\\s+(.+?)\\s+(\\d{14})$");
+                    for (String linha : linhas) {
+                        linha = linha.trim();
+                        Matcher empresaMatcher = empresaPatternFlex.matcher(linha);
+                        if (empresaMatcher.find()) {
+                            String codigo = empresaMatcher.group(1);
+                            String nome = empresaMatcher.group(2).trim();
+                            String cnpj = empresaMatcher.group(3);
                             
-                            if (empresaNome == null) {
-                                String possibleName = linha.replaceAll("\\d", " ").replaceAll("\\s+", " ").trim();
-                                if (possibleName.length() > 5) {
-                                    empresaNome = possibleName;
-                                    log.info("✅ Nome da empresa (fallback) identificado: {}", empresaNome);
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-                
-                // Extrair nome da empresa (mesma lógica do PayslipService)
-                if (empresaNome == null) {
-                    for (int i = 0; i < linhas.length; i++) {
-                        String linha = linhas[i].trim();
-                        String linhaUpper = linha.toUpperCase();
-                        
-                        // Procurar por linhas com "LTDA", "S.A", "ME", etc.
-                        if ((linhaUpper.contains("LTDA") || linhaUpper.contains("S.A") || 
-                            linhaUpper.contains(" ME ") || linhaUpper.contains("EIRELI")) &&
-                            !linhaUpper.contains("FUNCIONARIO") && !linhaUpper.contains("CPF") &&
-                            linha.length() > 10 && linha.length() < 150) {
-                            empresaNome = linha;
-                            log.info("✅ Nome da empresa encontrado (por sufixo empresarial): {}", empresaNome);
-                            break;
-                        }
-                    }
-                }
-                
-                // Extrair setor (workPostName) - mesma lógica do PayslipService
-                // Procurar por padrões de período que geralmente têm setor ao lado
-                Pattern periodoPattern = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+(?:a|à)\\s+(\\d{2})/(\\d{2})/(\\d{4})");
-                for (int idx = 0; idx < linhas.length; idx++) {
-                    String linha = linhas[idx];
-                    Matcher periodoMatcher = periodoPattern.matcher(linha);
-                    if (periodoMatcher.find()) {
-                        String trailingText = linha.substring(periodoMatcher.end()).trim();
-                        if (trailingText.length() > 3) {
-                            workPostName = sanitizeWorkPostCandidate(trailingText);
-                            if (workPostName != null) {
-                                log.info("✅ Setor encontrado (após período): {}", workPostName);
+                            // Validar que o nome parece ser um nome de empresa (contém palavras comuns)
+                            if (nome.length() > 10 && (nome.toUpperCase().contains("LTDA") || 
+                                nome.toUpperCase().contains("S.A") || nome.toUpperCase().contains("ME") ||
+                                nome.toUpperCase().contains("EIRELI") || nome.length() > 20)) {
+                                empresaNome = nome;
+                                empresaCnpj = cnpj;
+                                log.info("✅ Empresa encontrada (padrão flexível):");
+                                log.info("   Código: {}, Nome: {}, CNPJ: {}", codigo, empresaNome, empresaCnpj);
                                 break;
                             }
                         }
-                        
-                        // Verificar linhas seguintes
-                        for (int offset = 1; offset <= 2; offset++) {
-                            int idx2 = idx + offset;
-                            if (idx2 < linhas.length) {
-                                workPostName = sanitizeWorkPostCandidate(linhas[idx2]);
-                                if (workPostName != null) {
-                                    log.info("✅ Setor encontrado (linha após período): {}", workPostName);
+                    }
+                }
+                
+                // ============================================
+                // EXTRAÇÃO DE SETOR: Período + Nome do Setor na mesma linha
+                // Exemplo: "01/10/2025 a 31/10/2025 TRUCK PARK BR"
+                // ============================================
+                Pattern periodoSetorPattern = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+(?:a|à)\\s+(\\d{2})/(\\d{2})/(\\d{4})\\s+(.+)$");
+                for (String linha : linhas) {
+                    linha = linha.trim();
+                    Matcher periodoSetorMatcher = periodoSetorPattern.matcher(linha);
+                    if (periodoSetorMatcher.find()) {
+                        String setor = periodoSetorMatcher.group(6).trim();
+                        // Limpar o setor removendo caracteres especiais e espaços extras
+                        setor = setor.replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+                        if (setor.length() > 2) {
+                            workPostName = setor;
+                            log.info("✅ Setor encontrado (período + setor na mesma linha):");
+                            log.info("   Período: {}/{}/{} a {}/{}/{}", 
+                                periodoSetorMatcher.group(1), periodoSetorMatcher.group(2), periodoSetorMatcher.group(3),
+                                periodoSetorMatcher.group(4), periodoSetorMatcher.group(5), periodoSetorMatcher.group(3));
+                            log.info("   Setor: {}", workPostName);
+                            break;
+                        }
+                    }
+                }
+                
+                // Fallback: buscar período e setor em linhas próximas
+                if (workPostName == null) {
+                    Pattern periodoPattern = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+(?:a|à)\\s+(\\d{2})/(\\d{2})/(\\d{4})");
+                    for (int idx = 0; idx < linhas.length; idx++) {
+                        String linha = linhas[idx].trim();
+                        Matcher periodoMatcher = periodoPattern.matcher(linha);
+                        if (periodoMatcher.find()) {
+                            // Verificar se há texto após o período na mesma linha
+                            String trailingText = linha.substring(periodoMatcher.end()).trim();
+                            if (trailingText.length() > 3) {
+                                trailingText = trailingText.replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+                                if (trailingText.length() > 2) {
+                                    workPostName = trailingText;
+                                    log.info("✅ Setor encontrado (texto após período na mesma linha): {}", workPostName);
                                     break;
                                 }
                             }
-                        }
-                        if (workPostName != null) break;
-                    }
-                }
-                
-                // Buscar por rótulo de setor
-                if (workPostName == null) {
-                    Pattern labeledPattern = Pattern.compile("(?i)(setor|posto|local(?: de trabalho)?)[:\\s]+(.{3,})");
-                    for (String line : linhas) {
-                        Matcher matcher = labeledPattern.matcher(line);
-                        if (matcher.find()) {
-                            workPostName = sanitizeWorkPostCandidate(matcher.group(2));
-                            if (workPostName != null) {
-                                log.info("✅ Setor encontrado (por rótulo): {}", workPostName);
-                                break;
+                            
+                            // Verificar linha seguinte
+                            if (idx + 1 < linhas.length) {
+                                String nextLine = linhas[idx + 1].trim();
+                                nextLine = nextLine.replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+                                if (nextLine.length() > 2 && nextLine.length() < 100) {
+                                    workPostName = nextLine;
+                                    log.info("✅ Setor encontrado (linha após período): {}", workPostName);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -3449,6 +3731,235 @@ public class UnifiedDocumentService {
             log.error("❌ Erro ao extrair informações do PDF unificado {}: {}", filePath, e.getMessage(), e);
             return null;
         }
+    }
+    
+    /**
+     * Extrai o nome do funcionário do PDF do holerite
+     * Busca por linha que contenha código (6 dígitos), nome e CPF
+     */
+    private String extractEmployeeNameFromPayslipPDF(String payslipPath) {
+        try {
+            File payslipFile = new File(payslipPath);
+            if (!payslipFile.exists()) {
+                log.warn("⚠️ Arquivo do holerite não existe: {}", payslipPath);
+                return null;
+            }
+            
+            try (PDDocument document = PDDocument.load(payslipFile)) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                String payslipText = stripper.getText(document);
+                
+                if (payslipText == null || payslipText.trim().isEmpty()) {
+                    return null;
+                }
+                
+                String[] lines = payslipText.split("\r?\n");
+                Pattern codePattern = Pattern.compile("\\b\\d{6}\\b");
+                Pattern cpfPattern = Pattern.compile("(?:CPF|cpf)[:\\s]*([0-9]{11}|[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2})", Pattern.CASE_INSENSITIVE);
+                
+                for (String line : lines) {
+                    if (line == null || line.trim().isEmpty()) {
+                        continue;
+                    }
+                    
+                    Matcher codeMatcher = codePattern.matcher(line);
+                    Matcher cpfMatcher = cpfPattern.matcher(line);
+                    
+                    if (codeMatcher.find() && cpfMatcher.find()) {
+                        String code = codeMatcher.group();
+                        String cpf = cpfMatcher.group(1).replaceAll("[^0-9]", "");
+                        
+                        int codeStart = codeMatcher.start();
+                        int cpfStart = cpfMatcher.start();
+                        String nameSection = line.substring(codeStart + code.length(), cpfStart).trim();
+                        
+                        String extractedName = nameSection
+                            .replaceAll("[^a-zA-ZÀ-ÿ\\s]", " ")
+                            .replaceAll("\\s+", " ")
+                            .replaceAll("(?i)\\b(codigo|código|funcionario|funcionário|empregado|colaborador)\\b", "")
+                            .replaceAll("\\s+", " ")
+                            .trim();
+                        
+                        if (extractedName != null && extractedName.length() >= 3) {
+                            log.info("✅ Nome extraído do holerite: '{}' (código: {}, CPF: {})", extractedName, code, cpf);
+                            return extractedName;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao extrair nome do PDF do holerite {}: {}", payslipPath, e.getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Extrai o nome do funcionário do PDF do comprovante
+     * Busca pelo nome da conta creditada
+     */
+    private String extractEmployeeNameFromReceiptPDF(String receiptPath) {
+        try {
+            File receiptFile = new File(receiptPath);
+            if (!receiptFile.exists()) {
+                log.warn("⚠️ Arquivo do comprovante não existe: {}", receiptPath);
+                return null;
+            }
+            
+            try (PDDocument document = PDDocument.load(receiptFile)) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                String receiptText = stripper.getText(document);
+                
+                if (receiptText == null || receiptText.trim().isEmpty()) {
+                    return null;
+                }
+                
+                // Buscar por padrões de conta creditada
+                Pattern creditedPattern = Pattern.compile("(?i)(?:conta\\s+creditada|favorecido|beneficiário|nome)[:\\s]+([A-ZÀ-ÿ][A-ZÀ-ÿ\\s\\.]+)", Pattern.MULTILINE);
+                Matcher creditedMatcher = creditedPattern.matcher(receiptText);
+                
+                if (creditedMatcher.find()) {
+                    String extractedName = creditedMatcher.group(1).trim();
+                    log.info("✅ Nome extraído do comprovante: '{}'", extractedName);
+                    return extractedName;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao extrair nome do PDF do comprovante {}: {}", receiptPath, e.getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Busca o holerite correspondente ao comprovante verificando no PDF do holerite
+     * se o nome da conta creditada (que pode estar abreviado) aparece na mesma linha
+     * do código e do CPF.
+     * 
+     * @param receiptCreditedName Nome da conta creditada do comprovante (pode estar abreviado, ex: "Jose M. Ramos")
+     * @param payslips Lista de holerites candidatos para verificar
+     * @return O holerite correspondente ou null se não encontrado
+     */
+    private Payslip findPayslipByReceiptNameInPDF(String receiptCreditedName, List<Payslip> payslips) {
+        if (receiptCreditedName == null || receiptCreditedName.trim().isEmpty() || payslips == null || payslips.isEmpty()) {
+            return null;
+        }
+        
+        log.info("🔍 Buscando holerite para comprovante com nome: '{}' (verificando no PDF)", receiptCreditedName);
+        
+        // Normalizar nome do comprovante para comparação
+        String normalizedReceiptName = normalizeNameForSearch(receiptCreditedName.trim());
+        log.info("📝 Nome normalizado do comprovante: '{}'", normalizedReceiptName);
+        
+        for (Payslip payslip : payslips) {
+            if (payslip.getArquivoCaminho() == null || payslip.getArquivoCaminho().trim().isEmpty()) {
+                log.debug("⚠️ Holerite sem arquivoCaminho, pulando: {}", payslip.getEmployeeName());
+                continue;
+            }
+            
+            try {
+                File payslipFile = new File(payslip.getArquivoCaminho());
+                if (!payslipFile.exists()) {
+                    log.debug("⚠️ Arquivo do holerite não existe: {}", payslip.getArquivoCaminho());
+                    continue;
+                }
+                
+                log.info("📄 Verificando holerite: {} - {}/{} (arquivo: {})", 
+                    payslip.getEmployeeName(), payslip.getMonth(), payslip.getYear(), payslipFile.getName());
+                
+                // Extrair texto do PDF do holerite
+                try (PDDocument document = PDDocument.load(payslipFile)) {
+                    PDFTextStripper stripper = new PDFTextStripper();
+                    String payslipText = stripper.getText(document);
+                    
+                    if (payslipText == null || payslipText.trim().isEmpty()) {
+                        log.debug("⚠️ Não foi possível extrair texto do PDF do holerite: {}", payslipFile.getName());
+                        continue;
+                    }
+                    
+                    // Dividir em linhas
+                    String[] lines = payslipText.split("\r?\n");
+                    
+                    // Procurar por linhas que contenham código (6 dígitos), nome e CPF na mesma linha
+                    // Padrão: código (ex: 000026), nome (ex: SERGIO PEREIRA LEMOS), CPF (ex: CPF: 28469549847)
+                    Pattern codePattern = Pattern.compile("\\b\\d{6}\\b"); // Código de 6 dígitos
+                    Pattern cpfPattern = Pattern.compile("(?:CPF|cpf)[:\\s]*([0-9]{11}|[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2})", Pattern.CASE_INSENSITIVE);
+                    
+                    for (String line : lines) {
+                        if (line == null || line.trim().isEmpty()) {
+                            continue;
+                        }
+                        
+                        // Verificar se a linha contém código e CPF
+                        Matcher codeMatcher = codePattern.matcher(line);
+                        Matcher cpfMatcher = cpfPattern.matcher(line);
+                        
+                        if (codeMatcher.find() && cpfMatcher.find()) {
+                            // Linha contém código e CPF - extrair o nome dessa linha
+                            String code = codeMatcher.group();
+                            String cpf = cpfMatcher.group(1).replaceAll("[^0-9]", "");
+                            
+                            // Encontrar posições do código e CPF na linha
+                            int codeStart = codeMatcher.start();
+                            int cpfStart = cpfMatcher.start();
+                            
+                            // Extrair nome da linha (entre o código e o CPF)
+                            // O nome geralmente está entre o código e o CPF
+                            String nameSection = line.substring(codeStart + code.length(), cpfStart).trim();
+                            
+                            // Limpar o nome: remover caracteres especiais, números isolados, etc.
+                            // Manter apenas letras, espaços e acentos
+                            String extractedName = nameSection
+                                .replaceAll("[^a-zA-ZÀ-ÿ\\s]", " ") // Substituir caracteres especiais por espaço
+                                .replaceAll("\\s+", " ") // Múltiplos espaços para um só
+                                .trim();
+                            
+                            // Remover palavras comuns que podem estar na linha
+                            extractedName = extractedName
+                                .replaceAll("(?i)\\b(codigo|código|funcionario|funcionário|empregado|colaborador)\\b", "")
+                                .replaceAll("\\s+", " ")
+                                .trim();
+                            
+                            if (extractedName == null || extractedName.trim().isEmpty() || extractedName.length() < 3) {
+                                log.debug("⚠️ Nome extraído muito curto ou vazio: '{}'", extractedName);
+                                continue;
+                            }
+                            
+                            log.info("🔍 Linha encontrada com código e CPF: '{}'", line.trim());
+                            log.info("   Código: {}, Nome extraído do holerite: '{}', CPF: {}", code, extractedName, cpf);
+                            log.info("   Nome do comprovante (conta creditada): '{}'", receiptCreditedName);
+                            
+                            // Verificar se o nome do comprovante (que pode estar abreviado) corresponde ao nome extraído da linha (completo)
+                            // Exemplo: "Jose M. Ramos" (comprovante) vs "JOSE MARIO RAMOS" (holerite)
+                            // O método verifyEmployeeNames já suporta abreviações através de checkNamesWithAbbreviations
+                            log.info("🔍 Verificando se o nome do comprovante (pode estar abreviado) corresponde ao nome do holerite (completo)...");
+                            boolean nameMatches = verifyEmployeeNames(extractedName, receiptCreditedName) ||
+                                                verifyEmployeeNames(receiptCreditedName, extractedName);
+                            
+                            if (nameMatches) {
+                                log.info("✅ Holerite encontrado! Nome do comprovante corresponde ao nome no holerite");
+                                log.info("   Linha completa: '{}'", line.trim());
+                                log.info("   Código: {}, Nome no holerite: '{}', CPF: {}", code, extractedName, cpf);
+                                log.info("   Nome no comprovante: '{}'", receiptCreditedName);
+                                
+                                return payslip;
+                            } else {
+                                log.debug("   ❌ Nome do comprovante '{}' NÃO corresponde ao nome extraído '{}'", receiptCreditedName, extractedName);
+                            }
+                        }
+                    }
+                    
+                    log.debug("⚠️ Nome '{}' não encontrado no PDF do holerite {}", receiptCreditedName, payslipFile.getName());
+                    
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao processar PDF do holerite {}: {}", payslip.getArquivoCaminho(), e.getMessage());
+                }
+                
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao abrir arquivo do holerite {}: {}", payslip.getArquivoCaminho(), e.getMessage());
+            }
+        }
+        
+        log.warn("❌ Nenhum holerite encontrado para o comprovante com nome: '{}'", receiptCreditedName);
+        return null;
     }
     
     /**
@@ -3968,13 +4479,20 @@ public class UnifiedDocumentService {
                 return false;
             }
             
+            // Extrair nome do funcionário e verificar correspondência antes de criar documento unificado
+            // (implementação similar à unificação individual)
+            String finalEmployeeName = employeeName; // Fallback
+            // TODO: Implementar extração de nomes se necessário neste contexto
+            
             // Criar documento unificado
             String unifiedPath = createUnifiedPdfUsingMerger(
                 holeritePath, 
                 receiptPaths, 
-                employeeName, 
+                finalEmployeeName, 
                 month, 
-                year
+                year,
+                null, // payslip não disponível neste contexto
+                null  // receipt não disponível neste contexto
             );
             
             log.info("✅ Documento unificado criado: {}", unifiedPath);

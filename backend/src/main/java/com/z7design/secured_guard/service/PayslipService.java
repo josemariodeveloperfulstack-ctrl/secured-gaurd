@@ -287,15 +287,17 @@ public class PayslipService {
     private List<String> detectarTodosCPFsNaPagina(String pageText) {
         List<String> cpfs = new ArrayList<>();
         
-        // Padrão 1: CPF: 123.456.789-00 ou CPF 123.456.789-00
-        Pattern cpfPattern1 = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})", Pattern.CASE_INSENSITIVE);
+        // Padrão 1: CPF: 123.456.789-00 ou CPF 123.456.789-00 ou CPF: 12345678900
+        // Melhorado para capturar CPF sem formatação também
+        Pattern cpfPattern1 = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2}|[0-9]{11})", Pattern.CASE_INSENSITIVE);
         Matcher matcher1 = cpfPattern1.matcher(pageText);
         
         while (matcher1.find()) {
             String cpf = matcher1.group(1).replaceAll("[^0-9]", "");
             if (cpf.length() == 11 && !cpfs.contains(cpf)) {
                 cpfs.add(cpf);
-                log.debug("✅ CPF detectado (padrão 1): {}", cpf);
+                log.info("✅ CPF detectado (padrão 1): {} (contexto: '{}')", cpf, 
+                    matcher1.group(0).substring(0, Math.min(50, matcher1.group(0).length())));
             }
         }
         
@@ -670,7 +672,8 @@ public class PayslipService {
         // 1. EXTRAÇÃO DE CPF PRIMEIRO (mais confiável)
         // IMPORTANTE: Cada página contém as duas vias do holerite (frente e verso do mesmo funcionário)
         // Portanto, deve haver apenas 1 CPF único por página. Se houver múltiplos, usar apenas o primeiro.
-        Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2})");
+        // Melhorado para capturar CPF com ou sem formatação: "CPF: 12724178670" ou "CPF: 127.241.786-70"
+        Pattern cpfPattern = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2}|[0-9]{11})", Pattern.CASE_INSENSITIVE);
         
         // Contar quantos CPFs diferentes foram encontrados na página
         Set<String> cpfsEncontrados = new HashSet<>();
@@ -680,47 +683,46 @@ public class PayslipService {
             Matcher cpfMatcher = cpfPattern.matcher(linha);
             if (cpfMatcher.find()) {
                 String cpfEncontrado = cpfMatcher.group(1).replaceAll("[^0-9]", "");
-                cpfsEncontrados.add(cpfEncontrado);
-                
-                // Usar apenas o PRIMEIRO CPF encontrado (frente e verso têm o mesmo CPF)
-                if (cpf == null) {
-                    cpf = cpfEncontrado;
-                    log.info("✅ CPF encontrado (primeiro): {} na linha {}: {}", cpf, linhaIndex + 1, linha.trim());
+                if (cpfEncontrado.length() == 11) {
+                    cpfsEncontrados.add(cpfEncontrado);
                     
-                    // Na linha do CPF, tentar extrair código e nome
-                    String linhaCpf = linha.trim();
+                    // Usar apenas o PRIMEIRO CPF encontrado (frente e verso têm o mesmo CPF)
+                    if (cpf == null) {
+                        cpf = cpfEncontrado;
+                        log.info("✅ CPF encontrado (primeiro): {} na linha {}: '{}'", cpf, linhaIndex + 1, linha.trim());
+                        
+                        // Na linha do CPF, tentar extrair código e nome
+                        String linhaCpf = linha.trim();
+                        
+                        // IMPORTANTE: Se não encontrar nome na mesma linha, tentar linha anterior
+                        // (estrutura comum: linha anterior tem matrícula e nome, linha atual tem CPF)
+                        String linhaAnterior = (linhaIndex > 0) ? linhas[linhaIndex - 1].trim() : null;
                     
-                    // IMPORTANTE: Se não encontrar nome na mesma linha, tentar linha anterior
-                    // (estrutura comum: linha anterior tem matrícula e nome, linha atual tem CPF)
-                    String linhaAnterior = (linhaIndex > 0) ? linhas[linhaIndex - 1].trim() : null;
-                    
-                    // Padrão 1: CODIGO NOME CPF (ex: 000044 ELAINE APARECIDA SOARES PEREIRA CPF: 073.495.276-75)
-                    // Melhorado para aceitar CPF: ou CPF (com ou sem dois pontos)
-                    Pattern linhaCompleta1 = Pattern.compile("(\\d{4,6})\\s+(.+?)\\s+CPF[:\\s]", Pattern.CASE_INSENSITIVE);
-                    Matcher lineMatch1 = linhaCompleta1.matcher(linhaCpf);
-                    if (lineMatch1.find()) {
-                        codigo = lineMatch1.group(1).trim();
-                        String nomeCandidate = lineMatch1.group(2).trim().replaceAll("\\s+", " ");
-                        if (isValidEmployeeName(nomeCandidate)) {
-                            nome = nomeCandidate.toUpperCase();
-                            log.info("✅ Padrão 1 - Código: {}, Nome: {}", codigo, nome);
-                            break;
-                        }
-                    }
-                    
-                    // Padrão 2a: NOME seguido de CPF (mais flexível, captura tudo antes de CPF)
-                    // Este padrão é para casos como "MARCO TULIO MENEZES  CPF: 11396510648"
-                    // TESTAR PRIMEIRO porque é mais flexível e captura casos com múltiplos espaços
+                    // PADRÃO 2a (TESTAR PRIMEIRO - mais flexível): CODIGO NOME CPF ou NOME CPF
+                    // Este padrão captura tudo antes de CPF e depois separa código e nome
+                    // Funciona para casos como:
+                    // - "000230 JEREMIAS DA COSTA ALMEIDA CPF: 12724178670"
+                    // - "MARCO TULIO MENEZES  CPF: 11396510648"
                     int cpfIndex2 = linhaCpf.toUpperCase().indexOf("CPF");
                     if (cpfIndex2 > 5) {
-                        String nomeCandidate = linhaCpf.substring(0, cpfIndex2).trim().replaceAll("\\s+", " ");
-                        log.debug("🔍 Padrão 2a - Texto antes de CPF: '{}'", nomeCandidate);
+                        String textoAntesCpf = linhaCpf.substring(0, cpfIndex2).trim().replaceAll("\\s+", " ");
+                        log.debug("🔍 Padrão 2a - Linha completa: '{}'", linhaCpf);
+                        log.debug("🔍 Padrão 2a - Texto antes de CPF: '{}'", textoAntesCpf);
                         
-                        // Remover possíveis códigos numéricos no início (4-6 dígitos)
-                        String nomeSemCodigo = nomeCandidate.replaceAll("^\\d{4,6}\\s+", "").trim();
-                        if (!nomeSemCodigo.equals(nomeCandidate)) {
-                            log.debug("🔍 Padrão 2a - Código removido: '{}' -> '{}'", nomeCandidate, nomeSemCodigo);
-                            nomeCandidate = nomeSemCodigo;
+                        // Verificar se há código no início (4-6 dígitos)
+                        Pattern codigoPattern = Pattern.compile("^(\\d{4,6})\\s+(.+)$");
+                        Matcher codigoMatcher = codigoPattern.matcher(textoAntesCpf);
+                        String nomeCandidate;
+                        
+                        if (codigoMatcher.find()) {
+                            // Há código no início, extrair código e nome
+                            codigo = codigoMatcher.group(1).trim();
+                            nomeCandidate = codigoMatcher.group(2).trim();
+                            log.debug("🔍 Padrão 2a - Código encontrado: '{}', Nome: '{}'", codigo, nomeCandidate);
+                        } else {
+                            // Não há código, usar todo o texto como nome
+                            nomeCandidate = textoAntesCpf;
+                            log.debug("🔍 Padrão 2a - Sem código, usando todo o texto como nome: '{}'", nomeCandidate);
                         }
                         
                         // Validar se é um nome válido (pelo menos 5 caracteres, contém letras)
@@ -730,21 +732,44 @@ public class PayslipService {
                             
                             if (isValid) {
                                 nome = nomeCandidate.toUpperCase();
-                                log.info("✅ Padrão 2a - Nome extraído: {} (tudo antes de CPF)", nome);
+                                log.info("✅ Padrão 2a - Código: {}, Nome: {} (extraído de tudo antes de CPF)", codigo, nome);
                                 break;
                             } else {
                                 // Se isValidEmployeeName falhou, mas o nome parece válido (tem pelo menos 2 palavras),
                                 // aceitar mesmo assim (pode ser um caso edge)
                                 String[] palavras = nomeCandidate.split("\\s+");
-                                if (palavras.length >= 2 && palavras[0].length() >= 3 && palavras[1].length() >= 3) {
+                                if (palavras.length >= 2 && palavras[0].length() >= 3) {
                                     nome = nomeCandidate.toUpperCase();
-                                    log.warn("⚠️ Padrão 2a - Nome aceito mesmo com validação falhando (parece válido): {}", nome);
+                                    log.warn("⚠️ Padrão 2a - Nome aceito mesmo com validação falhando (parece válido): Código: {}, Nome: {}", codigo, nome);
                                     break;
                                 }
                             }
                         } else {
                             log.debug("🔍 Padrão 2a - Nome candidato rejeitado: comprimento={}, tem letras={}", 
                                 nomeCandidate.length(), nomeCandidate.matches(".*[A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ].*"));
+                        }
+                    }
+                    
+                    // Padrão 1: CODIGO NOME CPF (ex: 000044 ELAINE APARECIDA SOARES PEREIRA CPF: 073.495.276-75)
+                    // Melhorado para aceitar CPF: ou CPF (com ou sem dois pontos)
+                    // IMPORTANTE: Usar .+? (non-greedy) mas garantir que capture até o CPF
+                    Pattern linhaCompleta1 = Pattern.compile("(\\d{4,6})\\s+(.+?)\\s+CPF[:\\s]", Pattern.CASE_INSENSITIVE);
+                    Matcher lineMatch1 = linhaCompleta1.matcher(linhaCpf);
+                    if (lineMatch1.find()) {
+                        codigo = lineMatch1.group(1).trim();
+                        String nomeCandidate = lineMatch1.group(2).trim().replaceAll("\\s+", " ");
+                        
+                        // Log detalhado para debug
+                        log.debug("🔍 Padrão 1 - Linha completa: '{}'", linhaCpf);
+                        log.debug("🔍 Padrão 1 - Código extraído: '{}'", codigo);
+                        log.debug("🔍 Padrão 1 - Nome candidato: '{}'", nomeCandidate);
+                        
+                        if (isValidEmployeeName(nomeCandidate)) {
+                            nome = nomeCandidate.toUpperCase();
+                            log.info("✅ Padrão 1 - Código: {}, Nome: {}", codigo, nome);
+                            break;
+                        } else {
+                            log.warn("⚠️ Padrão 1 - Nome candidato '{}' não passou na validação isValidEmployeeName", nomeCandidate);
                         }
                     }
                     
@@ -829,11 +854,11 @@ public class PayslipService {
 
         // 1.5. EXTRAÇÃO DO CNPJ DA EMPRESA
         Pattern cnpjPattern = Pattern.compile("CNPJ[:\\s]*([0-9]{2}\\.?[0-9]{3}\\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2}|[0-9]{14})");
-        for (String linha : linhas) {
-            Matcher cnpjMatcher = cnpjPattern.matcher(linha);
+        for (String linhaCnpj : linhas) {
+            Matcher cnpjMatcher = cnpjPattern.matcher(linhaCnpj);
             if (cnpjMatcher.find()) {
                 empresaCnpj = cnpjMatcher.group(1).replaceAll("[^0-9]", "");
-                log.info("✅ CNPJ da empresa encontrado: {} na linha: {}", empresaCnpj, linha.trim());
+                log.info("✅ CNPJ da empresa encontrado: {} na linha: {}", empresaCnpj, linhaCnpj.trim());
                 
                 // Tentar extrair nome da empresa da mesma linha ou linhas próximas
                 // Padrão comum: NOME_DA_EMPRESA + CNPJ
@@ -847,15 +872,15 @@ public class PayslipService {
             Pattern fallbackCnpjPattern = Pattern.compile("(?<!\\d)(\\d{14})(?!\\d)");
             int limiteLinhas = Math.min(15, linhas.length);
             for (int i = 0; i < limiteLinhas; i++) {
-                String linha = linhas[i];
-                Matcher fallbackMatcher = fallbackCnpjPattern.matcher(linha.replaceAll("\\s+", ""));
+                String linhaCnpjFallback = linhas[i];
+                Matcher fallbackMatcher = fallbackCnpjPattern.matcher(linhaCnpjFallback.replaceAll("\\s+", ""));
                 if (fallbackMatcher.find()) {
                     empresaCnpj = fallbackMatcher.group(1);
-                    log.info("✅ CNPJ (fallback) encontrado: {} na linha {}", empresaCnpj, linha.trim());
+                    log.info("✅ CNPJ (fallback) encontrado: {} na linha {}", empresaCnpj, linhaCnpjFallback.trim());
 
                     // Tentar capturar o nome da empresa na mesma linha (removendo números)
                     if (empresaNome == null) {
-                        String possibleName = linha.replaceAll("\\d", " ").replaceAll("\\s+", " ").trim();
+                        String possibleName = linhaCnpjFallback.replaceAll("\\d", " ").replaceAll("\\s+", " ").trim();
                         if (possibleName.length() > 5) {
                             empresaNome = possibleName;
                             log.info("✅ Nome da empresa (fallback) identificado: {}", empresaNome);
@@ -869,15 +894,15 @@ public class PayslipService {
         // 1.6. EXTRAÇÃO DO NOME DA EMPRESA
         // Procurar por linhas que contenham palavras-chave de empresa
         for (int i = 0; i < linhas.length; i++) {
-            String linha = linhas[i].trim();
-            String linhaUpper = linha.toUpperCase();
+            String linhaEmpresa = linhas[i].trim();
+            String linhaUpper = linhaEmpresa.toUpperCase();
             
             // Se encontrar CNPJ na linha, tentar pegar nome da linha anterior ou mesma linha
             if (linhaUpper.contains("CNPJ") && empresaNome == null) {
                 // Tentar extrair nome da mesma linha (antes do CNPJ)
                 int cnpjIndex = linhaUpper.indexOf("CNPJ");
                 if (cnpjIndex > 10) { // Se há texto suficiente antes
-                    String possibleName = linha.substring(0, cnpjIndex).trim();
+                    String possibleName = linhaEmpresa.substring(0, cnpjIndex).trim();
                     // Remover palavras-chave que não são parte do nome
                     possibleName = possibleName.replaceAll("(?i)(EMPRESA|RAZÃO SOCIAL|EMPREGADOR)[:\\s]*", "").trim();
                     if (possibleName.length() > 5 && !possibleName.matches(".*\\d{3}.*")) {
@@ -966,13 +991,13 @@ public class PayslipService {
         // Padrão 1: "DD/MM/AAAA a DD/MM/AAAA" (período completo)
         Pattern periodoPattern1 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+a\\s+(\\d{2})/(\\d{2})/(\\d{4})");
         for (int idx = 0; idx < linhas.length; idx++) {
-            String linha = linhas[idx];
-            Matcher periodoMatcher = periodoPattern1.matcher(linha);
+            String linhaPeriodo = linhas[idx];
+            Matcher periodoMatcher = periodoPattern1.matcher(linhaPeriodo);
             if (periodoMatcher.find()) {
                 mes = periodoMatcher.group(5); // mês da data final (período de referência)
                 ano = periodoMatcher.group(6); // ano da data final (período de referência)
-                log.info("✅ Período de referência encontrado (padrão 1): {}/{} - Linha: {}", mes, ano, linha.trim());
-                workPostName = findWorkPostName(linhas, idx, linha.substring(periodoMatcher.end()));
+                log.info("✅ Período de referência encontrado (padrão 1): {}/{} - Linha: {}", mes, ano, linhaPeriodo.trim());
+                workPostName = findWorkPostName(linhas, idx, linhaPeriodo.substring(periodoMatcher.end()));
                 break;
             }
         }
@@ -981,8 +1006,8 @@ public class PayslipService {
         if (mes == null || ano == null) {
             Pattern periodoPattern1b = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})\\s+à\\s+(\\d{2})/(\\d{2})/(\\d{4})");
             for (int idx = 0; idx < linhas.length; idx++) {
-                String linha = linhas[idx];
-                Matcher periodoMatcher = periodoPattern1b.matcher(linha);
+                String linhaPeriodo1b = linhas[idx];
+                Matcher periodoMatcher = periodoPattern1b.matcher(linhaPeriodo1b);
                 if (periodoMatcher.find()) {
                     mes = periodoMatcher.group(5);
                     ano = periodoMatcher.group(6);
@@ -999,8 +1024,8 @@ public class PayslipService {
         if (mes == null || ano == null) {
             Pattern periodoPattern2 = Pattern.compile("(\\d{2})/(\\d{4})");
             for (int idx = 0; idx < linhas.length; idx++) {
-                String linha = linhas[idx];
-                Matcher periodoMatcher = periodoPattern2.matcher(linha);
+                String linhaPeriodo2 = linhas[idx];
+                Matcher periodoMatcher = periodoPattern2.matcher(linhaPeriodo2);
                 String lastMatch = null;
                 int lastEnd = -1;
                 // Encontrar a última ocorrência do padrão na linha
@@ -1026,8 +1051,8 @@ public class PayslipService {
         if (mes == null || ano == null) {
             Pattern periodoPattern3 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})");
             for (int idx = 0; idx < linhas.length; idx++) {
-                String linha = linhas[idx];
-                Matcher periodoMatcher = periodoPattern3.matcher(linha);
+                String linhaPeriodo3 = linhas[idx];
+                Matcher periodoMatcher = periodoPattern3.matcher(linhaPeriodo3);
                 if (periodoMatcher.find()) {
                     mes = periodoMatcher.group(2);
                     ano = periodoMatcher.group(3);
@@ -1064,8 +1089,8 @@ public class PayslipService {
         if ((mes == null || ano == null)) {
             log.info("🔍 Procurando por palavras-chave de período...");
             for (int idx = 0; idx < linhas.length; idx++) {
-                String linha = linhas[idx];
-                String linhaUpper = linha.toUpperCase();
+                String linhaSetor = linhas[idx];
+                String linhaUpper = linhaSetor.toUpperCase();
                 if (linhaUpper.contains("PERÍODO") || linhaUpper.contains("REFERÊNCIA") || 
                     linhaUpper.contains("COMPETÊNCIA") || linhaUpper.contains("MÊS")) {
                     
@@ -1098,8 +1123,8 @@ public class PayslipService {
         // Padrões: "Total Vencimentos: 1.912,65", "TOTAL VENCIMENTOS 1.912,65", "Total Ganhos: 1.912,65"
         // Melhorado para capturar valores com ou sem separadores
         Pattern totalVencimentosPattern = Pattern.compile("(?i)(?:TOTAL\\s+VENCIMENTOS?|VENCIMENTOS?\\s+TOTAL|TOTAL\\s+GANHOS?)\\s*:?\\s*([\\d.]+[,.]?\\d{0,2}|[\\d,]+)", Pattern.CASE_INSENSITIVE);
-        for (String linha : linhas) {
-            Matcher matcher = totalVencimentosPattern.matcher(linha);
+        for (String linhaVencimentos : linhas) {
+            Matcher matcher = totalVencimentosPattern.matcher(linhaVencimentos);
             if (matcher.find()) {
                 try {
                     String valorStr = matcher.group(1).trim();
@@ -1127,8 +1152,8 @@ public class PayslipService {
         // Extrair Total Descontos
         // Padrões: "Total Descontos: 500,65", "TOTAL DESCONTOS 500,65"
         Pattern totalDescontosPattern = Pattern.compile("(?i)(?:TOTAL\\s+DESCONTOS?|DESCONTOS?\\s+TOTAL)\\s*:?\\s*([\\d.]+[,.]?\\d{0,2}|[\\d,]+)", Pattern.CASE_INSENSITIVE);
-        for (String linha : linhas) {
-            Matcher matcher = totalDescontosPattern.matcher(linha);
+        for (String linhaDescontos : linhas) {
+            Matcher matcher = totalDescontosPattern.matcher(linhaDescontos);
             if (matcher.find()) {
                 try {
                     String valorStr = matcher.group(1).trim();
@@ -1154,8 +1179,8 @@ public class PayslipService {
         // Extrair Valor Líquido
         // Padrões: "Valor Líquido: 1.412,00", "VALOR LÍQUIDO 1.412,00", "Líquido: 1.412,00"
         Pattern valorLiquidoPattern = Pattern.compile("(?i)(?:VALOR\\s+L[IÍ]QUIDO|L[IÍ]QUIDO|VALOR\\s+FINAL|VALOR\\s+A\\s+RECEBER)\\s*:?\\s*([\\d.]+[,.]?\\d{0,2}|[\\d,]+)", Pattern.CASE_INSENSITIVE);
-        for (String linha : linhas) {
-            Matcher matcher = valorLiquidoPattern.matcher(linha);
+        for (String linhaLiquido : linhas) {
+            Matcher matcher = valorLiquidoPattern.matcher(linhaLiquido);
             if (matcher.find()) {
                 try {
                     String valorStr = matcher.group(1).trim();
@@ -1444,12 +1469,13 @@ public class PayslipService {
 
     private boolean isValidEmployeeName(String name) {
         if (name == null || name.trim().isEmpty() || name.length() < 5) {
+            log.debug("⚠️ Nome inválido: null, vazio ou muito curto (< 5 caracteres)");
             return false;
         }
         
         String nameUpper = name.toUpperCase().trim();
         
-        // Filtrar títulos e cargos
+        // Filtrar títulos e cargos (mas apenas se for o nome completo, não se for parte do nome)
         String[] invalidNames = {
             "FOLHA", "PAGAMENTO", "DEMONSTRATIVO", "HOLERITE", "CONTRACHEQUE",
             "PORTEIRO", "CONTROLADOR", "VIGIA", "AUXILIAR", "SERVICOS", "SEGURANCA",
@@ -1457,14 +1483,35 @@ public class PayslipService {
             "PERIODO", "REFERENCIA", "FUNCIONARIO", "COLABORADOR", "SALARIO"
         };
         
+        // Verificar se o nome completo é exatamente um dos nomes inválidos
         for (String invalid : invalidNames) {
-            if (nameUpper.contains(invalid)) {
+            if (nameUpper.equals(invalid)) {
+                log.debug("⚠️ Nome inválido: é exatamente '{}' (título/cargo)", invalid);
                 return false;
             }
         }
         
-        // Deve conter apenas letras, espaços e acentos
-        return nameUpper.matches("^[A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ ]+$");
+        // Verificar se contém apenas letras, espaços e acentos (permitir preposições como DA, DE, DOS, etc.)
+        if (!nameUpper.matches("^[A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ ]+$")) {
+            log.debug("⚠️ Nome inválido: contém caracteres inválidos. Nome: '{}'", nameUpper);
+            return false;
+        }
+        
+        // Deve ter pelo menos 2 palavras (primeiro nome e sobrenome)
+        String[] palavras = nameUpper.split("\\s+");
+        if (palavras.length < 2) {
+            log.debug("⚠️ Nome inválido: tem menos de 2 palavras. Nome: '{}'", nameUpper);
+            return false;
+        }
+        
+        // Primeira palavra deve ter pelo menos 3 caracteres
+        if (palavras[0].length() < 3) {
+            log.debug("⚠️ Nome inválido: primeira palavra muito curta. Nome: '{}'", nameUpper);
+            return false;
+        }
+        
+        log.debug("✅ Nome válido: '{}'", nameUpper);
+        return true;
     }
 
     /**

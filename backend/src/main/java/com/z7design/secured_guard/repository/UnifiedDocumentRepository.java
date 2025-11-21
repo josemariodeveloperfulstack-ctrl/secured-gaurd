@@ -29,4 +29,9 @@ public interface UnifiedDocumentRepository extends JpaRepository<UnifiedDocument
 
     @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.matchingConfidence < :threshold")
     List<UnifiedDocument> findByLowConfidence(@Param("threshold") Double threshold);
+    
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE unified_documents SET receipt_id = NULL WHERE receipt_id = :receiptId", nativeQuery = true)
+    int removeReceiptReference(@Param("receiptId") UUID receiptId);
 } 

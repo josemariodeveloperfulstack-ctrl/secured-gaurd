@@ -9,6 +9,7 @@ import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.UnifiedDocumentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,9 @@ public class PaymentReceiptService {
 
     @Autowired
     private CompanyRepository companyRepository;
+    
+    @Autowired
+    private UnifiedDocumentRepository unifiedDocumentRepository;
     
     public PaymentReceiptDTO createPaymentReceipt(CreatePaymentReceiptDTO createDTO) {
         PaymentReceipt paymentReceipt = new PaymentReceipt(
@@ -775,6 +779,12 @@ public class PaymentReceiptService {
     
     // Excluir comprovante por ID
     public void deleteById(String id) {
+        deleteByIdInTransaction(id);
+    }
+    
+    // Método auxiliar para excluir em transação separada
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    private void deleteByIdInTransaction(String id) {
         if (id == null || id.trim().isEmpty()) {
             log.warn("ID nulo ou vazio fornecido para exclusão");
             return;
@@ -787,45 +797,74 @@ public class PaymentReceiptService {
             if (receiptOpt.isPresent()) {
                 PaymentReceipt receipt = receiptOpt.get();
                 
-                // Excluir arquivo físico se existir
+                // Excluir arquivo físico se existir (fora da transação)
                 if (receipt.getFilePath() != null && !receipt.getFilePath().trim().isEmpty()) {
                     try {
                         Path filePath = Paths.get(receipt.getFilePath());
                         if (Files.exists(filePath)) {
                             Files.delete(filePath);
-                            log.info("Arquivo físico excluído: {}", filePath);
+                            log.info("✅ Arquivo físico excluído: {}", filePath);
                         } else {
-                            log.debug("Arquivo físico não encontrado (já foi excluído?): {}", filePath);
+                            log.debug("⚠️ Arquivo físico não encontrado (já foi excluído?): {}", filePath);
                         }
                     } catch (IOException e) {
-                        log.warn("Erro ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
+                        log.warn("⚠️ Erro ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
                         // Não lançar exceção - continuar com exclusão do banco
                     } catch (Exception e) {
-                        log.warn("Erro inesperado ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
+                        log.warn("⚠️ Erro inesperado ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
                         // Não lançar exceção - continuar com exclusão do banco
                     }
+                }
+                
+                // ANTES de excluir, remover referências na tabela unified_documents
+                try {
+                    int updatedCount = unifiedDocumentRepository.removeReceiptReference(receiptId);
+                    if (updatedCount > 0) {
+                        log.info("✅ {} referência(s) removida(s) em unified_documents para o comprovante {}", updatedCount, id);
+                    }
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao remover referências em unified_documents: {}", e.getMessage());
+                    // Continuar mesmo assim - tentar excluir
                 }
                 
                 // Excluir do banco de dados
                 try {
                     paymentReceiptRepository.deleteById(receiptId);
-                    log.info("Comprovante excluído do banco: {}", id);
+                    paymentReceiptRepository.flush(); // Força o commit imediato
+                    log.info("✅ Comprovante excluído do banco com sucesso: {}", id);
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    log.error("❌ Erro de integridade ao excluir comprovante {}: {}", id, e.getMessage(), e);
+                    String errorMsg = "Erro ao excluir comprovante: existe referência em outra tabela. " + 
+                                     (e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+                    throw new RuntimeException(errorMsg, e);
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    log.warn("⚠️ Comprovante não encontrado no banco (já foi excluído?): {}", id);
+                    // Não lançar exceção - comprovante não existe é um caso válido
+                } catch (org.hibernate.exception.ConstraintViolationException e) {
+                    log.error("❌ Erro de constraint ao excluir comprovante {}: {}", id, e.getMessage(), e);
+                    throw new RuntimeException("Erro ao excluir comprovante: violação de constraint. " + 
+                                             (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()), e);
                 } catch (Exception e) {
-                    log.error("Erro ao excluir comprovante do banco de dados {}: {}", id, e.getMessage(), e);
-                    throw new RuntimeException("Erro ao excluir comprovante do banco de dados: " + e.getMessage(), e);
+                    log.error("❌ Erro ao excluir comprovante do banco de dados {}: {}", id, e.getMessage(), e);
+                    log.error("❌ Tipo da exceção: {}", e.getClass().getName());
+                    if (e.getCause() != null) {
+                        log.error("❌ Causa: {}", e.getCause().getMessage());
+                    }
+                    throw new RuntimeException("Erro ao excluir comprovante do banco de dados: " + 
+                                             (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()), e);
                 }
             } else {
-                log.warn("Comprovante não encontrado para exclusão: {}", id);
+                log.warn("⚠️ Comprovante não encontrado para exclusão: {}", id);
                 // Não lançar exceção - comprovante não existe é um caso válido
             }
         } catch (IllegalArgumentException e) {
-            log.error("ID inválido fornecido para exclusão: {} - {}", id, e.getMessage());
+            log.error("❌ ID inválido fornecido para exclusão: {} - {}", id, e.getMessage());
             throw new IllegalArgumentException("ID inválido: " + id, e);
         } catch (RuntimeException e) {
             // Re-lançar RuntimeException
             throw e;
         } catch (Exception e) {
-            log.error("Erro inesperado ao excluir comprovante {}: {}", id, e.getMessage(), e);
+            log.error("❌ Erro inesperado ao excluir comprovante {}: {}", id, e.getMessage(), e);
             throw new RuntimeException("Erro ao excluir comprovante: " + e.getMessage(), e);
         }
     }
@@ -902,51 +941,5 @@ public class PaymentReceiptService {
         
         log.info("✅ Exclusão múltipla concluída: {} excluídos, {} falharam", deleted, failed);
         return result;
-    }
-    
-    // Método auxiliar para excluir em transação separada (cada exclusão é independente)
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    private void deleteByIdInTransaction(String id) {
-        try {
-            UUID receiptId = UUID.fromString(id);
-            Optional<PaymentReceipt> receiptOpt = paymentReceiptRepository.findById(receiptId);
-            
-            if (receiptOpt.isPresent()) {
-                PaymentReceipt receipt = receiptOpt.get();
-                
-                // Excluir arquivo físico se existir (fora da transação)
-                if (receipt.getFilePath() != null && !receipt.getFilePath().trim().isEmpty()) {
-                    try {
-                        Path filePath = Paths.get(receipt.getFilePath());
-                        if (Files.exists(filePath)) {
-                            Files.delete(filePath);
-                            log.info("Arquivo físico excluído: {}", filePath);
-                        } else {
-                            log.debug("Arquivo físico não encontrado (já foi excluído?): {}", filePath);
-                        }
-                    } catch (IOException e) {
-                        log.warn("Erro ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
-                        // Não lançar exceção - continuar com exclusão do banco
-                    } catch (Exception e) {
-                        log.warn("Erro inesperado ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
-                        // Não lançar exceção - continuar com exclusão do banco
-                    }
-                }
-                
-                // Excluir do banco de dados
-                paymentReceiptRepository.deleteById(receiptId);
-                paymentReceiptRepository.flush(); // Força o commit imediato
-                log.info("Comprovante excluído do banco: {}", id);
-            } else {
-                log.warn("Comprovante não encontrado para exclusão: {}", id);
-                // Não lançar exceção - comprovante não existe é um caso válido
-            }
-        } catch (IllegalArgumentException e) {
-            log.error("ID inválido fornecido para exclusão: {} - {}", id, e.getMessage());
-            throw new IllegalArgumentException("ID inválido: " + id, e);
-        } catch (Exception e) {
-            log.error("Erro inesperado ao excluir comprovante {}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("Erro ao excluir comprovante: " + e.getMessage(), e);
-        }
     }
 }

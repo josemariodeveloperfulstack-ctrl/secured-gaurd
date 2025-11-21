@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.PaymentReceiptDTO;
 import com.z7design.secured_guard.dto.ReceiptProcessingResponse;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.model.PaymentReceiptStatus;
+import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class ReceiptProcessingService {
 
     private final PaymentReceiptRepository receiptRepository;
     private final PaymentReceiptService paymentReceiptService;
+    private final PayslipService payslipService;
     private final String UPLOAD_DIR = "uploads/receipts/";
 
     @Transactional
@@ -305,10 +307,138 @@ public class ReceiptProcessingService {
                 return null;
             }
 
+            // ===== VALIDAÇÕES SOLICITADAS =====
+            log.info("🔍 Iniciando validações do comprovante...");
+            
+            // 1. Buscar holerite correspondente ao funcionário e período
+            Payslip matchingPayslip = null;
+            try {
+                List<Payslip> payslipsInDb = payslipService.getAllPayslips().stream()
+                    .filter(p -> p.getMonth() != null && p.getMonth().equals(receiptData.month))
+                    .filter(p -> p.getYear() != null && p.getYear().equals(receiptData.year))
+                    .collect(Collectors.toList());
+                
+                log.info("📊 Holerites encontrados para {}/{}: {}", receiptData.month, receiptData.year, payslipsInDb.size());
+                
+                // Normalizar nome do comprovante para comparação
+                String receiptEmployeeName = receiptData.employeeName != null ? receiptData.employeeName.trim().toUpperCase() : "";
+                String receiptNameFirst3 = receiptEmployeeName.length() >= 3 ? receiptEmployeeName.substring(0, 3) : receiptEmployeeName;
+                
+                // Buscar holerite correspondente
+                for (Payslip payslip : payslipsInDb) {
+                    if (payslip.getEmployeeName() != null) {
+                        String payslipEmployeeName = payslip.getEmployeeName().trim().toUpperCase();
+                        String payslipNameFirst3 = payslipEmployeeName.length() >= 3 ? payslipEmployeeName.substring(0, 3) : payslipEmployeeName;
+                        
+                        // Verificar se os 3 primeiros caracteres coincidem (para nomes abreviados)
+                        boolean nameMatches = receiptNameFirst3.equals(payslipNameFirst3) || 
+                                            receiptEmployeeName.equals(payslipEmployeeName) ||
+                                            receiptEmployeeName.contains(payslipEmployeeName) ||
+                                            payslipEmployeeName.contains(receiptEmployeeName);
+                        
+                        if (nameMatches) {
+                            matchingPayslip = payslip;
+                            log.info("✅ Holerite encontrado: {} - {}/{} (Empresa: {}, Setor: {})", 
+                                payslip.getEmployeeName(), payslip.getMonth(), payslip.getYear(),
+                                payslip.getCompanyName(), payslip.getWorkPostName());
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao buscar holerite: {}", e.getMessage());
+            }
+            
+            // 2. Validar valor líquido se holerite foi encontrado
+            boolean valueMatches = false;
+            if (matchingPayslip != null && matchingPayslip.getNetValue() != null && receiptData.amount != null) {
+                java.math.BigDecimal payslipNetValue = matchingPayslip.getNetValue();
+                java.math.BigDecimal receiptAmount = java.math.BigDecimal.valueOf(receiptData.amount);
+                
+                // Comparar valores (tolerância de 0.01 para diferenças de arredondamento)
+                valueMatches = payslipNetValue.subtract(receiptAmount).abs().compareTo(java.math.BigDecimal.valueOf(0.01)) <= 0;
+                
+                log.info("💰 Comparação de valores - Holerite: R$ {}, Comprovante: R$ {}, Match: {}", 
+                    payslipNetValue, receiptAmount, valueMatches);
+            } else {
+                log.warn("⚠️ Não foi possível validar valor: Holerite={}, NetValue={}, ReceiptAmount={}", 
+                    matchingPayslip != null, 
+                    matchingPayslip != null && matchingPayslip.getNetValue() != null ? matchingPayslip.getNetValue() : "null",
+                    receiptData.amount);
+            }
+            
+            // 3. Verificar duplicatas (mesmo funcionário, mesmo valor, mesma data de transferência)
+            boolean isDuplicate = false;
+            try {
+                List<PaymentReceipt> existingReceipts = receiptRepository.findAll().stream()
+                    .filter(r -> r.getEmployeeName() != null && 
+                                r.getEmployeeName().trim().equalsIgnoreCase(receiptData.employeeName.trim()))
+                    .filter(r -> r.getMonth() != null && r.getMonth().equals(receiptData.month))
+                    .filter(r -> r.getYear() != null && r.getYear().equals(receiptData.year))
+                    .collect(Collectors.toList());
+                
+                for (PaymentReceipt existing : existingReceipts) {
+                    // Verificar se é duplicata: mesmo valor E mesma data de transferência
+                    boolean sameValue = existing.getNetSalary() != null && receiptData.amount != null &&
+                                      existing.getNetSalary().subtract(java.math.BigDecimal.valueOf(receiptData.amount))
+                                          .abs().compareTo(java.math.BigDecimal.valueOf(0.01)) <= 0;
+                    
+                    // Normalizar data de transferência para comparação (formato DD/MM/AAAA ou MM/AAAA)
+                    String existingTransferDate = existing.getTransferDate() != null ? existing.getTransferDate().trim() : "";
+                    String receiptTransferDate = receiptData.transferDate != null ? receiptData.transferDate.trim() : "";
+                    
+                    // Se a data não foi extraída do PDF, usar a data derivada do período (MM/AAAA)
+                    if (receiptTransferDate.isEmpty()) {
+                        receiptTransferDate = String.format("%02d/%04d", receiptData.month, receiptData.year);
+                    }
+                    
+                    boolean sameDate = !existingTransferDate.isEmpty() && !receiptTransferDate.isEmpty() &&
+                                     existingTransferDate.equals(receiptTransferDate);
+                    
+                    // É duplicata se: mesmo valor E mesma data de transferência
+                    if (sameValue && sameDate) {
+                        isDuplicate = true;
+                        log.warn("⚠️ Comprovante duplicado encontrado: {} - {}/{} (Valor: R$ {}, Data: {})", 
+                            existing.getEmployeeName(), existing.getMonth(), existing.getYear(),
+                            existing.getNetSalary(), existing.getTransferDate());
+                        break;
+                    } else if (sameValue && !sameDate) {
+                        log.info("✅ Comprovante permitido: mesmo valor mas data diferente ({} vs {})", 
+                            existingTransferDate, receiptTransferDate);
+                    } else if (!sameValue && sameDate) {
+                        log.info("✅ Comprovante permitido: mesma data mas valor diferente (R$ {} vs R$ {})", 
+                            existing.getNetSalary(), receiptData.amount);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao verificar duplicatas: {}", e.getMessage());
+            }
+            
+            // 4. Se é duplicata, não processar (exceto se valor ou data forem diferentes - já verificado acima)
+            if (isDuplicate) {
+                log.warn("❌ Comprovante duplicado ignorado: {} - {}/{} (mesmo valor e mesma data)", 
+                    receiptData.employeeName, receiptData.month, receiptData.year);
+                return null;
+            }
+            
+            // 5. Se nome e valor coincidem com holerite, usar estrutura de pastas do holerite
+            if (matchingPayslip != null && valueMatches) {
+                log.info("✅ Validações passaram - Nome e valor coincidem com holerite. Usando estrutura de pastas do holerite.");
+                // A estrutura de pastas será definida pelo applyCompanyHierarchy que usa os dados do holerite
+                receiptData.companyName = matchingPayslip.getCompanyName();
+                receiptData.companyCnpj = matchingPayslip.getCompanyCnpj();
+            } else {
+                log.warn("⚠️ Validações não passaram - Nome ou valor não coincidem com holerite. Usando estrutura padrão.");
+            }
+            
+            log.info("🔍 Validações concluídas - Holerite encontrado: {}, Valor coincide: {}, Duplicata: {}", 
+                matchingPayslip != null, valueMatches, isDuplicate);
+
             // Criar novo PDF com os dados extraídos
             String newPdfPath = null;
             try {
-                newPdfPath = extractReceiptPageFromOriginal(originalInputStream, pageNumber, receiptData);
+                // Passar o holerite encontrado para usar sua estrutura de pastas se validações passaram
+                newPdfPath = extractReceiptPageFromOriginal(originalInputStream, pageNumber, receiptData, matchingPayslip);
                 log.info("PDF criado com sucesso: {}", newPdfPath);
                 
                 // Verificar se o arquivo foi realmente criado
@@ -853,11 +983,36 @@ public class ReceiptProcessingService {
 
     /**
      * Extrai uma página específica do PDF original preservando o layout exato
+     * Se um holerite for fornecido e as validações passarem, usa a estrutura de pastas do holerite (Empresa/Setor)
      */
-    private String extractReceiptPageFromOriginal(java.io.InputStream originalInputStream, int pageNumber, ReceiptData data) throws IOException {
-        // Criar diretório por mês com caminho absoluto
-        String monthFolder = String.format("%02d_%04d", data.month, data.year);
-        Path monthPath = Paths.get(UPLOAD_DIR, monthFolder).toAbsolutePath();
+    private String extractReceiptPageFromOriginal(java.io.InputStream originalInputStream, int pageNumber, ReceiptData data, Payslip matchingPayslip) throws IOException {
+        Path monthPath;
+        
+        // Se holerite foi encontrado e validações passaram, usar estrutura de pastas do holerite
+        if (matchingPayslip != null && matchingPayslip.getCompanyName() != null) {
+            // Estrutura: uploads/receipts/{Empresa}/{Setor}/{Ano}/{Mês}
+            String companyFolder = matchingPayslip.getCompanyName().trim()
+                .replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "")
+                .replaceAll("\\s+", "_")
+                .toLowerCase();
+            
+            String sectorFolder = matchingPayslip.getWorkPostName() != null ? 
+                matchingPayslip.getWorkPostName().trim()
+                    .replaceAll("[^a-zA-ZÀ-ÿ0-9\\s]", "")
+                    .replaceAll("\\s+", "_")
+                    .toLowerCase() : "sem_setor";
+            
+            String yearFolder = String.format("%04d", data.year);
+            String monthFolder = String.format("%02d", data.month);
+            
+            monthPath = Paths.get(UPLOAD_DIR, companyFolder, sectorFolder, yearFolder, monthFolder).toAbsolutePath();
+            log.info("📁 Usando estrutura de pastas do holerite: {}/{}/{}/{}", companyFolder, sectorFolder, yearFolder, monthFolder);
+        } else {
+            // Estrutura padrão: uploads/receipts/{Mês}_{Ano}
+            String monthFolder = String.format("%02d_%04d", data.month, data.year);
+            monthPath = Paths.get(UPLOAD_DIR, monthFolder).toAbsolutePath();
+            log.info("📁 Usando estrutura de pastas padrão: {}", monthFolder);
+        }
         
         log.info("Criando diretório: {}", monthPath);
         

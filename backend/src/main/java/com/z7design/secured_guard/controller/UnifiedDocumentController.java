@@ -1667,15 +1667,24 @@ public class UnifiedDocumentController {
      * Organiza documentos unificados por Empresa/Setor/Ano/Mês
      */
     @GetMapping("/organization")
-    public ResponseEntity<com.z7design.secured_guard.dto.PayslipOrganizationResponse> getUnifiedDocumentsOrganization() {
+    public ResponseEntity<?> getUnifiedDocumentsOrganization() {
         try {
             log.info("📋 Organizando documentos unificados por Empresa/Setor/Ano/Mês...");
             com.z7design.secured_guard.dto.PayslipOrganizationResponse response = 
                 unifiedDocumentService.organizeUnifiedDocumentsByCompany();
             return ResponseEntity.ok(response);
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            log.error("💥 Erro ao organizar documentos unificados (entidade não encontrada): {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Erro ao organizar documentos: referência a entidade inexistente");
+            errorResponse.put("message", "Alguns documentos unificados referenciam payslips que não existem mais no banco de dados");
+            return ResponseEntity.status(500).body(errorResponse);
         } catch (Exception e) {
             log.error("💥 Erro ao organizar documentos unificados: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Erro ao organizar documentos unificados");
+            errorResponse.put("message", e.getMessage() != null ? e.getMessage() : "Erro desconhecido");
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 
