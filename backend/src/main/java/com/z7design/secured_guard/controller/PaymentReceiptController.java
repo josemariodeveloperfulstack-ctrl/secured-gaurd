@@ -217,12 +217,35 @@ public class PaymentReceiptController {
     
     // Excluir comprovante individual
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletePaymentReceipt(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> deletePaymentReceipt(@PathVariable String id) {
         try {
-            paymentReceiptService.deleteById(id);
-            return ResponseEntity.noContent().build();
+            log.info("🗑️ Excluindo comprovante individual: {}", id);
+            
+            if (id == null || id.trim().isEmpty()) {
+                log.warn("⚠️ ID nulo ou vazio fornecido");
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "ID não pode ser nulo ou vazio");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            paymentReceiptService.deleteById(id.trim());
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("message", "Comprovante excluído com sucesso");
+            result.put("id", id);
+            
+            log.info("✅ Comprovante excluído com sucesso: {}", id);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            log.error("❌ ID inválido: {}", e.getMessage());
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "ID inválido: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("❌ Erro ao excluir comprovante {}: {}", id, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Erro ao excluir comprovante: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }
     

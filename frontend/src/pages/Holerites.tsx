@@ -2006,11 +2006,12 @@ const Holerites: React.FC = () => {
         title: "Comprovante excluído",
         description: "Comprovante excluído com sucesso.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir comprovante:', error);
+      const errorMessage = error.response?.data?.error || error.message || "Erro ao excluir comprovante. Tente novamente.";
       toast({
         title: "Erro",
-        description: "Erro ao excluir comprovante. Tente novamente.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -2089,9 +2090,30 @@ const Holerites: React.FC = () => {
         status: error.response?.status
       });
       
+      // Se o backend retornou dados mesmo com erro, tentar processar
+      if (error.response?.data && error.response.data.deleted !== undefined) {
+        const result = error.response.data;
+        if (result.deleted > 0) {
+          toast({
+            title: "Exclusão parcial",
+            description: `${result.deleted} comprovante${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''}, mas ${result.failed} falharam.`,
+          });
+          setSelectedPaymentReceipts([]);
+          await loadPaymentReceipts();
+          return;
+        }
+      }
+      
+      const errorMessage = error.response?.data?.error || 
+                          (error.response?.data?.errors && Array.isArray(error.response.data.errors) 
+                            ? error.response.data.errors.join(', ') 
+                            : null) ||
+                          error.message || 
+                          "Erro ao excluir comprovantes. Tente novamente.";
+      
       toast({
         title: "Erro",
-        description: `Erro ao excluir comprovantes: ${error.message}`,
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -3962,18 +3984,19 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       
       const response = await api.delete(`/receipts/${receiptId}`);
       
-      if (response.status === 200) {
+      if (response.status === 200 || response.status === 204) {
         toast({
           title: "Sucesso",
           description: "Recibo excluído com sucesso!",
         });
         await loadReceipts(); // Recarregar lista
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao deletar recibo:', error);
+      const errorMessage = error.response?.data?.error || error.message || "Não foi possível excluir o recibo.";
       toast({
         title: "Erro",
-        description: "Não foi possível excluir o recibo.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

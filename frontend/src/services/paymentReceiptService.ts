@@ -208,10 +208,15 @@ class PaymentReceiptService {
   async deletePaymentReceipt(receiptId: string): Promise<void> {
     try {
       console.log('🗑️ Excluindo comprovante:', receiptId);
-      await api.delete(`/receipts/${receiptId}`);
-      console.log('✅ Comprovante excluído com sucesso');
-    } catch (error) {
+      const response = await api.delete(`/receipts/${receiptId}`);
+      console.log('✅ Comprovante excluído com sucesso', response.status);
+    } catch (error: any) {
       console.error('❌ Erro ao excluir comprovante:', error);
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       throw error;
     }
   }
@@ -220,6 +225,7 @@ class PaymentReceiptService {
   async deleteMultiplePaymentReceipts(receiptIds: string[]): Promise<{ deleted: number; failed: number; errors: string[] }> {
     try {
       console.log('🗑️ Excluindo múltiplos comprovantes:', receiptIds.length);
+      console.log('📋 IDs:', receiptIds);
       
       if (receiptIds.length === 0) {
         return { deleted: 0, failed: 0, errors: [] };
@@ -228,8 +234,24 @@ class PaymentReceiptService {
       const response = await api.post('/receipts/delete-multiple', { ids: receiptIds });
       console.log('✅ Múltiplos comprovantes excluídos:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao excluir múltiplos comprovantes:', error);
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        requestData: { ids: receiptIds }
+      });
+      
+      // Se o backend retornou uma resposta com dados, tentar extrair informações úteis
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.deleted !== undefined && errorData.failed !== undefined) {
+          // O backend retornou um resultado parcial, retornar isso
+          return errorData;
+        }
+      }
+      
       throw error;
     }
   }
