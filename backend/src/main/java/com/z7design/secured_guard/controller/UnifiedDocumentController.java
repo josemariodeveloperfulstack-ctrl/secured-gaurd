@@ -54,6 +54,7 @@ public class UnifiedDocumentController {
     private final PayslipService payslipService;
     private final PaymentReceiptRepository paymentReceiptRepository;
     private final AuthenticatedCpfResolver authenticatedCpfResolver;
+    private final com.z7design.secured_guard.repository.UserRepository userRepository;
 
     private static final Pattern CPF_PATTERN = Pattern.compile("(\\d{11})");
 
@@ -1431,6 +1432,7 @@ public class UnifiedDocumentController {
 
     /**
      * Cria documentos unificados em lote/massa com verificação rigorosa de nomes
+     * AGORA COM PROCESSAMENTO ASSÍNCRONO - retorna imediatamente com jobId
      */
     @PostMapping("/create-batch")
     public ResponseEntity<Map<String, Object>> createBatchUnifiedDocuments(
@@ -1441,39 +1443,93 @@ public class UnifiedDocumentController {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            log.info("🎯 Iniciando unificação em lote: Mês={}, Ano={}, Force={}", month, year, forceUnification);
+            log.info("🎯 Criando job de unificação em lote: Mês={}, Ano={}, Force={}", month, year, forceUnification);
             
-            com.z7design.secured_guard.dto.BatchUnificationRequest request = 
-                com.z7design.secured_guard.dto.BatchUnificationRequest.builder()
-                    .month(month)
-                    .year(year)
-                    .forceUnification(forceUnification)
-                    .build();
+            // Obter usuário autenticado
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            java.util.UUID createdBy = null;
+            if (auth != null && auth.getName() != null) {
+                try {
+                    com.z7design.secured_guard.model.User user = 
+                        userRepository.findByUsername(auth.getName()).orElse(null);
+                    if (user != null) {
+                        createdBy = user.getId();
+                    }
+                } catch (Exception e) {
+                    log.warn("⚠️ Não foi possível obter ID do usuário: {}", e.getMessage());
+                }
+            }
             
-            com.z7design.secured_guard.dto.BatchUnificationResult result = 
-                unifiedDocumentService.createBatchUnifiedDocuments(request);
+            // Criar job (processamento assíncrono será iniciado automaticamente)
+            com.z7design.secured_guard.model.UnificationJob job = 
+                unifiedDocumentService.createUnificationJob(month, year, forceUnification, createdBy);
             
-            response.put("sucesso", result.getTotalSuccess() > 0);
-            response.put("mensagem", String.format(
-                "Processamento concluído: %d sucesso, %d falhas de %d total",
-                result.getTotalSuccess(), 
-                result.getTotalFailed(), 
-                result.getTotalProcessed()
-            ));
-            response.put("totalProcessed", result.getTotalProcessed());
-            response.put("totalSuccess", result.getTotalSuccess());
-            response.put("totalFailed", result.getTotalFailed());
-            response.put("processingTimeMs", result.getProcessingTimeMs());
-            response.put("successList", result.getSuccessList());
-            response.put("failureList", result.getFailureList());
+            // Retornar imediatamente com informações do job
+            response.put("sucesso", true);
+            response.put("mensagem", "Processamento iniciado! Use o jobId para acompanhar o progresso.");
+            response.put("jobId", job.getId());
+            response.put("status", job.getStatus().name());
+            response.put("totalDocuments", job.getTotalDocuments());
+            response.put("createdAt", job.getCreatedAt());
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            log.error("💥 Erro na unificação em lote: {}", e.getMessage(), e);
+            log.error("💥 Erro ao criar job de unificação em lote: {}", e.getMessage(), e);
             response.put("sucesso", false);
-            response.put("mensagem", "Erro na unificação em lote: " + e.getMessage());
+            response.put("mensagem", "Erro ao iniciar processamento: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
             response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Consulta o status de um job de unificação
+     */
+    @GetMapping("/job/{jobId}/status")
+    public ResponseEntity<Map<String, Object>> getJobStatus(@PathVariable java.util.UUID jobId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            com.z7design.secured_guard.model.UnificationJob job = unifiedDocumentService.getJobById(jobId);
+            com.z7design.secured_guard.dto.UnificationJobDTO jobDTO = 
+                com.z7design.secured_guard.dto.UnificationJobDTO.fromEntity(job);
+            
+            response.put("sucesso", true);
+            response.put("job", jobDTO);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao consultar status do job {}: {}", jobId, e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Job não encontrado: " + jobId);
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Cancela um job em processamento
+     */
+    @PostMapping("/job/{jobId}/cancel")
+    public ResponseEntity<Map<String, Object>> cancelJob(@PathVariable java.util.UUID jobId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            unifiedDocumentService.cancelJob(jobId);
+            response.put("sucesso", true);
+            response.put("mensagem", "Job cancelado com sucesso");
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalStateException e) {
+            response.put("sucesso", false);
+            response.put("mensagem", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("💥 Erro ao cancelar job {}: {}", jobId, e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao cancelar job: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
     }

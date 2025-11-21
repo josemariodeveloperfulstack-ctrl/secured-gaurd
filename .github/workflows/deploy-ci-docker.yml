@@ -394,11 +394,43 @@ EOF
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
             # Pull das imagens
-            docker pull z7design/secured-guard-backend:ci
-            docker pull z7design/secured-guard-frontend:ci
-            docker pull z7design/secured-guard-whatsapp:ci
+            docker pull z7design/secured-guard-backend:ci || echo "⚠️ Erro ao fazer pull do backend"
+            docker pull z7design/secured-guard-frontend:ci || echo "⚠️ Erro ao fazer pull do frontend"
+            docker pull z7design/secured-guard-whatsapp:ci || echo "⚠️ Erro ao fazer pull do whatsapp"
             
             echo "✅ Imagens atualizadas!"
+            
+            # Verificar se as imagens foram baixadas
+            echo ""
+            echo "🔍 Verificando imagens baixadas..."
+            docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem z7design/secured-guard encontrada"
+          EOF
+
+      # ============================================
+      # 1️⃣6️⃣.5️⃣ LIMPAR CONTAINERS ÓRFÃOS E CONFLITOS
+      # ============================================
+      - name: 🧹 Clean orphaned containers
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🧹 Limpando containers órfãos e conflitos..."
+            
+            cd /var/www/secured_guard/ci
+            
+            # Parar e remover containers órfãos
+            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            else
+              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            fi
+            
+            # Remover containers órfãos manualmente
+            echo "🧹 Removendo containers órfãos manualmente..."
+            docker ps -a | grep "secured-guard" | grep -v "CONTAINER" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            
+            # Remover containers com nomes conflitantes
+            docker ps -a | grep "c7c91a09d556_secured-guard-whatsapp-ci" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            
+            echo "✅ Limpeza concluída!"
           EOF
 
       # ============================================
@@ -411,14 +443,45 @@ EOF
             
             cd /var/www/secured_guard/ci
             
-            # Iniciar containers
-            docker-compose -f docker-compose.ci.yml up -d
+            # Verificar se está em modo swarm
+            if docker info 2>/dev/null | grep -q "Swarm: active"; then
+              echo "⚠️ Docker está em modo Swarm"
+              echo "🔄 Tentando usar 'docker compose' (v2) ao invés de 'docker-compose'..."
+              
+              # Tentar usar docker compose v2 se disponível
+              if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+                echo "✅ Usando 'docker compose' (v2)..."
+                COMPOSE_HTTP_TIMEOUT=300 docker compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+              else
+                echo "⚠️ Docker Compose v2 não disponível. Tentando com docker-compose v1..."
+                COMPOSE_HTTP_TIMEOUT=300 docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+              fi
+            else
+              echo "✅ Docker não está em modo Swarm"
+              # Usar docker compose v2 se disponível, senão docker-compose v1
+              if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+                echo "✅ Usando 'docker compose' (v2)..."
+                COMPOSE_HTTP_TIMEOUT=300 docker compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+              else
+                echo "✅ Usando 'docker-compose' (v1)..."
+                COMPOSE_HTTP_TIMEOUT=300 docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+              fi
+            fi
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
             
             # Verificar status dos containers
-            docker-compose -f docker-compose.ci.yml ps
+            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+              docker compose -f docker-compose.ci.yml ps
+            else
+              docker-compose -f docker-compose.ci.yml ps
+            fi
+            
+            # Verificar se containers foram criados
+            echo ""
+            echo "🔍 Verificando containers criados..."
+            docker ps -a | grep "secured-guard" || echo "⚠️ Nenhum container secured-guard encontrado"
             
             echo "✅ Containers iniciados!"
           EOF

@@ -19,6 +19,8 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,6 +56,7 @@ public class UnifiedDocumentService {
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final UnifiedDocumentRepository unifiedDocumentRepository;
+    private final com.z7design.secured_guard.repository.UnificationJobRepository unificationJobRepository;
     private static final String UNIFIED_DIR = "uploads/unified/";
 
     /**
@@ -3487,5 +3490,396 @@ public class UnifiedDocumentService {
         }
         
         return cleaned;
+    }
+
+    // ===== PROCESSAMENTO ASSÍNCRONO =====
+
+    /**
+     * Cria um job de unificação em lote e retorna imediatamente
+     */
+    @Transactional
+    public com.z7design.secured_guard.model.UnificationJob createUnificationJob(
+            Integer month, Integer year, Boolean forceUnification, UUID createdBy) {
+        
+        log.info("📋 Criando job de unificação em lote: Mês={}, Ano={}, Force={}", month, year, forceUnification);
+        
+        // Contar quantos documentos serão processados
+        List<Payslip> allPayslips = payslipService.getAllPayslips();
+        List<Payslip> filteredPayslips = allPayslips.stream()
+            .filter(p -> month == null || p.getMonth().equals(month))
+            .filter(p -> year == null || p.getYear().equals(year))
+            .filter(p -> p.getEmployeeName() != null && p.getMonth() != null && p.getYear() != null)
+            .toList();
+        
+        Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
+            .collect(Collectors.toMap(
+                p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
+                p -> p,
+                (existing, replacement) -> existing
+            ));
+        
+        int totalDocuments = uniquePayslips.size();
+        
+        // Criar job
+        com.z7design.secured_guard.model.UnificationJob job = com.z7design.secured_guard.model.UnificationJob.builder()
+            .status(com.z7design.secured_guard.model.UnificationJob.JobStatus.PENDING)
+            .month(month)
+            .year(year)
+            .forceUnification(forceUnification != null ? forceUnification : false)
+            .totalDocuments(totalDocuments)
+            .processedDocuments(0)
+            .successCount(0)
+            .failureCount(0)
+            .createdBy(createdBy)
+            .build();
+        
+        job = unificationJobRepository.save(job);
+        log.info("✅ Job criado: ID={}, Total de documentos: {}", job.getId(), totalDocuments);
+        
+        // Iniciar processamento assíncrono
+        processUnificationJobAsync(job.getId());
+        
+        return job;
+    }
+
+    /**
+     * Processa um job de unificação em lote de forma assíncrona
+     */
+    @Async
+    @Transactional
+    public void processUnificationJobAsync(UUID jobId) {
+        log.info("🚀 Iniciando processamento assíncrono do job: {}", jobId);
+        
+        com.z7design.secured_guard.model.UnificationJob job = unificationJobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
+        
+        try {
+            // Atualizar status para PROCESSING
+            job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.PROCESSING);
+            job.setStartedAt(LocalDateTime.now());
+            unificationJobRepository.save(job);
+            
+            long startTime = System.currentTimeMillis();
+            
+            // Criar request
+            com.z7design.secured_guard.dto.BatchUnificationRequest request = 
+                com.z7design.secured_guard.dto.BatchUnificationRequest.builder()
+                    .month(job.getMonth())
+                    .year(job.getYear())
+                    .forceUnification(job.getForceUnification())
+                    .build();
+            
+            // Buscar todos os holerites
+            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            List<Payslip> filteredPayslips = allPayslips.stream()
+                .filter(p -> request.getMonth() == null || p.getMonth().equals(request.getMonth()))
+                .filter(p -> request.getYear() == null || p.getYear().equals(request.getYear()))
+                .filter(p -> p.getEmployeeName() != null && p.getMonth() != null && p.getYear() != null)
+                .toList();
+            
+            Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
+                .collect(Collectors.toMap(
+                    p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
+                    p -> p,
+                    (existing, replacement) -> existing
+                ));
+            
+            int totalDocuments = uniquePayslips.size();
+            job.setTotalDocuments(totalDocuments);
+            unificationJobRepository.save(job);
+            
+            log.info("📊 Processando {} documentos únicos", totalDocuments);
+            
+            // Processar cada documento
+            int processed = 0;
+            int success = 0;
+            int failure = 0;
+            
+            for (Payslip payslip : uniquePayslips.values()) {
+                // Verificar se o job foi cancelado
+                job = unificationJobRepository.findById(jobId).orElse(null);
+                if (job == null || job.getStatus() == com.z7design.secured_guard.model.UnificationJob.JobStatus.CANCELLED) {
+                    log.warn("⚠️ Job {} foi cancelado. Parando processamento.", jobId);
+                    break;
+                }
+                
+                String employeeName = payslip.getEmployeeName();
+                Integer month = payslip.getMonth();
+                Integer year = payslip.getYear();
+                
+                try {
+                    // Usar a mesma lógica do método síncrono, mas atualizando o job
+                    boolean successResult = processSingleDocumentForJob(jobId, employeeName, month, year, request.getForceUnification());
+                    
+                    if (successResult) {
+                        success++;
+                    } else {
+                        failure++;
+                    }
+                } catch (Exception e) {
+                    log.error("💥 Erro ao processar documento {} - {}/{}: {}", employeeName, month, year, e.getMessage());
+                    failure++;
+                }
+                
+                processed++;
+                
+                // Atualizar progresso a cada 10 documentos ou no último
+                if (processed % 10 == 0 || processed == totalDocuments) {
+                    job = unificationJobRepository.findById(jobId).orElse(null);
+                    if (job != null) {
+                        job.setProcessedDocuments(processed);
+                        job.setSuccessCount(success);
+                        job.setFailureCount(failure);
+                        unificationJobRepository.save(job);
+                        log.info("📊 Progresso: {}/{} processados ({} sucesso, {} falhas)", 
+                            processed, totalDocuments, success, failure);
+                    }
+                }
+            }
+            
+            // Finalizar job
+            long endTime = System.currentTimeMillis();
+            job = unificationJobRepository.findById(jobId).orElse(null);
+            if (job != null) {
+                job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.COMPLETED);
+                job.setProcessedDocuments(processed);
+                job.setSuccessCount(success);
+                job.setFailureCount(failure);
+                job.setProcessingTimeMs(endTime - startTime);
+                job.setCompletedAt(LocalDateTime.now());
+                unificationJobRepository.save(job);
+                
+                log.info("✅ Job {} concluído: {} processados, {} sucesso, {} falhas, tempo: {} ms", 
+                    jobId, processed, success, failure, endTime - startTime);
+            }
+            
+        } catch (Exception e) {
+            log.error("💥 Erro crítico ao processar job {}: {}", jobId, e.getMessage(), e);
+            job = unificationJobRepository.findById(jobId).orElse(null);
+            if (job != null) {
+                job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.FAILED);
+                job.setErrorMessage("Erro crítico: " + e.getMessage());
+                job.setCompletedAt(LocalDateTime.now());
+                unificationJobRepository.save(job);
+            }
+        }
+    }
+
+    /**
+     * Processa um único documento para um job (extraído da lógica do método síncrono)
+     */
+    private boolean processSingleDocumentForJob(UUID jobId, String employeeName, Integer month, Integer year, Boolean forceUnification) {
+        try {
+            // Buscar holerite
+            final String cleanEmployeeName = cleanText(employeeName);
+            String normalizedSearchNameHolerite = normalizeNameForSearch(cleanEmployeeName);
+            
+            List<Payslip> payslipsInDb = payslipService.getAllPayslips().stream()
+                .filter(p -> p.getMonth() != null && p.getMonth().equals(month))
+                .filter(p -> p.getYear() != null && p.getYear().equals(year))
+                .collect(java.util.stream.Collectors.toList());
+            
+            Payslip matchingPayslip = null;
+            for (Payslip p : payslipsInDb) {
+                if (p.getEmployeeName() != null) {
+                    String normalizedPayslipName = normalizeNameForSearch(p.getEmployeeName());
+                    boolean exactMatch = normalizedPayslipName.equals(normalizedSearchNameHolerite);
+                    boolean containsMatch = normalizedPayslipName.contains(normalizedSearchNameHolerite) || 
+                                           normalizedSearchNameHolerite.contains(normalizedPayslipName);
+                    boolean verifyMatch = verifyEmployeeNames(cleanEmployeeName, p.getEmployeeName());
+                    
+                    if (exactMatch || containsMatch || verifyMatch) {
+                        matchingPayslip = p;
+                        break;
+                    }
+                }
+            }
+            
+            String holeritePath = null;
+            if (matchingPayslip != null && matchingPayslip.getArquivoCaminho() != null) {
+                holeritePath = matchingPayslip.getArquivoCaminho();
+                Path absolutePath = Paths.get(holeritePath);
+                if (!Files.exists(absolutePath)) {
+                    Path relativePath = Paths.get(System.getProperty("user.dir"), holeritePath);
+                    if (Files.exists(relativePath)) {
+                        holeritePath = relativePath.toAbsolutePath().toString();
+                    } else {
+                        holeritePath = null;
+                    }
+                }
+            }
+            
+            if (holeritePath == null || !Files.exists(Paths.get(holeritePath))) {
+                holeritePath = findHoleriteOriginalFileByNameAndPeriod(cleanEmployeeName, month, year);
+            }
+            
+            if (holeritePath == null || !Files.exists(Paths.get(holeritePath))) {
+                log.warn("❌ Holerite não encontrado para {} - {}/{}", employeeName, month, year);
+                return false;
+            }
+            
+            // Buscar comprovantes
+            String normalizedName = normalizeNameForSearch(employeeName);
+            int receiptMonthNext = month == 12 ? 1 : month + 1;
+            int receiptYearNext = month == 12 ? year + 1 : year;
+            
+            List<PaymentReceipt> receiptsInPeriod = new ArrayList<>();
+            List<PaymentReceipt> receiptsNextMonth = receiptRepository.findByYearAndMonth(receiptYearNext, receiptMonthNext);
+            receiptsInPeriod.addAll(receiptsNextMonth);
+            
+            List<PaymentReceipt> receiptsSameMonth = receiptRepository.findByYearAndMonth(year, month);
+            for (PaymentReceipt receipt : receiptsSameMonth) {
+                if (!receiptsInPeriod.contains(receipt)) {
+                    receiptsInPeriod.add(receipt);
+                }
+            }
+            
+            List<PaymentReceipt> matchedByName = receiptsInPeriod.stream()
+                .filter(receipt -> {
+                    if (receipt.getEmployeeName() == null) return false;
+                    boolean exactMatch = verifyEmployeeNames(employeeName, receipt.getEmployeeName());
+                    boolean flexibleMatch = isFlexibleNameMatch(employeeName, receipt.getEmployeeName());
+                    boolean normalizedMatch = normalizeNameForSearch(receipt.getEmployeeName())
+                        .contains(normalizedName) || normalizedName.contains(normalizeNameForSearch(receipt.getEmployeeName()));
+                    return exactMatch || flexibleMatch || normalizedMatch;
+                })
+                .collect(Collectors.toList());
+            
+            if (matchedByName.isEmpty()) {
+                List<PaymentReceipt> receiptsByName = receiptRepository
+                    .findByEmployeeNameContainingIgnoreCase(employeeName);
+                
+                String[] nameParts = employeeName.trim().toUpperCase().split("\\s+");
+                if (nameParts.length >= 2) {
+                    String firstName = nameParts[0];
+                    String lastName = nameParts[nameParts.length - 1];
+                    List<PaymentReceipt> receiptsByFirst = receiptRepository
+                        .findByEmployeeNameContainingIgnoreCase(firstName);
+                    for (PaymentReceipt receipt : receiptsByFirst) {
+                        if (receipt.getEmployeeName() != null && 
+                            receipt.getEmployeeName().toUpperCase().contains(lastName)) {
+                            if (!receiptsByName.contains(receipt)) {
+                                receiptsByName.add(receipt);
+                            }
+                        }
+                    }
+                }
+                
+                matchedByName = receiptsByName.stream()
+                    .filter(receipt -> {
+                        if (receipt.getEmployeeName() == null) return false;
+                        boolean exactMatch = verifyEmployeeNames(employeeName, receipt.getEmployeeName());
+                        boolean flexibleMatch = isFlexibleNameMatch(employeeName, receipt.getEmployeeName());
+                        boolean normalizedMatch = normalizeNameForSearch(receipt.getEmployeeName())
+                            .contains(normalizedName) || normalizedName.contains(normalizeNameForSearch(receipt.getEmployeeName()));
+                        return exactMatch || flexibleMatch || normalizedMatch;
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            List<PaymentReceipt> uniqueReceipts = deduplicateReceiptsByDateCompanyAndEmployee(matchedByName);
+            
+            if (uniqueReceipts.isEmpty()) {
+                log.warn("❌ Comprovante não encontrado para {} - {}/{}", employeeName, month, year);
+                return false;
+            }
+            
+            boolean allNamesMatch = uniqueReceipts.stream()
+                .allMatch(receipt -> verifyEmployeeNames(employeeName, receipt.getEmployeeName()));
+            
+            if (!allNamesMatch && (forceUnification == null || !forceUnification)) {
+                log.warn("❌ Nomes não coincidem para {} - {}/{}", employeeName, month, year);
+                return false;
+            }
+            
+            // Buscar arquivos PDF dos comprovantes
+            List<String> receiptPaths = new ArrayList<>();
+            for (PaymentReceipt receipt : uniqueReceipts) {
+                String receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                    receipt.getEmployeeName(), 
+                    receipt.getMonth(),
+                    receipt.getYear(),
+                    new java.util.ArrayList<>()
+                );
+                
+                if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
+                    int nextMonth = receipt.getMonth() == 12 ? 1 : receipt.getMonth() + 1;
+                    int nextYear = receipt.getMonth() == 12 ? receipt.getYear() + 1 : receipt.getYear();
+                    receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                        receipt.getEmployeeName(),
+                        nextMonth,
+                        nextYear,
+                        new java.util.ArrayList<>()
+                    );
+                }
+                
+                if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
+                    int prevMonth = receipt.getMonth() == 1 ? 12 : receipt.getMonth() - 1;
+                    int prevYear = receipt.getMonth() == 1 ? receipt.getYear() - 1 : receipt.getYear();
+                    receiptPath = findReceiptOriginalFileByNameAndPeriod(
+                        receipt.getEmployeeName(),
+                        prevMonth,
+                        prevYear,
+                        new java.util.ArrayList<>()
+                    );
+                }
+                
+                if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
+                    receiptPath = findReceiptOriginalFileByNameOnly(receipt.getEmployeeName(), new java.util.ArrayList<>());
+                }
+                
+                if (receiptPath != null && Files.exists(Paths.get(receiptPath))) {
+                    receiptPaths.add(receiptPath);
+                }
+            }
+            
+            if (receiptPaths.isEmpty()) {
+                log.warn("❌ PDFs dos comprovantes não encontrados para {} - {}/{}", employeeName, month, year);
+                return false;
+            }
+            
+            // Criar documento unificado
+            String unifiedPath = createUnifiedPdfUsingMerger(
+                holeritePath, 
+                receiptPaths, 
+                employeeName, 
+                month, 
+                year
+            );
+            
+            log.info("✅ Documento unificado criado: {}", unifiedPath);
+            return true;
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao processar documento {} - {}/{}: {}", employeeName, month, year, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Busca um job por ID
+     */
+    @Transactional(readOnly = true)
+    public com.z7design.secured_guard.model.UnificationJob getJobById(UUID jobId) {
+        return unificationJobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
+    }
+
+    /**
+     * Cancela um job em processamento
+     */
+    @Transactional
+    public void cancelJob(UUID jobId) {
+        com.z7design.secured_guard.model.UnificationJob job = unificationJobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
+        
+        if (job.getStatus() == com.z7design.secured_guard.model.UnificationJob.JobStatus.PROCESSING) {
+            job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.CANCELLED);
+            job.setCompletedAt(LocalDateTime.now());
+            unificationJobRepository.save(job);
+            log.info("✅ Job {} cancelado", jobId);
+        } else {
+            throw new IllegalStateException("Job não pode ser cancelado. Status atual: " + job.getStatus());
+        }
     }
 } 

@@ -373,6 +373,10 @@ const Holerites: React.FC = () => {
   const [processingBatchUnification, setProcessingBatchUnification] = useState(false);
   const [batchUnificationResult, setBatchUnificationResult] = useState<any>(null);
   const [showBatchResultModal, setShowBatchResultModal] = useState(false);
+  // Estados para processamento assíncrono
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<any>(null);
+  const [jobProgressInterval, setJobProgressInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Estados para navegação de holerites por ano/mês
   const [holeriteActiveYear, setHoleriteActiveYear] = useState<string>('2025');
@@ -761,7 +765,7 @@ const Holerites: React.FC = () => {
       
       const response = await api.post('/api/unified-documents/create-batch', null, { 
         params,
-        timeout: 120000 // 2 minutos de timeout para processamento em lote
+        timeout: 600000 // 10 minutos de timeout para processamento em lote (pode processar muitos documentos)
       });
       
       console.log('✅ Resposta do servidor:', response.data);
@@ -7044,11 +7048,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               <Button variant="outline" onClick={() => setShowBatchUnificationModal(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleBatchUnification} disabled={processingBatchUnification}>
-                {processingBatchUnification ? (
+              <Button onClick={handleBatchUnification} disabled={processingBatchUnification || currentJobId !== null}>
+                {processingBatchUnification || currentJobId ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processando...
+                    {currentJobId ? 'Processando...' : 'Iniciando...'}
                   </>
                 ) : (
                   'Iniciar Unificação'
@@ -7057,6 +7061,56 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Progresso da Unificação em Lote (Assíncrono) */}
+        {currentJobId && jobStatus && !jobStatus.isFinished && (
+          <Dialog open={true} onOpenChange={() => {}}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Processando Unificação em Lote</DialogTitle>
+                <DialogDescription>
+                  Acompanhe o progresso em tempo real
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Progresso:</span>
+                    <span className="font-semibold">
+                      {jobStatus.processedDocuments || 0} / {jobStatus.totalDocuments || 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${jobStatus.progressPercentage || 0}%` 
+                      }}
+                    />
+                  </div>
+                  <div className="text-center text-sm text-gray-600">
+                    {jobStatus.progressPercentage || 0}% concluído
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="text-center p-2 bg-green-50 rounded">
+                    <div className="font-bold text-green-600">{jobStatus.successCount || 0}</div>
+                    <div className="text-green-800">Sucessos</div>
+                  </div>
+                  <div className="text-center p-2 bg-red-50 rounded">
+                    <div className="font-bold text-red-600">{jobStatus.failureCount || 0}</div>
+                    <div className="text-red-800">Falhas</div>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-500 text-center">
+                  Status: {jobStatus.status === 'PROCESSING' ? '🔄 Processando...' : jobStatus.status}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Modal de Resultado da Unificação em Lote */}
         <Dialog open={showBatchResultModal} onOpenChange={setShowBatchResultModal}>
