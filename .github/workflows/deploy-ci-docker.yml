@@ -1174,8 +1174,17 @@ EOF
             docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo "Container nginx não encontrado"
             
             echo ""
+            echo "📋 Logs do frontend (últimas 30 linhas):"
+            docker logs --tail 30 secured-guard-frontend-ci 2>&1 || echo "Container frontend não encontrado"
+            
+            echo ""
             echo "🌐 Testando conectividade interna:"
-            curl -s -o /dev/null -w "Backend (localhost:8081): %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
+            echo "Backend (localhost:8081):"
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
+            echo "Frontend (localhost:3000):"
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3000 || echo "Frontend não responde"
+            echo "Nginx (localhost:8082):"
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8082 || echo "Nginx não responde"
           EOF
           
           exit 1
