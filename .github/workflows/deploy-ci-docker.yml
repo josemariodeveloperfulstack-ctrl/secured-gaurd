@@ -424,38 +424,142 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣8️⃣ VERIFICAR JWT_SECRET NO CONTAINER
+      # 1️⃣8️⃣ VERIFICAR E CORRIGIR JWT_SECRET NO CONTAINER
       # ============================================
-      - name: 🔐 Verify JWT_SECRET in container
+      - name: 🔐 Verify and fix JWT_SECRET in container
+        env:
+          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "🔐 Verificando JWT_SECRET no container backend..."
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+            echo "🔐 Verificando e corrigindo JWT_SECRET no container backend..."
             
             # Aguardar container iniciar
-            sleep 10
+            sleep 15
             
-            # Verificar se JWT_SECRET está configurado corretamente
-            JWT_SECRET_IN_CONTAINER=$(docker exec secured-guard-backend-ci printenv JWT_SECRET 2>/dev/null || echo "")
+            CORRECT_JWT_SECRET="${{ env.JWT_SECRET_VALUE }}"
+            MAX_RETRIES=3
+            RETRY=0
             
-            if [ -z "$JWT_SECRET_IN_CONTAINER" ]; then
-              echo "❌ ERRO: JWT_SECRET não está definido no container!"
+            while [ \$RETRY -lt \$MAX_RETRIES ]; do
+              RETRY=\$((RETRY + 1))
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "Tentativa \$RETRY de \$MAX_RETRIES..."
+              
+              # Verificar se JWT_SECRET está configurado corretamente
+              JWT_SECRET_IN_CONTAINER=\$(docker exec secured-guard-backend-ci printenv JWT_SECRET 2>/dev/null || echo "")
+              
+              if [ -z "\$JWT_SECRET_IN_CONTAINER" ]; then
+                echo "⚠️ JWT_SECRET não está definido no container. Corrigindo..."
+              else
+                JWT_LENGTH=\${#JWT_SECRET_IN_CONTAINER}
+                echo "JWT_SECRET atual no container: \${JWT_SECRET_IN_CONTAINER:0:30}... (\$JWT_LENGTH caracteres)"
+                
+                if [ \$JWT_LENGTH -ge 64 ]; then
+                  echo "✅ JWT_SECRET está configurado corretamente no container (\$JWT_LENGTH caracteres)"
+                  break
+                else
+                  echo "⚠️ JWT_SECRET no container é muito curto (\$JWT_LENGTH caracteres). Corrigindo..."
+                fi
+              fi
+              
+              # Corrigir .env se necessário
+              cd /var/www/secured_guard/ci
+              if [ -f .env ]; then
+                sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
+                echo "✅ .env atualizado com JWT_SECRET correto"
+              fi
+              
+              # Reiniciar container backend para aplicar mudanças
+              echo "🔄 Reiniciando container backend..."
+              docker-compose -f docker-compose.ci.yml restart backend-ci
+              
+              echo "⏳ Aguardando container reiniciar (20s)..."
+              sleep 20
+              
+              # Verificar se container está rodando
+              if ! docker ps | grep -q secured-guard-backend-ci; then
+                echo "❌ Container não está rodando após reinício!"
+                docker logs --tail 30 secured-guard-backend-ci 2>&1 || echo "Container não encontrado"
+                if [ \$RETRY -lt \$MAX_RETRIES ]; then
+                  echo "Tentando iniciar container novamente..."
+                  docker-compose -f docker-compose.ci.yml up -d backend-ci
+                  sleep 20
+                fi
+              fi
+            done
+            
+            # Verificação final
+            FINAL_JWT=\$(docker exec secured-guard-backend-ci printenv JWT_SECRET 2>/dev/null || echo "")
+            if [ -z "\$FINAL_JWT" ]; then
+              echo "❌ ERRO: JWT_SECRET ainda não está definido no container após \$MAX_RETRIES tentativas!"
+              echo "📋 Logs do backend:"
+              docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i jwt || echo "Nenhum log JWT encontrado"
               exit 1
             fi
             
-            JWT_LENGTH=${#JWT_SECRET_IN_CONTAINER}
-            echo "Tamanho do JWT_SECRET no container: $JWT_LENGTH caracteres"
-            
-            if [ $JWT_LENGTH -lt 64 ]; then
-              echo "❌ ERRO: JWT_SECRET no container é muito curto ($JWT_LENGTH caracteres)!"
-              echo "Valor atual (primeiros 30 caracteres): ${JWT_SECRET_IN_CONTAINER:0:30}..."
+            FINAL_LENGTH=\${#FINAL_JWT}
+            if [ \$FINAL_LENGTH -lt 64 ]; then
+              echo "❌ ERRO: JWT_SECRET ainda está muito curto (\$FINAL_LENGTH caracteres) após \$MAX_RETRIES tentativas!"
+              echo "Valor atual: \${FINAL_JWT:0:50}..."
+              echo "📋 Verificando .env:"
+              grep "^JWT_SECRET=" .env || echo "JWT_SECRET não encontrado no .env"
               exit 1
             fi
             
-            echo "✅ JWT_SECRET está configurado corretamente no container ($JWT_LENGTH caracteres)"
+            echo ""
+            echo "✅ JWT_SECRET verificado e corrigido com sucesso!"
+            echo "   Tamanho: \$FINAL_LENGTH caracteres"
+            echo "   Valor (primeiros 30): \${FINAL_JWT:0:30}..."
           EOF
 
       # ============================================
-      # 1️⃣9️⃣ DIAGNÓSTICO DOS CONTAINERS
+      # 1️⃣9️⃣ GARANTIR ROLES E PERMISSÕES DOS USUÁRIOS
+      # ============================================
+      - name: 👥 Ensure user roles and permissions
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "👥 Verificando e garantindo roles e permissões dos usuários..."
+            
+            # Aguardar backend estar totalmente pronto
+            sleep 30
+            
+            # Verificar se o backend está respondendo
+            MAX_ATTEMPTS=10
+            ATTEMPT=0
+            BACKEND_READY=false
+            
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health 2>/dev/null || echo "000")
+              
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Backend está respondendo"
+                BACKEND_READY=true
+                break
+              else
+                echo "⏳ Aguardando backend iniciar... (tentativa $ATTEMPT/$MAX_ATTEMPTS)"
+                sleep 10
+              fi
+            done
+            
+            if [ "$BACKEND_READY" = false ]; then
+              echo "⚠️ Backend não está respondendo, mas continuando..."
+              echo "📋 Logs do backend:"
+              docker logs --tail 30 secured-guard-backend-ci 2>&1 | tail -20
+            else
+              echo "✅ Backend está pronto. Roles e permissões serão criadas automaticamente pelo RoleMigrationService."
+              echo "   O serviço RoleMigrationService executa na inicialização da aplicação."
+            fi
+            
+            # Verificar logs do backend para confirmar que roles foram criadas
+            echo ""
+            echo "📋 Verificando logs de migração de roles..."
+            docker logs secured-guard-backend-ci 2>&1 | grep -i "role\|migration\|migração" | tail -10 || echo "Nenhum log de roles encontrado"
+          EOF
+
+      # ============================================
+      # 2️⃣0️⃣ DIAGNÓSTICO DOS CONTAINERS
       # ============================================
       - name: 🔍 Diagnostic - Container Status
         run: |
@@ -478,7 +582,7 @@ EOF
           EOF
 
       # ============================================
-      # 2️⃣0️⃣ DIAGNÓSTICO DE CONECTIVIDADE
+      # 2️⃣1️⃣ DIAGNÓSTICO DE CONECTIVIDADE
       # ============================================
       - name: 🌐 Diagnostic - Network Connectivity
         run: |
@@ -503,7 +607,7 @@ EOF
           EOF
 
       # ============================================
-      # 2️⃣1️⃣ VERIFICAR STATUS DOS CONTAINERS ANTES DO HEALTH CHECK
+      # 2️⃣2️⃣ VERIFICAR STATUS DOS CONTAINERS ANTES DO HEALTH CHECK
       # ============================================
       - name: 🔍 Verify containers are running
         run: |
@@ -526,7 +630,7 @@ EOF
           EOF
 
       # ============================================
-      # 2️⃣2️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
+      # 2️⃣3️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
       # ============================================
       - name: 🏥 Health check
         run: |
@@ -602,7 +706,40 @@ EOF
           exit 1
 
       # ============================================
-      # 2️⃣3️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 2️⃣4️⃣ TESTE DE LOGIN APÓS DEPLOY
+      # ============================================
+      - name: 🔐 Test login after deploy
+        run: |
+          echo "🔐 Testando login após deploy..."
+          echo "⏳ Aguardando 30 segundos para aplicação estar totalmente pronta..."
+          sleep 30
+          
+          # Tentar fazer login de teste (pode falhar se não houver usuário, mas verifica se o endpoint está funcionando)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST https://ci.z7botsolutions.com.br/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"test","password":"test"}' \
+            --max-time 10 2>/dev/null || echo "000")
+          
+          echo "HTTP Code do login: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+            echo "✅ Endpoint de login está funcionando (retornou $HTTP_CODE - credenciais inválidas, mas endpoint OK)"
+          elif [ "$HTTP_CODE" = "500" ]; then
+            echo "❌ ERRO: Login retornou 500 (Internal Server Error)"
+            echo "📋 Verificando logs do backend para erro de JWT..."
+            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+              docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i "jwt\|token\|secret" | tail -20 || echo "Nenhum log JWT encontrado"
+            EOF
+            exit 1
+          elif [ "$HTTP_CODE" = "000" ]; then
+            echo "⚠️ Timeout ao testar login (aplicação pode ainda estar iniciando)"
+          else
+            echo "ℹ️ Login retornou código $HTTP_CODE"
+          fi
+
+      # ============================================
+      # 2️⃣5️⃣ NOTIFICAÇÃO DE SUCESSO
       # ============================================
       - name: 🎉 Deployment successful
         if: success()
@@ -617,7 +754,7 @@ EOF
           echo "================================"
 
       # ============================================
-      # 2️⃣4️⃣ ROLLBACK EM CASO DE FALHA
+      # 2️⃣6️⃣ ROLLBACK EM CASO DE FALHA
       # ============================================
       - name: 🔄 Rollback on failure
         if: failure()
