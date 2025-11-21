@@ -1525,22 +1525,73 @@ public class UnifiedDocumentController {
             
             return ResponseEntity.ok(response);
             
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("💥 Erro ao criar job de unificação em lote: {}", e.getMessage(), e);
             response.put("sucesso", false);
             
             // Verificar se é erro de tabela não existente
             String errorMessage = e.getMessage() != null ? e.getMessage() : "Erro desconhecido";
-            if (errorMessage.contains("unification_jobs") && errorMessage.contains("não existe")) {
+            String causeMessage = e.getCause() != null && e.getCause().getMessage() != null ? 
+                e.getCause().getMessage() : "";
+            
+            if (errorMessage.contains("unification_jobs") || 
+                errorMessage.contains("não existe") ||
+                errorMessage.contains("does not exist") ||
+                causeMessage.contains("unification_jobs") ||
+                causeMessage.contains("não existe") ||
+                causeMessage.contains("does not exist")) {
                 response.put("mensagem", "ERRO: A tabela 'unification_jobs' não existe no banco de dados. " +
                     "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
                     "Reinicie a aplicação para que o Flyway execute as migrations pendentes.");
                 response.put("tipoErro", "MIGRATION_PENDENTE");
+                response.put("detalhes", errorMessage);
             } else {
                 response.put("mensagem", "Erro ao iniciar processamento: " + errorMessage);
+                response.put("detalhes", errorMessage);
+                if (causeMessage != null && !causeMessage.isEmpty()) {
+                    response.put("causa", causeMessage);
+                }
             }
             
             response.put("erro", e.getClass().getSimpleName());
+            if (e.getCause() != null) {
+                response.put("causaTipo", e.getCause().getClass().getSimpleName());
+            }
+            return ResponseEntity.internalServerError().body(response);
+        } catch (Exception e) {
+            log.error("💥 Erro inesperado ao criar job de unificação em lote: {}", e.getMessage(), e);
+            response.put("sucesso", false);
+            
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Erro desconhecido";
+            String causeMessage = "";
+            if (e.getCause() != null && e.getCause().getMessage() != null) {
+                causeMessage = e.getCause().getMessage();
+            }
+            
+            response.put("mensagem", "Erro inesperado ao iniciar processamento: " + errorMessage);
+            response.put("erro", e.getClass().getSimpleName());
+            response.put("detalhes", errorMessage);
+            
+            if (!causeMessage.isEmpty()) {
+                response.put("causa", causeMessage);
+                if (e.getCause() != null) {
+                    response.put("causaTipo", e.getCause().getClass().getSimpleName());
+                }
+            }
+            
+            // Verificar se é erro de tabela não existente mesmo em Exception genérica
+            if (errorMessage.contains("unification_jobs") || 
+                errorMessage.contains("não existe") ||
+                errorMessage.contains("does not exist") ||
+                causeMessage.contains("unification_jobs") ||
+                causeMessage.contains("não existe") ||
+                causeMessage.contains("does not exist")) {
+                response.put("tipoErro", "MIGRATION_PENDENTE");
+                response.put("mensagem", "ERRO: A tabela 'unification_jobs' não existe no banco de dados. " +
+                    "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
+                    "Reinicie a aplicação para que o Flyway execute as migrations pendentes.");
+            }
+            
             return ResponseEntity.internalServerError().body(response);
         }
     }

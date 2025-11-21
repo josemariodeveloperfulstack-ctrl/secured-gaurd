@@ -3527,6 +3527,7 @@ public class UnifiedDocumentService {
                 .toList();
             
             Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
+                .filter(p -> p.getEmployeeName() != null && !p.getEmployeeName().trim().isEmpty())
                 .collect(Collectors.toMap(
                     p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
                     p -> p,
@@ -3551,8 +3552,15 @@ public class UnifiedDocumentService {
             job = unificationJobRepository.save(job);
             log.info("✅ Job criado: ID={}, Total de documentos: {}", job.getId(), totalDocuments);
             
-            // Iniciar processamento assíncrono
-            processUnificationJobAsync(job.getId());
+            // Iniciar processamento assíncrono (não bloquear se houver erro)
+            try {
+                processUnificationJobAsync(job.getId());
+                log.info("✅ Processamento assíncrono iniciado para job: {}", job.getId());
+            } catch (Exception e) {
+                log.error("⚠️ Erro ao iniciar processamento assíncrono (job continuará em PENDING): {}", e.getMessage(), e);
+                // Não propagar o erro - o job foi criado e pode ser processado manualmente depois
+                // O erro será registrado mas não impedirá a criação do job
+            }
             
             return job;
             
@@ -3625,6 +3633,7 @@ public class UnifiedDocumentService {
                 .toList();
             
             Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
+                .filter(p -> p.getEmployeeName() != null && !p.getEmployeeName().trim().isEmpty())
                 .collect(Collectors.toMap(
                     p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
                     p -> p,
