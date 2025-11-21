@@ -775,8 +775,18 @@ const Holerites: React.FC = () => {
       
       console.log('✅ Resposta do servidor:', response.data);
       
-      if (response.data.sucesso || response.data.totalSuccess > 0) {
-        setBatchUnificationResult(response.data);
+      // Normalizar resposta para garantir que successList e failureList sejam arrays
+      const normalizedResult = {
+        ...response.data,
+        successList: Array.isArray(response.data.successList) ? response.data.successList : [],
+        failureList: Array.isArray(response.data.failureList) ? response.data.failureList : [],
+        totalProcessed: response.data.totalProcessed || 0,
+        totalSuccess: response.data.totalSuccess || 0,
+        totalFailed: response.data.totalFailed || 0
+      };
+      
+      if (response.data.sucesso || response.data.totalSuccess > 0 || response.data.jobId) {
+        setBatchUnificationResult(normalizedResult);
         setShowBatchUnificationModal(false);
         setShowBatchResultModal(true);
         
@@ -821,7 +831,11 @@ const Holerites: React.FC = () => {
         message: error.message,
         code: error.code,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
+        erro: error.response?.data?.erro,
+        tipoErro: error.response?.data?.tipoErro,
+        causa: error.response?.data?.causa,
+        causaTipo: error.response?.data?.causaTipo
       });
       
       // Tratamento mais específico de erros
@@ -829,10 +843,21 @@ const Holerites: React.FC = () => {
       
       if (error.code === 'ECONNABORTED') {
         errorMessage = "Timeout: O processamento demorou muito. Tente com um período menor.";
+      } else if (error.code === 'ERR_CONNECTION_RESET' || error.message?.includes('ERR_CONNECTION_RESET')) {
+        errorMessage = "Conexão resetada pelo servidor. O servidor pode ter encontrado um erro. Verifique os logs do backend ou tente novamente.";
+      } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        errorMessage = "Erro de rede. Verifique sua conexão e tente novamente.";
       } else if (error.response?.data?.mensagem) {
         errorMessage = error.response.data.mensagem;
+      } else if (error.response?.data?.detalhes) {
+        errorMessage = error.response.data.detalhes;
       } else if (error.message) {
         errorMessage = error.message;
+      }
+      
+      // Se for erro de migration pendente, mostrar mensagem específica
+      if (error.response?.data?.tipoErro === 'MIGRATION_PENDENTE') {
+        errorMessage = "ERRO: A tabela 'unification_jobs' não existe no banco de dados. Por favor, execute a migration V338 ou reinicie a aplicação para que o Flyway execute as migrations pendentes.";
       }
       
       toast({
@@ -7120,20 +7145,20 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{batchUnificationResult.totalProcessed}</div>
+                    <div className="text-2xl font-bold text-blue-600">{batchUnificationResult.totalProcessed || 0}</div>
                     <div className="text-sm text-blue-800">Total Processado</div>
                                  </div>
                   <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{batchUnificationResult.totalSuccess}</div>
+                    <div className="text-2xl font-bold text-green-600">{batchUnificationResult.totalSuccess || 0}</div>
                     <div className="text-sm text-green-800">Sucessos</div>
                                </div>
                   <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{batchUnificationResult.totalFailed}</div>
+                    <div className="text-2xl font-bold text-red-600">{batchUnificationResult.totalFailed || 0}</div>
                     <div className="text-sm text-red-800">Falhas</div>
                                </div>
                              </div>
                              
-                {batchUnificationResult.successList.length > 0 && (
+                {batchUnificationResult.successList && Array.isArray(batchUnificationResult.successList) && batchUnificationResult.successList.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-green-800 mb-2">✅ Sucessos ({batchUnificationResult.successList.length})</h4>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -7147,7 +7172,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                </div>
                 )}
 
-                {batchUnificationResult.failureList.length > 0 && (
+                {batchUnificationResult.failureList && Array.isArray(batchUnificationResult.failureList) && batchUnificationResult.failureList.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-red-800 mb-2">âŒ Falhas ({batchUnificationResult.failureList.length})</h4>
                     <div className="space-y-3 max-h-96 overflow-y-auto">

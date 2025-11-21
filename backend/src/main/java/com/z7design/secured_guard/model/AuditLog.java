@@ -240,6 +240,8 @@ public class AuditLog {
 */
 
 // Classe vazia temporária
+package com.z7design.secured_guard.model;
+
 public class AuditLog {
     // Classe temporariamente desabilitada devido a conflito de schema
 } 

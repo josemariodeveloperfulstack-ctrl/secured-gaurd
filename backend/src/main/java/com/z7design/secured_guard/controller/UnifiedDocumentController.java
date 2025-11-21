@@ -1526,20 +1526,30 @@ public class UnifiedDocumentController {
             return ResponseEntity.ok(response);
             
         } catch (RuntimeException e) {
-            log.error("💥 Erro ao criar job de unificação em lote: {}", e.getMessage(), e);
+            log.error("💥 Erro RuntimeException ao criar job de unificação em lote: {}", e.getMessage(), e);
+            log.error("💥 Tipo de exceção: {}", e.getClass().getName());
+            if (e.getCause() != null) {
+                log.error("💥 Causa: {}", e.getCause().getMessage());
+                log.error("💥 Tipo da causa: {}", e.getCause().getClass().getName());
+            }
+            
             response.put("sucesso", false);
             
             // Verificar se é erro de tabela não existente
             String errorMessage = e.getMessage() != null ? e.getMessage() : "Erro desconhecido";
-            String causeMessage = e.getCause() != null && e.getCause().getMessage() != null ? 
-                e.getCause().getMessage() : "";
+            String causeMessage = "";
+            if (e.getCause() != null && e.getCause().getMessage() != null) {
+                causeMessage = e.getCause().getMessage();
+            }
             
             if (errorMessage.contains("unification_jobs") || 
                 errorMessage.contains("não existe") ||
                 errorMessage.contains("does not exist") ||
                 causeMessage.contains("unification_jobs") ||
                 causeMessage.contains("não existe") ||
-                causeMessage.contains("does not exist")) {
+                causeMessage.contains("does not exist") ||
+                e.getClass().getName().contains("SQLGrammarException") ||
+                e.getClass().getName().contains("PSQLException")) {
                 response.put("mensagem", "ERRO: A tabela 'unification_jobs' não existe no banco de dados. " +
                     "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
                     "Reinicie a aplicação para que o Flyway execute as migrations pendentes.");
@@ -1548,7 +1558,7 @@ public class UnifiedDocumentController {
             } else {
                 response.put("mensagem", "Erro ao iniciar processamento: " + errorMessage);
                 response.put("detalhes", errorMessage);
-                if (causeMessage != null && !causeMessage.isEmpty()) {
+                if (!causeMessage.isEmpty()) {
                     response.put("causa", causeMessage);
                 }
             }
@@ -1559,6 +1569,12 @@ public class UnifiedDocumentController {
             }
             return ResponseEntity.internalServerError().body(response);
         } catch (Exception e) {
+            log.error("💥 Erro Exception genérico ao criar job de unificação em lote: {}", e.getMessage(), e);
+            log.error("💥 Tipo de exceção: {}", e.getClass().getName());
+            if (e.getCause() != null) {
+                log.error("💥 Causa: {}", e.getCause().getMessage());
+                log.error("💥 Tipo da causa: {}", e.getCause().getClass().getName());
+            }
             log.error("💥 Erro inesperado ao criar job de unificação em lote: {}", e.getMessage(), e);
             response.put("sucesso", false);
             

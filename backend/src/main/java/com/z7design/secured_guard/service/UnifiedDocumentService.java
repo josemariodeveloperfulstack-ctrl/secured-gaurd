@@ -3507,24 +3507,49 @@ public class UnifiedDocumentService {
         try {
             // Verificar se a tabela existe tentando fazer uma query simples
             try {
-                unificationJobRepository.count();
+                log.debug("🔍 Verificando se a tabela unification_jobs existe...");
+                long count = unificationJobRepository.count();
+                log.debug("✅ Tabela unification_jobs existe. Total de jobs: {}", count);
             } catch (Exception e) {
-                if (e.getMessage() != null && e.getMessage().contains("não existe")) {
+                String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+                String causeMsg = e.getCause() != null && e.getCause().getMessage() != null ? 
+                    e.getCause().getMessage() : "";
+                
+                log.error("❌ Erro ao verificar tabela unification_jobs: {}", errorMsg);
+                log.error("❌ Causa: {}", causeMsg);
+                log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+                
+                if (errorMsg.contains("não existe") || 
+                    errorMsg.contains("does not exist") ||
+                    errorMsg.contains("unification_jobs") ||
+                    causeMsg.contains("não existe") ||
+                    causeMsg.contains("does not exist") ||
+                    causeMsg.contains("unification_jobs") ||
+                    e.getClass().getName().contains("SQLGrammarException") ||
+                    e.getClass().getName().contains("PSQLException")) {
                     log.error("❌ ERRO CRÍTICO: A tabela 'unification_jobs' não existe no banco de dados!");
                     log.error("❌ Por favor, execute a migration V338__create_unification_jobs_table.sql");
                     throw new RuntimeException("A tabela 'unification_jobs' não existe no banco de dados. " +
-                        "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela.", e);
+                        "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
+                        "Erro: " + errorMsg, e);
                 }
+                // Se não for erro de tabela não existente, relançar
+                log.error("❌ Erro inesperado ao verificar tabela: {}", e.getClass().getName());
                 throw e;
             }
             
             // Contar quantos documentos serão processados
+            log.debug("📊 Buscando holerites para processamento...");
             List<Payslip> allPayslips = payslipService.getAllPayslips();
+            log.debug("📊 Total de holerites encontrados: {}", allPayslips.size());
+            
             List<Payslip> filteredPayslips = allPayslips.stream()
                 .filter(p -> month == null || p.getMonth().equals(month))
                 .filter(p -> year == null || p.getYear().equals(year))
                 .filter(p -> p.getEmployeeName() != null && p.getMonth() != null && p.getYear() != null)
                 .toList();
+            
+            log.debug("📊 Holerites após filtro: {}", filteredPayslips.size());
             
             Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
                 .filter(p -> p.getEmployeeName() != null && !p.getEmployeeName().trim().isEmpty())
@@ -3535,8 +3560,10 @@ public class UnifiedDocumentService {
                 ));
             
             int totalDocuments = uniquePayslips.size();
+            log.debug("📊 Documentos únicos para processar: {}", totalDocuments);
             
             // Criar job
+            log.debug("📝 Criando objeto UnificationJob...");
             com.z7design.secured_guard.model.UnificationJob job = com.z7design.secured_guard.model.UnificationJob.builder()
                 .status(com.z7design.secured_guard.model.UnificationJob.JobStatus.PENDING)
                 .month(month)
@@ -3549,20 +3576,34 @@ public class UnifiedDocumentService {
                 .createdBy(createdBy)
                 .build();
             
-            job = unificationJobRepository.save(job);
-            log.info("✅ Job criado: ID={}, Total de documentos: {}", job.getId(), totalDocuments);
-            
-            // Iniciar processamento assíncrono (não bloquear se houver erro)
+            log.debug("💾 Salvando job no banco de dados...");
             try {
-                processUnificationJobAsync(job.getId());
-                log.info("✅ Processamento assíncrono iniciado para job: {}", job.getId());
+                job = unificationJobRepository.save(job);
+                log.info("✅ Job criado com sucesso: ID={}, Total de documentos: {}", job.getId(), totalDocuments);
+            } catch (Exception saveError) {
+                log.error("❌ Erro ao salvar job no banco de dados: {}", saveError.getMessage(), saveError);
+                log.error("❌ Tipo de exceção: {}", saveError.getClass().getName());
+                if (saveError.getCause() != null) {
+                    log.error("❌ Causa: {}", saveError.getCause().getMessage());
+                }
+                throw saveError;
+            }
+            
+            // Retornar o job (a transação será commitada antes do processamento assíncrono)
+            // O método assíncrono será executado em thread separada e transação separada
+            com.z7design.secured_guard.model.UnificationJob savedJob = job;
+            
+            // Iniciar processamento assíncrono (será executado em thread separada após o commit)
+            // O @Async garante execução em thread separada, e REQUIRES_NEW garante transação separada
+            try {
+                processUnificationJobAsync(savedJob.getId());
+                log.info("✅ Processamento assíncrono iniciado para job: {}", savedJob.getId());
             } catch (Exception e) {
                 log.error("⚠️ Erro ao iniciar processamento assíncrono (job continuará em PENDING): {}", e.getMessage(), e);
                 // Não propagar o erro - o job foi criado e pode ser processado manualmente depois
-                // O erro será registrado mas não impedirá a criação do job
             }
             
-            return job;
+            return savedJob;
             
         } catch (org.hibernate.exception.SQLGrammarException e) {
             String errorMsg = e.getMessage() != null ? e.getMessage() : "";
@@ -3601,13 +3642,42 @@ public class UnifiedDocumentService {
      * Processa um job de unificação em lote de forma assíncrona
      */
     @Async
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void processUnificationJobAsync(UUID jobId) {
         log.info("🚀 Iniciando processamento assíncrono do job: {}", jobId);
         
-        com.z7design.secured_guard.model.UnificationJob job = unificationJobRepository.findById(jobId)
-            .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
-        
+        try {
+            com.z7design.secured_guard.model.UnificationJob job = unificationJobRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
+            
+            processUnificationJobInternal(jobId, job);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro crítico no processamento assíncrono do job {}: {}", jobId, e.getMessage(), e);
+            // Tentar atualizar o job com status de erro (em nova transação)
+            try {
+                updateJobStatusInNewTransaction(jobId, com.z7design.secured_guard.model.UnificationJob.JobStatus.FAILED, 
+                    "Erro crítico: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            } catch (Exception updateError) {
+                log.error("💥 Erro ao atualizar status do job após falha: {}", updateError.getMessage(), updateError);
+            }
+        }
+    }
+    
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    private void updateJobStatusInNewTransaction(UUID jobId, com.z7design.secured_guard.model.UnificationJob.JobStatus status, String errorMessage) {
+        com.z7design.secured_guard.model.UnificationJob job = unificationJobRepository.findById(jobId).orElse(null);
+        if (job != null) {
+            job.setStatus(status);
+            if (errorMessage != null) {
+                job.setErrorMessage(errorMessage);
+            }
+            job.setCompletedAt(LocalDateTime.now());
+            unificationJobRepository.save(job);
+        }
+    }
+    
+    private void processUnificationJobInternal(UUID jobId, com.z7design.secured_guard.model.UnificationJob job) {
         try {
             // Atualizar status para PROCESSING
             job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.PROCESSING);
@@ -3697,12 +3767,16 @@ public class UnifiedDocumentService {
             long endTime = System.currentTimeMillis();
             job = unificationJobRepository.findById(jobId).orElse(null);
             if (job != null) {
+                // Status será COMPLETED mesmo com falhas (o job foi processado completamente)
                 job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.COMPLETED);
                 job.setProcessedDocuments(processed);
                 job.setSuccessCount(success);
                 job.setFailureCount(failure);
                 job.setProcessingTimeMs(endTime - startTime);
                 job.setCompletedAt(LocalDateTime.now());
+                if (failure > 0) {
+                    job.setErrorMessage(String.format("Processamento concluído com %d sucesso(s) e %d falha(s)", success, failure));
+                }
                 unificationJobRepository.save(job);
                 
                 log.info("✅ Job {} concluído: {} processados, {} sucesso, {} falhas, tempo: {} ms", 
@@ -3711,12 +3785,12 @@ public class UnifiedDocumentService {
             
         } catch (Exception e) {
             log.error("💥 Erro crítico ao processar job {}: {}", jobId, e.getMessage(), e);
-            job = unificationJobRepository.findById(jobId).orElse(null);
-            if (job != null) {
-                job.setStatus(com.z7design.secured_guard.model.UnificationJob.JobStatus.FAILED);
-                job.setErrorMessage("Erro crítico: " + e.getMessage());
-                job.setCompletedAt(LocalDateTime.now());
-                unificationJobRepository.save(job);
+            // Atualizar status do job em nova transação para evitar problemas de rollback
+            try {
+                updateJobStatusInNewTransaction(jobId, com.z7design.secured_guard.model.UnificationJob.JobStatus.FAILED, 
+                    "Erro crítico: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            } catch (Exception updateError) {
+                log.error("💥 Erro ao atualizar status do job após falha: {}", updateError.getMessage(), updateError);
             }
         }
     }
