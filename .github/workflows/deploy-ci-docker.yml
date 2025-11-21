@@ -247,14 +247,19 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣3️⃣ GARANTIR QUE JWT_SECRET ESTÁ CORRETO NO HOST
+      # 1️⃣3️⃣ GARANTIR QUE JWT_SECRET ESTÁ CORRETO NO HOST E NO .ENV
       # ============================================
-      - name: 🔐 Ensure JWT_SECRET is correct on host
+      - name: 🔐 Ensure JWT_SECRET is correct on host and .env
+        env:
+          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "🔐 Verificando e corrigindo JWT_SECRET no host..."
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+            echo "🔐 Verificando e corrigindo JWT_SECRET no host e .env..."
             
-            # Remover JWT_SECRET do ambiente do host se estiver definido com valor curto
+            # Valor correto do JWT_SECRET
+            CORRECT_JWT_SECRET="${{ env.JWT_SECRET_VALUE }}"
+            
+            # 1. Remover JWT_SECRET do ambiente do host se estiver definido com valor curto
             if [ -n "\$JWT_SECRET" ]; then
               JWT_LENGTH=\${#JWT_SECRET}
               if [ \$JWT_LENGTH -lt 64 ]; then
@@ -269,12 +274,90 @@ EOF
                 echo "✅ JWT_SECRET no host está OK (\$JWT_LENGTH caracteres)"
               fi
             else
-              echo "ℹ️ JWT_SECRET não está definido no host (usando valor do docker-compose)"
+              echo "ℹ️ JWT_SECRET não está definido no host (usando valor do .env ou docker-compose)"
+            fi
+            
+            # 2. Verificar e corrigir JWT_SECRET no arquivo .env
+            cd /var/www/secured_guard/ci
+            if [ -f .env ]; then
+              CURRENT_JWT=\$(grep "^JWT_SECRET=" .env | cut -d'=' -f2 || echo "")
+              if [ -n "\$CURRENT_JWT" ]; then
+                CURRENT_LENGTH=\${#CURRENT_JWT}
+                echo "JWT_SECRET atual no .env: \${CURRENT_JWT:0:20}... (\$CURRENT_LENGTH caracteres)"
+                
+                if [ \$CURRENT_LENGTH -lt 64 ]; then
+                  echo "⚠️ JWT_SECRET no .env é muito curto! Corrigindo..."
+                  # Atualizar JWT_SECRET no .env
+                  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
+                  echo "✅ JWT_SECRET corrigido no .env"
+                else
+                  echo "✅ JWT_SECRET no .env está OK (\$CURRENT_LENGTH caracteres)"
+                  # Mesmo assim, garantir que está usando o valor correto
+                  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
+                  echo "✅ JWT_SECRET atualizado para garantir valor correto"
+                fi
+              else
+                echo "⚠️ JWT_SECRET não encontrado no .env. Adicionando..."
+                echo "JWT_SECRET=\${CORRECT_JWT_SECRET}" >> .env
+                echo "✅ JWT_SECRET adicionado ao .env"
+              fi
+              
+              # Verificar novamente após correção
+              VERIFIED_JWT=\$(grep "^JWT_SECRET=" .env | cut -d'=' -f2)
+              VERIFIED_LENGTH=\${#VERIFIED_JWT}
+              if [ \$VERIFIED_LENGTH -ge 64 ]; then
+                echo "✅ JWT_SECRET verificado no .env: \${VERIFIED_LENGTH} caracteres"
+              else
+                echo "❌ ERRO: JWT_SECRET ainda está incorreto após correção!"
+                exit 1
+              fi
+            else
+              echo "⚠️ Arquivo .env não existe. Será criado no próximo passo."
             fi
           EOF
 
       # ============================================
-      # 1️⃣4️⃣ FAZER BACKUP E PARAR CONTAINERS ANTIGOS
+      # 1️⃣4️⃣ FORÇAR CORREÇÃO DO .ENV ANTES DE PARAR CONTAINERS
+      # ============================================
+      - name: 🔧 Force .env correction before stopping containers
+        env:
+          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+            echo "🔧 Forçando correção do .env antes de parar containers..."
+            
+            cd /var/www/secured_guard/ci
+            CORRECT_JWT_SECRET="${{ env.JWT_SECRET_VALUE }}"
+            
+            # Garantir que o .env existe e tem o JWT_SECRET correto
+            if [ ! -f .env ]; then
+              echo "Criando arquivo .env..."
+              touch .env
+            fi
+            
+            # Atualizar ou adicionar JWT_SECRET
+            if grep -q "^JWT_SECRET=" .env; then
+              sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
+              echo "✅ JWT_SECRET atualizado no .env"
+            else
+              echo "JWT_SECRET=\${CORRECT_JWT_SECRET}" >> .env
+              echo "✅ JWT_SECRET adicionado ao .env"
+            fi
+            
+            # Verificar tamanho
+            JWT_LENGTH=\$(grep "^JWT_SECRET=" .env | cut -d'=' -f2 | wc -c)
+            echo "Tamanho do JWT_SECRET no .env: \$((JWT_LENGTH - 1)) caracteres"
+            
+            if [ \$JWT_LENGTH -lt 65 ]; then
+              echo "❌ ERRO: JWT_SECRET ainda está muito curto após correção!"
+              exit 1
+            fi
+            
+            echo "✅ .env corrigido e verificado!"
+          EOF
+
+      # ============================================
+      # 1️⃣5️⃣ FAZER BACKUP E PARAR CONTAINERS ANTIGOS
       # ============================================
       - name: 💾 Backup and stop old containers
         run: |
@@ -298,7 +381,7 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣5️⃣ FAZER PULL DAS NOVAS IMAGENS
+      # 1️⃣6️⃣ FAZER PULL DAS NOVAS IMAGENS
       # ============================================
       - name: 📥 Pull new images
         run: |
@@ -319,7 +402,7 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣6️⃣ INICIAR NOVOS CONTAINERS
+      # 1️⃣7️⃣ INICIAR NOVOS CONTAINERS
       # ============================================
       - name: 🚀 Start new containers
         run: |
@@ -341,7 +424,7 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣7️⃣ VERIFICAR JWT_SECRET NO CONTAINER
+      # 1️⃣8️⃣ VERIFICAR JWT_SECRET NO CONTAINER
       # ============================================
       - name: 🔐 Verify JWT_SECRET in container
         run: |
@@ -372,7 +455,7 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣8️⃣ DIAGNÓSTICO DOS CONTAINERS
+      # 1️⃣9️⃣ DIAGNÓSTICO DOS CONTAINERS
       # ============================================
       - name: 🔍 Diagnostic - Container Status
         run: |
@@ -395,7 +478,7 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣9️⃣ DIAGNÓSTICO DE CONECTIVIDADE
+      # 2️⃣0️⃣ DIAGNÓSTICO DE CONECTIVIDADE
       # ============================================
       - name: 🌐 Diagnostic - Network Connectivity
         run: |
@@ -420,7 +503,7 @@ EOF
           EOF
 
       # ============================================
-      # 2️⃣0️⃣ VERIFICAR STATUS DOS CONTAINERS ANTES DO HEALTH CHECK
+      # 2️⃣1️⃣ VERIFICAR STATUS DOS CONTAINERS ANTES DO HEALTH CHECK
       # ============================================
       - name: 🔍 Verify containers are running
         run: |
@@ -443,7 +526,7 @@ EOF
           EOF
 
       # ============================================
-      # 2️⃣1️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
+      # 2️⃣2️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
       # ============================================
       - name: 🏥 Health check
         run: |
@@ -519,7 +602,7 @@ EOF
           exit 1
 
       # ============================================
-      # 2️⃣2️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 2️⃣3️⃣ NOTIFICAÇÃO DE SUCESSO
       # ============================================
       - name: 🎉 Deployment successful
         if: success()
@@ -534,7 +617,7 @@ EOF
           echo "================================"
 
       # ============================================
-      # 2️⃣3️⃣ ROLLBACK EM CASO DE FALHA
+      # 2️⃣4️⃣ ROLLBACK EM CASO DE FALHA
       # ============================================
       - name: 🔄 Rollback on failure
         if: failure()
