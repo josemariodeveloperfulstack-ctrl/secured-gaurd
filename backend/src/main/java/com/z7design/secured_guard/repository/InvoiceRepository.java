@@ -14,6 +14,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -252,4 +253,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
     // Buscar todos os centros de custo da tabela cost_centers (incluindo inativos)
     @Query("SELECT cc.name FROM CostCenter cc ORDER BY cc.name")
     List<String> findAllCostCenterNames();
+    
+    // Buscar invoice por ID com todos os relacionamentos carregados (evita LazyInitializationException)
+    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit"})
+    @Query("SELECT i FROM Invoice i WHERE i.id = :id")
+    Optional<Invoice> findByIdWithRelations(@Param("id") UUID id);
 } 

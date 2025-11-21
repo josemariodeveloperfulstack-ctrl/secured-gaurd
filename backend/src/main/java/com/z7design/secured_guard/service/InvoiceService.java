@@ -47,7 +47,8 @@ public class InvoiceService {
     }
     
     public Optional<Invoice> findById(UUID id) {
-        return invoiceRepository.findById(id);
+        // Usar método com EntityGraph para carregar relacionamentos e evitar LazyInitializationException
+        return invoiceRepository.findByIdWithRelations(id);
     }
     
     public List<Invoice> findByStatus(ExpenseStatus status) {

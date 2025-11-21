@@ -27,6 +27,7 @@ import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.Map;
@@ -81,7 +82,32 @@ public class InvoiceController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<InvoiceDTO> getById(@PathVariable String id) {
-        return ResponseEntity.ok(invoiceService.findById(UUID.fromString(id)).map(InvoiceDTO::fromEntity).orElseThrow(() -> new ResourceNotFoundException("Fatura não encontrada")));
+        try {
+            log.info("GET /api/invoices/{} - Buscando fatura por ID", id);
+            UUID invoiceId = UUID.fromString(id);
+            Optional<Invoice> invoiceOpt = invoiceService.findById(invoiceId);
+            
+            if (invoiceOpt.isEmpty()) {
+                log.warn("⚠️ Fatura não encontrada: {}", id);
+                throw new ResourceNotFoundException("Fatura não encontrada");
+            }
+            
+            Invoice invoice = invoiceOpt.get();
+            log.debug("✅ Fatura encontrada: {} - {}", invoice.getId(), invoice.getDescription());
+            
+            InvoiceDTO dto = InvoiceDTO.fromEntity(invoice);
+            log.debug("✅ DTO criado com sucesso para fatura: {}", id);
+            
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            log.error("❌ ID inválido: {}", id, e);
+            throw new ResourceNotFoundException("ID de fatura inválido: " + id);
+        } catch (ResourceNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar fatura {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Erro ao buscar fatura: " + e.getMessage(), e);
+        }
     }
     
     @GetMapping("/status/{status}")

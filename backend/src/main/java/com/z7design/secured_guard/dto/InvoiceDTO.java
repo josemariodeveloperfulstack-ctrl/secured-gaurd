@@ -127,31 +127,66 @@ public class InvoiceDTO {
 
     public static InvoiceDTO fromEntity(com.z7design.secured_guard.model.Invoice invoice) {
         if (invoice == null) return null;
-        InvoiceDTO dto = new InvoiceDTO();
-        dto.setId(invoice.getId());
-        dto.setInvoiceNumber(invoice.getInvoiceNumber());
-        dto.setDescription(invoice.getDescription());
-        dto.setAmount(invoice.getAmount());
-        dto.setType(invoice.getType());
-        dto.setStatus(invoice.getStatus());
-        dto.setIssueDate(invoice.getIssueDate());
-        dto.setDueDate(invoice.getDueDate());
-        dto.setPaymentDate(invoice.getPaymentDate());
-        dto.setCategory(invoice.getCategory());
-        dto.setCentroCusto(invoice.getCentroCusto());
-        dto.setComprovanteUrl(invoice.getComprovanteUrl());
-        dto.setBarcode(invoice.getBarcode());
-        dto.setNotes(invoice.getNotes());
-        dto.setCompanySigla(invoice.getCompanySigla());
-        dto.setSupplierId(invoice.getSupplier() != null ? invoice.getSupplier().getId() : null);
-        dto.setSupplierName(invoice.getSupplier() != null ? invoice.getSupplier().getName() : null);
-        dto.setClientId(invoice.getClient() != null ? invoice.getClient().getId() : null);
-        dto.setClientName(invoice.getClient() != null ? invoice.getClient().getName() : null);
-        dto.setContractId(invoice.getContract() != null ? invoice.getContract().getId() : null);
-        dto.setContractNumber(invoice.getContract() != null ? invoice.getContract().getContractNumber() : null);
-        dto.setUnitId(invoice.getUnit() != null ? invoice.getUnit().getId() : null);
-        dto.setCreatedAt(invoice.getCreatedAt());
-        dto.setUpdatedAt(invoice.getUpdatedAt());
-        return dto;
+        try {
+            InvoiceDTO dto = new InvoiceDTO();
+            dto.setId(invoice.getId());
+            dto.setInvoiceNumber(invoice.getInvoiceNumber());
+            dto.setDescription(invoice.getDescription());
+            dto.setAmount(invoice.getAmount());
+            dto.setType(invoice.getType());
+            dto.setStatus(invoice.getStatus());
+            dto.setIssueDate(invoice.getIssueDate());
+            dto.setDueDate(invoice.getDueDate());
+            dto.setPaymentDate(invoice.getPaymentDate());
+            dto.setCategory(invoice.getCategory());
+            dto.setCentroCusto(invoice.getCentroCusto());
+            dto.setComprovanteUrl(invoice.getComprovanteUrl());
+            dto.setBarcode(invoice.getBarcode());
+            dto.setNotes(invoice.getNotes());
+            dto.setCompanySigla(invoice.getCompanySigla());
+            
+            // Tratamento seguro para relacionamentos (pode causar LazyInitializationException)
+            try {
+                dto.setSupplierId(invoice.getSupplier() != null ? invoice.getSupplier().getId() : null);
+                dto.setSupplierName(invoice.getSupplier() != null ? invoice.getSupplier().getName() : null);
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar supplier da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setSupplierId(null);
+                dto.setSupplierName(null);
+            }
+            
+            try {
+                dto.setClientId(invoice.getClient() != null ? invoice.getClient().getId() : null);
+                dto.setClientName(invoice.getClient() != null ? invoice.getClient().getName() : null);
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar client da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setClientId(null);
+                dto.setClientName(null);
+            }
+            
+            try {
+                dto.setContractId(invoice.getContract() != null ? invoice.getContract().getId() : null);
+                dto.setContractNumber(invoice.getContract() != null ? invoice.getContract().getContractNumber() : null);
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar contract da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setContractId(null);
+                dto.setContractNumber(null);
+            }
+            
+            try {
+                dto.setUnitId(invoice.getUnit() != null ? invoice.getUnit().getId() : null);
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar unit da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setUnitId(null);
+            }
+            
+            dto.setCreatedAt(invoice.getCreatedAt());
+            dto.setUpdatedAt(invoice.getUpdatedAt());
+            return dto;
+        } catch (Exception e) {
+            System.err.println("❌ Erro ao converter Invoice para DTO: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao converter Invoice para DTO: " + e.getMessage(), e);
+        }
     }
 } 
