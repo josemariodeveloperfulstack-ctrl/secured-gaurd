@@ -831,7 +831,6 @@ public class PaymentReceiptService {
     }
     
     // Excluir múltiplos comprovantes
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public Map<String, Object> deleteMultiplePaymentReceipts(List<String> ids) {
         Map<String, Object> result = new HashMap<>();
         int deleted = 0;
@@ -871,7 +870,7 @@ public class PaymentReceiptService {
                     continue;
                 }
                 
-                // Tentar excluir cada comprovante em sua própria transação
+                // Tentar excluir cada comprovante
                 try {
                     deleteByIdInTransaction(trimmedId);
                     deleted++;
@@ -905,9 +904,49 @@ public class PaymentReceiptService {
         return result;
     }
     
-    // Método auxiliar para excluir em transação separada
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    // Método auxiliar para excluir em transação separada (cada exclusão é independente)
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     private void deleteByIdInTransaction(String id) {
-        deleteById(id);
+        try {
+            UUID receiptId = UUID.fromString(id);
+            Optional<PaymentReceipt> receiptOpt = paymentReceiptRepository.findById(receiptId);
+            
+            if (receiptOpt.isPresent()) {
+                PaymentReceipt receipt = receiptOpt.get();
+                
+                // Excluir arquivo físico se existir (fora da transação)
+                if (receipt.getFilePath() != null && !receipt.getFilePath().trim().isEmpty()) {
+                    try {
+                        Path filePath = Paths.get(receipt.getFilePath());
+                        if (Files.exists(filePath)) {
+                            Files.delete(filePath);
+                            log.info("Arquivo físico excluído: {}", filePath);
+                        } else {
+                            log.debug("Arquivo físico não encontrado (já foi excluído?): {}", filePath);
+                        }
+                    } catch (IOException e) {
+                        log.warn("Erro ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
+                        // Não lançar exceção - continuar com exclusão do banco
+                    } catch (Exception e) {
+                        log.warn("Erro inesperado ao excluir arquivo físico {}: {}", receipt.getFilePath(), e.getMessage());
+                        // Não lançar exceção - continuar com exclusão do banco
+                    }
+                }
+                
+                // Excluir do banco de dados
+                paymentReceiptRepository.deleteById(receiptId);
+                paymentReceiptRepository.flush(); // Força o commit imediato
+                log.info("Comprovante excluído do banco: {}", id);
+            } else {
+                log.warn("Comprovante não encontrado para exclusão: {}", id);
+                // Não lançar exceção - comprovante não existe é um caso válido
+            }
+        } catch (IllegalArgumentException e) {
+            log.error("ID inválido fornecido para exclusão: {} - {}", id, e.getMessage());
+            throw new IllegalArgumentException("ID inválido: " + id, e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao excluir comprovante {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Erro ao excluir comprovante: " + e.getMessage(), e);
+        }
     }
 }
