@@ -4491,20 +4491,18 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                  </p>
                                </div>
               <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
-                {/* Checkbox "Selecionar empresa" - só aparece se a empresa NÃO estiver expandida (sem setores visíveis) */}
-                {!companyExpanded && (
-                  <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
-                    <Checkbox
-                      checked={companyCheckboxState}
-                      onCheckedChange={(checked) => handleSelectMultipleHolerites(companyIds, checked === true)}
-                      className="border-blue-400"
-                    />
-                    <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
-                  </div>
-                )}
+                {/* Checkbox "Selecionar empresa" - sempre visível */}
+                <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                  <Checkbox
+                    checked={companyCheckboxState}
+                    onCheckedChange={(checked) => handleSelectMultipleHolerites(companyIds, checked === true)}
+                    className="border-blue-400"
+                  />
+                  <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
+                </div>
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {/* Botões de ação em massa - só aparecem quando "Selecionar empresa" está marcado E a empresa NÃO está expandida */}
-                  {companySelectedCount > 0 && !companyExpanded && (
+                  {/* Botões de ação em massa - aparecem quando "Selecionar empresa" está marcado */}
+                  {companySelectedCount > 0 && (
                     <>
                       <Button
                         size="sm"
@@ -4572,19 +4570,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                              </p>
                                            </div>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            {/* Checkbox "Selecionar setor" - só aparece se o setor NÃO estiver expandido (sem botões individuais visíveis) */}
-                            {!sectorExpanded && (
-                              <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
-                                <Checkbox
-                                  checked={sectorCheckboxState}
-                                  onCheckedChange={(checked) => handleSelectMultipleHolerites(sectorIds, checked === true)}
-                                  className="border-blue-400"
-                                />
-                                <span className="text-xs text-gray-300">Selecionar setor</span>
-                              </div>
-                            )}
-                            {/* Botões de ação em massa - só aparecem quando "Selecionar setor" está marcado E o setor NÃO está expandido */}
-                            {sectorSelectedCount > 0 && !sectorExpanded && (
+                            {/* Checkbox "Selecionar setor" - sempre visível */}
+                            <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                              <Checkbox
+                                checked={sectorCheckboxState}
+                                onCheckedChange={(checked) => handleSelectMultipleHolerites(sectorIds, checked === true)}
+                                className="border-blue-400"
+                              />
+                              <span className="text-xs text-gray-300">Selecionar setor</span>
+                            </div>
+                            {/* Botões de ação em massa - aparecem quando "Selecionar setor" está marcado */}
+                            {sectorSelectedCount > 0 && (
                               <div className="flex flex-wrap gap-2 justify-end">
                                 <Button
                                   size="sm"
