@@ -578,56 +578,56 @@ EOF
               COMPOSE_CMD="docker-compose"
             fi
             
-            # Iniciar containers na ordem correta
+            # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
-            echo "🚀 Iniciando containers na ordem correta..."
-            
-            # 1. Iniciar banco e redis primeiro
-            echo "1️⃣ Iniciando PostgreSQL e Redis..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans postgres-ci redis-ci
+            echo "🚀 Iniciando TODOS os containers..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
             
             if [ $? -ne 0 ]; then
-              echo "❌ ERRO ao iniciar PostgreSQL/Redis!"
+              echo "❌ ERRO ao iniciar containers!"
+              echo "📋 Verificando logs de erro..."
+              $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 2>&1 | tail -50
               exit 1
             fi
             
-            echo "⏳ Aguardando PostgreSQL e Redis ficarem saudáveis (30s)..."
+            echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
             
-            # 2. Iniciar backend
-            echo "2️⃣ Iniciando Backend..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans backend-ci
-            
-            if [ $? -ne 0 ]; then
-              echo "❌ ERRO ao iniciar Backend!"
-              echo "📋 Logs do backend:"
-              docker logs --tail 50 secured-guard-backend-ci 2>&1 | tail -30 || echo "Container não encontrado"
-              exit 1
+            # Verificar se PostgreSQL e Redis estão rodando
+            echo ""
+            echo "🔍 Verificando PostgreSQL e Redis..."
+            if ! docker ps | grep -q "secured-guard-db-ci"; then
+              echo "⚠️ PostgreSQL não está rodando! Tentando iniciar..."
+              docker start secured-guard-db-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
+              sleep 10
             fi
             
-            echo "⏳ Aguardando Backend iniciar (20s)..."
+            if ! docker ps | grep -q "secured-guard-redis-ci"; then
+              echo "⚠️ Redis não está rodando! Tentando iniciar..."
+              docker start secured-guard-redis-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
+              sleep 10
+            fi
+            
+            # Aguardar PostgreSQL e Redis ficarem saudáveis
+            echo "⏳ Aguardando PostgreSQL e Redis ficarem saudáveis (20s)..."
             sleep 20
             
-            # 3. Iniciar WhatsApp (depende do backend)
-            echo "3️⃣ Iniciando WhatsApp..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans whatsapp-service-ci
-            
-            if [ $? -ne 0 ]; then
-              echo "⚠️ ERRO ao iniciar WhatsApp, mas continuando..."
-              echo "📋 Logs do WhatsApp:"
-              docker logs --tail 50 secured-guard-whatsapp-ci 2>&1 | tail -30 || echo "Container não encontrado"
-            fi
-            
-            # 4. Iniciar frontend e nginx
-            echo "4️⃣ Iniciando Frontend e Nginx..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans frontend-ci nginx-ci
-            
-            if [ $? -ne 0 ]; then
-              echo "❌ ERRO ao iniciar Frontend/Nginx!"
+            # Verificar novamente se estão rodando
+            if ! docker ps | grep -q "secured-guard-db-ci"; then
+              echo "❌ ERRO: PostgreSQL ainda não está rodando!"
+              echo "📋 Logs do PostgreSQL:"
+              docker logs --tail 50 secured-guard-db-ci 2>&1 | tail -30 || echo "Container não encontrado"
               exit 1
             fi
             
-            echo "✅ Todos os containers foram iniciados!"
+            if ! docker ps | grep -q "secured-guard-redis-ci"; then
+              echo "❌ ERRO: Redis ainda não está rodando!"
+              echo "📋 Logs do Redis:"
+              docker logs --tail 50 secured-guard-redis-ci 2>&1 | tail -30 || echo "Container não encontrado"
+              exit 1
+            fi
+            
+            echo "✅ PostgreSQL e Redis estão rodando!"
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
@@ -747,8 +747,8 @@ EOF
             
             cd /var/www/secured_guard/ci
             
-            # Verificar containers críticos
-            CRITICAL_CONTAINERS=("secured-guard-backend-ci" "secured-guard-whatsapp-ci")
+            # Verificar containers críticos (incluindo PostgreSQL e Redis)
+            CRITICAL_CONTAINERS=("secured-guard-db-ci" "secured-guard-redis-ci" "secured-guard-backend-ci" "secured-guard-whatsapp-ci" "secured-guard-frontend-ci" "secured-guard-nginx-ci")
             
             for container in "${CRITICAL_CONTAINERS[@]}"; do
               if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
@@ -762,10 +762,18 @@ EOF
                   echo "⚠️ Erro ao iniciar. Tentando recriar..."
                   
                   # Extrair nome do serviço do docker-compose
-                  if [[ "$container" == *"backend"* ]]; then
+                  if [[ "$container" == *"db"* ]] || [[ "$container" == *"postgres"* ]]; then
+                    SERVICE_NAME="postgres-ci"
+                  elif [[ "$container" == *"redis"* ]]; then
+                    SERVICE_NAME="redis-ci"
+                  elif [[ "$container" == *"backend"* ]]; then
                     SERVICE_NAME="backend-ci"
                   elif [[ "$container" == *"whatsapp"* ]]; then
                     SERVICE_NAME="whatsapp-service-ci"
+                  elif [[ "$container" == *"frontend"* ]]; then
+                    SERVICE_NAME="frontend-ci"
+                  elif [[ "$container" == *"nginx"* ]]; then
+                    SERVICE_NAME="nginx-ci"
                   else
                     continue
                   fi
