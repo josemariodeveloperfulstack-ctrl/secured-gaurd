@@ -1999,11 +1999,23 @@ const Holerites: React.FC = () => {
 
   // Excluir comprovante individual
   const handleDeletePaymentReceipt = async (receiptId: string) => {
+    const idStr = String(receiptId).trim();
+    
+    if (!idStr) {
+      toast({
+        title: "Erro",
+        description: "ID do comprovante inválido.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      await paymentReceiptService.deletePaymentReceipt(receiptId);
+      console.log('🗑️ Excluindo comprovante individual:', idStr);
+      await paymentReceiptService.deletePaymentReceipt(idStr);
       
       // Remover da seleção se estiver selecionado
-      setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => id !== receiptId));
+      setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => String(id) !== idStr));
       
       // Recarregar lista de comprovantes de pagamento
       await loadPaymentReceipts();
@@ -2013,7 +2025,12 @@ const Holerites: React.FC = () => {
         description: "Comprovante excluído com sucesso.",
       });
     } catch (error: any) {
-      console.error('Erro ao excluir comprovante:', error);
+      console.error('❌ Erro ao excluir comprovante:', error);
+      console.error('❌ Detalhes:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       const errorMessage = error.response?.data?.error || error.message || "Erro ao excluir comprovante. Tente novamente.";
       toast({
         title: "Erro",
@@ -5647,7 +5664,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                               {/* Botão Excluir */}
                               <Button
                                 size="sm"
-                                onClick={() => handleDeletePaymentReceipt(receipt.id)}
+                                onClick={() => handleDeletePaymentReceipt(String(receipt.id))}
                                 className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
                               >
                                 <Trash2 size={14} className="mr-1" />
