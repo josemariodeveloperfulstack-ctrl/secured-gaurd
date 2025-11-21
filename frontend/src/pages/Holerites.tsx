@@ -377,6 +377,11 @@ const Holerites: React.FC = () => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<any>(null);
   const [jobProgressInterval, setJobProgressInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Estados para job de exclusão assíncrona
+  const [currentDeletionJobId, setCurrentDeletionJobId] = useState<string | null>(null);
+  const [deletionJobStatus, setDeletionJobStatus] = useState<any>(null);
+  const [deletionJobProgressInterval, setDeletionJobProgressInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Estados para navegação de holerites por ano/mês
   const [holeriteActiveYear, setHoleriteActiveYear] = useState<string>('2025');
@@ -6182,20 +6187,18 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                       </p>
                                                   </div>
                                                   <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
-                                                      {/* Checkbox "Selecionar empresa" - só aparece se a empresa NÃO estiver expandida */}
-                                                      {!companyExpanded && (
-                                                          <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
-                                                              <Checkbox
-                                                                  checked={companyCheckboxState}
-                                                                  onCheckedChange={(checked) => handleSelectUnifiedDocuments(companyIndices, checked === true)}
-                                                                  className="border-blue-400"
-                                                              />
-                                                              <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
-                                                          </div>
-                                                      )}
+                                                      {/* Checkbox "Selecionar empresa" - sempre visível */}
+                                                      <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                                                          <Checkbox
+                                                              checked={companyCheckboxState}
+                                                              onCheckedChange={(checked) => handleSelectUnifiedDocuments(companyIndices, checked === true)}
+                                                              className="border-blue-400"
+                                                          />
+                                                          <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
+                                                      </div>
                                                       <div className="flex flex-wrap gap-2 justify-end">
-                                                          {/* Botões de ação em massa - só aparecem quando "Selecionar empresa" está marcado E a empresa NÃO está expandida */}
-                                                          {companySelectedCount > 0 && !companyExpanded && (
+                                                          {/* Botões de ação em massa - aparecem quando "Selecionar empresa" está marcado */}
+                                                          {companySelectedCount > 0 && (
                                                               <>
                                                                   <Button
                                                                       size="sm"
@@ -6283,19 +6286,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                               </p>
                                                                           </div>
                                                                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                                                              {/* Checkbox "Selecionar setor" - só aparece se o setor NÃO estiver expandido */}
-                                                                              {!sectorExpanded && (
-                                                                                  <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
-                                                                                      <Checkbox
-                                                                                          checked={sectorCheckboxState}
-                                                                                          onCheckedChange={(checked) => handleSelectUnifiedDocuments(sectorIndices, checked === true)}
-                                                                                          className="border-blue-400"
-                                                                                      />
-                                                                                      <span className="text-xs text-gray-300">Selecionar setor</span>
-                                                                                  </div>
-                                                                              )}
-                                                                              {/* Botões de ação em massa - só aparecem quando "Selecionar setor" está marcado E o setor NÃO está expandido */}
-                                                                              {sectorSelectedCount > 0 && !sectorExpanded && (
+                                                                              {/* Checkbox "Selecionar setor" - sempre visível */}
+                                                                              <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                                                                  <Checkbox
+                                                                                      checked={sectorCheckboxState}
+                                                                                      onCheckedChange={(checked) => handleSelectUnifiedDocuments(sectorIndices, checked === true)}
+                                                                                      className="border-blue-400"
+                                                                                  />
+                                                                                  <span className="text-xs text-gray-300">Selecionar setor</span>
+                                                                              </div>
+                                                                              {/* Botões de ação em massa - aparecem quando "Selecionar setor" está marcado */}
+                                                                              {sectorSelectedCount > 0 && (
                                                                                   <div className="flex flex-wrap gap-2 justify-end">
                                                                                       <Button
                                                                                           size="sm"
@@ -6378,19 +6379,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                                       <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
                                                                                                   </div>
                                                                                                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                                                                                      {/* Checkbox "Selecionar período" - só aparece se o período NÃO estiver expandido */}
-                                                                                                      {!periodExpanded && (
-                                                                                                          <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
-                                                                                                              <Checkbox
-                                                                                                                  checked={periodCheckboxState}
-                                                                                                                  onCheckedChange={(checked) => handleSelectUnifiedDocuments(periodIndices, checked === true)}
-                                                                                                                  className="border-blue-400"
-                                                                                                              />
-                                                                                                              <span className="text-xs text-gray-300">Selecionar período</span>
-                                                                                                          </div>
-                                                                                                      )}
-                                                                                                      {/* Botões de ação em massa - só aparecem quando "Selecionar período" está marcado E o período NÃO está expandido */}
-                                                                                                      {periodSelectedCount > 0 && !periodExpanded && (
+                                                                                                      {/* Checkbox "Selecionar período" - sempre visível */}
+                                                                                                      <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                                                                                          <Checkbox
+                                                                                                              checked={periodCheckboxState}
+                                                                                                              onCheckedChange={(checked) => handleSelectUnifiedDocuments(periodIndices, checked === true)}
+                                                                                                              className="border-blue-400"
+                                                                                                          />
+                                                                                                          <span className="text-xs text-gray-300">Selecionar período</span>
+                                                                                                      </div>
+                                                                                                      {/* Botões de ação em massa - aparecem quando "Selecionar período" está marcado */}
+                                                                                                      {periodSelectedCount > 0 && (
                                                                                                           <div className="flex flex-wrap gap-2 justify-end">
                                                                                                               <Button
                                                                                                                   size="sm"

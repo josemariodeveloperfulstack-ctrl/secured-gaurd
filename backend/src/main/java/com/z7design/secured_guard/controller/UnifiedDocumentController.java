@@ -1327,49 +1327,100 @@ public class UnifiedDocumentController {
 
     /**
      * Exclui múltiplos documentos unificados
+     * AGORA COM PROCESSAMENTO ASSÍNCRONO - retorna imediatamente com jobId
      */
     @DeleteMapping("/delete-multiple")
     public ResponseEntity<Map<String, Object>> deleteMultipleUnifiedDocuments(@RequestBody List<String> fileNames) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            log.info("🗑️ Excluindo {} documentos unificados", fileNames.size());
+            log.info("🗑️ Criando job de exclusão em lote: {} arquivo(s)", fileNames.size());
             
-            int deletedCount = 0;
-            List<String> failedFiles = new ArrayList<>();
-            
-            for (String fileName : fileNames) {
+            // Obter usuário autenticado
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            java.util.UUID createdBy = null;
+            if (auth != null && auth.getName() != null) {
                 try {
-                    if (unifiedDocumentService.deleteUnifiedDocument(fileName)) {
-                        deletedCount++;
-                    } else {
-                        failedFiles.add(fileName);
+                    com.z7design.secured_guard.model.User user = 
+                        userRepository.findByUsername(auth.getName()).orElse(null);
+                    if (user != null) {
+                        createdBy = user.getId();
                     }
                 } catch (Exception e) {
-                    log.error("💥 Erro ao excluir arquivo {}: {}", fileName, e.getMessage());
-                    failedFiles.add(fileName);
+                    log.warn("⚠️ Não foi possível obter ID do usuário: {}", e.getMessage());
                 }
             }
             
-            response.put("sucesso", true);
-            response.put("mensagem", String.format("Excluídos %d de %d documentos", deletedCount, fileNames.size()));
-            response.put("deletedCount", deletedCount);
-            response.put("totalCount", fileNames.size());
-            response.put("failedFiles", failedFiles);
+            // Criar job (processamento assíncrono será iniciado automaticamente)
+            com.z7design.secured_guard.model.DeletionJob job = 
+                unifiedDocumentService.createDeletionJob(fileNames, createdBy);
             
-            if (failedFiles.isEmpty()) {
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("sucesso", false);
-                response.put("mensagem", String.format("Excluídos %d de %d documentos. %d falharam.", deletedCount, fileNames.size(), failedFiles.size()));
-                return ResponseEntity.status(207).body(response); // Multi-Status
-            }
+            // Retornar imediatamente com informações do job
+            response.put("sucesso", true);
+            response.put("mensagem", "Processamento de exclusão iniciado! Use o jobId para acompanhar o progresso.");
+            response.put("jobId", job.getId());
+            response.put("status", job.getStatus().name());
+            response.put("totalFiles", job.getTotalFiles());
+            response.put("createdAt", job.getCreatedAt());
+            
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            log.error("💥 Erro ao excluir múltiplos documentos: {}", e.getMessage(), e);
+            log.error("💥 Erro ao criar job de exclusão em lote: {}", e.getMessage(), e);
             response.put("sucesso", false);
-            response.put("mensagem", "Erro ao excluir documentos: " + e.getMessage());
+            response.put("mensagem", "Erro ao iniciar processamento de exclusão: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
             response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Consulta o status de um job de exclusão
+     */
+    @GetMapping("/deletion-job/{jobId}/status")
+    public ResponseEntity<Map<String, Object>> getDeletionJobStatus(@PathVariable java.util.UUID jobId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            com.z7design.secured_guard.model.DeletionJob job = unifiedDocumentService.getDeletionJobById(jobId);
+            com.z7design.secured_guard.dto.DeletionJobDTO jobDTO = 
+                com.z7design.secured_guard.dto.DeletionJobDTO.fromEntity(job);
+            
+            response.put("sucesso", true);
+            response.put("job", jobDTO);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao consultar status do job de exclusão {}: {}", jobId, e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Job não encontrado: " + jobId);
+            response.put("erro", e.getClass().getSimpleName());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Cancela um job de exclusão em processamento
+     */
+    @PostMapping("/deletion-job/{jobId}/cancel")
+    public ResponseEntity<Map<String, Object>> cancelDeletionJob(@PathVariable java.util.UUID jobId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            unifiedDocumentService.cancelDeletionJob(jobId);
+            response.put("sucesso", true);
+            response.put("mensagem", "Job de exclusão cancelado com sucesso");
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalStateException e) {
+            response.put("sucesso", false);
+            response.put("mensagem", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("💥 Erro ao cancelar job de exclusão {}: {}", jobId, e.getMessage(), e);
+            response.put("sucesso", false);
+            response.put("mensagem", "Erro ao cancelar job: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -1477,7 +1528,18 @@ public class UnifiedDocumentController {
         } catch (Exception e) {
             log.error("💥 Erro ao criar job de unificação em lote: {}", e.getMessage(), e);
             response.put("sucesso", false);
-            response.put("mensagem", "Erro ao iniciar processamento: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
+            
+            // Verificar se é erro de tabela não existente
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Erro desconhecido";
+            if (errorMessage.contains("unification_jobs") && errorMessage.contains("não existe")) {
+                response.put("mensagem", "ERRO: A tabela 'unification_jobs' não existe no banco de dados. " +
+                    "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
+                    "Reinicie a aplicação para que o Flyway execute as migrations pendentes.");
+                response.put("tipoErro", "MIGRATION_PENDENTE");
+            } else {
+                response.put("mensagem", "Erro ao iniciar processamento: " + errorMessage);
+            }
+            
             response.put("erro", e.getClass().getSimpleName());
             return ResponseEntity.internalServerError().body(response);
         }

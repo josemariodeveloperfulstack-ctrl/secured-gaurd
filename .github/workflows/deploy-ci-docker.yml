@@ -357,6 +357,79 @@ EOF
           EOF
 
       # ============================================
+      # 1️⃣4️⃣.5️⃣ FORÇAR SAÍDA DO SWARM MODE E LIMPEZA COMPLETA
+      # ============================================
+      - name: 🔧 Force exit Swarm mode and complete cleanup
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔧 =========================================="
+            echo "🔧 FORÇANDO SAÍDA DO SWARM MODE E LIMPEZA"
+            echo "🔧 ========================================="
+            echo ""
+            
+            cd /var/www/secured_guard/ci
+            
+            # 1. Verificar e sair do Swarm mode
+            echo "📋 Verificando modo Docker..."
+            if docker info 2>/dev/null | grep -q "Swarm: active"; then
+              echo "⚠️ Docker está em modo Swarm"
+              echo "🔄 Tentando sair do modo Swarm..."
+              docker swarm leave --force 2>/dev/null || echo "⚠️ Não foi possível sair do modo Swarm (pode estar em uso)"
+              sleep 5
+            else
+              echo "✅ Docker não está em modo Swarm"
+            fi
+            
+            # 2. Parar TODOS os containers relacionados (usando docker-compose e docker diretamente)
+            echo ""
+            echo "🛑 Parando todos os containers relacionados..."
+            
+            # Parar usando docker-compose
+            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            else
+              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            fi
+            
+            # Parar e remover containers manualmente (incluindo os com nomes estranhos)
+            echo "🧹 Removendo containers manualmente..."
+            docker ps -a --format "{{.ID}} {{.Names}}" | grep -E "(secured-guard|cc[0-9a-f]+_secured-guard)" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            
+            # Remover containers específicos com padrões conhecidos
+            docker ps -a | grep "secured-guard" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            docker ps -a | grep -E "cc[0-9a-f]+_secured-guard" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            
+            # 3. Remover imagens corrompidas ou antigas
+            echo ""
+            echo "🧹 Removendo imagens corrompidas..."
+            docker images | grep "z7design/secured-guard" | grep -E "(<none>|ci)" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+            
+            # 4. Limpar redes órfãs
+            echo ""
+            echo "🧹 Limpando redes órfãs..."
+            docker network prune -f 2>/dev/null || true
+            docker network rm secured-guard-ci-network 2>/dev/null || true
+            
+            # 5. Limpar volumes órfãos (cuidado: não remover volumes com dados)
+            echo ""
+            echo "🧹 Limpando volumes órfãos..."
+            docker volume prune -f 2>/dev/null || true
+            
+            # 6. Verificar se nginx.conf existe
+            echo ""
+            echo "📋 Verificando arquivos necessários..."
+            if [ ! -f "nginx/ci.conf" ]; then
+              echo "⚠️ nginx/ci.conf não encontrado! Criando diretório..."
+              mkdir -p nginx
+            else
+              echo "✅ nginx/ci.conf encontrado"
+            fi
+            
+            echo ""
+            echo "✅ Limpeza completa concluída!"
+          EOF
+
+      # ============================================
       # 1️⃣5️⃣ FAZER BACKUP E PARAR CONTAINERS ANTIGOS
       # ============================================
       - name: 💾 Backup and stop old containers
@@ -374,8 +447,12 @@ EOF
               echo "✅ Backup dos dados criado em: $BACKUP_DIR"
             fi
             
-            # Parar e remover containers antigos
-            docker-compose -f docker-compose.ci.yml down || true
+            # Parar e remover containers antigos (já foi feito no passo anterior, mas garantindo)
+            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            else
+              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            fi
             
             echo "✅ Containers antigos parados!"
           EOF
@@ -407,30 +484,54 @@ EOF
           EOF
 
       # ============================================
-      # 1️⃣6️⃣.5️⃣ LIMPAR CONTAINERS ÓRFÃOS E CONFLITOS
+      # 1️⃣6️⃣.5️⃣ VERIFICAR IMAGENS ANTES DE INICIAR
       # ============================================
-      - name: 🧹 Clean orphaned containers
+      - name: 🔍 Verify images before starting
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "🧹 Limpando containers órfãos e conflitos..."
+            echo "🔍 Verificando imagens antes de iniciar containers..."
             
             cd /var/www/secured_guard/ci
             
-            # Parar e remover containers órfãos
-            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            # Verificar se todas as imagens necessárias estão disponíveis
+            echo "📋 Verificando imagens disponíveis..."
+            docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem z7design/secured-guard encontrada"
+            
+            # Verificar se as imagens específicas existem
+            BACKEND_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "z7design/secured-guard-backend:ci" || echo "")
+            FRONTEND_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "z7design/secured-guard-frontend:ci" || echo "")
+            WHATSAPP_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "z7design/secured-guard-whatsapp:ci" || echo "")
+            
+            if [ -z "$BACKEND_IMAGE" ]; then
+              echo "❌ Imagem backend não encontrada! Fazendo pull..."
+              docker pull z7design/secured-guard-backend:ci || echo "⚠️ Erro ao fazer pull do backend"
             else
-              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+              echo "✅ Backend image: $BACKEND_IMAGE"
             fi
             
-            # Remover containers órfãos manualmente
-            echo "🧹 Removendo containers órfãos manualmente..."
-            docker ps -a | grep "secured-guard" | grep -v "CONTAINER" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            if [ -z "$FRONTEND_IMAGE" ]; then
+              echo "❌ Imagem frontend não encontrada! Fazendo pull..."
+              docker pull z7design/secured-guard-frontend:ci || echo "⚠️ Erro ao fazer pull do frontend"
+            else
+              echo "✅ Frontend image: $FRONTEND_IMAGE"
+            fi
             
-            # Remover containers com nomes conflitantes
-            docker ps -a | grep "c7c91a09d556_secured-guard-whatsapp-ci" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            if [ -z "$WHATSAPP_IMAGE" ]; then
+              echo "❌ Imagem whatsapp não encontrada! Fazendo pull..."
+              docker pull z7design/secured-guard-whatsapp:ci || echo "⚠️ Erro ao fazer pull do whatsapp"
+            else
+              echo "✅ WhatsApp image: $WHATSAPP_IMAGE"
+            fi
             
-            echo "✅ Limpeza concluída!"
+            # Verificar se nginx.conf existe
+            if [ ! -f "nginx/ci.conf" ]; then
+              echo "❌ ERRO: nginx/ci.conf não encontrado!"
+              exit 1
+            else
+              echo "✅ nginx/ci.conf encontrado"
+            fi
+            
+            echo "✅ Verificação concluída!"
           EOF
 
       # ============================================
@@ -439,51 +540,97 @@ EOF
       - name: 🚀 Start new containers
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            echo "🚀 Iniciando novos containers..."
+            echo "🚀 =========================================="
+            echo "🚀 INICIANDO NOVOS CONTAINERS"
+            echo "🚀 ========================================="
+            echo ""
             
             cd /var/www/secured_guard/ci
             
-            # Verificar se está em modo swarm
+            # Garantir que não está em modo Swarm
             if docker info 2>/dev/null | grep -q "Swarm: active"; then
-              echo "⚠️ Docker está em modo Swarm"
-              echo "🔄 Tentando usar 'docker compose' (v2) ao invés de 'docker-compose'..."
-              
-              # Tentar usar docker compose v2 se disponível
-              if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-                echo "✅ Usando 'docker compose' (v2)..."
-                COMPOSE_HTTP_TIMEOUT=300 docker compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
-              else
-                echo "⚠️ Docker Compose v2 não disponível. Tentando com docker-compose v1..."
-                COMPOSE_HTTP_TIMEOUT=300 docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
-              fi
+              echo "❌ ERRO: Docker ainda está em modo Swarm!"
+              echo "🔄 Tentando sair do modo Swarm novamente..."
+              docker swarm leave --force 2>/dev/null || true
+              sleep 5
+            fi
+            
+            # Verificar novamente
+            if docker info 2>/dev/null | grep -q "Swarm: active"; then
+              echo "❌ ERRO: Não foi possível sair do modo Swarm. Abortando..."
+              exit 1
             else
               echo "✅ Docker não está em modo Swarm"
-              # Usar docker compose v2 se disponível, senão docker-compose v1
-              if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-                echo "✅ Usando 'docker compose' (v2)..."
-                COMPOSE_HTTP_TIMEOUT=300 docker compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
-              else
-                echo "✅ Usando 'docker-compose' (v1)..."
-                COMPOSE_HTTP_TIMEOUT=300 docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
-              fi
+            fi
+            
+            # Verificar se nginx.conf existe
+            if [ ! -f "nginx/ci.conf" ]; then
+              echo "❌ ERRO: nginx/ci.conf não encontrado! Abortando..."
+              exit 1
+            fi
+            
+            # Usar docker compose v2 se disponível, senão docker-compose v1
+            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+              echo "✅ Usando 'docker compose' (v2)..."
+              COMPOSE_CMD="docker compose"
+            else
+              echo "✅ Usando 'docker-compose' (v1)..."
+              COMPOSE_CMD="docker-compose"
+            fi
+            
+            # Iniciar containers com recriação forçada
+            echo ""
+            echo "🚀 Iniciando containers..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ ERRO ao iniciar containers!"
+              echo "📋 Verificando logs de erro..."
+              $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 2>&1 | tail -50
+              exit 1
             fi
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
             
             # Verificar status dos containers
-            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-              docker compose -f docker-compose.ci.yml ps
-            else
-              docker-compose -f docker-compose.ci.yml ps
-            fi
+            echo ""
+            echo "📋 Status dos containers:"
+            $COMPOSE_CMD -f docker-compose.ci.yml ps
             
             # Verificar se containers foram criados
             echo ""
             echo "🔍 Verificando containers criados..."
             docker ps -a | grep "secured-guard" || echo "⚠️ Nenhum container secured-guard encontrado"
             
-            echo "✅ Containers iniciados!"
+            # Verificar se todos os containers esperados estão rodando
+            echo ""
+            echo "🔍 Verificando containers específicos..."
+            REQUIRED_CONTAINERS=("secured-guard-backend-ci" "secured-guard-frontend-ci" "secured-guard-nginx-ci" "secured-guard-whatsapp-ci" "secured-guard-db-ci" "secured-guard-redis-ci")
+            MISSING_CONTAINERS=()
+            
+            for container in "${REQUIRED_CONTAINERS[@]}"; do
+              if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+                STATUS=$(docker ps --format "{{.Names}} {{.Status}}" | grep "^${container} " || echo "${container} (stopped)")
+                echo "  ✅ $STATUS"
+              else
+                echo "  ❌ $container NÃO encontrado!"
+                MISSING_CONTAINERS+=("$container")
+              fi
+            done
+            
+            if [ ${#MISSING_CONTAINERS[@]} -gt 0 ]; then
+              echo ""
+              echo "❌ ERRO: Os seguintes containers não foram criados:"
+              printf '  - %s\n' "${MISSING_CONTAINERS[@]}"
+              echo ""
+              echo "📋 Logs do docker-compose:"
+              $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 100 2>&1 | tail -100
+              exit 1
+            fi
+            
+            echo ""
+            echo "✅ Todos os containers foram criados com sucesso!"
           EOF
 
       # ============================================

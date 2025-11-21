@@ -27,12 +27,27 @@ echo ""
 echo "🛑 Parando e removendo containers CI..."
 docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
 
-# 3. Remover containers órfãos manualmente
+# 3. Remover containers órfãos manualmente (incluindo os com nomes estranhos)
 echo ""
 echo "🧹 Removendo containers órfãos..."
 docker ps -a | grep "secured-guard" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+docker ps -a --format "{{.ID}} {{.Names}}" | grep -E "(secured-guard|cc[0-9a-f]+_secured-guard)" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
 
-# 4. Verificar se as imagens existem
+# Remover containers específicos com padrões conhecidos
+docker ps -a | grep -E "cc[0-9a-f]+_secured-guard" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+
+# 4. Limpar redes órfãs
+echo ""
+echo "🧹 Limpando redes órfãs..."
+docker network prune -f 2>/dev/null || true
+docker network rm secured-guard-ci-network 2>/dev/null || true
+
+# 5. Remover imagens corrompidas
+echo ""
+echo "🧹 Removendo imagens corrompidas..."
+docker images | grep "z7design/secured-guard" | grep -E "(<none>|ci)" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+
+# 6. Verificar se as imagens existem
 echo ""
 echo "🔍 Verificando imagens Docker..."
 IMAGES=(
@@ -51,7 +66,7 @@ for IMAGE in "${IMAGES[@]}"; do
     fi
 done
 
-# 5. Fazer pull das imagens faltantes
+# 7. Fazer pull das imagens faltantes
 if [ ${#MISSING_IMAGES[@]} -gt 0 ]; then
     echo ""
     echo "📥 Fazendo pull das imagens faltantes..."
@@ -61,12 +76,12 @@ if [ ${#MISSING_IMAGES[@]} -gt 0 ]; then
     done
 fi
 
-# 6. Limpar volumes órfãos (cuidado!)
+# 8. Limpar volumes órfãos (cuidado!)
 echo ""
 echo "🧹 Limpando volumes órfãos..."
 docker volume prune -f 2>/dev/null || true
 
-# 7. Verificar arquivo .env
+# 9. Verificar arquivo .env
 echo ""
 echo "🔍 Verificando arquivo .env..."
 if [ -f .env ]; then
@@ -84,7 +99,17 @@ else
     echo "❌ Arquivo .env não existe!"
 fi
 
-# 8. Tentar iniciar containers com docker compose (v2) se disponível
+# 10. Verificar se nginx.conf existe
+echo ""
+echo "🔍 Verificando nginx.conf..."
+if [ ! -f "nginx/ci.conf" ]; then
+    echo "❌ ERRO: nginx/ci.conf não encontrado!"
+    exit 1
+else
+    echo "✅ nginx/ci.conf encontrado"
+fi
+
+# 11. Tentar iniciar containers com docker compose (v2) se disponível
 echo ""
 echo "🚀 Tentando iniciar containers..."
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
@@ -98,22 +123,22 @@ else
     exit 1
 fi
 
-# 9. Aguardar containers iniciarem
+# 12. Aguardar containers iniciarem
 echo ""
 echo "⏳ Aguardando containers iniciarem (30s)..."
 sleep 30
 
-# 10. Verificar status dos containers
+# 13. Verificar status dos containers
 echo ""
 echo "📋 Status dos containers:"
 docker-compose -f docker-compose.ci.yml ps || docker compose -f docker-compose.ci.yml ps
 
-# 11. Verificar logs do backend
+# 14. Verificar logs do backend
 echo ""
 echo "📋 Logs do backend (últimas 20 linhas):"
 docker logs --tail 20 secured-guard-backend-ci 2>&1 || echo "⚠️ Container backend não encontrado"
 
-# 12. Verificar logs do nginx
+# 15. Verificar logs do nginx
 echo ""
 echo "📋 Logs do nginx (últimas 20 linhas):"
 docker logs --tail 20 secured-guard-nginx-ci 2>&1 || echo "⚠️ Container nginx não encontrado"

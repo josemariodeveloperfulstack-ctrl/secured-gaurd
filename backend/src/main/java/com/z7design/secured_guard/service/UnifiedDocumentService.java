@@ -57,6 +57,7 @@ public class UnifiedDocumentService {
     private final EmployeeRepository employeeRepository;
     private final UnifiedDocumentRepository unifiedDocumentRepository;
     private final com.z7design.secured_guard.repository.UnificationJobRepository unificationJobRepository;
+    private final com.z7design.secured_guard.repository.DeletionJobRepository deletionJobRepository;
     private static final String UNIFIED_DIR = "uploads/unified/";
 
     /**
@@ -3503,43 +3504,89 @@ public class UnifiedDocumentService {
         
         log.info("📋 Criando job de unificação em lote: Mês={}, Ano={}, Force={}", month, year, forceUnification);
         
-        // Contar quantos documentos serão processados
-        List<Payslip> allPayslips = payslipService.getAllPayslips();
-        List<Payslip> filteredPayslips = allPayslips.stream()
-            .filter(p -> month == null || p.getMonth().equals(month))
-            .filter(p -> year == null || p.getYear().equals(year))
-            .filter(p -> p.getEmployeeName() != null && p.getMonth() != null && p.getYear() != null)
-            .toList();
-        
-        Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
-            .collect(Collectors.toMap(
-                p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
-                p -> p,
-                (existing, replacement) -> existing
-            ));
-        
-        int totalDocuments = uniquePayslips.size();
-        
-        // Criar job
-        com.z7design.secured_guard.model.UnificationJob job = com.z7design.secured_guard.model.UnificationJob.builder()
-            .status(com.z7design.secured_guard.model.UnificationJob.JobStatus.PENDING)
-            .month(month)
-            .year(year)
-            .forceUnification(forceUnification != null ? forceUnification : false)
-            .totalDocuments(totalDocuments)
-            .processedDocuments(0)
-            .successCount(0)
-            .failureCount(0)
-            .createdBy(createdBy)
-            .build();
-        
-        job = unificationJobRepository.save(job);
-        log.info("✅ Job criado: ID={}, Total de documentos: {}", job.getId(), totalDocuments);
-        
-        // Iniciar processamento assíncrono
-        processUnificationJobAsync(job.getId());
-        
-        return job;
+        try {
+            // Verificar se a tabela existe tentando fazer uma query simples
+            try {
+                unificationJobRepository.count();
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().contains("não existe")) {
+                    log.error("❌ ERRO CRÍTICO: A tabela 'unification_jobs' não existe no banco de dados!");
+                    log.error("❌ Por favor, execute a migration V338__create_unification_jobs_table.sql");
+                    throw new RuntimeException("A tabela 'unification_jobs' não existe no banco de dados. " +
+                        "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela.", e);
+                }
+                throw e;
+            }
+            
+            // Contar quantos documentos serão processados
+            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            List<Payslip> filteredPayslips = allPayslips.stream()
+                .filter(p -> month == null || p.getMonth().equals(month))
+                .filter(p -> year == null || p.getYear().equals(year))
+                .filter(p -> p.getEmployeeName() != null && p.getMonth() != null && p.getYear() != null)
+                .toList();
+            
+            Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
+                .collect(Collectors.toMap(
+                    p -> p.getEmployeeName().trim().toUpperCase() + "_" + p.getMonth() + "_" + p.getYear(),
+                    p -> p,
+                    (existing, replacement) -> existing
+                ));
+            
+            int totalDocuments = uniquePayslips.size();
+            
+            // Criar job
+            com.z7design.secured_guard.model.UnificationJob job = com.z7design.secured_guard.model.UnificationJob.builder()
+                .status(com.z7design.secured_guard.model.UnificationJob.JobStatus.PENDING)
+                .month(month)
+                .year(year)
+                .forceUnification(forceUnification != null ? forceUnification : false)
+                .totalDocuments(totalDocuments)
+                .processedDocuments(0)
+                .successCount(0)
+                .failureCount(0)
+                .createdBy(createdBy)
+                .build();
+            
+            job = unificationJobRepository.save(job);
+            log.info("✅ Job criado: ID={}, Total de documentos: {}", job.getId(), totalDocuments);
+            
+            // Iniciar processamento assíncrono
+            processUnificationJobAsync(job.getId());
+            
+            return job;
+            
+        } catch (org.hibernate.exception.SQLGrammarException e) {
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+            if (errorMsg.contains("não existe") || 
+                errorMsg.contains("does not exist") ||
+                errorMsg.contains("unification_jobs")) {
+                log.error("❌ ERRO CRÍTICO: A tabela 'unification_jobs' não existe no banco de dados!");
+                log.error("❌ Erro: {}", errorMsg);
+                throw new RuntimeException("A tabela 'unification_jobs' não existe no banco de dados. " +
+                    "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
+                    "Erro original: " + errorMsg, e);
+            }
+            throw e;
+        } catch (Exception e) {
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+            // Verificar se é erro de tabela não existente (PostgreSQL)
+            if (errorMsg.contains("não existe") || 
+                errorMsg.contains("does not exist") ||
+                errorMsg.contains("unification_jobs") ||
+                (e.getCause() != null && e.getCause().getMessage() != null && 
+                 (e.getCause().getMessage().contains("não existe") || 
+                  e.getCause().getMessage().contains("does not exist") ||
+                  e.getCause().getMessage().contains("unification_jobs")))) {
+                log.error("❌ ERRO CRÍTICO: A tabela 'unification_jobs' não existe no banco de dados!");
+                log.error("❌ Erro: {}", errorMsg);
+                throw new RuntimeException("A tabela 'unification_jobs' não existe no banco de dados. " +
+                    "Por favor, execute a migration V338__create_unification_jobs_table.sql para criar a tabela. " +
+                    "Reinicie a aplicação para que o Flyway execute as migrations pendentes. " +
+                    "Erro original: " + errorMsg, e);
+            }
+            throw e;
+        }
     }
 
     /**
@@ -3878,6 +3925,173 @@ public class UnifiedDocumentService {
             job.setCompletedAt(LocalDateTime.now());
             unificationJobRepository.save(job);
             log.info("✅ Job {} cancelado", jobId);
+        } else {
+            throw new IllegalStateException("Job não pode ser cancelado. Status atual: " + job.getStatus());
+        }
+    }
+
+    // ===== PROCESSAMENTO ASSÍNCRONO DE EXCLUSÃO =====
+
+    /**
+     * Cria um job de exclusão em lote e retorna imediatamente
+     */
+    @Transactional
+    public com.z7design.secured_guard.model.DeletionJob createDeletionJob(
+            List<String> fileNames, UUID createdBy) {
+        
+        log.info("🗑️ Criando job de exclusão em lote: {} arquivo(s)", fileNames.size());
+        
+        // Salvar lista de arquivos como JSON
+        String fileNamesJson;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            fileNamesJson = mapper.writeValueAsString(fileNames);
+        } catch (Exception e) {
+            log.error("💥 Erro ao serializar lista de arquivos: {}", e.getMessage());
+            fileNamesJson = "[]";
+        }
+        
+        com.z7design.secured_guard.model.DeletionJob job = com.z7design.secured_guard.model.DeletionJob.builder()
+            .status(com.z7design.secured_guard.model.DeletionJob.JobStatus.PENDING)
+            .totalFiles(fileNames.size())
+            .processedFiles(0)
+            .deletedCount(0)
+            .failedCount(0)
+            .fileNames(fileNamesJson)
+            .createdBy(createdBy)
+            .build();
+        
+        job = deletionJobRepository.save(job);
+        log.info("✅ Job de exclusão criado: {} ({} arquivos)", job.getId(), fileNames.size());
+        
+        // Iniciar processamento assíncrono
+        processDeletionJobAsync(job.getId());
+        
+        return job;
+    }
+
+    /**
+     * Processa um job de exclusão em lote de forma assíncrona
+     */
+    @Async
+    @Transactional
+    public void processDeletionJobAsync(UUID jobId) {
+        log.info("🗑️ Iniciando processamento assíncrono do job de exclusão: {}", jobId);
+        
+        com.z7design.secured_guard.model.DeletionJob job = deletionJobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job de exclusão não encontrado: " + jobId));
+        
+        try {
+            // Atualizar status para PROCESSING
+            job.setStatus(com.z7design.secured_guard.model.DeletionJob.JobStatus.PROCESSING);
+            job.setStartedAt(LocalDateTime.now());
+            deletionJobRepository.save(job);
+            
+            long startTime = System.currentTimeMillis();
+            
+            // Parsear lista de arquivos
+            List<String> fileNames;
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                fileNames = mapper.readValue(job.getFileNames(), 
+                    mapper.getTypeFactory().constructCollectionType(List.class, String.class));
+            } catch (Exception e) {
+                log.error("💥 Erro ao parsear lista de arquivos: {}", e.getMessage());
+                throw new RuntimeException("Erro ao parsear lista de arquivos", e);
+            }
+            
+            int deletedCount = 0;
+            int failedCount = 0;
+            List<String> failedFiles = new ArrayList<>();
+            
+            // Processar exclusões em paralelo (usando stream paralelo para melhor performance)
+            log.info("🗑️ Processando {} arquivo(s) para exclusão...", fileNames.size());
+            
+            for (int i = 0; i < fileNames.size(); i++) {
+                String fileName = fileNames.get(i);
+                
+                // Verificar se job foi cancelado
+                job = deletionJobRepository.findById(jobId).orElse(null);
+                if (job == null || job.getStatus() == com.z7design.secured_guard.model.DeletionJob.JobStatus.CANCELLED) {
+                    log.info("⚠️ Job de exclusão foi cancelado. Parando processamento.");
+                    break;
+                }
+                
+                try {
+                    if (deleteUnifiedDocument(fileName)) {
+                        deletedCount++;
+                        log.debug("✅ Arquivo excluído: {} ({}/{})", fileName, i + 1, fileNames.size());
+                    } else {
+                        failedCount++;
+                        failedFiles.add(fileName);
+                        log.warn("⚠️ Falha ao excluir arquivo: {} ({}/{})", fileName, i + 1, fileNames.size());
+                    }
+                } catch (Exception e) {
+                    failedCount++;
+                    failedFiles.add(fileName);
+                    log.error("💥 Erro ao excluir arquivo {}: {}", fileName, e.getMessage());
+                }
+                
+                // Atualizar progresso a cada 10 arquivos ou no final
+                if ((i + 1) % 10 == 0 || (i + 1) == fileNames.size()) {
+                    job.setProcessedFiles(i + 1);
+                    job.setDeletedCount(deletedCount);
+                    job.setFailedCount(failedCount);
+                    deletionJobRepository.save(job);
+                    log.info("📊 Progresso: {}/{} processados, {} excluídos, {} falhas", 
+                        i + 1, fileNames.size(), deletedCount, failedCount);
+                }
+            }
+            
+            // Finalizar job
+            long endTime = System.currentTimeMillis();
+            job.setStatus(com.z7design.secured_guard.model.DeletionJob.JobStatus.COMPLETED);
+            job.setProcessedFiles(fileNames.size());
+            job.setDeletedCount(deletedCount);
+            job.setFailedCount(failedCount);
+            job.setProcessingTimeMs(endTime - startTime);
+            job.setCompletedAt(LocalDateTime.now());
+            
+            if (failedCount > 0) {
+                job.setErrorMessage(String.format("%d arquivo(s) não puderam ser excluídos: %s", 
+                    failedCount, String.join(", ", failedFiles.subList(0, Math.min(10, failedFiles.size())))));
+            }
+            
+            deletionJobRepository.save(job);
+            
+            log.info("✅ Job de exclusão concluído: {} ({} excluídos, {} falhas, {}ms)", 
+                jobId, deletedCount, failedCount, endTime - startTime);
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao processar job de exclusão {}: {}", jobId, e.getMessage(), e);
+            job.setStatus(com.z7design.secured_guard.model.DeletionJob.JobStatus.FAILED);
+            job.setErrorMessage("Erro ao processar exclusão: " + e.getMessage());
+            job.setCompletedAt(LocalDateTime.now());
+            deletionJobRepository.save(job);
+        }
+    }
+
+    /**
+     * Busca um job de exclusão por ID
+     */
+    public com.z7design.secured_guard.model.DeletionJob getDeletionJobById(UUID jobId) {
+        return deletionJobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job de exclusão não encontrado: " + jobId));
+    }
+
+    /**
+     * Cancela um job de exclusão em processamento
+     */
+    @Transactional
+    public void cancelDeletionJob(UUID jobId) {
+        com.z7design.secured_guard.model.DeletionJob job = deletionJobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job de exclusão não encontrado: " + jobId));
+        
+        if (job.getStatus() == com.z7design.secured_guard.model.DeletionJob.JobStatus.PROCESSING) {
+            job.setStatus(com.z7design.secured_guard.model.DeletionJob.JobStatus.CANCELLED);
+            job.setCompletedAt(LocalDateTime.now());
+            deletionJobRepository.save(job);
+            log.info("✅ Job de exclusão {} cancelado", jobId);
         } else {
             throw new IllegalStateException("Job não pode ser cancelado. Status atual: " + job.getStatus());
         }
