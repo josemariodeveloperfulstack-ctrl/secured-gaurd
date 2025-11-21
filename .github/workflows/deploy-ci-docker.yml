@@ -578,6 +578,31 @@ EOF
               COMPOSE_CMD="docker-compose"
             fi
             
+            # Criar redes Docker se não existirem
+            echo ""
+            echo "🌐 Verificando e criando redes Docker..."
+            
+            # Criar rede z7network se não existir
+            if ! docker network ls | grep -q "z7network"; then
+              echo "📡 Criando rede z7network..."
+              docker network create z7network 2>&1 || echo "⚠️ Erro ao criar rede z7network (pode já existir)"
+            else
+              echo "✅ Rede z7network já existe"
+            fi
+            
+            # Criar rede secured-guard-ci-network se não existir
+            if ! docker network ls | grep -q "secured-guard-ci"; then
+              echo "📡 Criando rede secured-guard-ci-network..."
+              docker network create secured-guard-ci-network 2>&1 || echo "⚠️ Erro ao criar rede secured-guard-ci-network (pode já existir)"
+            else
+              echo "✅ Rede secured-guard-ci-network já existe"
+            fi
+            
+            # Verificar se as redes foram criadas
+            echo ""
+            echo "📋 Redes Docker disponíveis:"
+            docker network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
+            
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
             echo "🚀 Iniciando TODOS os containers..."
