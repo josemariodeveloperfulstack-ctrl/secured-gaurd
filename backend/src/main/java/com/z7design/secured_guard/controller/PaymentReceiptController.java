@@ -229,8 +229,18 @@ public class PaymentReceiptController {
     @PostMapping("/delete-multiple")
     public ResponseEntity<Map<String, Object>> deleteMultiplePaymentReceipts(@RequestBody Map<String, List<String>> body) {
         try {
+            if (body == null) {
+                log.warn("⚠️ Request body é nulo");
+                Map<String, Object> result = new HashMap<>();
+                result.put("deleted", 0);
+                result.put("failed", 0);
+                result.put("errors", List.of("Request body não pode ser nulo"));
+                return ResponseEntity.badRequest().body(result);
+            }
+            
             List<String> idStrings = body.get("ids");
             if (idStrings == null || idStrings.isEmpty()) {
+                log.info("📋 Lista de IDs vazia ou nula");
                 Map<String, Object> result = new HashMap<>();
                 result.put("deleted", 0);
                 result.put("failed", 0);
@@ -238,13 +248,17 @@ public class PaymentReceiptController {
                 return ResponseEntity.ok(result);
             }
             
+            log.info("🗑️ Iniciando exclusão de {} comprovantes", idStrings.size());
             Map<String, Object> result = paymentReceiptService.deleteMultiplePaymentReceipts(idStrings);
+            log.info("✅ Exclusão concluída: {} excluídos, {} falharam", result.get("deleted"), result.get("failed"));
             return ResponseEntity.ok(result);
         } catch (Exception e) {
+            log.error("❌ Erro ao processar exclusão múltipla: {}", e.getMessage(), e);
             Map<String, Object> errorResult = new HashMap<>();
             errorResult.put("deleted", 0);
             errorResult.put("failed", 0);
-            errorResult.put("errors", List.of("Erro interno: " + e.getMessage()));
+            String errorMessage = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            errorResult.put("errors", List.of("Erro interno: " + errorMessage));
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
         }
     }

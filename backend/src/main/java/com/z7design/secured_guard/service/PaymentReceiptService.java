@@ -814,16 +814,47 @@ public class PaymentReceiptService {
         int failed = 0;
         List<String> errors = new ArrayList<>();
         
+        if (ids == null || ids.isEmpty()) {
+            result.put("deleted", 0);
+            result.put("failed", 0);
+            result.put("errors", new ArrayList<>());
+            return result;
+        }
+        
         for (String id : ids) {
             try {
-                deleteById(id);
+                // Validar UUID antes de tentar excluir
+                if (id == null || id.trim().isEmpty()) {
+                    failed++;
+                    errors.add("ID vazio ou nulo fornecido");
+                    log.warn("ID vazio ou nulo fornecido para exclusão");
+                    continue;
+                }
+                
+                // Validar formato UUID
+                try {
+                    UUID.fromString(id.trim());
+                } catch (IllegalArgumentException e) {
+                    failed++;
+                    String error = "ID inválido (não é um UUID válido): " + id;
+                    errors.add(error);
+                    log.warn(error);
+                    continue;
+                }
+                
+                deleteById(id.trim());
                 deleted++;
                 log.info("Comprovante excluído com sucesso: {}", id);
-            } catch (Exception e) {
+            } catch (IllegalArgumentException e) {
                 failed++;
-                String error = "Erro ao excluir comprovante " + id + ": " + e.getMessage();
+                String error = "ID inválido " + id + ": " + e.getMessage();
                 errors.add(error);
                 log.error(error, e);
+            } catch (Exception e) {
+                failed++;
+                String error = "Erro ao excluir comprovante " + id + ": " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                errors.add(error);
+                log.error("Erro ao excluir comprovante {}: {}", id, e.getMessage(), e);
             }
         }
         
