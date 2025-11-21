@@ -21,16 +21,35 @@ else
     echo "✅ Docker não está em modo Swarm"
 fi
 
-# 2. Criar diretório se não existir
+# 2. Detectar diretório do projeto
 echo ""
-echo "2️⃣ Verificando diretório do projeto..."
-CI_DIR="/var/www/secured_guard/ci"
-if [ ! -d "$CI_DIR" ]; then
+echo "2️⃣ Detectando diretório do projeto..."
+# Tentar encontrar o diretório do projeto
+if [ -d "/root/secured_guard/ci" ]; then
+    CI_DIR="/root/secured_guard/ci"
+    echo "✅ Diretório encontrado: $CI_DIR"
+elif [ -d "/var/www/secured_guard/ci" ]; then
+    CI_DIR="/var/www/secured_guard/ci"
+    echo "✅ Diretório encontrado: $CI_DIR"
+elif [ -d "./ci" ]; then
+    CI_DIR="$(pwd)/ci"
+    echo "✅ Diretório encontrado: $CI_DIR"
+else
+    # Tentar criar em /root/secured_guard/ci primeiro
+    CI_DIR="/root/secured_guard/ci"
     echo "📁 Criando diretório $CI_DIR..."
     mkdir -p "$CI_DIR"
-    echo "✅ Diretório criado"
+    echo "✅ Diretório criado: $CI_DIR"
+fi
+
+# Criar diretório de volumes se não existir
+VOLUMES_DIR="/var/www/secured_guard/ci"
+if [ ! -d "$VOLUMES_DIR" ]; then
+    echo "📁 Criando diretório de volumes: $VOLUMES_DIR..."
+    mkdir -p "$VOLUMES_DIR"
+    echo "✅ Diretório de volumes criado"
 else
-    echo "✅ Diretório já existe: $CI_DIR"
+    echo "✅ Diretório de volumes já existe: $VOLUMES_DIR"
 fi
 
 # 3. Criar redes Docker necessárias
@@ -76,12 +95,15 @@ fi
 # 6. Criar diretórios necessários
 echo ""
 echo "6️⃣ Criando diretórios necessários..."
-mkdir -p "$CI_DIR/postgres_data"
-mkdir -p "$CI_DIR/redis_data"
-mkdir -p "$CI_DIR/uploads"
-mkdir -p "$CI_DIR/logs"
-mkdir -p "$CI_DIR/whatsapp_sessions"
-mkdir -p "$CI_DIR/backups"
+# Diretórios no projeto
+mkdir -p "$CI_DIR/nginx"
+# Diretórios de volumes (usados pelo docker-compose)
+mkdir -p "$VOLUMES_DIR/postgres_data"
+mkdir -p "$VOLUMES_DIR/redis_data"
+mkdir -p "$VOLUMES_DIR/uploads"
+mkdir -p "$VOLUMES_DIR/logs"
+mkdir -p "$VOLUMES_DIR/whatsapp_sessions"
+mkdir -p "$VOLUMES_DIR/backups"
 echo "✅ Diretórios criados"
 
 # 7. Verificar permissões
