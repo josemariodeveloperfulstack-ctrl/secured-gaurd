@@ -715,12 +715,24 @@ EOF
                     echo "  ⚠️ Erro ao iniciar $container. Verificando logs..."
                     docker logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
                     
-                    # Se for backend ou whatsapp, tentar recriar
-                    if [[ "$container" == *"backend"* ]] || [[ "$container" == *"whatsapp"* ]]; then
-                      echo "  🔄 Tentando recriar $container..."
+                    # Tentar recriar qualquer container que não iniciou
+                    echo "  🔄 Tentando recriar $container..."
+                    if [[ "$container" == *"db"* ]] || [[ "$container" == *"postgres"* ]]; then
+                      SERVICE_NAME="postgres-ci"
+                    elif [[ "$container" == *"redis"* ]]; then
+                      SERVICE_NAME="redis-ci"
+                    elif [[ "$container" == *"backend"* ]]; then
+                      SERVICE_NAME="backend-ci"
+                    elif [[ "$container" == *"whatsapp"* ]]; then
+                      SERVICE_NAME="whatsapp-service-ci"
+                    elif [[ "$container" == *"frontend"* ]]; then
+                      SERVICE_NAME="frontend-ci"
+                    elif [[ "$container" == *"nginx"* ]]; then
+                      SERVICE_NAME="nginx-ci"
+                    else
                       SERVICE_NAME=$(echo "$container" | sed 's/secured-guard-//' | sed 's/-ci$//')
-                      $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME-ci" 2>&1 || echo "  ⚠️ Erro ao recriar $container"
                     fi
+                    $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME" 2>&1 || echo "  ⚠️ Erro ao recriar $container"
                   }
                 done
                 
