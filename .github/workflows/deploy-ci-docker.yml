@@ -578,17 +578,56 @@ EOF
               COMPOSE_CMD="docker-compose"
             fi
             
-            # Iniciar containers com recriação forçada
+            # Iniciar containers na ordem correta
             echo ""
-            echo "🚀 Iniciando containers..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+            echo "🚀 Iniciando containers na ordem correta..."
+            
+            # 1. Iniciar banco e redis primeiro
+            echo "1️⃣ Iniciando PostgreSQL e Redis..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans postgres-ci redis-ci
             
             if [ $? -ne 0 ]; then
-              echo "❌ ERRO ao iniciar containers!"
-              echo "📋 Verificando logs de erro..."
-              $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 2>&1 | tail -50
+              echo "❌ ERRO ao iniciar PostgreSQL/Redis!"
               exit 1
             fi
+            
+            echo "⏳ Aguardando PostgreSQL e Redis ficarem saudáveis (30s)..."
+            sleep 30
+            
+            # 2. Iniciar backend
+            echo "2️⃣ Iniciando Backend..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans backend-ci
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ ERRO ao iniciar Backend!"
+              echo "📋 Logs do backend:"
+              docker logs --tail 50 secured-guard-backend-ci 2>&1 | tail -30 || echo "Container não encontrado"
+              exit 1
+            fi
+            
+            echo "⏳ Aguardando Backend iniciar (20s)..."
+            sleep 20
+            
+            # 3. Iniciar WhatsApp (depende do backend)
+            echo "3️⃣ Iniciando WhatsApp..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans whatsapp-service-ci
+            
+            if [ $? -ne 0 ]; then
+              echo "⚠️ ERRO ao iniciar WhatsApp, mas continuando..."
+              echo "📋 Logs do WhatsApp:"
+              docker logs --tail 50 secured-guard-whatsapp-ci 2>&1 | tail -30 || echo "Container não encontrado"
+            fi
+            
+            # 4. Iniciar frontend e nginx
+            echo "4️⃣ Iniciando Frontend e Nginx..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans frontend-ci nginx-ci
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ ERRO ao iniciar Frontend/Nginx!"
+              exit 1
+            fi
+            
+            echo "✅ Todos os containers foram iniciados!"
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
@@ -603,34 +642,179 @@ EOF
             echo "🔍 Verificando containers criados..."
             docker ps -a | grep "secured-guard" || echo "⚠️ Nenhum container secured-guard encontrado"
             
-            # Verificar se todos os containers esperados estão rodando
+            # Verificar e tentar iniciar containers que não estão rodando
             echo ""
-            echo "🔍 Verificando containers específicos..."
-            REQUIRED_CONTAINERS=("secured-guard-backend-ci" "secured-guard-frontend-ci" "secured-guard-nginx-ci" "secured-guard-whatsapp-ci" "secured-guard-db-ci" "secured-guard-redis-ci")
-            MISSING_CONTAINERS=()
+            echo "🔍 Verificando e corrigindo containers que não estão rodando..."
+            REQUIRED_CONTAINERS=("secured-guard-db-ci" "secured-guard-redis-ci" "secured-guard-backend-ci" "secured-guard-whatsapp-ci" "secured-guard-frontend-ci" "secured-guard-nginx-ci")
+            MAX_RETRIES=3
+            RETRY=0
             
-            for container in "${REQUIRED_CONTAINERS[@]}"; do
-              if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
-                STATUS=$(docker ps --format "{{.Names}} {{.Status}}" | grep "^${container} " || echo "${container} (stopped)")
-                echo "  ✅ $STATUS"
-              else
-                echo "  ❌ $container NÃO encontrado!"
-                MISSING_CONTAINERS+=("$container")
+            while [ $RETRY -lt $MAX_RETRIES ]; do
+              RETRY=$((RETRY + 1))
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "Verificação $RETRY de $MAX_RETRIES..."
+              
+              STOPPED_CONTAINERS=()
+              
+              for container in "${REQUIRED_CONTAINERS[@]}"; do
+                if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+                  if docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                    STATUS=$(docker ps --format "{{.Names}} {{.Status}}" | grep "^${container} ")
+                    echo "  ✅ $STATUS"
+                  else
+                    echo "  ⚠️ $container está parado!"
+                    STOPPED_CONTAINERS+=("$container")
+                  fi
+                else
+                  echo "  ❌ $container NÃO foi criado!"
+                  STOPPED_CONTAINERS+=("$container")
+                fi
+              done
+              
+              if [ ${#STOPPED_CONTAINERS[@]} -eq 0 ]; then
+                echo ""
+                echo "✅ Todos os containers estão rodando!"
+                break
+              fi
+              
+              if [ $RETRY -lt $MAX_RETRIES ]; then
+                echo ""
+                echo "🔄 Tentando iniciar containers parados..."
+                
+                for container in "${STOPPED_CONTAINERS[@]}"; do
+                  echo "  🔄 Iniciando $container..."
+                  
+                  # Tentar iniciar o container
+                  docker start "$container" 2>&1 || {
+                    echo "  ⚠️ Erro ao iniciar $container. Verificando logs..."
+                    docker logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
+                    
+                    # Se for backend ou whatsapp, tentar recriar
+                    if [[ "$container" == *"backend"* ]] || [[ "$container" == *"whatsapp"* ]]; then
+                      echo "  🔄 Tentando recriar $container..."
+                      SERVICE_NAME=$(echo "$container" | sed 's/secured-guard-//' | sed 's/-ci$//')
+                      $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME-ci" 2>&1 || echo "  ⚠️ Erro ao recriar $container"
+                    fi
+                  }
+                done
+                
+                echo "⏳ Aguardando containers iniciarem (20s)..."
+                sleep 20
               fi
             done
             
-            if [ ${#MISSING_CONTAINERS[@]} -gt 0 ]; then
+            # Verificação final
+            echo ""
+            echo "🔍 Verificação final dos containers..."
+            FINAL_STOPPED=()
+            
+            for container in "${REQUIRED_CONTAINERS[@]}"; do
+              if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                echo "  ❌ $container NÃO está rodando!"
+                FINAL_STOPPED+=("$container")
+                
+                # Mostrar logs do container que não está rodando
+                echo "  📋 Logs de $container:"
+                docker logs --tail 50 "$container" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
+              fi
+            done
+            
+            if [ ${#FINAL_STOPPED[@]} -gt 0 ]; then
               echo ""
-              echo "❌ ERRO: Os seguintes containers não foram criados:"
-              printf '  - %s\n' "${MISSING_CONTAINERS[@]}"
+              echo "❌ ERRO: Os seguintes containers não estão rodando após $MAX_RETRIES tentativas:"
+              printf '  - %s\n' "${FINAL_STOPPED[@]}"
               echo ""
               echo "📋 Logs do docker-compose:"
               $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 100 2>&1 | tail -100
+              echo ""
+              echo "📋 Status detalhado:"
+              $COMPOSE_CMD -f docker-compose.ci.yml ps -a
               exit 1
             fi
             
             echo ""
-            echo "✅ Todos os containers foram criados com sucesso!"
+            echo "✅ Todos os containers estão rodando com sucesso!"
+          EOF
+
+      # ============================================
+      # 1️⃣7️⃣.5️⃣ VERIFICAR E CORRIGIR CONTAINERS QUE NÃO ESTÃO RODANDO
+      # ============================================
+      - name: 🔧 Fix containers that are not running
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔧 Verificando e corrigindo containers que não estão rodando..."
+            
+            cd /var/www/secured_guard/ci
+            
+            # Verificar containers críticos
+            CRITICAL_CONTAINERS=("secured-guard-backend-ci" "secured-guard-whatsapp-ci")
+            
+            for container in "${CRITICAL_CONTAINERS[@]}"; do
+              if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                echo "⚠️ $container não está rodando!"
+                echo "📋 Verificando logs..."
+                docker logs --tail 50 "$container" 2>&1 | tail -30 || echo "Container não encontrado"
+                
+                # Tentar iniciar
+                echo "🔄 Tentando iniciar $container..."
+                docker start "$container" 2>&1 || {
+                  echo "⚠️ Erro ao iniciar. Tentando recriar..."
+                  
+                  # Extrair nome do serviço do docker-compose
+                  if [[ "$container" == *"backend"* ]]; then
+                    SERVICE_NAME="backend-ci"
+                  elif [[ "$container" == *"whatsapp"* ]]; then
+                    SERVICE_NAME="whatsapp-service-ci"
+                  else
+                    continue
+                  fi
+                  
+                  # Recriar o serviço
+                  if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+                    docker compose -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME"
+                  else
+                    docker-compose -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME"
+                  fi
+                  
+                  echo "⏳ Aguardando $container iniciar (15s)..."
+                  sleep 15
+                  
+                  # Verificar novamente
+                  if docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                    echo "✅ $container iniciado com sucesso!"
+                  else
+                    echo "❌ $container ainda não está rodando após recriação"
+                    echo "📋 Logs finais:"
+                    docker logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
+                  fi
+                }
+              else
+                echo "✅ $container está rodando"
+              fi
+            done
+            
+            # Verificação final
+            echo ""
+            echo "🔍 Verificação final dos containers críticos..."
+            ALL_RUNNING=true
+            
+            for container in "${CRITICAL_CONTAINERS[@]}"; do
+              if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                echo "❌ $container NÃO está rodando!"
+                ALL_RUNNING=false
+              fi
+            done
+            
+            if [ "$ALL_RUNNING" = false ]; then
+              echo ""
+              echo "❌ ERRO: Alguns containers críticos não estão rodando!"
+              echo "📋 Status de todos os containers:"
+              docker ps -a | grep "secured-guard" || echo "Nenhum container encontrado"
+              exit 1
+            fi
+            
+            echo "✅ Todos os containers críticos estão rodando!"
           EOF
 
       # ============================================
@@ -784,11 +968,15 @@ EOF
             
             echo ""
             echo "🔍 Verificando logs do frontend (últimas 30 linhas)..."
-            docker logs --tail 30 secured-guard-frontend-ci
+            docker logs --tail 30 secured-guard-frontend-ci 2>&1 || echo "⚠️ Container frontend não encontrado"
+            
+            echo ""
+            echo "🔍 Verificando logs do WhatsApp (últimas 30 linhas)..."
+            docker logs --tail 30 secured-guard-whatsapp-ci 2>&1 || echo "⚠️ Container WhatsApp não encontrado"
             
             echo ""
             echo "🔍 Verificando logs do nginx (últimas 30 linhas)..."
-            docker logs --tail 30 secured-guard-nginx-ci
+            docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo "⚠️ Container nginx não encontrado"
           EOF
 
       # ============================================

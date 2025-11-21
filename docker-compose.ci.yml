@@ -111,6 +111,13 @@ services:
     volumes:
       - /var/www/secured_guard/ci/whatsapp_sessions:/app/sessions
       - /var/www/secured_guard/ci/uploads:/app/uploads
+    depends_on:
+      backend-ci:
+        condition: service_started
+      postgres-ci:
+        condition: service_healthy
+      redis-ci:
+        condition: service_healthy
     networks:
       - secured-guard-ci-network
       - z7network
@@ -119,6 +126,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
     # Memória compartilhada para Chromium/Puppeteer
     shm_size: 256mb
