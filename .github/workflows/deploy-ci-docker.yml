@@ -194,26 +194,26 @@ jobs:
         run: |
           echo "⚙️ Criando arquivo .env localmente..."
           
-          # Criar arquivo .env localmente
-          cat > .env.ci << EOF
-# ===== AMBIENTE CI =====
-ENVIRONMENT=ci
-APP_URL=https://ci.z7botsolutions.com.br
-
-# ===== BANCO DE DADOS =====
-POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}
-
-# ===== REDIS =====
-REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-
-# ===== JWT =====
-# Valor padrão seguro (80 caracteres) se não estiver definido no host
-JWT_SECRET=${{ env.JWT_SECRET_VALUE }}
-
-# ===== DOCKER =====
-DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
-DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}
-EOF
+          # Criar arquivo .env localmente usando echo para evitar problemas com YAML parser
+          {
+            echo "# ===== AMBIENTE CI ====="
+            echo "ENVIRONMENT=ci"
+            echo "APP_URL=https://ci.z7botsolutions.com.br"
+            echo ""
+            echo "# ===== BANCO DE DADOS ====="
+            echo "POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}"
+            echo ""
+            echo "# ===== REDIS ====="
+            echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}"
+            echo ""
+            echo "# ===== JWT ====="
+            echo "# Valor padrão seguro (80 caracteres) se não estiver definido no host"
+            echo "JWT_SECRET=${{ env.JWT_SECRET_VALUE }}"
+            echo ""
+            echo "# ===== DOCKER ====="
+            echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}"
+            echo "DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}"
+          } > .env.ci
           
           # Verificar tamanho do JWT_SECRET no arquivo
           JWT_LENGTH=$(grep "^JWT_SECRET=" .env.ci | cut -d'=' -f2 | wc -c)
