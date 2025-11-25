@@ -5,6 +5,7 @@ import com.z7design.secured_guard.dto.EnvioRequest;
 import com.z7design.secured_guard.dto.PayslipOrganizationResponse;
 import com.z7design.secured_guard.dto.PayslipProcessedFileResponse;
 import com.z7design.secured_guard.model.Payslip;
+import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.service.PayslipProcessingService;
 import com.z7design.secured_guard.service.PayslipService;
 import com.z7design.secured_guard.service.ExtractDataHoleritesService;
@@ -46,6 +47,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 public class PayslipController {
 
     private final PayslipService payslipService;
+    private final PayslipRepository payslipRepository;
     private final PayslipProcessingService payslipProcessingService;
     private final ExtractDataHoleritesService extractDataHoleritesService;
     private final AuthenticatedCpfResolver authenticatedCpfResolver;
@@ -135,23 +137,252 @@ public class PayslipController {
     // ==================== ENDPOINTS EXISTENTES ====================
 
     @PostMapping("/upload")
-    @Operation(summary = "Upload and process a PDF containing multiple payslips")
-    public ResponseEntity<List<Payslip>> uploadPayslips(@RequestParam("file") MultipartFile file) {
+    @Operation(summary = "Upload and process one or more PDFs containing multiple payslips (up to 3 files)")
+    public ResponseEntity<?> uploadPayslips(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files) {
         try {
-            log.info("Recebendo upload de holerite: {}", file.getOriginalFilename());
-            // Validação de nome de arquivo
-            String originalFilename = file.getOriginalFilename();
-            if (originalFilename != null && originalFilename.matches(".*[\\r\\n/\\\\<>:\"|?*].*")) {
-                log.warn("Nome de arquivo inválido recebido: {}", originalFilename);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Collections.emptyList());
+            // Log inicial para debug
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📥 RECEBENDO UPLOAD DE HOLERITES");
+            log.info("   Parâmetro 'file': {}", file != null ? file.getOriginalFilename() + " (" + file.getSize() + " bytes)" : "null");
+            log.info("   Parâmetro 'files': {}", files != null ? files.size() + " arquivo(s)" : "null");
+            if (files != null && !files.isEmpty()) {
+                for (int i = 0; i < files.size(); i++) {
+                    MultipartFile f = files.get(i);
+                    log.info("      [{}/{}] {} ({} bytes)", i + 1, files.size(), 
+                        f != null ? f.getOriginalFilename() : "null", 
+                        f != null ? f.getSize() : 0);
+                }
             }
-            List<Payslip> payslips = payslipService.processPayslipPDF(file);
-            return ResponseEntity.ok(payslips);
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            // Determinar quais arquivos processar
+            List<MultipartFile> filesToProcess = new ArrayList<>();
+            
+            // Verificar se há múltiplos arquivos no parâmetro 'files'
+            if (files != null && !files.isEmpty()) {
+                log.info("📦 Recebidos {} arquivo(s) via parâmetro 'files'", files.size());
+                int validCount = 0;
+                for (MultipartFile f : files) {
+                    if (f != null && !f.isEmpty()) {
+                        filesToProcess.add(f);
+                        validCount++;
+                        log.info("   ✅ Arquivo {} adicionado: {} ({} bytes)", validCount, f.getOriginalFilename(), f.getSize());
+                    } else {
+                        log.warn("   ⚠️ Arquivo nulo ou vazio ignorado na lista 'files'");
+                    }
+                }
+                log.info("   📊 Total de arquivos válidos em 'files': {}/{}", validCount, files.size());
+            }
+            
+            // Se não encontrou arquivos em 'files', verificar 'file' (compatibilidade)
+            if (filesToProcess.isEmpty()) {
+                if (file != null && !file.isEmpty()) {
+                    log.info("📦 Recebido 1 arquivo via parâmetro 'file': {} ({} bytes)", file.getOriginalFilename(), file.getSize());
+                    filesToProcess.add(file);
+                } else {
+                    log.warn("⚠️ Nenhum arquivo válido encontrado nem em 'files' nem em 'file'");
+                }
+            }
+            
+            // Validação crítica: garantir que temos arquivos para processar
+            if (filesToProcess.isEmpty()) {
+                log.error("❌ CRÍTICO: Nenhum arquivo válido para processar após validação!");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                        "error", "Nenhum arquivo válido fornecido",
+                        "message", "É necessário fornecer pelo menos um arquivo válido",
+                        "debug", Map.of(
+                            "fileParam", file != null ? "presente" : "ausente",
+                            "filesParam", files != null ? files.size() + " arquivo(s)" : "ausente"
+                        )
+                    ));
+            }
+            
+            log.info("✅ Total de arquivos válidos para processar: {}", filesToProcess.size());
+            
+            // Validar quantidade máxima (até 3 arquivos por usuário para manter performance e precisão)
+            if (filesToProcess.size() > 3) {
+                log.warn("⚠️ Muitos arquivos recebidos: {} (máximo 3 permitidos)", filesToProcess.size());
+                log.warn("   Processando apenas os primeiros 3 arquivos");
+                filesToProcess = new ArrayList<>(filesToProcess.subList(0, 3));
+            }
+            
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📤 INICIANDO PROCESSAMENTO DE {} ARQUIVO(S)", filesToProcess.size());
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            for (int i = 0; i < filesToProcess.size(); i++) {
+                MultipartFile f = filesToProcess.get(i);
+                log.info("   [{}/{}] {} ({} bytes)", i + 1, filesToProcess.size(), f.getOriginalFilename(), f.getSize());
+            }
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            // Processar arquivos SEQUENCIALMENTE (um por vez) para garantir precisão
+            List<Payslip> allPayslips = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+            int totalPages = 0;
+            int totalFilesProcessed = 0;
+            int filesBlocked = 0; // Contador para arquivos bloqueados
+            Map<String, Integer> pagesPerFile = new HashMap<>();
+            
+            // Usar filesToProcess diretamente (já validados acima)
+            List<MultipartFile> validFiles = filesToProcess;
+            
+            // Processar arquivos SEQUENCIALMENTE (um por vez) para garantir precisão e evitar problemas de memória
+            log.info("📊 Processando {} arquivo(s) válido(s) SEQUENCIALMENTE (um por vez)", validFiles.size());
+            log.info("   ℹ️ Cada arquivo será processado completamente antes de iniciar o próximo");
+            log.info("   ℹ️ Processamento sequencial garante precisão e evita problemas de memória");
+            
+            for (int i = 0; i < validFiles.size(); i++) {
+                MultipartFile f = validFiles.get(i);
+                String originalFilename = f.getOriginalFilename();
+                
+                try {
+                    log.info("");
+                    log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                    log.info("📤 ARQUIVO [{}/{}]: {}", i + 1, validFiles.size(), originalFilename);
+                    log.info("   Tamanho: {} bytes", f.getSize());
+                    log.info("   Iniciando processamento...");
+                    log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                    
+                    // Carregar arquivo em memória para verificação de hash
+                    byte[] fileBytes = f.getBytes();
+                    
+                    // Garantir que o arquivo ainda está acessível
+                    if (fileBytes.length == 0) {
+                        throw new IllegalArgumentException("Arquivo está vazio após carregamento");
+                    }
+                    
+                    // Verificar se o arquivo completo já foi processado anteriormente
+                    log.info("🔍 Verificando se arquivo já foi processado anteriormente...");
+                    boolean alreadyProcessed = payslipService.isFileAlreadyProcessed(fileBytes, originalFilename);
+                    log.info("   Resultado da verificação: {}", alreadyProcessed ? "JÁ PROCESSADO - BLOQUEANDO" : "NÃO PROCESSADO - PERMITINDO");
+                    
+                    if (alreadyProcessed) {
+                        log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        log.warn("⚠️ [{}/{}] ARQUIVO JÁ PROCESSADO - BLOQUEANDO PROCESSAMENTO", 
+                            i + 1, validFiles.size());
+                        log.warn("   Arquivo: {}", originalFilename);
+                        log.warn("   Status: Já foi processado anteriormente e não foi excluído do sistema.");
+                        log.warn("   Ação: Arquivo NÃO será processado novamente.");
+                        log.warn("   ℹ️ Se o arquivo foi modificado, o sistema detectará automaticamente e criará uma nova versão.");
+                        log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        errors.add("Arquivo " + originalFilename + ": Já foi processado anteriormente. Se houver alterações no conteúdo, uma nova versão será criada automaticamente.");
+                        pagesPerFile.put(originalFilename, 0);
+                        filesBlocked++; // Incrementar contador de arquivos bloqueados
+                        continue; // Pular para o próximo arquivo - NÃO PROCESSAR
+                    }
+                    
+                    log.info("✅ Arquivo não foi processado anteriormente ou foi modificado. Processando...");
+                    
+                    long startTime = System.currentTimeMillis();
+                    
+                    log.info("   🔄 Chamando processPayslipPDF para arquivo: {} ({} bytes)", originalFilename, fileBytes.length);
+                    List<Payslip> payslips = payslipService.processPayslipPDF(f);
+                    long processingTime = System.currentTimeMillis() - startTime;
+                    
+                    log.info("   📊 Resultado do processamento: {} holerite(s) retornado(s)", 
+                        payslips != null ? payslips.size() : 0);
+                    
+                    if (payslips == null || payslips.isEmpty()) {
+                        log.warn("⚠️ [{}/{}] Arquivo {} processado mas nenhum holerite foi extraído", 
+                            i + 1, validFiles.size(), originalFilename);
+                        errors.add("Arquivo " + originalFilename + ": Nenhum holerite extraído (pode estar vazio ou corrompido)");
+                        pagesPerFile.put(originalFilename, 0);
+                    } else {
+                        allPayslips.addAll(payslips);
+                        int pagesInFile = payslips.size();
+                        totalPages += pagesInFile;
+                        totalFilesProcessed++;
+                        pagesPerFile.put(originalFilename, pagesInFile);
+                        
+                        log.info("✅ [{}/{}] Arquivo {} processado com SUCESSO:", 
+                            i + 1, validFiles.size(), originalFilename);
+                        log.info("   📄 Holerites extraídos: {}", pagesInFile);
+                        log.info("   ⏱️ Tempo de processamento: {}ms ({})", 
+                            processingTime, String.format("%.2f", processingTime / 1000.0) + "s");
+                        log.info("   ✅ Arquivo concluído - Próximo arquivo será processado agora");
+                    }
+                } catch (Exception e) {
+                    log.error("❌ [{}/{}] ERRO ao processar arquivo {}: {}", 
+                        i + 1, validFiles.size(), originalFilename, e.getMessage(), e);
+                    errors.add("Erro ao processar " + originalFilename + ": " + e.getMessage());
+                    pagesPerFile.put(originalFilename, 0);
+                    // CONTINUAR processando próximos arquivos mesmo se este falhar
+                    log.info("   ⏭️ Continuando com próximo arquivo...");
+                }
+            }
+            
+            log.info("");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📊 RESUMO FINAL DO PROCESSAMENTO DE TODOS OS ARQUIVOS:");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("   📁 Total de arquivos recebidos: {}", filesToProcess.size());
+            log.info("   ✅ Arquivos processados com sucesso: {}/{}", totalFilesProcessed, validFiles.size());
+            log.info("   🚫 Arquivos bloqueados (já processados): {}", filesBlocked);
+            log.info("   📄 Total de holerites extraídos: {}", allPayslips.size());
+            log.info("   📑 Total de PÁGINAS processadas em TODOS os arquivos: {}", totalPages);
+            log.info("   ⚠️ Erros encontrados: {}", errors.size());
+            log.info("");
+            log.info("   📋 DETALHAMENTO POR ARQUIVO:");
+            for (Map.Entry<String, Integer> entry : pagesPerFile.entrySet()) {
+                log.info("      • {}: {} página(s)/holerite(s)", entry.getKey(), entry.getValue());
+            }
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            if (allPayslips.isEmpty() && !errors.isEmpty()) {
+                log.warn("⚠️ Nenhum holerite foi processado dos arquivos enviados, mas erros foram encontrados.");
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "Nenhum holerite foi processado. Verifique os erros.");
+                response.put("payslips", Collections.emptyList());
+                response.put("errors", errors);
+                response.put("totalPayslips", 0);
+                response.put("totalPages", 0);
+                response.put("totalFiles", filesToProcess.size());
+                response.put("filesProcessed", totalFilesProcessed);
+                response.put("filesBlocked", filesBlocked);
+                response.put("pagesPerFile", pagesPerFile);
+                return ResponseEntity.ok(response);
+            } else if (allPayslips.isEmpty()) {
+                log.warn("⚠️ Nenhum holerite foi processado dos arquivos enviados");
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "Nenhum holerite foi processado");
+                response.put("payslips", Collections.emptyList());
+                response.put("warning", "Os arquivos podem estar vazios, corrompidos ou não conter holerites válidos");
+                if (!errors.isEmpty()) {
+                    response.put("errors", errors);
+                }
+                response.put("filesBlocked", filesBlocked);
+                return ResponseEntity.ok(response);
+            }
+            
+            // Preparar resposta com informações detalhadas
+            Map<String, Object> response = new HashMap<>();
+            response.put("payslips", allPayslips);
+            response.put("totalPayslips", allPayslips.size());
+            response.put("totalPages", totalPages); // Total de páginas processadas em TODOS os arquivos
+            response.put("totalFiles", filesToProcess.size());
+            response.put("filesProcessed", totalFilesProcessed);
+            response.put("filesBlocked", filesBlocked);
+            response.put("pagesPerFile", pagesPerFile);
+            
+            // Sempre incluir erros na resposta (mesmo que vazio) para o frontend saber
+            if (!errors.isEmpty()) {
+                response.put("errors", errors);
+                response.put("message", "Processamento concluído com alguns avisos/erros. " + allPayslips.size() + " holerite(s) extraído(s).");
+            } else {
+                response.put("message", "Processamento concluído com sucesso! " + allPayslips.size() + " holerite(s) extraído(s) de " + totalPages + " página(s) em " + totalFilesProcessed + " arquivo(s)");
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Erro de validação ao processar upload: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "Erro de validação", "message", e.getMessage()));
         } catch (Exception e) {
-            log.error("Erro ao processar upload de holerite: {}", e.getMessage(), e);
-            // Retornar lista vazia ao invés de erro 500 para não quebrar o frontend
-            return ResponseEntity.ok(Collections.emptyList());
+            log.error("❌ Erro inesperado ao processar upload de holerite: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erro interno", "message", "Erro ao processar o arquivo: " + e.getMessage()));
         }
     }
 
@@ -805,6 +1036,23 @@ public class PayslipController {
         } catch (Exception e) {
             log.error("❌ Erro ao buscar dados extraídos: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @PostMapping("/update-missing-data")
+    @Operation(summary = "Update payslips missing company and sector data by extracting from PDFs")
+    public ResponseEntity<Map<String, Object>> updateMissingData() {
+        log.info("🔄 Iniciando atualização de holerites sem empresa/setor");
+        
+        try {
+            Map<String, Object> result = payslipService.updateMissingCompanyAndSectorData();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("❌ Erro ao atualizar holerites: {}", e.getMessage(), e);
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResult);
         }
     }
 }

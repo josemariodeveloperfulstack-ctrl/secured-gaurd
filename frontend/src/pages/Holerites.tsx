@@ -535,7 +535,12 @@ const Holerites: React.FC = () => {
     
     // Buscar por CPF (remove formatação para comparação)
     const cpfNormalized = entry.cpf?.replace(/\D/g, '').toLowerCase() || '';
-    if (cpfNormalized.includes(normalizedSearch.replace(/\D/g, ''))) {
+    const searchCpfNormalized = normalizedSearch.replace(/\D/g, '');
+    if (cpfNormalized && searchCpfNormalized && cpfNormalized.includes(searchCpfNormalized)) {
+      return true;
+    }
+    // Também verificar se o CPF formatado do entry contém o termo de busca (caso o usuário digite com formatação)
+    if (entry.cpf && normalizedSearch.length >= 3 && entry.cpf.toLowerCase().includes(normalizedSearch)) {
       return true;
     }
 
@@ -567,6 +572,71 @@ const Holerites: React.FC = () => {
 
     return false;
   }, []);
+
+  // Função para coletar todos os holerites da organização para busca direta
+  const getAllHoleritesFromOrganization = useCallback((): HoleriteOrganizedEntry[] => {
+    if (!organizationData?.companies) {
+      return [];
+    }
+
+    const allEntries: HoleriteOrganizedEntry[] = [];
+    
+    organizationData.companies.forEach(company => {
+      company.sectors?.forEach(sector => {
+        sector.periods?.forEach(period => {
+          if (period.payslips) {
+            allEntries.push(...period.payslips);
+          }
+        });
+      });
+    });
+
+    return allEntries;
+  }, [organizationData]);
+
+  // Função para encontrar a localização completa de um holerite na estrutura organizada
+  const findHoleriteLocation = useCallback((entry: HoleriteOrganizedEntry) => {
+    if (!organizationData?.companies) {
+      return null;
+    }
+
+    for (const company of organizationData.companies) {
+      const companyKey = getCompanyKey(company);
+      for (const sector of company.sectors || []) {
+        const sectorKey = getSectorKey(companyKey, sector);
+        for (const period of sector.periods || []) {
+          if (period.payslips?.some(p => p.id === entry.id)) {
+            const periodKey = getPeriodKey(sectorKey, period);
+            return {
+              company,
+              sector,
+              period,
+              companyKey,
+              sectorKey,
+              periodKey
+            };
+          }
+        }
+      }
+    }
+    return null;
+  }, [organizationData]);
+
+  // Função para obter holerites encontrados pela busca com informações de localização
+  const getSearchResults = useCallback((): (HoleriteOrganizedEntry & { location?: ReturnType<typeof findHoleriteLocation> })[] => {
+    if (!searchTerm || !searchTerm.trim()) {
+      return [];
+    }
+
+    const allHolerites = getAllHoleritesFromOrganization();
+    const filtered = allHolerites.filter(entry => matchesSearchTerm(entry, searchTerm));
+    
+    // Adicionar informações de localização para cada resultado
+    return filtered.map(entry => ({
+      ...entry,
+      location: findHoleriteLocation(entry)
+    }));
+  }, [searchTerm, getAllHoleritesFromOrganization, matchesSearchTerm, findHoleriteLocation]);
 
   const formatCpf = (cpf?: string) => {
     if (!cpf) return 'CPF não informado';
@@ -619,6 +689,42 @@ const Holerites: React.FC = () => {
       [periodKey]: !prev[periodKey]
     }));
   }, []);
+
+  // Função para navegar até um holerite específico na estrutura organizada
+  const navigateToHolerite = useCallback((location: ReturnType<typeof findHoleriteLocation>) => {
+    if (!location) return;
+    
+    // Expandir empresa
+    setExpandedCompanies(prev => ({
+      ...prev,
+      [location.companyKey]: true
+    }));
+    
+    // Expandir setor
+    setExpandedSectors(prev => ({
+      ...prev,
+      [location.sectorKey]: true
+    }));
+    
+    // Expandir período
+    setExpandedPeriods(prev => ({
+      ...prev,
+      [location.periodKey]: true
+    }));
+    
+    // Scroll até o elemento após um pequeno delay para garantir que a estrutura foi expandida
+    setTimeout(() => {
+      const element = document.querySelector(`[data-period-key="${location.periodKey}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Destacar o elemento brevemente
+        element.classList.add('ring-2', 'ring-seguranca-yellow', 'ring-opacity-75');
+        setTimeout(() => {
+          element.classList.remove('ring-2', 'ring-seguranca-yellow', 'ring-opacity-75');
+        }, 2000);
+      }
+    }, 100);
+  }, [findHoleriteLocation]);
 
   const fetchOrganizationData = useCallback(async (forceReload = false) => {
     if (loadingOrganization) {
@@ -3345,58 +3451,140 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       }
     } catch (error: any) {
       // Exibe a mensagem detalhada retornada pelo backend, se existir
-      const backendMsg = error?.response?.data?.mensagem || error?.response?.data?.message;
+      const backendMsg = error?.response?.data?.mensagem || error?.response?.data?.message || error?.response?.data?.error;
       const msg = backendMsg || 'Erro ao enviar via WhatsApp.';
+      const lowerMsg = msg?.toLowerCase() || '';
       console.error('Erro ao enviar WhatsApp individual:', error);
       console.error('Mensagem do backend:', backendMsg);
+      console.error('Status HTTP:', error?.response?.status);
       
-      // Exibir toast com a mensagem específica do backend
-      toast({ title: 'Validação necessária', description: msg, variant: 'destructive' });
-
+      // Detectar se é erro de WhatsApp não cadastrado
+      const isWhatsAppNotRegistered = lowerMsg.includes('whatsapp não cadastrado') || 
+                                      lowerMsg.includes('whatsapp não encontrado') ||
+                                      (error?.response?.status === 400 && lowerMsg.includes('whatsapp'));
+      
       // Tentar abrir automaticamente o modal correto baseado na mensagem do backend
       try {
         // Reutiliza cpf/funcionarioId calculados acima
         let employeeIdToValidate = funcionarioId;
-        if (!employeeIdToValidate) {
-          const matches = await employeeService.searchEmployees(cpf);
-          const exact = matches?.find((e: any) => (e.document || e.cpf || '').replace(/\D/g, '') === cpf);
-          if (exact) employeeIdToValidate = exact.id;
-        }
-        if (employeeIdToValidate) {
-          const validation = await contactValidationService.validateContacts({ employeeIds: [employeeIdToValidate], type: 'whatsapp' });
-          const detail = validation?.details?.[0];
-          if (detail) {
-            setSelectedValidationDetail(detail);
-            const lowerMsg = msg?.toLowerCase() || '';
-            const requiresConsent = detailNeedsWhatsAppConsent(detail);
-            if (requiresConsent && detail.hasUser && detail.userId) {
-              console.log('🛑 Consentimento pendente detectado após erro - abrindo modal de confirmação.');
-              openConsentModalForDetail(detail, payslip, employeeIdToValidate);
-              return;
+        if (!employeeIdToValidate && cpf) {
+          try {
+            const matches = await employeeService.searchEmployees(cpf);
+            const exact = matches?.find((e: any) => (e.document || e.cpf || '').replace(/\D/g, '') === cpf);
+            if (exact) {
+              employeeIdToValidate = exact.id;
+              console.log('✅ Funcionário encontrado pelo CPF após erro:', employeeIdToValidate);
             }
-            if (shouldTriggerConsentModal(msg) && detail.hasUser && detail.userId && detailNeedsWhatsAppConsent(detail)) {
-              openConsentModalForDetail(detail, payslip, employeeIdToValidate);
-              return;
-            }
-            if (lowerMsg.includes('usuário não encontrado') || detail.needsUserCreation) {
-              setShowSingleUserModal(true);
-              return;
-            }
-            if (lowerMsg.includes('whatsapp') || detail.needsWhatsAppUpdate) {
-              openWhatsappUpdateModal(detail, payslip, employeeIdToValidate);
-              return;
-            }
-          }
-          if (!detail && shouldTriggerConsentModal(msg)) {
-            const opened = await tryOpenConsentModalFromCpf(cpf, payslip, employeeIdToValidate);
-            if (opened) return;
+          } catch (searchErr) {
+            console.error('Erro ao buscar funcionário após erro de envio:', searchErr);
           }
         }
-        const openedByCpf = shouldTriggerConsentModal(msg)
-          ? await tryOpenConsentModalFromCpf(cpf, payslip, employeeIdToValidate)
-          : false;
-        if (openedByCpf) return;
-      } catch (_) {}
+        
+        // Se detectou que WhatsApp não está cadastrado, tentar buscar validação e abrir modal
+        if (isWhatsAppNotRegistered || lowerMsg.includes('whatsapp')) {
+          console.log('📱 WhatsApp não cadastrado detectado - tentando abrir modal de atualização...');
+          console.log('   CPF:', cpf);
+          console.log('   EmployeeId:', employeeIdToValidate);
+          
+          // Primeiro tentar com employeeId se disponível
+          if (employeeIdToValidate) {
+            try {
+              const validation = await contactValidationService.validateContacts({ 
+                employeeIds: [employeeIdToValidate], 
+                type: 'whatsapp' 
+              });
+              const detail = validation?.details?.[0];
+              
+              if (detail) {
+                setSelectedValidationDetail(detail);
+                console.log('📋 Detalhe de validação encontrado (via employeeId):', detail);
+                
+                const requiresConsent = detailNeedsWhatsAppConsent(detail);
+                if (requiresConsent && detail.hasUser && detail.userId) {
+                  console.log('🛑 Consentimento pendente - abrindo modal de confirmação.');
+                  openConsentModalForDetail(detail, payslip, employeeIdToValidate);
+                  return;
+                }
+                
+                if (detail.needsUserCreation || (!detail.hasUser && lowerMsg.includes('usuário não encontrado'))) {
+                  console.log('👤 Usuário não encontrado - abrindo modal de criação.');
+                  setShowSingleUserModal(true);
+                  return;
+                }
+                
+                if (detail.needsWhatsAppUpdate || !detail.hasWhatsApp) {
+                  console.log('📱 WhatsApp precisa ser atualizado/cadastrado - abrindo modal.');
+                  openWhatsappUpdateModal(detail, payslip, employeeIdToValidate);
+                  return;
+                }
+              }
+            } catch (validationErr) {
+              console.error('Erro ao validar contatos após erro (via employeeId):', validationErr);
+            }
+          }
+          
+          // Se não conseguiu com employeeId, tentar buscar por CPF diretamente
+          if (cpf) {
+            console.log('🔍 Tentando buscar validação por CPF para abrir modal...');
+            try {
+              // Tentar abrir modal de consentimento via CPF (que busca validação internamente)
+              const opened = await tryOpenConsentModalFromCpf(cpf, payslip, employeeIdToValidate);
+              if (opened) {
+                console.log('✅ Modal aberto via CPF');
+                return;
+              }
+              
+              // Se não conseguiu abrir modal de consentimento, tentar buscar validação de usuário
+              if (!opened) {
+                console.log('🔍 Tentando buscar validação de usuário por CPF...');
+                const userValidation = await userValidationService.validateByCpf(cpf);
+                if (userValidation) {
+                  console.log('✅ Validação de usuário encontrada:', userValidation);
+                  const detail = buildConsentDetailFromUserValidation(userValidation, cpf, payslip.employeeName);
+                  if (detail) {
+                    setSelectedValidationDetail(detail);
+                    
+                    if (detail.needsUserCreation) {
+                      console.log('👤 Abrindo modal de criação de usuário');
+                      setShowSingleUserModal(true);
+                      return;
+                    }
+                    
+                    if (detail.needsWhatsAppUpdate || !detail.hasWhatsApp) {
+                      console.log('📱 Abrindo modal de atualização de WhatsApp');
+                      openWhatsappUpdateModal(detail, payslip, employeeIdToValidate);
+                      return;
+                    }
+                    
+                    if (detailNeedsWhatsAppConsent(detail) && detail.hasUser && detail.userId) {
+                      console.log('🛑 Abrindo modal de consentimento de WhatsApp');
+                      openConsentModalForDetail(detail, payslip, employeeIdToValidate);
+                      return;
+                    }
+                  }
+                }
+              }
+            } catch (cpfErr) {
+              console.error('Erro ao tentar buscar/abrir modal por CPF:', cpfErr);
+            }
+          }
+        }
+        
+        // Exibir toast com a mensagem específica do backend
+        if (isWhatsAppNotRegistered) {
+          toast({ 
+            title: 'WhatsApp não cadastrado', 
+            description: 'É necessário cadastrar o WhatsApp antes de enviar. Verifique os modais abertos.', 
+            variant: 'destructive',
+            duration: 5000
+          });
+        } else {
+          toast({ title: 'Erro no envio', description: msg, variant: 'destructive' });
+        }
+      } catch (handlerError) {
+        console.error('Erro ao processar tratamento de erro:', handlerError);
+        toast({ title: 'Erro no envio', description: msg, variant: 'destructive' });
+      }
     }
   };
 
@@ -4794,7 +4982,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                  const periodExpanded = !!expandedPeriods[periodKey];
 
                                                  return (
-                                  <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                  <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
                                                        <div>
                                                          <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
@@ -5043,7 +5231,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                     const periodExpanded = !!expandedPeriods[periodKey];
 
                                     return (
-                                      <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                      <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
                                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
                                           <div>
                                             <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
@@ -5437,6 +5625,136 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   )}
                 </div>
               )}
+
+              {/* Resultados da busca - Holerites encontrados diretamente */}
+              {searchTerm && !loadingOrganization && organizationData?.companies && (() => {
+                const searchResults = getSearchResults();
+                const totalHolerites = getAllHoleritesFromOrganization().length;
+                
+                console.log('🔍 Debug busca:', {
+                  searchTerm,
+                  totalHolerites,
+                  resultadosEncontrados: searchResults.length,
+                  organizationDataCompanies: organizationData.companies.length,
+                  resultados: searchResults.slice(0, 3) // Mostrar apenas os 3 primeiros para não poluir o console
+                });
+                
+                if (searchResults.length > 0) {
+                  return (
+                    <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-seguranca-lightgray font-semibold flex items-center gap-2">
+                          <Search className="h-5 w-5 text-seguranca-yellow" />
+                          Holerites encontrados ({searchResults.length})
+                        </h3>
+                      </div>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {searchResults.map((entry) => {
+                          const holeriteData = resolveHoleriteFromEntry(entry);
+                          const location = entry.location;
+                          return (
+                            <div
+                              key={entry.id}
+                              className="bg-seguranca-black border border-gray-700 rounded-lg p-3 hover:border-seguranca-yellow transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <div className="font-semibold text-seguranca-lightgray text-lg">
+                                      {entry.employeeName || 'Nome não informado'}
+                                    </div>
+                                    {entry.companySigla && (
+                                      <span className="px-2 py-1 text-xs font-semibold rounded bg-seguranca-yellow/20 text-seguranca-yellow">
+                                        {entry.companySigla}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-400 mb-2">
+                                    <span className="font-semibold text-seguranca-red">CPF:</span>{' '}
+                                    <span className="font-mono text-white">{formatCpf(entry.cpf)}</span>
+                                    {' | '}
+                                    <span className="font-semibold text-seguranca-red">Período:</span>{' '}
+                                    <span className="font-mono text-white">
+                                      {String(entry.month || 0).padStart(2, '0')}/{entry.year || 0}
+                                    </span>
+                                    {entry.workPostName && (
+                                      <>
+                                        {' | '}
+                                        <span className="font-semibold text-seguranca-red">Setor:</span>{' '}
+                                        <span className="text-white">{entry.workPostName}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Localização na estrutura organizada */}
+                                  {location && (
+                                    <div className="bg-seguranca-graphite/50 border border-gray-600 rounded p-2 mt-2">
+                                      <div className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                                        <Building2 className="h-3 w-3" />
+                                        <span className="font-semibold">Localização:</span>
+                                      </div>
+                                      <div className="text-xs text-gray-300 space-y-1">
+                                        <div>
+                                          <span className="text-seguranca-yellow">Empresa:</span>{' '}
+                                          <span className="text-white">{location.company.companyName || 'Não informada'}</span>
+                                        </div>
+                                        {location.sector.sectorName && (
+                                          <div>
+                                            <span className="text-seguranca-yellow">Setor:</span>{' '}
+                                            <span className="text-white">{location.sector.sectorName}</span>
+                                          </div>
+                                        )}
+                                        <div>
+                                          <span className="text-seguranca-yellow">Período:</span>{' '}
+                                          <span className="text-white">
+                                            {String(location.period.month).padStart(2, '0')}/{location.period.year}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleViewHolerite(holeriteData)}
+                                    className="bg-seguranca-red hover:bg-seguranca-darkred"
+                                  >
+                                    <FileText className="h-4 w-4 mr-1" />
+                                    Visualizar
+                                  </Button>
+                                  {location && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => navigateToHolerite(location)}
+                                      className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10"
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-1" />
+                                      Ir até
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                } else if (totalHolerites > 0) {
+                  // Se há holerites na organização mas nenhum resultado, mostrar mensagem
+                  return (
+                    <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Search className="h-5 w-5" />
+                        <p>Nenhum holerite encontrado para "{searchTerm}"</p>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {loadingOrganization ? (
                 <div className="flex items-center justify-center py-16">
@@ -6556,7 +6874,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                             : false;
 
                                                                                       return (
-                                                                                          <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                                                                          <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
                                                                                               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
                                                                                                   <div>
                                                                                                       <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>

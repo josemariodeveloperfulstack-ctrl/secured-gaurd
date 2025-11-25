@@ -77,7 +77,7 @@ const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
 const Grupos = lazy(() => import('@/pages/Grupos'));
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const Profile = lazy(() => import('@/pages/Profile'));
-import Holerites from '@/pages/Holerites';
+const Holerites = lazy(() => import('@/pages/Holerites'));
 const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
 const Payroll = lazy(() => import('@/pages/Payroll'));
 const PayslipView = lazy(() => import('@/pages/PayslipView'));
@@ -832,12 +832,16 @@ function App() {
                     {/* Holerites */}
                     <Route path="/payslips" element={
                       <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']}>
-                        <Holerites />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Holerites />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/holerites" element={
                       <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']}>
-                        <Holerites />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Holerites />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/meus-holerites" element={
