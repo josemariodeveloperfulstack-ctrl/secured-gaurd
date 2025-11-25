@@ -1,9 +1,10 @@
 name: 🐳 Deploy CI Environment Only
 
 on:
-  push:
-    branches:
-      - ci
+  # DESABILITADO: Usando deploy-ci-docker.yml em vez deste
+  # push:
+  #   branches:
+  #     - ci
   workflow_dispatch:
 
 env:
