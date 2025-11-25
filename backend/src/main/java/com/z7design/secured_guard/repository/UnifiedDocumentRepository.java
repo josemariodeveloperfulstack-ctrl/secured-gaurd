@@ -30,6 +30,15 @@ public interface UnifiedDocumentRepository extends JpaRepository<UnifiedDocument
     @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.matchingConfidence < :threshold")
     List<UnifiedDocument> findByLowConfidence(@Param("threshold") Double threshold);
     
+    @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.payslip.id = :payslipId AND ud.receipt.id = :receiptId")
+    Optional<UnifiedDocument> findByPayslipIdAndReceiptId(@Param("payslipId") UUID payslipId, @Param("receiptId") UUID receiptId);
+    
+    @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.payslip.id = :payslipId")
+    Optional<UnifiedDocument> findByPayslipId(@Param("payslipId") UUID payslipId);
+    
+    @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.receipt.id = :receiptId")
+    Optional<UnifiedDocument> findByReceiptId(@Param("receiptId") UUID receiptId);
+    
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Query(value = "UPDATE unified_documents SET receipt_id = NULL WHERE receipt_id = :receiptId", nativeQuery = true)

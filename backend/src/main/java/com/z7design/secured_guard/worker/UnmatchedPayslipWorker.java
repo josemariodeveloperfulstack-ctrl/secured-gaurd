@@ -1,0 +1,626 @@
+package com.z7design.secured_guard.worker;
+
+import com.z7design.secured_guard.model.DocumentPage;
+import com.z7design.secured_guard.model.Payslip;
+import com.z7design.secured_guard.model.PaymentReceipt;
+import com.z7design.secured_guard.model.PaymentReceiptStatus;
+import com.z7design.secured_guard.repository.DocumentPageRepository;
+import com.z7design.secured_guard.repository.PaymentReceiptRepository;
+import com.z7design.secured_guard.repository.PayslipRepository;
+import com.z7design.secured_guard.service.MinIOService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.annotation.PostConstruct;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Worker responsável por processar holerites e comprovantes sem match
+ * e salvá-los individualmente na tabela payslips/payment_receipts
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class UnmatchedPayslipWorker {
+    
+    private final StringRedisTemplate redisTemplate;
+    private final DocumentPageRepository documentPageRepository;
+    private final PayslipRepository payslipRepository;
+    private final PaymentReceiptRepository paymentReceiptRepository;
+    private final MinIOService minIOService;
+    
+    private static final String STREAM_VALIDATED = "stream:validated";
+    private static final String CONSUMER_GROUP = "unmatched-group";
+    private static final String CONSUMER_NAME = "unmatched-worker-1";
+    private static final String OUTPUT_DIR = "backend/holerites";
+    
+    @PostConstruct
+    public void init() {
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("🟡 UNMATCHED PAYSLIP WORKER: Iniciando inicialização...");
+        log.info("═══════════════════════════════════════════════════════════");
+        try {
+            redisTemplate.opsForStream().createGroup(STREAM_VALIDATED, ReadOffset.from("0"), CONSUMER_GROUP);
+            log.info("✅ UNMATCHED PAYSLIP WORKER: Consumer group '{}' criado/verificado", CONSUMER_GROUP);
+        } catch (Exception e) {
+            log.info("ℹ️ UNMATCHED PAYSLIP WORKER: Consumer group '{}' já existe ou erro: {}", CONSUMER_GROUP, e.getMessage());
+        }
+        log.info("✅ UNMATCHED PAYSLIP WORKER: Inicialização concluída - Worker pronto!");
+        log.info("═══════════════════════════════════════════════════════════");
+    }
+    
+    @Scheduled(fixedDelay = 2000) // Processa a cada 2 segundos
+    @Transactional
+    public void processValidatedDocuments() {
+        try {
+            // Log periódico para debug (a cada 5 segundos)
+            long currentTime = System.currentTimeMillis();
+            boolean shouldLog = (currentTime % 5000 < 2000);
+            
+            if (shouldLog) {
+                try {
+                    Long streamLength = redisTemplate.opsForStream().size(STREAM_VALIDATED);
+                    log.debug("🟡 UnmatchedPayslipWorker: Verificando stream:validated (tamanho: {})", streamLength);
+                } catch (Exception e) {
+                    log.debug("🟡 UnmatchedPayslipWorker: Erro ao verificar tamanho do stream: {}", e.getMessage());
+                }
+            }
+            
+            // Tentar ler mensagens do stream
+            @SuppressWarnings("unchecked")
+            List<MapRecord<String, String, String>> records = (List<MapRecord<String, String, String>>) (List<?>) redisTemplate.opsForStream().read(
+                org.springframework.data.redis.connection.stream.Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
+                StreamOffset.create(STREAM_VALIDATED, ReadOffset.lastConsumed())
+            );
+            
+            if (records == null || records.isEmpty()) {
+                // Se não houver mensagens novas, tentar ler do início (pode haver mensagens não processadas)
+                if (shouldLog) {
+                    log.debug("🟡 UnmatchedPayslipWorker: Nenhuma mensagem nova encontrada, tentando ler do início...");
+                }
+                try {
+                    @SuppressWarnings("unchecked")
+                    List<MapRecord<String, String, String>> allRecords = (List<MapRecord<String, String, String>>) (List<?>) redisTemplate.opsForStream().read(
+                        org.springframework.data.redis.connection.stream.Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
+                        StreamOffset.create(STREAM_VALIDATED, ReadOffset.from("0"))
+                    );
+                    if (allRecords != null && !allRecords.isEmpty()) {
+                        records = allRecords;
+                        log.info("🟡 UnmatchedPayslipWorker: Encontradas {} mensagens não processadas", records.size());
+                    }
+                } catch (Exception e) {
+                    // Ignorar erro - pode ser que não haja mensagens mesmo
+                    if (shouldLog) {
+                        log.debug("🟡 UnmatchedPayslipWorker: Nenhuma mensagem encontrada no stream");
+                    }
+                }
+            }
+            
+            if (records == null || records.isEmpty()) {
+                return;
+            }
+            
+            log.info("🟡 UnmatchedPayslipWorker: Processando {} documentos validados", records.size());
+            System.out.println("🟡 UnmatchedPayslipWorker: Processando " + records.size() + " documentos validados");
+            
+            for (MapRecord<String, String, String> record : records) {
+                try {
+                    processValidatedDocument(record);
+                    redisTemplate.opsForStream().acknowledge(STREAM_VALIDATED, CONSUMER_GROUP, record.getId());
+                } catch (Exception e) {
+                    log.error("Erro ao processar documento validado", e);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Erro no UnmatchedPayslipWorker", e);
+        }
+    }
+    
+    private void processValidatedDocument(MapRecord<String, String, String> record) {
+        String pageIdStr = record.getValue().get("pageId");
+        String typeStr = record.getValue().get("type");
+        String statusStr = record.getValue().get("status");
+        String fileHashFromRecord = record.getValue().get("fileHash"); // Hash do arquivo completo
+        
+        log.info("🟡 UnmatchedPayslipWorker: Recebida mensagem - pageId: {}, type: {}, status: {}, fileHash: {}", 
+            pageIdStr, typeStr, statusStr, 
+            fileHashFromRecord != null ? fileHashFromRecord.substring(0, Math.min(16, fileHashFromRecord.length())) + "..." : "null");
+        
+        if (pageIdStr == null) {
+            log.warn("⚠️ UnmatchedPayslipWorker: pageId não encontrado na mensagem. Campos: {}", record.getValue());
+            return;
+        }
+        
+        try {
+            UUID pageId = UUID.fromString(pageIdStr);
+            DocumentPage page = documentPageRepository.findById(pageId).orElse(null);
+            
+            if (page == null) {
+                log.warn("⚠️ UnmatchedPayslipWorker: DocumentPage {} não encontrada no banco de dados", pageId);
+                return;
+            }
+            
+            log.info("🟡 UnmatchedPayslipWorker: DocumentPage encontrada - ID: {}, Type: {}, Status: {}, CPF: {}, Nome: {}, Período: {}", 
+                pageId, page.getType(), page.getStatus(), page.getCpf(), page.getName(), page.getPeriod());
+            
+            // Processar apenas se o status for OK ou REVIEW
+            if (page.getStatus() != DocumentPage.DocumentPageStatus.OK && 
+                page.getStatus() != DocumentPage.DocumentPageStatus.REVIEW) {
+                log.info("ℹ️ UnmatchedPayslipWorker: DocumentPage {} com status {} não será processada", 
+                    pageId, page.getStatus());
+                return;
+            }
+            
+            // Processar baseado no tipo
+            if (page.getType() == DocumentPage.DocumentType.HOLERITE) {
+                log.info("🟡 UnmatchedPayslipWorker: Processando HOLERITE - ID: {}, CPF: {}, Nome: {}, Período: {}", 
+                    pageId, page.getCpf(), page.getName(), page.getPeriod());
+                saveUnmatchedPayslip(page, fileHashFromRecord);
+            } else if (page.getType() == DocumentPage.DocumentType.COMPROVANTE) {
+                log.info("🟡 UnmatchedPayslipWorker: Processando COMPROVANTE - ID: {}, Nome: {}, Período: {}", 
+                    pageId, page.getName(), page.getPeriod());
+                saveUnmatchedPaymentReceipt(page);
+            } else {
+                log.warn("⚠️ UnmatchedPayslipWorker: Tipo de documento desconhecido: {}", page.getType());
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao processar documento validado: pageId={}, erro={}", pageIdStr, e.getMessage(), e);
+        }
+    }
+    
+    private void saveUnmatchedPayslip(DocumentPage page, String fileHash) {
+        try {
+            log.info("🟡🟡🟡 UnmatchedPayslipWorker: INICIANDO SALVAMENTO DE PAYSLIP - CPF: {}, Nome: {}, Período: {}, Hash: {}", 
+                page.getCpf(), page.getName(), page.getPeriod(), 
+                fileHash != null ? fileHash.substring(0, Math.min(16, fileHash.length())) + "..." : "null");
+            
+            // Verificar campos obrigatórios
+            if (page.getCpf() == null || page.getCpf().trim().isEmpty()) {
+                log.warn("⚠️ UnmatchedPayslipWorker: CPF não encontrado na DocumentPage {}. Não é possível salvar payslip.", page.getId());
+                return;
+            }
+            
+            // Nome pode ser null - tentar extrair do texto bruto se não encontrado
+            String employeeName = page.getName();
+            if (employeeName == null || employeeName.trim().isEmpty() || employeeName.equals("NOME NÃO IDENTIFICADO")) {
+                log.warn("⚠️ UnmatchedPayslipWorker: Nome não encontrado na DocumentPage {}. Tentando extrair do texto bruto...", page.getId());
+                employeeName = extractNameFromRawText(page.getRawText());
+                if (employeeName == null || employeeName.trim().isEmpty()) {
+                    log.warn("⚠️ UnmatchedPayslipWorker: Nome não encontrado no texto bruto. Usando valor padrão 'NOME NÃO IDENTIFICADO'.");
+                    employeeName = "NOME NÃO IDENTIFICADO";
+                } else {
+                    log.info("✅ UnmatchedPayslipWorker: Nome extraído do texto bruto: {}", employeeName);
+                }
+            }
+            
+            // Extrair empresa e setor - usar dados do DocumentPage se disponíveis, senão extrair do texto bruto
+            String companyName = page.getCompanyName();
+            if (companyName == null || companyName.trim().isEmpty()) {
+                companyName = extractCompanyNameFromRawText(page.getRawText());
+            }
+            
+            String companyCnpj = page.getCompanyCnpj();
+            if (companyCnpj == null || companyCnpj.trim().isEmpty()) {
+                companyCnpj = extractCompanyCnpjFromRawText(page.getRawText());
+            }
+            
+            String workPostName = page.getWorkPostName();
+            if (workPostName == null || workPostName.trim().isEmpty()) {
+                workPostName = extractSectorFromRawText(page.getRawText());
+            }
+            
+            log.info("🟡 UnmatchedPayslipWorker: Dados extraídos - Empresa: {}, CNPJ: {}, Setor: {}", 
+                companyName, companyCnpj, workPostName);
+            
+            // Verificar período
+            Integer month = extractMonth(page.getPeriod());
+            Integer year = extractYear(page.getPeriod());
+            
+            if (month == null || year == null) {
+                log.warn("⚠️ UnmatchedPayslipWorker: Período inválido na DocumentPage {}: '{}'. Não é possível salvar payslip.", 
+                    page.getId(), page.getPeriod());
+                return;
+            }
+            
+            // VERIFICAÇÃO PRINCIPAL: Verificar se arquivo já foi processado (mesmo hash)
+            // TEMPORARIAMENTE DESABILITADO para garantir que o processamento ocorra
+            // TODO: Reativar após confirmar que está funcionando corretamente
+            /*
+            if (fileHash != null && !fileHash.isEmpty()) {
+                List<Payslip> existingByHash = payslipRepository.findByHashConteudo(fileHash);
+                if (!existingByHash.isEmpty()) {
+                    log.info("⏭️ UnmatchedPayslipWorker: Arquivo já foi processado anteriormente (hash: {}...). Encontrados {} payslip(s) com mesmo hash. Não será processado novamente.", 
+                        fileHash.substring(0, Math.min(16, fileHash.length())), existingByHash.size());
+                    return; // Arquivo já processado, não processar novamente
+                }
+            }
+            */
+            log.info("🔐 UnmatchedPayslipWorker: Hash do arquivo: {}... (verificação de duplicata temporariamente desabilitada)", 
+                fileHash != null ? fileHash.substring(0, Math.min(16, fileHash.length())) : "null");
+            
+            // Verificar se já existe payslip com mesmo CPF, mês e ano (para determinar versão)
+            List<Payslip> existingByCpfMonthYear = payslipRepository.findByCompanyCnpjAndCpfAndWorkPostNameAndMonthAndYear(
+                null, page.getCpf(), null, month, year);
+            
+            int nextVersion = 1;
+            if (!existingByCpfMonthYear.isEmpty()) {
+                // Encontrar a versão mais alta
+                int maxVersion = existingByCpfMonthYear.stream()
+                    .mapToInt(p -> p.getVersao() != null ? p.getVersao() : 1)
+                    .max()
+                    .orElse(1);
+                nextVersion = maxVersion + 1;
+                log.info("📋 UnmatchedPayslipWorker: Encontrados {} payslip(s) existente(s) para CPF: {}, Período: {}/{}. Criando versão {}.", 
+                    existingByCpfMonthYear.size(), page.getCpf(), month, year, nextVersion);
+            }
+            
+            // Gerar PDF físico na pasta holerites
+            String pdfFilePath;
+            try {
+                pdfFilePath = generatePdfFromPage(page, month, year);
+            } catch (IOException e) {
+                log.error("❌ Erro ao gerar PDF para página {}: {}", page.getId(), e.getMessage(), e);
+                // Continuar mesmo sem gerar PDF - salvar apenas no banco
+                pdfFilePath = page.getS3Url(); // Usar URL da imagem como fallback
+            }
+            
+            // Criar Payslip a partir do DocumentPage
+            Payslip payslip = Payslip.builder()
+                .employeeName(employeeName)
+                .cpf(page.getCpf())
+                .companyName(companyName)
+                .companyCnpj(companyCnpj)
+                .workPostName(workPostName)
+                .month(month)
+                .year(year)
+                .fileName(Paths.get(pdfFilePath).getFileName().toString())
+                .processedAt(LocalDateTime.now())
+                .netValue(page.getLiquidValue())
+                .totalEarnings(page.getLiquidValue() != null ? page.getLiquidValue() : BigDecimal.ZERO)
+                .totalDeductions(BigDecimal.ZERO)
+                .versao(nextVersion) // Usar versão calculada
+                .hashConteudo(fileHash != null ? fileHash : page.getHash()) // Usar hash do arquivo completo, não da página
+                .arquivoCaminho(pdfFilePath.replace('\\', '/'))
+                .build();
+            
+            payslip = payslipRepository.saveAndFlush(payslip);
+            log.info("✅✅✅ UnmatchedPayslipWorker: Payslip SALVO COM SUCESSO - ID={}, Nome={}, CPF={}, Período={}/{}, Arquivo={}", 
+                payslip.getId(), payslip.getEmployeeName(), payslip.getCpf(), 
+                payslip.getMonth(), payslip.getYear(),
+                pdfFilePath);
+            System.out.println("✅✅✅ UnmatchedPayslipWorker: Payslip SALVO - ID=" + payslip.getId() + 
+                ", Nome=" + payslip.getEmployeeName() + ", CPF=" + payslip.getCpf() + 
+                ", Período=" + payslip.getMonth() + "/" + payslip.getYear() + ", Arquivo=" + pdfFilePath);
+        } catch (Exception e) {
+            log.error("Erro ao salvar payslip sem match", e);
+            throw e;
+        }
+    }
+    
+    private void saveUnmatchedPaymentReceipt(DocumentPage page) {
+        try {
+            // Verificar se já existe um payment receipt com os mesmos dados
+            Integer month = extractMonth(page.getPeriod());
+            Integer year = extractYear(page.getPeriod());
+            
+            // Buscar por nome e período (verificação básica de duplicata)
+            if (page.getName() != null && month != null && year != null) {
+                List<PaymentReceipt> existing = paymentReceiptRepository.findByYearAndMonth(year, month);
+                boolean exists = existing.stream()
+                    .anyMatch(r -> r.getEmployeeName() != null && 
+                                  r.getEmployeeName().equalsIgnoreCase(page.getName()) &&
+                                  r.getNetSalary() != null && 
+                                  r.getNetSalary().equals(page.getLiquidValue()));
+                
+                if (exists) {
+                    log.info("PaymentReceipt já existe para Nome: {}, Período: {}/{}", 
+                        page.getName(), month, year);
+                    return;
+                }
+            }
+            
+            // Criar PaymentReceipt a partir do DocumentPage
+            PaymentReceipt receipt = PaymentReceipt.builder()
+                .employeeName(page.getName())
+                .month(extractMonth(page.getPeriod()))
+                .year(extractYear(page.getPeriod()))
+                .netSalary(page.getLiquidValue())
+                .grossSalary(page.getLiquidValue())
+                .fileName("comprovante_" + page.getId() + ".pdf")
+                .filePath(page.getS3Url())
+                .fileSize(0L)
+                .status(PaymentReceiptStatus.PROCESSED)
+                .processedAt(LocalDateTime.now())
+                .build();
+            
+            receipt = paymentReceiptRepository.save(receipt);
+            log.info("PaymentReceipt salvo (sem match): ID={}, Nome={}, Período={}", 
+                receipt.getId(), receipt.getEmployeeName(), 
+                String.format("%02d/%04d", receipt.getMonth(), receipt.getYear()));
+        } catch (Exception e) {
+            log.error("Erro ao salvar payment receipt sem match", e);
+            throw e;
+        }
+    }
+    
+    private Integer extractMonth(String period) {
+        if (period == null || period.length() < 2) {
+            return null;
+        }
+        try {
+            String[] parts = period.split("/");
+            if (parts.length >= 1) {
+                return Integer.parseInt(parts[0]);
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao extrair mês do período: {}", period);
+        }
+        return null;
+    }
+    
+    private Integer extractYear(String period) {
+        if (period == null || period.length() < 4) {
+            return null;
+        }
+        try {
+            String[] parts = period.split("/");
+            if (parts.length >= 2) {
+                return Integer.parseInt(parts[1]);
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao extrair ano do período: {}", period);
+        }
+        return null;
+    }
+    
+    /**
+     * Gera PDF físico na pasta holerites a partir da imagem da página
+     */
+    private String generatePdfFromPage(DocumentPage page, Integer month, Integer year) throws IOException {
+        log.info("🟡 UnmatchedPayslipWorker: Gerando PDF para página {} - CPF: {}, Nome: {}", 
+            page.getId(), page.getCpf(), page.getName());
+        
+        // Baixar imagem do MinIO/local
+        byte[] imageBytes = minIOService.downloadBytes(page.getS3Url());
+        if (imageBytes == null || imageBytes.length == 0) {
+            throw new IOException("Imagem não encontrada ou vazia: " + page.getS3Url());
+        }
+        
+        // Converter bytes para BufferedImage
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
+        if (image == null) {
+            throw new IOException("Não foi possível ler a imagem: " + page.getS3Url());
+        }
+        
+        // Criar estrutura de pastas: backend/holerites/mes-ano/
+        String periodo = String.format("%02d-%04d", month != null ? month : 0, year != null ? year : 0);
+        Path outputDir = Paths.get(OUTPUT_DIR, periodo);
+        Files.createDirectories(outputDir);
+        
+        // Nome do arquivo: holerite_CPF_mes_ano.pdf ou holerite_ID.pdf se não tiver CPF
+        String fileName;
+        if (page.getCpf() != null && !page.getCpf().isEmpty()) {
+            String cpfLimpo = page.getCpf().replaceAll("[^0-9]", "");
+            fileName = String.format("holerite_%s_%02d_%04d.pdf", cpfLimpo, month, year);
+        } else {
+            fileName = String.format("holerite_%s.pdf", page.getId().toString().substring(0, 8));
+        }
+        
+        Path pdfPath = outputDir.resolve(fileName);
+        
+        // Converter imagem para PDF usando PDFBox
+        try (PDDocument document = new PDDocument()) {
+            // Criar página com o tamanho da imagem
+            float width = image.getWidth();
+            float height = image.getHeight();
+            PDPage pdPage = new PDPage(new PDRectangle(width, height));
+            document.addPage(pdPage);
+            
+            // Adicionar imagem à página
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, pdPage)) {
+                PDImageXObject pdImage = PDImageXObject.createFromByteArray(document, imageBytes, "page");
+                contentStream.drawImage(pdImage, 0, 0, width, height);
+            }
+            
+            // Salvar PDF
+            document.save(pdfPath.toFile());
+            log.info("✅ UnmatchedPayslipWorker: PDF gerado com sucesso: {}", pdfPath.toAbsolutePath());
+        }
+        
+        return pdfPath.toString();
+    }
+    
+    /**
+     * Extrai nome do funcionário do texto bruto
+     */
+    private String extractNameFromRawText(String rawText) {
+        if (rawText == null || rawText.trim().isEmpty()) {
+            return null;
+        }
+        
+        String[] linhas = rawText.split("\r?\n");
+        
+        // Padrão 1: CODIGO NOME CPF
+        Pattern pattern1 = Pattern.compile("(\\d{4,6})\\s+(.+?)\\s+CPF[:\\s]", Pattern.CASE_INSENSITIVE);
+        for (String linha : linhas) {
+            Matcher matcher = pattern1.matcher(linha);
+            if (matcher.find()) {
+                String nome = matcher.group(2).trim();
+                if (nome.length() >= 5 && !nome.toUpperCase().contains("FOLHA") && 
+                    !nome.toUpperCase().contains("PAGAMENTO") && !nome.toUpperCase().contains("HOLERITE")) {
+                    return nome.toUpperCase();
+                }
+            }
+        }
+        
+        // Padrão 2: NOME CPF (sem código)
+        Pattern pattern2 = Pattern.compile("([A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ][A-ZÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ\\s]{4,}?)\\s{1,}CPF", Pattern.CASE_INSENSITIVE);
+        for (String linha : linhas) {
+            Matcher matcher = pattern2.matcher(linha);
+            if (matcher.find()) {
+                String nome = matcher.group(1).trim();
+                if (nome.length() >= 5 && !nome.toUpperCase().contains("FOLHA") && 
+                    !nome.toUpperCase().contains("PAGAMENTO") && !nome.toUpperCase().contains("HOLERITE")) {
+                    return nome.toUpperCase();
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extrai nome da empresa do texto bruto
+     */
+    private String extractCompanyNameFromRawText(String rawText) {
+        if (rawText == null || rawText.trim().isEmpty()) {
+            return null;
+        }
+        
+        String[] linhas = rawText.split("\r?\n");
+        
+        // Padrão 1: Procurar por CNPJ e pegar nome da mesma linha ou linha anterior
+        Pattern cnpjPattern = Pattern.compile("CNPJ[:\\s]*([0-9]{2}\\.?[0-9]{3}\\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2}|[0-9]{14})", Pattern.CASE_INSENSITIVE);
+        for (int i = 0; i < linhas.length; i++) {
+            String linha = linhas[i].trim();
+            Matcher cnpjMatcher = cnpjPattern.matcher(linha);
+            if (cnpjMatcher.find()) {
+                // Tentar extrair nome da mesma linha (antes do CNPJ)
+                int cnpjIndex = linha.toUpperCase().indexOf("CNPJ");
+                if (cnpjIndex > 10) {
+                    String possibleName = linha.substring(0, cnpjIndex).trim();
+                    possibleName = possibleName.replaceAll("(?i)(EMPRESA|RAZÃO SOCIAL|EMPREGADOR)[:\\s]*", "").trim();
+                    if (possibleName.length() > 5 && !possibleName.matches(".*\\d{3}.*")) {
+                        return possibleName.toUpperCase();
+                    }
+                }
+                
+                // Tentar linha anterior
+                if (i > 0) {
+                    String linhaAnterior = linhas[i - 1].trim();
+                    if (linhaAnterior.length() > 5 && !linhaAnterior.matches(".*\\d{3}.*") && 
+                        !linhaAnterior.toUpperCase().contains("FOLHA") &&
+                        !linhaAnterior.toUpperCase().contains("PAGAMENTO") &&
+                        !linhaAnterior.toUpperCase().contains("HOLERITE")) {
+                        return linhaAnterior.toUpperCase();
+                    }
+                }
+            }
+        }
+        
+        // Padrão 2: Procurar por linhas com "LTDA", "S.A", "ME", etc.
+        for (String linha : linhas) {
+            String linhaUpper = linha.toUpperCase();
+            if ((linhaUpper.contains("LTDA") || linhaUpper.contains("S.A") || 
+                 linhaUpper.contains(" ME ") || linhaUpper.contains("EIRELI")) &&
+                !linhaUpper.contains("FUNCIONARIO") && !linhaUpper.contains("CPF") &&
+                linha.length() > 10 && linha.length() < 150) {
+                return linha.trim().toUpperCase();
+            }
+        }
+        
+        // Padrão 3: Código + Nome + CNPJ na mesma linha
+        Pattern empresaPattern = Pattern.compile("^(\\d{4})\\s+(.+?)\\s+(\\d{14})$");
+        for (String linha : linhas) {
+            Matcher matcher = empresaPattern.matcher(linha);
+            if (matcher.find()) {
+                String nome = matcher.group(2).trim();
+                if (nome.length() > 5) {
+                    return nome.toUpperCase();
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extrai CNPJ da empresa do texto bruto
+     */
+    private String extractCompanyCnpjFromRawText(String rawText) {
+        if (rawText == null || rawText.trim().isEmpty()) {
+            return null;
+        }
+        
+        // Padrão 1: CNPJ: 12.345.678/0001-90 ou CNPJ: 12345678000190
+        Pattern cnpjPattern = Pattern.compile("CNPJ[:\\s]*([0-9]{2}\\.?[0-9]{3}\\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2}|[0-9]{14})", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = cnpjPattern.matcher(rawText);
+        if (matcher.find()) {
+            return matcher.group(1).replaceAll("[^0-9]", "");
+        }
+        
+        // Padrão 2: CNPJ sem rótulo (14 dígitos consecutivos)
+        Pattern fallbackPattern = Pattern.compile("(?<!\\d)(\\d{14})(?!\\d)");
+        matcher = fallbackPattern.matcher(rawText.replaceAll("\\s+", ""));
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extrai setor/cargo do texto bruto
+     */
+    private String extractSectorFromRawText(String rawText) {
+        if (rawText == null || rawText.trim().isEmpty()) {
+            return null;
+        }
+        
+        String[] linhas = rawText.split("\r?\n");
+        
+        // Padrão 1: Procurar por "Setor:", "Cargo:", "Local:", "Posto de Trabalho:"
+        Pattern sectorPattern = Pattern.compile("(?i)(?:setor|cargo|local|posto\\s+de\\s+trabalho)[:\\s]+(.+)");
+        for (String linha : linhas) {
+            Matcher matcher = sectorPattern.matcher(linha);
+            if (matcher.find()) {
+                String setor = matcher.group(1).trim();
+                if (setor.length() > 2 && setor.length() < 100) {
+                    return setor.toUpperCase();
+                }
+            }
+        }
+        
+        // Padrão 2: Procurar setor na linha do período (formato comum: "01/06/2025 a 30/06/2025    SETOR")
+        Pattern periodoSetorPattern = Pattern.compile("(\\d{2}/\\d{2}/\\d{4})\\s+a\\s+(\\d{2}/\\d{2}/\\d{4})\\s+(.+)");
+        for (String linha : linhas) {
+            Matcher matcher = periodoSetorPattern.matcher(linha);
+            if (matcher.find()) {
+                String setor = matcher.group(3).trim();
+                // Remover possíveis números ou datas do final
+                setor = setor.replaceAll("\\s+\\d{2}/\\d{4}$", "").trim();
+                if (setor.length() > 2 && setor.length() < 100 && 
+                    !setor.matches(".*\\d{4}.*")) { // Não deve ser só números
+                    return setor.toUpperCase();
+                }
+            }
+        }
+        
+        return null;
+    }
+}
+

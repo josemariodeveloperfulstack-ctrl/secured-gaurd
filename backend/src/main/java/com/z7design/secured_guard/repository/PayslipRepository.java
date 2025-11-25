@@ -30,6 +30,9 @@ public interface PayslipRepository extends JpaRepository<Payslip, java.util.UUID
         @Param("year") Integer year
     );
     
+    // Buscar payslips por hash do conteúdo (para verificar se arquivo já foi processado)
+    List<Payslip> findByHashConteudo(String hashConteudo);
+    
     List<Payslip> findAllByCpf(String cpf);
     
     // Retorna lista porque pode haver múltiplos holerites com o mesmo nome de arquivo em diferentes setores/empresas
