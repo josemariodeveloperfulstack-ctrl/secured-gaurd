@@ -29,7 +29,8 @@ import {
   CheckCircle2,
   Clock,
   UserMinus,
-  XCircle
+  XCircle,
+  ChevronRight
 } from 'lucide-react';
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
@@ -64,6 +65,7 @@ const Funcionarios: React.FC = () => {
   const params = new URLSearchParams(location.search);
   const shouldOpenModal = params.get('novo') === '1';
   const [modalOpen, setModalOpen] = useState(shouldOpenModal);
+  const [dependentSearchTerm, setDependentSearchTerm] = useState('');
 
   // Carregar funcionários
   const loadEmployees = async (filters: EmployeeFilters = {}) => {
@@ -375,8 +377,8 @@ Confirma a exclusão?`)) {
       subtitle={`${filteredEmployees.length} funcionário${filteredEmployees.length !== 1 ? 's' : ''} no sistema`}
     >
       <Tabs defaultValue="lista" className="w-full">
-        <TabsList className="mb-4 bg-seguranca-black/50 border border-gray-600/30 p-1">
-          <TabsTrigger value="lista" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white">
+        <TabsList className="mb-4 bg-seguranca-black/50 border border-gray-600/30 p-1 flex-wrap h-auto justify-start">
+          <TabsTrigger value="lista" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white flex-grow sm:flex-grow-0">
             <Users className="h-4 w-4 mr-2" />
             Lista de Funcionários
           </TabsTrigger>
@@ -407,27 +409,100 @@ Confirma a exclusão?`)) {
             </CardHeader>
             <CardContent>
               {selectedEmployee ? (
-                <DependenteModal 
-                  employeeId={selectedEmployee.id} 
-                  employeeName={selectedEmployee.name}
-                />
+                <div>
+                  <div className="mb-4 flex items-center justify-between bg-seguranca-black/30 p-3 rounded-lg border border-gray-700">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-seguranca-yellow/20 flex items-center justify-center text-seguranca-yellow font-bold">
+                        {selectedEmployee.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">{selectedEmployee.name}</p>
+                        <p className="text-xs text-gray-400">{selectedEmployee.position?.name || 'Cargo não definido'}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedEmployee(null)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      Trocar Funcionário
+                    </Button>
+                  </div>
+                  
+                  <DependenteModal 
+                    employeeId={selectedEmployee.id} 
+                    employeeName={selectedEmployee.name}
+                  />
+                </div>
               ) : (
-                <div className="text-center py-8">
-                  <UserPlus className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-300 mb-2">Selecione um funcionário</h3>
-                  <p className="text-gray-400 mb-4">Selecione um funcionário na lista para gerenciar seus dependentes.</p>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      const tabsList = document.querySelector('[role="tablist"]');
-                      const listaTab = tabsList?.querySelector('[value="lista"]');
-                      if (listaTab) {
-                        (listaTab as HTMLElement).click();
-                      }
-                    }}
-                  >
-                    Ir para Lista de Funcionários
-                  </Button>
+                <div className="flex flex-col items-center justify-center py-8 space-y-6">
+                  <div className="text-center max-w-lg">
+                    <UserPlus className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-300 mb-2">Selecione um funcionário</h3>
+                    <p className="text-gray-400 mb-6">Selecione um funcionário abaixo para gerenciar seus dependentes.</p>
+                    
+                    <div className="w-full max-w-md mx-auto space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                        <Input
+                          placeholder="Buscar por nome ou CPF..."
+                          value={dependentSearchTerm}
+                          onChange={(e) => setDependentSearchTerm(e.target.value)}
+                          className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus-visible:ring-seguranca-yellow"
+                        />
+                      </div>
+
+                      <div className="bg-seguranca-black/30 border border-gray-700 rounded-md max-h-80 overflow-y-auto text-left">
+                        {employees
+                          .filter(emp => 
+                            !dependentSearchTerm || 
+                            emp.name.toLowerCase().includes(dependentSearchTerm.toLowerCase()) ||
+                            (emp.document && emp.document.includes(dependentSearchTerm))
+                          )
+                          .map(emp => (
+                            <div 
+                              key={emp.id}
+                              className="p-3 hover:bg-gray-700 cursor-pointer flex items-center justify-between border-b border-gray-700/50 last:border-0 transition-colors group"
+                              onClick={() => setSelectedEmployee(emp)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-gray-700 group-hover:bg-gray-600 flex items-center justify-center text-gray-300 text-xs font-bold transition-colors">
+                                  {emp.name.charAt(0)}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-200 text-sm">{emp.name}</p>
+                                  <p className="text-xs text-gray-400">{emp.position?.name || 'Sem cargo'} • {emp.document || 'S/ CPF'}</p>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-gray-500 group-hover:text-seguranca-yellow transition-colors" />
+                            </div>
+                          ))}
+                          
+                        {employees.filter(emp => !dependentSearchTerm || emp.name.toLowerCase().includes(dependentSearchTerm.toLowerCase())).length === 0 && (
+                          <div className="p-8 text-center text-gray-500">
+                            <p>Nenhum funcionário encontrado.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-gray-700/50 w-full max-w-md text-center">
+                    <Button 
+                      variant="link" 
+                      className="text-gray-400 hover:text-seguranca-yellow"
+                      onClick={() => {
+                        const tabsList = document.querySelector('[role="tablist"]');
+                        const listaTab = tabsList?.querySelector('[value="lista"]');
+                        if (listaTab) {
+                          (listaTab as HTMLElement).click();
+                        }
+                      }}
+                    >
+                      Ver lista completa de funcionários
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

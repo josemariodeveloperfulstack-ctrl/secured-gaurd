@@ -65,6 +65,7 @@ import ActivityReportModal from '@/components/operacional/ActivityReportModal';
 import ShiftChangeTable from '@/components/operacional/ShiftChangeTable';
 import OrderOfServiceTable from '@/components/operacional/OrderOfServiceTable';
 import OrderOfServiceFormModal from '@/components/operacional/OrderOfServiceFormModal';
+import OrdemServicoViewModal from '@/components/ordemServico/OrdemServicoViewModal';
 import OperationalDashboard from '@/components/operacional/OperationalDashboard';
 import VisitDashboard from '@/components/visits/VisitDashboard';
 import NotificationSettingsModal from '@/components/operacional/NotificationSettingsModal';
@@ -92,6 +93,7 @@ const Operacional: React.FC = () => {
   const [ordersOfService, setOrdersOfService] = useState<OrderOfService[]>([]);
   const [isLoadingOrdersOfService, setIsLoadingOrdersOfService] = useState(false);
   const [showOrderOfServiceModal, setShowOrderOfServiceModal] = useState(false);
+  const [showOrderOfServiceViewModal, setShowOrderOfServiceViewModal] = useState(false);
   const [selectedOrderOfService, setSelectedOrderOfService] = useState<OrderOfService | null>(null);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
@@ -283,7 +285,7 @@ const Operacional: React.FC = () => {
 
   const handleViewOrderOfService = (order: OrderOfService) => {
     setSelectedOrderOfService(order);
-    setShowOrderOfServiceModal(true);
+    setShowOrderOfServiceViewModal(true);
   };
 
   const handleDeleteOrderOfService = async (order: OrderOfService) => {
@@ -1125,13 +1127,26 @@ const Operacional: React.FC = () => {
           onSave={handleSaveActivityReport}
         />
 
-        {/* Modal de Ordem de Serviço */}
+        {/* Modal de Ordem de Serviço (Criar/Editar) */}
         <OrderOfServiceFormModal
           isOpen={showOrderOfServiceModal}
-          onClose={() => setShowOrderOfServiceModal(false)}
+          onClose={() => {
+            setShowOrderOfServiceModal(false);
+            setSelectedOrderOfService(null);
+          }}
           onSubmit={handleSubmitOrderOfService}
           order={selectedOrderOfService}
           mode={selectedOrderOfService ? 'edit' : 'create'}
+        />
+
+        {/* Modal de Visualização de Ordem de Serviço */}
+        <OrdemServicoViewModal
+          open={showOrderOfServiceViewModal}
+          onClose={() => {
+            setShowOrderOfServiceViewModal(false);
+            setSelectedOrderOfService(null);
+          }}
+          orderOfService={selectedOrderOfService}
         />
       </div> {/* Fecha div principal background */}
     </StandardLayout>

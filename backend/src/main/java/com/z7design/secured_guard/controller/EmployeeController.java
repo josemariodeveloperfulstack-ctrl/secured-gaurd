@@ -289,59 +289,42 @@ public class EmployeeController {
     }
     
     @GetMapping("/{id}")
-    @Operation(summary = "Buscar funcionário por ID", description = "Retorna um funcionário específico pelo seu ID")
+    @Operation(summary = "Buscar funcionário por ID", description = "Retorna um funcionário específico pelo seu ID com todos os relacionamentos")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário encontrado"),
             @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
+    @Transactional(readOnly = true)
     public ResponseEntity<Object> getById(@PathVariable String id) {
         try {
             System.out.println("🔍 EmployeeController.getById - Buscando funcionário ID: " + id);
             
-            // Usar query nativa para buscar dados básicos
-            List<Object[]> data = employeeService.findBasicData();
-            System.out.println("🔍 Encontrados " + data.size() + " funcionários no banco");
-            
-            // Procurar o funcionário pelo ID
-            Object[] employeeData = null;
-            for (Object[] row : data) {
-                if (row[0] != null && row[0].toString().equals(id)) {
-                    employeeData = row;
-                    break;
-                }
+            // Converter String para UUID
+            UUID employeeId;
+            try {
+                employeeId = UUID.fromString(id);
+            } catch (IllegalArgumentException e) {
+                System.err.println("❌ ID inválido: " + id);
+                return ResponseEntity.badRequest().body(java.util.Map.of("error", "ID inválido: " + id));
             }
             
-            if (employeeData != null) {
-                System.out.println("✅ Funcionário encontrado: " + employeeData[1]);
-                
-                // Retornar dados básicos
-                java.util.Map<String, Object> result = new java.util.HashMap<>();
-                result.put("id", employeeData[0]);
-                result.put("name", employeeData[1]);
-                result.put("document", employeeData[2]);
-                result.put("birthDate", employeeData[3]);
-                result.put("registrationNumber", employeeData[4]);
-                result.put("hireDate", employeeData[5]);
-                result.put("terminationDate", employeeData[6]);
-                result.put("status", employeeData[7]);
-                result.put("notes", employeeData[8]);
-                result.put("address", employeeData[9]);
-                result.put("phone", employeeData[10]);
-                result.put("email", employeeData[11]);
-                result.put("cnhNumber", employeeData[12]);
-                result.put("ctps", employeeData[13]);
-                result.put("cbo", employeeData[14]);
-                result.put("pis", employeeData[15]);
-                result.put("salario", employeeData[16]);
-                result.put("createdAt", employeeData[17]);
-                result.put("updatedAt", employeeData[18]);
-                
-                return ResponseEntity.ok(result);
-            } else {
-                return ResponseEntity.notFound().build();
-            }
+            // Buscar funcionário completo com relacionamentos usando findById e toDTO
+            Employee employee = employeeService.findById(employeeId);
+            System.out.println("✅ Funcionário encontrado: " + employee.getName());
             
+            // Converter para DTO que inclui todos os relacionamentos (user, position, unit, etc)
+            EmployeeDTO dto = employeeService.toDTO(employee);
+            
+            System.out.println("✅ DTO convertido - User ID: " + (dto.getUser() != null ? dto.getUser().getId() : "null"));
+            System.out.println("✅ DTO convertido - Position ID: " + (dto.getPosition() != null ? dto.getPosition().getId() : "null"));
+            System.out.println("✅ DTO convertido - Unit ID: " + (dto.getUnit() != null ? dto.getUnit().getId() : "null"));
+            
+            return ResponseEntity.ok(dto);
+            
+        } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
+            System.err.println("❌ Funcionário não encontrado: " + id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getById - Erro: " + e.getMessage());
             e.printStackTrace();

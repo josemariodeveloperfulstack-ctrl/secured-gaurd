@@ -32,6 +32,23 @@ public class ImportController {
         ImportResultDto result = importService.importPdf(file);
         return ResponseEntity.ok(result);
     }
+
+    @PostMapping("/import-banking")
+    public ResponseEntity<ImportResultDto> importBankingData(@RequestParam("file") MultipartFile file) {
+        log.info("💰 Importação de dados bancários - arquivo recebido: {} ({} bytes)", file.getOriginalFilename(), file.getSize());
+        if (file == null || file.isEmpty()) {
+            log.warn("Arquivo de importação bancária ausente ou vazio");
+            return ResponseEntity.badRequest().body(ImportResultDto.builder()
+                    .totalRows(0)
+                    .inserted(0)
+                    .updated(0)
+                    .skipped(0)
+                    .errors(java.util.List.of("Arquivo não enviado ou vazio. Envie um arquivo CSV ou Excel com: nome, agencia, contaCorrente"))
+                    .build());
+        }
+        ImportResultDto result = importService.importBankingData(file);
+        return ResponseEntity.ok(result);
+    }
 }
 
 

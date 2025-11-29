@@ -142,6 +142,56 @@ export const employeeService = {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];
     }
+  },
+
+  /**
+   * Criar novo funcionário
+   */
+  async createEmployee(employeeData: any): Promise<Employee> {
+    try {
+      // Converter bankData para bankInfo se existir
+      const payload = { ...employeeData };
+      if (payload.bankData) {
+        payload.bankInfo = {
+          bank: payload.bankData.bank || '',
+          agency: payload.bankData.agency || '',
+          account: payload.bankData.account || '',
+          accountType: payload.bankData.type || 'CORRENTE'
+        };
+        delete payload.bankData;
+      }
+      
+      const response = await api.post('/api/employees', payload);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao criar funcionário:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao criar funcionário');
+    }
+  },
+
+  /**
+   * Atualizar funcionário existente
+   */
+  async updateEmployee(id: string, employeeData: any): Promise<Employee> {
+    try {
+      // Converter bankData para bankInfo se existir
+      const payload = { ...employeeData };
+      if (payload.bankData) {
+        payload.bankInfo = {
+          bank: payload.bankData.bank || '',
+          agency: payload.bankData.agency || '',
+          account: payload.bankData.account || '',
+          accountType: payload.bankData.type || 'CORRENTE'
+        };
+        delete payload.bankData;
+      }
+      
+      const response = await api.put(`/api/employees/${id}`, payload);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao atualizar funcionário:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao atualizar funcionário');
+    }
   }
 };
 

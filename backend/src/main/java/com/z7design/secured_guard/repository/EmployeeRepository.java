@@ -29,6 +29,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     
     boolean existsByDocument(String document);
     
+    Optional<Employee> findByNameIgnoreCase(String name);
+    
     Optional<Employee> findByDocument(String document);
     
     // Métodos para envio de holerites

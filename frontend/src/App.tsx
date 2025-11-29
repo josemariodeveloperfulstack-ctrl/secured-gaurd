@@ -108,6 +108,7 @@ const FeriasPage = lazy(() => import('@/pages/Ferias'));
 const Beneficios = lazy(() => import('@/pages/Beneficios'));
 const AdmissaoDemissao = lazy(() => import('@/pages/AdmissaoDemissao'));
 const CentrosDeCusto = lazy(() => import('@/pages/CentrosDeCusto'));
+const ImportarDadosBancarios = lazy(() => import('@/pages/ImportarDadosBancarios'));
 
 // Páginas adicionais
 const Filiais = lazy(() => import('@/pages/Filiais'));
@@ -672,6 +673,13 @@ function App() {
                     <Route path="/rh/funcionarios/novo" element={
                       <ProtectedRoute>
                         <FuncionarioNovo />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/funcionarios/importar-dados-bancarios" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ImportarDadosBancarios />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/ordens-servico" element={

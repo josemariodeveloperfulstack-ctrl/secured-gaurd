@@ -215,6 +215,12 @@ export interface Employee {
   
   // Dados aninhados (opcionais)
   bankData?: EmployeeBankData;
+  bankInfo?: {
+    bank?: string;
+    agency?: string;
+    account?: string;
+    accountType?: string;
+  };
   documents?: EmployeeDocument[];
   history?: EmployeeHistoryItem[];
   dependents?: Array<{
@@ -414,7 +420,6 @@ export interface CreateEmployeeDTO {
   
   // Campo para Departamento
   departmentId?: string;
-  };
   
   // Dados aninhados
   bankData?: EmployeeBankData;

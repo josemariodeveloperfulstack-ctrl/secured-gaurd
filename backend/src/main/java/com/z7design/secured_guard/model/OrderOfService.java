@@ -42,7 +42,7 @@ public class OrderOfService {
     @Column(name = "workplace", nullable = false)
     private String workplace;
     
-    @Column(name = "salary", nullable = false, precision = 10, scale = 2)
+    @Column(name = "salary", nullable = false, precision = 15, scale = 9)
     private BigDecimal salary;
     
     @Column(name = "start_date", nullable = false)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { orderOfServiceService } from '@/services/orderOfServiceService';
 import { OrderOfService } from '@/types/orderOfService';
@@ -12,6 +12,7 @@ import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const OrdemServicoPage: React.FC = () => {
+  const queryClient = useQueryClient();
   const [employeeId, setEmployeeId] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -47,16 +48,41 @@ const OrdemServicoPage: React.FC = () => {
 
   const { data, isLoading, refetch } = useQuery<OrderOfService[]>({
     queryKey: ['orders-of-service', employeeId],
-    queryFn: () => orderOfServiceService.listByEmployee(Number(employeeId)),
-    enabled: !!employeeId,
+    queryFn: async () => {
+      console.log('🔍 Buscando ordens de serviço...', { employeeId });
+      try {
+        let result;
+        if (employeeId) {
+          // Se houver filtro por funcionário, buscar apenas as ordens desse funcionário
+          result = await orderOfServiceService.getOrders({ employeeId });
+        } else {
+          // Buscar todas as ordens quando não há filtro
+          result = await orderOfServiceService.getOrders();
+        }
+        console.log('✅ Ordens retornadas:', result?.length || 0, result);
+        return result || [];
+      } catch (error) {
+        console.error('❌ Erro ao buscar ordens:', error);
+        return [];
+      }
+    },
+    enabled: true, // Sempre habilitado para buscar todas as ordens
+    refetchOnWindowFocus: true, // Recarregar quando a janela receber foco
+    refetchOnMount: true, // Recarregar quando o componente montar
   });
 
   const clearFilters = () => {
     setEmployeeId('');
   };
 
-  const handleRefresh = () => {
-    refetch();
+  const handleRefresh = async () => {
+    console.log('🔄 Atualizando lista manualmente...');
+    try {
+      await refetch();
+      console.log('✅ Lista atualizada');
+    } catch (error) {
+      console.error('❌ Erro ao atualizar lista:', error);
+    }
   };
 
   return (
@@ -69,6 +95,15 @@ const OrdemServicoPage: React.FC = () => {
             <p className="text-gray-400 mt-1">Gestão e emissão de ordens de serviço de segurança e saúde do trabalho</p>
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="border-gray-600 text-seguranca-lightgray hover:bg-gray-600"
+              onClick={() => refetch()}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
             <Button variant="outline" className="border-gray-600 text-seguranca-lightgray">
               <Download className="mr-2 h-4 w-4" />
               Exportar
@@ -112,10 +147,9 @@ const OrdemServicoPage: React.FC = () => {
                 variant="outline" 
                 onClick={handleRefresh}
                 className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
-                disabled={!employeeId}
               >
                 <Filter className="mr-2 h-4 w-4" />
-                Aplicar
+                Aplicar Filtro
               </Button>
             </div>
           </CardContent>
@@ -135,6 +169,7 @@ const OrdemServicoPage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
+                {console.log('📊 Renderizando tabela. Dados:', data, 'Tamanho:', data?.length)}
                 <table className="w-full">
                   <thead>
                     <tr className="text-seguranca-yellow text-left border-b border-gray-700">
@@ -149,7 +184,7 @@ const OrdemServicoPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {data?.length ? data.map(os => (
+                    {data && Array.isArray(data) && data.length > 0 ? data.map(os => (
                       <tr 
                         key={os.id} 
                         className="border-b border-gray-700 text-seguranca-lightgray hover:bg-seguranca-black transition-colors cursor-pointer"
@@ -159,8 +194,15 @@ const OrdemServicoPage: React.FC = () => {
                         <td className="p-3 text-sm">{os.role}</td>
                         <td className="p-3 text-sm">{os.company}</td>
                         <td className="p-3 text-sm">{os.workplace}</td>
-                        <td className="p-3 text-sm">R$ {os.salary.toFixed(2)}</td>
-                        <td className="p-3 text-sm">{os.startDate} {os.endDate ? `até ${os.endDate}` : ''}</td>
+                        <td className="p-3 text-sm">
+                          {typeof os.salary === 'number' 
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(os.salary)
+                            : `R$ ${parseFloat(String(os.salary || 0)).toFixed(2)}`}
+                        </td>
+                        <td className="p-3 text-sm">
+                          {os.startDate ? new Date(os.startDate).toLocaleDateString('pt-BR') : 'N/A'} 
+                          {os.endDate ? ` até ${new Date(os.endDate).toLocaleDateString('pt-BR')}` : ''}
+                        </td>
                         <td className="p-3 text-sm">
                           <span className={`px-2 py-1 rounded text-xs ${os.signed ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                             {os.signed ? 'Sim' : 'Não'}
@@ -216,7 +258,17 @@ const OrdemServicoPage: React.FC = () => {
       </div>
 
       {/* Modal para emitir nova OS */}
-      <EmitirOrdemServicoModal open={modalOpen} onClose={handleCloseModal} onCreated={refetch} />
+      <EmitirOrdemServicoModal 
+        open={modalOpen} 
+        onClose={handleCloseModal} 
+        onCreated={async () => {
+          console.log('🔄 Recarregando lista após criar ordem...');
+          // Invalidar cache e recarregar
+          await queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
+          await refetch();
+          handleCloseModal();
+        }} 
+      />
       {/* Modal para visualizar OS */}
       <OrdemServicoViewModal 
         open={viewModalOpen} 

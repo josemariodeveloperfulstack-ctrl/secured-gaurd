@@ -55,7 +55,7 @@ export default defineConfig(({ mode }) => {
       },
       proxy: {
         '/api': {
-          target: 'http://localhost:8081',
+          target: 'http://localhost:8083',
           changeOrigin: true,
           secure: false,
           configure: (proxy, options) => {
@@ -71,7 +71,7 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/ws': {
-          target: 'http://localhost:8081',
+          target: 'http://localhost:8083',
           changeOrigin: true,
           secure: false,
           ws: true,

@@ -42,6 +42,27 @@ export interface OrderOfServiceFilters {
   search?: string;
 }
 
+// Função para normalizar dados recebidos do backend
+function normalizeOrderOfService(data: any): OrderOfService {
+  return {
+    id: String(data.id || ''),
+    employeeId: String(data.employeeId || ''),
+    employeeName: String(data.employeeName || ''),
+    employeeCpf: String(data.employeeCpf || ''),
+    role: String(data.role || ''),
+    company: String(data.company || ''),
+    client: String(data.client || ''),
+    workplace: String(data.workplace || ''),
+    salary: typeof data.salary === 'number' ? data.salary : parseFloat(String(data.salary || '0')),
+    startDate: String(data.startDate || ''),
+    endDate: data.endDate ? String(data.endDate) : undefined,
+    documentUrl: data.documentUrl ? String(data.documentUrl) : undefined,
+    signed: Boolean(data.signed),
+    createdAt: String(data.createdAt || new Date().toISOString()),
+    updatedAt: String(data.updatedAt || new Date().toISOString())
+  };
+}
+
 // Dados de fallback para quando o backend não estiver disponível
 const fallbackOrders: OrderOfService[] = [
   {
@@ -113,7 +134,8 @@ export const orderOfServiceService = {
       // Verificar se os dados são um array válido
       if (Array.isArray(response.data)) {
         console.log('✅ Ordens de serviço carregadas do backend:', response.data.length);
-        return response.data;
+        // Normalizar os dados para garantir tipos corretos
+        return response.data.map(normalizeOrderOfService);
       } else {
         console.warn('⚠️ Backend retornou dados que não são um array:', response.data);
         return [];
@@ -150,7 +172,7 @@ export const orderOfServiceService = {
       console.log('🔗 Tentando buscar ordem de serviço por ID no backend:', id);
       const response = await api.get(`/api/orders-of-service/${id}`);
       console.log('✅ Ordem de serviço encontrada no backend');
-      return response.data;
+      return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, buscando nos dados de fallback:', error);
       
@@ -169,7 +191,7 @@ export const orderOfServiceService = {
       console.log('🔗 Tentando criar ordem de serviço no backend:', data);
       const response = await api.post('/api/orders-of-service', data);
       console.log('✅ Ordem de serviço criada no backend');
-      return response.data;
+      return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando criação:', error);
       
@@ -192,7 +214,7 @@ export const orderOfServiceService = {
       console.log('🔗 Tentando atualizar ordem de serviço no backend:', id);
       const response = await api.put(`/api/orders-of-service/${id}`, data);
       console.log('✅ Ordem de serviço atualizada no backend');
-      return response.data;
+      return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando atualização:', error);
       
@@ -217,7 +239,7 @@ export const orderOfServiceService = {
       console.log('🔗 Tentando assinar ordem de serviço no backend:', id);
       const response = await api.post(`/api/orders-of-service/${id}/sign`);
       console.log('✅ Ordem de serviço assinada no backend');
-      return response.data;
+      return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando assinatura:', error);
       
@@ -242,7 +264,7 @@ export const orderOfServiceService = {
       console.log('🔗 Tentando atualizar URL do documento no backend:', id);
       const response = await api.post(`/api/orders-of-service/${id}/document`, documentUrl);
       console.log('✅ URL do documento atualizada no backend');
-      return response.data;
+      return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando atualização de URL:', error);
       

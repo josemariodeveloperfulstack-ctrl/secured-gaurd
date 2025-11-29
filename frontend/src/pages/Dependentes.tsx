@@ -333,15 +333,27 @@ const Dependentes: React.FC = () => {
 
         {/* Selected Employee Info */}
         {selectedEmployee && (
-          <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-4" data-animate="fadeUp">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
-                <Building2 className="h-5 w-5 text-seguranca-red" />
+          <Card className="bg-[#1a1f2e] border-gray-700 p-0 overflow-hidden" data-animate="fadeUp">
+            <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-[#EAB308] flex items-center justify-center text-black font-bold text-xl">
+                  {selectedEmployee.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="font-bold text-white text-lg">{selectedEmployee.name}</h4>
+                  <p className="text-gray-400 text-sm">
+                    {selectedEmployee.position?.name || 'Cargo não definido'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-semibold text-white">Funcionário Selecionado</h4>
-                <p className="text-seguranca-lightgray">{selectedEmployee.name}</p>
-              </div>
+              
+              <Button 
+                onClick={clearFilters}
+                variant="outline"
+                className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+              >
+                Trocar Funcionário
+              </Button>
             </div>
           </Card>
         )}

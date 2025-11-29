@@ -55,6 +55,12 @@ const initialState: CreateEmployeeDTO = {
   },
   company: {
     id: ''
+  },
+  bankData: {
+    bank: '',
+    agency: '',
+    account: '',
+    type: 'CORRENTE'
   }
 };
 
@@ -183,6 +189,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         gender: employeeToEdit.gender || '',
         vistoFiscalizacao: employeeToEdit.vistoFiscalizacao || '',
         
+        // Dados bancários - converter de bankInfo (backend) para bankData (frontend)
+        bankData: employeeToEdit.bankData ? {
+          bank: employeeToEdit.bankData.bank || '',
+          agency: employeeToEdit.bankData.agency || '',
+          account: employeeToEdit.bankData.account || '',
+          type: employeeToEdit.bankData.type || 'CORRENTE'
+        } : {
+          bank: '',
+          agency: '',
+          account: '',
+          type: 'CORRENTE'
+        },
+        
         // Campos adicionais - comentados pois não existem na entidade
         // workPostId: (employeeToEdit as any).workPostId || '',
         // departmentId: (employeeToEdit as any).departmentId || ''
@@ -254,12 +273,25 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const loadEmployeeDependents = async (employeeId: string) => {
     if (!employeeId) return;
     
+    // Validar UUID - não fazer chamada se for UUID inválido/padrão
+    if (employeeId === '00000000-0000-0000-0000-000000000001' || 
+        employeeId === '00000000-0000-0000-0000-000000000000' ||
+        !employeeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      console.warn('UUID inválido para carregar dependentes:', employeeId);
+      setEmployeeDependents([]);
+      return;
+    }
+    
     setLoadingDependents(true);
     try {
       const dependents = await dependentService.getDependentsByEmployee(employeeId);
       setEmployeeDependents(dependents);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar dependentes:', error);
+      // Se for erro 403, apenas logar e não mostrar erro ao usuário
+      if (error?.response?.status === 403) {
+        console.warn('Acesso negado ao carregar dependentes. Verifique as permissões do usuário.');
+      }
       setEmployeeDependents([]);
     } finally {
       setLoadingDependents(false);
@@ -468,7 +500,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    
+    // Handle bankData fields
+    if (name.startsWith('bankData.')) {
+      const field = name.split('.')[1];
+      setForm((prev) => ({
+        ...prev,
+        bankData: {
+          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE' }),
+          [field]: value
+        }
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSelectChange = (field: string, value: string) => {
@@ -1613,10 +1658,44 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    placeholder="Rua, número, bairro, cidade - estado, CEP"
                  />
                </div>
-             </div>
-           </div>
+            </div>
+          </div>
 
-           {/* Seção: Informações Profissionais */}
+          {/* Seção: Dados Bancários */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white">Dados Bancários</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Banco</Label>
+                <Input 
+                  name="bankData.bank" 
+                  value={form.bankData?.bank || ''} 
+                  onChange={handleChange} 
+                  placeholder="Nome do banco"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Agência</Label>
+                <Input 
+                  name="bankData.agency" 
+                  value={form.bankData?.agency || ''} 
+                  onChange={handleChange} 
+                  placeholder="0000"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
+                <Input 
+                  name="bankData.account" 
+                  value={form.bankData?.account || ''} 
+                  onChange={handleChange} 
+                  placeholder="00000-0"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Informações Profissionais */}
            <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
              <h3 className="text-lg font-semibold flex items-center text-white">
                <Building className="mr-2" size={20} />
@@ -1778,7 +1857,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    onValueChange={handleCompanySelect}
                  >
                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                     <SelectValue placeholder="Selecione uma empresa" />
+                     <SelectValue placeholder="Selecione uma empresa">
+                       {selectedCompany ? (
+                         <div className="flex flex-col text-left">
+                           <span className="font-medium">
+                             {selectedCompany.sigla ? selectedCompany.sigla.toUpperCase() : selectedCompany.name}
+                           </span>
+                           {selectedCompany.sigla && selectedCompany.name && (
+                             <span className="text-xs text-gray-400">{selectedCompany.name}</span>
+                           )}
+                         </div>
+                       ) : (
+                         'Selecione uma empresa'
+                       )}
+                     </SelectValue>
                    </SelectTrigger>
                    <SelectContent className="bg-seguranca-graphite border-gray-600">
                      <SelectItem value="none" className="text-seguranca-lightgray hover:bg-gray-700">
@@ -1791,10 +1883,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                          className="text-seguranca-lightgray hover:bg-gray-700"
                        >
                          <div className="flex flex-col">
-                           <span className="font-medium">{company.name}</span>
-                           <span className="text-xs text-gray-400">
-                             {company.cnpj ? `CNPJ: ${company.cnpj}` : 'Sem CNPJ'} • {company.status}
+                           <span className="font-medium">
+                             {company.sigla ? company.sigla.toUpperCase() : company.name}
                            </span>
+                           {company.sigla && company.name && (
+                             <span className="text-xs text-gray-400">{company.name}</span>
+                           )}
+                           {company.cnpj && (
+                             <span className="text-xs text-gray-400">
+                               CNPJ: {company.cnpj} • {company.status}
+                             </span>
+                           )}
                          </div>
                        </SelectItem>
                      ))}

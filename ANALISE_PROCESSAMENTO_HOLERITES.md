@@ -440,3 +440,9 @@ CREATE TABLE document_processing_job (
 - `IMPLEMENTACAO_WORKERS_COMPLETA.md` - Documentação dos workers
 - `ANALISE_COMPLETA_PRD_HOLERITES.md` - Análise completa do PRD
 
+
+
+
+
+
+

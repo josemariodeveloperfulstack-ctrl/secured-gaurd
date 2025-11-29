@@ -136,6 +136,7 @@ const departamentoPessoalMenuItems = [
   // Gestão de Funcionários
   { icon: Users, text: 'Funcionários', to: '/rh/funcionarios', id: 'dp-funcionarios' },
   { icon: Upload, text: 'Importar WhatsApp (PDF)', to: '/rh/funcionarios/importar-whatsapp', id: 'dp-funcionarios-importar-whatsapp' },
+  { icon: Banknote, text: 'Importar Dados Bancários', to: '/rh/funcionarios/importar-dados-bancarios', id: 'dp-funcionarios-importar-bancarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
   
@@ -161,7 +162,6 @@ const departamentoPessoalMenuItems = [
   
   // Documentos e Contratos
   { icon: FileSignature, text: 'Documentos', to: '/rh/documentos', id: 'dp-documentos' },
-  { icon: Send, text: 'Holerites', to: '/rh/holerites', id: 'dp-holerites' },
   
   // Operações
   { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico', id: 'dp-ordens-servico' },

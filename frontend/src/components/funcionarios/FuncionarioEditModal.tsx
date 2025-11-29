@@ -9,6 +9,8 @@ import { UpdateEmployeeDTO } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
 import { unitService, Unit } from '@/services/unitService';
 import { userService } from '@/services/userService';
+import { companyService } from '@/services/companyService';
+import { Company } from '@/types/company';
 import { User } from '@/types/user';
 import { Employee } from '@/types/employee';
 import { Search, User as UserIcon, Building, Briefcase, Plus } from 'lucide-react';
@@ -46,6 +48,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     position: { id: '' },
     unit: { id: '' },
     user: { id: '' },
+    company: { id: '' },
+    bankData: {
+      bank: '',
+      agency: '',
+      account: '',
+      type: 'CORRENTE'
+    },
     // Campos do cônjuge
     spouseName: '',
     spouseCpf: '',
@@ -78,6 +87,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     fgtsDataOpcao: '',
     fgtsBancoDepositario: '',
     fgtsDataRetratacao: '',
+    pis: '',
     pisDataCadastro: '',
     pisBancoDepositario: '',
     pisEnderecoBanco: '',
@@ -111,21 +121,94 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [positions, setPositions] = useState<Position[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
 
-  // Carregar dados para os selects
+  // Carregar dados para os selects quando o modal abrir
   useEffect(() => {
     if (open) {
+      console.log('🔄 Modal aberto, carregando dados dos selects...');
       loadSelectData();
     }
   }, [open]);
+
+  // Atualizar usuário e cargo selecionados quando os dados forem carregados
+  useEffect(() => {
+    if (funcionario && open && users.length > 0 && positions.length > 0) {
+      console.log('🔄 Atualizando selects com dados carregados');
+      console.log('👤 Funcionário user ID:', funcionario.user?.id);
+      console.log('💼 Funcionário position ID:', funcionario.position?.id);
+      console.log('📋 Users disponíveis:', users.length);
+      console.log('📋 Positions disponíveis:', positions.length);
+      
+      // Preencher usuário selecionado
+      if (funcionario.user?.id) {
+        const user = users.find(u => u.id === funcionario.user?.id);
+        if (user) {
+          setSelectedUser(user);
+          setUserSearchTerm(user.name || user.email || '');
+          console.log('✅ Usuário encontrado e selecionado:', user.name);
+        } else {
+          console.warn('⚠️ Usuário não encontrado na lista:', funcionario.user?.id);
+        }
+      } else {
+        console.log('ℹ️ Funcionário não tem usuário associado');
+      }
+      
+      // Preencher cargo selecionado - comparar IDs como strings
+      if (funcionario.position?.id) {
+        const positionId = String(funcionario.position.id);
+        const position = positions.find(p => String(p.id) === positionId);
+        if (position) {
+          setSelectedPosition(position);
+          console.log('✅ Cargo encontrado e selecionado:', position.name);
+        } else {
+          console.warn('⚠️ Cargo não encontrado na lista:', positionId);
+        }
+      } else {
+        console.log('ℹ️ Funcionário não tem cargo associado');
+      }
+      
+      // Preencher usuário selecionado - comparar IDs como strings
+      if (funcionario.user?.id) {
+        const userId = String(funcionario.user.id);
+        const user = users.find(u => String(u.id) === userId);
+        if (user) {
+          setSelectedUser(user);
+          setUserSearchTerm(user.name || user.email || '');
+          console.log('✅ Usuário encontrado e selecionado:', user.name);
+        } else {
+          console.warn('⚠️ Usuário não encontrado na lista:', userId);
+        }
+      } else {
+        console.log('ℹ️ Funcionário não tem usuário associado');
+      }
+      
+      // Preencher empresa selecionada - comparar IDs como strings
+      if (funcionario.company?.id && companies.length > 0) {
+        const companyId = String(funcionario.company.id);
+        const company = companies.find(c => String(c.id) === companyId);
+        if (company) {
+          setSelectedCompany(company);
+          console.log('✅ Empresa encontrada e selecionada:', company.name, company.id);
+        } else {
+          console.warn('⚠️ Empresa não encontrada na lista:', companyId);
+        }
+      } else {
+        console.log('ℹ️ Funcionário não tem empresa associada ou lista de empresas não carregada');
+      }
+    }
+  }, [funcionario, users, positions, companies, open]);
 
   // Filtrar usuários baseado no termo de busca
   useEffect(() => {
@@ -144,13 +227,59 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   // Preencher formulário quando funcionário for selecionado
   useEffect(() => {
     if (funcionario && open) {
+      console.log('🔍 Carregando dados do funcionário para edição:', funcionario);
+      console.log('🔍 Dados bancários brutos:', {
+        bankData: funcionario.bankData,
+        bankInfo: (funcionario as any).bankInfo
+      });
+      
+      // Tratar address que pode ser string ou objeto
+      const addressValue = typeof funcionario.address === 'string' 
+        ? funcionario.address 
+        : funcionario.address?.street || '';
+      
+      // Tratar CPF que pode vir como cpf ou document
+      const cpfValue = funcionario.cpf || (funcionario as any).document || '';
+      
+      // Tratar dados bancários - verificar tanto bankData quanto bankInfo
+      let bankData = {
+        bank: '',
+        agency: '',
+        account: '',
+        type: 'CORRENTE'
+      };
+      
+      // Priorizar bankInfo (que vem do backend) sobre bankData
+      if ((funcionario as any).bankInfo) {
+        const bankInfo = (funcionario as any).bankInfo;
+        bankData = {
+          bank: bankInfo.bank || '',
+          agency: bankInfo.agency || '',
+          account: bankInfo.account || '',
+          type: bankInfo.accountType || 'CORRENTE'
+        };
+        console.log('💰 Dados bancários encontrados em bankInfo:', bankInfo);
+      } else if (funcionario.bankData) {
+        bankData = {
+          bank: funcionario.bankData.bank || '',
+          agency: funcionario.bankData.agency || '',
+          account: funcionario.bankData.account || '',
+          type: funcionario.bankData.type || 'CORRENTE'
+        };
+        console.log('💰 Dados bancários encontrados em bankData:', funcionario.bankData);
+      } else {
+        console.log('⚠️ Nenhum dado bancário encontrado no funcionário');
+      }
+      
+      console.log('💰 Dados bancários mapeados para o formulário:', bankData);
+      
       setForm({
         name: funcionario.name || '',
-        cpf: funcionario.cpf || '',
+        cpf: cpfValue,
         rg: funcionario.rg || '',
         email: funcionario.email || '',
         phone: funcionario.phone || '',
-        address: funcionario.address?.street || '',
+        address: addressValue,
         birthDate: funcionario.birthDate || '',
         maritalStatus: funcionario.maritalStatus || 'SINGLE',
         nationality: funcionario.nationality || 'Brasileiro',
@@ -158,9 +287,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         hireDate: funcionario.hireDate || '',
         status: funcionario.status || 'ACTIVE',
         notes: funcionario.notes || '',
-        position: { id: funcionario.position?.id || '' },
-        unit: { id: funcionario.unit?.id || '' },
-        user: { id: funcionario.user?.id || '' },
+        position: { id: funcionario.position?.id ? String(funcionario.position.id) : '' },
+        unit: { id: funcionario.unit?.id ? String(funcionario.unit.id) : '' },
+        user: { id: funcionario.user?.id ? String(funcionario.user.id) : '' },
+        company: { id: funcionario.company?.id ? String(funcionario.company.id) : '' },
+        bankData: bankData,
         // Campos do cônjuge
         spouseName: funcionario.spouseName || '',
         spouseCpf: funcionario.spouseCpf || '',
@@ -193,6 +324,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         fgtsDataOpcao: funcionario.fgtsDataOpcao || '',
         fgtsBancoDepositario: funcionario.fgtsBancoDepositario || '',
         fgtsDataRetratacao: funcionario.fgtsDataRetratacao || '',
+        pis: funcionario.pis || '',
         pisDataCadastro: funcionario.pisDataCadastro || '',
         pisBancoDepositario: funcionario.pisBancoDepositario || '',
         pisEnderecoBanco: funcionario.pisEnderecoBanco || '',
@@ -217,25 +349,117 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         decretoNaturalizacao: funcionario.decretoNaturalizacao || '',
         vistoFiscalizacao: funcionario.vistoFiscalizacao || '',
         assinaturaFuncionario: funcionario.assinaturaFuncionario || '',
-        dataRescisao: funcionario.dataRescisao || ''
+        dataRescisao: funcionario.dataRescisao || '',
+        gender: funcionario.gender || ''
       });
+      
+      console.log('✅ Formulário preenchido com dados do funcionário');
+      console.log('📋 Dados principais:', {
+        name: funcionario.name,
+        cpf: cpfValue,
+        email: funcionario.email,
+        phone: funcionario.phone,
+        position: funcionario.position?.id,
+        positionName: funcionario.position?.name,
+        userId: funcionario.user?.id,
+        userName: funcionario.user?.name || funcionario.user?.email,
+        bankData: bankData,
+        address: addressValue
+      });
+      
+      // Nota: Os selects de usuário e cargo serão preenchidos no useEffect
+      // que monitora users e positions para garantir que as listas estejam carregadas
+    } else if (open && !funcionario) {
+      // Resetar formulário quando modal abrir sem funcionário
+      console.log('🔄 Resetando formulário - nenhum funcionário selecionado');
     }
   }, [funcionario, open]);
 
   const loadSelectData = async () => {
     setLoadingData(true);
     try {
-      const [positionsData, unitsData, usersData] = await Promise.all([
+      console.log('📥 Carregando dados dos selects...');
+      const [positionsData, unitsData, usersData, companiesData] = await Promise.all([
         positionService.getPositions(),
         unitService.getAllUnits(),
-        userService.getAllUsers()
+        userService.getAllUsers(),
+        companyService.getAllCompanies()
       ]);
+      
+      console.log('✅ Dados carregados:', {
+        positions: positionsData.length,
+        units: unitsData.length,
+        users: usersData.length,
+        companies: companiesData.length
+      });
+      
       setPositions(positionsData);
       setUnits(unitsData);
       setUsers(usersData);
       setFilteredUsers(usersData);
+      setCompanies(companiesData);
+      
+      // Após carregar os dados, preencher os selects se houver funcionário
+      if (funcionario) {
+        console.log('🔍 Funcionário encontrado, preenchendo selects...');
+        console.log('👤 Funcionário user ID:', funcionario.user?.id);
+        console.log('💼 Funcionário position ID:', funcionario.position?.id);
+        
+        // Preencher usuário selecionado - comparar IDs como strings
+        if (funcionario.user?.id) {
+          const userId = String(funcionario.user.id);
+          const user = usersData.find(u => String(u.id) === userId);
+          if (user) {
+            setSelectedUser(user);
+            setUserSearchTerm(user.name || user.email || '');
+            console.log('✅ Usuário encontrado e selecionado:', user.name, user.id);
+          } else {
+            console.warn('⚠️ Usuário não encontrado na lista');
+            console.warn('   Procurando por:', userId);
+            console.warn('   IDs disponíveis:', usersData.map(u => String(u.id)));
+            // Mesmo não encontrando, definir o ID no formulário para que apareça quando a lista carregar
+            setForm(prev => ({ ...prev, user: { id: userId } }));
+          }
+        } else {
+          console.log('ℹ️ Funcionário não tem usuário associado');
+        }
+        
+        // Preencher cargo selecionado - comparar IDs como strings
+        if (funcionario.position?.id) {
+          const positionId = String(funcionario.position.id);
+          const position = positionsData.find(p => String(p.id) === positionId);
+          if (position) {
+            setSelectedPosition(position);
+            console.log('✅ Cargo encontrado e selecionado:', position.name, position.id);
+          } else {
+            console.warn('⚠️ Cargo não encontrado na lista');
+            console.warn('   Procurando por:', positionId);
+            console.warn('   IDs disponíveis:', positionsData.map(p => String(p.id)));
+            // Mesmo não encontrando, definir o ID no formulário para que apareça quando a lista carregar
+            setForm(prev => ({ ...prev, position: { id: positionId } }));
+          }
+        } else {
+          console.log('ℹ️ Funcionário não tem cargo associado');
+        }
+        
+        // Preencher empresa selecionada - comparar IDs como strings
+        if (funcionario.company?.id) {
+          const companyId = String(funcionario.company.id);
+          const company = companiesData.find(c => String(c.id) === companyId);
+          if (company) {
+            setSelectedCompany(company);
+            console.log('✅ Empresa encontrada e selecionada:', company.name, company.id);
+          } else {
+            console.warn('⚠️ Empresa não encontrada na lista');
+            console.warn('   Procurando por:', companyId);
+            console.warn('   IDs disponíveis:', companiesData.map(c => String(c.id)));
+          }
+        } else {
+          console.log('ℹ️ Funcionário não tem empresa associada');
+        }
+      }
     } catch (err) {
-      console.error('Erro ao carregar dados dos selects:', err);
+      console.error('❌ Erro ao carregar dados dos selects:', err);
     } finally {
       setLoadingData(false);
     }
@@ -243,27 +467,74 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    
+    // Handle bankData fields
+    if (name.startsWith('bankData.')) {
+      const field = name.split('.')[1];
+      setForm((prev) => ({
+        ...prev,
+        bankData: {
+          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE' }),
+          [field]: value
+        }
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSelectChange = (field: string, value: string) => {
     if (value) {
+      const stringValue = String(value);
       setForm((prev) => ({ 
         ...prev, 
-        [field]: { id: value } 
+        [field]: { id: stringValue } 
       }));
+      
+      // Atualizar estados selecionados
+      if (field === 'user') {
+        const user = users.find(u => String(u.id) === stringValue);
+        if (user) {
+          setSelectedUser(user);
+          setUserSearchTerm(user.name || user.email || '');
+        }
+      } else if (field === 'position') {
+        const position = positions.find(p => String(p.id) === stringValue);
+        if (position) {
+          setSelectedPosition(position);
+        }
+      }
     } else {
       setForm((prev) => {
         const newForm = { ...prev };
         if (field === 'position') {
           newForm.position = { id: '' };
+          setSelectedPosition(null);
         } else if (field === 'unit') {
           newForm.unit = { id: '' };
         } else if (field === 'user') {
           newForm.user = { id: '' };
+          setSelectedUser(null);
+          setUserSearchTerm('');
+        } else if (field === 'company') {
+          newForm.company = { id: '' };
+          setSelectedCompany(null);
         }
         return newForm;
       });
+    }
+  };
+  
+  const handleCompanySelect = (companyId: string) => {
+    if (companyId === 'none' || companyId === '') {
+      setSelectedCompany(null);
+      setForm(prev => ({ ...prev, company: { id: '' } }));
+    } else {
+      const company = companies.find(c => c.id === companyId);
+      if (company) {
+        setSelectedCompany(company);
+        setForm(prev => ({ ...prev, company: { id: company.id } }));
+      }
     }
   };
 
@@ -393,23 +664,42 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   />
                 </div>
                 <Select 
-                  value={form.user?.id || ''} 
+                  value={form.user?.id ? String(form.user.id) : undefined} 
                   onValueChange={(value) => handleSelectChange('user', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um usuário" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {filteredUsers.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{user.name}</span>
+                    <SelectValue placeholder="Selecione um usuário">
+                      {selectedUser ? (
+                        <div className="flex flex-col text-left">
+                          <span className="font-medium">{selectedUser.name}</span>
                           <span className="text-xs text-gray-500">
-                            {user.email} • {user.username} • {user.role}
+                            {selectedUser.email}
                           </span>
                         </div>
-                      </SelectItem>
-                    ))}
+                      ) : form.user?.id ? (
+                        <span className="text-gray-400">Carregando usuário...</span>
+                      ) : (
+                        'Selecione um usuário'
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {filteredUsers.length > 0 ? (
+                      filteredUsers.map((user) => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{user.name}</span>
+                            <span className="text-xs text-gray-500">
+                              {user.email} • {user.username} • {user.role}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        Nenhum usuário encontrado
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-300">
@@ -424,27 +714,49 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                  </Label>
                  <div className="flex gap-2">
                    <Select 
-                     value={form.position?.id || ''} 
+                     value={form.position?.id ? String(form.position.id) : undefined} 
                      onValueChange={(value) => handleSelectChange('position', value)}
                      className="flex-1"
                    >
                      <SelectTrigger>
-                       <SelectValue placeholder="Selecione um cargo" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {positions.map((position) => (
-                         <SelectItem key={position.id} value={position.id}>
+                       <SelectValue placeholder="Selecione um cargo">
+                         {selectedPosition ? (
                            <div className="flex items-center">
                              <Briefcase className="mr-2" size={16} />
-                             <div className="flex flex-col">
-                               <span className="font-medium">{position.name}</span>
-                               {position.description && (
-                                 <span className="text-xs text-gray-500">{position.description}</span>
+                             <div className="flex flex-col text-left">
+                               <span className="font-medium">{selectedPosition.name}</span>
+                               {selectedPosition.description && (
+                                 <span className="text-xs text-gray-500">{selectedPosition.description}</span>
                                )}
                              </div>
                            </div>
-                         </SelectItem>
-                       ))}
+                         ) : form.position?.id ? (
+                           <span className="text-gray-400">Carregando cargo...</span>
+                         ) : (
+                           'Selecione um cargo'
+                         )}
+                       </SelectValue>
+                     </SelectTrigger>
+                     <SelectContent>
+                       {positions.length > 0 ? (
+                         positions.map((position) => (
+                           <SelectItem key={position.id} value={String(position.id)}>
+                             <div className="flex items-center">
+                               <Briefcase className="mr-2" size={16} />
+                               <div className="flex flex-col">
+                                 <span className="font-medium">{position.name}</span>
+                                 {position.description && (
+                                   <span className="text-xs text-gray-500">{position.description}</span>
+                                 )}
+                               </div>
+                             </div>
+                           </SelectItem>
+                         ))
+                       ) : (
+                         <div className="px-3 py-2 text-sm text-gray-500">
+                           Nenhum cargo disponível
+                         </div>
+                       )}
                      </SelectContent>
                    </Select>
                    <Button
@@ -915,6 +1227,108 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Empresa (Opcional)</Label>
+                <Select 
+                  value={selectedCompany?.id || form.company?.id || 'none'} 
+                  onValueChange={handleCompanySelect}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma empresa">
+                      {selectedCompany ? (
+                        <div className="flex flex-col text-left">
+                          <span className="font-medium">
+                            {selectedCompany.sigla ? selectedCompany.sigla.toUpperCase() : selectedCompany.name}
+                          </span>
+                          {selectedCompany.sigla && selectedCompany.name && (
+                            <span className="text-xs text-gray-500">{selectedCompany.name}</span>
+                          )}
+                        </div>
+                      ) : form.company?.id ? (
+                        <span className="text-gray-400">Carregando empresa...</span>
+                      ) : (
+                        'Nenhuma empresa'
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-gray-400">Nenhuma empresa</span>
+                    </SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {company.sigla ? company.sigla.toUpperCase() : company.name}
+                          </span>
+                          {company.sigla && company.name && (
+                            <span className="text-xs text-gray-500">{company.name}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Dados Bancários */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg border-l-4 border-blue-500">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Building className="h-5 w-5 text-blue-500" />
+              Dados Bancários
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Banco</Label>
+                <Input 
+                  name="bankData.bank" 
+                  value={form.bankData?.bank || ''} 
+                  onChange={handleChange} 
+                  placeholder="Nome do banco"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Agência</Label>
+                <Input 
+                  name="bankData.agency" 
+                  value={form.bankData?.agency || ''} 
+                  onChange={handleChange} 
+                  placeholder="0000"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
+                <Input 
+                  name="bankData.account" 
+                  value={form.bankData?.account || ''} 
+                  onChange={handleChange} 
+                  placeholder="00000-0"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Tipo de Conta</Label>
+                <Select 
+                  value={form.bankData?.type || 'CORRENTE'} 
+                  onValueChange={(value) => setForm(prev => ({ 
+                    ...prev, 
+                    bankData: {
+                      ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE' }),
+                      type: value
+                    }
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CORRENTE">Conta Corrente</SelectItem>
+                    <SelectItem value="POUPANCA">Poupança</SelectItem>
+                    <SelectItem value="SALARIO">Conta Salário</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

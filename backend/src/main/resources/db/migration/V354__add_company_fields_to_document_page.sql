@@ -16,3 +16,9 @@ COMMENT ON COLUMN document_page.company_name IS 'Name of the company extracted f
 COMMENT ON COLUMN document_page.company_cnpj IS 'CNPJ of the company extracted from the document';
 COMMENT ON COLUMN document_page.work_post_name IS 'Work post/sector name extracted from the document';
 
+
+
+
+
+
+

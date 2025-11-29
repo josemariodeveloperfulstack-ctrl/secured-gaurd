@@ -77,9 +77,12 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
       setClients(clientsData || []);
       setEmployees(employeesData || []);
       
-      // Por enquanto, usar todos os funcionários como possíveis supervisores
-      // TODO: Filtrar por role quando o backend suportar
-      setSupervisors(employeesData || []);
+      // Filtrar apenas funcionários com cargo de Supervisor
+      const supervisorsData = (employeesData || []).filter(emp => 
+        emp.position?.name?.toLowerCase().includes('supervisor')
+      );
+      
+      setSupervisors(supervisorsData);
 
       console.log('✅ Dados carregados:', {
         postos: postsData?.length,
@@ -267,14 +270,9 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                         <SelectItem key={sup.id} value={sup.id} className="text-white hover:bg-gray-600">
                           {sup.name}
                         </SelectItem>
-                      )) : employees.slice(0, 10).map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id} className="text-white hover:bg-gray-600">
-                          {emp.name}
-                        </SelectItem>
-                      ))}
-                      {employees.length === 0 && (
+                      )) : (
                         <SelectItem value="none" disabled className="text-gray-400">
-                          Nenhum funcionário cadastrado
+                          Nenhum supervisor encontrado
                         </SelectItem>
                       )}
                     </SelectContent>

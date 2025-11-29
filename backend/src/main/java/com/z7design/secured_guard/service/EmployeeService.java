@@ -134,6 +134,19 @@ public class EmployeeService {
                 existingEmployee.setEmail(dto.getEmail());
             }
             
+            // Atualizar dados bancários se fornecidos
+            if (dto.getBankInfo() != null) {
+                if (dto.getBankInfo().getBank() != null) {
+                    existingEmployee.setBanco(dto.getBankInfo().getBank());
+                }
+                if (dto.getBankInfo().getAgency() != null) {
+                    existingEmployee.setAgencia(dto.getBankInfo().getAgency());
+                }
+                if (dto.getBankInfo().getAccount() != null) {
+                    existingEmployee.setContaCorrente(dto.getBankInfo().getAccount());
+                }
+            }
+            
             // Atualizar entidades relacionais se fornecidas
             if (dto.getUser() != null && dto.getUser().getId() != null) {
                 existingEmployee.setUser(userRepository.findById(dto.getUser().getId())
@@ -516,6 +529,9 @@ public class EmployeeService {
             // Mapear informações bancárias se fornecidas
             if (dto.getBankInfo() != null) {
                 System.out.println("[DEBUG] Informações bancárias fornecidas: " + dto.getBankInfo().getBank());
+                e.setBanco(dto.getBankInfo().getBank());
+                e.setAgencia(dto.getBankInfo().getAgency());
+                e.setContaCorrente(dto.getBankInfo().getAccount());
             }
             
             // Mapear informações profissionais se fornecidas
@@ -636,6 +652,16 @@ public class EmployeeService {
             dto.setVistoFiscalizacao(e.getVistoFiscalizacao());
             dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
             dto.setDataRescisao(e.getDataRescisao());
+            
+            // Mapear dados bancários
+            if (e.getBanco() != null || e.getAgencia() != null || e.getContaCorrente() != null) {
+                EmployeeDTO.BankInfoDTO bankInfo = new EmployeeDTO.BankInfoDTO();
+                bankInfo.setBank(e.getBanco());
+                bankInfo.setAgency(e.getAgencia());
+                bankInfo.setAccount(e.getContaCorrente());
+                bankInfo.setAccountType("CORRENTE"); // Tipo padrão
+                dto.setBankInfo(bankInfo);
+            }
             
             // Campos adicionais - comentados pois não existem na entidade
             // dto.setWorkPostId(e.getWorkPostId()); // Campo workPostId não existe na entidade

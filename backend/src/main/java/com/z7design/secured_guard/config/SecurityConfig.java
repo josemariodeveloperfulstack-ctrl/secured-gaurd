@@ -207,6 +207,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/documentos-gerados/**").permitAll()
                 // Endpoints de assinaturas de documentos - temporariamente público para teste
                 .requestMatchers("/api/assinaturas-documentos/**").permitAll()
+                // Endpoints de dependentes - requerem permissões específicas ou autenticação para leitura
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/dependents/**").authenticated()
+                .requestMatchers("/api/dependents/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "GESTOR", "RH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_RH", "EMPLOYEES_READ", "EMPLOYEES_WRITE")
                 // Todo o resto requer autenticação
                 .anyRequest().authenticated()
             )

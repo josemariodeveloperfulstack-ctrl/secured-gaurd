@@ -107,11 +107,19 @@ public class DependentController {
         @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
         @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','EMPLOYEES_READ')")
     public ResponseEntity<List<DependentDTO>> findByEmployeeId(
             @Parameter(description = "ID do funcionário") @PathVariable UUID employeeId) {
         try {
             log.info("Buscando dependentes do funcionário ID: {}", employeeId);
+            
+            // Validar UUID - se for o UUID padrão/inválido, retornar lista vazia
+            if (employeeId == null || employeeId.toString().equals("00000000-0000-0000-0000-000000000001") || 
+                employeeId.toString().equals("00000000-0000-0000-0000-000000000000")) {
+                log.warn("UUID inválido ou padrão recebido: {}", employeeId);
+                return ResponseEntity.ok(java.util.Collections.emptyList());
+            }
+            
             List<DependentDTO> dependents = dependentService.findByEmployeeId(employeeId);
             return ResponseEntity.ok(dependents);
         } catch (Exception e) {

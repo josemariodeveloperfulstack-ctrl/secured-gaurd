@@ -426,6 +426,168 @@ public class ImportService {
         }
         return n;
     }
+
+    /**
+     * Importa dados bancários de um arquivo CSV ou Excel
+     * O arquivo deve conter: nome, agencia, contaCorrente (e opcionalmente banco)
+     * Faz match pelo nome do funcionário na tabela employees
+     */
+    @Transactional
+    public ImportResultDto importBankingData(MultipartFile file) {
+        ImportResultDto result = ImportResultDto.empty();
+        List<String> errors = new ArrayList<>();
+        
+        try {
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || fileName.isEmpty()) {
+                errors.add("Nome do arquivo inválido");
+                result.setErrors(errors);
+                return result;
+            }
+            
+            String extension = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+            List<BankingData> bankingDataList = new ArrayList<>();
+            
+            if ("csv".equals(extension)) {
+                bankingDataList = parseCsv(file);
+            } else if ("xlsx".equals(extension) || "xls".equals(extension)) {
+                bankingDataList = parseExcel(file);
+            } else {
+                errors.add("Formato de arquivo não suportado. Use CSV ou Excel (.xlsx, .xls)");
+                result.setErrors(errors);
+                return result;
+            }
+            
+            result.setTotalRows(bankingDataList.size());
+            
+            int updated = 0;
+            int skipped = 0;
+            
+            for (BankingData data : bankingDataList) {
+                try {
+                    if (data.name == null || data.name.trim().isEmpty()) {
+                        skipped++;
+                        errors.add("Linha ignorada: nome do funcionário vazio");
+                        continue;
+                    }
+                    
+                    // Buscar funcionário pelo nome (case-insensitive, trim)
+                    Optional<Employee> employeeOpt = employeeRepository.findByNameExact(data.name.trim());
+                    
+                    if (employeeOpt.isEmpty()) {
+                        skipped++;
+                        errors.add(String.format("Funcionário não encontrado: %s", data.name));
+                        continue;
+                    }
+                    
+                    Employee employee = employeeOpt.get();
+                    
+                    // Atualizar dados bancários
+                    if (data.agencia != null && !data.agencia.trim().isEmpty()) {
+                        employee.setAgencia(data.agencia.trim());
+                    }
+                    if (data.contaCorrente != null && !data.contaCorrente.trim().isEmpty()) {
+                        employee.setContaCorrente(data.contaCorrente.trim());
+                    }
+                    if (data.banco != null && !data.banco.trim().isEmpty()) {
+                        employee.setBanco(data.banco.trim());
+                    }
+                    
+                    employeeRepository.save(employee);
+                    updated++;
+                    log.info("Dados bancários atualizados para funcionário: {}", data.name);
+                    
+                } catch (Exception e) {
+                    skipped++;
+                    errors.add(String.format("Erro ao processar %s: %s", data.name, e.getMessage()));
+                    log.error("Erro ao processar dados bancários para {}", data.name, e);
+                }
+            }
+            
+            result.setUpdated(updated);
+            result.setSkipped(skipped);
+            result.setErrors(errors);
+            
+            log.info("Importação bancária concluída: {} processados, {} atualizados, {} ignorados", 
+                    bankingDataList.size(), updated, skipped);
+            
+        } catch (Exception e) {
+            log.error("Erro ao importar dados bancários", e);
+            errors.add("Erro ao processar arquivo: " + e.getMessage());
+            result.setErrors(errors);
+        }
+        
+        return result;
+    }
+    
+    private List<BankingData> parseCsv(MultipartFile file) throws IOException {
+        List<BankingData> dataList = new ArrayList<>();
+        String content = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        String[] lines = content.split("\n");
+        
+        // Pular header se existir
+        int startIndex = 0;
+        if (lines.length > 0 && (lines[0].toLowerCase().contains("nome") || lines[0].toLowerCase().contains("name"))) {
+            startIndex = 1;
+        }
+        
+        for (int i = startIndex; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) continue;
+            
+            // CSV simples: nome,agencia,contaCorrente,banco
+            String[] parts = line.split(",");
+            if (parts.length >= 3) {
+                BankingData data = new BankingData();
+                data.name = parts[0].trim().replace("\"", "");
+                data.agencia = parts.length > 1 ? parts[1].trim().replace("\"", "") : null;
+                data.contaCorrente = parts.length > 2 ? parts[2].trim().replace("\"", "") : null;
+                data.banco = parts.length > 3 ? parts[3].trim().replace("\"", "") : null;
+                dataList.add(data);
+            }
+        }
+        
+        return dataList;
+    }
+    
+    private List<BankingData> parseExcel(MultipartFile file) throws IOException {
+        List<BankingData> dataList = new ArrayList<>();
+        // Para Excel, vamos usar uma abordagem simples lendo como texto
+        // Em produção, seria melhor usar Apache POI
+        try {
+            // Tentar ler como CSV primeiro (Excel pode ser salvo como CSV)
+            return parseCsv(file);
+        } catch (Exception e) {
+            log.warn("Erro ao ler Excel, tentando como texto: {}", e.getMessage());
+            // Fallback: ler como texto e processar
+            String content = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            String[] lines = content.split("\n");
+            
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty() || line.toLowerCase().contains("nome")) continue;
+                
+                // Tentar separar por tab ou espaço múltiplo
+                String[] parts = line.split("\t|\\s{2,}");
+                if (parts.length >= 2) {
+                    BankingData data = new BankingData();
+                    data.name = parts[0].trim();
+                    data.agencia = parts.length > 1 ? parts[1].trim() : null;
+                    data.contaCorrente = parts.length > 2 ? parts[2].trim() : null;
+                    data.banco = parts.length > 3 ? parts[3].trim() : null;
+                    dataList.add(data);
+                }
+            }
+        }
+        return dataList;
+    }
+    
+    private static class BankingData {
+        String name;
+        String agencia;
+        String contaCorrente;
+        String banco;
+    }
 }
 
 

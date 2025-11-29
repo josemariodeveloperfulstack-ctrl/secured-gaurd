@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,12 +12,13 @@ import clientService, { type Client } from '@/services/clientService';
 import unitService from '@/services/unitService';
 import { workPostService, type WorkPost } from '@/services/workPostService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Briefcase, AlertCircle, X, Clock } from 'lucide-react';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Briefcase, AlertCircle, X, Clock, User, ExternalLink } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale';
 import { DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
 import api from '@/lib/axios';
+import { Badge } from '@/components/ui/badge';
 
 interface OrderOfServiceFormModalProps {
   isOpen: boolean;
@@ -52,83 +53,20 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [employees, setEmployees] = useState<{ id: string; name: string; document?: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; name: string; document?: string; position?: string }[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  // Search state for autocomplete
-  const [employeeQuery, setEmployeeQuery] = useState('');
-  const [positionQuery, setPositionQuery] = useState('');
-  const [companyQuery, setCompanyQuery] = useState('');
-  const [clientQuery, setClientQuery] = useState('');
-  const [unitQuery, setUnitQuery] = useState('');
+  // Derived filtered lists for future search implementation if needed
+  // For now using simple selects as requested but with better UI
 
-  // Derived filtered lists
-  const filteredEmployees = employees.filter(e => e.name.toLowerCase().includes(employeeQuery.toLowerCase()));
-  const filteredPositions = positions.filter(p => p.name.toLowerCase().includes(positionQuery.toLowerCase()));
-  const filteredCompanies = companies.filter(c => c.name.toLowerCase().includes(companyQuery.toLowerCase()));
-  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientQuery.toLowerCase()));
-  
-  // Filter units based on selected client
-  const selectedClient = clients.find(c => formData.client === c.name);
-  const clientUnits = selectedClient 
-    ? (units as any[]).filter((u: any) => u.clientId === selectedClient.id || u.client_id === selectedClient.id)
-    : units;
-  const filteredUnits = clientUnits.filter((u: any) => (u.name || '').toLowerCase().includes(unitQuery.toLowerCase()));
   // Reset form when modal opens/closes or order changes
   useEffect(() => {
     if (isOpen) {
-      (async () => {
-        try {
-          console.log('🔍 DEBUG: Carregando dados para modal de nova ordem...');
-          
-          const [emps, poss, comps, cls, uns] = await Promise.all([
-            employeeService.getAllEmployees().catch(err => {
-              console.error('❌ Erro ao carregar funcionários:', err);
-              return [];
-            }),
-            positionService.getPositions().catch(err => {
-              console.error('❌ Erro ao carregar posições:', err);
-              return [];
-            }),
-            companyService.getAllCompanies().catch(err => {
-              console.error('❌ Erro ao carregar empresas:', err);
-              return [];
-            }),
-            clientService.getAllClients().catch(err => {
-              console.error('❌ Erro ao carregar clientes:', err);
-              return [];
-            }),
-            unitService.getAllUnits().catch(err => {
-              console.error('❌ Erro ao carregar unidades:', err);
-              return [];
-            })
-          ]);
-          
-          console.log('📊 Dados carregados:', {
-            funcionários: emps.length,
-            posições: poss.length,
-            empresas: comps.length,
-            clientes: cls.length,
-            unidades: uns.length
-          });
-          
-          setEmployees((emps as any[]).map((e: any) => ({ id: e.id, name: e.name, document: e.document || e.cpf })));
-          setPositions(poss as Position[]);
-          setCompanies((comps as any[]).map((c: any) => ({ id: c.id, name: c.name })));
-          setClients(cls as Client[]);
-          setUnits(uns as any[]);
-          setWorkPosts([]); // Reset work posts when modal opens
-          
-          console.log('✅ Dados processados e definidos nos states');
-        } catch (error) {
-          console.error('❌ Erro geral ao carregar dados:', error);
-        }
-      })();
+      loadData();
       
       if (mode === 'edit' && order) {
         setFormData({
@@ -146,8 +84,6 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
         });
         setStartDate(order.startDate ? new Date(order.startDate) : null);
         setEndDate(order.endDate ? new Date(order.endDate) : null);
-        
-        // Marcamos que precisamos carregar posts após clients carregarem
       } else {
         setFormData({
           employeeId: '',
@@ -188,6 +124,40 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
     }));
   }, [startDate, endDate]);
 
+  const loadData = async () => {
+    try {
+      const [emps, poss, comps, cls] = await Promise.all([
+        employeeService.getAllEmployees(),
+        positionService.getPositions(),
+        companyService.getAllCompanies(),
+        clientService.getAllClients()
+      ]);
+      
+      setEmployees((emps as any[]).map((e: any) => ({ 
+        id: e.id, 
+        name: e.name, 
+        document: e.document || e.cpf,
+        position: e.position?.name
+      })));
+      setPositions(poss as Position[]);
+      setCompanies((comps as any[]).map((c: any) => ({ id: c.id, name: c.name, sigla: c.sigla })));
+      setClients(cls as Client[]);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast({ title: 'Erro', description: 'Erro ao carregar dados iniciais.', variant: 'destructive' });
+    }
+  };
+
+  const loadWorkPostsByClient = async (clientId: string) => {
+    try {
+      const posts = await workPostService.getWorkPostsByClient(clientId);
+      setWorkPosts(posts);
+    } catch (error) {
+      console.error('Erro ao carregar postos:', error);
+      setWorkPosts([]);
+    }
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -196,7 +166,7 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
     if (!formData.role.trim()) newErrors.role = 'Cargo é obrigatório';
     if (!formData.company.trim()) newErrors.company = 'Empresa é obrigatória';
     if (!formData.client.trim()) newErrors.client = 'Cliente é obrigatório';
-    if (!formData.workplace.trim()) newErrors.workplace = 'Local de trabalho é obrigatório';
+    if (!formData.workplace.trim()) newErrors.workplace = 'Unidade/Local é obrigatório';
     if (formData.salary <= 0) newErrors.salary = 'Salário deve ser maior que zero';
     if (!formData.startDate) newErrors.startDate = 'Data de início é obrigatória';
 
@@ -238,49 +208,6 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const loadWorkPostsByClient = async (clientId: string) => {
-    try {
-      console.log('🔍 DEBUG: Carregando posts de trabalho para cliente:', clientId);
-      const posts = await workPostService.getWorkPostsByClient(clientId);
-      console.log('📊 Posts encontrados:', posts.length);
-      setWorkPosts(posts);
-    } catch (error) {
-      console.error('❌ Erro ao carregar posts de trabalho:', error);
-      setWorkPosts([]);
-    }
-  };
-
-  const handlePositionSelect = (positionId: string) => {
-    const pos = positions.find(p => p.id === positionId);
-    setFormData(prev => ({ ...prev, role: pos?.name || '' }));
-  };
-
-  const handleCompanySelect = (companyId: string) => {
-    const comp = companies.find(c => c.id === companyId);
-    setFormData(prev => ({ ...prev, company: comp?.name || '' }));
-  };
-
-  const handleClientSelect = (clientId: string) => {
-    const cli = clients.find(c => c.id === clientId);
-    setFormData(prev => ({ 
-      ...prev, 
-      client: cli?.name || '',
-      // Clear workplace when client changes
-      workplace: ''
-    }));
-    // Load work posts for the selected client
-    if (cli) {
-      loadWorkPostsByClient(cli.id);
-    }
-    // Clear unit search query when client changes
-    setUnitQuery('');
-  };
-
-  const handleUnitSelect = (unitId: string) => {
-    const u = clientUnits.find((x: any) => x.id === unitId);
-    setFormData(prev => ({ ...prev, workplace: (u as any)?.name || '' }));
-  };
-
   const handleUpload = async (file: File | null) => {
     if (!file) return;
     try {
@@ -298,31 +225,28 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
-        <DialogHeader>
+        <DialogHeader className="mb-4">
           <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
-            <Plus size={20} />
+            <Briefcase size={20} />
             {mode === 'create' ? 'Nova Ordem de Serviço' : 'Editar Ordem de Serviço'}
           </DialogTitle>
-          <DialogDescription className="text-gray-300">
+          <DialogDescription className="text-gray-400">
             {mode === 'create' ? 'Preencha os dados da nova ordem de serviço' : 'Atualize as informações da ordem de serviço'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Seção: Dados do Funcionário */}
-          <div className="bg-seguranca-black p-4 rounded-lg border border-gray-700">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray mb-4 flex items-center gap-2">
-              <Users className="h-5 w-5 text-seguranca-yellow" />
-              Dados do Funcionário
-            </h3>
+          <div className="bg-seguranca-black/50 p-4 rounded-lg border border-gray-700/50 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-seguranca-yellow mb-2">
+              <User className="h-4 w-4" />
+              <span>Dados do Funcionário</span>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Nome do Funcionário */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-400 flex items-center gap-2">
-                  <Users size={14} />
-                  Nome do Funcionário *
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Funcionário *</Label>
                 <Select
                   value={formData.employeeId}
                   onValueChange={(value) => {
@@ -330,20 +254,27 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                     handleInputChange('employeeId', value);
                     handleInputChange('employeeName', employee?.name || '');
                     handleInputChange('employeeCpf', employee?.document || '');
+                    
+                    if (employee?.position) {
+                      handleInputChange('role', employee.position);
+                    }
                   }}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione o funcionário" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                     {employees.map((employee) => (
                       <SelectItem 
                         key={employee.id} 
                         value={employee.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        className="focus:bg-gray-700 focus:text-white"
                       >
-                        {employee.name}
+                        <div className="flex flex-col text-left">
+                          <span className="font-medium">{employee.name}</span>
+                          {employee.document && <span className="text-xs text-gray-500">{employee.document}</span>}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -358,64 +289,65 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
 
               {/* CPF */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-red-400 flex items-center gap-2">
-                  <FileText size={14} />
-                  CPF *
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">CPF *</Label>
                 <Input
                   value={formData.employeeCpf}
                   onChange={(e) => handleInputChange('employeeCpf', e.target.value)}
                   placeholder="000.000.000-00"
-                  className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                  required
+                  className="h-10 sm:h-11 bg-seguranca-black/30 border-gray-600 text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  readOnly
                 />
-                {errors.employeeCpf && (
-                  <div className="flex items-center gap-2 text-red-400 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.employeeCpf}
-                  </div>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Seção: Dados da Empresa */}
-          <div className="bg-seguranca-black p-4 rounded-lg border border-gray-700">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray mb-4 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-seguranca-yellow" />
-              Dados da Empresa
-            </h3>
+          {/* Seção: Dados Contratuais */}
+          <div className="bg-seguranca-black/50 p-4 rounded-lg border border-gray-700/50 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-seguranca-yellow mb-2">
+              <Building2 className="h-4 w-4" />
+              <span>Dados Contratuais</span>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Cargo */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-green-400 flex items-center gap-2">
-                  <Tag size={14} />
-                  Cargo *
-                </label>
-                <Select
-                  value={positions.find(p => p.name === formData.role)?.id || ''}
-                  onValueChange={(value) => {
-                    const position = positions.find(p => p.id === value);
-                    handleInputChange('role', position?.name || '');
-                  }}
-                  required
-                >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                    <SelectValue placeholder="Selecione o cargo" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {positions.map((position) => (
-                      <SelectItem 
-                        key={position.id} 
-                        value={position.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {position.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Cargo *</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={positions.find(p => p.name === formData.role)?.id || ''}
+                    onValueChange={(value) => {
+                      const position = positions.find(p => p.id === value);
+                      handleInputChange('role', position?.name || '');
+                    }}
+                    required
+                  >
+                    <SelectTrigger className="h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-yellow flex-1">
+                      <SelectValue placeholder="Selecione o cargo" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      {positions.map((position) => (
+                        <SelectItem 
+                          key={position.id} 
+                          value={position.id}
+                          className="focus:bg-gray-700 focus:text-white"
+                        >
+                          {position.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {formData.employeeId && !formData.role && (
+                  <div className="flex items-center gap-2 mt-1 p-2 rounded bg-yellow-900/20 border border-yellow-800 text-yellow-400 text-xs">
+                    <AlertCircle className="h-3 w-3" />
+                    <span>Funcionário sem cargo definido.</span>
+                    <a href={`/rh/funcionarios?edit=${formData.employeeId}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-yellow-300 flex items-center gap-1">
+                      Editar Funcionário <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+                
                 {errors.role && (
                   <div className="flex items-center gap-2 text-red-400 text-sm">
                     <AlertCircle className="h-4 w-4" />
@@ -426,10 +358,7 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
 
               {/* Empresa */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-purple-400 flex items-center gap-2">
-                  <Building2 size={14} />
-                  Empresa *
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Empresa *</Label>
                 <Select
                   value={companies.find(c => c.name === formData.company)?.id || ''}
                   onValueChange={(value) => {
@@ -438,17 +367,20 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                   }}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione a empresa" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                     {companies.map((company) => (
                       <SelectItem 
                         key={company.id} 
                         value={company.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        className="focus:bg-gray-700 focus:text-white"
                       >
-                        {company.name}
+                         <div className="flex flex-col text-left">
+                          <span className="font-medium">{company.name}</span>
+                          {company.sigla && <span className="text-xs text-gray-500">{company.sigla}</span>}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -464,25 +396,22 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
           </div>
 
           {/* Seção: Detalhes da Ordem */}
-          <div className="bg-seguranca-black p-4 rounded-lg border border-gray-700">
-            <h3 className="text-lg font-semibold text-seguranca-lightgray mb-4 flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-seguranca-yellow" />
-              Detalhes da Ordem
-            </h3>
+          <div className="bg-seguranca-black/50 p-4 rounded-lg border border-gray-700/50 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-seguranca-yellow mb-2">
+              <Briefcase className="h-4 w-4" />
+              <span>Detalhes da Ordem</span>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Cliente */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-cyan-400 flex items-center gap-2">
-                  <Building2 size={14} />
-                  Cliente *
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Cliente *</Label>
                 <Select
                   value={clients.find(c => c.name === formData.client)?.id || ''}
                   onValueChange={(value) => {
                     const client = clients.find(c => c.id === value);
                     handleInputChange('client', client?.name || '');
-                    handleInputChange('workplace', ''); // Limpar workplace quando cliente muda
+                    handleInputChange('workplace', ''); 
                     if (value) {
                       loadWorkPostsByClient(value);
                     } else {
@@ -491,15 +420,15 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                   }}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className="h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-yellow">
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                     {clients.map((client) => (
                       <SelectItem 
                         key={client.id} 
                         value={client.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        className="focus:bg-gray-700 focus:text-white"
                       >
                         {client.name}
                       </SelectItem>
@@ -514,12 +443,9 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                 )}
               </div>
 
-              {/* Posto de Trabalho */}
+              {/* Unidade / Posto */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-orange-400 flex items-center gap-2">
-                  <Briefcase size={14} />
-                  Local de Trabalho *
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Unidade / Posto de Trabalho *</Label>
                 <Select
                   value={workPosts.find((wp: WorkPost) => wp.name === formData.workplace)?.id || ''}
                   onValueChange={(value) => {
@@ -529,37 +455,28 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                   disabled={!formData.client || workPosts.length === 0}
                   required
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectTrigger className={`h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-yellow ${(!formData.client || workPosts.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <SelectValue placeholder={
                       formData.client 
-                        ? (workPosts.length === 0 ? "Nenhum posto encontrado" : "Selecione o posto")
-                        : "Primeiro selecione um cliente"
+                        ? (workPosts.length === 0 ? "Nenhuma unidade encontrada" : "Selecione a unidade")
+                        : "Selecione o cliente primeiro"
                     } />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                     {workPosts.map((workPost: WorkPost) => (
                       <SelectItem 
                         key={workPost.id} 
                         value={workPost.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                        className="focus:bg-gray-700 focus:text-white"
                       >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col text-left">
                           <span className="font-medium">{workPost.name}</span>
-                          <span className="text-xs text-gray-400">{workPost.postCode}</span>
+                          {workPost.postCode && <span className="text-xs text-gray-500">Cód: {workPost.postCode}</span>}
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {formData.client && !formData.workplace && workPosts.length > 0 && (
-                  <p className="text-xs text-blue-400">Selecione um posto de trabalho do cliente escolhido</p>
-                )}
-                {formData.client && workPosts.length === 0 && (
-                  <p className="text-xs text-yellow-400">Nenhum posto de trabalho encontrado para este cliente</p>
-                )}
-                {!formData.client && (
-                  <p className="text-xs text-gray-400">Selecione um cliente primeiro para ver os postos de trabalho</p>
-                )}
                 {errors.workplace && (
                   <div className="flex items-center gap-2 text-red-400 text-sm">
                     <AlertCircle className="h-4 w-4" />
@@ -570,15 +487,12 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
 
               {/* Salário */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
-                  <DollarSign size={14} />
-                  Salário *
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Salário *</Label>
                 <Input
                   value={formData.salary ? formData.salary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''}
                   onChange={handleSalaryChange}
                   placeholder="0,00"
-                  className="border-gray-600 bg-seguranca-graphite text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  className="h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                   required
                 />
                 {errors.salary && (
@@ -589,20 +503,29 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                 )}
               </div>
 
-              {/* Data de Início */}
+              {/* Datas */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-yellow flex items-center gap-2">
-                  <CalendarDays size={14} />
-                  Data de Início *
-                </label>
-                <DatePicker
-                  selected={startDate}
-                  onChange={(date: Date | null) => setStartDate(date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  className="w-full px-3 py-2 border border-seguranca-yellow rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white"
-                  {...DEFAULT_DATE_PICKER_PROPS}
-                />
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Vigência (Início e Fim)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <DatePicker
+                    selected={startDate}
+                    onChange={(date: Date | null) => setStartDate(date)}
+                    dateFormat="dd/MM/yyyy"
+                    locale={ptBR}
+                    placeholderText="Início"
+                    className="w-full px-3 h-10 sm:h-11 bg-seguranca-black border border-gray-600 rounded-md text-seguranca-lightgray focus:outline-none focus:ring-2 focus:ring-seguranca-yellow"
+                    {...DEFAULT_DATE_PICKER_PROPS}
+                  />
+                  <DatePicker
+                    selected={endDate}
+                    onChange={(date: Date | null) => setEndDate(date)}
+                    dateFormat="dd/MM/yyyy"
+                    locale={ptBR}
+                    placeholderText="Fim"
+                    className="w-full px-3 h-10 sm:h-11 bg-seguranca-black border border-gray-600 rounded-md text-seguranca-lightgray focus:outline-none focus:ring-2 focus:ring-seguranca-yellow"
+                    {...DEFAULT_DATE_PICKER_PROPS}
+                  />
+                </div>
                 {errors.startDate && (
                   <div className="flex items-center gap-2 text-red-400 text-sm">
                     <AlertCircle className="h-4 w-4" />
@@ -611,36 +534,17 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                 )}
               </div>
 
-              {/* Data de Fim */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-yellow flex items-center gap-2">
-                  <CalendarDays size={14} />
-                  Data de Fim
-                </label>
-                <DatePicker
-                  selected={endDate}
-                  onChange={(date: Date | null) => setEndDate(date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  className="w-full px-3 py-2 border border-seguranca-yellow rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white"
-                  {...DEFAULT_DATE_PICKER_PROPS}
-                />
-              </div>
-
               {/* Documento */}
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <Upload size={14} />
-                  Documento
-                </label>
+                <Label className="text-xs sm:text-sm text-seguranca-lightgray">Documento Anexo</Label>
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                   <Input
                     value={formData.documentUrl}
                     onChange={(e) => handleInputChange('documentUrl', e.target.value)}
-                    className="flex-1 border-gray-600 bg-seguranca-graphite text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    className="flex-1 h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                     placeholder="URL do documento (opcional)"
                   />
-                  <label className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-seguranca-red border border-seguranca-red rounded-lg cursor-pointer hover:bg-seguranca-darkred text-white transition-colors">
+                  <label className="inline-flex items-center justify-center gap-2 px-4 h-10 sm:h-11 bg-seguranca-red border border-seguranca-red rounded-md cursor-pointer hover:bg-seguranca-darkred text-white transition-colors">
                     <Upload className="h-4 w-4" />
                     <span>Upload</span>
                     <input 
@@ -650,40 +554,40 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
                       onChange={(e) => handleUpload(e.target.files?.[0] || null)} 
                     />
                   </label>
-                  {uploading && <div className="flex items-center gap-2 px-4 py-2 text-seguranca-yellow"><Clock className="h-4 w-4 animate-spin" />Enviando...</div>}
+                  {uploading && <div className="flex items-center gap-2 px-4 text-seguranca-yellow"><Clock className="h-4 w-4 animate-spin" /></div>}
                 </div>
                 {formData.documentUrl && (
                   <a 
                     href={formData.documentUrl} 
                     target="_blank" 
                     rel="noreferrer"
-                    className="text-seguranca-yellow text-sm underline hover:text-yellow-400 transition-colors"
+                    className="text-seguranca-yellow text-sm underline hover:text-yellow-400 transition-colors inline-flex items-center gap-1 mt-1"
                   >
-                    Ver documento
+                    Ver documento <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-gray-700">
+          <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t border-gray-700">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-gray-800 hover:text-white transition-colors"
+              className="w-full sm:w-auto h-11 border-gray-600 text-seguranca-lightgray hover:bg-gray-800 hover:text-white"
             >
               Cancelar
             </Button>
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="bg-seguranca-red hover:bg-seguranca-darkred text-white transition-colors"
+              className="w-full sm:w-auto h-11 bg-seguranca-red hover:bg-seguranca-darkred text-white"
             >
               {isLoading && <Clock className="mr-2 h-4 w-4 animate-spin" />}
-              {mode === 'create' ? 'Criar' : 'Atualizar'}
+              {mode === 'create' ? 'Criar Ordem' : 'Salvar Alterações'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

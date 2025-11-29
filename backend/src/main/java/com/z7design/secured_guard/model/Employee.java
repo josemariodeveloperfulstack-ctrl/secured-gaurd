@@ -312,6 +312,16 @@ public class Employee {
     @Column(name = "pis_codigo_agencia", length = 10)
     private String pisCodigoAgencia;
 
+    // Dados Bancários
+    @Column(name = "banco", length = 100)
+    private String banco;
+
+    @Column(name = "agencia", length = 20)
+    private String agencia;
+
+    @Column(name = "conta_corrente", length = 20)
+    private String contaCorrente;
+
     // Estrangeiros
     @Column(name = "carteira_modelo_19", length = 30)
     private String carteiraModelo19;
