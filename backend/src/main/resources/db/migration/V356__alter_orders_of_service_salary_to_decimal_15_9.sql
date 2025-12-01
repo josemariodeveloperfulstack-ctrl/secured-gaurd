@@ -9,3 +9,4 @@ COMMENT ON COLUMN orders_of_service.salary IS 'Salary value with precision 15 an
 
 
 
+

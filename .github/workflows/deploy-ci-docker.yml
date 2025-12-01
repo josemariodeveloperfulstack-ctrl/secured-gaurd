@@ -52,6 +52,7 @@ jobs:
         working-directory: ./backend
         run: |
           echo "🔨 Compilando backend para ambiente CI..."
+          chmod +x mvnw
           ./mvnw clean package -DskipTests -Dspring.profiles.active=ci
           echo "✅ Backend compilado com sucesso!"
           ls -lh target/*.jar
@@ -1245,24 +1246,33 @@ jobs:
         run: |
           echo "❌ Deploy falhou! Iniciando rollback..."
           
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd /var/www/secured_guard/ci
+          # Não deixar erros de rollback derrubarem o job inteiro
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF' || true
+            cd /var/www/secured_guard/ci || exit 0
             
-            # Parar containers atuais
-            docker-compose -f docker-compose.ci.yml down
+            # Parar containers atuais (ignorando erros)
+            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            else
+              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            fi
             
             # Restaurar backup se existir
-            LATEST_BACKUP=$(ls -t /var/www/secured_guard/ci/backups/ | head -1)
+            LATEST_BACKUP=$(ls -t /var/www/secured_guard/ci/backups/ 2>/dev/null | head -1)
             
             if [ -n "$LATEST_BACKUP" ]; then
               echo "🔄 Restaurando backup: $LATEST_BACKUP"
               
-              # Restaurar dados do banco
-              rm -rf postgres_data
-              cp -r "/var/www/secured_guard/ci/backups/$LATEST_BACKUP/postgres_data" ./
+              # Restaurar dados do banco (ignorando erros caso diretórios não existam)
+              rm -rf postgres_data 2>/dev/null || true
+              cp -r "/var/www/secured_guard/ci/backups/$LATEST_BACKUP/postgres_data" ./ 2>/dev/null || true
               
               # Iniciar containers com versão anterior
-              docker-compose -f docker-compose.ci.yml up -d
+              if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+                docker compose -f docker-compose.ci.yml up -d --remove-orphans 2>/dev/null || true
+              else
+                docker-compose -f docker-compose.ci.yml up -d --remove-orphans 2>/dev/null || true
+              fi
               
               echo "✅ Rollback concluído!"
             else
