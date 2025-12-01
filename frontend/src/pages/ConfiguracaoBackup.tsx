@@ -42,6 +42,12 @@ interface BackupHistory {
   durationSeconds: number;
 }
 
+interface GoogleDriveConfig {
+  enabled: boolean;
+  folderId: string;
+  description: string;
+}
+
 const ConfiguracaoBackup: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -79,6 +85,13 @@ const ConfiguracaoBackup: React.FC = () => {
     compressBackup: true,
   });
 
+  const [googleDriveConfig, setGoogleDriveConfig] = useState<GoogleDriveConfig>({
+    enabled: true,
+    // Pasta compartilhada enviada pelo usuário
+    folderId: '1QJrZ9Xk0wtJhOVZN_HEo61lKa9cfvwiS',
+    description: 'Pasta padrão de backup no Google Drive',
+  });
+
   const [history, setHistory] = useState<BackupHistory[]>([]);
 
   useEffect(() => {
@@ -99,6 +112,34 @@ const ConfiguracaoBackup: React.FC = () => {
 
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
+  const handleTestGoogleDrive = async () => {
+    setTesting('GDRIVE');
+    try {
+      const response = await api.post('/api/backup/google-drive/test', googleDriveConfig);
+
+      if (response.data.success) {
+        toast({
+          title: 'Configuração OK!',
+          description: response.data.message || 'Teste de envio para Google Drive simulado com sucesso.',
+        });
+      } else {
+        toast({
+          title: 'Falha no teste do Google Drive',
+          description: response.data.message || 'Não foi possível testar o envio para o Google Drive.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.response?.data?.message || 'Erro ao testar Google Drive',
+        variant: 'destructive',
+      });
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -226,7 +267,7 @@ const ConfiguracaoBackup: React.FC = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="local" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite">
+          <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite">
             <TabsTrigger value="local">
               <HardDrive className="h-4 w-4 mr-2" />
               Backup Local
@@ -234,6 +275,10 @@ const ConfiguracaoBackup: React.FC = () => {
             <TabsTrigger value="vps">
               <Server className="h-4 w-4 mr-2" />
               Backup VPS
+            </TabsTrigger>
+            <TabsTrigger value="gdrive">
+              <Database className="h-4 w-4 mr-2" />
+              Google Drive
             </TabsTrigger>
             <TabsTrigger value="history">
               <Clock className="h-4 w-4 mr-2" />
@@ -509,6 +554,119 @@ const ConfiguracaoBackup: React.FC = () => {
                     </AlertDescription>
                   </Alert>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Backup Google Drive */}
+          <TabsContent value="gdrive" className="space-y-4">
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-green-400" />
+                  Envio para Google Drive
+                </CardTitle>
+                <CardDescription>
+                  Configure o envio automático dos arquivos de backup para uma pasta do Google Drive.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Pasta do Google Drive (Folder ID)</Label>
+                  <Input
+                    value={googleDriveConfig.folderId}
+                    onChange={(e) =>
+                      setGoogleDriveConfig({
+                        ...googleDriveConfig,
+                        folderId: e.target.value,
+                      })
+                    }
+                    placeholder="ID da pasta no Google Drive"
+                    className="bg-seguranca-black border-gray-600"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Exemplo de link: https://drive.google.com/drive/folders/
+                    <span className="text-seguranca-yellow font-mono">
+                      1QJrZ9Xk0wtJhOVZN_HEo61lKa9cfvwiS
+                    </span>
+                    . Use apenas o ID da pasta.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Descrição</Label>
+                  <Input
+                    value={googleDriveConfig.description}
+                    onChange={(e) =>
+                      setGoogleDriveConfig({
+                        ...googleDriveConfig,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Ex.: Backup diário para Google Drive"
+                    className="bg-seguranca-black border-gray-600"
+                  />
+                </div>
+
+                <Alert className="bg-yellow-900/20 border-yellow-800">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription className="text-sm">
+                    A integração real com o Google Drive será feita no servidor usando uma conta de serviço.
+                    Esta tela salva apenas a configuração básica (ID da pasta e descrição) para uso pelo backend.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleTestGoogleDrive}
+                    disabled={testing === 'GDRIVE'}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {testing === 'GDRIVE' ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Testando...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="h-4 w-4 mr-2" /> Testar Configuração
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        const response = await api.post(
+                          '/api/backup/google-drive/config',
+                          googleDriveConfig
+                        );
+                        toast({
+                          title: 'Configuração salva!',
+                          description:
+                            response.data?.message ||
+                            'Configuração de envio para Google Drive salva com sucesso.',
+                        });
+                      } catch (error: any) {
+                        toast({
+                          title: 'Erro',
+                          description:
+                            error.response?.data?.message ||
+                            'Erro ao salvar configuração do Google Drive',
+                          variant: 'destructive',
+                        });
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="btn-primary flex-1"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Configuração
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

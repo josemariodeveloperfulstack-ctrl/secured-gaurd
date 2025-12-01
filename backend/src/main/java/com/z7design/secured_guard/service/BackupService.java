@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,6 +32,12 @@ public class BackupService {
 
     @Value("${app.backup.max-files:100}")
     private int maxFiles;
+
+    private final GoogleDriveBackupService googleDriveBackupService;
+
+    public BackupService(GoogleDriveBackupService googleDriveBackupService) {
+        this.googleDriveBackupService = googleDriveBackupService;
+    }
 
     /**
      * Backup automático diário às 2:00 AM
@@ -110,6 +115,13 @@ public class BackupService {
         }
 
         logger.info("Backup criado: {}", backupFile);
+
+        // Enviar para Google Drive (se habilitado)
+        try {
+            googleDriveBackupService.uploadBackupFile(backupFile);
+        } catch (Exception e) {
+            logger.error("Erro ao enviar backup para Google Drive (não é fatal para o backup local): {}", e.getMessage(), e);
+        }
     }
 
     /**

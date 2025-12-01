@@ -2,9 +2,12 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.BackupConfiguration;
 import com.z7design.secured_guard.model.BackupHistory;
+import com.z7design.secured_guard.model.GoogleDriveBackupConfig;
 import com.z7design.secured_guard.repository.BackupConfigurationRepository;
 import com.z7design.secured_guard.repository.BackupHistoryRepository;
 import com.z7design.secured_guard.service.BackupService;
+import com.z7design.secured_guard.service.GoogleDriveBackupService;
+import com.z7design.secured_guard.service.GoogleDriveBackupSettings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,8 @@ public class BackupController {
     private final BackupService backupService;
     private final BackupConfigurationRepository backupConfigurationRepository;
     private final BackupHistoryRepository backupHistoryRepository;
+    private final GoogleDriveBackupSettings googleDriveBackupSettings;
+    private final GoogleDriveBackupService googleDriveBackupService;
 
     @Operation(summary = "Listar configurações de backup")
     @GetMapping("/configurations")
@@ -154,6 +159,70 @@ public class BackupController {
         } catch (Exception e) {
             log.error("❌ Erro ao atualizar configuração: {}", e.getMessage());
             return ResponseEntity.status(500).build();
+        }
+    }
+
+    // =============================================
+    // Integração Google Drive (configuração básica)
+    // =============================================
+
+    @Operation(summary = "Configurar envio de backups para o Google Drive")
+    @PostMapping("/google-drive/config")
+    public ResponseEntity<?> configureGoogleDrive(@RequestBody GoogleDriveBackupConfig config) {
+        try {
+            log.info("🔧 Configuração Google Drive recebida: enabled={}, folderId={}",
+                    config.getEnabled(), config.getFolderId());
+
+            googleDriveBackupSettings.setEnabled(Boolean.TRUE.equals(config.getEnabled()));
+            googleDriveBackupSettings.setFolderId(config.getFolderId());
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Configuração de envio para Google Drive atualizada em memória."
+            ));
+        } catch (Exception e) {
+            log.error("❌ Erro ao processar configuração do Google Drive: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    @Operation(summary = "Testar configuração de envio para o Google Drive")
+    @PostMapping("/google-drive/test")
+    public ResponseEntity<?> testGoogleDrive(@RequestBody GoogleDriveBackupConfig config) {
+        try {
+            log.info("🧪 Testando configuração Google Drive: enabled={}, folderId={}",
+                    config.getEnabled(), config.getFolderId());
+
+            // Atualiza temporariamente as configurações e tenta enviar um arquivo de teste
+            googleDriveBackupSettings.setEnabled(Boolean.TRUE.equals(config.getEnabled()));
+            googleDriveBackupSettings.setFolderId(config.getFolderId());
+
+            // Criar arquivo temporário de teste
+            java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("backup_test_", ".txt");
+            java.nio.file.Files.writeString(tempFile, "Teste de upload de backup para Google Drive - " + java.time.LocalDateTime.now());
+
+            googleDriveBackupService.uploadBackupFile(tempFile);
+
+            // Apagar arquivo temporário local
+            try {
+                java.nio.file.Files.deleteIfExists(tempFile);
+            } catch (Exception ignore) {
+                // não é crítico
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Teste de Google Drive executado. Verifique a pasta configurada para o arquivo de teste."
+            ));
+        } catch (Exception e) {
+            log.error("❌ Erro ao testar Google Drive: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
         }
     }
 }
