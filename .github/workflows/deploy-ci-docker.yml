@@ -550,6 +550,44 @@ jobs:
             echo "🚀 ========================================="
             echo ""
             
+            # Carregar PATH do Docker (necessário em sessões SSH não-interativas)
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            
+            # Verificar se Docker está disponível
+            if ! command -v docker &> /dev/null; then
+              echo "⚠️ Docker não encontrado no PATH padrão. Procurando..."
+              # Tentar encontrar Docker em locais comuns
+              if [ -f /usr/bin/docker ]; then
+                export PATH="/usr/bin:$PATH"
+              elif [ -f /usr/local/bin/docker ]; then
+                export PATH="/usr/local/bin:$PATH"
+              else
+                echo "❌ ERRO: Docker não encontrado no sistema!"
+                exit 1
+              fi
+            fi
+            
+            # Verificar se docker-compose está disponível
+            if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null 2>&1; then
+              echo "⚠️ docker-compose não encontrado. Verificando instalação..."
+              if [ -f /usr/local/bin/docker-compose ]; then
+                export PATH="/usr/local/bin:$PATH"
+              elif [ -f /usr/bin/docker-compose ]; then
+                export PATH="/usr/bin:$PATH"
+              fi
+            fi
+            
+            # Verificar novamente se Docker está disponível
+            if ! command -v docker &> /dev/null; then
+              echo "❌ ERRO: Docker ainda não está disponível após ajustes de PATH!"
+              echo "📋 Tentando localizar Docker:"
+              which docker || find /usr -name docker 2>/dev/null | head -5
+              exit 1
+            fi
+            
+            echo "✅ Docker encontrado: $(which docker)"
+            echo "✅ Docker versão: $(docker --version)"
+            
             cd /var/www/secured_guard/ci
             
             # Garantir que não está em modo Swarm
@@ -1252,6 +1290,9 @@ jobs:
           
           # Não deixar erros de rollback derrubarem o job inteiro
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF' || true
+            # Carregar PATH do Docker (necessário em sessões SSH não-interativas)
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            
             cd /var/www/secured_guard/ci || exit 0
             
             # Parar containers atuais (ignorando erros)
