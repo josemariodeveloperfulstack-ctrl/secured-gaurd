@@ -53,7 +53,8 @@ jobs:
         run: |
           echo "🔨 Compilando backend para ambiente CI..."
           chmod +x mvnw
-          ./mvnw clean package -DskipTests -Dspring.profiles.active=ci
+          # pular totalmente compilação/execução de testes no CI (-Dmaven.test.skip=true)
+          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci
           echo "✅ Backend compilado com sucesso!"
           ls -lh target/*.jar
 
