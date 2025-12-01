@@ -165,14 +165,17 @@ jobs:
           # Valor padrão seguro (80 caracteres - suficiente para HS512)
           DEFAULT_JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
           
+          # Atribuir secret a uma variável primeiro para poder verificar o tamanho
+          JWT_SECRET_FROM_SECRETS="${{ secrets.JWT_SECRET }}"
+          
           # Usar secret se estiver definido e tiver pelo menos 64 caracteres
-          if [ -n "${{ secrets.JWT_SECRET }}" ] && [ ${#{{ secrets.JWT_SECRET }}} -ge 64 ]; then
-            JWT_SECRET_VALUE="${{ secrets.JWT_SECRET }}"
+          if [ -n "$JWT_SECRET_FROM_SECRETS" ] && [ ${#JWT_SECRET_FROM_SECRETS} -ge 64 ]; then
+            JWT_SECRET_VALUE="$JWT_SECRET_FROM_SECRETS"
             echo "✅ Usando JWT_SECRET do GitHub Secrets (${#JWT_SECRET_VALUE} caracteres)"
           else
             JWT_SECRET_VALUE="$DEFAULT_JWT_SECRET"
-            if [ -n "${{ secrets.JWT_SECRET }}" ]; then
-              echo "⚠️ JWT_SECRET do GitHub Secrets é muito curto (${#{{ secrets.JWT_SECRET }}} caracteres). Usando valor padrão."
+            if [ -n "$JWT_SECRET_FROM_SECRETS" ]; then
+              echo "⚠️ JWT_SECRET do GitHub Secrets é muito curto (${#JWT_SECRET_FROM_SECRETS} caracteres). Usando valor padrão."
             else
               echo "ℹ️ JWT_SECRET não está definido no GitHub Secrets. Usando valor padrão."
             fi
