@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isConnectionError } from '@/utils/connectionError';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -105,8 +106,12 @@ class PagamentosService {
       });
       // Garantir que sempre retornamos um array
       return Array.isArray(response.data) ? response.data : this.getMockPagamentos();
-    } catch (error) {
-      console.error('Erro ao buscar pagamentos:', error);
+    } catch (error: any) {
+      if (isConnectionError(error)) {
+        console.warn('⚠️ Backend não está disponível. Usando dados mockados para pagamentos.');
+      } else {
+        console.error('Erro ao buscar pagamentos:', error);
+      }
       // Retornar dados mockados temporariamente
       return this.getMockPagamentos();
     }
@@ -281,8 +286,12 @@ class PagamentosService {
         headers: this.getAuthHeaders()
       });
       return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar agendamentos:', error);
+    } catch (error: any) {
+      if (isConnectionError(error)) {
+        console.warn('⚠️ Backend não está disponível. Usando dados mockados para agendamentos.');
+      } else {
+        console.error('Erro ao buscar agendamentos:', error);
+      }
       // Retornar dados mockados temporariamente
       return this.getMockAgendamentos();
     }
@@ -348,8 +357,12 @@ class PagamentosService {
       });
       // Garantir que sempre retornamos um array
       return Array.isArray(response.data) ? response.data : [];
-    } catch (error) {
-      console.error('Erro ao buscar clientes:', error);
+    } catch (error: any) {
+      if (isConnectionError(error)) {
+        console.warn('⚠️ Backend não está disponível. Usando dados mockados para clientes.');
+      } else {
+        console.error('Erro ao buscar clientes:', error);
+      }
       // Retornar dados mockados temporariamente
       return this.getMockClientes();
     }

@@ -396,7 +396,7 @@ export const sstService = {
   },
 
   async getAccidentRecordById(id: string): Promise<AccidentRecord> {
-    const response = await api.get(`/sst/accidents/${id}`);
+    const response = await api.get(`/api/sst/accidents/${id}`);
     return response.data;
   },
 
@@ -406,26 +406,26 @@ export const sstService = {
   },
 
   async updateAccidentRecord(id: string, accident: Partial<AccidentRecord>): Promise<AccidentRecord> {
-    const response = await api.put(`/sst/accidents/${id}`, accident);
+    const response = await api.put(`/api/sst/accidents/${id}`, accident);
     return response.data;
   },
 
   async deleteAccidentRecord(id: string): Promise<void> {
-    await api.delete(`/sst/accidents/${id}`);
+    await api.delete(`/api/sst/accidents/${id}`);
   },
 
   async getAccidentRecordsByEmployee(employeeId: string): Promise<AccidentRecord[]> {
-    const response = await api.get(`/sst/accidents/employee/${employeeId}`);
+    const response = await api.get(`/api/sst/accidents/employee/${employeeId}`);
     return response.data;
   },
 
   async getAccidentRecordsByType(type: string): Promise<AccidentRecord[]> {
-    const response = await api.get(`/sst/accidents/type/${type}`);
+    const response = await api.get(`/api/sst/accidents/type/${type}`);
     return response.data;
   },
 
   async getAccidentRecordsByStatus(status: string): Promise<AccidentRecord[]> {
-    const response = await api.get(`/sst/accidents/status/${status}`);
+    const response = await api.get(`/api/sst/accidents/status/${status}`);
     return response.data;
   },
 

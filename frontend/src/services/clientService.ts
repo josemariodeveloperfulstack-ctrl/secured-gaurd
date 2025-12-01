@@ -1,5 +1,6 @@
 import api from '@/lib/axios';
 import { ClientPage, ClientSearchParams } from '@/types/client';
+import { isConnectionError } from '@/utils/connectionError';
 
 export interface Client {
   id: string;
@@ -43,7 +44,11 @@ export const clientService = {
     try {
       const response = await api.get('/api/clients/all');
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      if (isConnectionError(error)) {
+        console.warn('⚠️ Backend não está disponível. Retornando array vazio para clientes.');
+        return [];
+      }
       console.error('Erro ao buscar clientes:', error);
       throw new Error('Falha ao buscar clientes');
     }
@@ -54,7 +59,11 @@ export const clientService = {
     try {
       const response = await api.get('/api/clients/select');
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      if (isConnectionError(error)) {
+        console.warn('⚠️ Backend não está disponível. Retornando array vazio para seleção de clientes.');
+        return [];
+      }
       console.error('Erro ao buscar clientes para seleção:', error);
       throw new Error('Falha ao buscar clientes para seleção');
     }

@@ -63,7 +63,7 @@ public class DependentController {
         @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
         @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    // Permissões controladas pelo SecurityConfig
     public ResponseEntity<List<DependentDTO>> findAll() {
         try {
             log.info("Listando todos os dependentes");
@@ -107,7 +107,7 @@ public class DependentController {
         @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
         @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','EMPLOYEES_READ')")
+    // Permissões controladas pelo SecurityConfig
     public ResponseEntity<List<DependentDTO>> findByEmployeeId(
             @Parameter(description = "ID do funcionário") @PathVariable UUID employeeId) {
         try {

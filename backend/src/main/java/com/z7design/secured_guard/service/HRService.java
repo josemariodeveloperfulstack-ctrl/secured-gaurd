@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,10 +23,51 @@ public class HRService {
     
     public List<EmployeeDTO> getEmployeesWithExpiringProbation(int days) {
         try {
-            // Por enquanto, retorna funcionários ativos (mock)
-            List<Employee> employees = employeeRepository.findByStatus(EmploymentStatus.ACTIVE);
-            return employees.stream()
-                    .limit(5) // Mock: retorna apenas 5 funcionários
+            LocalDate today = LocalDate.now();
+            LocalDate threeDaysFromNow = today.plusDays(3);
+            
+            // Buscar funcionários ativos
+            List<Employee> activeEmployees = employeeRepository.findByStatus(EmploymentStatus.ACTIVE);
+            
+            return activeEmployees.stream()
+                    .filter(employee -> {
+                        // Verificar se tem data de admissão
+                        if (employee.getHireDate() == null) {
+                            return false;
+                        }
+                        
+                        // Calcular período de experiência baseado na data de admissão
+                        LocalDate probationEndDate = employee.getProbationEndDate();
+                        LocalDate hireDate = employee.getHireDate();
+                        
+                        // Se não tiver probationEndDate, calcular baseado na data de admissão
+                        if (probationEndDate == null) {
+                            // Calcular para diferentes períodos de experiência (30, 45, 90 dias)
+                            LocalDate endDate30 = hireDate.plusDays(30);
+                            LocalDate endDate45 = hireDate.plusDays(45);
+                            LocalDate endDate90 = hireDate.plusDays(90);
+                            
+                            // Verificar se algum dos períodos está vencendo (hoje ou nos próximos 3 dias)
+                            boolean expiring30 = !endDate30.isBefore(today) && !endDate30.isAfter(threeDaysFromNow);
+                            boolean expiring45 = !endDate45.isBefore(today) && !endDate45.isAfter(threeDaysFromNow);
+                            boolean expiring90 = !endDate90.isBefore(today) && !endDate90.isAfter(threeDaysFromNow);
+                            
+                            // Retornar true se algum período estiver vencendo
+                            return expiring30 || expiring45 || expiring90;
+                        } else {
+                            // Se já tiver probationEndDate, verificar se está vencendo
+                            // Verificar se o período de experiência é 30, 45 ou 90 dias
+                            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(hireDate, probationEndDate);
+                            
+                            // Apenas períodos de 30, 45 ou 90 dias
+                            if (daysBetween != 30 && daysBetween != 45 && daysBetween != 90) {
+                                return false;
+                            }
+                            
+                            // Verificar se está vencendo (hoje ou nos próximos 3 dias)
+                            return !probationEndDate.isBefore(today) && !probationEndDate.isAfter(threeDaysFromNow);
+                        }
+                    })
                     .map(this::convertToDTO)
                     .collect(Collectors.toList());
         } catch (Exception e) {
@@ -181,12 +223,32 @@ public class HRService {
     }
 
     private EmployeeDTO.JobInfoDTO convertJobInfoToDTO(Employee employee) {
+        // Calcular probationEndDate se não estiver definido
+        LocalDate probationEndDate = employee.getProbationEndDate();
+        if (probationEndDate == null && employee.getHireDate() != null) {
+            // Tentar calcular para 30, 45 ou 90 dias e verificar qual está vencendo
+            LocalDate today = LocalDate.now();
+            LocalDate threeDaysFromNow = today.plusDays(3);
+            LocalDate endDate30 = employee.getHireDate().plusDays(30);
+            LocalDate endDate45 = employee.getHireDate().plusDays(45);
+            LocalDate endDate90 = employee.getHireDate().plusDays(90);
+            
+            // Verificar qual período está vencendo (hoje ou nos próximos 3 dias)
+            if (!endDate30.isBefore(today) && !endDate30.isAfter(threeDaysFromNow)) {
+                probationEndDate = endDate30;
+            } else if (!endDate45.isBefore(today) && !endDate45.isAfter(threeDaysFromNow)) {
+                probationEndDate = endDate45;
+            } else if (!endDate90.isBefore(today) && !endDate90.isAfter(threeDaysFromNow)) {
+                probationEndDate = endDate90;
+            }
+        }
+        
         return EmployeeDTO.JobInfoDTO.builder()
                 .position(employee.getPosition() != null ? employee.getPosition().getName() : null)
                 .function(null) // Não existe no modelo atual
                 .unit(employee.getUnit() != null ? employee.getUnit().getName() : null)
                 .admissionDate(employee.getHireDate())
-                .probationEndDate(null) // Não existe no modelo atual
+                .probationEndDate(probationEndDate)
                 .contractType(null) // Não existe no modelo atual
                 .salary(null) // Não existe no modelo atual
                 .status(employee.getStatus().toString())

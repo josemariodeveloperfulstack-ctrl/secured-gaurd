@@ -58,6 +58,7 @@ const RelatoriosTab: React.FC = () => {
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<'PDF' | 'EXCEL' | 'CSV'>('PDF');
   
   // Sistema de navegação por histórico
   const [viewHistory, setViewHistory] = useState<ViewState[]>([
@@ -192,10 +193,8 @@ const RelatoriosTab: React.FC = () => {
     }
   ];
 
-  const carregarDadosRelatorio = async (tipo: ReportType) => {
+  const carregarDadosRelatorio = async (tipo: ReportType): Promise<ReportData> => {
     try {
-      setLoading(true);
-      
       const { startDate, endDate, status, tipo: tipoFiltro } = filters;
       const periodo = `${format(startDate!, 'dd/MM/yyyy')} - ${format(endDate!, 'dd/MM/yyyy')}`;
       
@@ -226,16 +225,15 @@ const RelatoriosTab: React.FC = () => {
       
       setReportData(data);
       setSelectedReport(tipo);
-      
+      return data;
     } catch (error) {
       console.error('Erro ao carregar dados do relatório:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar dados do relatório",
+        description: error instanceof Error ? error.message : "Erro ao carregar dados do relatório",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
@@ -401,15 +399,82 @@ const RelatoriosTab: React.FC = () => {
     setShowConfigModal(true);
   };
 
+  const handleVisualizarRelatorio = async (tipo: ReportType) => {
+    try {
+      setLoading(true);
+      const data = await carregarDadosRelatorio(tipo);
+      pushToHistory('report', data, filters);
+      
+      toast({
+        title: "Sucesso",
+        description: "Relatório carregado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao visualizar relatório:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar relatório para visualização",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleConfirmarGeracao = async () => {
-    if (!selectedReport) return;
+    if (!selectedReport) {
+      toast({
+        title: "Erro",
+        description: "Nenhum relatório selecionado",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    await carregarDadosRelatorio(selectedReport);
-    setShowConfigModal(false);
-    
-    // Adicionar ao histórico quando gerar relatório
-    if (reportData) {
-      pushToHistory('report', reportData, filters);
+    try {
+      setLoading(true);
+      
+      // Carregar dados do relatório
+      const data = await carregarDadosRelatorio(selectedReport);
+      
+      // Gerar arquivo no formato selecionado
+      switch (selectedFormat) {
+        case 'PDF':
+          ReportGenerator.generatePDF(data);
+          toast({
+            title: "Sucesso",
+            description: "Relatório PDF gerado e baixado com sucesso!",
+          });
+          break;
+        case 'EXCEL':
+          ReportGenerator.generateExcel(data);
+          toast({
+            title: "Sucesso",
+            description: "Relatório Excel gerado e baixado com sucesso!",
+          });
+          break;
+        case 'CSV':
+          ReportGenerator.generateCSV(data);
+          toast({
+            title: "Sucesso",
+            description: "Relatório CSV gerado e baixado com sucesso!",
+          });
+          break;
+      }
+      
+      // Adicionar ao histórico quando gerar relatório
+      pushToHistory('report', data, filters);
+      
+      setShowConfigModal(false);
+    } catch (error) {
+      console.error('Erro ao confirmar geração:', error);
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao gerar relatório",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -655,18 +720,32 @@ const RelatoriosTab: React.FC = () => {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button
-                      onClick={() => handleGerarRelatorio(relatorio.tipo)}
+                      onClick={() => {
+                        handleGerarRelatorio(relatorio.tipo);
+                        toast({
+                          title: "Configuração",
+                          description: "Configure os filtros e parâmetros do relatório",
+                        });
+                      }}
                       className="flex-1 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90 font-medium"
+                      disabled={loading}
                     >
                       <FileText size={16} className="mr-2" />
                       Gerar Relatório
                     </Button>
                     <Button
+                      onClick={() => handleVisualizarRelatorio(relatorio.tipo)}
                       variant="outline"
                       size="icon"
                       className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
+                      disabled={loading}
+                      title="Visualizar relatório"
                     >
-                      <Eye size={16} />
+                      {loading && selectedReport === relatorio.tipo ? (
+                        <RefreshCw size={16} className="animate-spin" />
+                      ) : (
+                        <Eye size={16} />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -952,6 +1031,27 @@ const RelatoriosTab: React.FC = () => {
               </div>
             </div>
 
+            {/* Formato do Relatório */}
+            <div className="space-y-3">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <FileSpreadsheet className="text-blue-500" />
+                Formato do Relatório
+              </h3>
+              <div>
+                <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Formato de Exportação</label>
+                <Select value={selectedFormat} onValueChange={(value: 'PDF' | 'EXCEL' | 'CSV') => setSelectedFormat(value)}>
+                  <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="PDF" className="text-white hover:bg-seguranca-graphite">PDF</SelectItem>
+                    <SelectItem value="EXCEL" className="text-white hover:bg-seguranca-graphite">Excel</SelectItem>
+                    <SelectItem value="CSV" className="text-white hover:bg-seguranca-graphite">CSV</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {/* Resumo da Configuração */}
             <div className="p-4 bg-seguranca-graphite rounded-lg border border-gray-600">
               <h3 className="text-white font-semibold mb-2">Resumo da Configuração</h3>
@@ -959,6 +1059,7 @@ const RelatoriosTab: React.FC = () => {
                 <p>• Período: {filters.startDate ? format(filters.startDate, 'dd/MM/yyyy') : 'Não definido'} - {filters.endDate ? format(filters.endDate, 'dd/MM/yyyy') : 'Não definido'}</p>
                 <p>• Status: {filters.status}</p>
                 <p>• Tipo: {filters.tipo}</p>
+                <p>• Formato: {selectedFormat}</p>
               </div>
             </div>
 

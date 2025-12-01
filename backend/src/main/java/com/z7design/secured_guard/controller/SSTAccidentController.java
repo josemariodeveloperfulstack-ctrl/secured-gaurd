@@ -1,7 +1,9 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.AccidentRecordDTO;
 import com.z7design.secured_guard.model.AccidentRecord;
 import com.z7design.secured_guard.model.NearMissRecord;
+import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.service.SSTAccidentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,15 +26,48 @@ import java.util.UUID;
 public class SSTAccidentController {
 
     private final SSTAccidentService accidentService;
+    private final EmployeeService employeeService;
 
     // ========== ACIDENTES ==========
 
     @GetMapping
     @Operation(summary = "Listar acidentes", description = "Retorna todos os acidentes registrados")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<List<AccidentRecord>> getAllAccidents() {
+    public ResponseEntity<List<AccidentRecordDTO>> getAllAccidents() {
         List<AccidentRecord> accidents = accidentService.getAllAccidents();
-        return ResponseEntity.ok(accidents);
+        List<AccidentRecordDTO> dtos = accidents.stream()
+                .map(this::convertToDTO)
+                .toList();
+        return ResponseEntity.ok(dtos);
+    }
+    
+    private AccidentRecordDTO convertToDTO(AccidentRecord accident) {
+        return AccidentRecordDTO.builder()
+                .id(accident.getId())
+                .employeeId(accident.getEmployee().getId())
+                .employeeName(accident.getEmployee().getName())
+                .accidentDate(accident.getAccidentDate())
+                .accidentTime(accident.getAccidentTime())
+                .location(accident.getLocation())
+                .accidentType(accident.getAccidentType())
+                .description(accident.getDescription())
+                .injuryDescription(accident.getInjuryDescription())
+                .bodyPartsAffected(accident.getBodyPartsAffected())
+                .immediateCauses(accident.getImmediateCauses())
+                .rootCauses(accident.getRootCauses())
+                .correctiveActions(accident.getCorrectiveActions())
+                .preventiveActions(accident.getPreventiveActions())
+                .catNumber(accident.getCatNumber())
+                .catIssuedDate(accident.getCatIssuedDate())
+                .daysOff(accident.getDaysOff())
+                .returnToWorkDate(accident.getReturnToWorkDate())
+                .witnessNames(accident.getWitnessNames())
+                .status(accident.getStatus())
+                .photosUrls(accident.getPhotosUrls())
+                .documentsUrls(accident.getDocumentsUrls())
+                .createdAt(accident.getCreatedAt())
+                .updatedAt(accident.getUpdatedAt())
+                .build();
     }
 
     @GetMapping("/{id}")
@@ -67,7 +102,31 @@ public class SSTAccidentController {
     @PostMapping
     @Operation(summary = "Registrar acidente", description = "Registra um novo acidente")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<AccidentRecord> createAccident(@RequestBody AccidentRecord accident) {
+    public ResponseEntity<AccidentRecord> createAccident(@RequestBody AccidentRecordDTO dto) {
+        // Converter DTO para modelo
+        AccidentRecord accident = AccidentRecord.builder()
+                .employee(employeeService.findById(dto.getEmployeeId()))
+                .accidentDate(dto.getAccidentDate())
+                .accidentTime(dto.getAccidentTime())
+                .location(dto.getLocation())
+                .accidentType(dto.getAccidentType())
+                .description(dto.getDescription())
+                .injuryDescription(dto.getInjuryDescription())
+                .bodyPartsAffected(dto.getBodyPartsAffected())
+                .immediateCauses(dto.getImmediateCauses())
+                .rootCauses(dto.getRootCauses())
+                .correctiveActions(dto.getCorrectiveActions())
+                .preventiveActions(dto.getPreventiveActions())
+                .catNumber(dto.getCatNumber())
+                .catIssuedDate(dto.getCatIssuedDate())
+                .daysOff(dto.getDaysOff() != null ? dto.getDaysOff() : 0)
+                .returnToWorkDate(dto.getReturnToWorkDate())
+                .witnessNames(dto.getWitnessNames())
+                .status(dto.getStatus() != null ? dto.getStatus() : com.z7design.secured_guard.model.enums.AccidentStatus.REGISTRADO)
+                .photosUrls(dto.getPhotosUrls())
+                .documentsUrls(dto.getDocumentsUrls())
+                .build();
+        
         AccidentRecord created = accidentService.createAccident(accident);
         return ResponseEntity.ok(created);
     }

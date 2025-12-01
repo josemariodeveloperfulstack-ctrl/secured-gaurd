@@ -57,8 +57,17 @@ const RH: React.FC = () => {
     queryFn: () => hrService.getEmployeesWithExpiringProbation(7)
   });
 
+  // Buscar funcionários com férias a vencer
+  const { 
+    data: expiringVacations, 
+    isLoading: vacationsLoading 
+  } = useQuery({
+    queryKey: ['expiringVacations'],
+    queryFn: () => hrService.getVacations({ status: 'PLANNED' })
+  });
+
   // Loading state
-  if (statsLoading || probationLoading) {
+  if (statsLoading || probationLoading || vacationsLoading) {
     return (
       <StandardLayout>
         <div className="flex items-center justify-center h-64">
@@ -211,60 +220,130 @@ const RH: React.FC = () => {
 
             {/* Alertas e Notificações */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Funcionários com Experiência Vencendo */}
+              {/* Funcionários com Experiência Vencendo - Apenas 30, 45 ou 90 dias, com 3 dias de antecedência ou no dia */}
+              {expiringProbation && expiringProbation.length > 0 ? (
+                <Card className="bg-seguranca-graphite border-gray-600">
+                  <CardHeader>
+                    <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                      Experiência Vencendo
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {expiringProbation
+                        .filter((employee) => {
+                          // Verificar se a data é válida
+                          const probationEndDate = employee.jobInfo?.probationEndDate;
+                          if (!probationEndDate || 
+                              probationEndDate === '1969-12-31' || 
+                              probationEndDate === '1970-01-01' ||
+                              isNaN(new Date(probationEndDate).getTime())) {
+                            return false;
+                          }
+                          
+                          // Calcular período de experiência
+                          const admissionDate = employee.jobInfo?.admissionDate;
+                          if (!admissionDate) return false;
+                          
+                          const endDate = new Date(probationEndDate);
+                          const admDate = new Date(admissionDate);
+                          const daysBetween = Math.ceil((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          // Apenas períodos de 30, 45 ou 90 dias
+                          return daysBetween === 30 || daysBetween === 45 || daysBetween === 90;
+                        })
+                        .map((employee) => {
+                          const probationEndDate = employee.jobInfo?.probationEndDate!;
+                          const endDate = new Date(probationEndDate);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          endDate.setHours(0, 0, 0, 0);
+                          const daysUntil = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          // Calcular período de experiência
+                          const admissionDate = new Date(employee.jobInfo!.admissionDate!);
+                          const daysBetween = Math.ceil((endDate.getTime() - admissionDate.getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          return (
+                            <div key={employee.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-red-500">
+                              <div>
+                                <p className="font-medium text-seguranca-lightgray">{employee.name}</p>
+                                <p className="text-sm text-gray-400">
+                                  {employee.jobInfo?.position || 'Cargo não definido'} • {daysBetween} dias
+                                </p>
+                              </div>
+                              <Badge className={daysUntil === 0 ? "bg-red-600 text-white" : "bg-red-100 text-red-800"}>
+                                {daysUntil === 0 ? 'Hoje' : daysUntil === 1 ? 'Amanhã' : `${daysUntil} dias`}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {/* Funcionários com Férias a Vencer */}
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-red-500" />
-                    Experiência Vencendo
+                    <Calendar className="h-5 w-5 text-orange-500" />
+                    Férias a Vencer
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {expiringProbation && expiringProbation.length > 0 ? (
+                  {expiringVacations && expiringVacations.length > 0 ? (
                     <div className="space-y-3">
-                      {expiringProbation.slice(0, 5).map((employee) => (
-                        <div key={employee.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-red-500">
-                          <div>
-                            <p className="font-medium text-seguranca-lightgray">{employee.name}</p>
-                            <p className="text-sm text-gray-400">{employee.jobInfo.position}</p>
-                          </div>
-                          <Badge className="bg-red-100 text-red-800">
-                            {new Date(employee.jobInfo.probationEndDate).toLocaleDateString('pt-BR')}
-                          </Badge>
-                        </div>
-                      ))}
-                      {expiringProbation.length > 5 && (
+                      {expiringVacations
+                        .filter(vacation => {
+                          // Filtrar apenas férias que começam nos próximos 30 dias
+                          const startDate = new Date(vacation.startDate);
+                          const today = new Date();
+                          const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          return daysUntil >= 0 && daysUntil <= 30;
+                        })
+                        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+                        .slice(0, 5)
+                        .map((vacation) => {
+                          const startDate = new Date(vacation.startDate);
+                          const today = new Date();
+                          const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          return (
+                            <div key={vacation.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-orange-500/50">
+                              <div>
+                                <p className="font-medium text-seguranca-lightgray">{vacation.employeeName}</p>
+                                <p className="text-sm text-gray-400">
+                                  {vacation.days} dias • {startDate.toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                              <Badge className={daysUntil <= 7 ? "bg-red-100 text-red-800" : "bg-orange-100 text-orange-800"}>
+                                {daysUntil === 0 ? 'Hoje' : daysUntil === 1 ? 'Amanhã' : `${daysUntil} dias`}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      {expiringVacations.filter(vacation => {
+                        const startDate = new Date(vacation.startDate);
+                        const today = new Date();
+                        const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                        return daysUntil >= 0 && daysUntil <= 30;
+                      }).length > 5 && (
                         <p className="text-sm text-gray-400 text-center">
-                          +{expiringProbation.length - 5} mais funcionários
+                          +{expiringVacations.filter(vacation => {
+                            const startDate = new Date(vacation.startDate);
+                            const today = new Date();
+                            const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            return daysUntil >= 0 && daysUntil <= 30;
+                          }).length - 5} mais funcionários
                         </p>
                       )}
                     </div>
                   ) : (
                     <div className="text-center py-6">
                       <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                      <p className="text-seguranca-lightgray">Nenhuma experiência vencendo</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Status por Unidade */}
-              <Card className="bg-seguranca-graphite border-gray-600">
-                <CardHeader>
-                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                    <Building className="h-5 w-5 text-blue-500" />
-                    Status por Unidade
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {stats && (
-                    <div className="space-y-3">
-                      {Object.entries(stats.byUnit).map(([unit, count]) => (
-                        <div key={unit} className="flex items-center justify-between">
-                          <span className="text-seguranca-lightgray">{unit}</span>
-                          <Badge className="bg-blue-100 text-blue-800">{count}</Badge>
-                        </div>
-                      ))}
+                      <p className="text-seguranca-lightgray">Nenhuma férias a vencer nos próximos 30 dias</p>
                     </div>
                   )}
                 </CardContent>

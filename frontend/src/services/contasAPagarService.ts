@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { isConnectionError } from '@/utils/connectionError';
 import { ContaAPagar } from '@/components/financeiro/ContasAPagarFormModal';
 import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 
@@ -448,10 +449,19 @@ export const contasAPagarService = {
   
   // Buscar todos os fornecedores
   async getFornecedores(): Promise<Supplier[]> {
-    const response = await api.get('/api/suppliers/all');
-    console.log('🔍 DEBUG: Resposta da API /api/suppliers/all:', response.data);
-    const data = response.data;
-    return Array.isArray(data) ? data : [];
+    try {
+      const response = await api.get('/api/suppliers/all');
+      console.log('🔍 DEBUG: Resposta da API /api/suppliers/all:', response.data);
+      const data = response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      if (isConnectionError(error)) {
+        console.warn('⚠️ Backend não está disponível. Retornando array vazio para fornecedores.');
+      } else {
+        console.error('Erro ao carregar dados:', error);
+      }
+      return [];
+    }
   },
 
   // Buscar todas as empresas

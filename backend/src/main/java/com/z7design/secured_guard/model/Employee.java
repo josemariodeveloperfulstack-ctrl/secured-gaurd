@@ -53,6 +53,10 @@ public class Employee {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate hireDate;
     
+    @Column(name = "probation_end_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate probationEndDate;
+    
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate terminationDate;
     

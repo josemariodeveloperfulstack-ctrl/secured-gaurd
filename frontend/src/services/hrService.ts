@@ -316,7 +316,7 @@ class HRService {
   // Buscar funcionários com experiência vencendo
   async getEmployeesWithExpiringProbation(days: number = 7): Promise<Employee[]> {
     try {
-      const response = await api.get(`/hr/employees/probation-expiring?days=${days}`);
+      const response = await api.get(`/api/hr/employees/probation-expiring?days=${days}`);
       return response.data.map((emp: EmployeeAPI) => this.mapEmployeeFromAPI(emp));
     } catch (error) {
       console.error('Erro ao buscar funcionários com experiência vencendo:', error);
@@ -569,7 +569,7 @@ class HRService {
       if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters?.dateTo) params.append('dateTo', filters.dateTo);
 
-      const url = `/hr/vacations${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/api/hr/vacations${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get(url);
       
       return response.data.map((vacation: VacationAPI) => ({

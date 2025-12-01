@@ -107,8 +107,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userWithPermissions);
         localStorage.setItem('user', JSON.stringify(userWithPermissions));
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       const status = error?.response?.status;
+      
+      if (error?.isConnectionError) {
+        console.warn('⚠️ [AuthContext] Backend não está disponível. Continuando sem grupos.');
+        return;
+      }
+      
       if (status === 403) {
         console.info('[AuthContext] Grupo não carregado (403) - usuário sem permissão para /groups, continuando sem grupos.');
       } else if (status === 401) {

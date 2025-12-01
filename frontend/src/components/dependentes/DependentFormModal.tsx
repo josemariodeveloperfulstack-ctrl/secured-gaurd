@@ -19,7 +19,8 @@ import {
   X, 
   Hash,
   Users,
-  CreditCard
+  CreditCard,
+  Loader2
 } from 'lucide-react';
 import { Dependent, DependentFormData, RELATIONSHIP_OPTIONS, GENDER_OPTIONS, STATE_OPTIONS } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
@@ -205,17 +206,17 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#1a1f2e] border-gray-700 text-white p-0 gap-0 shadow-2xl">
-        <DialogHeader className="p-6 border-b border-gray-700 bg-[#232936]">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600/20 p-2 rounded-lg">
-              <Users className="h-6 w-6 text-blue-400" />
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-[#1a1f2e] via-[#1e2330] to-[#1a1f2e] border-2 border-gray-600/50 text-white p-0 gap-0 shadow-2xl">
+        <DialogHeader className="p-6 sm:p-8 border-b-2 border-gray-700/50 bg-gradient-to-r from-[#232936] to-[#1e2330]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="bg-gradient-to-br from-blue-600/30 to-blue-500/20 p-3 rounded-xl border border-blue-500/30 shadow-lg">
+              <Users className="h-7 w-7 text-blue-400" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold text-white">
+            <div className="flex-1">
+              <DialogTitle className="text-2xl sm:text-3xl font-bold text-white mb-2">
                 {dependent ? 'Editar Dependente' : 'Adicionar Dependente'}
               </DialogTitle>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-sm sm:text-base text-gray-300">
                 {dependent ? 'Atualize os dados do dependente abaixo' : 'Preencha o formulário para adicionar um novo dependente'}
               </p>
             </div>
@@ -223,9 +224,9 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="p-6">
+          <div className="p-4 sm:p-6 lg:p-8">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-[#131722] p-1 mb-8 rounded-lg border border-gray-800">
+              <TabsList className="grid w-full grid-cols-3 bg-[#131722] p-1.5 mb-6 sm:mb-8 rounded-lg border-2 border-gray-800">
                 <TabsTrigger value="dados-basicos" className="data-[state='active']:bg-blue-600 data-[state='active']:text-white rounded-md transition-all">
                   <User className="h-4 w-4 mr-2" /> Dados Básicos
                 </TabsTrigger>
@@ -239,32 +240,34 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
 
               {/* Dados Básicos */}
               <TabsContent value="dados-basicos" className="space-y-6 mt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-gray-300 font-medium">
-                      Nome Completo <span className="text-red-500">*</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-2.5">
+                    <Label htmlFor="name" className="text-white font-bold text-base flex items-center gap-2">
+                      <User className="h-5 w-5 text-blue-400" />
+                      Nome Completo <span className="text-red-500 text-lg">*</span>
                     </Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
-                      placeholder="Nome completo do dependente"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-500 placeholder:font-normal"
+                      placeholder="Digite o nome completo"
                       required
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="relationship" className="text-gray-300 font-medium">
-                      Parentesco <span className="text-red-500">*</span>
+                  <div className="space-y-2.5">
+                    <Label htmlFor="relationship" className="text-white font-bold text-base flex items-center gap-2">
+                      <Users className="h-5 w-5 text-purple-400" />
+                      Parentesco <span className="text-red-500 text-lg">*</span>
                     </Label>
                     <Select value={formData.relationship} onValueChange={(value) => handleInputChange('relationship', value)}>
-                      <SelectTrigger className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm">
-                        <SelectValue placeholder="Selecione..." />
+                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold">
+                        <SelectValue placeholder="Selecione o parentesco..." className="text-gray-500 font-normal" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200 text-gray-900">
+                      <SelectContent className="bg-white border-2 border-gray-300 text-gray-900 shadow-xl">
                         {RELATIONSHIP_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="hover:bg-gray-100 cursor-pointer">
+                          <SelectItem key={option.value} value={option.value} className="hover:bg-blue-50 cursor-pointer text-base py-2.5 font-medium">
                             {option.label}
                           </SelectItem>
                         ))}
@@ -272,9 +275,10 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="birthDate" className="text-gray-300 font-medium">
-                      Data de Nascimento <span className="text-red-500">*</span>
+                  <div className="space-y-2.5">
+                    <Label htmlFor="birthDate" className="text-white font-bold text-base flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-green-400" />
+                      Data de Nascimento <span className="text-red-500 text-lg">*</span>
                     </Label>
                     <div className="relative">
                       <Input
@@ -282,23 +286,24 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                         type="date"
                         value={formData.birthDate}
                         onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                        className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                        className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold"
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="gender" className="text-gray-300 font-medium">
+                    <Label htmlFor="gender" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <User className="h-4 w-4 text-pink-400" />
                       Gênero
                     </Label>
                     <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
-                      <SelectTrigger className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm">
-                        <SelectValue placeholder="Selecione..." />
+                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium">
+                        <SelectValue placeholder="Selecione o gênero..." />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200 text-gray-900">
+                      <SelectContent className="bg-white border-2 border-gray-200 text-gray-900 shadow-xl">
                         {GENDER_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="hover:bg-gray-100 cursor-pointer">
+                          <SelectItem key={option.value} value={option.value} className="hover:bg-blue-50 cursor-pointer text-base py-2">
                             {option.label}
                           </SelectItem>
                         ))}
@@ -306,30 +311,32 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="cpf" className="text-gray-300 font-medium">
-                      CPF <span className="text-red-500">*</span>
+                  <div className="space-y-2.5">
+                    <Label htmlFor="cpf" className="text-white font-bold text-base flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-orange-400" />
+                      CPF <span className="text-red-500 text-lg">*</span>
                     </Label>
                     <Input
                       id="cpf"
                       value={formData.cpf}
                       onChange={(e) => handleInputChange('cpf', formatCpf(e.target.value))}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-500 placeholder:font-normal"
                       placeholder="000.000.000-00"
                       maxLength={14}
                       required
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="rg" className="text-gray-300 font-medium">
+                  <div className="space-y-2.5">
+                    <Label htmlFor="rg" className="text-white font-bold text-base flex items-center gap-2">
+                      <Hash className="h-5 w-5 text-cyan-400" />
                       RG
                     </Label>
                     <Input
                       id="rg"
                       value={formData.rg}
                       onChange={(e) => handleInputChange('rg', e.target.value)}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-500 placeholder:font-normal"
                       placeholder="Número do RG"
                     />
                   </div>
@@ -338,23 +345,25 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
 
               {/* Contato */}
               <TabsContent value="contato" className="space-y-6 mt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-gray-300 font-medium">
+                    <Label htmlFor="phone" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <Phone className="h-4 w-4 text-green-400" />
                       Telefone
                     </Label>
                     <Input
                       id="phone"
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', formatPhone(e.target.value))}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
                       placeholder="(00) 00000-0000"
                       maxLength={15}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-gray-300 font-medium">
+                    <Label htmlFor="email" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <Mail className="h-4 w-4 text-blue-400" />
                       Email
                     </Label>
                     <Input
@@ -362,48 +371,51 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
                       placeholder="email@exemplo.com"
                     />
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address" className="text-gray-300 font-medium">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="address" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <MapPin className="h-4 w-4 text-red-400" />
                       Endereço
                     </Label>
                     <Input
                       id="address"
                       value={formData.address}
                       onChange={(e) => handleInputChange('address', e.target.value)}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
                       placeholder="Rua, número, complemento"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="city" className="text-gray-300 font-medium">
+                    <Label htmlFor="city" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <MapPin className="h-4 w-4 text-purple-400" />
                       Cidade
                     </Label>
                     <Input
                       id="city"
                       value={formData.city}
                       onChange={(e) => handleInputChange('city', e.target.value)}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
-                      placeholder="Cidade"
+                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
+                      placeholder="Nome da cidade"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state" className="text-gray-300 font-medium">
+                    <Label htmlFor="state" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <MapPin className="h-4 w-4 text-indigo-400" />
                       Estado
                     </Label>
                     <Select value={formData.state} onValueChange={(value) => handleInputChange('state', value)}>
-                      <SelectTrigger className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm">
-                        <SelectValue placeholder="UF" />
+                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium">
+                        <SelectValue placeholder="Selecione o estado..." />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200 text-gray-900">
+                      <SelectContent className="bg-white border-2 border-gray-200 text-gray-900 shadow-xl">
                         {STATE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="hover:bg-gray-100 cursor-pointer">
+                          <SelectItem key={option.value} value={option.value} className="hover:bg-blue-50 cursor-pointer text-base py-2">
                             {option.value} - {option.label}
                           </SelectItem>
                         ))}
@@ -412,14 +424,15 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="zipCode" className="text-gray-300 font-medium">
+                    <Label htmlFor="zipCode" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                      <Hash className="h-4 w-4 text-teal-400" />
                       CEP
                     </Label>
                     <Input
                       id="zipCode"
                       value={formData.zipCode}
                       onChange={(e) => handleInputChange('zipCode', formatZipCode(e.target.value))}
-                      className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-10 shadow-sm"
+                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
                       placeholder="00000-000"
                       maxLength={9}
                     />
@@ -429,47 +442,47 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
 
               {/* Informações Adicionais */}
               <TabsContent value="informacoes" className="space-y-6 mt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4 bg-[#131722] p-4 rounded-lg border border-gray-800">
-                    <div className="flex items-center space-x-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-4 bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-5 rounded-xl border-2 border-blue-500/30 hover:border-blue-500/50 transition-all">
+                    <div className="flex items-center space-x-3">
                       <Checkbox
                         id="isStudent"
                         checked={formData.isStudent}
                         onCheckedChange={(checked) => handleInputChange('isStudent', checked as boolean)}
-                        className="border-gray-500 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                        className="border-2 border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5"
                       />
-                      <Label htmlFor="isStudent" className="text-gray-300 flex items-center gap-2 cursor-pointer font-medium">
-                        <GraduationCap className="h-4 w-4 text-blue-400" />
+                      <Label htmlFor="isStudent" className="text-gray-200 flex items-center gap-2 cursor-pointer font-semibold text-base">
+                        <GraduationCap className="h-5 w-5 text-blue-400" />
                         É estudante
                       </Label>
                     </div>
 
                     {formData.isStudent && (
-                      <div className="space-y-2 ml-6 pt-2 animate-in slide-in-from-top-2 duration-200">
-                        <Label htmlFor="schoolName" className="text-gray-400 text-sm">
+                      <div className="space-y-2 ml-8 pt-2 animate-in slide-in-from-top-2 duration-200">
+                        <Label htmlFor="schoolName" className="text-gray-300 text-sm font-medium">
                           Nome da Escola/Instituição
                         </Label>
                         <Input
                           id="schoolName"
                           value={formData.schoolName}
                           onChange={(e) => handleInputChange('schoolName', e.target.value)}
-                          className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md h-9 shadow-sm"
+                          className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-10 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
                           placeholder="Nome da escola ou instituição"
                         />
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-4 bg-[#131722] p-4 rounded-lg border border-gray-800">
-                    <div className="flex items-center space-x-2">
+                  <div className="space-y-4 bg-gradient-to-br from-pink-900/20 to-pink-800/10 p-5 rounded-xl border-2 border-pink-500/30 hover:border-pink-500/50 transition-all">
+                    <div className="flex items-center space-x-3">
                       <Checkbox
                         id="isBeneficiary"
                         checked={formData.isBeneficiary}
                         onCheckedChange={(checked) => handleInputChange('isBeneficiary', checked as boolean)}
-                        className="border-gray-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600"
+                        className="border-2 border-gray-400 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 h-5 w-5"
                       />
-                      <Label htmlFor="isBeneficiary" className="text-gray-300 flex items-center gap-2 cursor-pointer font-medium">
-                        <Heart className="h-4 w-4 text-pink-400" />
+                      <Label htmlFor="isBeneficiary" className="text-gray-200 flex items-center gap-2 cursor-pointer font-semibold text-base">
+                        <Heart className="h-5 w-5 text-pink-400" />
                         É beneficiário de planos
                       </Label>
                     </div>
@@ -477,16 +490,17 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes" className="text-gray-300 font-medium">
+                  <Label htmlFor="notes" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
+                    <Hash className="h-4 w-4 text-gray-400" />
                     Observações
                   </Label>
                   <Textarea
                     id="notes"
                     value={formData.notes}
                     onChange={(e) => handleInputChange('notes', e.target.value)}
-                    className="bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md shadow-sm"
-                    placeholder="Observações adicionais..."
-                    rows={4}
+                    className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg shadow-sm transition-all text-base font-medium placeholder:text-gray-400 resize-none"
+                    placeholder="Digite observações adicionais sobre o dependente..."
+                    rows={5}
                   />
                 </div>
 
@@ -505,13 +519,13 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
             </Tabs>
           </div>
 
-          <div className="p-6 border-t border-gray-700 bg-[#232936] rounded-b-lg flex justify-end gap-3">
+          <div className="p-6 sm:p-8 border-t-2 border-gray-700/50 bg-gradient-to-r from-[#232936] to-[#1e2330] rounded-b-lg flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+              className="bg-transparent border-2 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white hover:border-gray-500 transition-all h-11 px-6 font-semibold"
             >
               <X className="h-4 w-4 mr-2" />
               Cancelar
@@ -519,10 +533,19 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 transition-all h-11 px-8 font-semibold text-base"
             >
-              <Save className="h-4 w-4 mr-2" />
-              {isLoading ? 'Salvando...' : dependent ? 'Atualizar Dependente' : 'Salvar Dependente'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  {dependent ? 'Atualizar Dependente' : 'Salvar Dependente'}
+                </>
+              )}
             </Button>
           </div>
         </form>

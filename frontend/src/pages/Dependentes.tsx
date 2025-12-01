@@ -181,8 +181,8 @@ const Dependentes: React.FC = () => {
   };
 
   return (
-    <StandardLayout title="Gestão de Dependentes" subtitle="Gerencie os dependentes dos funcionários">
-      <div className="space-y-6">
+    <StandardLayout title="Gerenciamento de Dependentes" subtitle="Gerencie os dependentes dos funcionários">
+      <div className="space-y-6 p-4 sm:p-6">
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-animate="fadeDown">
           <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 group">
@@ -333,41 +333,53 @@ const Dependentes: React.FC = () => {
 
         {/* Selected Employee Info */}
         {selectedEmployee && (
-          <Card className="bg-[#1a1f2e] border-gray-700 p-0 overflow-hidden" data-animate="fadeUp">
-            <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-[#EAB308] flex items-center justify-center text-black font-bold text-xl">
-                  {selectedEmployee.name.charAt(0).toUpperCase()}
+          <Card className="bg-gradient-to-r from-seguranca-graphite via-seguranca-black to-seguranca-graphite border-2 border-gray-600/50 shadow-xl" data-animate="fadeUp">
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
+                <div className="flex items-center gap-4 sm:gap-6 flex-1 min-w-0">
+                  <div className="h-18 w-18 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-seguranca-yellow via-yellow-500 to-yellow-600 flex items-center justify-center text-seguranca-black font-bold text-3xl sm:text-4xl shadow-xl flex-shrink-0 border-2 border-yellow-400/30">
+                    {selectedEmployee.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-white text-xl sm:text-2xl lg:text-3xl mb-2 truncate">
+                      {selectedEmployee.name}
+                    </h4>
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                      <Badge className="bg-blue-500/20 text-blue-300 border-2 border-blue-500/30 px-3 py-1.5 text-sm font-semibold">
+                        {selectedEmployee.position?.name || 'Cargo não definido'}
+                      </Badge>
+                      {selectedEmployee.cpf && (
+                        <span className="text-gray-400 text-sm font-medium">
+                          CPF: {selectedEmployee.cpf}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-white text-lg">{selectedEmployee.name}</h4>
-                  <p className="text-gray-400 text-sm">
-                    {selectedEmployee.position?.name || 'Cargo não definido'}
-                  </p>
-                </div>
+                
+                <Button 
+                  onClick={clearFilters}
+                  variant="outline"
+                  className="bg-transparent border-2 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white hover:border-gray-500 transition-all whitespace-nowrap flex-shrink-0 font-semibold px-5 py-2.5 h-auto hover:scale-105"
+                >
+                  <RefreshCw size={18} className="mr-2" />
+                  Trocar Funcionário
+                </Button>
               </div>
-              
-              <Button 
-                onClick={clearFilters}
-                variant="outline"
-                className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
-              >
-                Trocar Funcionário
-              </Button>
             </div>
           </Card>
         )}
 
         {/* Dependents Table */}
-        <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
-          <div className="flex items-center justify-between mb-6">
+        <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-2 border-gray-600/50 shadow-xl p-6" data-animate="fadeUp">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b-2 border-gray-700/50">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
-                <Users className="h-5 w-5 text-seguranca-red" />
+              <div className="p-2.5 rounded-xl bg-seguranca-red/20 border-2 border-seguranca-red/30 shadow-lg">
+                <Users className="h-6 w-6 text-seguranca-red" />
               </div>
               <div>
-                <h3 className="font-semibold text-white">Lista de Dependentes</h3>
-                <p className="text-sm text-gray-400">
+                <h3 className="font-bold text-white text-lg sm:text-xl">Lista de Dependentes</h3>
+                <p className="text-sm text-gray-400 mt-1">
                   {selectedEmployeeId 
                     ? `Dependentes de ${selectedEmployee?.name || 'funcionário selecionado'}`
                     : 'Todos os dependentes cadastrados'
@@ -381,9 +393,9 @@ const Dependentes: React.FC = () => {
                 setIsFormModalOpen(true);
               }}
               disabled={!selectedEmployeeId}
-              className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20"
+              className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 text-white font-semibold px-6 py-2.5 h-auto transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <UserPlus className="h-4 w-4 mr-2" />
+              <UserPlus className="h-5 w-5 mr-2" />
               Novo Dependente
             </Button>
           </div>

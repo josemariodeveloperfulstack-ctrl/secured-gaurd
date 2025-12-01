@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiUrl, isDebugMode } from '../config/environment';
+import { isConnectionError, createConnectionError } from '../utils/connectionError';
 
 const api = axios.create({
   baseURL: getApiUrl(),
@@ -73,6 +74,16 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Tratamento especial para erros de conexão (backend não disponível)
+    if (!error.response && isConnectionError(error)) {
+      const apiUrl = error.config?.baseURL || getApiUrl();
+      console.warn('⚠️ Backend não está disponível:', apiUrl);
+      console.warn('⚠️ Verifique se o backend está rodando na porta correta');
+      
+      // Retornar erro customizado para que os componentes possam tratar
+      return Promise.reject(createConnectionError(apiUrl));
+    }
+    
     if (isDebugMode()) {
       console.error('❌ Axios Response Error:', error.response?.status, error.config?.url);
       console.error('❌ Error details:', error.response?.data);

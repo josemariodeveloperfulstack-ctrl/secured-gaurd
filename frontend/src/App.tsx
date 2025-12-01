@@ -63,6 +63,7 @@ const Departamentos = lazy(() => import('@/pages/RH/Departamentos'));
 const SST = lazy(() => import('@/pages/RH/SST'));
 const SSTEPIs = lazy(() => import('@/pages/RH/SST/EPIs'));
 const SSTExamesMedicos = lazy(() => import('@/pages/RH/SST/ExamesMedicos'));
+const SSTAcidentes = lazy(() => import('@/pages/RH/SST/Acidentes'));
 const SSTRelatorios = lazy(() => import('@/pages/RH/SST/Relatorios'));
 const SSTRiscosOcupacionais = lazy(() => import('@/pages/RH/SST/RiscosOcupacionais'));
 const SSTTemplates = lazy(() => import('@/pages/RH/SST/Templates'));
@@ -617,6 +618,13 @@ function App() {
                     <Route path="/rh/sst/exames" element={
                       <ProtectedRoute>
                         <SSTExamesMedicos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/sst/acidentes" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <SSTAcidentes />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/sst/relatorios" element={

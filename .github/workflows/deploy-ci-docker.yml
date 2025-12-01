@@ -1217,10 +1217,7 @@ jobs:
             if [ $((ATTEMPT % 3)) -eq 0 ]; then
               echo ""
               echo "🔍 Verificando logs do backend (últimas 20 linhas)..."
-              sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-                cd /var/www/secured_guard/ci
-                docker logs --tail 20 secured-guard-backend-ci 2>&1 | tail -20
-              EOF
+              sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && docker logs --tail 20 secured-guard-backend-ci 2>&1 | tail -20"
             fi
             
             echo "⏳ Aguardando 15 segundos antes da próxima tentativa..."
@@ -1285,9 +1282,7 @@ jobs:
           elif [ "$HTTP_CODE" = "500" ]; then
             echo "❌ ERRO: Login retornou 500 (Internal Server Error)"
             echo "📋 Verificando logs do backend para erro de JWT..."
-            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-              docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i "jwt\|token\|secret" | tail -20 || echo "Nenhum log JWT encontrado"
-            EOF
+            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i 'jwt\|token\|secret' | tail -20 || echo 'Nenhum log JWT encontrado'"
             exit 1
           elif [ "$HTTP_CODE" = "000" ]; then
             echo "⚠️ Timeout ao testar login (aplicação pode ainda estar iniciando)"
