@@ -132,6 +132,9 @@ const Supervisao = lazy(() => import('@/pages/Supervisao'));
 const ActivityManagement = lazy(() => import('@/pages/ActivityManagement'));
 const UserProfile = lazy(() => import('@/pages/UserProfile'));
 
+// Configurações avançadas
+const ConfiguracaoBackup = lazy(() => import('@/pages/ConfiguracaoBackup'));
+
 // Módulo Operacional
 const OperacionalDashboard = lazy(() => import('@/pages/OperacionalDashboard'));
 const GestaoPostos = lazy(() => import('@/pages/GestaoPostos'));
@@ -822,6 +825,13 @@ function App() {
                     <Route path="/configuracoes" element={
                       <ProtectedRoute>
                         <Configuracoes />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/configuracoes/backup" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ConfiguracaoBackup />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     
