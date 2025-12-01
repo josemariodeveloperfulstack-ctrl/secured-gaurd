@@ -551,55 +551,94 @@ jobs:
             echo ""
             
             # Carregar PATH do Docker (necessário em sessões SSH não-interativas)
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
             
             # Verificar se Docker está disponível
-            if ! command -v docker &> /dev/null; then
-              echo "⚠️ Docker não encontrado no PATH padrão. Procurando..."
-              # Tentar encontrar Docker em locais comuns
-              if [ -f /usr/bin/docker ]; then
-                export PATH="/usr/bin:$PATH"
-              elif [ -f /usr/local/bin/docker ]; then
-                export PATH="/usr/local/bin:$PATH"
+            DOCKER_CMD=""
+            if command -v docker &> /dev/null; then
+              DOCKER_CMD="docker"
+            elif [ -x /usr/bin/docker ]; then
+              DOCKER_CMD="/usr/bin/docker"
+              export PATH="/usr/bin:$PATH"
+            elif [ -x /usr/local/bin/docker ]; then
+              DOCKER_CMD="/usr/local/bin/docker"
+              export PATH="/usr/local/bin:$PATH"
+            elif [ -x /snap/bin/docker ]; then
+              DOCKER_CMD="/snap/bin/docker"
+              export PATH="/snap/bin:$PATH"
+            else
+              echo "⚠️ Docker não encontrado no PATH padrão. Procurando em todo o sistema..."
+              DOCKER_FOUND=$(find /usr /opt /snap -name docker -type f -executable 2>/dev/null | head -1)
+              if [ -n "$DOCKER_FOUND" ]; then
+                DOCKER_CMD="$DOCKER_FOUND"
+                export PATH="$(dirname $DOCKER_FOUND):$PATH"
+                echo "✅ Docker encontrado em: $DOCKER_FOUND"
               else
                 echo "❌ ERRO: Docker não encontrado no sistema!"
-                exit 1
+                echo "📋 Verificando se Docker está instalado mas não iniciado..."
+                if systemctl list-units --type=service | grep -q docker; then
+                  echo "⚠️ Serviço Docker encontrado. Tentando iniciar..."
+                  systemctl start docker 2>&1 || true
+                  sleep 3
+                  if command -v docker &> /dev/null; then
+                    DOCKER_CMD="docker"
+                  fi
+                fi
+                if [ -z "$DOCKER_CMD" ]; then
+                  echo "❌ Docker não está instalado ou não está acessível."
+                  echo "📋 Instale o Docker com: apt-get update && apt-get install -y docker.io docker-compose"
+                  exit 1
+                fi
               fi
             fi
             
             # Verificar se docker-compose está disponível
-            if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null 2>&1; then
-              echo "⚠️ docker-compose não encontrado. Verificando instalação..."
-              if [ -f /usr/local/bin/docker-compose ]; then
-                export PATH="/usr/local/bin:$PATH"
-              elif [ -f /usr/bin/docker-compose ]; then
-                export PATH="/usr/bin:$PATH"
+            COMPOSE_CMD=""
+            if command -v docker-compose &> /dev/null; then
+              COMPOSE_CMD="docker-compose"
+            elif [ -x /usr/local/bin/docker-compose ]; then
+              COMPOSE_CMD="/usr/local/bin/docker-compose"
+            elif [ -x /usr/bin/docker-compose ]; then
+              COMPOSE_CMD="/usr/bin/docker-compose"
+            elif $DOCKER_CMD compose version &> /dev/null 2>&1; then
+              COMPOSE_CMD="$DOCKER_CMD compose"
+            else
+              echo "⚠️ docker-compose não encontrado. Tentando usar 'docker compose' (v2)..."
+              if $DOCKER_CMD compose version &> /dev/null 2>&1; then
+                COMPOSE_CMD="$DOCKER_CMD compose"
+              else
+                echo "❌ docker-compose não está disponível!"
+                exit 1
               fi
             fi
             
-            # Verificar novamente se Docker está disponível
-            if ! command -v docker &> /dev/null; then
-              echo "❌ ERRO: Docker ainda não está disponível após ajustes de PATH!"
-              echo "📋 Tentando localizar Docker:"
-              which docker || find /usr -name docker 2>/dev/null | head -5
-              exit 1
+            # Verificar se Docker está funcionando
+            if ! $DOCKER_CMD info &> /dev/null; then
+              echo "⚠️ Docker não está respondendo. Tentando iniciar serviço..."
+              systemctl start docker 2>&1 || true
+              sleep 3
+              if ! $DOCKER_CMD info &> /dev/null; then
+                echo "❌ ERRO: Docker não está funcionando!"
+                exit 1
+              fi
             fi
             
-            echo "✅ Docker encontrado: $(which docker)"
-            echo "✅ Docker versão: $(docker --version)"
+            echo "✅ Docker encontrado: $DOCKER_CMD"
+            echo "✅ Docker versão: $($DOCKER_CMD --version)"
+            echo "✅ docker-compose: $COMPOSE_CMD"
             
             cd /var/www/secured_guard/ci
             
             # Garantir que não está em modo Swarm
-            if docker info 2>/dev/null | grep -q "Swarm: active"; then
+            if $DOCKER_CMD info 2>/dev/null | grep -q "Swarm: active"; then
               echo "❌ ERRO: Docker ainda está em modo Swarm!"
               echo "🔄 Tentando sair do modo Swarm novamente..."
-              docker swarm leave --force 2>/dev/null || true
+              $DOCKER_CMD swarm leave --force 2>/dev/null || true
               sleep 5
             fi
             
             # Verificar novamente
-            if docker info 2>/dev/null | grep -q "Swarm: active"; then
+            if $DOCKER_CMD info 2>/dev/null | grep -q "Swarm: active"; then
               echo "❌ ERRO: Não foi possível sair do modo Swarm. Abortando..."
               exit 1
             else
@@ -612,31 +651,22 @@ jobs:
               exit 1
             fi
             
-            # Usar docker compose v2 se disponível, senão docker-compose v1
-            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-              echo "✅ Usando 'docker compose' (v2)..."
-              COMPOSE_CMD="docker compose"
-            else
-              echo "✅ Usando 'docker-compose' (v1)..."
-              COMPOSE_CMD="docker-compose"
-            fi
-            
             # Criar redes Docker se não existirem
             echo ""
             echo "🌐 Verificando e criando redes Docker..."
             
             # Criar rede z7network se não existir
-            if ! docker network ls | grep -q "z7network"; then
+            if ! $DOCKER_CMD network ls | grep -q "z7network"; then
               echo "📡 Criando rede z7network..."
-              docker network create z7network 2>&1 || echo "⚠️ Erro ao criar rede z7network (pode já existir)"
+              $DOCKER_CMD network create z7network 2>&1 || echo "⚠️ Erro ao criar rede z7network (pode já existir)"
             else
               echo "✅ Rede z7network já existe"
             fi
             
             # Criar rede secured-guard-ci-network se não existir
-            if ! docker network ls | grep -q "secured-guard-ci"; then
+            if ! $DOCKER_CMD network ls | grep -q "secured-guard-ci"; then
               echo "📡 Criando rede secured-guard-ci-network..."
-              docker network create secured-guard-ci-network 2>&1 || echo "⚠️ Erro ao criar rede secured-guard-ci-network (pode já existir)"
+              $DOCKER_CMD network create secured-guard-ci-network 2>&1 || echo "⚠️ Erro ao criar rede secured-guard-ci-network (pode já existir)"
             else
               echo "✅ Rede secured-guard-ci-network já existe"
             fi
@@ -644,7 +674,7 @@ jobs:
             # Verificar se as redes foram criadas
             echo ""
             echo "📋 Redes Docker disponíveis:"
-            docker network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
+            $DOCKER_CMD network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
             
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
@@ -664,15 +694,15 @@ jobs:
             # Verificar se PostgreSQL e Redis estão rodando
             echo ""
             echo "🔍 Verificando PostgreSQL e Redis..."
-            if ! docker ps | grep -q "secured-guard-db-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-db-ci"; then
               echo "⚠️ PostgreSQL não está rodando! Tentando iniciar..."
-              docker start secured-guard-db-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
+              $DOCKER_CMD start secured-guard-db-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
               sleep 10
             fi
             
-            if ! docker ps | grep -q "secured-guard-redis-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-redis-ci"; then
               echo "⚠️ Redis não está rodando! Tentando iniciar..."
-              docker start secured-guard-redis-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
+              $DOCKER_CMD start secured-guard-redis-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
               sleep 10
             fi
             
@@ -681,17 +711,17 @@ jobs:
             sleep 20
             
             # Verificar novamente se estão rodando
-            if ! docker ps | grep -q "secured-guard-db-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-db-ci"; then
               echo "❌ ERRO: PostgreSQL ainda não está rodando!"
               echo "📋 Logs do PostgreSQL:"
-              docker logs --tail 50 secured-guard-db-ci 2>&1 | tail -30 || echo "Container não encontrado"
+              $DOCKER_CMD logs --tail 50 secured-guard-db-ci 2>&1 | tail -30 || echo "Container não encontrado"
               exit 1
             fi
             
-            if ! docker ps | grep -q "secured-guard-redis-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-redis-ci"; then
               echo "❌ ERRO: Redis ainda não está rodando!"
               echo "📋 Logs do Redis:"
-              docker logs --tail 50 secured-guard-redis-ci 2>&1 | tail -30 || echo "Container não encontrado"
+              $DOCKER_CMD logs --tail 50 secured-guard-redis-ci 2>&1 | tail -30 || echo "Container não encontrado"
               exit 1
             fi
             
@@ -700,31 +730,31 @@ jobs:
             # Verificar se Frontend e Nginx estão rodando
             echo ""
             echo "🔍 Verificando Frontend e Nginx..."
-            if ! docker ps | grep -q "secured-guard-frontend-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-frontend-ci"; then
               echo "⚠️ Frontend não está rodando! Tentando iniciar..."
-              docker start secured-guard-frontend-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
+              $DOCKER_CMD start secured-guard-frontend-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
               sleep 10
             fi
             
-            if ! docker ps | grep -q "secured-guard-nginx-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-nginx-ci"; then
               echo "⚠️ Nginx não está rodando! Tentando iniciar..."
-              docker start secured-guard-nginx-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
+              $DOCKER_CMD start secured-guard-nginx-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
               sleep 10
             fi
             
             # Verificar novamente
-            if ! docker ps | grep -q "secured-guard-frontend-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-frontend-ci"; then
               echo "❌ ERRO: Frontend ainda não está rodando!"
               echo "📋 Logs do Frontend:"
-              docker logs --tail 50 secured-guard-frontend-ci 2>&1 | tail -30 || echo "Container não encontrado"
+              $DOCKER_CMD logs --tail 50 secured-guard-frontend-ci 2>&1 | tail -30 || echo "Container não encontrado"
             else
               echo "✅ Frontend está rodando!"
             fi
             
-            if ! docker ps | grep -q "secured-guard-nginx-ci"; then
+            if ! $DOCKER_CMD ps | grep -q "secured-guard-nginx-ci"; then
               echo "❌ ERRO: Nginx ainda não está rodando!"
               echo "📋 Logs do Nginx:"
-              docker logs --tail 50 secured-guard-nginx-ci 2>&1 | tail -30 || echo "Container não encontrado"
+              $DOCKER_CMD logs --tail 50 secured-guard-nginx-ci 2>&1 | tail -30 || echo "Container não encontrado"
             else
               echo "✅ Nginx está rodando!"
             fi
@@ -740,7 +770,7 @@ jobs:
             # Verificar se containers foram criados
             echo ""
             echo "🔍 Verificando containers criados..."
-            docker ps -a | grep "secured-guard" || echo "⚠️ Nenhum container secured-guard encontrado"
+            $DOCKER_CMD ps -a | grep "secured-guard" || echo "⚠️ Nenhum container secured-guard encontrado"
             
             # Verificar e tentar iniciar containers que não estão rodando
             echo ""
@@ -758,9 +788,9 @@ jobs:
               STOPPED_CONTAINERS=()
               
               for container in "${REQUIRED_CONTAINERS[@]}"; do
-                if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
-                  if docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                    STATUS=$(docker ps --format "{{.Names}} {{.Status}}" | grep "^${container} ")
+                if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+                  if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                    STATUS=$($DOCKER_CMD ps --format "{{.Names}} {{.Status}}" | grep "^${container} ")
                     echo "  ✅ $STATUS"
                   else
                     echo "  ⚠️ $container está parado!"
@@ -786,9 +816,9 @@ jobs:
                   echo "  🔄 Iniciando $container..."
                   
                   # Tentar iniciar o container
-                  docker start "$container" 2>&1 || {
+                  $DOCKER_CMD start "$container" 2>&1 || {
                     echo "  ⚠️ Erro ao iniciar $container. Verificando logs..."
-                    docker logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
+                    $DOCKER_CMD logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
                     
                     # Tentar recriar qualquer container que não iniciou
                     echo "  🔄 Tentando recriar $container..."
@@ -822,13 +852,13 @@ jobs:
             FINAL_STOPPED=()
             
             for container in "${REQUIRED_CONTAINERS[@]}"; do
-              if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
+              if ! $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
                 echo "  ❌ $container NÃO está rodando!"
                 FINAL_STOPPED+=("$container")
                 
                 # Mostrar logs do container que não está rodando
                 echo "  📋 Logs de $container:"
-                docker logs --tail 50 "$container" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
+                $DOCKER_CMD logs --tail 50 "$container" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
               fi
             done
             
