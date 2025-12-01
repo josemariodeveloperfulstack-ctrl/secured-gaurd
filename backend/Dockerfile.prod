@@ -45,8 +45,8 @@ RUN for i in 1 2 3; do \
 # Copiar código fonte
 COPY src ./src
 
-# Compilar aplicação
-RUN mvn clean package -DskipTests -Dspring.profiles.active=ci
+# Compilar aplicação (pulando completamente compilação/execução de testes)
+RUN mvn clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci
 
 # ========================================
 # IMAGEM FINAL (RUNTIME)
