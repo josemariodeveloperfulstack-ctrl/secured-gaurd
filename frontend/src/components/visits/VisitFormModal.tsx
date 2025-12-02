@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Upload, QrCode, MapPin, User, Building, Clock, FileText, Scan } from 'lucide-react';
+import { X, Camera, Upload, QrCode, MapPin, User, Building, Clock, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CreateVisitRequest, VisitStatus, Visit } from '@/types/visit';
 import { visitService } from '@/services/visitService';
-import { facialRecognitionService } from '@/services/facialRecognitionService';
 import MapWithPin from '@/components/ui/MapWithPin';
 import api from '@/lib/axios';
 
@@ -78,13 +77,6 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
   const [allWorkPosts, setAllWorkPosts] = useState<WorkPost[]>([]);
   const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
   
-  // Reconhecimento facial
-  const [showFacialRecognition, setShowFacialRecognition] = useState(false);
-  const [capturedFace, setCapturedFace] = useState<string | null>(null);
-  const [isRecognizing, setIsRecognizing] = useState(false);
-  const [recognitionResult, setRecognitionResult] = useState<any>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -197,157 +189,6 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     }
   };
 
-  const startFacialRecognition = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setShowFacialRecognition(true);
-      }
-    } catch (error) {
-      console.error('Erro ao acessar câmera:', error);
-      toast({
-        title: "Erro ao acessar câmera",
-        description: "Não foi possível acessar a câmera. Verifique as permissões.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const stopFacialRecognition = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setShowFacialRecognition(false);
-    setCapturedFace(null);
-    setRecognitionResult(null);
-    setIsRecognizing(false);
-  };
-
-  const captureFace = async () => {
-    if (videoRef.current) {
-      try {
-        setIsRecognizing(true);
-        
-        // Capturar imagem da câmera
-        const imageFile = await facialRecognitionService.captureFromCamera(videoRef.current);
-        
-        if (!imageFile) {
-          throw new Error('Falha ao capturar imagem');
-        }
-        
-        // Validar arquivo
-        const validation = facialRecognitionService.validateImageFile(imageFile);
-        if (!validation.valid) {
-          throw new Error(validation.error);
-        }
-        
-        // Converter para base64 para exibição
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setCapturedFace(e.target?.result as string);
-        };
-        reader.readAsDataURL(imageFile);
-        
-        // Realizar reconhecimento facial
-        const result = await facialRecognitionService.recognizeFace(imageFile);
-        setRecognitionResult(result);
-        
-        if (result.success) {
-          // Preencher dados do supervisor automaticamente
-          setSupervisorCpf(result.cpf || '');
-          setSupervisorName(result.employee?.name || '');
-          
-          toast({
-            title: "Reconhecimento facial realizado com sucesso!",
-            description: `Supervisor identificado: ${result.employee?.name} (CPF: ${result.cpf})`,
-          });
-        } else {
-          toast({
-            title: "Face não reconhecida",
-            description: result.error || "Não foi possível identificar o supervisor",
-            variant: "destructive",
-          });
-        }
-        
-      } catch (error: any) {
-        console.error('Erro no reconhecimento facial:', error);
-        toast({
-          title: "Erro no reconhecimento facial",
-          description: error.message || "Erro desconhecido",
-          variant: "destructive",
-        });
-      } finally {
-        setIsRecognizing(false);
-      }
-    }
-  };
-
-  const processFacialRecognition = async (imageData: string) => {
-    setLoadingSupervisor(true);
-    
-    try {
-      // SIMULAÇÃO: Em produção, aqui você enviaria a imagem para uma API de reconhecimento facial
-      // que retornaria o ID ou CPF do funcionário identificado
-      
-      // Por enquanto, vamos simular um pequeno delay e mostrar uma mensagem
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast({
-        title: "Reconhecimento facial",
-        description: "Funcionalidade em desenvolvimento. Por favor, use o CPF para identificação.",
-        variant: "destructive",
-      });
-      
-      stopFacialRecognition();
-      
-      /* 
-      // CÓDIGO PARA PRODUÇÃO (quando tiver API de reconhecimento facial):
-      const formData = new FormData();
-      formData.append('image', imageData);
-      
-      const response = await api.post('/api/facial-recognition/identify', formData);
-      
-      if (response.data && response.data.employeeId) {
-        const employee = response.data;
-        setSupervisorName(employee.name);
-        setSupervisorCpf(employee.cpf);
-        setFormData(prev => ({ ...prev, supervisorId: employee.id }));
-        
-        toast({
-          title: "Supervisor identificado",
-          description: `${employee.name}`,
-        });
-        
-        stopFacialRecognition();
-      } else {
-        toast({
-          title: "Supervisor não identificado",
-          description: "Não foi possível identificar o supervisor. Tente novamente.",
-          variant: "destructive",
-        });
-      }
-      */
-    } catch (error) {
-      console.error('Erro no reconhecimento facial:', error);
-      toast({
-        title: "Erro no reconhecimento",
-        description: "Erro ao processar reconhecimento facial",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingSupervisor(false);
-    }
-  };
-
-  const retryCapture = () => {
-    setCapturedFace(null);
-  };
 
   useEffect(() => {
     if (visit) {
@@ -549,142 +390,8 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                   />
                 </div>
               </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={startFacialRecognition}
-                  className="flex items-center gap-2"
-                  disabled={loadingSupervisor}
-                >
-                  <Scan size={16} />
-                  Reconhecimento Facial
-                </Button>
-              </div>
             </CardContent>
           </Card>
-
-          {/* Modal de Reconhecimento Facial */}
-          {showFacialRecognition && (
-            <Dialog open={showFacialRecognition} onOpenChange={stopFacialRecognition}>
-              <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-700">
-                <DialogHeader>
-                  <DialogTitle className="text-seguranca-yellow">
-                    Reconhecimento Facial do Supervisor
-                  </DialogTitle>
-                </DialogHeader>
-                
-                <div className="space-y-4">
-                  {!capturedFace ? (
-                    <>
-                      <div className="relative bg-black rounded-lg overflow-hidden">
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          className="w-full h-auto"
-                          style={{ maxHeight: '400px' }}
-                        />
-                      </div>
-                      
-                      <div className="flex gap-3 justify-center">
-                        <Button
-                          onClick={captureFace}
-                          disabled={isRecognizing}
-                          className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-600"
-                        >
-                          <Camera size={16} className="mr-2" />
-                          {isRecognizing ? 'Reconhecendo...' : 'Capturar e Reconhecer'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={stopFacialRecognition}
-                          disabled={isRecognizing}
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="relative bg-black rounded-lg overflow-hidden">
-                        <img
-                          src={capturedFace}
-                          alt="Foto capturada"
-                          className="w-full h-auto"
-                          style={{ maxHeight: '400px' }}
-                        />
-                      </div>
-                      
-                      {isRecognizing && (
-                        <div className="text-center space-y-2">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-yellow mx-auto"></div>
-                          <p className="text-seguranca-lightgray">
-                            Processando reconhecimento facial...
-                          </p>
-                        </div>
-                      )}
-                      
-                      {recognitionResult && (
-                        <div className="space-y-3">
-                          {recognitionResult.success ? (
-                            <div className="p-4 bg-green-900/20 border border-green-600 rounded-lg">
-                              <div className="flex items-center gap-2 mb-2">
-                                <CheckCircle className="w-5 h-5 text-green-500" />
-                                <span className="text-green-400 font-medium">Reconhecimento bem-sucedido!</span>
-                              </div>
-                              <div className="text-sm text-green-300">
-                                <p><strong>Nome:</strong> {recognitionResult.employee?.name}</p>
-                                <p><strong>CPF:</strong> {recognitionResult.cpf}</p>
-                                <p><strong>Confiança:</strong> {recognitionResult.confidence?.toFixed(1)}%</p>
-                                <p><strong>Qualidade:</strong> {recognitionResult.quality?.toFixed(1)}%</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="p-4 bg-red-900/20 border border-red-600 rounded-lg">
-                              <div className="flex items-center gap-2 mb-2">
-                                <XCircle className="w-5 h-5 text-red-500" />
-                                <span className="text-red-400 font-medium">Face não reconhecida</span>
-                              </div>
-                              <div className="text-sm text-red-300">
-                                <p>{recognitionResult.error}</p>
-                                {recognitionResult.quality && (
-                                  <p><strong>Qualidade da imagem:</strong> {recognitionResult.quality.toFixed(1)}%</p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {!isRecognizing && (
-                        <div className="flex gap-3 justify-center">
-                          <Button
-                            onClick={() => {
-                              setCapturedFace(null);
-                              setRecognitionResult(null);
-                            }}
-                            variant="outline"
-                          >
-                            Tirar Outra Foto
-                          </Button>
-                          <Button
-                            onClick={stopFacialRecognition}
-                          >
-                            Fechar
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                
-                {/* Canvas oculto para processar a imagem */}
-                <canvas ref={canvasRef} style={{ display: 'none' }} />
-              </DialogContent>
-            </Dialog>
-          )}
 
           {/* Cliente e Posto de Trabalho */}
           <Card className="bg-seguranca-black border-gray-700">
