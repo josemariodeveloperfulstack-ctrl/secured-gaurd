@@ -48,11 +48,12 @@ const VehicleReportModal: React.FC<VehicleReportModalProps> = ({
         variant: "default",
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao gerar relatório de veículos:', error);
+      const errorMessage = error?.message || error?.response?.data?.message || 'Ocorreu um erro ao gerar o relatório de veículos. Tente novamente.';
       toast({
         title: "Erro ao gerar relatório",
-        description: "Ocorreu um erro ao gerar o relatório de veículos. Tente novamente.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

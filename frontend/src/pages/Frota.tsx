@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -149,6 +149,15 @@ const Frota: React.FC = () => {
   const [isManutencaoDeleting, setIsManutencaoDeleting] = useState(false);
   const [isVehicleReportModalOpen, setIsVehicleReportModalOpen] = useState(false);
   const [isMultaModalOpen, setIsMultaModalOpen] = useState(false);
+
+  // Debug: Monitorar mudanças nos estados dos modais
+  useEffect(() => {
+    console.log('🔍 Estado isVehicleReportModalOpen:', isVehicleReportModalOpen);
+  }, [isVehicleReportModalOpen]);
+
+  useEffect(() => {
+    console.log('🔍 Estado isVeiculoModalOpen:', isVeiculoModalOpen);
+  }, [isVeiculoModalOpen]);
   const [isMultaViewModalOpen, setIsMultaViewModalOpen] = useState(false);
   const [isMultaDeleteDialogOpen, setIsMultaDeleteDialogOpen] = useState(false);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
@@ -1378,7 +1387,11 @@ const Frota: React.FC = () => {
                   <CardTitle className="text-seguranca-lightgray">Veículos da Frota</CardTitle>
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => setIsVehicleReportModalOpen(true)}
+                      onClick={() => {
+                        console.log('🔍 Botão Relatório clicado');
+                        setIsVehicleReportModalOpen(true);
+                        console.log('🔍 isVehicleReportModalOpen definido como true');
+                      }}
                       variant="outline"
                       className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
                     >
@@ -1386,7 +1399,11 @@ const Frota: React.FC = () => {
                       Relatório
                     </Button>
                     <Button
-                      onClick={() => setIsVeiculoModalOpen(true)}
+                      onClick={() => {
+                        console.log('🔍 Botão Novo Veículo clicado');
+                        setIsVeiculoModalOpen(true);
+                        console.log('🔍 isVeiculoModalOpen definido como true');
+                      }}
                       className="bg-seguranca-red hover:bg-seguranca-darkred"
                     >
                       <Plus size={16} className="mr-2" />
@@ -1824,7 +1841,10 @@ const Frota: React.FC = () => {
         {/* Modais */}
         <VeiculoFormModal
           isOpen={isVeiculoModalOpen}
-          onClose={() => setIsVeiculoModalOpen(false)}
+          onClose={() => {
+            console.log('🔍 Fechando modal de novo veículo');
+            setIsVeiculoModalOpen(false);
+          }}
           onSuccess={handleVeiculoSuccess}
         />
 
@@ -1991,7 +2011,10 @@ const Frota: React.FC = () => {
 
         <VehicleReportModal
           isOpen={isVehicleReportModalOpen}
-          onClose={() => setIsVehicleReportModalOpen(false)}
+          onClose={() => {
+            console.log('🔍 Fechando modal de relatório');
+            setIsVehicleReportModalOpen(false);
+          }}
         />
 
       </div>

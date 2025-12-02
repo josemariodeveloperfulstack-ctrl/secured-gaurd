@@ -7,6 +7,7 @@ import { Edit, Trash2, Eye, Download, Trash2Icon, Edit3 } from 'lucide-react';
 import VeiculoDeleteDialog from './VeiculoDeleteDialog';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import * as XLSX from 'xlsx';
 
 interface Veiculo {
   id: string; // UUID
@@ -174,13 +175,83 @@ const VeiculosTable: React.FC<VeiculosTableProps> = ({ veiculos, searchTerm, mai
   };
 
   const handleExport = () => {
-    // Implementar exportação dos itens selecionados
-    console.log('Exportando itens selecionados:', Array.from(selectedItems));
-    toast({
-      title: "Funcionalidade",
-      description: "Exportação será implementada em breve",
-      variant: "default"
-    });
+    try {
+      // Determinar quais veículos exportar (selecionados ou todos)
+      const veiculosParaExportar = selectedItems.size > 0
+        ? veiculos.filter(v => selectedItems.has(v.id))
+        : filteredVeiculos;
+
+      if (veiculosParaExportar.length === 0) {
+        toast({
+          title: "Nenhum veículo para exportar",
+          description: selectedItems.size > 0 
+            ? "Selecione pelo menos um veículo para exportar" 
+            : "Não há veículos para exportar",
+          variant: "default"
+        });
+        return;
+      }
+
+      // Preparar dados para exportação
+      const dadosExportacao = veiculosParaExportar.map(veiculo => ({
+        'Placa': veiculo.placa,
+        'Marca': veiculo.marca,
+        'Modelo': veiculo.modelo,
+        'Ano': veiculo.ano,
+        'Cor': veiculo.cor || 'N/A',
+        'Combustível': veiculo.combustivel,
+        'Quilometragem': veiculo.quilometragem ? `${veiculo.quilometragem.toLocaleString('pt-BR')} km` : 'N/A',
+        'Status': veiculo.status,
+        'Capacidade': veiculo.capacidade || 'N/A',
+        'Data de Aquisição': veiculo.data_aquisicao ? new Date(veiculo.data_aquisicao).toLocaleDateString('pt-BR') : 'N/A',
+        'Valor de Aquisição': veiculo.valor_aquisicao ? `R$ ${veiculo.valor_aquisicao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'N/A',
+        'Observações': veiculo.observacoes || ''
+      }));
+
+      // Criar workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+
+      // Configurar larguras das colunas
+      const colWidths = [
+        { wch: 12 }, // Placa
+        { wch: 15 }, // Marca
+        { wch: 20 }, // Modelo
+        { wch: 8 },  // Ano
+        { wch: 12 }, // Cor
+        { wch: 12 }, // Combustível
+        { wch: 15 }, // Quilometragem
+        { wch: 12 }, // Status
+        { wch: 10 }, // Capacidade
+        { wch: 18 }, // Data de Aquisição
+        { wch: 18 }, // Valor de Aquisição
+        { wch: 30 }  // Observações
+      ];
+      ws['!cols'] = colWidths;
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Veículos');
+
+      // Gerar nome do arquivo
+      const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `veiculos_${timestamp}.xlsx`;
+
+      // Salvar arquivo
+      XLSX.writeFile(wb, filename);
+
+      toast({
+        title: "Exportação realizada com sucesso!",
+        description: `${veiculosParaExportar.length} veículo(s) exportado(s) para ${filename}`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Erro ao exportar veículos:', error);
+      toast({
+        title: "Erro ao exportar",
+        description: "Ocorreu um erro ao exportar os veículos. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleGenerateReport = () => {

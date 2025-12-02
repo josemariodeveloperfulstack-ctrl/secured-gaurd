@@ -82,7 +82,8 @@ export class ReportGenerator {
     // Tabela de dados
     const tableStartY = data.subtitle ? 60 : 50;
     
-    doc.autoTable({
+    // Usar autoTable diretamente do import
+    (doc as any).autoTable({
       startY: tableStartY,
       head: [data.headers],
       body: data.rows,

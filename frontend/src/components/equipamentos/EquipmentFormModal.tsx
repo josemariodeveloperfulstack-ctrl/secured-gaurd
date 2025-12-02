@@ -66,21 +66,17 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   const loadWorkPosts = async () => {
     setLoadingWorkPosts(true);
     try {
-      // Por enquanto, usar dados estáticos diretamente
-      console.log('Carregando postos de trabalho...');
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simular carregamento
-      
-      const staticPosts = [
-        { id: '1', postCode: 'P001', name: 'Portaria Principal', address: 'Entrada Principal', type: 'POSTO_24H', status: 'ATIVO', clientId: '1', requiredVigilantes: 2, workSchedule: '24h', shiftStart: '00:00', shiftEnd: '23:59' },
-        { id: '2', postCode: 'P002', name: 'Ronda Perimetral', address: 'Área Externa', type: 'POSTO_12H_DIURNO', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '12h', shiftStart: '06:00', shiftEnd: '18:00' },
-        { id: '3', postCode: 'P003', name: 'Central de Monitoramento', address: 'Sala de Controle', type: 'POSTO_24H', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '24h', shiftStart: '00:00', shiftEnd: '23:59' },
-        { id: '4', postCode: 'P004', name: 'Acesso Veicular', address: 'Garagem', type: 'POSTO_8H', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '8h', shiftStart: '08:00', shiftEnd: '16:00' }
-      ] as WorkPost[];
-      
-      setWorkPosts(staticPosts);
-      console.log('Postos carregados:', staticPosts);
+      console.log('Carregando postos de trabalho do banco de dados...');
+      const posts = await workPostService.getAllWorkPosts();
+      setWorkPosts(posts);
+      console.log('Postos carregados do banco:', posts.length, posts);
     } catch (error) {
       console.error('Erro ao carregar postos de trabalho:', error);
+      toast({
+        title: "Erro ao carregar postos",
+        description: "Não foi possível carregar os postos de trabalho. Tente novamente.",
+        variant: "destructive",
+      });
       setWorkPosts([]);
     } finally {
       setLoadingWorkPosts(false);
@@ -419,7 +415,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 ) : (
                   workPosts.map((post) => (
                     <SelectItem key={post.id} value={post.id}>
-                      {post.postCode} - {post.name}
+                      {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
+                      {post.address ? ` (${post.address})` : ''}
                     </SelectItem>
                   ))
                 )}
@@ -443,6 +440,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de destino"} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">Nenhum (opcional)</SelectItem>
                 {workPosts.length === 0 ? (
                   <SelectItem value="loading" disabled>
                     {loadingWorkPosts ? "Carregando..." : "Nenhum posto encontrado"}
@@ -450,7 +448,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 ) : (
                   workPosts.map((post) => (
                     <SelectItem key={post.id} value={post.id}>
-                      {post.postCode} - {post.name}
+                      {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
+                      {post.address ? ` (${post.address})` : ''}
                     </SelectItem>
                   ))
                 )}

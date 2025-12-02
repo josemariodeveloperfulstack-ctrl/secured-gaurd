@@ -59,6 +59,7 @@ const RelatoriosTab: React.FC = () => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<'PDF' | 'EXCEL' | 'CSV'>('PDF');
+  const [showReportView, setShowReportView] = useState(false);
   
   // Sistema de navegação por histórico
   const [viewHistory, setViewHistory] = useState<ViewState[]>([
@@ -125,6 +126,7 @@ const RelatoriosTab: React.FC = () => {
     setReportData(null);
     setSelectedReport(null);
     setEmpresaFiltrada(null);
+    setShowReportView(false);
     setViewHistory([{ view: 'list', timestamp: Date.now() }]);
     setCurrentViewIndex(0);
   };
@@ -145,7 +147,7 @@ const RelatoriosTab: React.FC = () => {
 
   // Verificar se pode voltar
   const canGoBack = currentViewIndex > 0;
-  const isInListView = !reportData && !empresaFiltrada;
+  const isInListView = !showReportView && !empresaFiltrada;
 
   // Configurações de relatórios
   const relatorios: RelatorioConfig[] = [
@@ -402,18 +404,32 @@ const RelatoriosTab: React.FC = () => {
   const handleVisualizarRelatorio = async (tipo: ReportType) => {
     try {
       setLoading(true);
-      const data = await carregarDadosRelatorio(tipo);
-      pushToHistory('report', data, filters);
+      setSelectedReport(tipo);
+      setShowReportView(true);
       
-      toast({
-        title: "Sucesso",
-        description: "Relatório carregado com sucesso!",
-      });
+      try {
+        const data = await carregarDadosRelatorio(tipo);
+        pushToHistory('report', data, filters);
+        
+        toast({
+          title: "Sucesso",
+          description: "Relatório carregado com sucesso!",
+        });
+      } catch (error) {
+        // Mesmo com erro, mostra a visualização com mensagem de "sem dados"
+        console.error('Erro ao carregar relatório:', error);
+        setReportData(null);
+        toast({
+          title: "Aviso",
+          description: "Não foi possível carregar os dados do relatório. Exibindo visualização vazia.",
+          variant: "default",
+        });
+      }
     } catch (error) {
       console.error('Erro ao visualizar relatório:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar relatório para visualização",
+        description: "Erro ao abrir visualização do relatório",
         variant: "destructive",
       });
     } finally {
@@ -599,9 +615,12 @@ const RelatoriosTab: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             {/* Botão de limpar filtros/voltar quando há filtro ativo */}
-            {(empresaFiltrada || reportData) && (
+            {(empresaFiltrada || showReportView) && (
               <Button
-                onClick={resetView}
+                onClick={() => {
+                  resetView();
+                  setShowReportView(false);
+                }}
                 variant="outline"
                 className="border-gray-600 text-white hover:bg-seguranca-black"
               >
@@ -796,43 +815,59 @@ const RelatoriosTab: React.FC = () => {
       </div>
 
         {/* Visualização do Relatório */}
-        {reportData && (
+        {showReportView && (
           <Card className="mt-8 bg-seguranca-graphite border-gray-600">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-white flex items-center gap-2">
                     <Eye className="text-blue-500" />
-                    {reportData.title}
+                    {reportData ? reportData.title : (selectedReport ? REPORT_CONFIGS[selectedReport]?.title || 'Visualização de Relatório' : 'Visualização de Relatório')}
                   </CardTitle>
-                  {reportData.subtitle && (
+                  {reportData?.subtitle && (
                     <p className="text-gray-400 text-sm mt-1">{reportData.subtitle}</p>
                   )}
-                  {reportData.period && (
+                  {reportData?.period && (
                     <p className="text-gray-400 text-sm">Período: {reportData.period}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
+                  {reportData && (
+                    <>
+                      <Button
+                        onClick={handleExportarPDF}
+                        className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
+                      >
+                        <FileImage size={16} className="mr-2" />
+                        PDF
+                      </Button>
+                      <Button
+                        onClick={handleExportarExcel}
+                        className="bg-green-600 hover:bg-green-700 text-white border border-green-700"
+                      >
+                        <FileSpreadsheet size={16} className="mr-2" />
+                        Excel
+                      </Button>
+                      <Button
+                        onClick={handleExportarCSV}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        <Download size={16} className="mr-2" />
+                        CSV
+                      </Button>
+                    </>
+                  )}
                   <Button
-                    onClick={handleExportarPDF}
-                    className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
+                    onClick={() => {
+                      setShowReportView(false);
+                      setReportData(null);
+                      setSelectedReport(null);
+                    }}
+                    variant="outline"
+                    className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
                   >
-                    <FileImage size={16} className="mr-2" />
-                    PDF
-                  </Button>
-                  <Button
-                    onClick={handleExportarExcel}
-                    className="bg-green-600 hover:bg-green-700 text-white border border-green-700"
-                  >
-                    <FileSpreadsheet size={16} className="mr-2" />
-                    Excel
-                  </Button>
-                  <Button
-                    onClick={handleExportarCSV}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    <Download size={16} className="mr-2" />
-                    CSV
+                    <X size={16} className="mr-2" />
+                    Fechar
                   </Button>
                 </div>
               </div>
@@ -857,26 +892,66 @@ const RelatoriosTab: React.FC = () => {
                 </div>
               )}
 
-              {/* Tabela de Dados */}
-              <div className="overflow-x-auto rounded-lg border border-gray-600">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-seguranca-black">
-                      {reportData.headers.map((header, index) => (
-                        <th key={index} className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.rows
-                      .filter(row => !empresaFiltrada || row[0]?.toString() === empresaFiltrada)
-                      .map((row, rowIndex) => (
-                      <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-seguranca-graphite' : 'bg-seguranca-black'}>
-                        {row.map((cell, cellIndex) => (
-                          <td key={cellIndex} className="px-4 py-3 text-gray-300 border-b border-gray-700">
-                            {/* Se for a coluna de Empresa (primeira coluna), adicionar badge e botão de filtrar */}
+              {/* Mensagem quando não há dados */}
+              {!reportData || !reportData.rows || reportData.rows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4">
+                  <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6 max-w-md w-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <AlertTriangle className="h-8 w-8 text-yellow-500" />
+                      <h3 className="text-white font-semibold text-lg">Nenhum relatório disponível</h3>
+                    </div>
+                    <p className="text-gray-400 mb-4">
+                      Não há dados para exibir no relatório selecionado. Por favor, gere um relatório primeiro usando o botão "Gerar Relatório".
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          if (selectedReport) {
+                            setShowReportView(false);
+                            setShowConfigModal(true);
+                          }
+                        }}
+                        className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+                      >
+                        <FileText size={16} className="mr-2" />
+                        Gerar Relatório
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowReportView(false);
+                          setReportData(null);
+                          setSelectedReport(null);
+                        }}
+                        variant="outline"
+                        className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
+                      >
+                        Fechar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Tabela de Dados */}
+                  <div className="overflow-x-auto rounded-lg border border-gray-600">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-seguranca-black">
+                          {reportData.headers.map((header, index) => (
+                            <th key={index} className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.rows
+                          .filter(row => !empresaFiltrada || row[0]?.toString() === empresaFiltrada)
+                          .map((row, rowIndex) => (
+                          <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-seguranca-graphite' : 'bg-seguranca-black'}>
+                            {row.map((cell, cellIndex) => (
+                              <td key={cellIndex} className="px-4 py-3 text-gray-300 border-b border-gray-700">
+                                {/* Se for a coluna de Empresa (primeira coluna), adicionar badge e botão de filtrar */}
                             {cellIndex === 0 && typeof cell === 'string' && cell.match(/^[A-Z]{2,4}$/i) ? (
                               <div className="flex items-center gap-2">
                                 <Badge 
@@ -944,6 +1019,8 @@ const RelatoriosTab: React.FC = () => {
                     ))}
                   </div>
                 </div>
+              )}
+                </>
               )}
             </CardContent>
           </Card>

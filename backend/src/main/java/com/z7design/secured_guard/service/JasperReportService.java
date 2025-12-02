@@ -94,7 +94,14 @@ public class JasperReportService {
             
             // Carregar template JRXML
             ClassPathResource resource = new ClassPathResource("reports/vehicle-report.jrxml");
+            if (!resource.exists()) {
+                log.error("Template JRXML não encontrado: reports/vehicle-report.jrxml");
+                throw new IOException("Template de relatório não encontrado: reports/vehicle-report.jrxml");
+            }
+            log.debug("Template JRXML encontrado: {}", resource.getPath());
+            
             InputStream templateStream = resource.getInputStream();
+            log.debug("Stream do template aberto com sucesso");
             
             // Compilar template
             JasperReport jasperReport = JasperCompileManager.compileReport(templateStream);
