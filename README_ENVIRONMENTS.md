@@ -350,3 +350,4 @@ docker exec secured-guard-local-redis redis-cli FLUSHALL
 **Versão:** 1.0.0
 
 
+

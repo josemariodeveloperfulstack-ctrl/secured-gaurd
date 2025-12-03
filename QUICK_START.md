@@ -138,3 +138,4 @@ docker restart secured-guard-local-whatsapp
 **Desenvolvido com ❤️ pela equipe Secured Guard**
 
 
+

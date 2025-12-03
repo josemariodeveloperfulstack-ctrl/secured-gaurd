@@ -207,3 +207,4 @@ cd ~/secured-guard && ./scripts/start-local.sh
 **Última atualização:** 03/12/2025
 
 
+

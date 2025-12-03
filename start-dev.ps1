@@ -111,3 +111,4 @@ Write-Host "📚 Documentação completa: DOCKER_COMPOSE_GUIDE.md" -ForegroundCo
 Write-Host ""
 
 
+

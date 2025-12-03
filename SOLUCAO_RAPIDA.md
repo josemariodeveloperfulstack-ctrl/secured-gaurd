@@ -129,3 +129,4 @@ wsl bash -c "cd ~/secured-guard && docker-compose -f docker-compose.local.yml do
 **Esta é a abordagem MAIS RÁPIDA e EFICIENTE para desenvolvimento!** 🚀
 
 
+
