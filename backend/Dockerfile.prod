@@ -1,90 +1,72 @@
-# ========================================
-# DOCKERFILE PARA BACKEND (PRODUÇÃO)
-# ========================================
+# ============================================
+# SECURED GUARD BACKEND - PRODUÇÃO
+# Multi-stage build otimizado
+# ============================================
 
-# Multi-stage build para otimizar tamanho da imagem
-FROM amazoncorretto:17-alpine AS builder
+# ============================================
+# STAGE 1: Build
+# ============================================
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 
-# Instalar Maven e curl
-RUN apk add --no-cache maven curl
+WORKDIR /build
 
-# Definir diretório de trabalho
-WORKDIR /app
-
-# Copiar arquivos de configuração do Maven
+# Copiar pom.xml e baixar dependências (cache layer)
 COPY pom.xml .
-COPY mvnw .
-COPY .mvn .mvn
-
-# Criar settings.xml do Maven com retry e timeout aumentados
-RUN mkdir -p /root/.m2 && \
-    echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \
-    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> /root/.m2/settings.xml && \
-    echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> /root/.m2/settings.xml && \
-    echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">' >> /root/.m2/settings.xml && \
-    echo '  <servers/>' >> /root/.m2/settings.xml && \
-    echo '  <mirrors/>' >> /root/.m2/settings.xml && \
-    echo '  <profiles/>' >> /root/.m2/settings.xml && \
-    echo '  <activeProfiles/>' >> /root/.m2/settings.xml && \
-    echo '</settings>' >> /root/.m2/settings.xml
-
-# Baixar dependências (cache layer) com retry e timeout aumentado
-# Tentar até 3 vezes com delay entre tentativas
-RUN for i in 1 2 3; do \
-      echo "Tentativa $i de download de dependências..." && \
-      mvn dependency:go-offline -B \
-        -Dmaven.wagon.http.retryHandler.count=10 \
-        -Dmaven.wagon.httpconnectionManager.ttlSeconds=300 \
-        -Dmaven.wagon.http.readTimeout=600000 \
-        -Dmaven.wagon.http.connectionTimeout=60000 && \
-      break || \
-      (echo "Tentativa $i falhou. Aguardando 30 segundos antes de tentar novamente..." && \
-       sleep 30); \
-    done
+RUN mvn dependency:go-offline -B
 
 # Copiar código fonte
 COPY src ./src
 
-# Compilar aplicação (pulando completamente compilação/execução de testes)
-RUN mvn clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci
+# Build do projeto (skip tests em produção)
+RUN mvn clean package -DskipTests -B && \
+    mv target/*.jar app.jar
 
-# ========================================
-# IMAGEM FINAL (RUNTIME)
-# ========================================
-FROM amazoncorretto:17-alpine
+# ============================================
+# STAGE 2: Runtime
+# ============================================
+FROM eclipse-temurin:17-jre-alpine AS production
 
-# Instalar curl para health checks
-RUN apk add --no-cache curl
+# Metadados
+LABEL maintainer="Secured Guard Team"
+LABEL environment="production"
+LABEL version="1.0.0"
 
-# Criar usuário não-root para segurança
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+# Instalar apenas o necessário
+RUN apk add --no-cache curl bash tzdata && \
+    cp /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && \
+    echo "America/Sao_Paulo" > /etc/timezone
 
-# Definir diretório de trabalho
+# Criar usuário não-root
+RUN addgroup -S spring && adduser -S spring -G spring
+
 WORKDIR /app
 
-# Copiar JAR compilado
-COPY --from=builder /app/target/*.jar app.jar
+# Copiar JAR do builder
+COPY --from=builder /build/app.jar app.jar
 
-# Criar diretórios necessários
-RUN mkdir -p /app/logs /app/uploads && \
-    chown -R appuser:appgroup /app
+# Criar diretórios e definir permissões
+RUN mkdir -p /app/holerites && \
+    mkdir -p /app/uploads && \
+    mkdir -p /app/logs && \
+    chown -R spring:spring /app
 
 # Mudar para usuário não-root
-USER appuser
+USER spring
 
 # Expor porta
-EXPOSE 8081
+EXPOSE 8083
 
-# Health check usando nossa API customizada
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8081/api/health || exit 1
+    CMD curl -f http://localhost:8083/api/health || exit 1
 
-# Comando para iniciar a aplicação
-ENTRYPOINT ["java", \
-  "-Xms512m", \
-  "-Xmx1024m", \
-  "-Dspring.profiles.active=ci", \
-  "-Dserver.port=8081", \
-  "-Djava.security.egd=file:/dev/./urandom", \
-  "-jar", "app.jar"]
+# JVM otimizada para container
+ENV JAVA_OPTS="-XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=75.0 \
+    -XX:InitialRAMPercentage=50.0 \
+    -XX:+UseG1GC \
+    -XX:+UseStringDeduplication \
+    -Djava.security.egd=file:/dev/./urandom"
+
+# Executar aplicação
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

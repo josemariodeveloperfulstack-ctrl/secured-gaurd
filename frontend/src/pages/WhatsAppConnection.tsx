@@ -72,6 +72,40 @@ const WhatsAppConnection: React.FC = () => {
     }
   };
 
+  // Limpar sessão (forçar logout)
+  const clearSession = async () => {
+    try {
+      setLoading(true);
+      
+      toast({
+        title: "🔄 Limpando sessão",
+        description: "Removendo sessão anterior...",
+      });
+
+      await api.post('/whatsapp/logout');
+      
+      toast({
+        title: "✅ Sessão limpa",
+        description: "Aguarde alguns segundos e gere um novo QR Code",
+      });
+      
+      setQrCode('');
+      setConnectionStatus({
+        connected: false,
+        instance: instanceName
+      });
+    } catch (error: any) {
+      console.error('Erro ao limpar sessão:', error);
+      toast({
+        title: "⚠️ Aviso",
+        description: "Erro ao limpar sessão, mas você pode tentar gerar um novo QR Code",
+        variant: "default",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Gerar QR Code para conexão
   const generateQRCode = async () => {
     try {
@@ -83,7 +117,7 @@ const WhatsAppConnection: React.FC = () => {
         description: "Aguarde...",
       });
 
-      // Criar/conectar instância
+      // Criar/conectar instância usando o endpoint do backend
       const createResponse = await api.post('/whatsapp/connection/create', {
         instanceName: instanceName,
         qrcode: true
@@ -91,7 +125,7 @@ const WhatsAppConnection: React.FC = () => {
 
       console.log('📥 Resposta recebida:', createResponse.data);
 
-      if (createResponse.data.qrcode && createResponse.data.qrcode.base64) {
+      if (createResponse.data.success && createResponse.data.qrcode && createResponse.data.qrcode.base64) {
         const qrData = createResponse.data.qrcode.base64;
         console.log('📸 QR Code recebido. Tamanho:', qrData.length);
         
@@ -104,11 +138,19 @@ const WhatsAppConnection: React.FC = () => {
 
         // Iniciar verificação periódica de conexão
         startConnectionPolling();
+      } else if (!createResponse.data.success) {
+        // Backend retornou erro mas com status 200
+        console.error('❌ Erro do backend:', createResponse.data.error);
+        toast({
+          title: "⚠️ Erro ao gerar QR Code",
+          description: createResponse.data.error || "Serviço WhatsApp indisponível. Verifique se o container está rodando.",
+          variant: "destructive",
+        });
       } else {
         console.error('❌ Resposta sem QR Code:', createResponse.data);
         toast({
-          title: "⚠️ Serviço WhatsApp Indisponível",
-          description: "O serviço Baileys REST não está rodando. Verifique se o container Docker está ativo em http://localhost:3333",
+          title: "⚠️ QR Code não disponível",
+          description: "O serviço está conectando ao WhatsApp. Aguarde alguns segundos e tente novamente.",
           variant: "destructive",
         });
       }
@@ -119,9 +161,11 @@ const WhatsAppConnection: React.FC = () => {
       let errorMessage = "Erro ao gerar QR Code";
       
       if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-        errorMessage = "Serviço WhatsApp não está acessível. Verifique se o Baileys REST está rodando em http://localhost:3333";
+        errorMessage = "Serviço WhatsApp não está acessível. Verifique se o backend e o container WhatsApp estão rodando.";
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
       }
       
       toast({
@@ -395,20 +439,36 @@ const WhatsAppConnection: React.FC = () => {
                       />
                     </div>
 
-                    {/* Botão Gerar QR Code */}
-                    <Button
-                      onClick={generateQRCode}
-                      disabled={loading || !instanceName.trim()}
-                      className="w-full bg-seguranca-red hover:bg-seguranca-darkred"
-                      size="lg"
-                    >
-                      {loading ? (
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      ) : (
-                        <QrCode className="h-5 w-5 mr-2" />
-                      )}
-                      Gerar QR Code
-                    </Button>
+                    {/* Botões de ação */}
+                    <div className="space-y-2">
+                      <Button
+                        onClick={generateQRCode}
+                        disabled={loading || !instanceName.trim()}
+                        className="w-full bg-seguranca-red hover:bg-seguranca-darkred"
+                        size="lg"
+                      >
+                        {loading ? (
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        ) : (
+                          <QrCode className="h-5 w-5 mr-2" />
+                        )}
+                        Gerar QR Code
+                      </Button>
+                      
+                      <Button
+                        onClick={clearSession}
+                        disabled={loading}
+                        variant="outline"
+                        className="w-full border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Limpar Sessão e Reconectar
+                      </Button>
+                      
+                      <p className="text-xs text-gray-400 text-center">
+                        Se o QR Code não aparecer, clique em "Limpar Sessão" primeiro
+                      </p>
+                    </div>
 
                     {/* Exibir QR Code */}
                     {qrCode && (

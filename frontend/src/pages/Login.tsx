@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertTriangle, User, Shield, Camera, CreditCard } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, User, Shield } from 'lucide-react';
 import SEO from '@/components/SEO';
 import Logo from '../components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,9 +31,6 @@ const Login = () => {
   const [supervisorCpf, setSupervisorCpf] = useState('');
   const [supervisorLoading, setSupervisorLoading] = useState(false);
   const [supervisorError, setSupervisorError] = useState('');
-  const [supervisorAuthMethod, setSupervisorAuthMethod] = useState<'cpf' | 'facial'>('cpf');
-  const [showCamera, setShowCamera] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<File | null>(null);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [supervisorData, setSupervisorData] = useState<any>(null);
 
@@ -145,42 +142,6 @@ const Login = () => {
     }
   };
 
-  const handleSupervisorFacialLogin = async (imageFile: File) => {
-    setSupervisorError('');
-    setSupervisorLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-
-      const response = await fetch('/api/supervisor-auth/login-facial', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSupervisorData(data.supervisor);
-        
-        if (data.needsConsent) {
-          setNeedsConsent(true);
-        } else {
-          // Login direto - salvar token e redirecionar
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('userType', 'SUPERVISOR');
-          navigate('/dashboard');
-        }
-      } else {
-        setSupervisorError(data.error || 'Face não reconhecida');
-      }
-    } catch (error) {
-      console.error('Erro no reconhecimento facial:', error);
-      setSupervisorError('Erro de conexão. Tente novamente.');
-    } finally {
-      setSupervisorLoading(false);
-    }
-  };
 
   const handleAcceptTerms = async () => {
     if (!supervisorData) return;
@@ -407,96 +368,48 @@ const Login = () => {
                 </div>
               )}
 
-              {/* Seleção do método de autenticação */}
-              <div className="flex gap-2 mb-4">
-                <Button
-                  type="button"
-                  variant={supervisorAuthMethod === 'cpf' ? 'default' : 'outline'}
-                  onClick={() => setSupervisorAuthMethod('cpf')}
-                  className={`flex-1 flex items-center gap-2 justify-center ${supervisorAuthMethod === 'cpf' ? 'bg-seguranca-yellow text-seguranca-black border-none' : 'border border-gray-700 text-seguranca-lightgray hover:bg-seguranca-yellow/10'}`}
-                >
-                  <CreditCard size={16} />
-                  CPF
-                </Button>
-                <Button
-                  type="button"
-                  variant={supervisorAuthMethod === 'facial' ? 'default' : 'outline'}
-                  onClick={() => setSupervisorAuthMethod('facial')}
-                  className={`flex-1 flex items-center gap-2 justify-center ${supervisorAuthMethod === 'facial' ? 'bg-seguranca-yellow text-seguranca-black border-none' : 'border border-gray-700 text-seguranca-lightgray hover:bg-seguranca-yellow/10'}`}
-                >
-                  <Camera size={16} />
-                  Reconhecimento Facial
-                </Button>
-              </div>
-
-              {/* Login por CPF */}
-              {supervisorAuthMethod === 'cpf' && (
-                <form onSubmit={handleSupervisorCpfLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="supervisorCpf" className="block text-sm font-medium">
-                      CPF do Supervisor
-                    </Label>
-                    <Input
-                      id="supervisorCpf"
-                      type="text"
-                      value={supervisorCpf}
-                      onChange={(e) => setSupervisorCpf(formatCpf(e.target.value))}
-                      className="bg-seguranca-black border-gray-600 focus:border-seguranca-yellow text-white"
-                      placeholder="000.000.000-00"
-                      maxLength={14}
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={supervisorLoading}
-                    className="w-full flex justify-center items-center bg-seguranca-red hover:bg-seguranca-red/90 text-white font-semibold py-3 rounded-lg transition-all"
-                  >
-                    {supervisorLoading ? (
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : 'Entrar como Supervisor'}
-                  </Button>
-                </form>
-              )}
-
-              {/* Login por Reconhecimento Facial */}
-              {supervisorAuthMethod === 'facial' && (
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <Camera size={48} className="mx-auto text-gray-400 mb-4" />
-                    <p className="text-sm text-gray-400 mb-4">
-                      Posicione seu rosto na câmera para autenticação
-                    </p>
-                  </div>
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="user"
+              {/* Login por CPF ou Matrícula */}
+              <form onSubmit={handleSupervisorCpfLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supervisorCpf" className="block text-sm font-medium">
+                    CPF ou Matrícula do Supervisor
+                  </Label>
+                  <Input
+                    id="supervisorCpf"
+                    type="text"
+                    value={supervisorCpf}
                     onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleSupervisorFacialLogin(file);
+                      const value = e.target.value;
+                      // Se contém apenas números e tem potencial de ser CPF, formatar
+                      if (/^\d/.test(value) && value.replace(/\D/g, '').length <= 11) {
+                        setSupervisorCpf(formatCpf(value));
+                      } else {
+                        // Caso contrário, permitir texto livre para matrícula
+                        setSupervisorCpf(value);
                       }
                     }}
-                    className="hidden"
-                    id="facial-input"
+                    className="bg-seguranca-black border-gray-600 focus:border-seguranca-yellow text-white"
+                    placeholder="000.000.000-00 ou matrícula"
+                    maxLength={20}
                   />
-
-                  <Button
-                    type="button"
-                    onClick={() => document.getElementById('facial-input')?.click()}
-                    disabled={supervisorLoading}
-                    className="w-full flex justify-center items-center bg-seguranca-red hover:bg-seguranca-red/90 text-white font-semibold py-3 rounded-lg transition-all"
-                  >
-                    <Camera size={16} className="mr-2" />
-                    {supervisorLoading ? 'Reconhecendo...' : 'Capturar Face'}
-                  </Button>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Informe seu CPF ou número de matrícula
+                  </p>
                 </div>
-              )}
+
+                <Button
+                  type="submit"
+                  disabled={supervisorLoading}
+                  className="w-full flex justify-center items-center bg-seguranca-red hover:bg-seguranca-red/90 text-white font-semibold py-3 rounded-lg transition-all"
+                >
+                  {supervisorLoading ? (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : 'Entrar como Supervisor'}
+                </Button>
+              </form>
             </TabsContent>
           </Tabs>
         </div>

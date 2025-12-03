@@ -74,6 +74,41 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # ========================================
+  # WHATSAPP SERVICE (BAILEYS)
+  # ========================================
+  whatsapp-service:
+    build:
+      context: ./whatsapp-service
+      dockerfile: Dockerfile
+    image: secured-guard-whatsapp:latest
+    container_name: whatsapp-service-dev
+    environment:
+      PORT: 3333
+      INSTANCE_KEY: securedguard
+      SESSION_DIR: /app/sessions
+      NODE_ENV: production
+    volumes:
+      - whatsapp_sessions_dev:/app/sessions
+      - ./backend/holerites:/app/holerites
+    ports:
+      - "3333:3333"
+    networks:
+      - secured-guard-dev
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "raw.githubusercontent.com:185.199.108.133"
+      - "github.com:140.82.121.4"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
 # ========================================
 # VOLUMES
 # ========================================
@@ -83,6 +118,8 @@ volumes:
   redis_data_dev:
     driver: local
   minio_data_dev:
+    driver: local
+  whatsapp_sessions_dev:
     driver: local
 
 # ========================================
