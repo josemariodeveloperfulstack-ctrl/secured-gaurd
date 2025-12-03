@@ -176,8 +176,11 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      // Remover campos auxiliares que o backend não precisa
+      const { requesterEmployeeId, requesterWorkPostId, replacingEmployeeId, replacingWorkPostId, ...restFormData } = formData;
+      
       const submitData = {
-        ...formData,
+        ...restFormData,
         dateOfRequest: formatDateForBackend(formData.dateOfRequest),
         requesterDayOffDate: formData.requesterDayOffDate ? formatDateForBackend(formData.requesterDayOffDate) : null,
         requesterShiftDate: formData.requesterShiftDate ? formatDateForBackend(formData.requesterShiftDate) : null,
