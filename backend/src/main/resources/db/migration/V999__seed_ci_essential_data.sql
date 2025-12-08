@@ -11,20 +11,33 @@
 -- =====================================================
 -- 1. USUÁRIO ADMINISTRADOR CI
 -- =====================================================
-INSERT INTO users (id, username, password, email, name, role, status, active, created_at, updated_at)
+INSERT INTO users (id, username, password, email, name, status, active, created_at, updated_at)
 VALUES (
     '11111111-1111-1111-1111-111111111111',
     'admin@ci',
     '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa',
     'admin@ci.z7botsolutions.com.br',
     'Administrador CI',
-    'ADMIN',
     'ACTIVE',
     true,
     NOW(),
     NOW()
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- Atribuir role ADMIN ao usuário admin@ci
+INSERT INTO user_roles (user_id, role_id, created_at)
+SELECT 
+    '11111111-1111-1111-1111-111111111111',
+    r.id,
+    NOW()
+FROM roles r
+WHERE r.name = 'ADMIN'
+  AND NOT EXISTS (
+      SELECT 1 FROM user_roles ur 
+      WHERE ur.user_id = '11111111-1111-1111-1111-111111111111' 
+        AND ur.role_id = r.id
+  );
 
 -- =====================================================
 -- 2. UNIDADE MATRIZ CI
