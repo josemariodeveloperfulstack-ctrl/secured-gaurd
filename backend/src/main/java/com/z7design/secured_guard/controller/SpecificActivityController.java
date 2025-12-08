@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.CreateSpecificActivityRequest;
+import com.z7design.secured_guard.dto.SpecificActivityResponse;
 import com.z7design.secured_guard.model.SpecificActivity;
 import com.z7design.secured_guard.service.SpecificActivityService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,117 +21,117 @@ public class SpecificActivityController {
     private SpecificActivityService specificActivityService;
 
     @GetMapping
-    public ResponseEntity<List<SpecificActivity>> getAllSpecificActivities() {
-        List<SpecificActivity> activities = specificActivityService.getAllSpecificActivities();
+    public ResponseEntity<List<SpecificActivityResponse>> getAllSpecificActivities() {
+        List<SpecificActivityResponse> activities = specificActivityService.getAllSpecificActivities();
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SpecificActivity> getSpecificActivityById(@PathVariable UUID id) {
+    public ResponseEntity<SpecificActivityResponse> getSpecificActivityById(@PathVariable UUID id) {
         return specificActivityService.getSpecificActivityById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByEmployee(@PathVariable UUID employeeId) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByEmployee(employeeId);
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByEmployee(@PathVariable UUID employeeId) {
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByEmployee(employeeId);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/location/{locationId}")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByLocation(@PathVariable UUID locationId) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByLocation(locationId);
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByLocation(@PathVariable UUID locationId) {
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByLocation(locationId);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/date/{date}")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByDate(@PathVariable LocalDate date) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByDate(date);
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByDate(@PathVariable LocalDate date) {
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByDate(date);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByStatus(@PathVariable SpecificActivity.ActivityStatus status) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByStatus(status);
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByStatus(@PathVariable SpecificActivity.ActivityStatus status) {
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByStatus(status);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/type/{type}")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByType(@PathVariable SpecificActivity.ActivityType type) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByType(type);
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByType(@PathVariable SpecificActivity.ActivityType type) {
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByType(type);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/date-range")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByDateRange(
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByDateRange(
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByDateRange(startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByDateRange(startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/employee/{employeeId}/date-range")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByEmployeeAndDateRange(
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByEmployeeAndDateRange(
             @PathVariable UUID employeeId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByEmployeeAndDateRange(employeeId, startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByEmployeeAndDateRange(employeeId, startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/location/{locationId}/date-range")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByLocationAndDateRange(
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByLocationAndDateRange(
             @PathVariable UUID locationId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByLocationAndDateRange(locationId, startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByLocationAndDateRange(locationId, startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/type/{type}/date-range")
-    public ResponseEntity<List<SpecificActivity>> getSpecificActivitiesByTypeAndDateRange(
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByTypeAndDateRange(
             @PathVariable SpecificActivity.ActivityType type,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivity> activities = specificActivityService.getSpecificActivitiesByTypeAndDateRange(type, startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByTypeAndDateRange(type, startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/today")
-    public ResponseEntity<List<SpecificActivity>> getTodayActivities() {
-        List<SpecificActivity> activities = specificActivityService.getTodayActivities();
+    public ResponseEntity<List<SpecificActivityResponse>> getTodayActivities() {
+        List<SpecificActivityResponse> activities = specificActivityService.getTodayActivities();
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<List<SpecificActivity>> getPendingActivities() {
-        List<SpecificActivity> activities = specificActivityService.getPendingActivities();
+    public ResponseEntity<List<SpecificActivityResponse>> getPendingActivities() {
+        List<SpecificActivityResponse> activities = specificActivityService.getPendingActivities();
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/pending/date/{date}")
-    public ResponseEntity<List<SpecificActivity>> getPendingActivitiesByDate(@PathVariable LocalDate date) {
-        List<SpecificActivity> activities = specificActivityService.getPendingActivitiesByDate(date);
+    public ResponseEntity<List<SpecificActivityResponse>> getPendingActivitiesByDate(@PathVariable LocalDate date) {
+        List<SpecificActivityResponse> activities = specificActivityService.getPendingActivitiesByDate(date);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/overdue")
-    public ResponseEntity<List<SpecificActivity>> getOverdueActivities() {
-        List<SpecificActivity> activities = specificActivityService.getOverdueActivities();
+    public ResponseEntity<List<SpecificActivityResponse>> getOverdueActivities() {
+        List<SpecificActivityResponse> activities = specificActivityService.getOverdueActivities();
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/in-progress")
-    public ResponseEntity<List<SpecificActivity>> getInProgressActivities() {
-        List<SpecificActivity> activities = specificActivityService.getInProgressActivities();
+    public ResponseEntity<List<SpecificActivityResponse>> getInProgressActivities() {
+        List<SpecificActivityResponse> activities = specificActivityService.getInProgressActivities();
         return ResponseEntity.ok(activities);
     }
 
     @PostMapping
-    public ResponseEntity<SpecificActivity> createSpecificActivity(@RequestBody SpecificActivity activity) {
+    public ResponseEntity<SpecificActivityResponse> createSpecificActivity(@RequestBody CreateSpecificActivityRequest request) {
         try {
-            SpecificActivity createdActivity = specificActivityService.createSpecificActivity(activity);
+            SpecificActivityResponse createdActivity = specificActivityService.createSpecificActivity(request);
             return ResponseEntity.ok(createdActivity);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -137,9 +139,9 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SpecificActivity> updateSpecificActivity(@PathVariable UUID id, @RequestBody SpecificActivity activity) {
+    public ResponseEntity<SpecificActivityResponse> updateSpecificActivity(@PathVariable UUID id, @RequestBody CreateSpecificActivityRequest request) {
         try {
-            SpecificActivity updatedActivity = specificActivityService.updateSpecificActivity(id, activity);
+            SpecificActivityResponse updatedActivity = specificActivityService.updateSpecificActivity(id, request);
             return ResponseEntity.ok(updatedActivity);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -147,9 +149,9 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<SpecificActivity> updateStatus(@PathVariable UUID id, @RequestParam SpecificActivity.ActivityStatus status) {
+    public ResponseEntity<SpecificActivityResponse> updateStatus(@PathVariable UUID id, @RequestParam SpecificActivity.ActivityStatus status) {
         try {
-            SpecificActivity updatedActivity = specificActivityService.updateStatus(id, status);
+            SpecificActivityResponse updatedActivity = specificActivityService.updateStatus(id, status);
             return ResponseEntity.ok(updatedActivity);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -157,9 +159,9 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}/start")
-    public ResponseEntity<SpecificActivity> startActivity(@PathVariable UUID id) {
+    public ResponseEntity<SpecificActivityResponse> startActivity(@PathVariable UUID id) {
         try {
-            SpecificActivity startedActivity = specificActivityService.startActivity(id);
+            SpecificActivityResponse startedActivity = specificActivityService.startActivity(id);
             return ResponseEntity.ok(startedActivity);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -167,9 +169,9 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}/complete")
-    public ResponseEntity<SpecificActivity> completeActivity(@PathVariable UUID id, @RequestParam(required = false) String observations) {
+    public ResponseEntity<SpecificActivityResponse> completeActivity(@PathVariable UUID id, @RequestParam(required = false) String observations) {
         try {
-            SpecificActivity completedActivity = specificActivityService.completeActivity(id, observations);
+            SpecificActivityResponse completedActivity = specificActivityService.completeActivity(id, observations);
             return ResponseEntity.ok(completedActivity);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();

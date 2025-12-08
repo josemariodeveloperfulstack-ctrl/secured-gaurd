@@ -48,10 +48,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     server: {
-      host: "::",
+      host: "0.0.0.0", // Permite acesso de qualquer IP na rede
       port: 3000,
+      strictPort: false, // Permite usar outra porta se 3000 estiver ocupada
       hmr: {
         overlay: false, // Desabilita overlay de erros HMR
+        // Configurar HMR para funcionar com IP externo
+        clientPort: 3000,
       },
       proxy: {
         '/api': {

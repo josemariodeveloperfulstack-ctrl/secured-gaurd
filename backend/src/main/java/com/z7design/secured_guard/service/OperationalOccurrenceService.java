@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.CreateOccurrenceDTO;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
@@ -23,6 +24,73 @@ public class OperationalOccurrenceService {
     
     private final OperationalOccurrenceRepository occurrenceRepository;
     private final EmployeeRepository employeeRepository;
+    
+    /**
+     * Criar nova ocorrência operacional a partir de DTO
+     */
+    public OperationalOccurrence createFromDTO(CreateOccurrenceDTO dto) {
+        log.info("Criando nova ocorrência a partir de DTO para funcionário: {}", dto.getEmployeeId());
+        
+        // Validar funcionário
+        Employee employee = employeeRepository.findById(dto.getEmployeeId())
+            .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
+        
+        // Validar número de advertência se fornecido
+        if (dto.getWarningNumber() != null && 
+            occurrenceRepository.existsByWarningNumber(dto.getWarningNumber())) {
+            throw new BusinessException("Número de advertência já existe");
+        }
+        
+        // Converter tipo
+        OperationalOccurrence.OccurrenceType type;
+        try {
+            type = OperationalOccurrence.OccurrenceType.valueOf(dto.getType().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException("Tipo de ocorrência inválido: " + dto.getType());
+        }
+        
+        // Converter status (se não fornecido, usar PENDENTE)
+        OperationalOccurrence.OccurrenceStatus status = OperationalOccurrence.OccurrenceStatus.PENDENTE;
+        if (dto.getStatus() != null && !dto.getStatus().isEmpty()) {
+            try {
+                status = OperationalOccurrence.OccurrenceStatus.valueOf(dto.getStatus().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Status inválido: {}, usando PENDENTE", dto.getStatus());
+            }
+        }
+        
+        // Converter prioridade (se não fornecido, usar MEDIA)
+        OperationalOccurrence.OccurrencePriority priority = OperationalOccurrence.OccurrencePriority.MEDIA;
+        if (dto.getPriority() != null && !dto.getPriority().isEmpty()) {
+            try {
+                priority = OperationalOccurrence.OccurrencePriority.valueOf(dto.getPriority().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Prioridade inválida: {}, usando MEDIA", dto.getPriority());
+            }
+        }
+        
+        // Converter data
+        LocalDateTime date = dto.getDateAsLocalDateTime();
+        
+        // Criar ocorrência
+        OperationalOccurrence occurrence = OperationalOccurrence.builder()
+            .type(type)
+            .title(dto.getTitle())
+            .description(dto.getDescription())
+            .employee(employee)
+            .location(dto.getLocation())
+            .status(status)
+            .priority(priority)
+            .date(date)
+            .responsible(dto.getResponsible())
+            .warningNumber(dto.getWarningNumber())
+            .build();
+        
+        OperationalOccurrence savedOccurrence = occurrenceRepository.save(occurrence);
+        log.info("Ocorrência criada com sucesso: {}", savedOccurrence.getId());
+        
+        return savedOccurrence;
+    }
     
     /**
      * Criar nova ocorrência operacional
@@ -288,5 +356,27 @@ public class OperationalOccurrenceService {
             .mapToInt(o -> o.getWarningNumber() != null ? o.getWarningNumber() : 0)
             .max()
             .orElse(0) + 1;
+    }
+    
+    /**
+     * Converter OperationalOccurrence para OccurrenceResponseDTO
+     */
+    public com.z7design.secured_guard.dto.OccurrenceResponseDTO convertToResponseDTO(OperationalOccurrence occurrence) {
+        return com.z7design.secured_guard.dto.OccurrenceResponseDTO.builder()
+            .id(occurrence.getId())
+            .type(occurrence.getType() != null ? occurrence.getType().name() : null)
+            .title(occurrence.getTitle())
+            .description(occurrence.getDescription())
+            .employeeId(occurrence.getEmployee() != null ? occurrence.getEmployee().getId().toString() : null)
+            .employeeName(occurrence.getEmployee() != null ? occurrence.getEmployee().getName() : null)
+            .location(occurrence.getLocation())
+            .status(occurrence.getStatus() != null ? occurrence.getStatus().name() : null)
+            .priority(occurrence.getPriority() != null ? occurrence.getPriority().name() : null)
+            .date(occurrence.getDate())
+            .responsible(occurrence.getResponsible())
+            .warningNumber(occurrence.getWarningNumber())
+            .createdAt(occurrence.getCreatedAt())
+            .updatedAt(occurrence.getUpdatedAt())
+            .build();
     }
 }

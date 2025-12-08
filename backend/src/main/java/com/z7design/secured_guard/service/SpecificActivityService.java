@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.CreateSpecificActivityRequest;
+import com.z7design.secured_guard.dto.SpecificActivityResponse;
 import com.z7design.secured_guard.model.SpecificActivity;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.WorkPost;
@@ -14,6 +16,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -28,90 +31,152 @@ public class SpecificActivityService {
     @Autowired
     private WorkPostRepository workPostRepository;
 
-    public List<SpecificActivity> getAllSpecificActivities() {
-        return specificActivityRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getAllSpecificActivities() {
+        return specificActivityRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public Optional<SpecificActivity> getSpecificActivityById(UUID id) {
-        return specificActivityRepository.findById(id);
+    @Transactional(readOnly = true)
+    public Optional<SpecificActivityResponse> getSpecificActivityById(UUID id) {
+        return specificActivityRepository.findById(id).map(this::mapToResponse);
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByEmployee(UUID employeeId) {
-        return specificActivityRepository.findByEmployeeId(employeeId);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByEmployee(UUID employeeId) {
+        return specificActivityRepository.findByEmployeeId(employeeId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByLocation(UUID locationId) {
-        return specificActivityRepository.findByLocationId(locationId);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByLocation(UUID locationId) {
+        return specificActivityRepository.findByLocationId(locationId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByDate(LocalDate date) {
-        return specificActivityRepository.findByActivityDate(date);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByDate(LocalDate date) {
+        return specificActivityRepository.findByActivityDate(date).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByStatus(SpecificActivity.ActivityStatus status) {
-        return specificActivityRepository.findByStatus(status);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByStatus(SpecificActivity.ActivityStatus status) {
+        return specificActivityRepository.findByStatus(status).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByType(SpecificActivity.ActivityType type) {
-        return specificActivityRepository.findByActivityType(type);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByType(SpecificActivity.ActivityType type) {
+        return specificActivityRepository.findByActivityType(type).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByDateRange(LocalDate startDate, LocalDate endDate) {
-        return specificActivityRepository.findByDateRange(startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByDateRange(LocalDate startDate, LocalDate endDate) {
+        return specificActivityRepository.findByDateRange(startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByEmployeeAndDateRange(UUID employeeId, LocalDate startDate, LocalDate endDate) {
-        return specificActivityRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByEmployeeAndDateRange(UUID employeeId, LocalDate startDate, LocalDate endDate) {
+        return specificActivityRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByLocationAndDateRange(UUID locationId, LocalDate startDate, LocalDate endDate) {
-        return specificActivityRepository.findByLocationAndDateRange(locationId, startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByLocationAndDateRange(UUID locationId, LocalDate startDate, LocalDate endDate) {
+        return specificActivityRepository.findByLocationAndDateRange(locationId, startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getSpecificActivitiesByTypeAndDateRange(SpecificActivity.ActivityType type, LocalDate startDate, LocalDate endDate) {
-        return specificActivityRepository.findByActivityTypeAndDateRange(type, startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getSpecificActivitiesByTypeAndDateRange(SpecificActivity.ActivityType type, LocalDate startDate, LocalDate endDate) {
+        return specificActivityRepository.findByActivityTypeAndDateRange(type, startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public SpecificActivity createSpecificActivity(SpecificActivity activity) {
+    public SpecificActivityResponse createSpecificActivity(CreateSpecificActivityRequest request) {
         // Validar se o funcionário existe
-        Employee employee = employeeRepository.findById(activity.getEmployee().getId())
+        Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
         // Validar se o local existe (se fornecido)
-        if (activity.getLocation() != null) {
-            WorkPost location = workPostRepository.findById(activity.getLocation().getId())
+        WorkPost location = null;
+        if (request.getLocationId() != null) {
+            location = workPostRepository.findById(request.getLocationId())
                     .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
-            activity.setLocation(location);
         }
 
-        activity.setEmployee(employee);
-        return specificActivityRepository.save(activity);
+        // Converter activityType string para enum
+        SpecificActivity.ActivityType activityType = SpecificActivity.ActivityType.valueOf(request.getActivityType());
+
+        // Criar a atividade
+        SpecificActivity activity = SpecificActivity.builder()
+                .employee(employee)
+                .activityType(activityType)
+                .activityDate(request.getActivityDate())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .location(location)
+                .description(request.getDescription())
+                .observations(request.getObservations())
+                .status(SpecificActivity.ActivityStatus.SCHEDULED)
+                .isCompleted(false)
+                .createdAt(java.time.LocalDateTime.now())
+                .updatedAt(java.time.LocalDateTime.now())
+                .build();
+
+        return mapToResponse(specificActivityRepository.save(activity));
     }
 
-    public SpecificActivity updateSpecificActivity(UUID id, SpecificActivity updatedActivity) {
+    public SpecificActivityResponse updateSpecificActivity(UUID id, CreateSpecificActivityRequest request) {
         SpecificActivity existingActivity = specificActivityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atividade específica não encontrada"));
 
-        // Atualizar campos permitidos conforme modelo atual
-        existingActivity.setDescription(updatedActivity.getDescription());
-        existingActivity.setActivityType(updatedActivity.getActivityType());
-        existingActivity.setActivityDate(updatedActivity.getActivityDate());
-        existingActivity.setStartTime(updatedActivity.getStartTime());
-        existingActivity.setEndTime(updatedActivity.getEndTime());
-        existingActivity.setStatus(updatedActivity.getStatus());
-        existingActivity.setObservations(updatedActivity.getObservations());
-        existingActivity.setUpdatedAt(java.time.LocalDateTime.now());
-
-        // O modelo atual não possui campo responsibleEmployee; removido
-
-        // Validar e atualizar local se fornecido
-        if (updatedActivity.getLocation() != null) {
-            WorkPost location = workPostRepository.findById(updatedActivity.getLocation().getId())
-                    .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
-            existingActivity.setLocation(location);
+        // Atualizar campos permitidos
+        if (request.getEmployeeId() != null) {
+            Employee employee = employeeRepository.findById(request.getEmployeeId())
+                    .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+            existingActivity.setEmployee(employee);
         }
 
-        return specificActivityRepository.save(existingActivity);
+        if (request.getActivityType() != null) {
+            SpecificActivity.ActivityType activityType = SpecificActivity.ActivityType.valueOf(request.getActivityType());
+            existingActivity.setActivityType(activityType);
+        }
+
+        if (request.getActivityDate() != null) {
+            existingActivity.setActivityDate(request.getActivityDate());
+        }
+
+        existingActivity.setStartTime(request.getStartTime());
+        existingActivity.setEndTime(request.getEndTime());
+        existingActivity.setDescription(request.getDescription());
+        existingActivity.setObservations(request.getObservations());
+
+        // Validar e atualizar local se fornecido
+        if (request.getLocationId() != null) {
+            WorkPost location = workPostRepository.findById(request.getLocationId())
+                    .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
+            existingActivity.setLocation(location);
+        } else {
+            existingActivity.setLocation(null);
+        }
+
+        existingActivity.setUpdatedAt(java.time.LocalDateTime.now());
+
+        return mapToResponse(specificActivityRepository.save(existingActivity));
     }
 
     public void deleteSpecificActivity(UUID id) {
@@ -121,57 +186,128 @@ public class SpecificActivityService {
         specificActivityRepository.deleteById(id);
     }
 
-    public SpecificActivity updateStatus(UUID id, SpecificActivity.ActivityStatus status) {
+    public SpecificActivityResponse updateStatus(UUID id, SpecificActivity.ActivityStatus status) {
         SpecificActivity activity = specificActivityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atividade específica não encontrada"));
         
         activity.setStatus(status);
         activity.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return specificActivityRepository.save(activity);
+        return mapToResponse(specificActivityRepository.save(activity));
     }
 
-    public SpecificActivity startActivity(UUID id) {
+    public SpecificActivityResponse startActivity(UUID id) {
         SpecificActivity activity = specificActivityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atividade específica não encontrada"));
         
         activity.setStatus(SpecificActivity.ActivityStatus.IN_PROGRESS);
         activity.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return specificActivityRepository.save(activity);
+        return mapToResponse(specificActivityRepository.save(activity));
     }
 
-    public SpecificActivity completeActivity(UUID id, String observations) {
+    public SpecificActivityResponse completeActivity(UUID id, String observations) {
         SpecificActivity activity = specificActivityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atividade específica não encontrada"));
         
         activity.setStatus(SpecificActivity.ActivityStatus.COMPLETED);
+        activity.setIsCompleted(true);
+        activity.setCompletionDate(java.time.LocalDateTime.now());
+        
         if (observations != null && !observations.trim().isEmpty()) {
-            String existingObs = activity.getObservations() != null ? activity.getObservations() : "";
-            activity.setObservations(existingObs + " | Concluída: " + observations);
+            activity.setCompletionNotes(observations);
         }
         activity.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return specificActivityRepository.save(activity);
+        return mapToResponse(specificActivityRepository.save(activity));
     }
 
-    public List<SpecificActivity> getTodayActivities() {
-        return specificActivityRepository.findByActivityDate(LocalDate.now());
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getTodayActivities() {
+        return specificActivityRepository.findByActivityDate(LocalDate.now()).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getPendingActivities() {
-        return specificActivityRepository.findByStatus(SpecificActivity.ActivityStatus.SCHEDULED);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getPendingActivities() {
+        return specificActivityRepository.findByStatus(SpecificActivity.ActivityStatus.SCHEDULED).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getPendingActivitiesByDate(LocalDate date) {
-        return specificActivityRepository.findPendingActivitiesByDate(date);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getPendingActivitiesByDate(LocalDate date) {
+        return specificActivityRepository.findPendingActivitiesByDate(date).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getOverdueActivities() {
-        return specificActivityRepository.findOverdueActivities(LocalDate.now());
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getOverdueActivities() {
+        return specificActivityRepository.findOverdueActivities(LocalDate.now()).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<SpecificActivity> getInProgressActivities() {
-        return specificActivityRepository.findByStatus(SpecificActivity.ActivityStatus.IN_PROGRESS);
+    @Transactional(readOnly = true)
+    public List<SpecificActivityResponse> getInProgressActivities() {
+        return specificActivityRepository.findByStatus(SpecificActivity.ActivityStatus.IN_PROGRESS).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private SpecificActivityResponse mapToResponse(SpecificActivity activity) {
+        SpecificActivityResponse.SimpleEmployee employeeData = null;
+        if (activity.getEmployee() != null) {
+            employeeData = new SpecificActivityResponse.SimpleEmployee(
+                    activity.getEmployee().getId(),
+                    activity.getEmployee().getName()
+            );
+        }
+
+        SpecificActivityResponse.SimpleWorkPost locationData = null;
+        if (activity.getLocation() != null) {
+            locationData = new SpecificActivityResponse.SimpleWorkPost(
+                    activity.getLocation().getId(),
+                    activity.getLocation().getName()
+            );
+        }
+
+        SpecificActivityResponse.SimpleUser assignedByData = null;
+        if (activity.getAssignedBy() != null) {
+            assignedByData = new SpecificActivityResponse.SimpleUser(
+                    activity.getAssignedBy().getId(),
+                    activity.getAssignedBy().getName()
+            );
+        }
+
+        SpecificActivityResponse.SimpleUser supervisedByData = null;
+        if (activity.getSupervisedBy() != null) {
+            supervisedByData = new SpecificActivityResponse.SimpleUser(
+                    activity.getSupervisedBy().getId(),
+                    activity.getSupervisedBy().getName()
+            );
+        }
+
+        return SpecificActivityResponse.builder()
+                .id(activity.getId())
+                .employee(employeeData)
+                .activityType(activity.getActivityType() != null ? activity.getActivityType().name() : null)
+                .activityDate(activity.getActivityDate())
+                .startTime(activity.getStartTime())
+                .endTime(activity.getEndTime())
+                .location(locationData)
+                .description(activity.getDescription())
+                .observations(activity.getObservations())
+                .status(activity.getStatus() != null ? activity.getStatus().name() : null)
+                .isCompleted(activity.getIsCompleted())
+                .completionNotes(activity.getCompletionNotes())
+                .assignedBy(assignedByData)
+                .supervisedBy(supervisedByData)
+                .completionDate(activity.getCompletionDate())
+                .createdAt(activity.getCreatedAt())
+                .updatedAt(activity.getUpdatedAt())
+                .build();
     }
 }

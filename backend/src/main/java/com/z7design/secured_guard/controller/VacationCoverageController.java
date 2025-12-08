@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.CreateVacationCoverageRequest;
+import com.z7design.secured_guard.dto.VacationCoverageResponse;
 import com.z7design.secured_guard.model.VacationCoverage;
 import com.z7design.secured_guard.service.VacationCoverageService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,54 +21,54 @@ public class VacationCoverageController {
     private VacationCoverageService vacationCoverageService;
 
     @GetMapping
-    public ResponseEntity<List<VacationCoverage>> getAllVacationCoverages() {
-        List<VacationCoverage> coverages = vacationCoverageService.getAllVacationCoverages();
+    public ResponseEntity<List<VacationCoverageResponse>> getAllVacationCoverages() {
+        List<VacationCoverageResponse> coverages = vacationCoverageService.getAllVacationCoverages();
         return ResponseEntity.ok(coverages);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<VacationCoverage> getVacationCoverageById(@PathVariable UUID id) {
+    public ResponseEntity<VacationCoverageResponse> getVacationCoverageById(@PathVariable UUID id) {
         return vacationCoverageService.getVacationCoverageById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<VacationCoverage>> getVacationCoveragesByEmployee(@PathVariable UUID employeeId) {
-        List<VacationCoverage> coverages = vacationCoverageService.getVacationCoveragesByEmployee(employeeId);
+    public ResponseEntity<List<VacationCoverageResponse>> getVacationCoveragesByEmployee(@PathVariable UUID employeeId) {
+        List<VacationCoverageResponse> coverages = vacationCoverageService.getVacationCoveragesByEmployee(employeeId);
         return ResponseEntity.ok(coverages);
     }
 
     @GetMapping("/substitute/{substituteEmployeeId}")
-    public ResponseEntity<List<VacationCoverage>> getVacationCoveragesBySubstitute(@PathVariable UUID substituteEmployeeId) {
-        List<VacationCoverage> coverages = vacationCoverageService.getVacationCoveragesBySubstitute(substituteEmployeeId);
+    public ResponseEntity<List<VacationCoverageResponse>> getVacationCoveragesBySubstitute(@PathVariable UUID substituteEmployeeId) {
+        List<VacationCoverageResponse> coverages = vacationCoverageService.getVacationCoveragesBySubstitute(substituteEmployeeId);
         return ResponseEntity.ok(coverages);
     }
 
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<VacationCoverage>> getVacationCoveragesByStatus(@PathVariable VacationCoverage.CoverageStatus status) {
-        List<VacationCoverage> coverages = vacationCoverageService.getVacationCoveragesByStatus(status);
+    public ResponseEntity<List<VacationCoverageResponse>> getVacationCoveragesByStatus(@PathVariable VacationCoverage.CoverageStatus status) {
+        List<VacationCoverageResponse> coverages = vacationCoverageService.getVacationCoveragesByStatus(status);
         return ResponseEntity.ok(coverages);
     }
 
     @GetMapping("/date-range")
-    public ResponseEntity<List<VacationCoverage>> getVacationCoveragesByDateRange(
+    public ResponseEntity<List<VacationCoverageResponse>> getVacationCoveragesByDateRange(
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<VacationCoverage> coverages = vacationCoverageService.getVacationCoveragesByDateRange(startDate, endDate);
+        List<VacationCoverageResponse> coverages = vacationCoverageService.getVacationCoveragesByDateRange(startDate, endDate);
         return ResponseEntity.ok(coverages);
     }
 
     @GetMapping("/needing-attention")
-    public ResponseEntity<List<VacationCoverage>> getVacationCoveragesNeedingAttention() {
-        List<VacationCoverage> coverages = vacationCoverageService.getVacationCoveragesNeedingAttention();
+    public ResponseEntity<List<VacationCoverageResponse>> getVacationCoveragesNeedingAttention() {
+        List<VacationCoverageResponse> coverages = vacationCoverageService.getVacationCoveragesNeedingAttention();
         return ResponseEntity.ok(coverages);
     }
 
     @PostMapping
-    public ResponseEntity<VacationCoverage> createVacationCoverage(@RequestBody VacationCoverage vacationCoverage) {
+    public ResponseEntity<VacationCoverageResponse> createVacationCoverage(@RequestBody CreateVacationCoverageRequest request) {
         try {
-            VacationCoverage createdCoverage = vacationCoverageService.createVacationCoverage(vacationCoverage);
+            VacationCoverageResponse createdCoverage = vacationCoverageService.createVacationCoverage(request);
             return ResponseEntity.ok(createdCoverage);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -74,9 +76,9 @@ public class VacationCoverageController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<VacationCoverage> updateVacationCoverage(@PathVariable UUID id, @RequestBody VacationCoverage vacationCoverage) {
+    public ResponseEntity<VacationCoverageResponse> updateVacationCoverage(@PathVariable UUID id, @RequestBody CreateVacationCoverageRequest request) {
         try {
-            VacationCoverage updatedCoverage = vacationCoverageService.updateVacationCoverage(id, vacationCoverage);
+            VacationCoverageResponse updatedCoverage = vacationCoverageService.updateVacationCoverage(id, request);
             return ResponseEntity.ok(updatedCoverage);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -84,9 +86,9 @@ public class VacationCoverageController {
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<VacationCoverage> updateStatus(@PathVariable UUID id, @RequestParam VacationCoverage.CoverageStatus status) {
+    public ResponseEntity<VacationCoverageResponse> updateStatus(@PathVariable UUID id, @RequestParam VacationCoverage.CoverageStatus status) {
         try {
-            VacationCoverage updatedCoverage = vacationCoverageService.updateStatus(id, status);
+            VacationCoverageResponse updatedCoverage = vacationCoverageService.updateStatus(id, status);
             return ResponseEntity.ok(updatedCoverage);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();

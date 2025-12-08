@@ -5,7 +5,9 @@ import com.z7design.secured_guard.dto.ReceiptProcessingResponse;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.model.PaymentReceiptStatus;
 import com.z7design.secured_guard.model.Payslip;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -40,6 +42,7 @@ public class ReceiptProcessingService {
     private final PaymentReceiptRepository receiptRepository;
     private final PaymentReceiptService paymentReceiptService;
     private final PayslipService payslipService;
+    private final EmployeeRepository employeeRepository;
     private final String UPLOAD_DIR = "uploads/receipts/";
 
     @Transactional
@@ -434,6 +437,140 @@ public class ReceiptProcessingService {
             log.info("🔍 Validações concluídas - Holerite encontrado: {}, Valor coincide: {}, Duplicata: {}", 
                 matchingPayslip != null, valueMatches, isDuplicate);
 
+            // ===== MELHORIA: MATCHING COM FUNCIONÁRIOS DA TABELA EMPLOYEES =====
+            // Buscar funcionário correspondente usando CPF, nome e conta corrente para melhor precisão
+            Employee matchingEmployee = null;
+            UUID employeeId = null;
+            
+            try {
+                log.info("🔍 Iniciando busca de funcionário na tabela employees...");
+                log.info("📋 Dados do comprovante - Nome: '{}', Conta Creditada: '{}'", 
+                    receiptData.employeeName, receiptData.creditedAccount);
+                
+                // ESTRATÉGIA 1: Buscar por conta corrente creditada (mais precisa)
+                if (receiptData.creditedAccount != null && !receiptData.creditedAccount.trim().isEmpty()) {
+                    String normalizedAccount = receiptData.creditedAccount.replaceAll("[^0-9]", "");
+                    if (!normalizedAccount.isEmpty()) {
+                        log.info("🔍 Estratégia 1: Buscando funcionário por conta corrente: '{}' (normalizada: '{}')", 
+                            receiptData.creditedAccount, normalizedAccount);
+                        
+                        java.util.Optional<Employee> employeeOpt = employeeRepository.findByContaCorrente(normalizedAccount);
+                        if (employeeOpt.isPresent()) {
+                            matchingEmployee = employeeOpt.get();
+                            employeeId = matchingEmployee.getId();
+                            log.info("✅ Funcionário encontrado por conta corrente: {} (ID: {})", 
+                                matchingEmployee.getName(), employeeId);
+                        } else {
+                            log.info("⚠️ Nenhum funcionário encontrado por conta corrente: {}", normalizedAccount);
+                        }
+                    }
+                }
+                
+                // ESTRATÉGIA 2: Buscar por nome (se não encontrou por conta corrente)
+                if (matchingEmployee == null && receiptData.employeeName != null && !receiptData.employeeName.trim().isEmpty()) {
+                    String normalizedName = receiptData.employeeName.trim().toUpperCase();
+                    log.info("🔍 Estratégia 2: Buscando funcionário por nome: '{}'", normalizedName);
+                    
+                    // Tentar busca exata primeiro
+                    java.util.Optional<Employee> employeeOpt = employeeRepository.findByNameExact(normalizedName);
+                    if (employeeOpt.isPresent()) {
+                        matchingEmployee = employeeOpt.get();
+                        employeeId = matchingEmployee.getId();
+                        log.info("✅ Funcionário encontrado por nome exato: {} (ID: {})", 
+                            matchingEmployee.getName(), employeeId);
+                    } else {
+                        // Tentar busca parcial (contains)
+                        java.util.List<Employee> employees = employeeRepository.findByNameContainingIgnoreCase(normalizedName);
+                        if (!employees.isEmpty()) {
+                            // Se houver múltiplos, tentar encontrar o mais próximo
+                            Employee bestMatch = employees.stream()
+                                .filter(e -> e.getName() != null)
+                                .min((e1, e2) -> {
+                                    String name1 = e1.getName().toUpperCase();
+                                    String name2 = e2.getName().toUpperCase();
+                                    // Preferir match mais próximo (menor diferença de tamanho)
+                                    int diff1 = Math.abs(name1.length() - normalizedName.length());
+                                    int diff2 = Math.abs(name2.length() - normalizedName.length());
+                                    return Integer.compare(diff1, diff2);
+                                })
+                                .orElse(employees.get(0));
+                            
+                            matchingEmployee = bestMatch;
+                            employeeId = matchingEmployee.getId();
+                            log.info("✅ Funcionário encontrado por nome parcial: {} (ID: {}) de {} candidato(s)", 
+                                matchingEmployee.getName(), employeeId, employees.size());
+                        } else {
+                            log.info("⚠️ Nenhum funcionário encontrado por nome: {}", normalizedName);
+                        }
+                    }
+                }
+                
+                // ESTRATÉGIA 3: Buscar por CPF do holerite (se disponível e não encontrou ainda)
+                if (matchingEmployee == null && matchingPayslip != null && matchingPayslip.getCpf() != null) {
+                    String payslipCpf = matchingPayslip.getCpf().replaceAll("[^0-9]", "");
+                    if (!payslipCpf.isEmpty() && payslipCpf.length() >= 11) {
+                        log.info("🔍 Estratégia 3: Buscando funcionário por CPF do holerite: '{}'", payslipCpf);
+                        
+                        java.util.Optional<Employee> employeeOpt = employeeRepository.findByCpf(payslipCpf);
+                        if (employeeOpt.isPresent()) {
+                            matchingEmployee = employeeOpt.get();
+                            employeeId = matchingEmployee.getId();
+                            log.info("✅ Funcionário encontrado por CPF do holerite: {} (ID: {})", 
+                                matchingEmployee.getName(), employeeId);
+                        } else {
+                            log.info("⚠️ Nenhum funcionário encontrado por CPF: {}", payslipCpf);
+                        }
+                    }
+                }
+                
+                // Log do resultado final
+                if (matchingEmployee != null) {
+                    log.info("✅ Funcionário associado ao comprovante:");
+                    log.info("   👤 Nome: {}", matchingEmployee.getName());
+                    log.info("   🆔 ID: {}", employeeId);
+                    log.info("   📄 CPF/Documento: {}", matchingEmployee.getDocument() != null ? matchingEmployee.getDocument() : "N/A");
+                    log.info("   💳 Conta Corrente: {}", matchingEmployee.getContaCorrente() != null ? matchingEmployee.getContaCorrente() : "N/A");
+                } else {
+                    log.warn("⚠️ Nenhum funcionário encontrado na tabela employees para o comprovante:");
+                    log.warn("   Nome: '{}'", receiptData.employeeName);
+                    log.warn("   Conta Creditada: '{}'", receiptData.creditedAccount);
+                    if (matchingPayslip != null) {
+                        log.warn("   CPF do Holerite: '{}'", matchingPayslip.getCpf());
+                    }
+                    log.warn("   O comprovante será salvo sem associação com funcionário (employeeId = null)");
+                }
+                
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao buscar funcionário na tabela employees: {}", e.getMessage(), e);
+            }
+            
+            // ===== COMENTADO PARA USO FUTURO: Verificar conta corrente do holerite =====
+            // Quando o holerite tiver o campo conta corrente, descomentar este código:
+            /*
+            if (matchingEmployee == null && matchingPayslip != null) {
+                // Verificar se o holerite tem conta corrente e fazer matching
+                String payslipContaCorrente = matchingPayslip.getContaCorrente(); // Campo futuro no Payslip
+                if (payslipContaCorrente != null && !payslipContaCorrente.trim().isEmpty() 
+                    && receiptData.creditedAccount != null && !receiptData.creditedAccount.trim().isEmpty()) {
+                    
+                    String normalizedPayslipAccount = payslipContaCorrente.replaceAll("[^0-9]", "");
+                    String normalizedReceiptAccount = receiptData.creditedAccount.replaceAll("[^0-9]", "");
+                    
+                    if (normalizedPayslipAccount.equals(normalizedReceiptAccount)) {
+                        log.info("🔍 Estratégia 4: Buscando funcionário por conta corrente do holerite: '{}'", normalizedPayslipAccount);
+                        
+                        java.util.Optional<Employee> employeeOpt = employeeRepository.findByContaCorrente(normalizedPayslipAccount);
+                        if (employeeOpt.isPresent()) {
+                            matchingEmployee = employeeOpt.get();
+                            employeeId = matchingEmployee.getId();
+                            log.info("✅ Funcionário encontrado por conta corrente do holerite: {} (ID: {})", 
+                                matchingEmployee.getName(), employeeId);
+                        }
+                    }
+                }
+            }
+            */
+
             // Criar novo PDF com os dados extraídos
             String newPdfPath = null;
             try {
@@ -467,6 +604,7 @@ public class ReceiptProcessingService {
             String normalizedTransferDate = String.format("%02d/%04d", receiptData.month, receiptData.year);
 
             PaymentReceipt receipt = PaymentReceipt.builder()
+                    .employeeId(employeeId) // Associar ao funcionário encontrado
                     .employeeName(receiptData.employeeName != null ? receiptData.employeeName.trim() : "Nome não extraído")
                     .companyName(receiptData.companyName != null ? receiptData.companyName.trim() : null)
                     .companyCnpj(receiptData.companyCnpj != null ? receiptData.companyCnpj : null)
@@ -643,38 +781,74 @@ public class ReceiptProcessingService {
             }
 
             // Extrair nome da empresa (conta debitada) - padrão específico do Itaú
+            // IMPORTANTE: O nome da empresa está na seção "Dados da conta a ser debitada"
             String companyName = null;
             
-            // Padrão 1: "Dados da conta a ser debitada" seguido de "Nome: [NOME EMPRESA]"
-            Pattern companyPattern1 = Pattern.compile("Dados da conta a ser debitada[\\s\\S]*?Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+)", Pattern.CASE_INSENSITIVE);
+            // Padrão 1: "Dados da conta a ser debitada" seguido de "Nome: [NOME EMPRESA]" até "Agência:" ou "Conta:"
+            // Este é o padrão CORRETO - a empresa está na conta debitada
+            Pattern companyPattern1 = Pattern.compile("Dados da conta a ser debitada[\\s\\S]*?Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+?)(?=\\s*(?:Agência|Conta|\\n|$))", Pattern.CASE_INSENSITIVE);
             Matcher companyMatcher1 = companyPattern1.matcher(text);
             if (companyMatcher1.find()) {
                 companyName = companyMatcher1.group(1).trim();
-                log.info("✅ Nome da empresa encontrado (padrão Itaú debitada): {}", companyName);
+                log.info("✅ Nome da empresa encontrado (padrão Itaú debitada): '{}'", companyName);
             }
             
-            // Padrão 2: Buscar por "PROMOVER VIGILANCIA PATRIMONIA" especificamente
+            // Padrão 1b: Mais específico - "Dados da conta a ser debitada" -> "Nome da empresa:" ou "Nome:" -> até "Agência:"
             if (companyName == null || companyName.isEmpty()) {
-                Pattern companyPattern2 = Pattern.compile("PROMOVER\\s+VIGILANCIA\\s+PATRIMONIA", Pattern.CASE_INSENSITIVE);
+                Pattern companyPattern1b = Pattern.compile("Dados da conta a ser debitada[\\s\\S]*?(?:Nome da empresa|Nome)\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+?)\\s*Agência\\s*:", Pattern.CASE_INSENSITIVE);
+                Matcher companyMatcher1b = companyPattern1b.matcher(text);
+                if (companyMatcher1b.find()) {
+                    companyName = companyMatcher1b.group(1).trim();
+                    log.info("✅ Nome da empresa encontrado (padrão Itaú debitada - específico): '{}'", companyName);
+                }
+            }
+            
+            // Padrão 2: Buscar por "PROMOVER" seguido de palavras (fallback para empresas conhecidas)
+            if (companyName == null || companyName.isEmpty()) {
+                Pattern companyPattern2 = Pattern.compile("PROMOVER\\s+(?:TERCEIRIZACAO|VIGILANCIA|SERVICOS)[\\s\\w]*", Pattern.CASE_INSENSITIVE);
                 Matcher companyMatcher2 = companyPattern2.matcher(text);
                 if (companyMatcher2.find()) {
-                    companyName = "PROMOVER VIGILANCIA PATRIMONIA";
-                    log.info("✅ Nome da empresa encontrado (padrão específico): {}", companyName);
+                    companyName = companyMatcher2.group(0).trim();
+                    log.info("✅ Nome da empresa encontrado (padrão PROMOVER): '{}'", companyName);
                 }
             }
             
-            // Padrão 3: Buscar por "Nome: [NOME]" em qualquer lugar (mas não o mesmo do funcionário)
+            // Padrão 3: Buscar por "Nome:" na seção debitada (evitar pegar da seção creditada)
+            // Primeiro encontrar a seção debitada, depois procurar "Nome:" dentro dela
             if (companyName == null || companyName.isEmpty()) {
-                Pattern companyPattern3 = Pattern.compile("Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+)", Pattern.CASE_INSENSITIVE);
-                Matcher companyMatcher3 = companyPattern3.matcher(text);
-                if (companyMatcher3.find()) {
-                    String candidateName = companyMatcher3.group(1).trim();
-                    // Verificar se não é o mesmo nome do funcionário
-                    if (!candidateName.equals(employeeName)) {
-                        companyName = candidateName;
-                        log.info("✅ Nome da empresa encontrado (padrão genérico): {}", companyName);
+                Pattern debitadaSectionPattern = Pattern.compile("Dados da conta a ser debitada([\\s\\S]*?)Dados da conta a ser creditada", Pattern.CASE_INSENSITIVE);
+                Matcher debitadaSectionMatcher = debitadaSectionPattern.matcher(text);
+                if (debitadaSectionMatcher.find()) {
+                    String debitadaSection = debitadaSectionMatcher.group(1);
+                    Pattern nomeInDebitadaPattern = Pattern.compile("Nome\\s*:\\s*([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ\\s]+?)(?=\\s*(?:Agência|Conta|\\n|$))", Pattern.CASE_INSENSITIVE);
+                    Matcher nomeInDebitadaMatcher = nomeInDebitadaPattern.matcher(debitadaSection);
+                    if (nomeInDebitadaMatcher.find()) {
+                        String candidateName = nomeInDebitadaMatcher.group(1).trim();
+                        // Verificar se não é o mesmo nome do funcionário
+                        if (employeeName == null || !candidateName.equalsIgnoreCase(employeeName.trim())) {
+                            companyName = candidateName;
+                            log.info("✅ Nome da empresa encontrado (dentro da seção debitada): '{}'", companyName);
+                        }
                     }
                 }
+            }
+            
+            // Limpar o nome da empresa removendo palavras comuns que podem estar sendo incluídas incorretamente
+            if (companyName != null && !companyName.trim().isEmpty()) {
+                String cleanedCompanyName = companyName.trim()
+                    .replaceAll("(?i)\\bagencia\\b", "") // Remove "agencia" (case insensitive)
+                    .replaceAll("(?i)\\bconta\\b", "") // Remove "conta" (case insensitive)
+                    .replaceAll("(?i)\\bcorrente\\b", "") // Remove "corrente" (case insensitive)
+                    .replaceAll("\\s+", " ") // Múltiplos espaços para um só
+                    .trim();
+                
+                // Se após a limpeza o nome ficou vazio, usar o nome original
+                if (cleanedCompanyName.isEmpty()) {
+                    cleanedCompanyName = companyName.trim();
+                }
+                
+                companyName = cleanedCompanyName;
+                log.info("🧹 Nome da empresa limpo: '{}' -> '{}'", companyName, cleanedCompanyName);
             }
             
             data.companyName = companyName;

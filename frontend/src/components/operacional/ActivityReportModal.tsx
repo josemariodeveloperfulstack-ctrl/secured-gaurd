@@ -64,9 +64,93 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   // Estados para dados dos dropdowns
   const [employees, setEmployees] = useState<{id: string, name: string}[]>([]);
   const [clients, setClients] = useState<{id: string, name: string}[]>([]);
-  const [workPosts, setWorkPosts] = useState<{id: string, name: string, clientId: string}[]>([]);
+  const [workPosts, setWorkPosts] = useState<{id: string, name: string, clientId: string | null}[]>([]);
   const [filteredWorkPosts, setFilteredWorkPosts] = useState<{id: string, name: string}[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+  
+  // Efeito para filtrar postos quando cliente mudar
+  useEffect(() => {
+    console.log('🔄 useEffect de filtragem executado');
+    console.log('📊 Estado atual:', {
+      clientId: formData.clientId,
+      clientIdType: typeof formData.clientId,
+      workPostsCount: workPosts.length,
+      hasClientId: !!formData.clientId,
+      hasWorkPosts: workPosts.length > 0
+    });
+    
+    if (formData.clientId && workPosts.length > 0) {
+      console.log('🔍 Filtrando postos para cliente:', formData.clientId);
+      console.log('📋 Total de postos disponíveis:', workPosts.length);
+      
+      // Mostrar alguns exemplos de postos
+      console.log('📋 Primeiros 3 postos:', workPosts.slice(0, 3).map(wp => ({
+        id: wp.id,
+        name: wp.name,
+        clientId: wp.clientId,
+        clientIdType: typeof wp.clientId
+      })));
+      
+      const filtered = workPosts.filter(wp => {
+        // Normalizar IDs para comparação - apenas trim e lowercase, manter hífens
+        const normalizeId = (id: any): string | null => {
+          if (!id) return null;
+          const str = String(id).trim().toLowerCase();
+          return str || null;
+        };
+        
+        const wpClientId = normalizeId(wp.clientId);
+        const selectedClientId = normalizeId(formData.clientId);
+        
+        // Comparação direta
+        const matches = wpClientId && selectedClientId && wpClientId === selectedClientId;
+        
+        // Log apenas para os primeiros 3 postos para não poluir o console
+        if (workPosts.indexOf(wp) < 3) {
+          console.log('🔍 Comparando:', {
+            wpName: wp.name,
+            wpClientIdOriginal: wp.clientId,
+            wpClientIdNormalized: wpClientId,
+            selectedClientIdOriginal: formData.clientId,
+            selectedClientIdNormalized: selectedClientId,
+            matches: matches
+          });
+        }
+        
+        if (matches) {
+          console.log('✅ Posto encontrado:', wp.name, 'ClientId:', wp.clientId);
+        }
+        
+        return matches;
+      });
+      
+      console.log('✅ Postos filtrados:', filtered.length);
+      if (filtered.length > 0) {
+        console.log('✅ Postos encontrados:', filtered.map(wp => ({ id: wp.id, name: wp.name, clientId: wp.clientId })));
+      }
+      
+      if (filtered.length === 0 && formData.clientId) {
+        console.warn('⚠️ Nenhum posto encontrado para o cliente:', formData.clientId);
+        console.warn('📋 Todos os postos disponíveis:', workPosts.map(wp => ({ 
+          id: wp.id,
+          name: wp.name, 
+          clientId: wp.clientId,
+          clientIdType: typeof wp.clientId,
+          clientIdString: String(wp.clientId)
+        })));
+        console.warn('📋 Cliente selecionado:', {
+          clientId: formData.clientId,
+          clientIdType: typeof formData.clientId,
+          clientIdString: String(formData.clientId)
+        });
+      }
+      
+      setFilteredWorkPosts(filtered);
+    } else {
+      console.log('⏸️ Não filtrando - cliente não selecionado ou sem postos');
+      setFilteredWorkPosts([]);
+    }
+  }, [formData.clientId, workPosts]);
 
   useEffect(() => {
     if (report) {
@@ -113,11 +197,9 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
       [field]: value
     }));
     
-    // Filtrar postos de trabalho quando cliente for selecionado
+    // Limpar posto selecionado quando cliente mudar
+    // A filtragem será feita pelo useEffect
     if (field === 'clientId') {
-      const filtered = workPosts.filter(wp => wp.clientId === value);
-      setFilteredWorkPosts(filtered);
-      // Limpar posto selecionado
       setFormData(prev => ({ ...prev, workPostId: '' }));
     }
   };
@@ -126,30 +208,141 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   const loadDropdownData = async () => {
     try {
       setLoadingData(true);
+      console.log('🔄 Iniciando carregamento de dados dos dropdowns...');
       
       // Carregar funcionários
-      const employeesResponse = await fetch('/api/employees/basic');
-      if (employeesResponse.ok) {
-        const employeesData = await employeesResponse.json();
-        setEmployees(employeesData.employees || []);
+      try {
+        const employeesResponse = await fetch('/api/employees/basic');
+        if (employeesResponse.ok) {
+          const employeesData = await employeesResponse.json();
+          const mappedEmployees = (employeesData.employees || []).map((emp: any) => ({
+            id: emp.id?.toString() || emp.id,
+            name: emp.name || 'Sem nome'
+          }));
+          setEmployees(mappedEmployees);
+          console.log('✅ Funcionários carregados:', mappedEmployees.length);
+        } else {
+          console.error('❌ Erro ao carregar funcionários:', employeesResponse.status);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar funcionários:', error);
       }
       
       // Carregar clientes
-      const clientsResponse = await fetch('/api/clients/select');
-      if (clientsResponse.ok) {
-        const clientsData = await clientsResponse.json();
-        setClients(clientsData || []);
+      try {
+        console.log('🔍 Buscando clientes em /api/clients/select...');
+        const clientsResponse = await fetch('/api/clients/select');
+        console.log('📡 Resposta do servidor:', clientsResponse.status, clientsResponse.statusText);
+        
+        if (clientsResponse.ok) {
+          const clientsData = await clientsResponse.json();
+          console.log('👥 Clientes carregados (raw):', clientsData?.length || 0);
+          console.log('👥 Primeiro cliente (exemplo):', clientsData?.[0]);
+          
+          // Mapear os dados para garantir formato correto
+          const mappedClients = (clientsData || []).map((client: any) => ({
+            id: client.id?.toString() || client.id,
+            name: client.name || 'Sem nome'
+          }));
+          
+          console.log('✅ Clientes mapeados:', mappedClients.length);
+          if (mappedClients.length > 0) {
+            console.log('👥 Primeiros 3 clientes:', mappedClients.slice(0, 3));
+          } else {
+            console.warn('⚠️ Nenhum cliente encontrado!');
+          }
+          
+          setClients(mappedClients);
+        } else {
+          console.error('❌ Erro ao carregar clientes:', clientsResponse.status, clientsResponse.statusText);
+          const errorText = await clientsResponse.text();
+          console.error('❌ Detalhes do erro:', errorText);
+          toast({
+            title: 'Aviso',
+            description: `Não foi possível carregar os clientes (${clientsResponse.status}). Verifique sua conexão.`,
+            variant: 'destructive'
+          });
+        }
+      } catch (error: any) {
+        console.error('❌ Erro ao buscar clientes:', error);
+        toast({
+          title: 'Erro',
+          description: 'Erro ao carregar clientes: ' + (error.message || 'Erro desconhecido'),
+          variant: 'destructive'
+        });
       }
       
       // Carregar postos de trabalho
-      const workPostsResponse = await fetch('/api/work-posts/all');
-      if (workPostsResponse.ok) {
-        const workPostsData = await workPostsResponse.json();
-        setWorkPosts(workPostsData || []);
+      try {
+        console.log('🔍 Buscando postos em /api/work-posts/all...');
+        const workPostsResponse = await fetch('/api/work-posts/all');
+        console.log('📡 Resposta do servidor (postos):', workPostsResponse.status, workPostsResponse.statusText);
+        
+        if (workPostsResponse.ok) {
+          const workPostsData = await workPostsResponse.json();
+          console.log('📋 Postos de trabalho carregados (raw):', workPostsData?.length || 0);
+          
+          if (workPostsData && workPostsData.length > 0) {
+            console.log('📋 Primeiro posto (exemplo raw):', workPostsData[0]);
+            console.log('📋 Campos do primeiro posto:', Object.keys(workPostsData[0]));
+            console.log('📋 clientId do primeiro posto:', workPostsData[0]?.clientId, 'tipo:', typeof workPostsData[0]?.clientId);
+            console.log('📋 client do primeiro posto:', workPostsData[0]?.client);
+          }
+          
+          // Mapear os dados para garantir que clientId está presente
+          const mappedWorkPosts = (workPostsData || []).map((wp: any) => {
+            // Tentar múltiplas formas de obter o clientId
+            let clientId = null;
+            
+            if (wp.clientId) {
+              clientId = wp.clientId;
+            } else if (wp.client?.id) {
+              clientId = wp.client.id;
+            } else if (wp.clientId) {
+              clientId = wp.clientId;
+            }
+            
+            // Normalizar para string
+            if (clientId) {
+              clientId = String(clientId).trim();
+            }
+            
+            return {
+              id: wp.id?.toString() || wp.id,
+              name: wp.name || wp.postCode || 'Sem nome',
+              clientId: clientId
+            };
+          });
+          
+          console.log('✅ Postos mapeados:', mappedWorkPosts.length);
+          if (mappedWorkPosts.length > 0) {
+            console.log('📋 Postos mapeados (primeiros 5):', mappedWorkPosts.slice(0, 5).map(wp => ({
+              id: wp.id,
+              name: wp.name,
+              clientId: wp.clientId,
+              clientIdType: typeof wp.clientId
+            })));
+            
+            // Mostrar quantos postos têm clientId
+            const withClientId = mappedWorkPosts.filter(wp => wp.clientId);
+            console.log('📊 Postos com clientId:', withClientId.length, 'de', mappedWorkPosts.length);
+            if (withClientId.length > 0) {
+              console.log('📋 Exemplos de clientIds únicos:', [...new Set(withClientId.map(wp => wp.clientId))].slice(0, 5));
+            }
+          }
+          
+          setWorkPosts(mappedWorkPosts);
+        } else {
+          console.error('❌ Erro ao carregar postos:', workPostsResponse.status, workPostsResponse.statusText);
+          const errorText = await workPostsResponse.text();
+          console.error('❌ Detalhes do erro:', errorText);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar postos:', error);
       }
       
     } catch (error) {
-      console.error('Erro ao carregar dados dos dropdowns:', error);
+      console.error('❌ Erro geral ao carregar dados dos dropdowns:', error);
       toast({
         title: 'Erro',
         description: 'Erro ao carregar dados. Tente novamente.',
@@ -157,6 +350,7 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
       });
     } finally {
       setLoadingData(false);
+      console.log('✅ Carregamento de dados concluído');
     }
   };
 

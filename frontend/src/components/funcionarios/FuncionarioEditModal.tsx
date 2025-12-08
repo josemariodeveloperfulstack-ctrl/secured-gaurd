@@ -548,10 +548,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setError('Usuário é obrigatório para editar um funcionário.');
       return;
     }
-    if (!form.position?.id) {
-      setError('Cargo é obrigatório para editar um funcionário.');
-      return;
-    }
     if (!form.address) {
       setError('Endereço é obrigatório para editar um funcionário.');
       return;
@@ -710,7 +706,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                              {/* Seleção de Cargo */}
                <div className="space-y-2">
                  <Label className="text-sm font-medium text-gray-200">
-                   Cargo * <span className="text-red-400">*</span>
+                   Cargo
                  </Label>
                  <div className="flex gap-2">
                    <Select 

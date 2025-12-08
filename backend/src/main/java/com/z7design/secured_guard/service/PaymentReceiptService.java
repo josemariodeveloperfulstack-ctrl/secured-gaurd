@@ -427,18 +427,100 @@ public class PaymentReceiptService {
             }
         }
         
-        // Buscar por data (transferDate é String)
-        if (receipt.getTransferDate() != null) {
-            String dateStr = receipt.getTransferDate().toLowerCase();
-            if (dateStr.contains(originalSearchLower)) {
-                return true;
+        // Buscar por conta corrente debitada (debitedAccount)
+        String debitedAccount = Optional.ofNullable(receipt.getDebitedAccount()).orElse("");
+        if (!debitedAccount.isEmpty()) {
+            // Remover formatação (espaços, hífens, pontos) para comparação
+            String debitedAccountClean = debitedAccount.replaceAll("[\\s\\-\\.]", "");
+            String searchAccountClean = originalSearch.replaceAll("[\\s\\-\\.]", "");
+            if (!searchAccountClean.isEmpty()) {
+                // Busca exata (sem formatação)
+                if (debitedAccountClean.contains(searchAccountClean) || 
+                    searchAccountClean.contains(debitedAccountClean)) {
+                    return true;
+                }
+                // Busca case-insensitive com formatação
+                if (debitedAccount.toLowerCase().contains(originalSearchLower)) {
+                    return true;
+                }
             }
         }
         
-        // Buscar por mês/ano (formato MM/YYYY ou MM-YYYY)
+        // Buscar por data de transferência (transferDate é String) - MELHORADO
+        if (receipt.getTransferDate() != null) {
+            String dateStr = receipt.getTransferDate().toLowerCase().trim();
+            String originalSearchLowerTrim = originalSearchLower.trim();
+            
+            // Busca simples por substring
+            if (dateStr.contains(originalSearchLowerTrim)) {
+                return true;
+            }
+            
+            // Tentar diferentes formatos de data
+            // Formato DD/MM/YYYY ou DD.MM.YYYY
+            if (dateStr.matches("\\d{2}[/\\.]\\d{2}[/\\.]\\d{4}")) {
+                String[] dateParts = dateStr.split("[/\\.]");
+                if (dateParts.length == 3) {
+                    String day = dateParts[0];
+                    String month = dateParts[1];
+                    String year = dateParts[2];
+                    
+                    // Buscar por dia
+                    if (day.contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                    // Buscar por mês
+                    if (month.contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                    // Buscar por ano
+                    if (year.contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                    // Buscar por DD/MM
+                    if ((day + "/" + month).contains(originalSearchLowerTrim) ||
+                        (day + "." + month).contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                    // Buscar por MM/YYYY
+                    if ((month + "/" + year).contains(originalSearchLowerTrim) ||
+                        (month + "." + year).contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                }
+            }
+            
+            // Formato MM/YYYY ou MM-YYYY
+            if (dateStr.matches("\\d{2}[/\\-]\\d{4}")) {
+                String[] dateParts = dateStr.split("[/\\-]");
+                if (dateParts.length == 2) {
+                    String month = dateParts[0];
+                    String year = dateParts[1];
+                    
+                    // Buscar por mês
+                    if (month.contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                    // Buscar por ano
+                    if (year.contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                    // Buscar por MM/YYYY
+                    if ((month + "/" + year).contains(originalSearchLowerTrim) ||
+                        (month + "-" + year).contains(originalSearchLowerTrim)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Buscar por mês/ano (formato MM/YYYY ou MM-YYYY) - baseado nos campos month e year
         String monthYear1 = String.format("%02d/%d", receipt.getMonth(), receipt.getYear());
         String monthYear2 = String.format("%02d-%d", receipt.getMonth(), receipt.getYear());
-        if (monthYear1.contains(originalSearch) || monthYear2.contains(originalSearch)) {
+        String monthYear3 = String.format("%d/%d", receipt.getMonth(), receipt.getYear());
+        if (monthYear1.contains(originalSearch) || 
+            monthYear2.contains(originalSearch) ||
+            monthYear3.contains(originalSearch)) {
             return true;
         }
         

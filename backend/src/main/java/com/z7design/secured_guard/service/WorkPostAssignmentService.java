@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.CreateWorkPostAssignmentRequest;
 import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.WorkPostAssignment;
 import com.z7design.secured_guard.model.Employee;
@@ -91,18 +92,18 @@ public class WorkPostAssignmentService {
                 .collect(Collectors.toList());
     }
 
-    public WorkPostAssignmentResponse createWorkPostAssignment(WorkPostAssignment assignment) {
+    public WorkPostAssignmentResponse createWorkPostAssignment(CreateWorkPostAssignmentRequest request) {
         // Validar se o funcionário existe
-        Employee employee = employeeRepository.findById(assignment.getEmployee().getId())
+        Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
         // Validar se o posto de trabalho existe
-        WorkPost workPost = workPostRepository.findById(assignment.getWorkPost().getId())
+        WorkPost workPost = workPostRepository.findById(request.getWorkPostId())
                 .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
 
         // Verificar conflitos de horário para o mesmo funcionário na mesma data
         List<WorkPostAssignment> existingAssignments = workPostAssignmentRepository
-                .findActiveAssignmentsByDateAndEmployee(assignment.getAssignmentDate(), employee.getId());
+                .findActiveAssignmentsByDateAndEmployee(request.getAssignmentDate(), employee.getId());
         
         if (!existingAssignments.isEmpty()) {
             throw new RuntimeException("Funcionário já possui atribuição ativa nesta data");
@@ -110,43 +111,74 @@ public class WorkPostAssignmentService {
 
         // Verificar conflitos de horário para o mesmo posto na mesma data
         List<WorkPostAssignment> existingPostAssignments = workPostAssignmentRepository
-                .findActiveAssignmentsByDateAndPost(assignment.getAssignmentDate(), workPost.getId());
+                .findActiveAssignmentsByDateAndPost(request.getAssignmentDate(), workPost.getId());
         
         if (!existingPostAssignments.isEmpty()) {
             throw new RuntimeException("Posto de trabalho já possui atribuição ativa nesta data");
         }
 
-        assignment.setEmployee(employee);
-        assignment.setWorkPost(workPost);
-        assignment.setCreatedAt(java.time.LocalDateTime.now());
-        assignment.setUpdatedAt(java.time.LocalDateTime.now());
+        // Converter ShiftType string para enum
+        WorkPostAssignment.ShiftType shiftType = WorkPostAssignment.ShiftType.valueOf(request.getShiftType());
+
+        // Criar a atribuição
+        WorkPostAssignment assignment = WorkPostAssignment.builder()
+                .employee(employee)
+                .workPost(workPost)
+                .assignmentDate(request.getAssignmentDate())
+                .shiftType(shiftType)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .status(WorkPostAssignment.AssignmentStatus.PENDING)
+                .isPrimaryAssignment(request.getIsPrimaryAssignment() != null ? request.getIsPrimaryAssignment() : true)
+                .isBackupAssignment(request.getIsBackupAssignment() != null ? request.getIsBackupAssignment() : false)
+                .observations(request.getObservations())
+                .specialInstructions(request.getSpecialInstructions())
+                .createdAt(java.time.LocalDateTime.now())
+                .updatedAt(java.time.LocalDateTime.now())
+                .build();
 
         return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
-    public WorkPostAssignmentResponse updateWorkPostAssignment(UUID id, WorkPostAssignment updatedAssignment) {
+    public WorkPostAssignmentResponse updateWorkPostAssignment(UUID id, CreateWorkPostAssignmentRequest request) {
         WorkPostAssignment existingAssignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
 
         // Atualizar campos permitidos
-        existingAssignment.setAssignmentDate(updatedAssignment.getAssignmentDate());
-        existingAssignment.setShiftType(updatedAssignment.getShiftType());
-        existingAssignment.setStartTime(updatedAssignment.getStartTime());
-        existingAssignment.setEndTime(updatedAssignment.getEndTime());
-        existingAssignment.setStatus(updatedAssignment.getStatus());
-        existingAssignment.setObservations(updatedAssignment.getObservations());
+        if (request.getAssignmentDate() != null) {
+            existingAssignment.setAssignmentDate(request.getAssignmentDate());
+        }
+        
+        if (request.getShiftType() != null) {
+            WorkPostAssignment.ShiftType shiftType = WorkPostAssignment.ShiftType.valueOf(request.getShiftType());
+            existingAssignment.setShiftType(shiftType);
+        }
+        
+        existingAssignment.setStartTime(request.getStartTime());
+        existingAssignment.setEndTime(request.getEndTime());
+        existingAssignment.setObservations(request.getObservations());
+        existingAssignment.setSpecialInstructions(request.getSpecialInstructions());
+        
+        if (request.getIsPrimaryAssignment() != null) {
+            existingAssignment.setIsPrimaryAssignment(request.getIsPrimaryAssignment());
+        }
+        
+        if (request.getIsBackupAssignment() != null) {
+            existingAssignment.setIsBackupAssignment(request.getIsBackupAssignment());
+        }
+        
         existingAssignment.setUpdatedAt(java.time.LocalDateTime.now());
 
         // Validar e atualizar funcionário se fornecido
-        if (updatedAssignment.getEmployee() != null) {
-            Employee employee = employeeRepository.findById(updatedAssignment.getEmployee().getId())
+        if (request.getEmployeeId() != null) {
+            Employee employee = employeeRepository.findById(request.getEmployeeId())
                     .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
             existingAssignment.setEmployee(employee);
         }
 
         // Validar e atualizar posto de trabalho se fornecido
-        if (updatedAssignment.getWorkPost() != null) {
-            WorkPost workPost = workPostRepository.findById(updatedAssignment.getWorkPost().getId())
+        if (request.getWorkPostId() != null) {
+            WorkPost workPost = workPostRepository.findById(request.getWorkPostId())
                     .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
             existingAssignment.setWorkPost(workPost);
         }

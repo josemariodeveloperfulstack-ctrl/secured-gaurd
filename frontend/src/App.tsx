@@ -347,7 +347,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/controle-rondas" element={
-                      <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
+                      <ProtectedRoute>
                         <ControleRondas />
                       </ProtectedRoute>
                     } />

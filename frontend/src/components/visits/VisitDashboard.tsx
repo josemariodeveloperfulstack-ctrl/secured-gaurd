@@ -75,9 +75,46 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
     setShowFormModal(true);
   };
 
-  const handleViewVisit = (visit: Visit) => {
-    setSelectedVisit(visit);
-    setShowViewModal(true);
+  const handleViewVisit = async (visitOrEvent: Visit | VisitCalendarEvent) => {
+    try {
+      let visitToShow: Visit;
+      
+      // Se for um VisitCalendarEvent, buscar a visita completa
+      if ('title' in visitOrEvent && 'date' in visitOrEvent && !('visitDate' in visitOrEvent)) {
+        // É um VisitCalendarEvent, buscar a visita completa
+        console.log('🔍 Buscando visita completa pelo ID:', visitOrEvent.id);
+        const fullVisit = await visitService.getVisitById(visitOrEvent.id);
+        console.log('✅ Visita completa carregada:', fullVisit);
+        visitToShow = fullVisit;
+      } else {
+        // Já é um Visit completo
+        console.log('✅ Usando visita já completa:', visitOrEvent);
+        visitToShow = visitOrEvent as Visit;
+      }
+      
+      console.log('📋 Dados da visita para exibição:', {
+        id: visitToShow.id,
+        supervisorId: visitToShow.supervisorId,
+        supervisorName: visitToShow.supervisorName,
+        workPostId: visitToShow.workPostId,
+        workPostName: visitToShow.workPostName,
+        clientId: visitToShow.clientId,
+        clientName: visitToShow.clientName,
+        visitDate: visitToShow.visitDate,
+        visitTime: visitToShow.visitTime,
+        status: visitToShow.status,
+      });
+      
+      setSelectedVisit(visitToShow);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error('❌ Erro ao buscar detalhes da visita:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao carregar detalhes da visita',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSaveVisit = async (visitData: any) => {

@@ -58,7 +58,7 @@ public class Visit {
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
     @Builder.Default
-    private VisitStatus status = VisitStatus.PENDING;
+    private VisitStatus status = VisitStatus.SCHEDULED;
     
     @Column(name = "latitude")
     private Double latitude;
@@ -75,6 +75,9 @@ public class Visit {
     @Column(name = "qr_code_verified")
     @Builder.Default
     private Boolean qrCodeVerified = false;
+    
+    @Column(name = "cancellation_reason", columnDefinition = "TEXT")
+    private String cancellationReason;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

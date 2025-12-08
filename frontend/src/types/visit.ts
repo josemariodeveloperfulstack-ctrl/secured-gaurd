@@ -32,10 +32,12 @@ export interface Visit {
 }
 
 export enum VisitStatus {
-  PENDING = 'PENDING',
+  SCHEDULED = 'SCHEDULED',
+  IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
-  NOT_COMPLETED = 'NOT_COMPLETED',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
+  PENDING = 'PENDING', // Mantido para compatibilidade
+  NOT_COMPLETED = 'NOT_COMPLETED' // Mantido para compatibilidade
 }
 
 export enum VisitScheduleStatus {
@@ -67,6 +69,9 @@ export interface CreateVisitRequest {
   // QR Code
   qrCodeScanned?: string;
   qrCodeVerified?: boolean;
+  
+  // Cancelamento
+  cancellationReason?: string;
 }
 
 export interface VisitFilters {

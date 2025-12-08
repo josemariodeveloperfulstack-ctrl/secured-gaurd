@@ -87,8 +87,10 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
       const cpfNumbers = employeeCpf.replace(/\D/g, '');
       const cpfSuffix = cpfNumbers.slice(-4);
       
-      const generatedUsername = `${firstName}.${lastName}.${cpfSuffix}`;
-      const generatedEmail = `${firstName}.${lastName}@securedguard.com`;
+      // Adicionar timestamp para garantir unicidade
+      const timestamp = Date.now().toString().slice(-3);
+      const generatedUsername = `${firstName}.${lastName}.${cpfSuffix}.${timestamp}`;
+      const generatedEmail = `${firstName}.${lastName}.${cpfSuffix}@securedguard.com`;
       
       setForm(prev => ({
         ...prev,
@@ -156,14 +158,21 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
     setError(null);
     
     try {
-      const userData: CreateUserDTO = {
+      // Encontrar o role selecionado para pegar o nome
+      const selectedRole = roles.find(r => r.id === form.roleId);
+      if (!selectedRole) {
+        setError('Role selecionado não encontrado');
+        return;
+      }
+
+      const userData = {
         username: form.username.trim(),
         email: form.email.trim(),
         password: form.password,
-        roleId: form.roleId,
-        isActive: form.isActive,
+        roles: [selectedRole.name], // Backend espera array de strings com os nomes dos roles
+        active: form.isActive,
         name: employeeName,
-        phone: employeePhone
+        whatsapp: employeePhone ? employeePhone.replace(/\D/g, '') : undefined // Backend espera whatsapp, não phone
       };
       
       const newUser = await userService.createUser(userData);
@@ -178,11 +187,24 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
       
     } catch (error: any) {
       console.error('Erro ao criar usuário:', error);
-      setError(error.response?.data?.message || 'Erro ao criar usuário');
+      
+      let errorMessage = 'Erro ao criar usuário';
+      
+      // Verificar se é erro de username duplicado
+      if (error.response?.data?.message?.includes('já está em uso') || 
+          error.response?.data?.message?.includes('já existe')) {
+        errorMessage = 'Nome de usuário ou email já está em uso. Tente gerar novamente.';
+        // Gerar novo username automaticamente
+        generateDefaultCredentials();
+      } else {
+        errorMessage = error.response?.data?.message || 'Erro ao criar usuário';
+      }
+      
+      setError(errorMessage);
       
       toast({
-        title: 'Erro',
-        description: error.response?.data?.message || 'Erro ao criar usuário',
+        title: 'Erro ao criar usuário',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {

@@ -67,27 +67,27 @@ class LeadService {
     return response.data;
   }
 
-  async getLeadById(id: number): Promise<Lead> {
+  async getLeadById(id: number | string): Promise<Lead> {
     const response = await api.get(`/api/leads/${id}`);
     return response.data;
   }
 
   async createLead(leadData: CreateLeadRequest): Promise<Lead> {
-    const response = await api.post('/leads', leadData);
+    const response = await api.post('/api/leads', leadData);
     return response.data;
   }
 
-  async updateLead(id: number, leadData: UpdateLeadRequest): Promise<Lead> {
+  async updateLead(id: number | string, leadData: UpdateLeadRequest): Promise<Lead> {
     const response = await api.put(`/api/leads/${id}`, leadData);
     return response.data;
   }
 
-  async updateLeadStatus(id: number, status: string): Promise<Lead> {
+  async updateLeadStatus(id: number | string, status: string): Promise<Lead> {
     const response = await api.patch(`/api/leads/${id}/status`, { status });
     return response.data;
   }
 
-  async deleteLead(id: number): Promise<void> {
+  async deleteLead(id: number | string): Promise<void> {
     await api.delete(`/api/leads/${id}`);
   }
 

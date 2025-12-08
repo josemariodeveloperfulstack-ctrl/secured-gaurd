@@ -26,7 +26,8 @@ import {
   FileCheck,
   Handshake,
   Settings,
-  BarChart3
+  BarChart3,
+  UserX
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import hrService from '@/services/hrService';
@@ -356,7 +357,7 @@ const RH: React.FC = () => {
                 <CardTitle className="text-seguranca-lightgray">Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/funcionarios')}
@@ -382,6 +383,15 @@ const RH: React.FC = () => {
                   >
                     <Calendar size={20} />
                     <span className="text-sm mt-1">Férias</span>
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/operacional?tab=gestao-operacional')}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                  >
+                    <UserX size={20} />
+                    <span className="text-sm mt-1">Faltas</span>
                   </Button>
                   
                   <Button 
@@ -489,6 +499,20 @@ const RH: React.FC = () => {
           {/* Operações */}
           <TabsContent value="operations" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/operacional?tab=gestao-operacional')}>
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <UserX className="h-5 w-5 text-red-500" />
+                    Controle de Faltas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-sm">
+                    Registro, aprovação e gestão de faltas com upload de atestados
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/vagas')}>
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">

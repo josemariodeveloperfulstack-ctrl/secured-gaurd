@@ -138,10 +138,53 @@ export const operationalStatsService = {
         employees = [];
       }
       
-      // Simular funcionários em serviço (em um sistema real, isso viria de dados de presença)
-      const onDuty = Math.floor(employees.length * 0.6); // 60% em serviço
-      const onVacation = Math.floor(employees.length * 0.1); // 10% de férias
-      const absent = Math.floor(employees.length * 0.05); // 5% ausentes
+      // Buscar funcionários realmente em serviço através de atribuições de postos de trabalho
+      let onDuty = 0;
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        // Buscar atribuições ativas de hoje
+        const assignmentsResponse = await api.get(`/api/work-post-assignments/today`);
+        const assignments = Array.isArray(assignmentsResponse.data) 
+          ? assignmentsResponse.data 
+          : [];
+        
+        // Contar funcionários únicos com atribuição ativa hoje
+        const uniqueEmployeesOnDuty = new Set(
+          assignments
+            .filter((a: any) => a.employeeId && (a.status === 'CONFIRMED' || a.status === 'PENDING'))
+            .map((a: any) => a.employeeId)
+        );
+        onDuty = uniqueEmployeesOnDuty.size;
+      } catch (error) {
+        console.warn('Erro ao buscar atribuições, tentando escalas:', error);
+        try {
+          // Fallback: tentar buscar escalas
+          const today = new Date().toISOString().split('T')[0];
+          const schedulesResponse = await api.get(`/api/schedules?date=${today}`);
+          const schedules = Array.isArray(schedulesResponse.data) 
+            ? schedulesResponse.data 
+            : (schedulesResponse.data?.content || []);
+          
+          const uniqueEmployeesOnDuty = new Set(
+            schedules
+              .filter((s: any) => s.employeeId)
+              .map((s: any) => s.employeeId)
+          );
+          onDuty = uniqueEmployeesOnDuty.size;
+        } catch (scheduleError) {
+          console.warn('Erro ao buscar escalas, usando estimativa:', scheduleError);
+          // Fallback final: estimar baseado em funcionários ativos
+          onDuty = Math.floor(employees.length * 0.6);
+        }
+      }
+      
+      // Buscar funcionários de férias e ausentes
+      const onVacation = employees.filter((emp: any) => 
+        emp.status === 'FERIAS' || emp.status === 'VACATION'
+      ).length;
+      const absent = employees.filter((emp: any) => 
+        emp.status === 'AUSENTE' || emp.status === 'ABSENT'
+      ).length;
 
       return {
         total: employees.length,
@@ -269,6 +312,93 @@ export const operationalStatsService = {
     } catch (error) {
       console.error('Erro ao buscar visitas recentes:', error);
       return [];
+    }
+  },
+
+  // Buscar atividade recente
+  async getRecentActivity(): Promise<any> {
+    try {
+      // Buscar movimentações ativas e pegar a mais recente
+      const response = await api.get('/api/equipment-movements/active');
+      let movements = response.data || [];
+      if (!Array.isArray(movements)) movements = [];
+      
+      // Ordenar por data mais recente
+      movements.sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || a.movementDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.movementDate || 0).getTime();
+        return dateB - dateA;
+      });
+      
+      if (movements.length > 0) {
+        const movement = movements[0];
+        const timeAgo = this.calculateTimeAgo(movement.createdAt || movement.movementDate);
+        const movementType = movement.movementType || movement.type || '';
+        const typeText = movementType === 'ASSIGNMENT' || movementType === 'RETIRADA' 
+          ? 'atribuído a' 
+          : movementType === 'RETURN' || movementType === 'DEVOLUCAO'
+          ? 'devolvido por'
+          : 'movimentado';
+        
+        return {
+          description: `Equipamento ${movement.equipment?.name || movement.equipmentName || 'N/A'} ${typeText} ${movement.employee?.name || movement.employeeName || 'N/A'}`,
+          timeAgo: timeAgo
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar atividade recente:', error);
+      return null;
+    }
+  },
+
+  // Buscar próximas ações
+  async getNextActions(): Promise<any> {
+    try {
+      // Buscar equipamentos próximos do vencimento
+      const response = await api.get('/api/equipments');
+      let equipments = response.data?.content || response.data || [];
+      if (!Array.isArray(equipments)) equipments = [];
+      
+      const today = new Date();
+      const nextExpiring = equipments
+        .filter((eq: any) => eq.validityDate)
+        .map((eq: any) => ({
+          ...eq,
+          daysUntilExpiry: Math.ceil((new Date(eq.validityDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        }))
+        .filter((eq: any) => eq.daysUntilExpiry > 0 && eq.daysUntilExpiry <= 30)
+        .sort((a: any, b: any) => a.daysUntilExpiry - b.daysUntilExpiry)[0];
+      
+      if (nextExpiring) {
+        return {
+          description: `Renovar registro ${nextExpiring.name || nextExpiring.code || 'N/A'}`,
+          daysUntilExpiry: nextExpiring.daysUntilExpiry
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar próximas ações:', error);
+      return null;
+    }
+  },
+
+  // Calcular tempo decorrido
+  calculateTimeAgo(dateString: string): string {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffMins < 60) return `${diffMins}min atrás`;
+      if (diffHours < 24) return `${diffHours}h atrás`;
+      return `${diffDays}d atrás`;
+    } catch (error) {
+      return 'N/A';
     }
   }
 };

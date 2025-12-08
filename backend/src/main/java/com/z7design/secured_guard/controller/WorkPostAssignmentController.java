@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.CreateWorkPostAssignmentRequest;
 import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.WorkPostAssignment;
 import com.z7design.secured_guard.service.WorkPostAssignmentService;
@@ -101,9 +102,9 @@ public class WorkPostAssignmentController {
     }
 
     @PostMapping
-    public ResponseEntity<WorkPostAssignmentResponse> createWorkPostAssignment(@RequestBody WorkPostAssignment assignment) {
+    public ResponseEntity<WorkPostAssignmentResponse> createWorkPostAssignment(@RequestBody CreateWorkPostAssignmentRequest request) {
         try {
-            WorkPostAssignmentResponse createdAssignment = workPostAssignmentService.createWorkPostAssignment(assignment);
+            WorkPostAssignmentResponse createdAssignment = workPostAssignmentService.createWorkPostAssignment(request);
             return ResponseEntity.ok(createdAssignment);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -111,9 +112,9 @@ public class WorkPostAssignmentController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<WorkPostAssignmentResponse> updateWorkPostAssignment(@PathVariable UUID id, @RequestBody WorkPostAssignment assignment) {
+    public ResponseEntity<WorkPostAssignmentResponse> updateWorkPostAssignment(@PathVariable UUID id, @RequestBody CreateWorkPostAssignmentRequest request) {
         try {
-            WorkPostAssignmentResponse updatedAssignment = workPostAssignmentService.updateWorkPostAssignment(id, assignment);
+            WorkPostAssignmentResponse updatedAssignment = workPostAssignmentService.updateWorkPostAssignment(id, request);
             return ResponseEntity.ok(updatedAssignment);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();

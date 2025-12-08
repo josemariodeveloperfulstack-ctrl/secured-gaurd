@@ -1,10 +1,12 @@
 package com.z7design.secured_guard.model.enums;
 
 public enum VisitStatus {
-    PENDING("Pendente"),
-    COMPLETED("Realizada"),
-    NOT_COMPLETED("Não Realizada"),
-    CANCELLED("Cancelada");
+    SCHEDULED("Agendada"),
+    IN_PROGRESS("Em Andamento"),
+    COMPLETED("Concluída"),
+    CANCELLED("Cancelada"),
+    PENDING("Pendente"), // Mantido para compatibilidade
+    NOT_COMPLETED("Não Realizada"); // Mantido para compatibilidade
     
     private final String description;
     

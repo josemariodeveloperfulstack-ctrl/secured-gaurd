@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
+import leadService, { Lead, CreateLeadRequest, UpdateLeadRequest } from '@/services/leadService';
 import { 
   Users, 
   Plus, 
@@ -43,29 +44,14 @@ import {
   Mail, 
   Building,
   Calendar,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface Lead {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  mobile: string;
-  company: string;
-  position: string;
-  status: string;
-  source: string;
-  estimatedValue: number;
-  notes: string;
-  assignedToName: string;
-  nextFollowUp: string;
-  createdAt: string;
-}
-
 const Leads = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,63 +59,60 @@ const Leads = () => {
   const [sourceFilter, setSourceFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Dados simulados
-  const mockLeads: Lead[] = [
-    {
-      id: 1,
-      name: 'João Silva',
-      email: 'joao.silva@empresa.com',
-      phone: '(11) 99999-9999',
-      mobile: '(11) 88888-8888',
-      company: 'Empresa ABC Ltda',
-      position: 'Gerente de Segurança',
-      status: 'NEW',
-      source: 'WEBSITE',
-      estimatedValue: 15000,
-      notes: 'Interessado em serviços de vigilância para shopping center',
-      assignedToName: 'Maria Santos',
-      nextFollowUp: '2025-01-20',
-      createdAt: '2025-01-15'
-    },
-    {
-      id: 2,
-      name: 'Ana Costa',
-      email: 'ana.costa@condominio.com',
-      phone: '(11) 77777-7777',
-      mobile: '(11) 66666-6666',
-      company: 'Condomínio Solar',
-      position: 'Síndica',
-      status: 'CONTACTED',
-      source: 'REFERRAL',
-      estimatedValue: 8000,
-      notes: 'Precisa de orçamento para vigilância 24h',
-      assignedToName: 'Carlos Oliveira',
-      nextFollowUp: '2025-01-18',
-      createdAt: '2025-01-10'
-    },
-    {
-      id: 3,
-      name: 'Pedro Santos',
-      email: 'pedro.santos@industria.com',
-      phone: '(11) 55555-5555',
-      mobile: '(11) 44444-4444',
-      company: 'Indústria XYZ',
-      position: 'Diretor de Operações',
-      status: 'QUALIFIED',
-      source: 'COLD_CALL',
-      estimatedValue: 25000,
-      notes: 'Empresa em expansão, precisa de segurança industrial',
-      assignedToName: 'João Silva',
-      nextFollowUp: '2025-01-22',
-      createdAt: '2025-01-08'
+  // Form state
+  const [formData, setFormData] = useState<CreateLeadRequest>({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    position: '',
+    source: 'WEBSITE',
+    description: ''
+  });
+
+  // Load leads from backend
+  const loadLeads = async () => {
+    try {
+      setLoading(true);
+      const data = await leadService.getAllLeads();
+      // Map backend data to frontend format
+      const mappedLeads = data.map((lead: any) => ({
+        id: lead.id,
+        name: lead.name || '',
+        email: lead.email || '',
+        phone: lead.phone || '',
+        mobile: lead.mobile || '',
+        company: lead.company || '',
+        position: lead.position || '',
+        status: lead.status || 'NEW',
+        source: lead.source || 'OTHER',
+        estimatedValue: lead.estimatedValue ? Number(lead.estimatedValue) : 0,
+        notes: lead.notes || lead.description || '',
+        assignedToName: lead.assignedTo?.name || lead.assignedToName || 'Não atribuído',
+        nextFollowUp: lead.nextFollowUp ? new Date(lead.nextFollowUp).toISOString().split('T')[0] : '',
+        createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+      }));
+      setLeads(mappedLeads);
+      setFilteredLeads(mappedLeads);
+    } catch (error: any) {
+      console.error('Erro ao carregar leads:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível carregar os leads.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    setLeads(mockLeads);
-    setFilteredLeads(mockLeads);
+    loadLeads();
   }, []);
 
   useEffect(() => {
@@ -137,9 +120,9 @@ const Leads = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(lead =>
-        lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.email.toLowerCase().includes(searchTerm.toLowerCase())
+        lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.email?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -153,6 +136,108 @@ const Leads = () => {
 
     setFilteredLeads(filtered);
   }, [leads, searchTerm, statusFilter, sourceFilter]);
+
+  // Handle create lead
+  const handleCreateLead = async () => {
+    try {
+      setIsSubmitting(true);
+      await leadService.createLead(formData);
+      toast({
+        title: "Sucesso",
+        description: "Lead criado com sucesso!",
+      });
+      setIsCreateModalOpen(false);
+      resetForm();
+      await loadLeads();
+    } catch (error: any) {
+      console.error('Erro ao criar lead:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível criar o lead.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle update lead
+  const handleUpdateLead = async () => {
+    if (!selectedLead) return;
+    try {
+      setIsSubmitting(true);
+      const updateData: UpdateLeadRequest = {
+        ...formData,
+        status: formData.status || selectedLead.status
+      };
+      await leadService.updateLead(Number(selectedLead.id), updateData);
+      toast({
+        title: "Sucesso",
+        description: "Lead atualizado com sucesso!",
+      });
+      setIsEditModalOpen(false);
+      resetForm();
+      await loadLeads();
+    } catch (error: any) {
+      console.error('Erro ao atualizar lead:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível atualizar o lead.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete lead
+  const handleDeleteLead = async (leadId: number) => {
+    if (!confirm('Tem certeza que deseja excluir este lead?')) return;
+    try {
+      await leadService.deleteLead(leadId);
+      toast({
+        title: "Sucesso",
+        description: "Lead excluído com sucesso!",
+      });
+      await loadLeads();
+    } catch (error: any) {
+      console.error('Erro ao excluir lead:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir o lead.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      position: '',
+      source: 'WEBSITE',
+      description: ''
+    });
+    setSelectedLead(null);
+  };
+
+  // Open edit modal
+  const handleEdit = (lead: Lead) => {
+    setSelectedLead(lead);
+    setFormData({
+      name: lead.name || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      company: lead.company || '',
+      position: lead.position || '',
+      source: lead.source || 'WEBSITE',
+      description: lead.description || ''
+    });
+    setIsEditModalOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -367,80 +452,92 @@ const Leads = () => {
             <CardTitle className="text-seguranca-lightgray">Lista de Leads</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-gray-600">
-                    <TableHead className="text-seguranca-lightgray">Nome</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Empresa</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Fonte</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Valor Estimado</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Próximo Follow-up</TableHead>
-                    <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLeads.map((lead) => (
-                    <TableRow key={lead.id} className="border-gray-600">
-                      <TableCell className="text-seguranca-lightgray">
-                        <div>
-                          <div className="font-medium">{lead.name}</div>
-                          <div className="text-sm text-gray-400">{lead.email}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        <div>
-                          <div className="font-medium">{lead.company}</div>
-                          <div className="text-sm text-gray-400">{lead.position}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
-                      <TableCell>{getSourceBadge(lead.source)}</TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        {formatCurrency(lead.estimatedValue)}
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        {lead.assignedToName}
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        {formatDate(lead.nextFollowUp)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                            onClick={() => {
-                              setSelectedLead(lead);
-                              setIsViewModalOpen(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+              </div>
+            ) : filteredLeads.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                Nenhum lead encontrado.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-600">
+                      <TableHead className="text-seguranca-lightgray">Nome</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Empresa</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Status</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Fonte</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Valor Estimado</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Próximo Follow-up</TableHead>
+                      <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLeads.map((lead) => (
+                      <TableRow key={lead.id} className="border-gray-600">
+                        <TableCell className="text-seguranca-lightgray">
+                          <div>
+                            <div className="font-medium">{lead.name}</div>
+                            <div className="text-sm text-gray-400">{lead.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-seguranca-lightgray">
+                          <div>
+                            <div className="font-medium">{lead.company || '-'}</div>
+                            <div className="text-sm text-gray-400">{lead.position || '-'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(lead.status)}</TableCell>
+                        <TableCell>{getSourceBadge(lead.source)}</TableCell>
+                        <TableCell className="text-seguranca-lightgray">
+                          {lead.estimatedValue ? formatCurrency(lead.estimatedValue) : '-'}
+                        </TableCell>
+                        <TableCell className="text-seguranca-lightgray">
+                          {lead.assignedToName}
+                        </TableCell>
+                        <TableCell className="text-seguranca-lightgray">
+                          {lead.nextFollowUp ? formatDate(lead.nextFollowUp) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                              onClick={() => {
+                                setSelectedLead(lead);
+                                setIsViewModalOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                              onClick={() => handleEdit(lead)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
+                              onClick={() => handleDeleteLead(Number(lead.id))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -521,7 +618,13 @@ const Leads = () => {
                   >
                     Fechar
                   </Button>
-                  <Button className="bg-seguranca-red hover:bg-seguranca-darkred">
+                  <Button 
+                    className="bg-seguranca-red hover:bg-seguranca-darkred"
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      handleEdit(selectedLead);
+                    }}
+                  >
                     Editar Lead
                   </Button>
                 </div>
@@ -530,8 +633,134 @@ const Leads = () => {
           </DialogContent>
         </Dialog>
 
+        {/* Modal de Edição */}
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-seguranca-lightgray">Editar Lead</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Atualize as informações do lead
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-name" className="text-seguranca-lightgray">Nome *</Label>
+                  <Input
+                    id="edit-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    placeholder="Nome completo"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-email" className="text-seguranca-lightgray">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-phone" className="text-seguranca-lightgray">Telefone</Label>
+                  <Input
+                    id="edit-phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-company" className="text-seguranca-lightgray">Empresa</Label>
+                  <Input
+                    id="edit-company"
+                    value={formData.company}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    placeholder="Nome da empresa"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-position" className="text-seguranca-lightgray">Cargo</Label>
+                  <Input
+                    id="edit-position"
+                    value={formData.position}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    placeholder="Cargo/função"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-source" className="text-seguranca-lightgray">Fonte *</Label>
+                  <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      <SelectValue placeholder="Selecione a fonte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WEBSITE">Website</SelectItem>
+                      <SelectItem value="REFERRAL">Indicação</SelectItem>
+                      <SelectItem value="COLD_CALL">Ligação a Frio</SelectItem>
+                      <SelectItem value="SOCIAL_MEDIA">Redes Sociais</SelectItem>
+                      <SelectItem value="EVENT">Evento</SelectItem>
+                      <SelectItem value="OTHER">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-description" className="text-seguranca-lightgray">Descrição</Label>
+                <Textarea
+                  id="edit-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  placeholder="Informações adicionais sobre o lead..."
+                  rows={3}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    resetForm();
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="bg-seguranca-red hover:bg-seguranca-darkred"
+                  onClick={handleUpdateLead}
+                  disabled={isSubmitting || !formData.name}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    'Atualizar Lead'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Modal de Criação */}
-        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
+          setIsCreateModalOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
             <DialogHeader>
               <DialogTitle className="text-seguranca-lightgray">Novo Lead</DialogTitle>
@@ -545,15 +774,19 @@ const Leads = () => {
                   <Label htmlFor="name" className="text-seguranca-lightgray">Nome *</Label>
                   <Input
                     id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     placeholder="Nome completo"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email" className="text-seguranca-lightgray">Email *</Label>
+                  <Label htmlFor="email" className="text-seguranca-lightgray">Email</Label>
                   <Input
                     id="email"
                     type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     placeholder="email@exemplo.com"
                   />
@@ -562,22 +795,18 @@ const Leads = () => {
                   <Label htmlFor="phone" className="text-seguranca-lightgray">Telefone</Label>
                   <Input
                     id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     placeholder="(11) 99999-9999"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="mobile" className="text-seguranca-lightgray">Celular</Label>
-                  <Input
-                    id="mobile"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="(11) 88888-8888"
                   />
                 </div>
                 <div>
                   <Label htmlFor="company" className="text-seguranca-lightgray">Empresa</Label>
                   <Input
                     id="company"
+                    value={formData.company}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     placeholder="Nome da empresa"
                   />
@@ -586,13 +815,15 @@ const Leads = () => {
                   <Label htmlFor="position" className="text-seguranca-lightgray">Cargo</Label>
                   <Input
                     id="position"
+                    value={formData.position}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     placeholder="Cargo/função"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="source" className="text-seguranca-lightgray">Fonte</Label>
-                  <Select>
+                  <Label htmlFor="source" className="text-seguranca-lightgray">Fonte *</Label>
+                  <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
                     <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                       <SelectValue placeholder="Selecione a fonte" />
                     </SelectTrigger>
@@ -600,30 +831,20 @@ const Leads = () => {
                       <SelectItem value="WEBSITE">Website</SelectItem>
                       <SelectItem value="REFERRAL">Indicação</SelectItem>
                       <SelectItem value="COLD_CALL">Ligação a Frio</SelectItem>
-                      <SelectItem value="EMAIL_MARKETING">Email Marketing</SelectItem>
                       <SelectItem value="SOCIAL_MEDIA">Redes Sociais</SelectItem>
-                      <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
                       <SelectItem value="EVENT">Evento</SelectItem>
-                      <SelectItem value="PARTNER">Parceiro</SelectItem>
                       <SelectItem value="OTHER">Outro</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="estimatedValue" className="text-seguranca-lightgray">Valor Estimado</Label>
-                  <Input
-                    id="estimatedValue"
-                    type="number"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="0,00"
-                  />
-                </div>
               </div>
               
               <div>
-                <Label htmlFor="notes" className="text-seguranca-lightgray">Observações</Label>
+                <Label htmlFor="description" className="text-seguranca-lightgray">Descrição</Label>
                 <Textarea
-                  id="notes"
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                   placeholder="Informações adicionais sobre o lead..."
                   rows={3}
@@ -634,12 +855,27 @@ const Leads = () => {
                 <Button
                   variant="outline"
                   className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    resetForm();
+                  }}
+                  disabled={isSubmitting}
                 >
                   Cancelar
                 </Button>
-                <Button className="bg-seguranca-red hover:bg-seguranca-darkred">
-                  Criar Lead
+                <Button 
+                  className="bg-seguranca-red hover:bg-seguranca-darkred"
+                  onClick={handleCreateLead}
+                  disabled={isSubmitting || !formData.name}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Lead'
+                  )}
                 </Button>
               </div>
             </div>

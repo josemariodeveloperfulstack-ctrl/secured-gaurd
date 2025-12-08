@@ -25,8 +25,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
+    console.log('🔒 ProtectedRoute: Usuário não autenticado, redirecionando para login');
+    console.log('🔒 ProtectedRoute: isLoading =', isLoading);
     return <Navigate to="/login" replace />;
   }
+  
+  console.log('🔒 ProtectedRoute: Usuário autenticado:', user.name, 'Role:', user.role);
 
   if (requiredPermissions && requiredPermissions.length > 0) {
     const userPermissions = user.permissions;

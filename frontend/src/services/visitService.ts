@@ -3,7 +3,7 @@ import { Visit, CreateVisitRequest, VisitFilters, VisitCalendarEvent, Geolocatio
 
 export const visitService = {
   // Buscar todas as visitas
-  async getVisits(filters: VisitFilters = {}, page: number = 0, size: number = 20): Promise<{
+  async getVisits(filters: VisitFilters = {}, page: number = 0, size: number = 20, sortBy: string = 'visitDate', sortDirection: string = 'DESC'): Promise<{
     content: Visit[];
     totalElements: number;
     totalPages: number;
@@ -19,6 +19,8 @@ export const visitService = {
     
     params.append('page', page.toString());
     params.append('size', size.toString());
+    params.append('sortBy', sortBy);
+    params.append('sortDirection', sortDirection);
 
     const response = await api.get(`/api/visits?${params.toString()}`);
     return response.data;
@@ -146,17 +148,28 @@ export const visitService = {
 
   // Converter visitas para eventos do calendário
   convertToCalendarEvents(visits: Visit[]): VisitCalendarEvent[] {
-    return visits.map(visit => ({
-      id: visit.id,
-      title: `${visit.workPostName} - ${visit.supervisorName}`,
-      date: visit.visitDate,
-      time: visit.visitTime,
-      supervisor: visit.supervisorName,
-      workPost: visit.workPostName,
-      client: visit.clientName,
-      status: visit.status,
-      color: this.getStatusColor(visit.status),
-    }));
+    return visits.map(visit => {
+      // Garantir que o status seja válido
+      const status = visit.status || 'SCHEDULED';
+      console.log('📅 Convertendo visita para evento do calendário:', {
+        id: visit.id,
+        status: status,
+        workPost: visit.workPostName,
+        color: this.getStatusColor(status)
+      });
+      
+      return {
+        id: visit.id,
+        title: `${visit.workPostName} - ${visit.supervisorName}`,
+        date: visit.visitDate,
+        time: visit.visitTime,
+        supervisor: visit.supervisorName,
+        workPost: visit.workPostName,
+        client: visit.clientName,
+        status: status as any,
+        color: this.getStatusColor(status),
+      };
+    });
   },
 
   // Obter cor do status
@@ -170,10 +183,14 @@ export const visitService = {
         return '#10b981'; // verde
       case 'CANCELLED':
         return '#ef4444'; // vermelho
+      case 'PENDING':
+        return '#3b82f6'; // azul (mesma cor de SCHEDULED para compatibilidade)
+      case 'NOT_COMPLETED':
+        return '#6b7280'; // cinza
       case 'MISSED':
         return '#6b7280'; // cinza
       default:
-        return '#6b7280';
+        return '#6b7280'; // cinza padrão
     }
   },
 

@@ -40,6 +40,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     replacingShiftDate: null as Date | null,
     replacingDayOffDate: null as Date | null,
     shiftTime: '',
+    status: undefined as any,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -113,6 +114,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
           replacingShiftDate: null,
           replacingDayOffDate: null,
           shiftTime: '',
+          status: undefined,
         });
       }
       setErrors({});
@@ -143,6 +145,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
         replacingShiftDate: shiftChange.replacingShiftDate ? new Date(shiftChange.replacingShiftDate) : null,
         replacingDayOffDate: shiftChange.replacingDayOffDate ? new Date(shiftChange.replacingDayOffDate) : null,
         shiftTime: shiftChange.shiftTime || '',
+        status: shiftChange.status,
       });
     }
   }, [shiftChange, employees, workPosts]);
@@ -186,6 +189,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
         requesterShiftDate: formData.requesterShiftDate ? formatDateForBackend(formData.requesterShiftDate) : null,
         replacingShiftDate: formData.replacingShiftDate ? formatDateForBackend(formData.replacingShiftDate) : null,
         replacingDayOffDate: formData.replacingDayOffDate ? formatDateForBackend(formData.replacingDayOffDate) : null,
+        // Inclui o status se estiver editando, caso contrário deixa undefined
+        status: formData.status || undefined,
       };
 
       await onSave(submitData);

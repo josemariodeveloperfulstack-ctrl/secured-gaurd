@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.RemanejamentoDTO;
 import com.z7design.secured_guard.model.Remanejamento;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.RemanejamentoService;
@@ -37,12 +38,12 @@ public class RemanejamentoController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @PostMapping
-    public ResponseEntity<Remanejamento> create(@RequestBody Remanejamento remanejamento, 
-                                               HttpServletRequest request) {
+    public ResponseEntity<RemanejamentoDTO> create(@RequestBody RemanejamentoDTO dto, 
+                                              HttpServletRequest request) {
         User usuarioAtual = getUsuarioAtual();
         String ipUsuario = getClientIpAddress(request);
         
-        Remanejamento created = remanejamentoService.create(remanejamento, usuarioAtual, 
+        RemanejamentoDTO created = remanejamentoService.createFromDTO(dto, usuarioAtual, 
             "Criação via API - IP: " + ipUsuario);
         return ResponseEntity.ok(created);
     }
@@ -57,13 +58,13 @@ public class RemanejamentoController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @PutMapping("/{id}")
-    public ResponseEntity<Remanejamento> update(@PathVariable UUID id, 
-                                               @RequestBody Remanejamento remanejamento,
-                                               HttpServletRequest request) {
+    public ResponseEntity<RemanejamentoDTO> update(@PathVariable UUID id, 
+                                              @RequestBody RemanejamentoDTO dto,
+                                              HttpServletRequest request) {
         User usuarioAtual = getUsuarioAtual();
         String ipUsuario = getClientIpAddress(request);
         
-        Remanejamento updated = remanejamentoService.update(id, remanejamento, usuarioAtual, 
+        RemanejamentoDTO updated = remanejamentoService.updateFromDTO(id, dto, usuarioAtual, 
             "Edição via API - IP: " + ipUsuario);
         return ResponseEntity.ok(updated);
     }
@@ -92,8 +93,8 @@ public class RemanejamentoController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @GetMapping
-    public ResponseEntity<List<Remanejamento>> findAll() {
-        return ResponseEntity.ok(remanejamentoService.findAll());
+    public ResponseEntity<List<RemanejamentoDTO>> findAll() {
+        return ResponseEntity.ok(remanejamentoService.findAllAsDTO());
     }
 
     @Operation(summary = "Busca um remanejamento por ID",
@@ -105,8 +106,8 @@ public class RemanejamentoController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<Remanejamento> findById(@PathVariable UUID id) {
-        Optional<Remanejamento> remanejamento = remanejamentoService.findById(id);
+    public ResponseEntity<RemanejamentoDTO> findById(@PathVariable UUID id) {
+        Optional<RemanejamentoDTO> remanejamento = remanejamentoService.findByIdAsDTO(id);
         return remanejamento.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -118,8 +119,8 @@ public class RemanejamentoController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<Remanejamento>> findByEmployeeId(@PathVariable UUID employeeId) {
-        return ResponseEntity.ok(remanejamentoService.findByEmployeeId(employeeId));
+    public ResponseEntity<List<RemanejamentoDTO>> findByEmployeeId(@PathVariable UUID employeeId) {
+        return ResponseEntity.ok(remanejamentoService.findByEmployeeIdAsDTO(employeeId));
     }
     
     /**

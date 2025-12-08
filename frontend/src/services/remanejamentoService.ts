@@ -1,41 +1,80 @@
-import api from '../lib/axios';
+import api from '@/lib/axios';
+
+export type RemanejamentoTipo = 
+  | 'TRANSFERENCIA_UNIDADE' 
+  | 'TRANSFERENCIA_POSTO_TRABALHO'
+  | 'TROCA_FUNCAO' 
+  | 'PROMOCAO' 
+  | 'COBRIR_FERIAS'
+  | 'COBRIR_FALTA'
+  | 'PLANTAO'
+  | 'OUTROS';
 
 export interface Remanejamento {
   id: string;
   employeeId: string;
-  originWorkstationId: string;
-  destinationWorkstationId: string;
-  remanejamentoDate: string;
-  status: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  employeeName?: string;
+  tipo: RemanejamentoTipo;
+  origem: string;
+  destino: string;
+  dataRemanejamento: string;
+  observacao?: string;
+  remanejamentoDate?: string; // Compatibilidade com RH
+  notes?: string; // Compatibilidade com RH
+  status?: string; // Compatibilidade com RH
+  originWorkstationId?: string;
+  destinationWorkstationId?: string;
 }
 
 export interface CreateRemanejamentoDTO {
   employeeId: string;
-  originWorkstationId: string;
-  destinationWorkstationId: string;
-  remanejamentoDate: string;
-  notes?: string;
+  tipo: RemanejamentoTipo;
+  origem: string;
+  destino: string;
+  dataRemanejamento: string;
+  observacao?: string;
 }
 
-export interface UpdateRemanejamentoDTO {
-  originWorkstationId?: string;
-  destinationWorkstationId?: string;
-  remanejamentoDate?: string;
-  status?: string;
-  notes?: string;
+class RemanejamentoService {
+  async getAllRemanejamentos(): Promise<Remanejamento[]> {
+    const response = await api.get('/api/remanejamentos');
+    return response.data;
+  }
+
+  // Alias para compatibilidade
+  async getRemanejamentosTyped(): Promise<Remanejamento[]> {
+    return this.getAllRemanejamentos();
+  }
+
+  async getRemanejamentoById(id: string): Promise<Remanejamento> {
+    const response = await api.get(`/api/remanejamentos/${id}`);
+    return response.data;
+  }
+
+  async getRemanejamentosByEmployee(employeeId: string): Promise<Remanejamento[]> {
+    const response = await api.get(`/api/remanejamentos/employee/${employeeId}`);
+    return response.data;
+  }
+
+  async createRemanejamento(data: CreateRemanejamentoDTO): Promise<Remanejamento> {
+    const response = await api.post('/api/remanejamentos', data);
+    return response.data;
+  }
+
+  async updateRemanejamento(id: string, data: Partial<CreateRemanejamentoDTO>): Promise<Remanejamento> {
+    const response = await api.put(`/api/remanejamentos/${id}`, data);
+    return response.data;
+  }
+
+  async deleteRemanejamento(id: string): Promise<void> {
+    await api.delete(`/api/remanejamentos/${id}`);
+  }
 }
 
-export const getRemanejamentos = () => api.get('/remanejamentos');
-export const getRemanejamentosByEmployee = (employeeId: string) => api.get(`/api/remanejamentos/employee/${employeeId}`);
-export const getRemanejamento = (id: string) => api.get(`/api/remanejamentos/${id}`);
-export const createRemanejamento = (data: CreateRemanejamentoDTO) => api.post('/remanejamentos', data);
-export const updateRemanejamento = (id: string, data: UpdateRemanejamentoDTO) => api.put(`/api/remanejamentos/${id}`, data);
-export const deleteRemanejamento = (id: string) => api.delete(`/api/remanejamentos/${id}`);
+const remanejamentoServiceInstance = new RemanejamentoService();
 
-export const getRemanejamentosTyped = async (): Promise<Remanejamento[]> => {
-  const response = await api.get('/remanejamentos');
-  return response.data;
-};
+// Exportar instância e também funções individuais para compatibilidade
+export const remanejamentoService = remanejamentoServiceInstance;
+
+// Exportar função diretamente para compatibilidade com import *
+export const getRemanejamentosTyped = () => remanejamentoServiceInstance.getRemanejamentosTyped();

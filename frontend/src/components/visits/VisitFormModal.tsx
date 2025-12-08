@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Upload, QrCode, MapPin, User, Building, Clock, FileText } from 'lucide-react';
+import { X, Camera, Upload, QrCode, User, Building, Clock, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CreateVisitRequest, VisitStatus, Visit } from '@/types/visit';
 import { visitService } from '@/services/visitService';
-import MapWithPin from '@/components/ui/MapWithPin';
 import api from '@/lib/axios';
+import CameraCaptureModal from '@/components/operacional/CameraCaptureModal';
+import { employeeService } from '@/services/employeeService';
 
 interface VisitFormModalProps {
   open: boolean;
@@ -52,7 +53,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     visitTime: '',
     description: '',
     observations: '',
-    status: VisitStatus.PENDING,
+    status: VisitStatus.SCHEDULED,
     presentEmployees: [],
     attachedFiles: [],
     photos: [],
@@ -61,13 +62,14 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     locationAddress: '',
     qrCodeScanned: '',
     qrCodeVerified: false,
+    cancellationReason: '',
   });
 
   const [loading, setLoading] = useState(false);
-  const [capturingLocation, setCapturingLocation] = useState(false);
   const [scanningQR, setScanningQR] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [capturedPhotos, setCapturedPhotos] = useState<File[]>([]);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   
   // Dados do banco
   const [supervisorCpf, setSupervisorCpf] = useState('');
@@ -79,7 +81,6 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
   
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
 
@@ -189,18 +190,119 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     }
   };
 
+  const loadSupervisorCpf = async (supervisorId: string) => {
+    try {
+      console.log('🔍 Buscando CPF do supervisor:', supervisorId);
+      const employee = await employeeService.getEmployeeById(supervisorId);
+      console.log('👤 Employee encontrado:', employee);
+      
+      if (employee) {
+        // Tentar buscar CPF em diferentes campos possíveis (cpf, document, documentNumber)
+        const cpfValue = employee.cpf || employee.document || (employee as any).documentNumber;
+        
+        if (cpfValue) {
+          // Formatar CPF (000.000.000-00)
+          const cpf = String(cpfValue).replace(/\D/g, '');
+          console.log('📋 CPF encontrado (normalizado):', cpf);
+          
+          if (cpf.length === 11) {
+            const formattedCpf = `${cpf.substring(0, 3)}.${cpf.substring(3, 6)}.${cpf.substring(6, 9)}-${cpf.substring(9, 11)}`;
+            console.log('✅ CPF formatado:', formattedCpf);
+            setSupervisorCpf(formattedCpf);
+          } else if (cpf.length > 0) {
+            // Se não tem 11 dígitos, usar como está
+            setSupervisorCpf(cpf);
+          } else {
+            console.warn('⚠️ CPF encontrado mas vazio após normalização');
+            setSupervisorCpf('');
+          }
+        } else {
+          console.warn('⚠️ CPF não encontrado nos campos do employee. Campos disponíveis:', Object.keys(employee));
+          setSupervisorCpf('');
+        }
+      } else {
+        console.warn('⚠️ Employee não encontrado');
+        setSupervisorCpf('');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar CPF do supervisor:', error);
+      // Não mostrar erro ao usuário, apenas deixar o CPF vazio
+      setSupervisorCpf('');
+    }
+  };
 
   useEffect(() => {
+    console.log('🔄 VisitFormModal useEffect - visit mudou:', visit);
     if (visit) {
-      setFormData({
+      console.log('📋 Preenchendo formulário com dados da visita:', {
+        id: visit.id,
         supervisorId: visit.supervisorId,
         workPostId: visit.workPostId,
         clientId: visit.clientId,
         visitDate: visit.visitDate,
         visitTime: visit.visitTime,
+        status: visit.status,
+        description: visit.description,
+        observations: visit.observations,
+      });
+      
+      // Formatar data para o input HTML (YYYY-MM-DD)
+      let formattedDate = '';
+      if (visit.visitDate) {
+        try {
+          // Se já está no formato correto, usar direto
+          if (visit.visitDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            formattedDate = visit.visitDate;
+          } else {
+            // Tentar converter de outros formatos
+            const date = new Date(visit.visitDate);
+            if (!isNaN(date.getTime())) {
+              formattedDate = date.toISOString().split('T')[0];
+            }
+          }
+        } catch (e) {
+          formattedDate = new Date().toISOString().split('T')[0];
+        }
+      }
+      if (!formattedDate) {
+        formattedDate = new Date().toISOString().split('T')[0];
+      }
+
+      // Formatar hora para o input HTML (HH:mm)
+      let formattedTime = '';
+      if (visit.visitTime) {
+        try {
+          // Se já está no formato HH:mm, usar direto
+          if (visit.visitTime.match(/^\d{2}:\d{2}$/)) {
+            formattedTime = visit.visitTime;
+          } else if (visit.visitTime.match(/^\d{2}:\d{2}:\d{2}/)) {
+            // Se está no formato HH:mm:ss, pegar apenas HH:mm
+            formattedTime = visit.visitTime.substring(0, 5);
+          } else {
+            // Tentar extrair hora de outros formatos
+            const timeMatch = visit.visitTime.match(/(\d{2}):(\d{2})/);
+            if (timeMatch) {
+              formattedTime = `${timeMatch[1]}:${timeMatch[2]}`;
+            }
+          }
+        } catch (e) {
+          formattedTime = new Date().toTimeString().slice(0, 5);
+        }
+      }
+      if (!formattedTime) {
+        formattedTime = new Date().toTimeString().slice(0, 5);
+      }
+
+      // Preencher todos os campos da visita
+      setFormData({
+        supervisorId: visit.supervisorId || '',
+        workPostId: visit.workPostId || '',
+        clientId: visit.clientId || '',
+        visitDate: formattedDate,
+        visitTime: formattedTime,
         description: visit.description || '',
         observations: visit.observations || '',
-        status: visit.status,
+        status: visit.status || VisitStatus.SCHEDULED,
         presentEmployees: visit.presentEmployees || [],
         attachedFiles: visit.attachedFiles || [],
         photos: visit.photos || [],
@@ -209,8 +311,21 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
         locationAddress: visit.locationAddress || '',
         qrCodeScanned: visit.qrCodeScanned || '',
         qrCodeVerified: visit.qrCodeVerified || false,
+        cancellationReason: (visit as any).cancellationReason || '',
       });
       setSupervisorName(visit.supervisorName || '');
+      
+      // Buscar CPF do supervisor se tiver supervisorId
+      if (visit.supervisorId) {
+        console.log('🔄 VisitFormModal: Buscando CPF para supervisorId:', visit.supervisorId);
+        // Usar setTimeout para garantir que o modal esteja totalmente aberto
+        setTimeout(() => {
+          loadSupervisorCpf(visit.supervisorId);
+        }, 100);
+      } else {
+        console.log('⚠️ VisitFormModal: supervisorId não encontrado na visita');
+        setSupervisorCpf('');
+      }
     } else {
       // Reset form for new visit
       setFormData({
@@ -221,7 +336,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
         visitTime: new Date().toTimeString().slice(0, 5),
         description: '',
         observations: '',
-        status: VisitStatus.PENDING,
+        status: VisitStatus.SCHEDULED,
         presentEmployees: [],
         attachedFiles: [],
         photos: [],
@@ -230,6 +345,7 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
         locationAddress: '',
         qrCodeScanned: '',
         qrCodeVerified: false,
+        cancellationReason: '',
       });
       setSupervisorCpf('');
       setSupervisorName('');
@@ -245,69 +361,17 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
     }));
   };
 
-  const handleCaptureLocation = async () => {
-    if (!navigator.geolocation) {
-      toast({
-        title: "Geolocalização não suportada",
-        description: "Seu navegador não suporta geolocalização",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setCapturingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        setFormData(prev => ({
-          ...prev,
-          latitude,
-          longitude,
-          locationAddress: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-        }));
-
-        toast({
-          title: "Localização capturada",
-          description: `Lat: ${latitude.toFixed(6)}, Long: ${longitude.toFixed(6)}`,
-        });
-
-        setCapturingLocation(false);
-      },
-      (error) => {
-        console.error('Erro ao capturar localização:', error);
-        toast({
-          title: "Erro ao capturar localização",
-          description: error.message,
-          variant: "destructive",
-        });
-        setCapturingLocation(false);
-      }
-    );
-  };
-
-  const handleMapLocationSelect = (lat: number, lng: number) => {
-    setFormData(prev => ({
-      ...prev,
-      latitude: lat,
-      longitude: lng,
-      locationAddress: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-    }));
-
-    toast({
-      title: "Localização selecionada no mapa",
-      description: `Lat: ${lat.toFixed(6)}, Long: ${lng.toFixed(6)}`,
-    });
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setUploadedFiles(prev => [...prev, ...files]);
   };
 
-  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setCapturedPhotos(prev => [...prev, ...files]);
+  const handlePhotoCaptured = (file: File) => {
+    setCapturedPhotos(prev => [...prev, file]);
+    toast({
+      title: "Foto capturada",
+      description: "Foto adicionada com sucesso",
+    });
   };
 
   const handleSubmit = async () => {
@@ -333,6 +397,16 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
       toast({
         title: "Posto de trabalho obrigatório",
         description: "Selecione um posto de trabalho",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar motivo de cancelamento se status for CANCELLED
+    if (formData.status === VisitStatus.CANCELLED && (!formData.cancellationReason || formData.cancellationReason.trim() === '')) {
+      toast({
+        title: "Motivo de cancelamento obrigatório",
+        description: "Informe o motivo do cancelamento",
         variant: "destructive",
       });
       return;
@@ -523,6 +597,74 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Status *</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleInputChange('status', value as VisitStatus)}
+                >
+                  <SelectTrigger className="bg-white text-black">
+                    <SelectValue placeholder="Selecione o status">
+                      {formData.status && (
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-3 h-3 rounded-full ${
+                            formData.status === VisitStatus.SCHEDULED ? 'bg-blue-500' :
+                            formData.status === VisitStatus.IN_PROGRESS ? 'bg-yellow-500' :
+                            formData.status === VisitStatus.COMPLETED ? 'bg-green-500' :
+                            formData.status === VisitStatus.CANCELLED ? 'bg-red-500' : 'bg-gray-500'
+                          }`}></div>
+                          <span>{
+                            formData.status === VisitStatus.SCHEDULED ? 'Agendada' :
+                            formData.status === VisitStatus.IN_PROGRESS ? 'Em Andamento' :
+                            formData.status === VisitStatus.COMPLETED ? 'Concluída' :
+                            formData.status === VisitStatus.CANCELLED ? 'Cancelada' : 'Selecione'
+                          }</span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value={VisitStatus.SCHEDULED} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span>Agendada</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={VisitStatus.IN_PROGRESS} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <span>Em Andamento</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={VisitStatus.COMPLETED} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span>Concluída</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={VisitStatus.CANCELLED} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span>Cancelada</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Campo de motivo de cancelamento - aparece apenas quando status é CANCELLED */}
+              {formData.status === VisitStatus.CANCELLED && (
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Motivo do Cancelamento *</Label>
+                  <Textarea
+                    value={formData.cancellationReason || ''}
+                    onChange={(e) => handleInputChange('cancellationReason', e.target.value)}
+                    placeholder="Informe o motivo do cancelamento"
+                    className="bg-white text-black"
+                    rows={3}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -555,53 +697,6 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                   rows={3}
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Geolocalização */}
-          <Card className="bg-seguranca-black border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-seguranca-yellow flex items-center gap-2">
-                <MapPin size={20} />
-                Geolocalização
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button
-                type="button"
-                onClick={handleCaptureLocation}
-                disabled={capturingLocation}
-                className="w-full flex items-center justify-center gap-2"
-              >
-                <MapPin size={16} />
-                {capturingLocation ? 'Capturando localização...' : 'Capturar Localização Atual'}
-              </Button>
-              {formData.latitude && formData.longitude && (
-                <div className="text-sm text-seguranca-lightgray">
-                  <p>Latitude: {formData.latitude.toFixed(6)}</p>
-                  <p>Longitude: {formData.longitude.toFixed(6)}</p>
-                </div>
-              )}
-              
-              {/* Mapa Interativo */}
-              {formData.latitude && formData.longitude && (
-                <div className="mt-4">
-                  <Label className="text-seguranca-lightgray mb-2 block">
-                    Mapa da Localização
-                  </Label>
-                  <MapWithPin
-                    latitude={formData.latitude}
-                    longitude={formData.longitude}
-                    onLocationSelect={handleMapLocationSelect}
-                    height="300px"
-                    className="rounded-lg"
-                    showControls={true}
-                  />
-                  <p className="text-xs text-gray-400 mt-2">
-                    💡 Clique no mapa para ajustar a localização
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -639,20 +734,11 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                   )}
                 </div>
                 <div>
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    multiple
-                    onChange={handleCameraCapture}
-                    className="hidden"
-                  />
                   <Button
                     type="button"
-                    onClick={() => cameraInputRef.current?.click()}
+                    onClick={() => setShowCameraModal(true)}
                     variant="outline"
-                    className="w-full flex items-center justify-center gap-2"
+                    className="w-full flex items-center justify-center gap-2 border-red-500 hover:bg-red-500 hover:text-white"
                   >
                     <Camera size={16} />
                     Tirar Foto
@@ -686,6 +772,12 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
           </Button>
         </div>
       </DialogContent>
+
+      <CameraCaptureModal
+        open={showCameraModal}
+        onOpenChange={setShowCameraModal}
+        onCapture={handlePhotoCaptured}
+      />
     </Dialog>
   );
 };

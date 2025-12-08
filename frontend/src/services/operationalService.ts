@@ -166,16 +166,36 @@ class OperationalService {
   }
 
   async createVacationCoverage(data: CreateVacationCoverageDTO): Promise<VacationCoverage> {
-    const response = await api.post('/api/vacation-coverages', data);
+    // Enviar DTO simples com IDs
+    const payload = {
+      employeeId: data.employeeId,
+      substituteEmployeeId: data.substituteEmployeeId || null,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      locationId: data.locationId || null,
+      shift: data.shift,
+      observations: data.observations || null,
+    };
+    const response = await api.post('/api/vacation-coverages', payload);
     return response.data;
   }
 
   async updateVacationCoverage(id: string, data: Partial<CreateVacationCoverageDTO>): Promise<VacationCoverage> {
-    const response = await api.put(`/api/vacation-coverages/${id}`, data);
+    // Enviar DTO simples com IDs
+    const payload: any = {
+      employeeId: data.employeeId,
+      substituteEmployeeId: data.substituteEmployeeId || null,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      locationId: data.locationId || null,
+      shift: data.shift,
+      observations: data.observations || null,
+    };
+    const response = await api.put(`/api/vacation-coverages/${id}`, payload);
     return response.data;
   }
 
-  async updateVacationCoverageStatus(id: string, status: 'PENDING' | 'CONFIRMED' | 'NO_COVERAGE'): Promise<VacationCoverage> {
+  async updateVacationCoverageStatus(id: string, status: string): Promise<VacationCoverage> {
     const response = await api.put(`/api/vacation-coverages/${id}/status?status=${status}`);
     return response.data;
   }
@@ -261,12 +281,52 @@ class OperationalService {
   }
 
   async createWorkPostAssignment(data: CreateWorkPostAssignmentDTO): Promise<WorkPostAssignment> {
-    const response = await api.post('/api/work-post-assignments', data);
+    // Enviar DTO simples com IDs
+    const payload = {
+      employeeId: data.employeeId,
+      workPostId: data.workPostId,
+      assignmentDate: data.assignmentDate,
+      shiftType: data.shift,
+      startTime: data.startTime || null,
+      endTime: data.endTime || null,
+      isPrimaryAssignment: true,
+      isBackupAssignment: false,
+      observations: data.observations || null,
+      specialInstructions: null,
+    };
+    const response = await api.post('/api/work-post-assignments', payload);
     return response.data;
   }
 
   async updateWorkPostAssignment(id: string, data: Partial<CreateWorkPostAssignmentDTO>): Promise<WorkPostAssignment> {
-    const response = await api.put(`/api/work-post-assignments/${id}`, data);
+    // Enviar DTO simples com IDs
+    const payload: any = {
+      employeeId: data.employeeId,
+      workPostId: data.workPostId,
+      assignmentDate: data.assignmentDate,
+      shiftType: data.shift,
+      startTime: data.startTime || null,
+      endTime: data.endTime || null,
+      observations: data.observations || null,
+      specialInstructions: null,
+    };
+    
+    const response = await api.put(`/api/work-post-assignments/${id}`, payload);
+    return response.data;
+  }
+
+  async updateAssignmentStatus(id: string, status: string): Promise<WorkPostAssignment> {
+    // Mapear status do frontend para o backend
+    const statusMap: Record<string, string> = {
+      'SCHEDULED': 'PENDING',
+      'CONFIRMED': 'CONFIRMED',
+      'ACTIVE': 'ACTIVE',
+      'COMPLETED': 'COMPLETED',
+      'CANCELLED': 'CANCELLED'
+    };
+    
+    const backendStatus = statusMap[status] || status;
+    const response = await api.put(`/api/work-post-assignments/${id}/status?status=${backendStatus}`);
     return response.data;
   }
 
@@ -316,12 +376,34 @@ class OperationalService {
   }
 
   async createSpecificActivity(data: CreateSpecificActivityDTO): Promise<SpecificActivity> {
-    const response = await api.post('/api/specific-activities', data);
+    // Enviar DTO simples com IDs
+    const payload = {
+      employeeId: data.employeeId,
+      activityType: data.activityType,
+      activityDate: data.activityDate,
+      startTime: data.startTime || null,
+      endTime: data.endTime || null,
+      locationId: data.locationId || null,
+      description: data.description || null,
+      observations: data.observations || null,
+    };
+    const response = await api.post('/api/specific-activities', payload);
     return response.data;
   }
 
   async updateSpecificActivity(id: string, data: Partial<CreateSpecificActivityDTO>): Promise<SpecificActivity> {
-    const response = await api.put(`/api/specific-activities/${id}`, data);
+    // Enviar DTO simples com IDs
+    const payload: any = {
+      employeeId: data.employeeId,
+      activityType: data.activityType,
+      activityDate: data.activityDate,
+      startTime: data.startTime || null,
+      endTime: data.endTime || null,
+      locationId: data.locationId || null,
+      description: data.description || null,
+      observations: data.observations || null,
+    };
+    const response = await api.put(`/api/specific-activities/${id}`, payload);
     return response.data;
   }
 

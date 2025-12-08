@@ -5,6 +5,7 @@ import api from '@/lib/axios';
 import { User, AuthContextType } from '@/types/user';
 import { generatePermissions, generatePermissionsFromGroups, combinePermissions } from '@/utils/permissions';
 import { groupService } from '@/services/groupService';
+import { getApiUrl } from '@/config/environment';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -131,6 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       console.log('🔍 Tentando fazer login com:', email);
+      console.log('🔍 Base URL:', getApiUrl());
       
       // Removido teste de comunicação para evitar erros desnecessários
       
@@ -138,7 +140,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Usar caminho completo com /api para garantir que o proxy funcione
       const response = await api.post('/api/auth/login', { username: email, password });
       
-      console.log('🔍 Resposta do login:', response.status, response.data);
+      console.log('✅ Resposta do login recebida:', response.status);
+      console.log('📦 Dados da resposta:', {
+        hasToken: !!response.data?.token,
+        hasUser: !!response.data?.user,
+        userRole: response.data?.user?.role,
+        userRoles: response.data?.user?.roles
+      });
       
       // Obter os roles do backend (array ou string)
       let userRoles: string[] = [];
@@ -209,16 +217,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Navegar apenas após login bem-sucedido
       navigate('/dashboard');
-    } catch (error) {
-      console.error('Erro no login:', error);
-      console.error('Detalhes do erro:', error.response?.data);
-      console.error('Status do erro:', error.response?.status);
+    } catch (error: any) {
+      console.error('❌ Erro no login:', error);
+      console.error('📋 Detalhes do erro:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        config: {
+          url: error?.config?.url,
+          method: error?.config?.method,
+          baseURL: error?.config?.baseURL
+        }
+      });
+      
+      // Mensagem de erro mais específica
+      let errorMessage = 'Verifique suas credenciais e tente novamente.';
+      
+      if (error?.response?.status === 401) {
+        errorMessage = error?.response?.data?.message || 'Usuário ou senha incorretos.';
+      } else if (error?.response?.status === 403) {
+        errorMessage = 'Acesso negado. Verifique suas permissões.';
+      } else if (error?.response?.status === 500) {
+        errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (error?.isConnectionError) {
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+      } else if (!error?.response) {
+        errorMessage = 'Erro de conexão. Verifique se o servidor está rodando.';
+      }
+      
       toast({
         title: 'Erro ao fazer login',
-        description: 'Verifique suas credenciais e tente novamente.',
+        description: errorMessage,
         variant: 'destructive',
       });
-      throw new Error('Falha na autenticação');
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }

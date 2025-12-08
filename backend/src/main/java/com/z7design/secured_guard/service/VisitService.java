@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.CreateVisitDTO;
 import com.z7design.secured_guard.dto.VisitDTO;
 import com.z7design.secured_guard.model.*;
+import com.z7design.secured_guard.model.enums.VisitStatus;
 import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +75,7 @@ public class VisitService {
     }
 
     @Transactional
-    public VisitDTO create(CreateVisitDTO createVisitDTO, String currentUserEmail) {
+    public VisitDTO create(CreateVisitDTO createVisitDTO, String currentUserIdentifier) {
         log.info("Criando nova visita para supervisor: {}", createVisitDTO.getSupervisorId());
 
         // Buscar entidades relacionadas
@@ -87,45 +88,58 @@ public class VisitService {
         Client client = clientRepository.findById(createVisitDTO.getClientId())
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
 
-        User createdBy = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        // Tentar buscar usuário por username primeiro, depois por email
+        User createdBy = userRepository.findByUsername(currentUserIdentifier)
+                .orElseGet(() -> userRepository.findByEmail(currentUserIdentifier)
+                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + currentUserIdentifier)));
 
-        // Criar visita
-        Visit visit = Visit.builder()
-                .supervisor(supervisor)
-                .workPost(workPost)
-                .client(client)
-                .visitDate(createVisitDTO.getVisitDate())
-                .visitTime(createVisitDTO.getVisitTime())
-                .description(createVisitDTO.getDescription())
-                .observations(createVisitDTO.getObservations())
-                .status(createVisitDTO.getStatus())
-                // .presentEmployees(...) // Removido
-                // .attachedFiles(...) // Removido
-                // .photos(...) // Removido
-                // .latitude(...) // Removido
-                // .longitude(...) // Removido
-                // .locationAddress(...) // Removido
-                // .qrCodeScanned(...) // Removido
-                // .qrCodeVerified(...) // Removido
-                .createdBy(createdBy)
-                .build();
+        try {
+            // Criar visita
+            Visit visit = Visit.builder()
+                    .supervisor(supervisor)
+                    .workPost(workPost)
+                    .client(client)
+                    .visitDate(createVisitDTO.getVisitDate())
+                    .visitTime(createVisitDTO.getVisitTime())
+                    .description(createVisitDTO.getDescription())
+                    .observations(createVisitDTO.getObservations())
+                    .status(createVisitDTO.getStatus() != null ? createVisitDTO.getStatus() : VisitStatus.SCHEDULED)
+                    .cancellationReason(createVisitDTO.getCancellationReason())
+                    // .presentEmployees(...) // Removido
+                    // .attachedFiles(...) // Removido
+                    // .photos(...) // Removido
+                    // .latitude(...) // Removido
+                    // .longitude(...) // Removido
+                    // .locationAddress(...) // Removido
+                    // .qrCodeScanned(...) // Removido
+                    // .qrCodeVerified(...) // Removido
+                    .createdBy(createdBy)
+                    .build();
 
-        Visit savedVisit = visitRepository.save(visit);
-        log.info("Visita criada com sucesso: {}", savedVisit.getId());
+            log.debug("Visit entity criada: status={}, cancellationReason={}", visit.getStatus(), visit.getCancellationReason());
 
-        return convertToDTO(savedVisit);
+            Visit savedVisit = visitRepository.save(visit);
+            log.info("Visita criada com sucesso: {}", savedVisit.getId());
+
+            return convertToDTO(savedVisit);
+        } catch (Exception e) {
+            log.error("Erro ao salvar visita no banco de dados: {}", e.getMessage(), e);
+            log.error("Stack trace completo:", e);
+            throw new RuntimeException("Erro ao salvar visita: " + e.getMessage(), e);
+        }
     }
 
     @Transactional
-    public VisitDTO update(UUID id, CreateVisitDTO updateDTO, String currentUserEmail) {
+    public VisitDTO update(UUID id, CreateVisitDTO updateDTO, String currentUserIdentifier) {
         log.info("Atualizando visita: {}", id);
 
         Visit visit = visitRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Visita não encontrada"));
 
-        User updatedBy = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        // Tentar buscar usuário por username primeiro, depois por email
+        User updatedBy = userRepository.findByUsername(currentUserIdentifier)
+                .orElseGet(() -> userRepository.findByEmail(currentUserIdentifier)
+                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + currentUserIdentifier)));
 
         // Atualizar campos
         if (updateDTO.getSupervisorId() != null) {
@@ -164,6 +178,10 @@ public class VisitService {
 
         if (updateDTO.getStatus() != null) {
             visit.setStatus(updateDTO.getStatus());
+        }
+
+        if (updateDTO.getCancellationReason() != null) {
+            visit.setCancellationReason(updateDTO.getCancellationReason());
         }
 
         // Campos removidos temporariamente - Visit.java refatorado
@@ -256,27 +274,15 @@ public class VisitService {
                     .description(visit.getDescription())
                     .observations(visit.getObservations())
                     .status(visit.getStatus())
-                    // .presentEmployees(...) // Removido
-                    // .attachedFiles(...) // Removido
-                    // .photos(...) // Removido
-                    // .arrivalTime(visit.getArrivalTime() != null ? visit.getArrivalTime().toLocalTime() : null)
-                    // .departureTime(visit.getDepartureTime() != null ? visit.getDepartureTime().toLocalTime() : null)
-                    // .securityCheck(visit.getSecurityCheck())
-                    // .equipmentCheck(visit.getEquipmentCheck())
-                    // .staffCheck(visit.getStaffCheck())
-                    // .procedureCheck(Boolean.FALSE)
-                    // .estimatedDurationMinutes(0)
-                    // .priorityLevel(1)
-                    // .preferredTimeStart(null)
-                    // .preferredTimeEnd(null)
-                    // .routeOrder(0)
-                    // .travelTimeToNextMinutes(0)
-                    // .travelDistanceToNextKm(0.0)
-                    // .latitude(null)
-                    // .longitude(visit.getLongitude())
-                    // .locationAddress(visit.getLocationAddress())
-                    // .qrCodeScanned(visit.getQrCodeScanned())
-                    // .qrCodeVerified(visit.getQrCodeVerified())
+                    .cancellationReason(visit.getCancellationReason())
+                    .latitude(visit.getLatitude())
+                    .longitude(visit.getLongitude())
+                    .locationAddress(visit.getLocationAddress())
+                    .qrCodeScanned(visit.getQrCodeScanned())
+                    .qrCodeVerified(visit.getQrCodeVerified())
+                    .presentEmployees(java.util.Collections.emptyList()) // Lista vazia por enquanto
+                    .attachedFiles(java.util.Collections.emptyList()) // Lista vazia por enquanto
+                    .photos(java.util.Collections.emptyList()) // Lista vazia por enquanto
                     .createdAt(visit.getCreatedAt())
                     .updatedAt(visit.getUpdatedAt())
                     .createdByName(visit.getCreatedBy() != null ? visit.getCreatedBy().getName() : null)

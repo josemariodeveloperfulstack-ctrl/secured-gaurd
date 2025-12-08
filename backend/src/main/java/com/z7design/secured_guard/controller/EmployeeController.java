@@ -206,10 +206,24 @@ public class EmployeeController {
                 java.util.Map<String, Object> employee = new java.util.HashMap<>();
                 employee.put("id", row[0]);
                 employee.put("name", row[1]);
-                employee.put("email", row[2]);
-                employee.put("phone", row[3]);
-                employee.put("status", row[4]);
-                employee.put("createdAt", row[5]);
+                employee.put("email", row[11]); // email está na posição 11 na query completa
+                employee.put("phone", row[10]); // phone está na posição 10
+                employee.put("status", row[7]); // status está na posição 7
+                employee.put("createdAt", row[17]); // created_at está na posição 17
+                
+                // Adicionar position e unit
+                if (row.length > 19 && row[19] != null) {
+                    java.util.Map<String, Object> position = new java.util.HashMap<>();
+                    position.put("name", row[19]); // position_name
+                    employee.put("position", position);
+                }
+                
+                if (row.length > 20 && row[20] != null) {
+                    java.util.Map<String, Object> unit = new java.util.HashMap<>();
+                    unit.put("name", row[20]); // unit_name
+                    employee.put("unit", unit);
+                }
+                
                 employees.add(employee);
             }
             
@@ -269,6 +283,19 @@ public class EmployeeController {
                     employee.put("salario", row[16]);
                     employee.put("createdAt", row[17]);
                     employee.put("updatedAt", row[18]);
+                    
+                    // Adicionar position e unit (novas colunas da query)
+                    if (row.length > 19 && row[19] != null) {
+                        java.util.Map<String, Object> position = new java.util.HashMap<>();
+                        position.put("name", row[19]); // position_name
+                        employee.put("position", position);
+                    }
+                    
+                    if (row.length > 20 && row[20] != null) {
+                        java.util.Map<String, Object> unit = new java.util.HashMap<>();
+                        unit.put("name", row[20]); // unit_name
+                        employee.put("unit", unit);
+                    }
                     
                     employees.add(employee);
                     } catch (Exception dtoError) {

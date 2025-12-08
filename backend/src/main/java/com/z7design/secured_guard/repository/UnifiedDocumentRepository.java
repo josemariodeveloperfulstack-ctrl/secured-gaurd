@@ -36,8 +36,14 @@ public interface UnifiedDocumentRepository extends JpaRepository<UnifiedDocument
     @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.payslip.id = :payslipId")
     Optional<UnifiedDocument> findByPayslipId(@Param("payslipId") UUID payslipId);
     
+    @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.payslip.id = :payslipId")
+    List<UnifiedDocument> findAllByPayslipId(@Param("payslipId") UUID payslipId);
+    
     @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.receipt.id = :receiptId")
     Optional<UnifiedDocument> findByReceiptId(@Param("receiptId") UUID receiptId);
+    
+    @Query("SELECT ud FROM UnifiedDocument ud WHERE ud.receipt.id = :receiptId")
+    List<UnifiedDocument> findAllByReceiptId(@Param("receiptId") UUID receiptId);
     
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional

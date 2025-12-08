@@ -21,31 +21,63 @@ export const VisitViewModal: React.FC<VisitViewModalProps> = ({
   onEdit,
   onDelete,
 }) => {
-  if (!visit) return null;
+  console.log('👁️ VisitViewModal renderizado - visit:', visit);
+  
+  if (!visit) {
+    console.warn('⚠️ VisitViewModal: visit é null ou undefined');
+    return null;
+  }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('pt-BR');
+    } catch (e) {
+      return dateString;
+    }
   };
 
-  const formatTime = (timeString: string) => {
-    return timeString.substring(0, 5);
+  const formatTime = (timeString: string | null | undefined) => {
+    if (!timeString) return 'N/A';
+    try {
+      return timeString.substring(0, 5);
+    } catch (e) {
+      return timeString;
+    }
   };
 
-  const formatDateTime = (dateString: string, timeString: string) => {
-    const date = new Date(`${dateString}T${timeString}`);
-    return date.toLocaleString('pt-BR');
+  const formatDateTime = (dateString: string | null | undefined, timeString: string | null | undefined) => {
+    if (!dateString || !timeString) {
+      const date = dateString ? formatDate(dateString) : 'N/A';
+      const time = timeString ? formatTime(timeString) : 'N/A';
+      return `${date} ${time}`;
+    }
+    try {
+      // LocalDate vem como "2024-12-07" e LocalTime como "14:30:00" ou "14:30"
+      const date = new Date(`${dateString}T${timeString}`);
+      if (isNaN(date.getTime())) {
+        // Se falhar, tentar formatar manualmente
+        return `${formatDate(dateString)} ${formatTime(timeString)}`;
+      }
+      return date.toLocaleString('pt-BR');
+    } catch (e) {
+      // Fallback: formatar manualmente
+      return `${formatDate(dateString)} ${formatTime(timeString)}`;
+    }
   };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
+      PENDING: { label: 'Pendente', className: 'bg-blue-500 text-white' },
       SCHEDULED: { label: 'Agendada', className: 'bg-blue-500 text-white' },
       IN_PROGRESS: { label: 'Em Andamento', className: 'bg-yellow-500 text-white' },
       COMPLETED: { label: 'Concluída', className: 'bg-green-500 text-white' },
+      NOT_COMPLETED: { label: 'Não Realizada', className: 'bg-gray-500 text-white' },
       CANCELLED: { label: 'Cancelada', className: 'bg-red-500 text-white' },
       MISSED: { label: 'Não Realizada', className: 'bg-gray-500 text-white' },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.SCHEDULED;
+    const config = statusConfig[status as keyof typeof statusConfig] || { label: status || 'Desconhecido', className: 'bg-gray-500 text-white' };
     
     return (
       <Badge className={config.className}>
@@ -130,7 +162,7 @@ export const VisitViewModal: React.FC<VisitViewModalProps> = ({
                     <User className="w-4 h-4 mr-2" />
                     <span className="font-medium">Supervisor:</span>
                   </div>
-                  <p className="text-white ml-6">{visit.supervisorName}</p>
+                  <p className="text-white ml-6">{visit.supervisorName || 'N/A'}</p>
                 </div>
 
                 <div className="space-y-2">
@@ -138,7 +170,7 @@ export const VisitViewModal: React.FC<VisitViewModalProps> = ({
                     <Building className="w-4 h-4 mr-2" />
                     <span className="font-medium">Posto de Trabalho:</span>
                   </div>
-                  <p className="text-white ml-6">{visit.workPostName}</p>
+                  <p className="text-white ml-6">{visit.workPostName || 'N/A'}</p>
                 </div>
               </div>
 
@@ -147,7 +179,7 @@ export const VisitViewModal: React.FC<VisitViewModalProps> = ({
                   <Building className="w-4 h-4 mr-2" />
                   <span className="font-medium">Cliente:</span>
                 </div>
-                <p className="text-white ml-6">{visit.clientName}</p>
+                <p className="text-white ml-6">{visit.clientName || 'N/A'}</p>
               </div>
             </CardContent>
           </Card>
@@ -354,9 +386,13 @@ export const VisitViewModal: React.FC<VisitViewModalProps> = ({
               <CardTitle className="text-white text-sm">Informações do Sistema</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-gray-400 space-y-1">
-              <div>Criado em: {formatDateTime(visit.createdAt.split('T')[0], '00:00')}</div>
+              {visit.createdAt && (
+                <div>Criado em: {formatDateTime(visit.createdAt.split('T')[0], '00:00')}</div>
+              )}
               {visit.createdByName && <div>Criado por: {visit.createdByName}</div>}
-              <div>Atualizado em: {formatDateTime(visit.updatedAt.split('T')[0], '00:00')}</div>
+              {visit.updatedAt && (
+                <div>Atualizado em: {formatDateTime(visit.updatedAt.split('T')[0], '00:00')}</div>
+              )}
               {visit.updatedByName && <div>Atualizado por: {visit.updatedByName}</div>}
             </CardContent>
           </Card>

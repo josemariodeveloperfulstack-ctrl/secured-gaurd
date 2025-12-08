@@ -67,6 +67,9 @@ public class VisitDTO {
     private String qrCodeScanned;
     private Boolean qrCodeVerified;
     
+    // Cancelamento
+    private String cancellationReason;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String createdByName;

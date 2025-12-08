@@ -21,16 +21,21 @@ const VisitList: React.FC<VisitListProps> = ({
   onView,
   onDelete,
 }) => {
+  // Garantir que visits seja um array
+  const safeVisits = visits || [];
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
+      PENDING: { label: 'Pendente', className: 'bg-blue-500 text-white' },
       SCHEDULED: { label: 'Agendada', className: 'bg-blue-500 text-white' },
       IN_PROGRESS: { label: 'Em Andamento', className: 'bg-yellow-500 text-white' },
       COMPLETED: { label: 'Concluída', className: 'bg-green-500 text-white' },
+      NOT_COMPLETED: { label: 'Não Realizada', className: 'bg-gray-500 text-white' },
       CANCELLED: { label: 'Cancelada', className: 'bg-red-500 text-white' },
       MISSED: { label: 'Não Realizada', className: 'bg-gray-500 text-white' },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.SCHEDULED;
+    const config = statusConfig[status as keyof typeof statusConfig] || { label: status || 'Desconhecido', className: 'bg-gray-500 text-white' };
     
     return (
       <Badge className={config.className}>
@@ -39,12 +44,22 @@ const VisitList: React.FC<VisitListProps> = ({
     );
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('pt-BR');
+    } catch (e) {
+      return dateString;
+    }
   };
 
-  const formatTime = (timeString: string) => {
-    return timeString.substring(0, 5);
+  const formatTime = (timeString: string | null | undefined) => {
+    if (!timeString) return 'N/A';
+    try {
+      return timeString.substring(0, 5);
+    } catch (e) {
+      return timeString;
+    }
   };
 
   if (loading) {
@@ -55,7 +70,7 @@ const VisitList: React.FC<VisitListProps> = ({
     );
   }
 
-  if (visits.length === 0) {
+  if (safeVisits.length === 0) {
     return (
       <div className="text-center py-8">
         <MapPin className="w-16 h-16 text-gray-500 mx-auto mb-4" />
@@ -69,21 +84,21 @@ const VisitList: React.FC<VisitListProps> = ({
     <div className="space-y-4">
       {/* Cards para mobile */}
       <div className="block md:hidden space-y-3">
-        {visits.map((visit) => (
+        {safeVisits.map((visit) => (
           <Card key={visit.id} className="bg-seguranca-black border-gray-700">
             <CardContent className="p-4">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
-                  <h3 className="text-white font-semibold mb-1">{visit.workPostName}</h3>
-                  <p className="text-gray-400 text-sm">{visit.clientName}</p>
+                  <h3 className="text-white font-semibold mb-1">{visit.workPostName || 'N/A'}</h3>
+                  <p className="text-gray-400 text-sm">{visit.clientName || 'N/A'}</p>
                 </div>
-                {getStatusBadge(visit.status)}
+                {getStatusBadge(visit.status || 'PENDING')}
               </div>
 
               <div className="space-y-2 mb-4">
                 <div className="flex items-center text-sm text-gray-300">
                   <User className="w-4 h-4 mr-2" />
-                  <span>{visit.supervisorName}</span>
+                  <span>{visit.supervisorName || 'N/A'}</span>
                 </div>
                 
                 <div className="flex items-center text-sm text-gray-300">
@@ -98,14 +113,18 @@ const VisitList: React.FC<VisitListProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center text-sm text-gray-300">
-                  <span>{visit.presentEmployees.length} funcionário(s) presente(s)</span>
-                </div>
+                {(visit.presentEmployees && visit.presentEmployees.length > 0) && (
+                  <div className="flex items-center text-sm text-gray-300">
+                    <span>{visit.presentEmployees.length} funcionário(s) presente(s)</span>
+                  </div>
+                )}
 
-                {(visit.photos.length > 0 || visit.attachedFiles.length > 0) && (
+                {((visit.photos && visit.photos.length > 0) || (visit.attachedFiles && visit.attachedFiles.length > 0)) && (
                   <div className="flex items-center text-sm text-gray-300">
                     <Camera className="w-4 h-4 mr-2" />
-                    <span>{visit.photos.length} foto(s), {visit.attachedFiles.length} arquivo(s)</span>
+                    <span>
+                      {visit.photos?.length || 0} foto(s), {visit.attachedFiles?.length || 0} arquivo(s)
+                    </span>
                   </div>
                 )}
               </div>
@@ -170,7 +189,7 @@ const VisitList: React.FC<VisitListProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visits.map((visit) => (
+                {safeVisits.map((visit) => (
                   <TableRow key={visit.id} className="border-gray-700 hover:bg-gray-800">
                     <TableCell className="text-white">
                       <div>
@@ -180,7 +199,7 @@ const VisitList: React.FC<VisitListProps> = ({
                     </TableCell>
                     
                     <TableCell className="text-white">
-                      <div className="font-medium">{visit.workPostName}</div>
+                      <div className="font-medium">{visit.workPostName || 'N/A'}</div>
                       {visit.latitude && visit.longitude && (
                         <div className="flex items-center text-xs text-gray-400">
                           <MapPin className="w-3 h-3 mr-1" />
@@ -189,34 +208,34 @@ const VisitList: React.FC<VisitListProps> = ({
                       )}
                     </TableCell>
                     
-                    <TableCell className="text-white">{visit.clientName}</TableCell>
+                    <TableCell className="text-white">{visit.clientName || 'N/A'}</TableCell>
                     
-                    <TableCell className="text-white">{visit.supervisorName}</TableCell>
+                    <TableCell className="text-white">{visit.supervisorName || 'N/A'}</TableCell>
                     
                     <TableCell>{getStatusBadge(visit.status)}</TableCell>
                     
                     <TableCell className="text-white">
                       <div className="flex items-center">
                         <User className="w-4 h-4 mr-1" />
-                        <span>{visit.presentEmployees.length}</span>
+                        <span>{visit.presentEmployees?.length || 0}</span>
                       </div>
                     </TableCell>
                     
                     <TableCell className="text-white">
                       <div className="flex items-center space-x-2">
-                        {visit.photos.length > 0 && (
+                        {(visit.photos && visit.photos.length > 0) && (
                           <div className="flex items-center text-xs">
                             <Camera className="w-3 h-3 mr-1" />
                             <span>{visit.photos.length}</span>
                           </div>
                         )}
-                        {visit.attachedFiles.length > 0 && (
+                        {(visit.attachedFiles && visit.attachedFiles.length > 0) && (
                           <div className="flex items-center text-xs">
                             <FileText className="w-3 h-3 mr-1" />
                             <span>{visit.attachedFiles.length}</span>
                           </div>
                         )}
-                        {visit.photos.length === 0 && visit.attachedFiles.length === 0 && (
+                        {(!visit.photos || visit.photos.length === 0) && (!visit.attachedFiles || visit.attachedFiles.length === 0) && (
                           <span className="text-gray-500 text-xs">Nenhum</span>
                         )}
                       </div>

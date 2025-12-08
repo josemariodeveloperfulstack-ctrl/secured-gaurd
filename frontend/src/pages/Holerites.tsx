@@ -1837,19 +1837,21 @@ const Holerites: React.FC = () => {
         });
         
         if (deleteResponse.data.sucesso) {
-          completed = deleteResponse.data.deletedCount || selected.length;
+          completed = deleteResponse.data.deletedCount || 0;
           failed = deleteResponse.data.failedCount || 0;
           
           console.log(`✅ Exclusão em lote concluída: ${completed} sucessos, ${failed} falhas`);
           
           // Remover da lista local apenas os sucessos
-          const successfulDeletions = deleteResponse.data.deletedFiles || fileNames.slice(0, completed);
+          const successfulDeletions = deleteResponse.data.deletedFiles || [];
           
-          setUnifiedDocuments(prev => {
-            const updatedList = prev.filter(d => !successfulDeletions.includes(d.fileName));
-            console.log(`📊‹ Lista local atualizada: ${prev.length} → ${updatedList.length} documentos`);
-            return updatedList;
-          });
+          if (successfulDeletions.length > 0) {
+            setUnifiedDocuments(prev => {
+              const updatedList = prev.filter(d => !successfulDeletions.includes(d.fileName));
+              console.log(`📊 Lista local atualizada: ${prev.length} → ${updatedList.length} documentos`);
+              return updatedList;
+            });
+          }
           
           // Atualizar progresso final
           setDeleteProgress({ 
@@ -1858,6 +1860,11 @@ const Holerites: React.FC = () => {
             failed, 
             current: 'Exclusão em lote concluída!' 
           });
+          
+          // Log de arquivos que falharam
+          if (failed > 0 && deleteResponse.data.failedFiles) {
+            console.warn('⚠️ Arquivos que falharam na exclusão:', deleteResponse.data.failedFiles);
+          }
         } else {
           throw new Error(deleteResponse.data.mensagem || 'Erro ao excluir documentos em lote');
         }
@@ -4461,7 +4468,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           
           // Carregar holerites processados via API (sempre buscar do backend, não usar cache)
           try {
+              console.log('🔄 Tentando carregar holerites processados via API...');
               const holeritesResponse = await api.get('/api/payslips/processed-files');
+              console.log('📥 Resposta da API de holerites:', holeritesResponse.data);
+              
               if (holeritesResponse.data && holeritesResponse.data.success) {
                   const files = holeritesResponse.data.files || [];
                   const holeritesProcessados = files.map((file: any) => ({
@@ -4476,11 +4486,15 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   setProcessedHolerites(holeritesProcessados);
                   console.log('✅ Holerites carregados via API:', holeritesProcessados.length);
               } else {
-                  console.log('⚠️ Nenhum holerite encontrado na resposta da API');
+                  console.warn('⚠️ Resposta da API não contém success=true ou files vazio');
+                  console.warn('   Resposta completa:', holeritesResponse.data);
                   setProcessedHolerites([]);
               }
           } catch (apiError: any) {
-              console.warn('⚠️ Erro ao carregar holerites via API:', apiError?.response?.status, apiError?.message);
+              console.error('❌ Erro ao carregar holerites via API:', apiError);
+              console.error('   Status:', apiError?.response?.status);
+              console.error('   Mensagem:', apiError?.message);
+              console.error('   Dados:', apiError?.response?.data);
               setProcessedHolerites([]);
           }
 
@@ -5833,13 +5847,13 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     <p className="text-gray-400">Navegue pelos anos e meses para visualizar os comprovantes</p>
                   </div>
 
-                  {/* Barra de Pesquisa */}
+                  {/* Barra de Pesquisa - Layout similar ao Holerite */}
                   <div className="w-full">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
                         type="text"
-                        placeholder="Buscar por Empresa, Nome ou Data (mínimo 4 caracteres)..."
+                        placeholder="Buscar por Nome, Empresa, Conta Corrente Debitada ou Data (ex: João Silva, 01/2024, 12345-6)..."
                         value={paymentReceiptSearchTerm}
                         onChange={(e) => handlePaymentReceiptSearchChange(e.target.value)}
                         className="pl-10 bg-seguranca-black border-gray-600 text-white placeholder-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
@@ -5853,9 +5867,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                               clearTimeout(searchDebounceTimer);
                             }
                           }}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white flex items-center gap-1"
                         >
                           <X className="h-5 w-5" />
+                          <span className="text-xs">Limpar</span>
                         </button>
                       )}
                     </div>
@@ -5865,141 +5880,259 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                       </p>
                     )}
                     {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 && (
-                      <p className="text-xs text-blue-400 mt-2 ml-1">
-                        Buscando por: <span className="font-semibold">{paymentReceiptSearchTerm}</span>
+                      <p className="text-xs text-gray-400 mt-2 ml-7">
+                        Pesquisando por: <span className="text-seguranca-yellow font-semibold">{paymentReceiptSearchTerm}</span>
                       </p>
                     )}
                   </div>
 
-                  {/* Abas de Ano Melhoradas */}
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
-                      <div className="flex flex-wrap justify-center gap-3">
-                        {getAvailableYears().map((year) => (
-                        <Button
-                            key={year}
-                            variant={activeYear === year.toString() ? "default" : "outline"}
-                            onClick={() => {
-                              setActiveYear(year.toString());
-                              const months = getAvailableMonths(year.toString());
-                              if (months.length > 0) {
-                                setActiveMonth(months[0].toString());
-                              }
-                            }}
-                            className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                              activeYear === year.toString() 
-                                ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105' 
-                                : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
-                            }`}
-                          >
-                            {activeYear === year.toString() && (
-                              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
-                            )}
-                            <span className="relative text-lg font-bold">{year}</span>
-                        </Button>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Resultados da busca - Comprovantes encontrados diretamente (similar ao Holerite) */}
+                  {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 && !loadingPaymentReceipts && (() => {
+                    const searchResults = getFilteredPaymentReceipts();
+                    
+                    if (searchResults.length > 0) {
+                      return (
+                        <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-seguranca-lightgray font-semibold flex items-center gap-2">
+                              <Search className="h-5 w-5 text-seguranca-yellow" />
+                              Comprovantes encontrados ({searchResults.length})
+                            </h3>
+                          </div>
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {searchResults.map((receipt) => {
+                              const period = getReceiptPeriod(receipt);
+                              return (
+                                <div
+                                  key={receipt.id}
+                                  className="bg-seguranca-black border border-gray-700 rounded-lg p-3 hover:border-seguranca-yellow transition-colors"
+                                >
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <div className="font-semibold text-seguranca-lightgray text-lg">
+                                          {receipt.employeeName || 'Nome não informado'}
+                                        </div>
+                                        {receipt.companySigla && (
+                                          <span className="px-2 py-1 text-xs font-semibold rounded bg-seguranca-yellow/20 text-seguranca-yellow">
+                                            {receipt.companySigla}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-gray-400 mb-2 space-y-1">
+                                        <div>
+                                          <span className="font-semibold text-seguranca-red">Período:</span>{' '}
+                                          <span className="font-mono text-white">
+                                            {String(period.month || 0).padStart(2, '0')}/{period.year || 0}
+                                          </span>
+                                          {receipt.transferDate && (
+                                            <>
+                                              {' | '}
+                                              <span className="font-semibold text-seguranca-red">Data Transferência:</span>{' '}
+                                              <span className="font-mono text-white">{receipt.transferDate}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                        {receipt.companyName && (
+                                          <div>
+                                            <span className="font-semibold text-seguranca-red">Empresa:</span>{' '}
+                                            <span className="text-white">{receipt.companyName}</span>
+                                          </div>
+                                        )}
+                                        {receipt.debitedAccount && (
+                                          <div>
+                                            <span className="font-semibold text-seguranca-red">Conta Debitada:</span>{' '}
+                                            <span className="font-mono text-white">{receipt.debitedAccount}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Localização na estrutura */}
+                                      <div className="bg-seguranca-graphite/50 border border-gray-600 rounded p-2 mt-2">
+                                        <div className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                                          <Building2 className="h-3 w-3" />
+                                          <span className="font-semibold">Informações:</span>
+                                        </div>
+                                        <div className="text-xs text-gray-300 space-y-1">
+                                          {receipt.companyName && (
+                                            <div>
+                                              <span className="text-seguranca-yellow">Empresa:</span>{' '}
+                                              <span className="text-white">{receipt.companyName}</span>
+                                            </div>
+                                          )}
+                                          <div>
+                                            <span className="text-seguranca-yellow">Período:</span>{' '}
+                                            <span className="text-white">
+                                              {String(period.month).padStart(2, '0')}/{period.year}
+                                            </span>
+                                          </div>
+                                          {receipt.debitedAccount && (
+                                            <div>
+                                              <span className="text-seguranca-yellow">Conta Debitada:</span>{' '}
+                                              <span className="text-white">{receipt.debitedAccount}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleViewPaymentReceipt(receipt)}
+                                        className="bg-seguranca-red hover:bg-seguranca-darkred"
+                                      >
+                                        <FileText className="h-4 w-4 mr-1" />
+                                        Visualizar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    } else if (paymentReceipts.length > 0) {
+                      // Se há comprovantes mas nenhum resultado, mostrar mensagem
+                      return (
+                        <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                          <div className="flex items-center gap-2 text-gray-400">
+                            <Search className="h-5 w-5" />
+                            <p>Nenhum comprovante encontrado para "{paymentReceiptSearchTerm}"</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
-                    {/* Abas de MÃªs Melhoradas */}
-                    {activeYear && (
+                  {/* Abas de Ano e Mês - Ocultar quando há busca ativa */}
+                  {(!paymentReceiptSearchTerm || paymentReceiptSearchTerm.trim().length < 4) && (
+                    <div className="space-y-6">
                       <div className="text-center">
-                        <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Mês</h5>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                          {getAvailableMonths(activeYear).map((month) => (
-                      <Button
-                              key={month}
-                              variant={activeMonth === month.toString() ? "default" : "outline"}
-                              onClick={() => setActiveMonth(month.toString())}
-                              className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
-                                activeMonth === month.toString() 
-                                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105' 
-                                  : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
+                        <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {getAvailableYears().map((year) => (
+                          <Button
+                              key={year}
+                              variant={activeYear === year.toString() ? "default" : "outline"}
+                              onClick={() => {
+                                setActiveYear(year.toString());
+                                const months = getAvailableMonths(year.toString());
+                                if (months.length > 0) {
+                                  setActiveMonth(months[0].toString());
+                                }
+                              }}
+                              className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                                activeYear === year.toString() 
+                                  ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105' 
+                                  : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
                               }`}
                             >
-                              {activeMonth === month.toString() && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-blue-500/20 rounded-xl blur opacity-50"></div>
+                              {activeYear === year.toString() && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
                               )}
-                              <span className="relative text-sm font-semibold">
-                                {getMonthName(month)}
-                              </span>
-                      </Button>
+                              <span className="relative text-lg font-bold">{year}</span>
+                          </Button>
                           ))}
-                    </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Lista de Comprovantes do Período Selecionado */}
-                  <div className="space-y-6">
-                    {/* Header responsivo melhorado */}
-                    <div className="bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
-                      
-                      {/* Layout principal: empilhado em mobile, lado a lado em desktop */}
-                      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 xl:gap-6">
-                        
-                        {/* SeÃ§Ã£o de informaÃ§Ãµes - sempre visÃ­vel */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                            <FileText size={20} className="sm:w-6 sm:h-6 text-white" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h5 className="text-lg sm:text-xl xl:text-2xl font-bold text-white leading-tight">
-                              {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 
-                                ? `Resultados da busca: "${paymentReceiptSearchTerm}"`
-                                : `Comprovantes de ${getMonthName(parseInt(activeMonth))} de ${activeYear}`
-                              }
-                            </h5>
-                            <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-1">
-                              {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4
-                                ? "Resultados encontrados na busca"
-                                : "Documentos processados e organizados"
-                              }
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Badge de contagem - responsivo */}
-                        <div className="flex justify-center xl:justify-end">
-                          <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-lg font-bold shadow-xl rounded-xl sm:rounded-2xl">
-                            {getFilteredPaymentReceipts().length} comprovante{getFilteredPaymentReceipts().length !== 1 ? 's' : ''}
-                          </Badge>
-                        </div>
+                      {/* Abas de Mês Melhoradas */}
+                      {activeYear && (
+                        <div className="text-center">
+                          <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Mês</h5>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {getAvailableMonths(activeYear).map((month) => (
+                        <Button
+                                key={month}
+                                variant={activeMonth === month.toString() ? "default" : "outline"}
+                                onClick={() => setActiveMonth(month.toString())}
+                                className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                                  activeMonth === month.toString() 
+                                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105' 
+                                    : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
+                                }`}
+                              >
+                                {activeMonth === month.toString() && (
+                                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-blue-500/20 rounded-xl blur opacity-50"></div>
+                                )}
+                                <span className="relative text-sm font-semibold">
+                                  {getMonthName(month)}
+                                </span>
+                        </Button>
+                            ))}
                       </div>
-                      
-                      {/* Botões de Ação - PADRÃO SST SIMPLIFICADO */}
-                      {getFilteredPaymentReceipts().length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-600">
-                          {/* Checkbox Selecionar Todos */}
-                          <div className="mb-3 flex items-center gap-2 bg-gray-700 p-3 rounded">
-                            <Checkbox
-                              id="select-all-payment-receipts"
-                              checked={areAllPaymentReceiptsSelected()}
-                              onCheckedChange={handleSelectAllPaymentReceipts}
-                              className="border-blue-400"
-                            />
-                            <label htmlFor="select-all-payment-receipts" className="text-white text-sm font-medium cursor-pointer">
-                              Selecionar Todos
-                            </label>
-                          </div>
-                          
-                          {/* Botão de ação em massa - Excluir - só aparece quando "Selecionar todos" está marcado */}
-                          {areAllPaymentReceiptsSelected() && (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Button
-                              onClick={handleDeleteMultiplePaymentReceipts}
-                              className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
-                            >
-                              <Trash2 size={16} className="mr-2" />
-                              Excluir ({selectedPaymentReceipts.length})
-                            </Button>
-                          </div>
-                          )}
                         </div>
                       )}
                     </div>
-                </div>
+                  )}
+
+                  {/* Lista de Comprovantes do Período Selecionado - Só mostrar quando não há busca ativa */}
+                  {(!paymentReceiptSearchTerm || paymentReceiptSearchTerm.trim().length < 4) && (
+                    <div className="space-y-6">
+                      {/* Header responsivo melhorado */}
+                      <div className="bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
+                        
+                        {/* Layout principal: empilhado em mobile, lado a lado em desktop */}
+                        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 xl:gap-6">
+                          
+                          {/* Seção de informações - sempre visível */}
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                              <FileText size={20} className="sm:w-6 sm:h-6 text-white" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h5 className="text-lg sm:text-xl xl:text-2xl font-bold text-white leading-tight">
+                                Comprovantes de {getMonthName(parseInt(activeMonth))} de {activeYear}
+                              </h5>
+                              <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-1">
+                                Documentos processados e organizados
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Badge de contagem - responsivo */}
+                          <div className="flex justify-center xl:justify-end">
+                            <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-lg font-bold shadow-xl rounded-xl sm:rounded-2xl">
+                              {getFilteredPaymentReceipts().length} comprovante{getFilteredPaymentReceipts().length !== 1 ? 's' : ''}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Botões de Ação - PADRÃO SST SIMPLIFICADO */}
+                        {getFilteredPaymentReceipts().length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-600">
+                            {/* Checkbox Selecionar Todos */}
+                            <div className="mb-3 flex items-center gap-2 bg-gray-700 p-3 rounded">
+                              <Checkbox
+                                id="select-all-payment-receipts"
+                                checked={areAllPaymentReceiptsSelected()}
+                                onCheckedChange={handleSelectAllPaymentReceipts}
+                                className="border-blue-400"
+                              />
+                              <label htmlFor="select-all-payment-receipts" className="text-white text-sm font-medium cursor-pointer">
+                                Selecionar Todos
+                              </label>
+                            </div>
+                            
+                            {/* Botão de ação em massa - Excluir - só aparece quando "Selecionar todos" está marcado */}
+                            {areAllPaymentReceiptsSelected() && (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Button
+                                onClick={handleDeleteMultiplePaymentReceipts}
+                                className="w-full sm:w-auto bg-red-600 text-white hover:bg-red-700"
+                              >
+                                <Trash2 size={16} className="mr-2" />
+                                Excluir ({selectedPaymentReceipts.length})
+                              </Button>
+                            </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 
                     {loadingPaymentReceipts ? (
                       <div className="text-center py-12">

@@ -103,20 +103,36 @@ const TransportGuideModal: React.FC<TransportGuideModalProps> = ({
   });
 
   useEffect(() => {
-    if (guide) {
-      setValue('cnpj', guide.cnpj);
-      setValue('empresa', guide.empresa);
-      setValue('numeroColete', guide.numeroColete || '');
-      setValue('numeroArma', guide.numeroArma);
-      setValue('calibre', guide.calibre);
-      setValue('qtdMunicoes', guide.qtdMunicoes);
-      setValue('origem', guide.origem);
-      setValue('destino', guide.destino);
-      setValue('trajeto', guide.trajeto);
-      setValue('motivo', guide.motivo);
-    } else {
-      reset();
-      setSelectedFile(null);
+    if (open) {
+      if (guide) {
+        // Preencher formulário para edição
+        setValue('cnpj', guide.cnpj);
+        setValue('empresa', guide.empresa);
+        setValue('numeroColete', guide.numeroColete || '');
+        setValue('numeroArma', guide.numeroArma);
+        setValue('calibre', guide.calibre);
+        setValue('qtdMunicoes', guide.qtdMunicoes);
+        setValue('origem', guide.origem);
+        setValue('destino', guide.destino);
+        setValue('trajeto', guide.trajeto);
+        setValue('motivo', guide.motivo);
+      } else {
+        // Resetar formulário para novo cadastro
+        reset({
+          cnpj: '',
+          empresa: '',
+          numeroColete: '',
+          numeroArma: '',
+          calibre: '',
+          qtdMunicoes: 0,
+          origem: '',
+          destino: '',
+          trajeto: '',
+          motivo: '',
+          arquivoGuia: null
+        });
+        setSelectedFile(null);
+      }
     }
   }, [guide, open, setValue, reset]);
 
@@ -336,7 +352,10 @@ const TransportGuideModal: React.FC<TransportGuideModalProps> = ({
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="motivo" className="text-sm font-medium">Motivo do Transporte *</Label>
-                <Select onValueChange={(value) => setValue('motivo', value)}>
+                <Select 
+                  value={watch('motivo')} 
+                  onValueChange={(value) => setValue('motivo', value)}
+                >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione o motivo" />
                   </SelectTrigger>

@@ -684,6 +684,9 @@ public class EmployeeService {
             
             if (e.getPosition() != null) {
                 try {
+                    // Forçar inicialização do position (LAZY loading)
+                    org.hibernate.Hibernate.initialize(e.getPosition());
+                    
                     EmployeeDTO.PositionDTO positionDTO = new EmployeeDTO.PositionDTO();
                     positionDTO.setId(e.getPosition().getId());
                     positionDTO.setName(e.getPosition().getName());
@@ -691,14 +694,19 @@ public class EmployeeService {
                         positionDTO.setDescription(e.getPosition().getDescription());
                     }
                     dto.setPosition(positionDTO);
+                    System.out.println("[DEBUG] Position mapeado com sucesso: " + positionDTO.getName());
                 } catch (Exception positionEx) {
                     System.err.println("[WARNING] Erro ao mapear position: " + positionEx.getMessage());
+                    positionEx.printStackTrace();
                     dto.setPosition(null);
                 }
             }
             
             if (e.getUnit() != null) {
                 try {
+                    // Forçar inicialização do unit (LAZY loading)
+                    org.hibernate.Hibernate.initialize(e.getUnit());
+                    
                     EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
                     unitDTO.setId(e.getUnit().getId());
                     unitDTO.setName(e.getUnit().getName());
@@ -706,8 +714,10 @@ public class EmployeeService {
                         unitDTO.setDescription(e.getUnit().getDescription());
                     }
                     dto.setUnit(unitDTO);
+                    System.out.println("[DEBUG] Unit mapeado com sucesso: " + unitDTO.getName());
                 } catch (Exception unitEx) {
                     System.err.println("[WARNING] Erro ao mapear unit: " + unitEx.getMessage());
+                    unitEx.printStackTrace();
                     dto.setUnit(null);
                 }
             }

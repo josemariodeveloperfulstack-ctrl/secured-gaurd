@@ -1,9 +1,14 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.CreateVacationCoverageRequest;
+import com.z7design.secured_guard.dto.VacationCoverageResponse;
 import com.z7design.secured_guard.model.VacationCoverage;
+import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.WorkPost;
+import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.repository.VacationCoverageRepository;
+import com.z7design.secured_guard.repository.VacationRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +19,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -23,91 +29,164 @@ public class VacationCoverageService {
     private VacationCoverageRepository vacationCoverageRepository;
 
     @Autowired
+    private VacationRepository vacationRepository;
+
+    @Autowired
     private EmployeeRepository employeeRepository;
 
     @Autowired
     private WorkPostRepository workPostRepository;
 
-    public List<VacationCoverage> getAllVacationCoverages() {
-        return vacationCoverageRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<VacationCoverageResponse> getAllVacationCoverages() {
+        return vacationCoverageRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public Optional<VacationCoverage> getVacationCoverageById(UUID id) {
-        return vacationCoverageRepository.findById(id);
+    @Transactional(readOnly = true)
+    public Optional<VacationCoverageResponse> getVacationCoverageById(UUID id) {
+        return vacationCoverageRepository.findById(id).map(this::mapToResponse);
     }
 
-    public List<VacationCoverage> getVacationCoveragesByEmployee(UUID employeeId) {
-        // Busca por employee via entidade Vacation (employee em Vacation)
-        return vacationCoverageRepository.findByVacationEmployeeId(employeeId);
+    @Transactional(readOnly = true)
+    public List<VacationCoverageResponse> getVacationCoveragesByEmployee(UUID employeeId) {
+        return vacationCoverageRepository.findByVacationEmployeeId(employeeId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<VacationCoverage> getVacationCoveragesBySubstitute(UUID substituteEmployeeId) {
-        return vacationCoverageRepository.findBySubstituteEmployeeId(substituteEmployeeId);
+    @Transactional(readOnly = true)
+    public List<VacationCoverageResponse> getVacationCoveragesBySubstitute(UUID substituteEmployeeId) {
+        return vacationCoverageRepository.findBySubstituteEmployeeId(substituteEmployeeId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<VacationCoverage> getVacationCoveragesByStatus(VacationCoverage.CoverageStatus status) {
-        return vacationCoverageRepository.findByStatus(status);
+    @Transactional(readOnly = true)
+    public List<VacationCoverageResponse> getVacationCoveragesByStatus(VacationCoverage.CoverageStatus status) {
+        return vacationCoverageRepository.findByStatus(status).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<VacationCoverage> getVacationCoveragesByDateRange(LocalDate startDate, LocalDate endDate) {
-        return vacationCoverageRepository.findByDateRange(startDate, endDate);
+    @Transactional(readOnly = true)
+    public List<VacationCoverageResponse> getVacationCoveragesByDateRange(LocalDate startDate, LocalDate endDate) {
+        return vacationCoverageRepository.findByDateRange(startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public VacationCoverage createVacationCoverage(VacationCoverage vacationCoverage) {
+    public VacationCoverageResponse createVacationCoverage(CreateVacationCoverageRequest request) {
         // Validar se o funcionário existe
-        // Employee está em Vacation
-        Employee employee = employeeRepository.findById(vacationCoverage.getVacation().getEmployee().getId())
+        Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
-        // Validar se o substituto existe (se fornecido)
-        if (vacationCoverage.getSubstituteEmployee() != null) {
-            Employee substitute = employeeRepository.findById(vacationCoverage.getSubstituteEmployee().getId())
+        // Criar ou buscar vacation
+        Vacation vacation;
+        if (request.getVacationId() != null) {
+            vacation = vacationRepository.findById(request.getVacationId())
+                    .orElseThrow(() -> new RuntimeException("Férias não encontradas"));
+        } else {
+            // Criar vacation temporária para esta cobertura
+            // Calcular dias de férias
+            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+            int daysTaken = (int) daysBetween;
+            
+            vacation = Vacation.builder()
+                    .employee(employee)
+                    .startDate(request.getStartDate())
+                    .endDate(request.getEndDate())
+                    .daysTaken(daysTaken)
+                    .remainingDays(30 - daysTaken) // Assumindo 30 dias de direito
+                    .status(VacationStatus.APPROVED)
+                    .build();
+            vacation = vacationRepository.save(vacation);
+        }
+
+        // Validar e buscar substituto (se fornecido)
+        Employee substitute = null;
+        if (request.getSubstituteEmployeeId() != null) {
+            substitute = employeeRepository.findById(request.getSubstituteEmployeeId())
                     .orElseThrow(() -> new RuntimeException("Funcionário substituto não encontrado"));
-            vacationCoverage.setSubstituteEmployee(substitute);
         }
 
-        // Validar se o local existe (se fornecido)
-        if (vacationCoverage.getLocation() != null) {
-            WorkPost location = workPostRepository.findById(vacationCoverage.getLocation().getId())
+        // Validar e buscar local (se fornecido)
+        WorkPost location = null;
+        if (request.getLocationId() != null) {
+            location = workPostRepository.findById(request.getLocationId())
                     .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
-            vacationCoverage.setLocation(location);
         }
 
-        // garantir coerência do vacation vinculado ao employee
-        vacationCoverage.getVacation().setEmployee(employee);
-        vacationCoverage.setCreatedAt(java.time.LocalDateTime.now());
-        vacationCoverage.setUpdatedAt(java.time.LocalDateTime.now());
+        // Converter shift string para enum
+        VacationCoverage.ShiftType shiftType = VacationCoverage.ShiftType.valueOf(request.getShift());
 
-        return vacationCoverageRepository.save(vacationCoverage);
+        // Determinar status inicial
+        VacationCoverage.CoverageStatus status = substitute != null 
+                ? VacationCoverage.CoverageStatus.PENDING 
+                : VacationCoverage.CoverageStatus.NO_COVERAGE;
+
+        // Criar cobertura
+        VacationCoverage coverage = VacationCoverage.builder()
+                .vacation(vacation)
+                .substituteEmployee(substitute)
+                .coverageStartDate(request.getStartDate())
+                .coverageEndDate(request.getEndDate())
+                .location(location)
+                .shift(shiftType)
+                .status(status)
+                .observations(request.getObservations())
+                .isConfirmed(false)
+                .createdAt(java.time.LocalDateTime.now())
+                .updatedAt(java.time.LocalDateTime.now())
+                .build();
+
+        return mapToResponse(vacationCoverageRepository.save(coverage));
     }
 
-    public VacationCoverage updateVacationCoverage(UUID id, VacationCoverage updatedVacationCoverage) {
+    public VacationCoverageResponse updateVacationCoverage(UUID id, CreateVacationCoverageRequest request) {
         VacationCoverage existingCoverage = vacationCoverageRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cobertura de férias não encontrada"));
 
         // Atualizar campos permitidos
-        existingCoverage.setCoverageStartDate(updatedVacationCoverage.getCoverageStartDate());
-        existingCoverage.setCoverageEndDate(updatedVacationCoverage.getCoverageEndDate());
-        existingCoverage.setStatus(updatedVacationCoverage.getStatus());
-        existingCoverage.setShift(updatedVacationCoverage.getShift());
-        existingCoverage.setObservations(updatedVacationCoverage.getObservations());
-        existingCoverage.setUpdatedAt(java.time.LocalDateTime.now());
+        if (request.getStartDate() != null) {
+            existingCoverage.setCoverageStartDate(request.getStartDate());
+        }
+        
+        if (request.getEndDate() != null) {
+            existingCoverage.setCoverageEndDate(request.getEndDate());
+        }
 
-        // Validar e atualizar substituto se fornecido
-        if (updatedVacationCoverage.getSubstituteEmployee() != null) {
-            Employee substitute = employeeRepository.findById(updatedVacationCoverage.getSubstituteEmployee().getId())
+        if (request.getShift() != null) {
+            VacationCoverage.ShiftType shiftType = VacationCoverage.ShiftType.valueOf(request.getShift());
+            existingCoverage.setShift(shiftType);
+        }
+
+        existingCoverage.setObservations(request.getObservations());
+
+        // Atualizar substituto se fornecido
+        if (request.getSubstituteEmployeeId() != null) {
+            Employee substitute = employeeRepository.findById(request.getSubstituteEmployeeId())
                     .orElseThrow(() -> new RuntimeException("Funcionário substituto não encontrado"));
             existingCoverage.setSubstituteEmployee(substitute);
+            // Se tinha NO_COVERAGE e agora tem substituto, mudar para PENDING
+            if (existingCoverage.getStatus() == VacationCoverage.CoverageStatus.NO_COVERAGE) {
+                existingCoverage.setStatus(VacationCoverage.CoverageStatus.PENDING);
+            }
         }
 
-        // Validar e atualizar local se fornecido
-        if (updatedVacationCoverage.getLocation() != null) {
-            WorkPost location = workPostRepository.findById(updatedVacationCoverage.getLocation().getId())
+        // Atualizar local se fornecido
+        if (request.getLocationId() != null) {
+            WorkPost location = workPostRepository.findById(request.getLocationId())
                     .orElseThrow(() -> new RuntimeException("Posto de trabalho não encontrado"));
             existingCoverage.setLocation(location);
+        } else {
+            existingCoverage.setLocation(null);
         }
 
-        return vacationCoverageRepository.save(existingCoverage);
+        existingCoverage.setUpdatedAt(java.time.LocalDateTime.now());
+
+        return mapToResponse(vacationCoverageRepository.save(existingCoverage));
     }
 
     public void deleteVacationCoverage(UUID id) {
@@ -117,23 +196,75 @@ public class VacationCoverageService {
         vacationCoverageRepository.deleteById(id);
     }
 
-    public VacationCoverage updateStatus(UUID id, VacationCoverage.CoverageStatus status) {
+    public VacationCoverageResponse updateStatus(UUID id, VacationCoverage.CoverageStatus status) {
         VacationCoverage coverage = vacationCoverageRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cobertura de férias não encontrada"));
         
         coverage.setStatus(status);
+        
+        // Se confirmar, registrar data e confirmação
+        if (status == VacationCoverage.CoverageStatus.CONFIRMED) {
+            coverage.setIsConfirmed(true);
+            coverage.setConfirmationDate(java.time.LocalDateTime.now());
+        }
+        
         coverage.setUpdatedAt(java.time.LocalDateTime.now());
         
-        return vacationCoverageRepository.save(coverage);
+        return mapToResponse(vacationCoverageRepository.save(coverage));
     }
 
-    public List<VacationCoverage> getVacationCoveragesNeedingAttention() {
+    @Transactional(readOnly = true)
+    public List<VacationCoverageResponse> getVacationCoveragesNeedingAttention() {
         LocalDate today = LocalDate.now();
         LocalDate nextWeek = today.plusWeeks(1);
         
         return vacationCoverageRepository.findByDateRange(today, nextWeek).stream()
                 .filter(coverage -> coverage.getStatus() == VacationCoverage.CoverageStatus.PENDING ||
                                   coverage.getStatus() == VacationCoverage.CoverageStatus.NO_COVERAGE)
-                .toList();
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private VacationCoverageResponse mapToResponse(VacationCoverage coverage) {
+        VacationCoverageResponse.SimpleEmployee employeeData = null;
+        if (coverage.getVacation() != null && coverage.getVacation().getEmployee() != null) {
+            employeeData = new VacationCoverageResponse.SimpleEmployee(
+                    coverage.getVacation().getEmployee().getId(),
+                    coverage.getVacation().getEmployee().getName()
+            );
+        }
+
+        VacationCoverageResponse.SimpleEmployee substituteData = null;
+        if (coverage.getSubstituteEmployee() != null) {
+            substituteData = new VacationCoverageResponse.SimpleEmployee(
+                    coverage.getSubstituteEmployee().getId(),
+                    coverage.getSubstituteEmployee().getName()
+            );
+        }
+
+        VacationCoverageResponse.SimpleWorkPost locationData = null;
+        if (coverage.getLocation() != null) {
+            locationData = new VacationCoverageResponse.SimpleWorkPost(
+                    coverage.getLocation().getId(),
+                    coverage.getLocation().getName()
+            );
+        }
+
+        return VacationCoverageResponse.builder()
+                .id(coverage.getId())
+                .employee(employeeData)
+                .substituteEmployee(substituteData)
+                .startDate(coverage.getCoverageStartDate())
+                .endDate(coverage.getCoverageEndDate())
+                .location(locationData)
+                .shift(coverage.getShift() != null ? coverage.getShift().name() : null)
+                .status(coverage.getStatus() != null ? coverage.getStatus().name() : null)
+                .observations(coverage.getObservations())
+                .isConfirmed(coverage.getIsConfirmed())
+                .confirmedById(coverage.getConfirmedBy() != null ? coverage.getConfirmedBy().getId() : null)
+                .confirmationDate(coverage.getConfirmationDate())
+                .createdAt(coverage.getCreatedAt())
+                .updatedAt(coverage.getUpdatedAt())
+                .build();
     }
 }

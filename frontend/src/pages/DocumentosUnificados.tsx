@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from '../lib/axios';
 import { useToast } from '@/hooks/use-toast';
 import { ContactValidationModal } from '@/components/contact-validation/ContactValidationModal';
@@ -31,7 +31,10 @@ import {
     Square,
     FileDown,
     Search,
-    AlertTriangle
+    AlertTriangle,
+    ExternalLink,
+    Building2,
+    X
 } from 'lucide-react';
 
 interface UnifiedDocument {
@@ -62,6 +65,145 @@ interface WhatsAppForm {
     month: number;
     year: number;
 }
+
+// Componente para item de documento com carregamento individual via AJAX
+const DocumentItem: React.FC<{
+    doc: UnifiedDocument;
+    loadDocumentPayslipData: (doc: UnifiedDocument) => Promise<UnifiedDocument>;
+    formatCpf: (cpf?: string) => string;
+    handleViewDocument: (doc: UnifiedDocument) => void;
+    handleDownloadDocument: (doc: UnifiedDocument) => void;
+    handleSendEmail: (doc: UnifiedDocument) => void;
+    handleSendWhatsApp: (doc: UnifiedDocument) => void;
+    toast: any;
+}> = ({ doc, loadDocumentPayslipData, formatCpf, handleViewDocument, handleDownloadDocument, handleSendEmail, handleSendWhatsApp, toast }) => {
+    const [docWithPayslip, setDocWithPayslip] = useState<UnifiedDocument>(doc);
+    const [loadingPayslip, setLoadingPayslip] = useState(false);
+
+    useEffect(() => {
+        // Se não tem dados do holerite, carregar via AJAX
+        if (!(doc as any).payslipData && doc.employeeName) {
+            setLoadingPayslip(true);
+            loadDocumentPayslipData(doc).then(enrichedDoc => {
+                setDocWithPayslip(enrichedDoc);
+                setLoadingPayslip(false);
+            }).catch(() => {
+                setLoadingPayslip(false);
+            });
+        }
+    }, [doc.id, doc.employeeName]);
+
+    const payslipData = (docWithPayslip as any).payslipData;
+    
+    // Extrair sigla da empresa
+    const getCompanySigla = (companyName?: string): string => {
+        if (!companyName) return '';
+        const words = companyName.toUpperCase().split(/\s+/);
+        if (words.length >= 2) {
+            return words.slice(0, 2).map(w => w.substring(0, 2)).join('');
+        }
+        return companyName.substring(0, 4).toUpperCase();
+    };
+
+    return (
+        <div
+            key={doc.id}
+            className="bg-seguranca-black border border-gray-700 rounded-lg p-3 hover:border-seguranca-yellow transition-colors"
+        >
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="font-semibold text-seguranca-lightgray text-lg">
+                            {doc.employeeName || 'Nome não informado'}
+                        </div>
+                        {payslipData?.companyName && (
+                            <span className="px-2 py-1 text-xs font-semibold rounded bg-seguranca-yellow/20 text-seguranca-yellow">
+                                {getCompanySigla(payslipData.companyName)}
+                            </span>
+                        )}
+                        {loadingPayslip && (
+                            <span className="text-xs text-gray-400">Carregando dados...</span>
+                        )}
+                    </div>
+                    <div className="text-sm text-gray-400 mb-2">
+                        <span className="font-semibold text-seguranca-red">CPF:</span>{' '}
+                        <span className="font-mono text-white">
+                            {payslipData?.cpf ? formatCpf(payslipData.cpf) : 'Não informado'}
+                        </span>
+                        {' | '}
+                        <span className="font-semibold text-seguranca-red">Período:</span>{' '}
+                        <span className="font-mono text-white">
+                            {String(doc.month || 0).padStart(2, '0')}/{doc.year || 0}
+                        </span>
+                        {payslipData?.workPostName && (
+                            <>
+                                {' | '}
+                                <span className="font-semibold text-seguranca-red">Setor:</span>{' '}
+                                <span className="text-white">{payslipData.workPostName}</span>
+                            </>
+                        )}
+                    </div>
+                    
+                    {/* Localização na estrutura organizada - usando dados do holerite */}
+                    {payslipData && (
+                        <div className="bg-seguranca-graphite/50 border border-gray-600 rounded p-2 mt-2">
+                            <div className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                <span className="font-semibold">Localização:</span>
+                            </div>
+                            <div className="text-xs text-gray-300 space-y-1">
+                                {payslipData.companyName && (
+                                    <div>
+                                        <span className="text-seguranca-yellow">Empresa:</span>{' '}
+                                        <span className="text-white">{payslipData.companyName}</span>
+                                    </div>
+                                )}
+                                {payslipData.workPostName && (
+                                    <div>
+                                        <span className="text-seguranca-yellow">Setor:</span>{' '}
+                                        <span className="text-white">{payslipData.workPostName}</span>
+                                    </div>
+                                )}
+                                <div>
+                                    <span className="text-seguranca-yellow">Período:</span>{' '}
+                                    <span className="text-white">
+                                        {String(doc.month).padStart(2, '0')}/{doc.year}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                    <Button
+                        size="sm"
+                        onClick={() => handleViewDocument(doc)}
+                        className="bg-seguranca-red hover:bg-seguranca-darkred"
+                    >
+                        <FileText className="h-4 w-4 mr-1" />
+                        Visualizar
+                    </Button>
+                    {payslipData && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                toast({
+                                    title: "Navegação",
+                                    description: "Funcionalidade de navegação em desenvolvimento",
+                                });
+                            }}
+                            className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10"
+                        >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Ir até
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const DocumentosUnificados: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
@@ -121,6 +263,9 @@ const DocumentosUnificados: React.FC = () => {
     const [unificationTypeFilter, setUnificationTypeFilter] = useState<'all' | 'INDIVIDUAL' | 'BATCH' | 'UNKNOWN'>('all');
     const [yearFilter, setYearFilter] = useState<number | 'all'>('all');
     const [monthFilter, setMonthFilter] = useState<number | 'all'>('all');
+    
+    // Estados para pesquisa (busca local em tempo real, igual ao Holerite)
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Estados para análise de falhas
     const [failedUnifications, setFailedUnifications] = useState<any[]>([]);
@@ -146,6 +291,98 @@ const DocumentosUnificados: React.FC = () => {
         return () => window.removeEventListener('focus', handleFocus);
     }, [isAuthenticated, loading]);
 
+    // Função para carregar dados individuais de um documento unificado via AJAX
+    const loadDocumentPayslipData = async (doc: UnifiedDocument): Promise<UnifiedDocument> => {
+        // Se já tem dados do holerite, retornar sem buscar
+        if ((doc as any).payslipData) {
+            return doc;
+        }
+
+        try {
+            // Buscar dados do holerite via AJAX para este documento específico
+            const response = await axios.get('/api/payslips/list', {
+                params: {
+                    employeeName: doc.employeeName,
+                    month: doc.month,
+                    year: doc.year
+                }
+            });
+
+            if (response.data && Array.isArray(response.data)) {
+                const payslips = response.data;
+                
+                // Tentar encontrar holerite correspondente
+                const matchingPayslip = payslips.find((p: any) => {
+                    if (!p.employeeName || !doc.employeeName) return false;
+                    const payslipName = p.employeeName.toLowerCase().trim();
+                    const docName = doc.employeeName.toLowerCase().trim();
+                    return payslipName === docName && p.month === doc.month && p.year === doc.year;
+                });
+                
+                if (matchingPayslip) {
+                    return {
+                        ...doc,
+                        payslipData: {
+                            cpf: matchingPayslip.cpf,
+                            companyName: matchingPayslip.companyName,
+                            companyCnpj: matchingPayslip.companyCnpj,
+                            workPostName: matchingPayslip.workPostName,
+                            netValue: matchingPayslip.netValue
+                        }
+                    };
+                }
+            }
+        } catch (error) {
+            console.warn(`⚠️ Erro ao buscar dados do holerite para documento ${doc.fileName}:`, error);
+        }
+        
+        return doc;
+    };
+
+    // Função para enriquecer documentos com dados do holerite (quando disponível)
+    // Carrega em lote inicialmente, depois carrega individualmente quando necessário
+    const enrichDocumentsWithPayslipData = async (docs: UnifiedDocument[]): Promise<UnifiedDocument[]> => {
+        try {
+            // Primeiro, tentar carregar todos os holerites de uma vez
+            const payslipsResponse = await axios.get('/api/payslips/list');
+            if (payslipsResponse.data && Array.isArray(payslipsResponse.data)) {
+                const payslips = payslipsResponse.data;
+                
+                return docs.map(doc => {
+                    // Se já tem dados do holerite, não precisa buscar novamente
+                    if ((doc as any).payslipData) {
+                        return doc;
+                    }
+                    
+                    // Tentar encontrar holerite correspondente
+                    const matchingPayslip = payslips.find((p: any) => {
+                        if (!p.employeeName || !doc.employeeName) return false;
+                        const payslipName = p.employeeName.toLowerCase().trim();
+                        const docName = doc.employeeName.toLowerCase().trim();
+                        return payslipName === docName && p.month === doc.month && p.year === doc.year;
+                    });
+                    
+                    if (matchingPayslip) {
+                        return {
+                            ...doc,
+                            payslipData: {
+                                cpf: matchingPayslip.cpf,
+                                companyName: matchingPayslip.companyName,
+                                companyCnpj: matchingPayslip.companyCnpj,
+                                workPostName: matchingPayslip.workPostName,
+                                netValue: matchingPayslip.netValue
+                            }
+                        };
+                    }
+                    return doc;
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ Erro ao buscar dados do holerite para enriquecimento em lote:', error);
+        }
+        return docs;
+    };
+
     const loadDocuments = async () => {
         setLoading(true);
         setError(null);
@@ -159,22 +396,28 @@ const DocumentosUnificados: React.FC = () => {
                 console.log('✅ Resposta do endpoint detalhado público:', response.data);
 
                 if (response.data.sucesso) {
-                    const mappedDocuments = response.data.documents.map((doc: any) => ({
+                    let mappedDocuments = response.data.documents.map((doc: any) => ({
                         id: doc.fileName || Math.random().toString(),
                         employeeName: doc.employeeName || 'Nome não identificado',
-                        month: extractMonthFromFileName(doc.fileName),
-                        year: extractYearFromFileName(doc.fileName),
+                        month: doc.month || extractMonthFromFileName(doc.fileName),
+                        year: doc.year || extractYearFromFileName(doc.fileName),
                         filePath: doc.filePath,
                         fileName: doc.fileName,
                         createdAt: doc.createdAt || new Date().toISOString(),
                         createdAtFormatted: doc.createdAtFormatted,
                         fileSize: doc.fileSize || 0,
                         unificationType: doc.unificationType || 'UNKNOWN',
-                        unificationTypeLabel: doc.unificationTypeLabel || 'Tipo Não Identificado'
+                        unificationTypeLabel: doc.unificationTypeLabel || 'Tipo Não Identificado',
+                        payslipData: doc.payslipData || null // Dados do holerite quando disponível
                     }));
+
+                    // Enriquecer com dados do holerite se não vieram do backend
+                    mappedDocuments = await enrichDocumentsWithPayslipData(mappedDocuments);
 
                     console.log('📄 Documentos mapeados (detalhado):', mappedDocuments);
                     console.log(`📊 Estatísticas: Total: ${response.data.total}, Individuais: ${response.data.individualCount}, Em lote: ${response.data.batchCount}`);
+                    console.log(`✅ ${mappedDocuments.length} documentos carregados e prontos para exibição`);
+                    console.log('📋 Primeiros 5 documentos:', mappedDocuments.slice(0, 5).map(d => ({ nome: d.employeeName, mes: d.month, ano: d.year })));
                     setDocuments(mappedDocuments);
                     return;
                 } else {
@@ -190,11 +433,11 @@ const DocumentosUnificados: React.FC = () => {
             console.log('✅ Resposta do endpoint público:', publicResponse.data);
 
             if (publicResponse.data.sucesso) {
-                const mappedDocuments = publicResponse.data.documents.map((doc: any) => ({
+                let mappedDocuments = publicResponse.data.documents.map((doc: any) => ({
                     id: doc.fileName || Math.random().toString(),
                     employeeName: doc.employeeName || 'Nome não identificado',
-                    month: extractMonthFromFileName(doc.fileName),
-                    year: extractYearFromFileName(doc.fileName),
+                    month: doc.month || extractMonthFromFileName(doc.fileName),
+                    year: doc.year || extractYearFromFileName(doc.fileName),
                     filePath: doc.filePath,
                     fileName: doc.fileName,
                     createdAt: doc.createdAt || new Date().toISOString(),
@@ -203,8 +446,12 @@ const DocumentosUnificados: React.FC = () => {
                     unificationType: doc.fileName?.includes('UNIFICADO_') ? 'INDIVIDUAL' : 
                                    doc.fileName?.includes('BATCH_') ? 'BATCH' : 'UNKNOWN',
                     unificationTypeLabel: doc.fileName?.includes('UNIFICADO_') ? 'Unificação Individual' : 
-                                        doc.fileName?.includes('BATCH_') ? 'Unificação em Lote' : 'Tipo Não Identificado'
+                                        doc.fileName?.includes('BATCH_') ? 'Unificação em Lote' : 'Tipo Não Identificado',
+                    payslipData: doc.payslipData || null
                 }));
+
+                // Enriquecer com dados do holerite se não vieram do backend
+                mappedDocuments = await enrichDocumentsWithPayslipData(mappedDocuments);
 
                 console.log('📄 Documentos mapeados (público):', mappedDocuments);
                 setDocuments(mappedDocuments);
@@ -737,6 +984,14 @@ const DocumentosUnificados: React.FC = () => {
         console.log('📄 Arquivo TXT baixado com sucesso');
     };
 
+    // Função para formatar CPF
+    const formatCpf = (cpf?: string): string => {
+        if (!cpf) return 'Não informado';
+        const cleaned = cpf.replace(/\D/g, '');
+        if (cleaned.length !== 11) return cpf;
+        return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    };
+
     const formatFileSize = (bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -750,8 +1005,103 @@ const DocumentosUnificados: React.FC = () => {
     };
 
     // Função para filtrar documentos
-    const getFilteredDocuments = (): UnifiedDocument[] => {
-        return documents.filter(doc => {
+    // Função para verificar se um documento corresponde ao termo de busca (igual ao Holerite)
+    const matchesSearchTerm = useCallback((doc: UnifiedDocument, searchTerm: string): boolean => {
+        if (!searchTerm.trim()) {
+            return true; // Se não houver termo de busca, mostra todos
+        }
+
+        const normalizedSearch = searchTerm.toLowerCase().trim();
+        const payslipData = (doc as any).payslipData;
+        
+        // Debug: log para verificar o que está sendo buscado
+        console.log('🔍 Buscando documento:', {
+            employeeName: doc.employeeName,
+            searchTerm: normalizedSearch,
+            hasPayslipData: !!payslipData
+        });
+        
+        // Buscar por CPF (remove formatação para comparação)
+        if (payslipData?.cpf) {
+            const cpfNormalized = payslipData.cpf.replace(/\D/g, '').toLowerCase();
+            const searchCpfNormalized = normalizedSearch.replace(/\D/g, '');
+            if (cpfNormalized && searchCpfNormalized && cpfNormalized.includes(searchCpfNormalized)) {
+                return true;
+            }
+            // Também verificar se o CPF formatado contém o termo de busca
+            if (normalizedSearch.length >= 3 && payslipData.cpf.toLowerCase().includes(normalizedSearch)) {
+                return true;
+            }
+        }
+
+        // Buscar por nome do funcionário (busca parcial, não precisa ser exato)
+        const employeeName = doc.employeeName?.toLowerCase() || '';
+        if (employeeName && employeeName.includes(normalizedSearch)) {
+            console.log('✅ Match por nome:', { employeeName, normalizedSearch });
+            return true;
+        }
+        
+        // Buscar por partes do nome (palavras individuais) - importante para "ANDRE" encontrar "ANDRE RIBEIRO DE OLIVEIRA"
+        if (employeeName && normalizedSearch.length >= 3) {
+            const nameWords = employeeName.split(/\s+/);
+            for (const word of nameWords) {
+                // Verifica se a palavra começa com o termo de busca ou vice-versa
+                if (word.startsWith(normalizedSearch) || normalizedSearch.startsWith(word)) {
+                    console.log('✅ Match por palavra do nome (startsWith):', { word, normalizedSearch, employeeName });
+                    return true;
+                }
+                // Também verifica se o termo está contido na palavra (para casos como "ANDRE" em "ANDRE RIBEIRO")
+                if (word.includes(normalizedSearch) || normalizedSearch.includes(word)) {
+                    console.log('✅ Match por palavra do nome (includes):', { word, normalizedSearch, employeeName });
+                    return true;
+                }
+            }
+        }
+
+        // Buscar por período (formato: MM/YYYY ou M/YYYY)
+        const periodFormatted = `${String(doc.month).padStart(2, '0')}/${doc.year}`;
+        if (periodFormatted.includes(normalizedSearch)) {
+            return true;
+        }
+
+        // Buscar por mês (ex: "01", "1", "janeiro", etc.)
+        const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
+                            'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+        const monthNumber = doc.month;
+        if (String(monthNumber).includes(normalizedSearch) || 
+            monthNames[monthNumber - 1]?.includes(normalizedSearch)) {
+            return true;
+        }
+
+        // Buscar por ano
+        if (String(doc.year).includes(normalizedSearch)) {
+            return true;
+        }
+
+        // Buscar por empresa (se disponível nos dados do holerite)
+        if (payslipData?.companyName && payslipData.companyName.toLowerCase().includes(normalizedSearch)) {
+            return true;
+        }
+
+        // Buscar por setor (se disponível nos dados do holerite)
+        if (payslipData?.workPostName && payslipData.workPostName.toLowerCase().includes(normalizedSearch)) {
+            return true;
+        }
+
+        // Buscar no nome do arquivo
+        if (doc.fileName && doc.fileName.toLowerCase().includes(normalizedSearch)) {
+            return true;
+        }
+
+        return false;
+    }, []);
+
+    // Função para filtrar documentos localmente (busca em tempo real, igual ao Holerite)
+    const getFilteredDocuments = useCallback((): UnifiedDocument[] => {
+        let filtered = documents;
+        
+        // Aplicar filtros normais primeiro
+        filtered = filtered.filter(doc => {
             // Filtro por tipo de unificação
             if (unificationTypeFilter !== 'all' && doc.unificationType !== unificationTypeFilter) {
                 return false;
@@ -769,7 +1119,24 @@ const DocumentosUnificados: React.FC = () => {
             
             return true;
         });
-    };
+        
+        // Se houver pesquisa ativa, filtrar por termo de busca (em tempo real, igual ao Holerite)
+        if (searchTerm && searchTerm.trim()) {
+            filtered = filtered.filter(doc => {
+                const matches = matchesSearchTerm(doc, searchTerm);
+                if (matches) {
+                    console.log('✅ Documento encontrado na busca:', doc.employeeName);
+                }
+                return matches;
+            });
+            console.log(`🔍 Resultados da busca: ${filtered.length} de ${documents.length} documentos (${filtered.length > 0 ? '✅ ENCONTRADOS' : '❌ NENHUM ENCONTRADO'})`);
+            if (filtered.length > 0) {
+                console.log('📋 Documentos encontrados:', filtered.map(d => d.employeeName));
+            }
+        }
+        
+        return filtered;
+    }, [documents, searchTerm, unificationTypeFilter, yearFilter, monthFilter, matchesSearchTerm]);
 
     // Obter anos únicos dos documentos
     const getUniqueYears = (): number[] => {
@@ -865,8 +1232,40 @@ const DocumentosUnificados: React.FC = () => {
 
                 {/* TAB: Documentos */}
                 <TabsContent value="documents" className="space-y-4">
-                    {/* Filtros */}
-                    {documents.length > 0 && (
+                    {/* Barra de Pesquisa - Estilo igual ao Holerite */}
+                    <Card className="bg-seguranca-graphite border-gray-600">
+                        <CardContent className="pt-6">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-seguranca-yellow" />
+                                <Input
+                                    type="text"
+                                    placeholder="Buscar por nome do funcionário, empresa ou período..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10 pr-20 bg-seguranca-black border-gray-600 text-seguranca-lightgray placeholder-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                                />
+                                {searchTerm && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setSearchTerm('')}
+                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                                    >
+                                        <X className="h-4 w-4 mr-1" />
+                                        Limpar
+                                    </Button>
+                                )}
+                            </div>
+                            {searchTerm && (
+                                <p className="text-xs text-gray-400 mt-2 ml-7">
+                                    Pesquisando por: <span className="text-seguranca-yellow font-semibold">{searchTerm}</span>
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Filtros - Ocultar quando há pesquisa ativa */}
+                    {documents.length > 0 && (!searchTerm || !searchTerm.trim()) && (
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -1035,127 +1434,201 @@ const DocumentosUnificados: React.FC = () => {
                                     <p className="text-red-600">{error}</p>
                                     <Button onClick={loadDocuments} className="mt-4">Tentar Novamente</Button>
                                 </div>
-                            ) : getFilteredDocuments().length === 0 ? (
-                                <div className="text-center py-8">
-                                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                    <p className="text-gray-600">
-                                        {documents.length === 0 
-                                            ? "Nenhum documento unificado encontrado" 
-                                            : "Nenhum documento corresponde aos filtros aplicados"
-                                        }
-                                    </p>
-                                    <p className="text-sm text-gray-500">
-                                        {documents.length === 0 
-                                            ? "Crie seu primeiro documento na aba \"Criar Novo\"" 
-                                            : "Tente ajustar os filtros para ver mais documentos"
-                                        }
-                                    </p>
-                                </div>
                             ) : (
-                                <div className="space-y-4">
-                                    {getFilteredDocuments().map((doc) => (
-                                        <Card key={doc.id} className={`border-l-4 border-l-blue-500 ${selectedDocuments.includes(doc.id) ? 'ring-2 ring-blue-200 bg-blue-50' : ''}`}>
-                                            <CardContent className="p-4">
-                                                <div className="flex items-start gap-3">
-                                                    {/* Checkbox */}
-                                                    <button
-                                                        onClick={() => handleSelectDocument(doc.id)}
-                                                        className="mt-1 flex-shrink-0"
-                                                    >
-                                                        {selectedDocuments.includes(doc.id) ? (
-                                                            <CheckSquare className="h-5 w-5 text-blue-600" />
-                                                        ) : (
-                                                            <Square className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                                                        )}
-                                                    </button>
+                                <>
+                                    {/* Debug: Mostrar informações sobre documentos carregados */}
+                                    {console.log('🔍 Estado atual:', {
+                                        totalDocuments: documents.length,
+                                        searchTerm,
+                                        filteredCount: getFilteredDocuments().length,
+                                        loading,
+                                        error
+                                    })}
+                                    
+                                    {/* Seção de resultados de pesquisa - estilo igual ao Holerite */}
+                                    {/* Sempre mostrar quando há pesquisa ativa */}
+                                    {searchTerm && searchTerm.trim() ? (
+                                        <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-seguranca-lightgray font-semibold flex items-center gap-2">
+                                                    <Search className="h-5 w-5 text-seguranca-yellow" />
+                                                    Documentos Unificados encontrados ({getFilteredDocuments().length})
+                                                </h3>
+                                            </div>
+                                            {(() => {
+                                                const filtered = getFilteredDocuments();
+                                                console.log('🔍 Renderizando resultados da busca:', {
+                                                    searchTerm,
+                                                    totalDocuments: documents.length,
+                                                    filteredCount: filtered.length,
+                                                    filteredDocs: filtered.map(d => d.employeeName)
+                                                });
+                                                return filtered.length > 0 ? (
+                                                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                                                        {filtered.map((doc) => (
+                                                            <DocumentItem
+                                                                key={doc.id}
+                                                                doc={doc}
+                                                                loadDocumentPayslipData={loadDocumentPayslipData}
+                                                                formatCpf={formatCpf}
+                                                                handleViewDocument={handleViewDocument}
+                                                                handleDownloadDocument={handleDownloadDocument}
+                                                                handleSendEmail={handleSendEmail}
+                                                                handleSendWhatsApp={handleSendWhatsApp}
+                                                                toast={toast}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center py-6 text-gray-400">
+                                                        <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                                        <p className="text-sm">Nenhum documento encontrado para "{searchTerm}"</p>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        /* Lista normal quando não há pesquisa ativa */
+                                        getFilteredDocuments().length > 0 ? (
+                                            <div className="space-y-4">
+                                                {getFilteredDocuments().map((doc) => (
+                                                <Card key={doc.id} className={`border-l-4 border-l-blue-500 ${selectedDocuments.includes(doc.id) ? 'ring-2 ring-blue-200 bg-blue-50' : ''}`}>
+                                                    <CardContent className="p-4">
+                                                        <div className="flex items-start gap-3">
+                                                            {/* Checkbox */}
+                                                            <button
+                                                                onClick={() => handleSelectDocument(doc.id)}
+                                                                className="mt-1 flex-shrink-0"
+                                                            >
+                                                                {selectedDocuments.includes(doc.id) ? (
+                                                                    <CheckSquare className="h-5 w-5 text-blue-600" />
+                                                                ) : (
+                                                                    <Square className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                                                )}
+                                                            </button>
 
-                                                    {/* Conteúdo do documento */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-3 mb-2">
-                                                                    <h3 className="font-semibold text-lg">{doc.employeeName}</h3>
-                                                                    <Badge variant="secondary">
-                                                                        {doc.month}/{doc.year}
-                                                                    </Badge>
-                                                                    {/* Badge do tipo de unificação */}
-                                                                    <Badge 
-                                                                        variant="outline" 
-                                                                        className={
-                                                                            doc.unificationType === 'INDIVIDUAL' ? 'bg-green-100 text-green-800 border-green-300' :
-                                                                            doc.unificationType === 'BATCH' ? 'bg-purple-100 text-purple-800 border-purple-300' :
-                                                                            'bg-orange-100 text-orange-800 border-orange-300'
-                                                                        }
-                                                                    >
-                                                                        {doc.unificationType === 'INDIVIDUAL' ? '👤 Individual' :
-                                                                         doc.unificationType === 'BATCH' ? '📦 Em Lote' :
-                                                                         '❓ Desconhecido'}
-                                                                    </Badge>
+                                                            {/* Conteúdo do documento */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex-1">
+                                                                        <div className="flex items-center gap-3 mb-2">
+                                                                            <h3 className="font-semibold text-lg">{doc.employeeName}</h3>
+                                                                            <Badge variant="secondary">
+                                                                                {doc.month}/{doc.year}
+                                                                            </Badge>
+                                                                            {/* Badge do tipo de unificação */}
+                                                                            <Badge 
+                                                                                variant="outline" 
+                                                                                className={
+                                                                                    doc.unificationType === 'INDIVIDUAL' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                                                    doc.unificationType === 'BATCH' ? 'bg-purple-100 text-purple-800 border-purple-300' :
+                                                                                    'bg-orange-100 text-orange-800 border-orange-300'
+                                                                                }
+                                                                            >
+                                                                                {doc.unificationType === 'INDIVIDUAL' ? '👤 Individual' :
+                                                                                 doc.unificationType === 'BATCH' ? '📦 Em Lote' :
+                                                                                 '❓ Desconhecido'}
+                                                                            </Badge>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <FileText className="h-4 w-4" />
+                                                                                {doc.fileName}
+                                                                            </span>
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Calendar className="h-4 w-4" />
+                                                                                {doc.createdAtFormatted || formatDate(doc.createdAt)}
+                                                                            </span>
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Download className="h-4 w-4" />
+                                                                                {formatFileSize(doc.fileSize)}
+                                                                            </span>
+                                                                        </div>
+                                                                        {/* Mostrar dados do holerite quando disponível */}
+                                                                        {(doc as any).payslipData && (
+                                                                            <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                                                                <p className="text-xs font-semibold text-blue-800 mb-1">
+                                                                                    📄 Dados do Holerite (prioridade):
+                                                                                </p>
+                                                                                <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
+                                                                                    {(doc as any).payslipData.companyName && (
+                                                                                        <span><strong>Empresa:</strong> {(doc as any).payslipData.companyName}</span>
+                                                                                    )}
+                                                                                    {(doc as any).payslipData.workPostName && (
+                                                                                        <span><strong>Setor:</strong> {(doc as any).payslipData.workPostName}</span>
+                                                                                    )}
+                                                                                    {(doc as any).payslipData.cpf && (
+                                                                                        <span><strong>CPF:</strong> {(doc as any).payslipData.cpf}</span>
+                                                                                    )}
+                                                                                    {(doc as any).payslipData.netValue && (
+                                                                                        <span><strong>Valor Líquido:</strong> R$ {parseFloat((doc as any).payslipData.netValue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handleViewDocument(doc)}
+                                                                            className="flex items-center gap-1"
+                                                                        >
+                                                                            <Eye className="h-4 w-4" />
+                                                                            Visualizar
+                                                                        </Button>
+
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handleDownloadDocument(doc)}
+                                                                            className="flex items-center gap-1"
+                                                                        >
+                                                                            <Download className="h-4 w-4" />
+                                                                            Baixar
+                                                                        </Button>
+
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handleSendEmail(doc)}
+                                                                            className="flex items-center gap-1"
+                                                                        >
+                                                                            <Mail className="h-4 w-4" />
+                                                                            Email
+                                                                        </Button>
+
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handleSendWhatsApp(doc)}
+                                                                            className="flex items-center gap-1"
+                                                                        >
+                                                                            <MessageCircle className="h-4 w-4" />
+                                                                            WhatsApp
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                                    <span className="flex items-center gap-1">
-                                                                        <FileText className="h-4 w-4" />
-                                                                        {doc.fileName}
-                                                                    </span>
-                                                                    <span className="flex items-center gap-1">
-                                                                        <Calendar className="h-4 w-4" />
-                                                                        {doc.createdAtFormatted || formatDate(doc.createdAt)}
-                                                                    </span>
-                                                                    <span className="flex items-center gap-1">
-                                                                        <Download className="h-4 w-4" />
-                                                                        {formatFileSize(doc.fileSize)}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="flex items-center gap-2">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => handleViewDocument(doc)}
-                                                                    className="flex items-center gap-1"
-                                                                >
-                                                                    <Eye className="h-4 w-4" />
-                                                                    Visualizar
-                                                                </Button>
-
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => handleDownloadDocument(doc)}
-                                                                    className="flex items-center gap-1"
-                                                                >
-                                                                    <Download className="h-4 w-4" />
-                                                                    Baixar
-                                                                </Button>
-
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => handleSendEmail(doc)}
-                                                                    className="flex items-center gap-1"
-                                                                >
-                                                                    <Mail className="h-4 w-4" />
-                                                                    Email
-                                                                </Button>
-
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => handleSendWhatsApp(doc)}
-                                                                    className="flex items-center gap-1"
-                                                                >
-                                                                    <MessageCircle className="h-4 w-4" />
-                                                                    WhatsApp
-                                                                </Button>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
+                                                    </CardContent>
+                                                </Card>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8">
+                                                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                                <p className="text-gray-600">
+                                                    Nenhum documento corresponde aos filtros aplicados
+                                                </p>
+                                                <p className="text-sm text-gray-500 mt-2">
+                                                    Tente ajustar os filtros para ver mais documentos
+                                                </p>
+                                            </div>
+                                        )
+                                    )}
+                                </>
                             )}
                         </CardContent>
                     </Card>

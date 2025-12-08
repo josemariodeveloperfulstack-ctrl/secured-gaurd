@@ -3,8 +3,7 @@ import { StandardLayout } from '@/components/StandardLayout';
 import RemanejamentoFormModal from '@/components/funcionarios/RemanejamentoFormModal';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
-import * as remanejamentoService from '@/services/remanejamentoService';
-import { Remanejamento } from '@/services/remanejamentoService';
+import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import { Loader2, Plus, Filter, Search, RefreshCw, Download } from 'lucide-react';
 import { employeeService, Employee } from '@/services/employeeService';
 import { unitService, Unit } from '@/services/unitService';
@@ -42,7 +41,7 @@ const RemanejamentoPage: React.FC = () => {
   // Busca lista de remanejamentos (sem filtros no backend)
   const { data: remanejamentosRaw, isLoading, refetch } = useQuery<Remanejamento[]>({
     queryKey: ['remanejamentos'],
-    queryFn: remanejamentoService.getRemanejamentosTyped,
+    queryFn: () => remanejamentoService.getRemanejamentosTyped(),
   });
 
   // Filtrar no frontend

@@ -22,6 +22,8 @@ import AllVisitsModal from './AllVisitsModal';
 const OperationalStatsCards: React.FC = () => {
   const [stats, setStats] = useState<OperationalStats | null>(null);
   const [recentVisits, setRecentVisits] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any | null>(null);
+  const [nextAction, setNextAction] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,12 +34,16 @@ const OperationalStatsCards: React.FC = () => {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const [statsData, visitsData] = await Promise.all([
+      const [statsData, visitsData, activityData, actionData] = await Promise.all([
         operationalStatsService.getOperationalStats(),
-        operationalStatsService.getRecentVisits()
+        operationalStatsService.getRecentVisits(),
+        operationalStatsService.getRecentActivity().catch(() => null),
+        operationalStatsService.getNextActions().catch(() => null)
       ]);
       setStats(statsData);
       setRecentVisits(visitsData);
+      setRecentActivity(activityData);
+      setNextAction(actionData);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
     } finally {
@@ -106,7 +112,9 @@ const OperationalStatsCards: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-gray-400">Equipamentos Ativos</p>
                 <p className="text-3xl font-bold text-white">{stats.activeEquipment}</p>
-                <p className="text-xs text-gray-500 mt-1">+2 desde o último mês</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.activeEquipment > 0 ? `${stats.activeEquipment} ativos` : 'Nenhum ativo'}
+                </p>
               </div>
               <div className="p-3 bg-blue-600 rounded-lg">
                 <Shield className="h-6 w-6 text-white" />
@@ -122,7 +130,9 @@ const OperationalStatsCards: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-gray-400">Funcionários em Serviço</p>
                 <p className="text-3xl font-bold text-white">{stats.employeesOnDuty}</p>
-                <p className="text-xs text-gray-500 mt-1">+1 desde ontem</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.employeesOnDuty > 0 ? `${stats.employeesOnDuty} em serviço hoje` : 'Nenhum em serviço'}
+                </p>
               </div>
               <div className="p-3 bg-green-600 rounded-lg">
                 <Users className="h-6 w-6 text-white" />
@@ -154,7 +164,12 @@ const OperationalStatsCards: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-gray-400">Alertas Pendentes</p>
                 <p className="text-3xl font-bold text-orange-400">{stats.pendingAlerts}</p>
-                <p className="text-xs text-gray-500 mt-1">2 equipamentos vencendo</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.pendingAlerts > 0 
+                    ? `${stats.pendingAlerts} ${stats.pendingAlerts === 1 ? 'equipamento' : 'equipamentos'} ${stats.pendingAlerts === 1 ? 'vencendo' : 'vencendo'}`
+                    : 'Nenhum alerta pendente'
+                  }
+                </p>
               </div>
               <div className="p-3 bg-orange-600 rounded-lg">
                 <AlertTriangle className="h-6 w-6 text-white" />
@@ -265,13 +280,19 @@ const OperationalStatsCards: React.FC = () => {
             <CardTitle className="text-white">Atividade Recente</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-3 p-3 bg-gray-900 rounded-lg">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm text-white">Equipamento EQ-001 atribuído a João Silva</p>
-                <p className="text-xs text-gray-400">2h atrás</p>
+            {recentActivity ? (
+              <div className="flex items-center gap-3 p-3 bg-gray-900 rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm text-white">{recentActivity.description}</p>
+                  <p className="text-xs text-gray-400">{recentActivity.timeAgo}</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center text-gray-400 py-4">
+                Nenhuma atividade recente
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -281,17 +302,30 @@ const OperationalStatsCards: React.FC = () => {
             <CardTitle className="text-white">Próximas Ações</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
-              <p className="text-sm text-white">Renovar registro AR-003</p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-white">
-                  <CheckCircle className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-white">
-                  <Eye className="h-4 w-4" />
-                </Button>
+            {nextAction ? (
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div className="flex-1">
+                  <p className="text-sm text-white">{nextAction.description}</p>
+                  {nextAction.daysUntilExpiry && (
+                    <p className="text-xs text-gray-400">
+                      Vence em {nextAction.daysUntilExpiry} {nextAction.daysUntilExpiry === 1 ? 'dia' : 'dias'}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-white">
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-white">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center text-gray-400 py-4">
+                Nenhuma ação pendente
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

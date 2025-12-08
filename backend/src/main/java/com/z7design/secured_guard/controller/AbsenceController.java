@@ -3,6 +3,7 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.model.Absence;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.dto.AbsenceDTO;
+import com.z7design.secured_guard.dto.AbsenceResponse;
 import com.z7design.secured_guard.service.AbsenceService;
 import com.z7design.secured_guard.service.EmployeeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -26,96 +28,96 @@ public class AbsenceController {
     private EmployeeService employeeService;
 
     @GetMapping
-    public ResponseEntity<List<AbsenceDTO>> getAllAbsences() {
+    public ResponseEntity<List<AbsenceResponse>> getAllAbsences() {
         List<Absence> absences = absenceService.getAllAbsences();
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AbsenceDTO> getAbsenceById(@PathVariable UUID id) {
+    public ResponseEntity<AbsenceResponse> getAbsenceById(@PathVariable UUID id) {
         return absenceService.getAbsenceById(id)
-                .map(absence -> ResponseEntity.ok(AbsenceDTO.fromEntity(absence)))
+                .map(absence -> ResponseEntity.ok(AbsenceResponse.fromEntity(absence)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<AbsenceDTO>> getAbsencesByEmployee(@PathVariable UUID employeeId) {
+    public ResponseEntity<List<AbsenceResponse>> getAbsencesByEmployee(@PathVariable UUID employeeId) {
         List<Absence> absences = absenceService.getAbsencesByEmployee(employeeId);
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/date/{date}")
-    public ResponseEntity<List<AbsenceDTO>> getAbsencesByDate(@PathVariable LocalDate date) {
+    public ResponseEntity<List<AbsenceResponse>> getAbsencesByDate(@PathVariable LocalDate date) {
         List<Absence> absences = absenceService.getAbsencesByDate(date);
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<AbsenceDTO>> getAbsencesByStatus(@PathVariable Absence.AbsenceStatus status) {
+    public ResponseEntity<List<AbsenceResponse>> getAbsencesByStatus(@PathVariable Absence.AbsenceStatus status) {
         List<Absence> absences = absenceService.getAbsencesByStatus(status);
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/absence-type/{absenceType}")
-    public ResponseEntity<List<AbsenceDTO>> getAbsencesByType(@PathVariable Absence.AbsenceType absenceType) {
+    public ResponseEntity<List<AbsenceResponse>> getAbsencesByType(@PathVariable Absence.AbsenceType absenceType) {
         List<Absence> absences = absenceService.getAbsencesByType(absenceType);
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/date-range")
-    public ResponseEntity<List<AbsenceDTO>> getAbsencesByDateRange(
+    public ResponseEntity<List<AbsenceResponse>> getAbsencesByDateRange(
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
         List<Absence> absences = absenceService.getAbsencesByDateRange(startDate, endDate);
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/employee/{employeeId}/date-range")
-    public ResponseEntity<List<AbsenceDTO>> getAbsencesByEmployeeAndDateRange(
+    public ResponseEntity<List<AbsenceResponse>> getAbsencesByEmployeeAndDateRange(
             @PathVariable UUID employeeId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
         List<Absence> absences = absenceService.getAbsencesByEmployeeAndDateRange(employeeId, startDate, endDate);
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<List<AbsenceDTO>> getPendingAbsences() {
+    public ResponseEntity<List<AbsenceResponse>> getPendingAbsences() {
         List<Absence> absences = absenceService.getPendingAbsences();
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/today")
-    public ResponseEntity<List<AbsenceDTO>> getTodayAbsences() {
+    public ResponseEntity<List<AbsenceResponse>> getTodayAbsences() {
         List<Absence> absences = absenceService.getTodayAbsences();
-        List<AbsenceDTO> absenceDTOs = absences.stream()
-            .map(AbsenceDTO::fromEntity)
+        List<AbsenceResponse> absenceResponses = absences.stream()
+            .map(AbsenceResponse::fromEntity)
             .toList();
-        return ResponseEntity.ok(absenceDTOs);
+        return ResponseEntity.ok(absenceResponses);
     }
 
     @GetMapping("/employee/{employeeId}/count")
@@ -128,26 +130,70 @@ public class AbsenceController {
     }
 
     @PostMapping
-    public ResponseEntity<AbsenceDTO> createAbsence(@RequestBody AbsenceDTO absenceDTO) {
+    public ResponseEntity<?> createAbsence(@RequestBody AbsenceDTO absenceDTO) {
+        try {
+            // Validações
+            if (absenceDTO.getEmployeeId() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "ID do funcionário é obrigatório"));
+            }
+            
+            if (absenceDTO.getAbsenceDate() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Data da falta é obrigatória"));
+            }
+            
+            if (absenceDTO.getReason() == null || absenceDTO.getReason().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Motivo da falta é obrigatório"));
+            }
+            
+            // Buscar o funcionário pelo ID
+            Employee employee = employeeService.findById(absenceDTO.getEmployeeId());
+            if (employee == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Funcionário não encontrado"));
+            }
+            
+            Absence absence = absenceDTO.toEntity();
+            absence.setEmployee(employee);
+            
+            // Buscar funcionário de cobertura se fornecido
+            if (absenceDTO.getCoverageEmployeeId() != null) {
+                Employee coverageEmployee = employeeService.findById(absenceDTO.getCoverageEmployeeId());
+                if (coverageEmployee != null) {
+                    absence.setCoverageEmployee(coverageEmployee);
+                }
+            }
+            
+            Absence createdAbsence = absenceService.createAbsence(absence);
+            return ResponseEntity.ok(AbsenceResponse.fromEntity(createdAbsence));
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", "Erro ao criar falta: " + e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", "Erro interno ao criar falta: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<AbsenceResponse> updateAbsence(@PathVariable UUID id, @RequestBody AbsenceDTO absenceDTO) {
         try {
             // Buscar o funcionário pelo ID
             Employee employee = employeeService.findById(absenceDTO.getEmployeeId());
             Absence absence = absenceDTO.toEntity();
             absence.setEmployee(employee);
             
-            Absence createdAbsence = absenceService.createAbsence(absence);
-            return ResponseEntity.ok(AbsenceDTO.fromEntity(createdAbsence));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Absence> updateAbsence(@PathVariable UUID id, @RequestBody Absence absence) {
-        try {
+            // Buscar funcionário de cobertura se fornecido
+            if (absenceDTO.getCoverageEmployeeId() != null) {
+                Employee coverageEmployee = employeeService.findById(absenceDTO.getCoverageEmployeeId());
+                absence.setCoverageEmployee(coverageEmployee);
+            }
+            
             Absence updatedAbsence = absenceService.updateAbsence(id, absence);
-            return ResponseEntity.ok(updatedAbsence);
+            return ResponseEntity.ok(AbsenceResponse.fromEntity(updatedAbsence));
         } catch (RuntimeException e) {
+            e.printStackTrace(); // Log para debug
             return ResponseEntity.badRequest().build();
         }
     }
@@ -176,12 +222,12 @@ public class AbsenceController {
 
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAnyAuthority('HR_APPROVE', 'HR_READ', 'HR_WRITE', 'HR_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<AbsenceDTO> approveAbsence(
+    public ResponseEntity<AbsenceResponse> approveAbsence(
             @PathVariable UUID id,
             @RequestBody(required = false) ApprovalRequest request) {
         try {
             Absence absence = absenceService.approveAbsence(id, request != null ? request.getObservacoes() : null);
-            return ResponseEntity.ok(AbsenceDTO.fromEntity(absence));
+            return ResponseEntity.ok(AbsenceResponse.fromEntity(absence));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -189,12 +235,12 @@ public class AbsenceController {
 
     @PutMapping("/{id}/reject")
     @PreAuthorize("hasAnyAuthority('HR_APPROVE', 'HR_READ', 'HR_WRITE', 'HR_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<AbsenceDTO> rejectAbsence(
+    public ResponseEntity<AbsenceResponse> rejectAbsence(
             @PathVariable UUID id,
             @RequestBody ApprovalRequest request) {
         try {
             Absence absence = absenceService.rejectAbsence(id, request.getObservacoes());
-            return ResponseEntity.ok(AbsenceDTO.fromEntity(absence));
+            return ResponseEntity.ok(AbsenceResponse.fromEntity(absence));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
         }

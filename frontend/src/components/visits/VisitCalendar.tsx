@@ -29,6 +29,21 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
 
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+  // Função auxiliar para converter string de data (YYYY-MM-DD) para Date no timezone local
+  // Isso evita problemas de timezone onde uma data pode aparecer no dia anterior
+  const parseLocalDate = (dateString: string): Date => {
+    // Se a data já está no formato YYYY-MM-DD, criar diretamente no timezone local
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Mês é 0-indexed
+      const day = parseInt(parts[2], 10);
+      return new Date(year, month, day);
+    }
+    // Fallback para o método padrão
+    return new Date(dateString);
+  };
+
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -56,8 +71,10 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
     for (let day = 1; day <= daysInMonth; day++) {
       const dayDate = new Date(year, month, day);
       const dayEvents = events.filter(event => {
-        const eventDate = new Date(event.date);
-        return eventDate.toDateString() === dayDate.toDateString();
+        const eventDate = parseLocalDate(event.date);
+        return eventDate.getFullYear() === dayDate.getFullYear() &&
+               eventDate.getMonth() === dayDate.getMonth() &&
+               eventDate.getDate() === dayDate.getDate();
       });
 
       days.push({
@@ -106,8 +123,16 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (status: string | null | undefined) => {
+    if (!status) {
+      console.warn('⚠️ Status não definido, usando SCHEDULED como padrão');
+      return 'bg-blue-500';
+    }
+    
+    const normalizedStatus = status.toUpperCase();
+    console.log('🎨 Obtendo cor para status:', normalizedStatus);
+    
+    switch (normalizedStatus) {
       case 'SCHEDULED':
         return 'bg-blue-500';
       case 'IN_PROGRESS':
@@ -116,9 +141,14 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
         return 'bg-green-500';
       case 'CANCELLED':
         return 'bg-red-500';
+      case 'PENDING':
+        return 'bg-blue-500'; // Mesma cor de SCHEDULED para compatibilidade
+      case 'NOT_COMPLETED':
+        return 'bg-gray-500';
       case 'MISSED':
         return 'bg-gray-500';
       default:
+        console.warn('⚠️ Status desconhecido:', normalizedStatus, '- usando cinza');
         return 'bg-gray-500';
     }
   };
@@ -246,26 +276,26 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
       )}
 
       {/* Eventos do dia selecionado */}
-      {selectedDate && (
-        <Card className="bg-seguranca-graphite border-gray-700">
-          <CardContent className="p-4">
-            <h3 className="text-lg font-semibold text-white mb-3">
-              Visitas em {selectedDate.toLocaleDateString('pt-BR')}
-            </h3>
-            
-            {events.filter(event => {
-              const eventDate = new Date(event.date);
-              return eventDate.toDateString() === selectedDate.toDateString();
-            }).length === 0 ? (
-              <p className="text-gray-400">Nenhuma visita agendada para este dia</p>
-            ) : (
-              <div className="space-y-2">
-                {events
-                  .filter(event => {
-                    const eventDate = new Date(event.date);
-                    return eventDate.toDateString() === selectedDate.toDateString();
-                  })
-                  .map((event) => (
+      {selectedDate && (() => {
+        const selectedDayEvents = events.filter(event => {
+          const eventDate = parseLocalDate(event.date);
+          return eventDate.getFullYear() === selectedDate.getFullYear() &&
+                 eventDate.getMonth() === selectedDate.getMonth() &&
+                 eventDate.getDate() === selectedDate.getDate();
+        });
+
+        return (
+          <Card className="bg-seguranca-graphite border-gray-700">
+            <CardContent className="p-4">
+              <h3 className="text-lg font-semibold text-white mb-3">
+                Visitas em {selectedDate.toLocaleDateString('pt-BR')}
+              </h3>
+              
+              {selectedDayEvents.length === 0 ? (
+                <p className="text-gray-400">Nenhuma visita agendada para este dia</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedDayEvents.map((event) => (
                     <div
                       key={event.id}
                       className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-gray-700 hover:bg-gray-800 cursor-pointer"
@@ -289,7 +319,8 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
             )}
           </CardContent>
         </Card>
-      )}
+        );
+      })()}
     </div>
   );
 };

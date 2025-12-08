@@ -37,6 +37,68 @@ public class FileUploadController {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    @PostMapping("/atestados")
+    @Operation(summary = "Upload de atestado médico", description = "Faz upload de atestado médico para registro de falta")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Arquivo enviado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Arquivo inválido"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<Map<String, String>> uploadAtestado(
+            @Parameter(description = "Arquivo do atestado")
+            @RequestParam("file") MultipartFile file) {
+        
+        try {
+            // Validar arquivo
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Arquivo não pode estar vazio"));
+            }
+
+            // Validar tipo de arquivo (PDF, JPG, JPEG, PNG)
+            String contentType = file.getContentType();
+            if (contentType == null || !isValidFileType(contentType)) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Tipo de arquivo não permitido. Use PDF, JPG, JPEG ou PNG"));
+            }
+
+            // Validar tamanho (máximo 10MB)
+            if (file.getSize() > 10 * 1024 * 1024) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Arquivo muito grande. Máximo 10MB"));
+            }
+
+            // Gerar nome único para o arquivo
+            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String fileExtension = getFileExtension(originalFilename);
+            String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
+
+            // Criar diretório se não existir
+            Path uploadPath = Paths.get(uploadDir, "atestados");
+            Files.createDirectories(uploadPath);
+
+            // Salvar arquivo
+            Path filePath = uploadPath.resolve(uniqueFilename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Retornar informações do arquivo
+            Map<String, String> response = new HashMap<>();
+            response.put("filename", uniqueFilename);
+            response.put("originalName", originalFilename);
+            response.put("path", "atestados/" + uniqueFilename);
+            response.put("size", String.valueOf(file.getSize()));
+            response.put("contentType", contentType);
+            response.put("url", "/api/uploads/atestados/" + uniqueFilename);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/comprovantes")
     @Operation(summary = "Upload de comprovante de pagamento", description = "Faz upload de comprovante de pagamento para conta a pagar")
     @ApiResponses(value = {

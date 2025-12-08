@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createRemanejamento, Remanejamento } from '../../services/remanejamentoService';
+import { remanejamentoService, Remanejamento } from '../../services/remanejamentoService';
 import { unitService, Unit } from '../../services/unitService';
 import { employeeService, Employee } from '../../services/employeeService';
 import { workPostService, WorkPost } from '../../services/workPostService';
@@ -154,13 +154,14 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
       // Converter para CreateRemanejamentoDTO
       const remanejamentoData = {
         employeeId: form.employeeId,
-        originWorkstationId: form.origem,
-        destinationWorkstationId: form.destino,
-        remanejamentoDate: form.dataRemanejamento,
-        notes: form.observacao
+        tipo: form.tipo as RemanejamentoTipo,
+        origem: form.origem,
+        destino: form.destino,
+        dataRemanejamento: form.dataRemanejamento,
+        observacao: form.observacao
       };
       
-      await createRemanejamento(remanejamentoData);
+      await remanejamentoService.createRemanejamento(remanejamentoData);
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar remanejamento');

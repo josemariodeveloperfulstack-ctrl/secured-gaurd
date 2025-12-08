@@ -61,7 +61,11 @@ public class ShiftChangeFormService {
         existingEntity.setReplacingShiftDate(dto.getReplacingShiftDate());
         existingEntity.setReplacingDayOffDate(dto.getReplacingDayOffDate());
         existingEntity.setShiftTime(dto.getShiftTime());
-        existingEntity.setStatus(dto.getStatus());
+        
+        // Só atualiza o status se foi enviado (não nulo)
+        if (dto.getStatus() != null) {
+            existingEntity.setStatus(dto.getStatus());
+        }
 
         return new ShiftChangeFormDTO(shiftChangeFormRepository.save(existingEntity));
     }

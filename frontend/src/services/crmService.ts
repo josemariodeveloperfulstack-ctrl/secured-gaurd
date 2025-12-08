@@ -99,6 +99,6 @@ export async function fetchKanbanSummary() {
 
 // Métricas e gráficos do dashboard CRM
 export async function fetchCrmMetrics() {
-  const { data } = await api.get('/crm/dashboard/metrics');
+  const { data } = await api.get('/api/crm/dashboard/metrics');
   return data;
 } 

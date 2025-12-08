@@ -38,7 +38,7 @@ public class CreateVisitDTO {
     private String observations;
     
     @Builder.Default
-    private VisitStatus status = VisitStatus.PENDING;
+    private VisitStatus status = VisitStatus.SCHEDULED;
     
     private List<UUID> presentEmployees;
     
@@ -54,4 +54,7 @@ public class CreateVisitDTO {
     // QR Code
     private String qrCodeScanned;
     private Boolean qrCodeVerified;
+    
+    // Cancelamento
+    private String cancellationReason;
 }

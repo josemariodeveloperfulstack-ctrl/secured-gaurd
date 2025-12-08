@@ -62,11 +62,11 @@ public class AbsenceDTO {
                 .id(this.id)
                 .absenceType(this.absenceType)
                 .absenceDate(this.absenceDate)
-                .status(this.status)
+                .status(this.status != null ? this.status : Absence.AbsenceStatus.PENDING)
                 .reason(this.reason)
                 .documentUrl(this.documentUrl)
                 .medicalCertificateDays(this.medicalCertificateDays)
-                .isJustified(this.isJustified)
+                .isJustified(this.isJustified != null ? this.isJustified : false)
                 .approvalDate(this.approvalDate)
                 .coverageNotes(this.coverageNotes)
                 .build();

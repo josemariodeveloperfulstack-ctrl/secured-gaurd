@@ -77,7 +77,13 @@ const Login = () => {
     setLoading(true);
 
     try {
+      console.log('🔐 Iniciando login...');
+      console.log('👤 Usuário:', username);
+      console.log('🔗 API URL:', window.location.origin);
+      
       await login(username, password);
+      
+      console.log('✅ Login bem-sucedido!');
       
       // Gerenciar Remember Me
       if (rememberMe) {
@@ -89,9 +95,33 @@ const Login = () => {
         localStorage.removeItem('rememberMe');
         console.log('🔒 Credenciais removidas (Remember Me desabilitado)');
       }
-    } catch (error) {
-      console.error('Error during sign in:', error);
-      setError('Falha na autenticação. Verifique seu usuário e senha.');
+    } catch (error: any) {
+      console.error('❌ Erro durante login:', error);
+      console.error('📋 Detalhes:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      
+      // Mensagem de erro mais específica
+      let errorMessage = 'Falha na autenticação. Verifique seu usuário e senha.';
+      
+      if (error?.response?.status === 401) {
+        errorMessage = error?.response?.data?.message || 'Usuário ou senha incorretos.';
+      } else if (error?.response?.status === 403) {
+        errorMessage = 'Acesso negado. Verifique suas permissões.';
+      } else if (error?.response?.status === 500) {
+        errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      toast({
+        title: 'Erro ao fazer login',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

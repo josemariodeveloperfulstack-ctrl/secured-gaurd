@@ -11,10 +11,12 @@ import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import OcorrenciaFormModal from '@/components/operacional/OcorrenciaFormModal';
+import OcorrenciaViewModal from '@/components/operacional/OcorrenciaViewModal';
 
 const OcorrenciasPage: React.FC = () => {
   const [employeeId, setEmployeeId] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedOccurrence, setSelectedOccurrence] = useState<ServiceOccurrence | null>(null);
   const [filters, setFilters] = useState({
     type: 'all',
@@ -46,6 +48,17 @@ const OcorrenciasPage: React.FC = () => {
     setModalOpen(true);
   };
 
+  const handleViewOccurrence = (occurrence: ServiceOccurrence) => {
+    console.log('🔍 Visualizando ocorrência:', occurrence);
+    // Definir a ocorrência primeiro, depois abrir o modal
+    setSelectedOccurrence(occurrence);
+    // Usar setTimeout para garantir que o estado seja atualizado antes de abrir o modal
+    setTimeout(() => {
+      setViewModalOpen(true);
+      console.log('✅ Modal de visualização aberto');
+    }, 0);
+  };
+
   const handleEditOccurrence = (occurrence: ServiceOccurrence) => {
     setSelectedOccurrence(occurrence);
     setModalOpen(true);
@@ -53,8 +66,17 @@ const OcorrenciasPage: React.FC = () => {
 
   const handleCloseModal = () => {
     setModalOpen(false);
+    setViewModalOpen(false);
     setSelectedOccurrence(null);
     refetch();
+  };
+
+  const handleCloseViewModal = () => {
+    setViewModalOpen(false);
+    // Não limpar selectedOccurrence imediatamente para evitar flicker
+    setTimeout(() => {
+      setSelectedOccurrence(null);
+    }, 300);
   };
 
   const handleSaveOccurrence = (ocorrencia: ServiceOccurrence) => {
@@ -296,6 +318,7 @@ const OcorrenciasPage: React.FC = () => {
                                 size="sm"
                                 variant="outline"
                                 className="text-seguranca-yellow border-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
+                                onClick={() => handleViewOccurrence(occurrence)}
                               >
                                 <Eye size={16} className="mr-1" />
                                 Ver
@@ -338,6 +361,13 @@ const OcorrenciasPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal para visualizar ocorrência */}
+      <OcorrenciaViewModal 
+        open={viewModalOpen} 
+        onOpenChange={handleCloseViewModal}
+        ocorrencia={selectedOccurrence}
+      />
 
       {/* Modal para criar/editar ocorrência */}
       <OcorrenciaFormModal 

@@ -101,6 +101,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/vehicles/**").authenticated()
                 // Endpoints de work-posts - temporariamente públicos para debug
                 .requestMatchers("/api/work-posts/**").permitAll()
+                // Endpoints de guias de transporte - requerem autenticação
+                .requestMatchers("/api/transport-guides/**").authenticated()
                 // Endpoints de reconhecimento facial - requerem apenas autenticação
                 .requestMatchers("/api/facial-recognition/recognize").authenticated()
                 .requestMatchers("/api/facial-recognition/test").permitAll()

@@ -1243,28 +1243,198 @@ public class UnifiedDocumentService {
     /**
      * Busca documentos unificados por nome do funcionário
      */
-    public List<Map<String, Object>> searchUnifiedDocumentsByEmployee(String employeeName) throws IOException {
-        log.info("🔍 Buscando documentos unificados para funcionário: {}", employeeName);
+    /**
+     * Busca documentos unificados por múltiplos critérios
+     * Dá preferência aos dados do holerite quando disponível
+     */
+    public List<Map<String, Object>> searchUnifiedDocuments(String searchTerm) throws IOException {
+        if (searchTerm == null || searchTerm.trim().length() < 4) {
+            log.warn("⚠️ Termo de busca muito curto (mínimo 4 caracteres): {}", searchTerm);
+            return Collections.emptyList();
+        }
         
+        log.info("🔍 Buscando documentos unificados com termo: '{}'", searchTerm);
+        
+        String trimmedSearch = searchTerm.trim();
+        String normalizedSearch = normalizeNameForSearch(trimmedSearch);
+        String searchLower = trimmedSearch.toLowerCase();
+        
+        // Buscar todos os documentos
         List<Map<String, Object>> allDocuments = listAllUnifiedDocuments();
         List<Map<String, Object>> filteredDocuments = new ArrayList<>();
         
-        String searchTerm = employeeName.toLowerCase().trim();
+        // Buscar holerites correspondentes para enriquecer os dados
+        List<Payslip> matchingPayslips = new ArrayList<>();
+        try {
+            matchingPayslips = payslipService.getAllPayslips().stream()
+                .filter(p -> p.getEmployeeName() != null && 
+                    (normalizeNameForSearch(p.getEmployeeName()).contains(normalizedSearch) ||
+                     p.getEmployeeName().toLowerCase().contains(searchLower) ||
+                     (p.getCpf() != null && p.getCpf().replaceAll("[^0-9]", "").contains(trimmedSearch.replaceAll("[^0-9]", ""))) ||
+                     (p.getCompanyName() != null && normalizeNameForSearch(p.getCompanyName()).contains(normalizedSearch))))
+                .collect(Collectors.toList());
+            log.info("📊 Encontrados {} holerite(s) correspondentes", matchingPayslips.size());
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao buscar holerites: {}", e.getMessage());
+        }
         
+        // Criar mapa de holerites por nome/CPF/período para acesso rápido
+        Map<String, Payslip> payslipMap = new HashMap<>();
+        for (Payslip payslip : matchingPayslips) {
+            String key = String.format("%s|%s|%d|%d", 
+                normalizeNameForSearch(payslip.getEmployeeName()),
+                payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : "",
+                payslip.getMonth(), payslip.getYear());
+            payslipMap.put(key, payslip);
+        }
+        
+        // Filtrar documentos unificados
         for (Map<String, Object> doc : allDocuments) {
-            String fileName = (String) doc.get("fileName");
+            if (matchesSearchTerm(doc, normalizedSearch, searchLower, trimmedSearch, payslipMap)) {
+                // Enriquecer documento com dados do holerite se disponível
+                enrichDocumentWithPayslipData(doc, payslipMap);
+                filteredDocuments.add(doc);
+            }
+        }
+        
+        // Ordenar: documentos com dados do holerite primeiro
+        filteredDocuments.sort((d1, d2) -> {
+            boolean d1HasPayslip = d1.containsKey("payslipData") && d1.get("payslipData") != null;
+            boolean d2HasPayslip = d2.containsKey("payslipData") && d2.get("payslipData") != null;
+            
+            if (d1HasPayslip && !d2HasPayslip) return -1;
+            if (!d1HasPayslip && d2HasPayslip) return 1;
+            
+            // Se ambos têm ou não têm, ordenar por data (mais recente primeiro)
+            Integer year1 = (Integer) d1.get("year");
+            Integer year2 = (Integer) d2.get("year");
+            Integer month1 = (Integer) d1.get("month");
+            Integer month2 = (Integer) d2.get("month");
+            
+            if (year1 != null && year2 != null) {
+                int yearCompare = year2.compareTo(year1);
+                if (yearCompare != 0) return yearCompare;
+            }
+            if (month1 != null && month2 != null) {
+                return month2.compareTo(month1);
+            }
+            return 0;
+        });
+        
+        log.info("✅ Encontrados {} documentos unificados para busca: '{}'", filteredDocuments.size(), trimmedSearch);
+        return filteredDocuments;
+    }
+    
+    /**
+     * Verifica se um documento corresponde ao termo de busca
+     */
+    private boolean matchesSearchTerm(Map<String, Object> doc, String normalizedSearch, 
+                                     String searchLower, String trimmedSearch, 
+                                     Map<String, Payslip> payslipMap) {
+        // Buscar por nome do funcionário
+        String employeeName = (String) doc.get("employeeName");
+        if (employeeName != null) {
+            String normalizedName = normalizeNameForSearch(employeeName);
+            if (normalizedName.contains(normalizedSearch) || 
+                employeeName.toLowerCase().contains(searchLower)) {
+                return true;
+            }
+        }
+        
+        // Buscar por CPF
+        String cpf = (String) doc.get("cpf");
+        if (cpf != null) {
+            String cpfDigits = cpf.replaceAll("[^0-9]", "");
+            String searchDigits = trimmedSearch.replaceAll("[^0-9]", "");
+            if (!searchDigits.isEmpty() && cpfDigits.contains(searchDigits)) {
+                return true;
+            }
+        }
+        
+        // Buscar por período (MM/YYYY ou MM-YYYY)
+        Integer month = (Integer) doc.get("month");
+        Integer year = (Integer) doc.get("year");
+        if (month != null && year != null) {
+            String period1 = String.format("%02d/%d", month, year);
+            String period2 = String.format("%02d-%d", month, year);
+            String period3 = String.format("%d/%d", month, year);
+            if (trimmedSearch.contains(period1) || trimmedSearch.contains(period2) || 
+                trimmedSearch.contains(period3) || trimmedSearch.contains(String.valueOf(year))) {
+                return true;
+            }
+        }
+        
+        // Buscar no nome do arquivo
+        String fileName = (String) doc.get("fileName");
+        if (fileName != null && fileName.toLowerCase().contains(searchLower)) {
+            return true;
+        }
+        
+        // Buscar nos dados do holerite associado (se disponível)
+        for (Payslip payslip : payslipMap.values()) {
+            String key = String.format("%s|%s|%d|%d", 
+                normalizeNameForSearch(payslip.getEmployeeName()),
+                payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : "",
+                payslip.getMonth(), payslip.getYear());
+            
+            Integer docMonth = (Integer) doc.get("month");
+            Integer docYear = (Integer) doc.get("year");
             String docEmployeeName = (String) doc.get("employeeName");
             
-            if (fileName != null && docEmployeeName != null) {
-                if (fileName.toLowerCase().contains(searchTerm) || 
-                    docEmployeeName.toLowerCase().contains(searchTerm)) {
-                    filteredDocuments.add(doc);
+            if (docMonth != null && docYear != null && docEmployeeName != null &&
+                docMonth.equals(payslip.getMonth()) && 
+                docYear.equals(payslip.getYear()) &&
+                normalizeNameForSearch(docEmployeeName).equals(normalizeNameForSearch(payslip.getEmployeeName()))) {
+                // Verificar se o holerite corresponde à busca
+                if (payslip.getCompanyName() != null && 
+                    normalizeNameForSearch(payslip.getCompanyName()).contains(normalizedSearch)) {
+                    return true;
                 }
             }
         }
         
-        log.info("✅ Encontrados {} documentos para o funcionário: {}", filteredDocuments.size(), employeeName);
-        return filteredDocuments;
+        return false;
+    }
+    
+    /**
+     * Enriquece documento com dados do holerite quando disponível
+     */
+    private void enrichDocumentWithPayslipData(Map<String, Object> doc, Map<String, Payslip> payslipMap) {
+        String employeeName = (String) doc.get("employeeName");
+        Integer month = (Integer) doc.get("month");
+        Integer year = (Integer) doc.get("year");
+        
+        if (employeeName != null && month != null && year != null) {
+            String key = String.format("%s|%s|%d|%d", 
+                normalizeNameForSearch(employeeName),
+                doc.get("cpf") != null ? ((String) doc.get("cpf")).replaceAll("[^0-9]", "") : "",
+                month, year);
+            
+            Payslip matchingPayslip = payslipMap.values().stream()
+                .filter(p -> p.getMonth().equals(month) && 
+                            p.getYear().equals(year) &&
+                            normalizeNameForSearch(p.getEmployeeName()).equals(normalizeNameForSearch(employeeName)))
+                .findFirst()
+                .orElse(null);
+            
+            if (matchingPayslip != null) {
+                Map<String, Object> payslipData = new HashMap<>();
+                payslipData.put("cpf", matchingPayslip.getCpf());
+                payslipData.put("companyName", matchingPayslip.getCompanyName());
+                payslipData.put("companyCnpj", matchingPayslip.getCompanyCnpj());
+                payslipData.put("workPostName", matchingPayslip.getWorkPostName());
+                payslipData.put("netValue", matchingPayslip.getNetValue());
+                doc.put("payslipData", payslipData);
+                log.debug("✅ Documento enriquecido com dados do holerite: {}", employeeName);
+            }
+        }
+    }
+    
+    /**
+     * Busca documentos unificados por nome do funcionário (método legado - mantido para compatibilidade)
+     */
+    public List<Map<String, Object>> searchUnifiedDocumentsByEmployee(String employeeName) throws IOException {
+        return searchUnifiedDocuments(employeeName);
     }
 
     /**
@@ -2207,6 +2377,62 @@ public class UnifiedDocumentService {
      * Trata variações comuns como "DA COSTA" vs "DACOSTA", "DE SOUZA" vs "DESOUZA", etc.
      * A estratégia é normalizar removendo espaços após preposições comuns para padronizar.
      */
+    /**
+     * Normaliza número de conta corrente removendo espaços, hífens e pontos
+     */
+    private String normalizeAccountNumber(String account) {
+        if (account == null) return "";
+        return account.replaceAll("[^0-9]", "");
+    }
+    
+    /**
+     * Normaliza CPF removendo formatação
+     */
+    private String normalizeCpf(String cpf) {
+        if (cpf == null) return "";
+        return cpf.replaceAll("[^0-9]", "");
+    }
+    
+    /**
+     * Busca funcionário na tabela employees usando dados do holerite
+     * Estratégia: CPF > Nome exato > Nome parcial
+     */
+    private Employee findEmployeeForPayslip(Payslip payslip) {
+        try {
+            // ESTRATÉGIA 1: Buscar por CPF
+            if (payslip.getCpf() != null && !payslip.getCpf().trim().isEmpty()) {
+                String normalizedCpf = payslip.getCpf().replaceAll("[^0-9]", "");
+                if (normalizedCpf.length() >= 11) {
+                    Optional<Employee> employeeOpt = employeeRepository.findByCpf(normalizedCpf);
+                    if (employeeOpt.isPresent()) {
+                        return employeeOpt.get();
+                    }
+                }
+            }
+            
+            // ESTRATÉGIA 2: Buscar por nome exato
+            if (payslip.getEmployeeName() != null && !payslip.getEmployeeName().trim().isEmpty()) {
+                Optional<Employee> employeeOpt = employeeRepository.findByNameExact(payslip.getEmployeeName().trim());
+                if (employeeOpt.isPresent()) {
+                    return employeeOpt.get();
+                }
+            }
+            
+            // ESTRATÉGIA 3: Buscar por nome parcial
+            if (payslip.getEmployeeName() != null && !payslip.getEmployeeName().trim().isEmpty()) {
+                List<Employee> employees = employeeRepository.findByNameContainingIgnoreCase(payslip.getEmployeeName().trim());
+                if (!employees.isEmpty()) {
+                    // Retornar o primeiro (ou o mais próximo se houver lógica de matching)
+                    return employees.get(0);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao buscar funcionário na tabela employees: {}", e.getMessage());
+        }
+        
+        return null;
+    }
+    
     private String normalizeNameForSearch(String name) {
         if (name == null || name.trim().isEmpty()) {
             return "";
@@ -2554,6 +2780,9 @@ public class UnifiedDocumentService {
             .build();
         
         try {
+            // OTIMIZAÇÃO 1: Pré-carregar todos os dados necessários de uma vez
+            log.info("⚡ Pré-carregando dados para otimização...");
+            
             // 1. Buscar todos os holerites
             List<Payslip> allPayslips = payslipService.getAllPayslips();
             log.info("📊 Total de holerites no banco: {}", allPayslips.size());
@@ -2567,6 +2796,43 @@ public class UnifiedDocumentService {
             
             log.info("📊 Holerites após filtro: {}", filteredPayslips.size());
             result.setTotalProcessed(filteredPayslips.size());
+            
+            // OTIMIZAÇÃO 2: Pré-carregar todos os employees em um mapa (CPF -> Employee e Nome -> Employee)
+            Map<String, Employee> employeesByCpf = new HashMap<>();
+            Map<String, Employee> employeesByName = new HashMap<>();
+            List<Employee> allEmployees = employeeRepository.findAll();
+            for (Employee emp : allEmployees) {
+                if (emp.getDocument() != null) {
+                    String normalizedCpf = normalizeCpf(emp.getDocument());
+                    if (!normalizedCpf.isEmpty()) {
+                        employeesByCpf.put(normalizedCpf, emp);
+                    }
+                }
+                if (emp.getName() != null) {
+                    String normalizedName = normalizeNameForSearch(emp.getName());
+                    if (!normalizedName.isEmpty()) {
+                        employeesByName.put(normalizedName, emp);
+                    }
+                }
+            }
+            log.info("⚡ Pré-carregados {} employees em cache", allEmployees.size());
+            
+            // OTIMIZAÇÃO 3: Pré-carregar comprovantes por período (mês seguinte e mesmo mês)
+            Map<String, List<PaymentReceipt>> receiptsByPeriod = new HashMap<>();
+            for (Payslip p : filteredPayslips) {
+                int receiptMonthNext = p.getMonth() == 12 ? 1 : p.getMonth() + 1;
+                int receiptYearNext = p.getMonth() == 12 ? p.getYear() + 1 : p.getYear();
+                String keyNext = receiptMonthNext + "_" + receiptYearNext;
+                String keySame = p.getMonth() + "_" + p.getYear();
+                
+                if (!receiptsByPeriod.containsKey(keyNext)) {
+                    receiptsByPeriod.put(keyNext, receiptRepository.findByYearAndMonth(receiptYearNext, receiptMonthNext));
+                }
+                if (!receiptsByPeriod.containsKey(keySame)) {
+                    receiptsByPeriod.put(keySame, receiptRepository.findByYearAndMonth(p.getYear(), p.getMonth()));
+                }
+            }
+            log.info("⚡ Pré-carregados comprovantes para {} períodos", receiptsByPeriod.size());
             
             // 3. Agrupar por funcionário e período (um documento por funcionário/mês/ano)
             Map<String, Payslip> uniquePayslips = filteredPayslips.stream()
@@ -2665,8 +2931,8 @@ public class UnifiedDocumentService {
                     // 4.2. Buscar comprovantes para o funcionário usando múltiplas estratégias
                     // ESTRATÉGIA MELHORADA: Primeiro buscar por PERÍODO, depois verificar NOME
                     // Isso resolve o problema onde o comprovante existe mas o nome pode ter pequenas diferenças
-                    String normalizedName = normalizeNameForSearch(employeeName);
-                    log.info("🔍 Buscando comprovantes para '{}' (normalizado: '{}')", employeeName, normalizedName);
+                    String normalizedEmployeeName = normalizeNameForSearch(employeeName);
+                    log.info("🔍 Buscando comprovantes para '{}' (normalizado: '{}')", employeeName, normalizedEmployeeName);
                     
                     // REGRA DE NEGÓCIO: O comprovante de pagamento pode ser do mês SEGUINTE ou do MESMO mês
                     // Ex: Holerite de setembro -> Comprovante de outubro (mês do pagamento) OU setembro
@@ -2676,22 +2942,27 @@ public class UnifiedDocumentService {
                     log.info("🔍 Buscando comprovante para holerite {}/{} -> tentando comprovante {}/{} (mês seguinte) ou {}/{} (mesmo mês)", 
                         month, year, receiptMonthNext, receiptYearNext, month, year);
                     
-                    // ESTRATÉGIA 1: Buscar TODOS os comprovantes do período esperado (sem filtrar por nome)
+                    // OTIMIZAÇÃO: Usar cache pré-carregado de comprovantes
                     List<PaymentReceipt> receiptsInPeriod = new ArrayList<>();
                     
                     // Tentativa 1: Mês seguinte (pagamento típico)
-                    List<PaymentReceipt> receiptsNextMonth = receiptRepository.findByYearAndMonth(receiptYearNext, receiptMonthNext);
-                    log.info("📋 Encontrados {} comprovante(s) no banco para o período {}/{} (mês seguinte)", 
+                    String keyNext = receiptMonthNext + "_" + receiptYearNext;
+                    List<PaymentReceipt> receiptsNextMonth = receiptsByPeriod.getOrDefault(keyNext, new ArrayList<>());
+                    log.info("📋 Encontrados {} comprovante(s) no cache para o período {}/{} (mês seguinte)", 
                         receiptsNextMonth.size(), receiptMonthNext, receiptYearNext);
                     receiptsInPeriod.addAll(receiptsNextMonth);
                     
                     // Tentativa 2: Mesmo mês (fallback)
-                    List<PaymentReceipt> receiptsSameMonth = receiptRepository.findByYearAndMonth(year, month);
-                    log.info("📋 Encontrados {} comprovante(s) no banco para o período {}/{} (mesmo mês)", 
+                    String keySame = month + "_" + year;
+                    List<PaymentReceipt> receiptsSameMonth = receiptsByPeriod.getOrDefault(keySame, new ArrayList<>());
+                    log.info("📋 Encontrados {} comprovante(s) no cache para o período {}/{} (mesmo mês)", 
                         receiptsSameMonth.size(), month, year);
                     // Adicionar apenas os que não estão na lista do mês seguinte
+                    Set<UUID> existingIds = receiptsInPeriod.stream()
+                        .map(PaymentReceipt::getId)
+                        .collect(Collectors.toSet());
                     for (PaymentReceipt receipt : receiptsSameMonth) {
-                        if (!receiptsInPeriod.contains(receipt)) {
+                        if (!existingIds.contains(receipt.getId())) {
                             receiptsInPeriod.add(receipt);
                         }
                     }
@@ -2700,9 +2971,37 @@ public class UnifiedDocumentService {
                         receiptsInPeriod.size(), receiptsNextMonth.size(), receiptsSameMonth.size());
                     
                     // ESTRATÉGIA 2: Verificar se algum comprovante do período corresponde ao nome do funcionário
+                    // REGRA DE NEGÓCIO: Comparar Nome, Valor Líquido e Conta Corrente (quando disponível)
                     // NOVA ESTRATÉGIA: Usar o nome da conta creditada do comprovante e verificar no PDF do holerite
                     // se esse nome aparece na mesma linha do código e CPF
                     List<PaymentReceipt> matchedByName = new ArrayList<>();
+                    
+                    // OTIMIZAÇÃO: Buscar funcionário no cache pré-carregado (mais rápido)
+                    Employee employee = null;
+                    if (payslip.getCpf() != null) {
+                        String normalizedCpf = normalizeCpf(payslip.getCpf());
+                        employee = employeesByCpf.get(normalizedCpf);
+                        if (employee != null) {
+                            log.debug("✅ Employee encontrado por CPF no cache: {} (ID: {})", employee.getName(), employee.getId());
+                        }
+                    }
+                    if (employee == null && employeeName != null && !employeeName.trim().isEmpty()) {
+                        String normalizedEmployeeNameForCache = normalizeNameForSearch(employeeName);
+                        employee = employeesByName.get(normalizedEmployeeNameForCache);
+                        if (employee != null) {
+                            log.debug("✅ Employee encontrado por nome no cache: {} (ID: {})", employee.getName(), employee.getId());
+                        }
+                    }
+                    // Fallback: buscar via método tradicional se não encontrou no cache
+                    if (employee == null) {
+                        employee = findEmployeeForPayslip(payslip);
+                    }
+                    if (employee != null) {
+                        log.info("✅ Funcionário encontrado na tabela employees: {} (ID: {}, CPF: {}, Conta: {})", 
+                            employee.getName(), employee.getId(), 
+                            employee.getDocument() != null ? employee.getDocument() : "N/A",
+                            employee.getContaCorrente() != null ? employee.getContaCorrente() : "N/A");
+                    }
                     
                     // Primeiro, tentar buscar usando o nome da conta creditada do comprovante
                     for (PaymentReceipt receipt : receiptsInPeriod) {
@@ -2716,20 +3015,92 @@ public class UnifiedDocumentService {
                         // Verificar no PDF do holerite se o nome do comprovante aparece na mesma linha do código e CPF
                         Payslip matchedPayslip = findPayslipByReceiptNameInPDF(receiptName, List.of(payslip));
                         
+                        boolean nameMatches = false;
+                        boolean cpfMatches = false;
+                        boolean valueMatches = false;
+                        boolean accountMatches = false;
+                        
+                        // 1. VERIFICAR NOME
                         if (matchedPayslip != null) {
-                            matchedByName.add(receipt);
-                            log.info("✅ Comprovante '{}' corresponde ao holerite '{}' (verificado no PDF)", 
+                            nameMatches = true;
+                            log.debug("✅ Comprovante '{}' corresponde ao holerite '{}' (verificado no PDF)", 
                                 receiptName, payslip.getEmployeeName());
                         } else {
                             // Fallback: verificar usando estratégias tradicionais de matching
                             boolean exactMatch = verifyEmployeeNames(employeeName, receipt.getEmployeeName());
                             boolean flexibleMatch = isFlexibleNameMatch(employeeName, receipt.getEmployeeName());
-                            boolean normalizedMatch = normalizeNameForSearch(receipt.getEmployeeName())
-                                .contains(normalizedName) || normalizedName.contains(normalizeNameForSearch(receipt.getEmployeeName()));
+                            String receiptNormalizedName = normalizeNameForSearch(receipt.getEmployeeName());
+                            boolean normalizedMatch = receiptNormalizedName.contains(normalizedEmployeeName) || 
+                                normalizedEmployeeName.contains(receiptNormalizedName);
                             
-                            if (exactMatch || flexibleMatch || normalizedMatch) {
-                                matchedByName.add(receipt);
+                            nameMatches = exactMatch || flexibleMatch || normalizedMatch;
+                        }
+                        
+                        // 2. VERIFICAR CPF (prioridade alta para matching preciso)
+                        if (payslip.getCpf() != null) {
+                            String payslipCpf = normalizeCpf(payslip.getCpf());
+                            if (!payslipCpf.isEmpty()) {
+                                // Verificar CPF do employee se disponível
+                                if (employee != null && employee.getDocument() != null) {
+                                    String employeeCpf = normalizeCpf(employee.getDocument());
+                                    if (payslipCpf.equals(employeeCpf)) {
+                                        // Se o receipt tem employeeId, verificar se corresponde
+                                        if (receipt.getEmployeeId() != null && receipt.getEmployeeId().equals(employee.getId())) {
+                                            cpfMatches = true;
+                                            log.debug("✅ CPF corresponde (via employeeId do receipt): {}", payslipCpf);
+                                        } else {
+                                            // Verificar se o receipt pertence a um employee com mesmo CPF
+                                            cpfMatches = true; // Se o employee tem o CPF, assume match
+                                            log.debug("✅ CPF corresponde (via employee): {}", payslipCpf);
+                                        }
+                                    }
+                                }
                             }
+                        }
+                        
+                        // 3. VERIFICAR VALOR (Valor Líquido do Holerite vs Valor do Comprovante)
+                        if (payslip.getNetValue() != null && receipt.getNetSalary() != null) {
+                            valueMatches = payslip.getNetValue().compareTo(receipt.getNetSalary()) == 0;
+                        }
+                        
+                        // 4. VERIFICAR CONTA CORRENTE USANDO TABELA EMPLOYEES (quando não tiver no holerite)
+                        // PRIORIDADE: Se não encontrou match de conta corrente no holerite, buscar na tabela employees
+                        if (employee != null && employee.getContaCorrente() != null && receipt.getCreditedAccount() != null) {
+                            String employeeAccount = normalizeAccountNumber(employee.getContaCorrente());
+                            String receiptAccount = normalizeAccountNumber(receipt.getCreditedAccount());
+                            accountMatches = employeeAccount.equals(receiptAccount);
+                            
+                            if (accountMatches) {
+                                log.debug("✅ Conta corrente corresponde (via tabela employees): '{}' = '{}'", 
+                                    employeeAccount, receiptAccount);
+                            }
+                        }
+                        
+                        // REGRA DE NEGÓCIO MELHORADA: Match se (Nome OU CPF) E Valor correspondem
+                        // Conta Corrente é usado para validação adicional quando disponível
+                        boolean basicMatch = (nameMatches || cpfMatches) && valueMatches;
+                        
+                        if (basicMatch) {
+                            // Se conta corrente foi verificada e não corresponde, dar aviso mas ainda fazer match
+                            // (conta corrente é validação adicional, não bloqueante)
+                            if (accountMatches) {
+                                matchedByName.add(receipt);
+                                log.info("✅ Comprovante adicionado ao match - Nome: {}, CPF: {}, Valor: {}, Conta: ✅", 
+                                    nameMatches, cpfMatches, valueMatches);
+                            } else if (receipt.getCreditedAccount() == null || employee == null || employee.getContaCorrente() == null) {
+                                // Se não tem conta corrente para verificar, fazer match mesmo assim
+                                matchedByName.add(receipt);
+                                log.info("✅ Comprovante adicionado ao match - Nome: {}, CPF: {}, Valor: {}, Conta: N/A", 
+                                    nameMatches, cpfMatches, valueMatches);
+                            } else {
+                                // Conta corrente foi verificada e não corresponde - avisar mas ainda fazer match
+                                matchedByName.add(receipt);
+                                log.warn("⚠️ Comprovante adicionado com AVISO - Nome: {}, CPF: {}, Valor: {}, Conta: ❌ (não corresponde)", 
+                                    nameMatches, cpfMatches, valueMatches);
+                            }
+                        } else {
+                            log.debug("   Match não encontrado - Nome: {}, CPF: {}, Valor: {}", 
+                                nameMatches, cpfMatches, valueMatches);
                         }
                     }
                     
@@ -2746,19 +3117,21 @@ public class UnifiedDocumentService {
                         log.info("📋 Encontrados {} comprovante(s) por nome completo '{}'", receiptsByName.size(), employeeName);
                         
                         // Buscar por partes do nome (primeiro e último nome)
-                        String[] nameParts = employeeName.trim().toUpperCase().split("\\s+");
-                        if (nameParts.length >= 2) {
-                            String firstName = nameParts[0];
-                            String lastName = nameParts[nameParts.length - 1];
-                            log.info("🔍 Buscando por primeiro nome '{}' e último nome '{}'", firstName, lastName);
-                            
-                            List<PaymentReceipt> receiptsByFirst = receiptRepository
-                                .findByEmployeeNameContainingIgnoreCase(firstName);
-                            for (PaymentReceipt receipt : receiptsByFirst) {
-                                if (receipt.getEmployeeName() != null && 
-                                    receipt.getEmployeeName().toUpperCase().contains(lastName)) {
-                                    if (!receiptsByName.contains(receipt)) {
-                                        receiptsByName.add(receipt);
+                        if (employeeName != null && !employeeName.trim().isEmpty()) {
+                            String[] nameParts = employeeName.trim().toUpperCase().split("\\s+");
+                            if (nameParts.length >= 2) {
+                                String firstName = nameParts[0];
+                                String lastName = nameParts[nameParts.length - 1];
+                                log.info("🔍 Buscando por primeiro nome '{}' e último nome '{}'", firstName, lastName);
+                                
+                                List<PaymentReceipt> receiptsByFirst = receiptRepository
+                                    .findByEmployeeNameContainingIgnoreCase(firstName);
+                                for (PaymentReceipt receipt : receiptsByFirst) {
+                                    if (receipt.getEmployeeName() != null && 
+                                        receipt.getEmployeeName().toUpperCase().contains(lastName)) {
+                                        if (!receiptsByName.contains(receipt)) {
+                                            receiptsByName.add(receipt);
+                                        }
                                     }
                                 }
                             }
@@ -2785,8 +3158,9 @@ public class UnifiedDocumentService {
                                 // Fallback: verificar usando estratégias tradicionais de matching
                                 boolean exactMatch = verifyEmployeeNames(employeeName, receipt.getEmployeeName());
                                 boolean flexibleMatch = isFlexibleNameMatch(employeeName, receipt.getEmployeeName());
-                                boolean normalizedMatch = normalizeNameForSearch(receipt.getEmployeeName())
-                                    .contains(normalizedName) || normalizedName.contains(normalizeNameForSearch(receipt.getEmployeeName()));
+                                String receiptNormalizedNameForMatch = normalizeNameForSearch(receipt.getEmployeeName());
+                                boolean normalizedMatch = receiptNormalizedNameForMatch.contains(normalizedEmployeeName) || 
+                                    normalizedEmployeeName.contains(receiptNormalizedNameForMatch);
                                 
                                 if (exactMatch || flexibleMatch || normalizedMatch) {
                                     matchedByName.add(receipt);

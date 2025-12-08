@@ -43,27 +43,15 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { proposalService, Proposal, CreateProposalRequest, UpdateProposalRequest } from '@/services/proposalService';
 import PropostaAcordo from '@/components/comercial/PropostaAcordo';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-
-interface Proposal {
-  id: number;
-  title: string;
-  proposalNumber: string;
-  clientName: string;
-  leadName: string;
-  status: string;
-  totalValue: number;
-  validUntil: string;
-  description: string;
-  createdByName: string;
-  assignedToName: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { Loader2 } from 'lucide-react';
 
 const Propostas = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [filteredProposals, setFilteredProposals] = useState<Proposal[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,60 +59,55 @@ const Propostas = () => {
   const [clientFilter, setClientFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Dados simulados
-  const mockProposals: Proposal[] = [
-    {
-      id: 1,
-      title: 'Serviços de Vigilância - Shopping Center ABC',
-      proposalNumber: 'PROP-2025-001',
-      clientName: 'Shopping Center ABC',
-      leadName: 'João Silva',
-      status: 'DRAFT',
-      totalValue: 45000,
-      validUntil: '2025-02-15',
-      description: 'Proposta para serviços de vigilância 24h no shopping center',
-      createdByName: 'Maria Santos',
-      assignedToName: 'Carlos Oliveira',
-      createdAt: '2025-01-15',
-      updatedAt: '2025-01-15'
-    },
-    {
-      id: 2,
-      title: 'Segurança Industrial - Indústria XYZ',
-      proposalNumber: 'PROP-2025-002',
-      clientName: 'Indústria XYZ',
-      leadName: 'Pedro Santos',
-      status: 'SENT',
-      totalValue: 78000,
-      validUntil: '2025-02-20',
-      description: 'Proposta para segurança industrial com monitoramento',
-      createdByName: 'Ana Costa',
-      assignedToName: 'João Silva',
-      createdAt: '2025-01-12',
-      updatedAt: '2025-01-14'
-    },
-    {
-      id: 3,
-      title: 'Vigilância Condominial - Residencial Solar',
-      proposalNumber: 'PROP-2025-003',
-      clientName: 'Condomínio Solar',
-      leadName: 'Ana Costa',
-      status: 'UNDER_REVIEW',
-      totalValue: 32000,
-      validUntil: '2025-02-10',
-      description: 'Proposta para vigilância condominial 24h',
-      createdByName: 'Carlos Oliveira',
-      assignedToName: 'Maria Santos',
-      createdAt: '2025-01-10',
-      updatedAt: '2025-01-13'
+  // Form state
+  const [formData, setFormData] = useState<CreateProposalRequest>({
+    title: '',
+    totalValue: 0,
+    description: ''
+  });
+
+  // Load proposals from backend
+  const loadProposals = async () => {
+    try {
+      setLoading(true);
+      const data = await proposalService.getAllProposals();
+      // Map backend data to frontend format
+      const mappedProposals = data.map((proposal: any) => ({
+        id: proposal.id,
+        title: proposal.title || '',
+        proposalNumber: proposal.proposalNumber || '',
+        clientName: proposal.client?.name || proposal.clientName || 'N/A',
+        leadName: proposal.lead?.name || proposal.leadName || '',
+        status: proposal.status || 'DRAFT',
+        totalValue: proposal.totalValue ? Number(proposal.totalValue) : 0,
+        validUntil: proposal.validUntil ? new Date(proposal.validUntil).toISOString().split('T')[0] : '',
+        description: proposal.description || '',
+        createdByName: proposal.createdBy?.name || proposal.createdByName || 'N/A',
+        assignedToName: proposal.assignedTo?.name || proposal.assignedToName || 'Não atribuído',
+        createdAt: proposal.createdAt ? new Date(proposal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        updatedAt: proposal.updatedAt ? new Date(proposal.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+      }));
+      setProposals(mappedProposals);
+      setFilteredProposals(mappedProposals);
+    } catch (error: any) {
+      console.error('Erro ao carregar propostas:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível carregar as propostas.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    setProposals(mockProposals);
-    setFilteredProposals(mockProposals);
+    loadProposals();
   }, []);
 
   useEffect(() => {
@@ -132,9 +115,9 @@ const Propostas = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(proposal =>
-        proposal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        proposal.proposalNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        proposal.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+        proposal.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        proposal.proposalNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        proposal.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -148,6 +131,100 @@ const Propostas = () => {
 
     setFilteredProposals(filtered);
   }, [proposals, searchTerm, statusFilter, clientFilter]);
+
+  // Handle create proposal
+  const handleCreateProposal = async () => {
+    try {
+      setIsSubmitting(true);
+      await proposalService.createProposal(formData);
+      toast({
+        title: "Sucesso",
+        description: "Proposta criada com sucesso!",
+      });
+      setIsCreateModalOpen(false);
+      resetForm();
+      await loadProposals();
+    } catch (error: any) {
+      console.error('Erro ao criar proposta:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível criar a proposta.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle update proposal
+  const handleUpdateProposal = async () => {
+    if (!selectedProposal) return;
+    try {
+      setIsSubmitting(true);
+      const updateData: UpdateProposalRequest = {
+        ...formData,
+        status: formData.status || selectedProposal.status
+      };
+      await proposalService.updateProposal(Number(selectedProposal.id), updateData);
+      toast({
+        title: "Sucesso",
+        description: "Proposta atualizada com sucesso!",
+      });
+      setIsEditModalOpen(false);
+      resetForm();
+      await loadProposals();
+    } catch (error: any) {
+      console.error('Erro ao atualizar proposta:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível atualizar a proposta.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete proposal
+  const handleDeleteProposal = async (proposalId: number) => {
+    if (!confirm('Tem certeza que deseja excluir esta proposta?')) return;
+    try {
+      await proposalService.deleteProposal(proposalId);
+      toast({
+        title: "Sucesso",
+        description: "Proposta excluída com sucesso!",
+      });
+      await loadProposals();
+    } catch (error: any) {
+      console.error('Erro ao excluir proposta:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir a proposta.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      totalValue: 0,
+      description: ''
+    });
+    setSelectedProposal(null);
+  };
+
+  // Open edit modal
+  const handleEdit = (proposal: Proposal) => {
+    setSelectedProposal(proposal);
+    setFormData({
+      title: proposal.title || '',
+      totalValue: proposal.totalValue || 0,
+      description: proposal.description || ''
+    });
+    setIsEditModalOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -347,82 +424,96 @@ const Propostas = () => {
                 <CardTitle className="text-seguranca-lightgray">Lista de Propostas</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-gray-600">
-                        <TableHead className="text-seguranca-lightgray">Número</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Título</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Cliente</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Valor</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Válida Até</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
-                        <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredProposals.map((proposal) => (
-                        <TableRow key={proposal.id} className="border-gray-600">
-                          <TableCell className="text-seguranca-lightgray font-medium">
-                            {proposal.proposalNumber}
-                          </TableCell>
-                          <TableCell className="text-seguranca-lightgray">
-                            <div>
-                              <div className="font-medium">{proposal.title}</div>
-                              <div className="text-sm text-gray-400">{proposal.description}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-seguranca-lightgray">
-                            <div>
-                              <div className="font-medium">{proposal.clientName}</div>
-                              <div className="text-sm text-gray-400">Lead: {proposal.leadName}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{getStatusBadge(proposal.status)}</TableCell>
-                          <TableCell className="text-seguranca-lightgray font-medium">
-                            {formatCurrency(proposal.totalValue)}
-                          </TableCell>
-                          <TableCell className="text-seguranca-lightgray">
-                            {formatDate(proposal.validUntil)}
-                          </TableCell>
-                          <TableCell className="text-seguranca-lightgray">
-                            {proposal.assignedToName}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                                onClick={() => {
-                                  setSelectedProposal(proposal);
-                                  setIsViewModalOpen(true);
-                                }}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+                  </div>
+                ) : filteredProposals.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    Nenhuma proposta encontrada.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-gray-600">
+                          <TableHead className="text-seguranca-lightgray">Número</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Título</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Cliente</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Status</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Valor</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Válida Até</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
+                          <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProposals.map((proposal) => (
+                          <TableRow key={proposal.id} className="border-gray-600">
+                            <TableCell className="text-seguranca-lightgray font-medium">
+                              {proposal.proposalNumber || '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              <div>
+                                <div className="font-medium">{proposal.title}</div>
+                                <div className="text-sm text-gray-400">{proposal.description || ''}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              <div>
+                                <div className="font-medium">{proposal.clientName}</div>
+                                {proposal.leadName && (
+                                  <div className="text-sm text-gray-400">Lead: {proposal.leadName}</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(proposal.status)}</TableCell>
+                            <TableCell className="text-seguranca-lightgray font-medium">
+                              {proposal.totalValue ? formatCurrency(proposal.totalValue) : '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              {proposal.validUntil ? formatDate(proposal.validUntil) : '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              {proposal.assignedToName}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                                  onClick={() => {
+                                    setSelectedProposal(proposal);
+                                    setIsViewModalOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                                  onClick={() => handleEdit(proposal)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
+                                  onClick={() => handleDeleteProposal(Number(proposal.id))}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

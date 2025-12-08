@@ -550,10 +550,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     e.preventDefault();
     
     // Validações
-    if (!form.position?.id) {
-      setError('Cargo é obrigatório para criar um funcionário.');
-      return;
-    }
     if (!form.address) {
       setError('Endereço é obrigatório para criar um funcionário.');
       return;
@@ -1304,7 +1300,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                {/* Seleção de Cargo */}
                <div className="space-y-2">
                  <Label className="text-sm font-medium text-gray-200">
-                   Cargo * <span className="text-red-400">*</span>
+                   Cargo
                  </Label>
                  <div className="relative">
                    <div className="flex gap-2">

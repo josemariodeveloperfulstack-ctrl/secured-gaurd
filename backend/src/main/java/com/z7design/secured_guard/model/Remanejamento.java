@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -11,8 +12,9 @@ public class Remanejamento {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
+    @JsonIgnoreProperties({"timeRecords", "payrolls", "documents", "benefits", "schedules", "occurrences", "epis", "dependents"})
     private Employee employee;
 
     @Enumerated(EnumType.STRING)

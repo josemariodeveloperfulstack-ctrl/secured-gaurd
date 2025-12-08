@@ -44,111 +44,78 @@ import {
   Clock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { quoteService, Quote, CreateQuoteRequest, UpdateQuoteRequest } from '@/services/quoteService';
+import { Loader2 } from 'lucide-react';
 
-interface Quote {
-  id: number;
-  title: string;
-  quoteNumber: string;
-  clientName: string;
-  leadName: string;
-  status: string;
-  totalValue: number;
-  validUntil: string;
-  description: string;
-  createdByName: string;
-  assignedToName: string;
-  createdAt: string;
-  updatedAt: string;
-  estimatedDuration: string;
-  paymentTerms: string;
+interface QuoteExtended extends Quote {
+  quoteNumber?: string;
+  estimatedDuration?: string;
+  paymentTerms?: string;
 }
 
 const Orcamentos = () => {
   const { user } = useAuth();
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [filteredQuotes, setFilteredQuotes] = useState<Quote[]>([]);
+  const { toast } = useToast();
+  const [quotes, setQuotes] = useState<QuoteExtended[]>([]);
+  const [filteredQuotes, setFilteredQuotes] = useState<QuoteExtended[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [clientFilter, setClientFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteExtended | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Dados simulados
-  const mockQuotes: Quote[] = [
-    {
-      id: 1,
-      title: 'Orçamento de Vigilância - Shopping Center ABC',
-      quoteNumber: 'ORC-2025-001',
-      clientName: 'Shopping Center ABC',
-      leadName: 'João Silva',
-      status: 'DRAFT',
-      totalValue: 45000,
-      validUntil: '2025-02-15',
-      description: 'Orçamento para serviços de vigilância 24h no shopping center',
-      createdByName: 'Maria Santos',
-      assignedToName: 'Carlos Oliveira',
-      createdAt: '2025-01-15',
-      updatedAt: '2025-01-15',
-      estimatedDuration: '12 meses',
-      paymentTerms: '30/60/90 dias'
-    },
-    {
-      id: 2,
-      title: 'Orçamento de Segurança - Indústria XYZ',
-      quoteNumber: 'ORC-2025-002',
-      clientName: 'Indústria XYZ',
-      leadName: 'Pedro Santos',
-      status: 'SENT',
-      totalValue: 78000,
-      validUntil: '2025-02-20',
-      description: 'Orçamento para segurança industrial com monitoramento',
-      createdByName: 'Ana Costa',
-      assignedToName: 'João Silva',
-      createdAt: '2025-01-12',
-      updatedAt: '2025-01-14',
-      estimatedDuration: '24 meses',
-      paymentTerms: 'À vista'
-    },
-    {
-      id: 3,
-      title: 'Orçamento de Vigilância - Residencial Solar',
-      quoteNumber: 'ORC-2025-003',
-      clientName: 'Condomínio Solar',
-      leadName: 'Ana Costa',
-      status: 'UNDER_REVIEW',
-      totalValue: 32000,
-      validUntil: '2025-02-10',
-      description: 'Orçamento para vigilância condominial 24h',
-      createdByName: 'Carlos Oliveira',
-      assignedToName: 'Maria Santos',
-      createdAt: '2025-01-10',
-      updatedAt: '2025-01-13',
-      estimatedDuration: '6 meses',
-      paymentTerms: 'Mensal'
-    },
-    {
-      id: 4,
-      title: 'Orçamento de Segurança - Hospital Central',
-      quoteNumber: 'ORC-2025-004',
-      clientName: 'Hospital Central',
-      leadName: 'Roberto Lima',
-      status: 'APPROVED',
-      totalValue: 120000,
-      validUntil: '2025-03-01',
-      description: 'Orçamento para segurança hospitalar completa',
-      createdByName: 'Carlos Oliveira',
-      assignedToName: 'Ana Costa',
-      createdAt: '2025-01-08',
-      updatedAt: '2025-01-16',
-      estimatedDuration: '36 meses',
-      paymentTerms: '30/60/90 dias'
+  // Form state
+  const [formData, setFormData] = useState<CreateQuoteRequest>({
+    title: '',
+    clientId: 0,
+    totalValue: 0,
+    validUntil: ''
+  });
+
+  // Load quotes from backend
+  const loadQuotes = async () => {
+    try {
+      setLoading(true);
+      const data = await quoteService.getAllQuotes();
+      // Map backend data to frontend format
+      const mappedQuotes = data.map((quote: any) => ({
+        id: quote.id,
+        title: quote.title || '',
+        quoteNumber: quote.quoteNumber || `ORC-${quote.id}`,
+        clientName: quote.clientName || 'N/A',
+        leadName: quote.leadName || '',
+        status: quote.status || 'DRAFT',
+        totalValue: quote.totalValue ? Number(quote.totalValue) : 0,
+        validUntil: quote.validUntil ? new Date(quote.validUntil).toISOString().split('T')[0] : '',
+        description: quote.description || '',
+        createdByName: quote.createdByName || 'N/A',
+        assignedToName: quote.assignedToName || 'Não atribuído',
+        createdAt: quote.createdAt ? new Date(quote.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        updatedAt: quote.updatedAt ? new Date(quote.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        estimatedDuration: quote.estimatedDuration || '',
+        paymentTerms: quote.paymentTerms || quote.terms || ''
+      }));
+      setQuotes(mappedQuotes);
+      setFilteredQuotes(mappedQuotes);
+    } catch (error: any) {
+      console.error('Erro ao carregar orçamentos:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível carregar os orçamentos.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    setQuotes(mockQuotes);
-    setFilteredQuotes(mockQuotes);
+    loadQuotes();
   }, []);
 
   useEffect(() => {
@@ -156,9 +123,9 @@ const Orcamentos = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(quote =>
-        quote.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        quote.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+        quote.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        quote.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        quote.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -172,6 +139,103 @@ const Orcamentos = () => {
 
     setFilteredQuotes(filtered);
   }, [quotes, searchTerm, statusFilter, clientFilter]);
+
+  // Handle create quote
+  const handleCreateQuote = async () => {
+    try {
+      setIsSubmitting(true);
+      await quoteService.createQuote(formData);
+      toast({
+        title: "Sucesso",
+        description: "Orçamento criado com sucesso!",
+      });
+      setIsCreateModalOpen(false);
+      resetForm();
+      await loadQuotes();
+    } catch (error: any) {
+      console.error('Erro ao criar orçamento:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível criar o orçamento.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle update quote
+  const handleUpdateQuote = async () => {
+    if (!selectedQuote) return;
+    try {
+      setIsSubmitting(true);
+      const updateData: UpdateQuoteRequest = {
+        ...formData,
+        status: formData.status || selectedQuote.status
+      };
+      await quoteService.updateQuote(Number(selectedQuote.id), updateData);
+      toast({
+        title: "Sucesso",
+        description: "Orçamento atualizado com sucesso!",
+      });
+      setIsEditModalOpen(false);
+      resetForm();
+      await loadQuotes();
+    } catch (error: any) {
+      console.error('Erro ao atualizar orçamento:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível atualizar o orçamento.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete quote
+  const handleDeleteQuote = async (quoteId: number) => {
+    if (!confirm('Tem certeza que deseja excluir este orçamento?')) return;
+    try {
+      await quoteService.deleteQuote(quoteId);
+      toast({
+        title: "Sucesso",
+        description: "Orçamento excluído com sucesso!",
+      });
+      await loadQuotes();
+    } catch (error: any) {
+      console.error('Erro ao excluir orçamento:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir o orçamento.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      clientId: 0,
+      totalValue: 0,
+      validUntil: ''
+    });
+    setSelectedQuote(null);
+  };
+
+  // Open edit modal
+  const handleEdit = (quote: QuoteExtended) => {
+    setSelectedQuote(quote);
+    setFormData({
+      title: quote.title || '',
+      clientId: quote.clientId || 0,
+      totalValue: quote.totalValue || 0,
+      validUntil: quote.validUntil || '',
+      description: quote.description || ''
+    });
+    setIsEditModalOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -364,91 +428,107 @@ const Orcamentos = () => {
           <CardHeader>
             <CardTitle className="text-seguranca-lightgray">Lista de Orçamentos</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-gray-600">
-                    <TableHead className="text-seguranca-lightgray">Número</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Título</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Cliente</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Valor</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Válido Até</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Duração</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
-                    <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredQuotes.map((quote) => (
-                    <TableRow key={quote.id} className="border-gray-600">
-                      <TableCell className="text-seguranca-lightgray font-medium">
-                        {quote.quoteNumber}
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        <div>
-                          <div className="font-medium">{quote.title}</div>
-                          <div className="text-sm text-gray-400">{quote.description}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        <div>
-                          <div className="font-medium">{quote.clientName}</div>
-                          <div className="text-sm text-gray-400">Lead: {quote.leadName}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(quote.status)}</TableCell>
-                      <TableCell className="text-seguranca-lightgray font-medium">
-                        {formatCurrency(quote.totalValue)}
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        {formatDate(quote.validUntil)}
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {quote.estimatedDuration}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-seguranca-lightgray">
-                        {quote.assignedToName}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                            onClick={() => {
-                              setSelectedQuote(quote);
-                              setIsViewModalOpen(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
+              <CardContent>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+                  </div>
+                ) : filteredQuotes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    Nenhum orçamento encontrado.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-gray-600">
+                          <TableHead className="text-seguranca-lightgray">Número</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Título</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Cliente</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Status</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Valor</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Válido Até</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Duração</TableHead>
+                          <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
+                          <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredQuotes.map((quote) => (
+                          <TableRow key={quote.id} className="border-gray-600">
+                            <TableCell className="text-seguranca-lightgray font-medium">
+                              {quote.quoteNumber || '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              <div>
+                                <div className="font-medium">{quote.title}</div>
+                                <div className="text-sm text-gray-400">{quote.description || ''}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              <div>
+                                <div className="font-medium">{quote.clientName}</div>
+                                {quote.leadName && (
+                                  <div className="text-sm text-gray-400">Lead: {quote.leadName}</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(quote.status)}</TableCell>
+                            <TableCell className="text-seguranca-lightgray font-medium">
+                              {quote.totalValue ? formatCurrency(quote.totalValue) : '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              {quote.validUntil ? formatDate(quote.validUntil) : '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              {quote.estimatedDuration ? (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {quote.estimatedDuration}
+                                </div>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              {quote.assignedToName}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                                  onClick={() => {
+                                    setSelectedQuote(quote);
+                                    setIsViewModalOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                                  onClick={() => handleEdit(quote)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
+                                  onClick={() => handleDeleteQuote(Number(quote.id))}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
         </Card>
 
         {/* Modal de Visualização */}

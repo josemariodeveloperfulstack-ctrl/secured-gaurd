@@ -1262,25 +1262,34 @@ public class UnifiedDocumentController {
     }
 
     /**
-     * Busca documentos unificados por nome do funcionário
+     * Busca documentos unificados por múltiplos critérios
+     * Aceita: nome do funcionário, empresa, período (MM/YYYY), CPF
+     * Dá preferência aos dados do holerite quando disponível
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchUnifiedDocuments(
-            @RequestParam String employeeName) {
+            @RequestParam(required = false) String search) {
         
         Map<String, Object> response = new HashMap<>();
         
         try {
-            log.info("🔍 Buscando documentos unificados para: {}", employeeName);
+            if (search == null || search.trim().isEmpty()) {
+                response.put("sucesso", false);
+                response.put("mensagem", "Termo de busca é obrigatório");
+                return ResponseEntity.badRequest().body(response);
+            }
             
-            List<Map<String, Object>> documents = unifiedDocumentService.searchUnifiedDocumentsByEmployee(employeeName);
+            log.info("🔍 Buscando documentos unificados com termo: '{}'", search);
+            
+            List<Map<String, Object>> documents = unifiedDocumentService.searchUnifiedDocuments(search);
             
             response.put("sucesso", true);
             response.put("mensagem", "Busca realizada com sucesso");
             response.put("documents", documents);
             response.put("total", documents.size());
-            response.put("employeeName", employeeName);
+            response.put("searchTerm", search);
             
+            log.info("✅ Encontrados {} documentos unificados para busca: '{}'", documents.size(), search);
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
@@ -1327,49 +1336,68 @@ public class UnifiedDocumentController {
 
     /**
      * Exclui múltiplos documentos unificados
-     * AGORA COM PROCESSAMENTO ASSÍNCRONO - retorna imediatamente com jobId
+     * PROCESSAMENTO SÍNCRONO para exclusão em massa - retorna resultado imediato
      */
     @DeleteMapping("/delete-multiple")
     public ResponseEntity<Map<String, Object>> deleteMultipleUnifiedDocuments(@RequestBody List<String> fileNames) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            log.info("🗑️ Criando job de exclusão em lote: {} arquivo(s)", fileNames.size());
+            log.info("🗑️ Excluindo documentos em lote: {} arquivo(s)", fileNames.size());
             
-            // Obter usuário autenticado
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            java.util.UUID createdBy = null;
-            if (auth != null && auth.getName() != null) {
+            if (fileNames == null || fileNames.isEmpty()) {
+                response.put("sucesso", false);
+                response.put("mensagem", "Lista de arquivos vazia");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            int deletedCount = 0;
+            int failedCount = 0;
+            List<String> deletedFiles = new ArrayList<>();
+            List<String> failedFiles = new ArrayList<>();
+            
+            // Processar exclusões de forma síncrona
+            for (int i = 0; i < fileNames.size(); i++) {
+                String fileName = fileNames.get(i);
                 try {
-                    com.z7design.secured_guard.model.User user = 
-                        userRepository.findByUsername(auth.getName()).orElse(null);
-                    if (user != null) {
-                        createdBy = user.getId();
+                    boolean deleted = unifiedDocumentService.deleteUnifiedDocument(fileName);
+                    if (deleted) {
+                        deletedCount++;
+                        deletedFiles.add(fileName);
+                        log.debug("✅ Arquivo excluído: {} ({}/{})", fileName, i + 1, fileNames.size());
+                    } else {
+                        failedCount++;
+                        failedFiles.add(fileName);
+                        log.warn("⚠️ Falha ao excluir arquivo: {} ({}/{})", fileName, i + 1, fileNames.size());
                     }
                 } catch (Exception e) {
-                    log.warn("⚠️ Não foi possível obter ID do usuário: {}", e.getMessage());
+                    failedCount++;
+                    failedFiles.add(fileName);
+                    log.error("💥 Erro ao excluir arquivo {}: {}", fileName, e.getMessage());
                 }
             }
             
-            // Criar job (processamento assíncrono será iniciado automaticamente)
-            com.z7design.secured_guard.model.DeletionJob job = 
-                unifiedDocumentService.createDeletionJob(fileNames, createdBy);
+            log.info("✅ Exclusão em lote concluída: {} sucessos, {} falhas de {} total", 
+                deletedCount, failedCount, fileNames.size());
             
-            // Retornar imediatamente com informações do job
+            // Retornar resultado completo
             response.put("sucesso", true);
-            response.put("mensagem", "Processamento de exclusão iniciado! Use o jobId para acompanhar o progresso.");
-            response.put("jobId", job.getId());
-            response.put("status", job.getStatus().name());
-            response.put("totalFiles", job.getTotalFiles());
-            response.put("createdAt", job.getCreatedAt());
+            response.put("mensagem", String.format("Exclusão concluída: %d sucesso(s), %d falha(s)", 
+                deletedCount, failedCount));
+            response.put("deletedCount", deletedCount);
+            response.put("failedCount", failedCount);
+            response.put("totalFiles", fileNames.size());
+            response.put("deletedFiles", deletedFiles);
+            if (!failedFiles.isEmpty()) {
+                response.put("failedFiles", failedFiles);
+            }
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            log.error("💥 Erro ao criar job de exclusão em lote: {}", e.getMessage(), e);
+            log.error("💥 Erro ao processar exclusão em lote: {}", e.getMessage(), e);
             response.put("sucesso", false);
-            response.put("mensagem", "Erro ao iniciar processamento de exclusão: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
-            response.put("erro", e.getClass().getSimpleName());
+            response.put("mensagem", "Erro ao processar exclusão em lote: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
             return ResponseEntity.internalServerError().body(response);
         }
     }

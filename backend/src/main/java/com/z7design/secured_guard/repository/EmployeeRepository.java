@@ -46,8 +46,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     @Query("SELECT e.id FROM Employee e")
     List<UUID> findAllIds();
     
-    // Buscar dados básicos sem relacionamentos
-    @Query(value = "SELECT id, name, document, birth_date, registration_number, hire_date, termination_date, status, notes, address, phone, email, cnh_number, ctps, cbo, pis, salario, created_at, updated_at FROM employees", nativeQuery = true)
+    // Buscar dados básicos COM relacionamentos de cargo e unidade
+    @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name FROM employees e LEFT JOIN positions p ON e.position_id = p.id LEFT JOIN units u ON e.unit_id = u.id", nativeQuery = true)
     List<Object[]> findBasicData();
 
     // Buscar apenas o nome por ID para evitar carregar toda a entidade (e colunas inexistentes em alguns ambientes)
@@ -69,6 +69,12 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             "REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') = :whatsapp " +
             "LIMIT 1", nativeQuery = true)
     Optional<Employee> findByWhatsApp(@Param("whatsapp") String whatsapp);
+    
+    // Buscar por conta corrente (normaliza removendo espaços, hífens e pontos)
+    @Query(value = "SELECT * FROM employees WHERE " +
+            "REGEXP_REPLACE(COALESCE(conta_corrente, ''), '[^0-9]', '', 'g') = :contaCorrente " +
+            "LIMIT 1", nativeQuery = true)
+    Optional<Employee> findByContaCorrente(@Param("contaCorrente") String contaCorrente);
     
     // List<Employee> findByPossuiWhatsappTrue();
 } 

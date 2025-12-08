@@ -13,7 +13,8 @@ import {
   Building2, 
   Settings,
   Truck,
-  Route
+  Route,
+  UserCheck
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -52,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage = 'dashboard' }) => {
     { icon: <Calendar size={20} />, text: 'Escalas', to: '/escalas', id: 'escalas' },
     { icon: <Building2 size={20} />, text: 'Clientes', to: '/clientes', id: 'clientes' },
     { icon: <ClipboardList size={20} />, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
+    { icon: <UserCheck size={20} />, text: 'RH / Dept. Pessoal', to: '/rh', id: 'rh' },
     { icon: <DollarSign size={20} />, text: 'Financeiro', to: '/financeiro', id: 'financeiro' },
     { icon: <FileSpreadsheet size={20} />, text: 'Holerites', to: '/holerites', id: 'holerites' },
     { icon: <FileSpreadsheet size={20} />, text: 'Folha de Pagamento', to: '/payrolls', id: 'payrolls' },

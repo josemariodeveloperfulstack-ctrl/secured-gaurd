@@ -90,29 +90,11 @@ api.interceptors.response.use(
     }
     const originalRequest = error.config;
 
-    // Se o erro for 401 ou 403 e não for uma tentativa de refresh
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+    // Se o erro for 401 (não autorizado - token inválido/expirado)
+    if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        // Para erro 403, verificar se o token existe e tentar novamente
-        if (error.response?.status === 403) {
-          const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
-          const token = localStorage.getItem(tokenKey) || localStorage.getItem('token');
-          
-          if (token) {
-            // Token existe, mas foi rejeitado - pode ser expirado ou inválido
-            console.warn('⚠️ Token encontrado mas requisição retornou 403. Tentando refresh...');
-          } else {
-            // Token não existe - redirecionar para login
-            console.error('❌ Token não encontrado no localStorage. Redirecionando para login...');
-            localStorage.removeItem(import.meta.env.VITE_TOKEN_KEY || 'token');
-            localStorage.removeItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
-            localStorage.removeItem(import.meta.env.VITE_USER_KEY || 'user');
-            window.location.href = '/login';
-            return Promise.reject(error);
-          }
-        }
         
         const refreshToken = localStorage.getItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
         if (!refreshToken) {

@@ -40,6 +40,8 @@ import EscalaTrabalhoTable from '@/components/operacional/EscalaTrabalhoTable';
 import NotificacoesList from '@/components/operacional/NotificacoesList';
 import OcorrenciasTable from '@/components/operacional/OcorrenciasTable';
 import OcorrenciaFormModal from '@/components/operacional/OcorrenciaFormModal';
+import OcorrenciaViewModal from '@/components/operacional/OcorrenciaViewModal';
+import ConfirmDeleteModal from '@/components/operacional/ConfirmDeleteModal';
 import EscalaFormModal from '@/components/EscalaFormModal';
 import TransportGuideTab from '@/components/operacional/TransportGuideTab';
 import VisitWidget from '@/components/operacional/VisitWidget';
@@ -83,6 +85,9 @@ const Operacional: React.FC = () => {
   const [ocorrencias, setOcorrencias] = useState<Occurrence[]>([]);
   const [isLoadingOcorrencias, setIsLoadingOcorrencias] = useState(false);
   const [showOcorrenciaModal, setShowOcorrenciaModal] = useState(false);
+  const [showOcorrenciaViewModal, setShowOcorrenciaViewModal] = useState(false);
+  const [showDeleteOcorrenciaModal, setShowDeleteOcorrenciaModal] = useState(false);
+  const [ocorrenciaToDelete, setOcorrenciaToDelete] = useState<Occurrence | null>(null);
   const [activityReports, setActivityReports] = useState<ActivityReport[]>([]);
   const [isLoadingActivityReports, setIsLoadingActivityReports] = useState(false);
   const [showActivityReportModal, setShowActivityReportModal] = useState(false);
@@ -512,20 +517,36 @@ const Operacional: React.FC = () => {
   };
 
   const handleDeleteOcorrencia = (ocorrencia: Occurrence) => {
-    toast({
-      title: 'Excluir Ocorrência',
-      description: `Excluindo ocorrência: ${ocorrencia.title}`,
-      variant: 'destructive',
-    });
-    // TODO: Implementar confirmação e exclusão
+    setOcorrenciaToDelete(ocorrencia);
+    setShowDeleteOcorrenciaModal(true);
+  };
+
+  const confirmDeleteOcorrencia = async () => {
+    if (!ocorrenciaToDelete) return;
+
+    try {
+      await occurrenceService.deleteOccurrence(ocorrenciaToDelete.id);
+      setOcorrencias(prev => prev.filter(o => o.id !== ocorrenciaToDelete.id));
+      setShowDeleteOcorrenciaModal(false);
+      setOcorrenciaToDelete(null);
+      toast({
+        title: 'Ocorrência excluída',
+        description: `A ocorrência "${ocorrenciaToDelete.title}" foi excluída com sucesso.`,
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Erro ao excluir ocorrência:', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir a ocorrência. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleViewOcorrencia = (ocorrencia: Occurrence) => {
-    toast({
-      title: 'Visualizar Ocorrência',
-      description: `Visualizando ocorrência: ${ocorrencia.title}`,
-    });
-    // TODO: Implementar modal de visualização
+    setSelectedOcorrencia(ocorrencia);
+    setShowOcorrenciaViewModal(true);
   };
 
   const handleCreateOcorrencia = () => {
@@ -1103,12 +1124,29 @@ const Operacional: React.FC = () => {
         </Tabs>
         </div> {/* Fecha container mx-auto */}
 
-        {/* Modal de Ocorrência */}
+        {/* Modal de Visualização de Ocorrência */}
+        <OcorrenciaViewModal
+          ocorrencia={selectedOcorrencia}
+          open={showOcorrenciaViewModal}
+          onOpenChange={setShowOcorrenciaViewModal}
+        />
+
+        {/* Modal de Ocorrência (Criar/Editar) */}
         <OcorrenciaFormModal
           ocorrencia={selectedOcorrencia}
           open={showOcorrenciaModal}
           onOpenChange={setShowOcorrenciaModal}
           onSave={handleSaveOcorrencia}
+        />
+
+        {/* Modal de Confirmação de Exclusão de Ocorrência */}
+        <ConfirmDeleteModal
+          open={showDeleteOcorrenciaModal}
+          onOpenChange={setShowDeleteOcorrenciaModal}
+          onConfirm={confirmDeleteOcorrencia}
+          title="Excluir Ocorrência"
+          description="Tem certeza que deseja excluir esta ocorrência?"
+          itemName={ocorrenciaToDelete ? `${ocorrenciaToDelete.title} - ${ocorrenciaToDelete.employeeName || 'N/A'}` : ''}
         />
 
         {/* Modal de Escala */}

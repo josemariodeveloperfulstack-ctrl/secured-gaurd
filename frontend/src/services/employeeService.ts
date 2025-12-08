@@ -3,6 +3,7 @@ import api from '@/lib/axios';
 export interface Employee {
   id: string;
   name: string;
+  cpf?: string;
   document?: string;
   birthDate?: string;
   registrationNumber?: string;
