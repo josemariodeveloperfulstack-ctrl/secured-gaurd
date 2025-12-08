@@ -139,7 +139,7 @@ VALUES (
     NOW(),
     NOW()
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (cnpj) DO NOTHING;
 
 -- =====================================================
 -- 7. EMPRESA DE TESTE
@@ -164,7 +164,7 @@ VALUES (
     NOW(),
     NOW()
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (cnpj) DO NOTHING;
 
 -- =====================================================
 -- 8. FUNCIONÁRIOS DE TESTE
@@ -218,56 +218,56 @@ ON CONFLICT (id) DO NOTHING;
 -- =====================================================
 -- Usar subquery para buscar o ID do departamento "Operacional"
 INSERT INTO vehicles (id, plate, model, brand, year, color, status, fuel_type, capacity, current_mileage, department_id, company_id, created_at, updated_at)
-SELECT
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'ABC1234',
-    'Civic',
-    'Honda',
-    2020,
-    'Prata',
-    'ACTIVE',
-    'FLEX',
-    5,
-    45000,
-    COALESCE((SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1), '99999999-9999-9999-9999-999999999999'),
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    NOW(),
-    NOW()
-WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
-UNION ALL
-SELECT
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    'DEF5678',
-    'Corolla',
-    'Toyota',
-    2019,
-    'Branco',
-    'ACTIVE',
-    'FLEX',
-    5,
-    38000,
-    COALESCE((SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1), '99999999-9999-9999-9999-999999999999'),
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    NOW(),
-    NOW()
-WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE id = 'ffffffff-ffff-ffff-ffff-ffffffffffff')
-UNION ALL
-SELECT
-    '11111111-1111-1111-1111-111111111112',
-    'GHI9012',
-    'Hilux',
-    'Toyota',
-    2021,
-    'Prata',
-    'ACTIVE',
-    'DIESEL',
-    5,
-    25000,
-    COALESCE((SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1), '99999999-9999-9999-9999-999999999999'),
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    NOW(),
-    NOW()
-WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE id = '11111111-1111-1111-1111-111111111112');
+VALUES
+    (
+        'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        'ABC1234',
+        'Civic',
+        'Honda',
+        2020,
+        'Prata',
+        'ACTIVE',
+        'FLEX',
+        5,
+        45000,
+        (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        NOW(),
+        NOW()
+    ),
+    (
+        'ffffffff-ffff-ffff-ffff-ffffffffffff',
+        'DEF5678',
+        'Corolla',
+        'Toyota',
+        2019,
+        'Branco',
+        'ACTIVE',
+        'FLEX',
+        5,
+        38000,
+        (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        NOW(),
+        NOW()
+    ),
+    (
+        '11111111-1111-1111-1111-111111111112',
+        'GHI9012',
+        'Hilux',
+        'Toyota',
+        2021,
+        'Prata',
+        'ACTIVE',
+        'DIESEL',
+        5,
+        25000,
+        (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        NOW(),
+        NOW()
+    )
+ON CONFLICT (plate) DO NOTHING;
 
 -- =====================================================
 -- LOG DE CONCLUSÃO
