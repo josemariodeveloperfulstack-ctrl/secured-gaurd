@@ -638,17 +638,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Seção: Relacionamentos Obrigatórios */}
+          {/* Seção: Relacionamentos */}
           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
             <h3 className="text-lg font-semibold flex items-center text-white">
               <UserIcon className="mr-2" size={20} />
-              Relacionamentos Obrigatórios
+              Relacionamentos
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Seleção de Usuário */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-200">
-                  Usuário do Sistema * <span className="text-red-400">*</span>
+                  Usuário do Sistema
                 </Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -699,7 +699,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-300">
-                  O usuário selecionado será associado ao funcionário para acesso ao sistema.
+                  O usuário selecionado será associado ao funcionário para acesso ao sistema. (Opcional)
                 </p>
               </div>
 
@@ -1428,7 +1428,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || loadingData || !form.user?.id || !form.position?.id}
+              disabled={loading || loadingData || !form.position?.id}
               className="w-full sm:w-auto"
             >
               {loading ? 'Salvando...' : 'Atualizar Funcionário'}

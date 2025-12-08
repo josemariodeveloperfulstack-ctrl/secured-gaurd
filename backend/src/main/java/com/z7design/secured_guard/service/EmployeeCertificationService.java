@@ -7,10 +7,15 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.z7design.secured_guard.dto.CreateEmployeeCertificationRequest;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.EmployeeCertification;
+import com.z7design.secured_guard.model.Training;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.repository.EmployeeCertificationRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.TrainingRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,6 +24,36 @@ import lombok.RequiredArgsConstructor;
 public class EmployeeCertificationService {
     
     private final EmployeeCertificationRepository certificationRepository;
+    private final EmployeeRepository employeeRepository;
+    private final TrainingRepository trainingRepository;
+    
+    @Transactional
+    public EmployeeCertification create(CreateEmployeeCertificationRequest request) {
+        // Buscar Employee e Training
+        Employee employee = employeeRepository.findById(request.getEmployeeId())
+            .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
+        
+        Training training = trainingRepository.findById(request.getTrainingId())
+            .orElseThrow(() -> new ResourceNotFoundException("Treinamento não encontrado"));
+        
+        // Criar entidade EmployeeCertification
+        EmployeeCertification certification = EmployeeCertification.builder()
+            .employee(employee)
+            .training(training)
+            .certificationNumber(request.getCertificationNumber())
+            .issueDate(request.getIssueDate())
+            .expirationDate(request.getExpirationDate())
+            .documentUrl(request.getDocumentUrl() != null && !request.getDocumentUrl().trim().isEmpty() 
+                ? request.getDocumentUrl() 
+                : "N/A")
+            .status(CertificationStatus.ACTIVE)
+            .build();
+        
+        System.out.println("✅ EmployeeCertificationService.create - Certificação criada: " + certification.getId());
+        
+        validateCertification(certification);
+        return certificationRepository.save(certification);
+    }
     
     @Transactional
     public EmployeeCertification create(EmployeeCertification certification) {

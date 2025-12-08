@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.QuoteDTO;
 import com.z7design.secured_guard.model.Quote;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.QuoteStatus;
 import com.z7design.secured_guard.service.QuoteService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -14,6 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -53,8 +56,14 @@ public class QuoteController {
     @PostMapping
     @Operation(summary = "Criar novo orçamento", description = "Cria um novo orçamento no sistema")
     public ResponseEntity<Quote> createQuote(@RequestBody QuoteDTO quoteDTO) {
-        // TODO: Obter ID do usuário logado do contexto de segurança
-        UUID currentUserId = UUID.randomUUID(); // Temporário
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        User currentUser = (User) authentication.getPrincipal();
+        UUID currentUserId = currentUser.getId();
+        
         Quote createdQuote = quoteService.create(quoteDTO, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdQuote);
     }

@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.EPIStockDTO;
 import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
 import com.z7design.secured_guard.service.SSTEPIService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -91,5 +92,23 @@ public class SSTEPIController {
     public ResponseEntity<Void> updateStock(@PathVariable UUID id, @RequestParam Integer newStock) {
         epiService.updateEPIStock(id, newStock);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/stock-inventory")
+    @Operation(summary = "Listar EPIs em formato de estoque", description = "Retorna todos os EPIs no formato de estoque para o frontend")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<EPIStockDTO>> getEPIStockInventory() {
+        System.out.println("🔍 SSTEPIController.getEPIStockInventory - Iniciando busca de estoque");
+        List<EPIStockDTO> stock = epiService.getEPIStockInventory();
+        System.out.println("✅ SSTEPIController.getEPIStockInventory - Retornando " + stock.size() + " EPIs");
+        return ResponseEntity.ok(stock);
+    }
+
+    @GetMapping("/stock-inventory/active")
+    @Operation(summary = "Listar EPIs ativos em formato de estoque", description = "Retorna EPIs ativos no formato de estoque para o frontend")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<EPIStockDTO>> getActiveEPIStockInventory() {
+        List<EPIStockDTO> stock = epiService.getActiveEPIStockInventory();
+        return ResponseEntity.ok(stock);
     }
 }

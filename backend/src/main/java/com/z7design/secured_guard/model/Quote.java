@@ -1,9 +1,9 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.z7design.secured_guard.model.enums.QuoteStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -16,6 +16,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "quotes")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Quote {
     
     @Id
@@ -32,10 +33,12 @@ public class Quote {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Client client;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lead_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Lead lead;
     
     @Enumerated(EnumType.STRING)
@@ -56,13 +59,16 @@ public class Quote {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User createdBy;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_to_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User assignedTo;
     
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "quote"})
     private List<QuoteItem> items = new ArrayList<>();
     
     @CreationTimestamp

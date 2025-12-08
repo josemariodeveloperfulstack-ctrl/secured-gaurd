@@ -22,6 +22,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -45,9 +46,12 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { proposalService, Proposal, CreateProposalRequest, UpdateProposalRequest } from '@/services/proposalService';
+import { clientService, Client } from '@/services/clientService';
+import leadService from '@/services/leadService';
+import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import PropostaAcordo from '@/components/comercial/PropostaAcordo';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus as PlusIcon, Link as LinkIcon } from 'lucide-react';
 
 const Propostas = () => {
   const { user } = useAuth();
@@ -63,12 +67,21 @@ const Propostas = () => {
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<CreateProposalRequest>({
     title: '',
+    clientId: undefined,
+    leadId: undefined,
     totalValue: 0,
-    description: ''
+    validUntil: undefined,
+    description: '',
+    status: 'DRAFT'
   });
 
   // Load proposals from backend
@@ -109,6 +122,66 @@ const Propostas = () => {
   useEffect(() => {
     loadProposals();
   }, []);
+
+  // Load clients and leads when create modal opens
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      loadClients();
+      loadLeads();
+    }
+  }, [isCreateModalOpen]);
+
+  // Load clients function
+  const loadClients = async () => {
+    try {
+      setLoadingClients(true);
+      const data = await clientService.getAllClients();
+      setClients(data);
+    } catch (error: any) {
+      console.error('Erro ao carregar clientes:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os clientes.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
+  // Load leads function
+  const loadLeads = async () => {
+    try {
+      setLoadingLeads(true);
+      const data = await leadService.getAllLeads();
+      setLeads(data);
+    } catch (error: any) {
+      console.error('Erro ao carregar leads:', error);
+      // Não mostrar toast para leads, pois é opcional
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  // Handle client creation success
+  const handleClientCreated = async (createdClient?: Client) => {
+    await loadClients();
+    setIsClientModalOpen(false);
+    
+    // Se um cliente foi criado, selecioná-lo automaticamente
+    if (createdClient && createdClient.id) {
+      setFormData({ ...formData, clientId: Number(createdClient.id) });
+      toast({
+        title: "Sucesso",
+        description: `Cliente "${createdClient.name}" criado e selecionado com sucesso!`,
+      });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: "Cliente criado com sucesso! Agora você pode selecioná-lo.",
+      });
+    }
+  };
 
   useEffect(() => {
     let filtered = proposals;
@@ -209,8 +282,12 @@ const Propostas = () => {
   const resetForm = () => {
     setFormData({
       title: '',
+      clientId: undefined,
+      leadId: undefined,
       totalValue: 0,
-      description: ''
+      validUntil: undefined,
+      description: '',
+      status: 'DRAFT'
     });
     setSelectedProposal(null);
   };
@@ -522,6 +599,9 @@ const Propostas = () => {
               <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-seguranca-lightgray">Detalhes da Proposta</DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    Visualize os detalhes completos da proposta selecionada
+                  </DialogDescription>
                 </DialogHeader>
                 {selectedProposal && (
                   <div className="space-y-6">
@@ -601,6 +681,9 @@ const Propostas = () => {
               <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-seguranca-lightgray">Nova Proposta</DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    Preencha os dados para criar uma nova proposta comercial
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -608,33 +691,120 @@ const Propostas = () => {
                       <Label htmlFor="title" className="text-seguranca-lightgray">Título *</Label>
                       <Input
                         id="title"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                         placeholder="Título da proposta"
                       />
                     </div>
                     <div>
                       <Label htmlFor="client" className="text-seguranca-lightgray">Cliente *</Label>
-                      <Select>
-                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                          <SelectValue placeholder="Selecione o cliente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="shopping">Shopping Center ABC</SelectItem>
-                          <SelectItem value="industria">Indústria XYZ</SelectItem>
-                          <SelectItem value="condominio">Condomínio Solar</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <Select
+                            value={formData.clientId?.toString() || ''}
+                            onValueChange={(value) => {
+                              setFormData({ ...formData, clientId: Number(value) });
+                            }}
+                            disabled={loadingClients}
+                          >
+                            <SelectTrigger 
+                              className="bg-seguranca-black border-gray-600 text-white [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-70"
+                            >
+                              <SelectValue 
+                                placeholder={loadingClients ? "Carregando clientes..." : clients.length === 0 ? "Nenhum cliente cadastrado" : "Selecione o cliente"}
+                              />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600">
+                              {loadingClients ? (
+                                <SelectItem value="loading" disabled className="text-gray-400">
+                                  Carregando clientes...
+                                </SelectItem>
+                              ) : clients.length === 0 ? (
+                                <SelectItem value="no-clients" disabled className="text-gray-400">
+                                  Nenhum cliente encontrado
+                                </SelectItem>
+                              ) : (
+                                clients.map((client) => (
+                                  <SelectItem 
+                                    key={client.id} 
+                                    value={client.id.toString()}
+                                    className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                                  >
+                                    {client.name} {client.cnpj ? `- ${client.cnpj}` : ''}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {/* Exibição customizada do nome do cliente selecionado - fallback se Radix UI não renderizar */}
+                          {formData.clientId && clients.length > 0 && (() => {
+                            const selectedClient = clients.find(c => c.id === formData.clientId);
+                            if (selectedClient) {
+                              return (
+                                <div 
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10 pr-8"
+                                  style={{ color: '#ffffff' }}
+                                >
+                                  <span className="text-sm font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis block max-w-full">
+                                    {selectedClient.name} {selectedClient.cnpj ? `- ${selectedClient.cnpj}` : ''}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsClientModalOpen(true)}
+                          className="bg-seguranca-black border-gray-600 text-seguranca-yellow hover:text-yellow-400 hover:border-yellow-400 shrink-0"
+                          title="Criar novo cliente"
+                        >
+                          <PlusIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {clients.length === 0 && !loadingClients && (
+                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                          <span>Nenhum cliente cadastrado.</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsClientModalOpen(true)}
+                            className="text-seguranca-yellow hover:text-yellow-400 underline"
+                          >
+                            Clique aqui para criar um novo cliente
+                          </button>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="lead" className="text-seguranca-lightgray">Lead</Label>
-                      <Select>
-                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                          <SelectValue placeholder="Selecione o lead" />
+                      <Select
+                        value={formData.leadId?.toString() || '__NONE__'}
+                        onValueChange={(value) => setFormData({ ...formData, leadId: value === '__NONE__' ? undefined : Number(value) })}
+                        disabled={loadingLeads}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:text-seguranca-lightgray">
+                          <SelectValue placeholder={loadingLeads ? "Carregando leads..." : "Selecione o lead (opcional)"} />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="joao">João Silva</SelectItem>
-                          <SelectItem value="pedro">Pedro Santos</SelectItem>
-                          <SelectItem value="ana">Ana Costa</SelectItem>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="__NONE__" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Nenhum</SelectItem>
+                          {leads.length === 0 ? (
+                            <SelectItem value="no-leads" disabled className="text-gray-400">
+                              Nenhum lead encontrado
+                            </SelectItem>
+                          ) : (
+                            leads.map((lead) => (
+                              <SelectItem 
+                                key={lead.id} 
+                                value={lead.id.toString()}
+                                className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                              >
+                                {lead.name} {lead.company ? `- ${lead.company}` : ''}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -643,6 +813,9 @@ const Propostas = () => {
                       <Input
                         id="totalValue"
                         type="number"
+                        step="0.01"
+                        value={formData.totalValue || ''}
+                        onChange={(e) => setFormData({ ...formData, totalValue: parseFloat(e.target.value) || 0 })}
                         className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                         placeholder="0,00"
                       />
@@ -652,19 +825,24 @@ const Propostas = () => {
                       <Input
                         id="validUntil"
                         type="date"
+                        value={formData.validUntil || ''}
+                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
                         className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                       />
                     </div>
                     <div>
                       <Label htmlFor="status" className="text-seguranca-lightgray">Status</Label>
-                      <Select>
-                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      <Select
+                        value={formData.status || 'DRAFT'}
+                        onValueChange={(value) => setFormData({ ...formData, status: value as any })}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:text-seguranca-lightgray">
                           <SelectValue placeholder="Selecione o status" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="DRAFT">Rascunho</SelectItem>
-                          <SelectItem value="SENT">Enviada</SelectItem>
-                          <SelectItem value="UNDER_REVIEW">Em Análise</SelectItem>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="DRAFT" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Rascunho</SelectItem>
+                          <SelectItem value="SENT" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Enviada</SelectItem>
+                          <SelectItem value="UNDER_REVIEW" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Em Análise</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -674,6 +852,8 @@ const Propostas = () => {
                     <Label htmlFor="description" className="text-seguranca-lightgray">Descrição</Label>
                     <Textarea
                       id="description"
+                      value={formData.description || ''}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                       placeholder="Descrição detalhada da proposta..."
                       rows={3}
@@ -684,17 +864,38 @@ const Propostas = () => {
                     <Button
                       variant="outline"
                       className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                      onClick={() => setIsCreateModalOpen(false)}
+                      onClick={() => {
+                        setIsCreateModalOpen(false);
+                        resetForm();
+                      }}
                     >
                       Cancelar
                     </Button>
-                    <Button className="bg-seguranca-red hover:bg-seguranca-darkred">
-                      Criar Proposta
+                    <Button 
+                      className="bg-seguranca-red hover:bg-seguranca-darkred"
+                      onClick={handleCreateProposal}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Criando...
+                        </>
+                      ) : (
+                        'Criar Proposta'
+                      )}
                     </Button>
                   </div>
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Modal de Criação de Cliente */}
+            <ClientFormModal
+              isOpen={isClientModalOpen}
+              onClose={() => setIsClientModalOpen(false)}
+              onSuccess={handleClientCreated}
+            />
           </div>
         </TabsContent>
         <TabsContent value="acordo">

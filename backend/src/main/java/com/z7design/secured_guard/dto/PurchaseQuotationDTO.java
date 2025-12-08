@@ -45,3 +45,4 @@ public class PurchaseQuotationDTO {
     private boolean canBeApproved;
     private boolean canBeRejected;
 }
+

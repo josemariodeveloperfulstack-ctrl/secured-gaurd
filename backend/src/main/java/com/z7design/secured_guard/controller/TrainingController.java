@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
+import com.z7design.secured_guard.dto.CreateTrainingRequest;
 import com.z7design.secured_guard.dto.ErrorResponse;
 import com.z7design.secured_guard.model.Training;
 import com.z7design.secured_guard.service.TrainingService;
@@ -57,7 +60,15 @@ public class TrainingController {
                         content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
             })
     @PostMapping
-    public ResponseEntity<Training> create(@RequestBody Training training) {
+    public ResponseEntity<Training> create(@Valid @RequestBody CreateTrainingRequest request) {
+        Training training = Training.builder()
+                .name(request.getName())
+                .description(request.getDescription())
+                .provider(request.getProvider())
+                .duration(request.getDuration())
+                .renewalPeriodMonths(request.getRenewalPeriodMonths() != null ? request.getRenewalPeriodMonths() : 12)
+                .mandatoryForGuards(request.getMandatoryForGuards() != null ? request.getMandatoryForGuards() : Boolean.TRUE)
+                .build();
         return ResponseEntity.ok(trainingService.create(training));
     }
 

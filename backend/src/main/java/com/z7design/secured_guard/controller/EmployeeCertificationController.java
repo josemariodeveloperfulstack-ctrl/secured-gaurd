@@ -17,10 +17,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.z7design.secured_guard.dto.CreateEmployeeCertificationRequest;
 import com.z7design.secured_guard.dto.EmployeeCertificationResponse;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.service.EmployeeCertificationService;
+
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -58,17 +61,26 @@ public class EmployeeCertificationController {
             results = certificationService.findAll();
         }
 
+        System.out.println("📋 EmployeeCertificationController.find - Total de certificações encontradas: " + results.size());
+        results.forEach(cert -> {
+            System.out.println("  - ID: " + cert.getId() + 
+                ", Employee: " + (cert.getEmployee() != null ? cert.getEmployee().getName() : "null") +
+                ", Training: " + (cert.getTraining() != null ? cert.getTraining().getName() : "null"));
+        });
+
         List<EmployeeCertificationResponse> payload = results.stream()
                 .map(EmployeeCertificationResponse::fromEntity)
                 .toList();
+        
+        System.out.println("📋 EmployeeCertificationController.find - Total de responses criadas: " + payload.size());
         return ResponseEntity.ok(payload);
     }
 
     @Operation(summary = "Cria certificação")
     @PostMapping
     @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<EmployeeCertificationResponse> create(@RequestBody EmployeeCertification certification) {
-        EmployeeCertification created = certificationService.create(certification);
+    public ResponseEntity<EmployeeCertificationResponse> create(@Valid @RequestBody CreateEmployeeCertificationRequest request) {
+        EmployeeCertification created = certificationService.create(request);
         EmployeeCertification loaded = certificationService.findById(created.getId());
         return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
     }

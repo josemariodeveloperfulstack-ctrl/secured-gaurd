@@ -28,6 +28,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Table(name = "employees")
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Employee {
     
     @Id

@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.z7design.secured_guard.model.enums.EPIDeliveryReason;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -23,6 +24,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class EPIDelivery {
 
     @Id
@@ -32,11 +34,13 @@ public class EPIDelivery {
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
     private Employee employee;
 
     @NotNull(message = "EPI é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "epi_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private PersonalProtectiveEquipment epi;
 
     @NotNull(message = "Data de entrega é obrigatória")
@@ -55,6 +59,7 @@ public class EPIDelivery {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "delivered_by_user_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User deliveredByUser;
 
     @Builder.Default

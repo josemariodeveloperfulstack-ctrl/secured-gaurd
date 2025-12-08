@@ -201,6 +201,34 @@
     color: rgb(107 114 128) !important;
   }
   
+  /* Fix para Select do Radix UI - garantir texto branco quando valor selecionado */
+  [data-radix-select-trigger] span:not([data-placeholder]) {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+  
+  /* Fix mais específico para o SelectValue do Radix UI */
+  [data-radix-select-trigger] [data-radix-select-value] {
+    color: #ffffff !important;
+  }
+  
+  [data-radix-select-trigger] [data-radix-select-value][data-placeholder] {
+    color: #9ca3af !important;
+    opacity: 0.7 !important;
+  }
+
+  /* Forçar cor branca em todos os elementos de texto do Select quando há valor selecionado */
+  [data-radix-select-trigger][data-state="open"] span,
+  [data-radix-select-trigger]:not([data-placeholder]) span {
+    color: #ffffff !important;
+  }
+
+  /* Garantir que o texto selecionado seja sempre branco */
+  button[data-radix-select-trigger] span[data-radix-select-value]:not([data-placeholder]) {
+    color: #ffffff !important;
+    font-weight: 500 !important;
+  }
+
   .react-datepicker {
     @apply bg-seguranca-graphite border border-gray-600 text-seguranca-lightgray;
   }

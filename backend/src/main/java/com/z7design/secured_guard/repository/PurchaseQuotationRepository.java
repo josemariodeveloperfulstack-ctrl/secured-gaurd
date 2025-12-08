@@ -40,3 +40,4 @@ public interface PurchaseQuotationRepository extends JpaRepository<PurchaseQuota
     
     long countByStatus(PurchaseQuotationStatus status);
 }
+

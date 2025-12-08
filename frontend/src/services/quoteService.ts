@@ -24,12 +24,13 @@ export interface Quote {
 export interface CreateQuoteRequest {
   title: string;
   description?: string;
-  clientId: number;
-  leadId?: number;
+  clientId: string | number; // Aceita string (UUID) ou number para compatibilidade
+  leadId?: string | number; // Aceita string (UUID) ou number para compatibilidade
   assignedToId?: number;
   totalValue: number;
   validUntil: string;
-  terms?: string;
+  estimatedDuration?: number;
+  paymentTerms?: string;
   notes?: string;
 }
 

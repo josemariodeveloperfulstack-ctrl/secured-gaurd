@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.z7design.secured_guard.model.enums.LeadSource;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import jakarta.persistence.*;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "leads")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Lead {
     
     @Id

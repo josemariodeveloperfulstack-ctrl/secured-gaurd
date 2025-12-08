@@ -20,6 +20,8 @@ import EPIControlTable from '@/components/epi/EPIControlTable';
 import EPIControlViewModal from '@/components/epi/EPIControlViewModal';
 import epiControlReportGenerator from '@/utils/epiControlReportGenerator';
 import epiReceiptGenerator from '@/utils/epiReceiptGenerator';
+import epiStockReportGenerator from '@/utils/epiStockReportGenerator';
+import epiService from '@/services/epiService';
 
 const EPIControl: React.FC = () => {
   const [activeTab, setActiveTab] = useState('list');
@@ -190,10 +192,6 @@ const EPIControl: React.FC = () => {
             Gestão completa dos equipamentos de proteção individual
           </p>
         </div>
-        <Button onClick={handleCreateNew} className="flex items-center gap-2 bg-seguranca-red hover:bg-seguranca-darkred">
-          <Plus className="h-4 w-4" />
-          Novo Registro
-        </Button>
       </div>
 
         {/* Estatísticas */}
@@ -290,10 +288,20 @@ const EPIControl: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className="h-20 flex flex-col items-center justify-center gap-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                    onClick={() => {
-                      // Implementar relatório em lote
-                      toast.info('Funcionalidade de relatório em lote em desenvolvimento');
+                    onClick={async () => {
+                      try {
+                        if (records.length === 0) {
+                          toast.error('Não há registros para gerar o relatório');
+                          return;
+                        }
+                        await epiStockReportGenerator.generateBatchReport(records);
+                        toast.success('Relatório em lote gerado com sucesso!');
+                      } catch (error) {
+                        console.error('Erro ao gerar relatório em lote:', error);
+                        toast.error('Erro ao gerar relatório em lote');
+                      }
                     }}
+                    disabled={recordsLoading || records.length === 0}
                   >
                     <FileText className="h-6 w-6" />
                     Relatório em Lote
@@ -301,10 +309,21 @@ const EPIControl: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className="h-20 flex flex-col items-center justify-center gap-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                    onClick={() => {
-                      // Implementar relatório de estatísticas
-                      toast.info('Funcionalidade de relatório de estatísticas em desenvolvimento');
+                    onClick={async () => {
+                      try {
+                        // Buscar EPIs e estatísticas
+                        const [episData, epiStats] = await Promise.all([
+                          epiService.getEPIs(),
+                          epiService.getEPIStats()
+                        ]);
+                        await epiStockReportGenerator.generateStatisticsReport(episData, epiStats, stats || undefined);
+                        toast.success('Relatório de estatísticas gerado com sucesso!');
+                      } catch (error) {
+                        console.error('Erro ao gerar relatório de estatísticas:', error);
+                        toast.error('Erro ao gerar relatório de estatísticas');
+                      }
                     }}
+                    disabled={recordsLoading || statsLoading}
                   >
                     <BarChart3 className="h-6 w-6" />
                     Relatório de Estatísticas

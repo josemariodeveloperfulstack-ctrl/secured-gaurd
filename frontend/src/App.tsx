@@ -635,6 +635,11 @@ function App() {
                         <SSTEPIs />
                       </ProtectedRoute>
                     } />
+                    <Route path="/rh/sst/epis/:id" element={
+                      <ProtectedRoute>
+                        <SSTEPIs />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/rh/sst/exames" element={
                       <ProtectedRoute>
                         <SSTExamesMedicos />

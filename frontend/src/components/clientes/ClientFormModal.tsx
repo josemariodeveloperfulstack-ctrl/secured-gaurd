@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +64,7 @@ const formatZipCode = (value: string): string => {
 interface ClientFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (createdClient?: Client) => void;
   client?: Client;
 }
 
@@ -209,7 +209,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           title: "✅ Cliente criado",
           description: `Cliente ${formData.name} foi criado com sucesso!`,
         });
-        onSuccess();
+        onSuccess(saved);
       }
       
       onClose();

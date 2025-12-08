@@ -58,7 +58,7 @@ export interface LeadSourceStats {
 
 class LeadService {
   async getAllLeads(): Promise<Lead[]> {
-    const response = await api.get('/leads/all');
+    const response = await api.get('/api/leads/all');
     return response.data;
   }
 

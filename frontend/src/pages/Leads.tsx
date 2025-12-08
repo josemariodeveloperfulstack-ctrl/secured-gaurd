@@ -191,7 +191,7 @@ const Leads = () => {
   };
 
   // Handle delete lead
-  const handleDeleteLead = async (leadId: number) => {
+  const handleDeleteLead = async (leadId: string | number) => {
     if (!confirm('Tem certeza que deseja excluir este lead?')) return;
     try {
       await leadService.deleteLead(leadId);
@@ -526,7 +526,7 @@ const Leads = () => {
                               variant="outline"
                               size="sm"
                               className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
-                              onClick={() => handleDeleteLead(Number(lead.id))}
+                              onClick={() => handleDeleteLead(lead.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

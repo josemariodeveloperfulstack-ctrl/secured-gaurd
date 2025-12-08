@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -250,7 +250,7 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                       id="name"
                       value={formData.name}
                       onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-500 placeholder:font-normal"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="Digite o nome completo"
                       required
                     />
@@ -262,8 +262,8 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                       Parentesco <span className="text-red-500 text-lg">*</span>
                     </Label>
                     <Select value={formData.relationship} onValueChange={(value) => handleInputChange('relationship', value)}>
-                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold">
-                        <SelectValue placeholder="Selecione o parentesco..." className="text-gray-500 font-normal" />
+                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold [&>span]:text-gray-900 [&>span[data-placeholder]]:text-gray-600 [&>span[data-placeholder]]:font-medium">
+                        <SelectValue placeholder="Selecione o parentesco..." />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-2 border-gray-300 text-gray-900 shadow-xl">
                         {RELATIONSHIP_OPTIONS.map((option) => (
@@ -292,13 +292,13 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="gender" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <User className="h-4 w-4 text-pink-400" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="gender" className="text-white font-bold text-base flex items-center gap-2">
+                      <User className="h-5 w-5 text-pink-400" />
                       Gênero
                     </Label>
                     <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
-                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium">
+                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold [&>span]:text-gray-900 [&>span[data-placeholder]]:text-gray-600 [&>span[data-placeholder]]:font-medium">
                         <SelectValue placeholder="Selecione o gênero..." />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-2 border-gray-200 text-gray-900 shadow-xl">
@@ -336,7 +336,7 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                       id="rg"
                       value={formData.rg}
                       onChange={(e) => handleInputChange('rg', e.target.value)}
-                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-500 placeholder:font-normal"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="Número do RG"
                     />
                   </div>
@@ -346,24 +346,24 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
               {/* Contato */}
               <TabsContent value="contato" className="space-y-6 mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <Phone className="h-4 w-4 text-green-400" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="phone" className="text-white font-bold text-base flex items-center gap-2">
+                      <Phone className="h-5 w-5 text-green-400" />
                       Telefone
                     </Label>
                     <Input
                       id="phone"
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', formatPhone(e.target.value))}
-                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="(00) 00000-0000"
                       maxLength={15}
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <Mail className="h-4 w-4 text-blue-400" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="email" className="text-white font-bold text-base flex items-center gap-2">
+                      <Mail className="h-5 w-5 text-blue-400" />
                       Email
                     </Label>
                     <Input
@@ -371,46 +371,46 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="email@exemplo.com"
                     />
                   </div>
 
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="address" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-red-400" />
+                  <div className="space-y-2.5 sm:col-span-2">
+                    <Label htmlFor="address" className="text-white font-bold text-base flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-red-400" />
                       Endereço
                     </Label>
                     <Input
                       id="address"
                       value={formData.address}
                       onChange={(e) => handleInputChange('address', e.target.value)}
-                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="Rua, número, complemento"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="city" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-purple-400" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="city" className="text-white font-bold text-base flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-purple-400" />
                       Cidade
                     </Label>
                     <Input
                       id="city"
                       value={formData.city}
                       onChange={(e) => handleInputChange('city', e.target.value)}
-                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="Nome da cidade"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="state" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-indigo-400" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="state" className="text-white font-bold text-base flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-indigo-400" />
                       Estado
                     </Label>
                     <Select value={formData.state} onValueChange={(value) => handleInputChange('state', value)}>
-                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium">
+                      <SelectTrigger className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold [&>span]:text-gray-900 [&>span[data-placeholder]]:text-gray-600 [&>span[data-placeholder]]:font-medium">
                         <SelectValue placeholder="Selecione o estado..." />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-2 border-gray-200 text-gray-900 shadow-xl">
@@ -423,16 +423,16 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="zipCode" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                      <Hash className="h-4 w-4 text-teal-400" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="zipCode" className="text-white font-bold text-base flex items-center gap-2">
+                      <Hash className="h-5 w-5 text-teal-400" />
                       CEP
                     </Label>
                     <Input
                       id="zipCode"
                       value={formData.zipCode}
                       onChange={(e) => handleInputChange('zipCode', formatZipCode(e.target.value))}
-                      className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg h-11 shadow-sm transition-all text-base font-medium placeholder:text-gray-400"
+                      className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
                       placeholder="00000-000"
                       maxLength={9}
                     />
@@ -489,16 +489,16 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="notes" className="text-gray-200 font-semibold text-sm flex items-center gap-1">
-                    <Hash className="h-4 w-4 text-gray-400" />
+                <div className="space-y-2.5">
+                  <Label htmlFor="notes" className="text-white font-bold text-base flex items-center gap-2">
+                    <Hash className="h-5 w-5 text-gray-400" />
                     Observações
                   </Label>
                   <Textarea
                     id="notes"
                     value={formData.notes}
                     onChange={(e) => handleInputChange('notes', e.target.value)}
-                    className="bg-white text-gray-900 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg shadow-sm transition-all text-base font-medium placeholder:text-gray-400 resize-none"
+                    className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium resize-none"
                     placeholder="Digite observações adicionais sobre o dependente..."
                     rows={5}
                   />

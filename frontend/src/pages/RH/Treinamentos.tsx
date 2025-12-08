@@ -137,6 +137,12 @@ const Treinamentos: React.FC = () => {
         trainingService.getEmployeeCertifications(),
         employeeService.getSimpleEmployees(),
       ]);
+      console.log('📋 Treinamentos - Dados carregados:', {
+        trainings: trainingData.length,
+        certifications: certificationData.length,
+        employees: employeeData.length,
+        certificationsData: certificationData
+      });
       setTrainings(trainingData);
       setCertifications(certificationData);
       setEmployees(employeeData);

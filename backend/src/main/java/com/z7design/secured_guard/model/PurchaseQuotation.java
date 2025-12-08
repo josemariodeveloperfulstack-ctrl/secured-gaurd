@@ -106,3 +106,4 @@ public class PurchaseQuotation {
         return status == PurchaseQuotationStatus.SENT || status == PurchaseQuotationStatus.DRAFT;
     }
 }
+

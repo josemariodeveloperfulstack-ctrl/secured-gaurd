@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.EPIDelivery;
 import com.z7design.secured_guard.service.SSTEPIService;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -47,21 +48,32 @@ public class SSTEPIDeliveryController {
     @PostMapping
     @Operation(summary = "Criar nova entrega de EPI", description = "Cria uma nova entrega de EPI")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<EPIDelivery> createEPIDelivery(@RequestBody CreateEPIDeliveryRequest request) {
+    public ResponseEntity<?> createEPIDelivery(@RequestBody CreateEPIDeliveryRequest request) {
         log.info("POST /api/sst/epi-deliveries - Criando entrega de EPI para funcionário: {}", request.getEmployeeId());
         try {
+            // Usar a data fornecida ou a data atual se não fornecida
+            LocalDate deliveryDate = request.getDeliveryDate() != null 
+                ? request.getDeliveryDate() 
+                : LocalDate.now();
+            
             EPIDelivery delivery = epiService.deliverEPI(
                 request.getEmployeeId(),
                 request.getEpiId(),
                 request.getQuantity(),
                 request.getReason(),
                 request.getDeliveredByUserId(),
-                request.getNotes()
+                request.getNotes(),
+                deliveryDate
             );
             return ResponseEntity.ok(delivery);
+        } catch (IllegalArgumentException e) {
+            log.error("Erro de validação ao criar entrega de EPI: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(java.util.Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao criar entrega de EPI: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(500)
+                .body(java.util.Map.of("error", "Erro interno ao criar entrega de EPI"));
         }
     }
 
@@ -97,6 +109,20 @@ public class SSTEPIDeliveryController {
         }
     }
 
+    @GetMapping("/epi/{epiId}")
+    @Operation(summary = "Listar entregas por EPI", description = "Retorna todas as entregas de um EPI específico")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<EPIDelivery>> getEPIDeliveriesByEPI(@PathVariable UUID epiId) {
+        log.info("GET /api/sst/epi-deliveries/epi/{} - Buscando entregas por EPI", epiId);
+        try {
+            List<EPIDelivery> deliveries = epiService.getDeliveriesByEPI(epiId);
+            return ResponseEntity.ok(deliveries);
+        } catch (Exception e) {
+            log.error("Erro ao buscar entregas por EPI: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @GetMapping("/expiring/{days}")
     @Operation(summary = "Listar entregas expirando", description = "Retorna entregas que estão expirando nos próximos X dias")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
@@ -128,6 +154,8 @@ public class SSTEPIDeliveryController {
         private String reason;
         private UUID deliveredByUserId;
         private String notes;
+        @JsonFormat(pattern = "yyyy-MM-dd")
+        private LocalDate deliveryDate;
 
         // Getters e Setters
         public UUID getEmployeeId() { return employeeId; }
@@ -142,6 +170,8 @@ public class SSTEPIDeliveryController {
         public void setDeliveredByUserId(UUID deliveredByUserId) { this.deliveredByUserId = deliveredByUserId; }
         public String getNotes() { return notes; }
         public void setNotes(String notes) { this.notes = notes; }
+        public LocalDate getDeliveryDate() { return deliveryDate; }
+        public void setDeliveryDate(LocalDate deliveryDate) { this.deliveryDate = deliveryDate; }
     }
 
     public static class UpdateEPIDeliveryRequest {

@@ -125,13 +125,20 @@ export interface AccidentRecord {
 export interface PersonalProtectiveEquipment {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   category: 'CABECA' | 'OLHOS' | 'AUDITIVO' | 'RESPIRATORIO' | 'MAOS' | 'PES' | 'CORPO';
-  caNumber: string;
-  validityMonths: number;
+  caNumber?: string;
+  caValidity?: string; // Data de validade do CA
+  validityMonths?: number;
+  manufacturer?: string;
+  model?: string;
+  unitOfMeasurement?: string;
+  minimumStock?: number;
+  currentStock?: number;
+  unitCost?: number;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface EPIDelivery {
@@ -180,9 +187,10 @@ export interface CreateAccidentRecordDTO {
 export interface CreateEPIDeliveryDTO {
   employeeId: string;
   epiId: string;
-  deliveryDate: string;
+  deliveryDate: string; // Formato: yyyy-MM-dd
   quantity: number;
   reason: string;
+  deliveredByUserId?: string; // ID do usuário que está fazendo a entrega
   notes?: string;
 }
 
@@ -441,7 +449,7 @@ export const sstService = {
   },
 
   async getPersonalProtectiveEquipmentById(id: string): Promise<PersonalProtectiveEquipment> {
-    const response = await api.get(`/sst/epis/${id}`);
+    const response = await api.get(`/api/sst/epis/${id}`);
     return response.data;
   },
 

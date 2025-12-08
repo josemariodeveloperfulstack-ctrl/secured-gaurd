@@ -48,7 +48,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Setter
 @ToString(exclude = {"groups", "roles", "permissions"})
 @EqualsAndHashCode(of = {"id"})
-@JsonIgnoreProperties({"groups"})
+@JsonIgnoreProperties({"groups", "hibernateLazyInitializer", "handler"})
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

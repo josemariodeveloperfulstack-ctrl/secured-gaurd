@@ -1,8 +1,9 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.EPIStockDTO;
 import com.z7design.secured_guard.model.*;
-// import com.z7design.secured_guard.model.enums.EPICategory;
-// import com.z7design.secured_guard.model.enums.EPIDeliveryReason;
+import com.z7design.secured_guard.model.enums.EPICategory;
+import com.z7design.secured_guard.model.enums.EPIDeliveryReason;
 import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Serviço para gerenciamento de EPIs
@@ -25,6 +28,8 @@ public class SSTEPIService {
     private final PersonalProtectiveEquipmentRepository epiRepository;
     private final EPIDeliveryRepository deliveryRepository;
     private final SSTAlertService alertService;
+    private final EmployeeRepository employeeRepository;
+    private final UserRepository userRepository;
 
     // ========== GERENCIAMENTO DE EPIs ==========
 
@@ -147,8 +152,12 @@ public class SSTEPIService {
     /**
      * Registra entrega de EPI
      */
-    public EPIDelivery deliverEPI(UUID employeeId, UUID epiId, Integer quantity, String reason, UUID deliveredByUserId, String notes) {
-        log.info("Registrando entrega de EPI {} para funcionário {}", epiId, employeeId);
+    public EPIDelivery deliverEPI(UUID employeeId, UUID epiId, Integer quantity, String reason, UUID deliveredByUserId, String notes, LocalDate deliveryDate) {
+        log.info("Registrando entrega de EPI {} para funcionário {} na data {}", epiId, employeeId, deliveryDate);
+        
+        // Busca o funcionário
+        Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -> new IllegalArgumentException("Funcionário não encontrado"));
         
         // Verifica se há estoque suficiente
         PersonalProtectiveEquipment epi = getEPIById(epiId);
@@ -160,15 +169,29 @@ public class SSTEPIService {
             throw new IllegalArgumentException("Estoque insuficiente");
         }
         
+        // Converte o motivo da entrega (string) para enum
+        EPIDeliveryReason deliveryReason;
+        try {
+            deliveryReason = EPIDeliveryReason.valueOf(reason.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Motivo de entrega inválido: " + reason);
+        }
+        
+        // Busca o usuário que está fazendo a entrega (se fornecido)
+        User deliveredByUser = null;
+        if (deliveredByUserId != null) {
+            deliveredByUser = userRepository.findById(deliveredByUserId)
+                .orElse(null); // Não é obrigatório, pode ser null
+        }
+        
         // Cria registro de entrega
-        // TODO: Implementar quando as entidades Employee, PersonalProtectiveEquipment e User estiverem disponíveis
         EPIDelivery delivery = new EPIDelivery();
-        // delivery.setEmployee(employee);
-        // delivery.setEpi(epi);
-        delivery.setDeliveryDate(LocalDate.now());
+        delivery.setEmployee(employee);
+        delivery.setEpi(epi);
+        delivery.setDeliveryDate(deliveryDate != null ? deliveryDate : LocalDate.now());
         delivery.setQuantity(quantity);
-        // delivery.setDeliveryReason(reason); // TODO: Implementar quando EPIDeliveryReason estiver disponível
-        // delivery.setDeliveredByUser(deliveredByUser);
+        delivery.setDeliveryReason(deliveryReason);
+        delivery.setDeliveredByUser(deliveredByUser);
         delivery.setReceivedByEmployee(false);
         delivery.setNotes(notes);
         
@@ -198,6 +221,19 @@ public class SSTEPIService {
     @Transactional(readOnly = true)
     public List<EPIDelivery> getDeliveriesByEmployee(UUID employeeId) {
         return deliveryRepository.findByEmployeeId(employeeId);
+    }
+
+    /**
+     * Busca todas as entregas de um EPI específico
+     */
+    @Transactional(readOnly = true)
+    public List<EPIDelivery> getDeliveriesByEPI(UUID epiId) {
+        PersonalProtectiveEquipment epi = epiRepository.findById(epiId).orElse(null);
+        if (epi == null) {
+            log.warn("EPI não encontrado: {}", epiId);
+            return List.of();
+        }
+        return deliveryRepository.findByEpi(epi);
     }
 
     /**
@@ -260,5 +296,141 @@ public class SSTEPIService {
     @Transactional(readOnly = true)
     public List<PersonalProtectiveEquipment> generateStockReport() {
         return getActiveEPIs();
+    }
+
+    // ========== ESTOQUE DE EPIs (Formato Frontend) ==========
+
+    /**
+     * Busca todos os EPIs no formato de estoque para o frontend
+     */
+    @Transactional(readOnly = true)
+    public List<EPIStockDTO> getEPIStockInventory() {
+        List<PersonalProtectiveEquipment> epis = getAllEPIs();
+        log.info("📦 Buscando estoque de EPIs. Total encontrado no banco: {}", epis.size());
+        
+        if (epis.isEmpty()) {
+            log.warn("⚠️ Nenhum EPI encontrado no banco de dados. Retornando lista vazia.");
+        }
+        
+        List<EPIStockDTO> stock = epis.stream()
+                .map(this::convertToEPIStockDTO)
+                .collect(Collectors.toList());
+        
+        log.info("✅ Convertidos {} EPIs para EPIStockDTO", stock.size());
+        return stock;
+    }
+
+    /**
+     * Busca EPIs ativos no formato de estoque para o frontend
+     */
+    @Transactional(readOnly = true)
+    public List<EPIStockDTO> getActiveEPIStockInventory() {
+        List<PersonalProtectiveEquipment> epis = getActiveEPIs();
+        return epis.stream()
+                .map(this::convertToEPIStockDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Converte PersonalProtectiveEquipment para EPIStockDTO
+     */
+    private EPIStockDTO convertToEPIStockDTO(PersonalProtectiveEquipment epi) {
+        // Calcular quantidade atribuída (entregas não retornadas)
+        Integer assignedQuantity = calculateAssignedQuantity(epi.getId());
+        Integer availableQuantity = Math.max(0, epi.getCurrentStock() - assignedQuantity);
+
+        // Mapear categoria para tipo
+        String type = mapCategoryToType(epi.getCategory());
+
+        // Mapear status
+        String status = epi.getIsActive() ? "ACTIVE" : "INACTIVE";
+        
+        // Verificar se está expirado (baseado no CA)
+        if (epi.getCaValidity() != null && epi.getCaValidity().isBefore(LocalDate.now())) {
+            status = "EXPIRED";
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
+
+        return EPIStockDTO.builder()
+                .id(epi.getId())
+                .name(epi.getName())
+                .description(epi.getDescription())
+                .type(type)
+                .brand(epi.getManufacturer() != null ? epi.getManufacturer() : "N/A")
+                .model(epi.getModel() != null ? epi.getModel() : "N/A")
+                .size(null) // Não disponível no modelo atual
+                .color(null) // Não disponível no modelo atual
+                .certification(epi.getCaNumber() != null ? epi.getCaNumber() : "")
+                .status(status)
+                .quantity(epi.getCurrentStock())
+                .availableQuantity(availableQuantity)
+                .unitPrice(epi.getUnitCost() != null ? epi.getUnitCost() : java.math.BigDecimal.ZERO)
+                .supplier(epi.getManufacturer() != null ? epi.getManufacturer() : "N/A")
+                .purchaseDate(null) // Não disponível no modelo atual
+                .expiryDate(epi.getCaValidity() != null ? epi.getCaValidity().toString() : null)
+                .lastMaintenanceDate(null) // Não disponível no modelo atual
+                .nextMaintenanceDate(null) // Não disponível no modelo atual
+                .location("Almoxarifado") // Valor padrão, pode ser expandido no futuro
+                .notes(epi.getDescription())
+                .createdAt(epi.getCreatedAt() != null ? epi.getCreatedAt().format(formatter) : null)
+                .updatedAt(epi.getUpdatedAt() != null ? epi.getUpdatedAt().format(formatter) : null)
+                .build();
+    }
+
+    /**
+     * Calcula a quantidade atribuída (entregas não retornadas) de um EPI
+     */
+    private Integer calculateAssignedQuantity(UUID epiId) {
+        try {
+            // Buscar o EPI primeiro
+            PersonalProtectiveEquipment epi = epiRepository.findById(epiId).orElse(null);
+            if (epi == null) {
+                return 0;
+            }
+
+            // Buscar todas as entregas deste EPI
+            // Por enquanto, vamos somar todas as entregas (assumindo que não há sistema de retorno)
+            List<EPIDelivery> deliveries = deliveryRepository.findByEpi(epi);
+            
+            if (deliveries == null || deliveries.isEmpty()) {
+                return 0;
+            }
+
+            // Somar quantidades de todas as entregas
+            // TODO: Implementar lógica de retorno quando disponível
+            return deliveries.stream()
+                    .mapToInt(EPIDelivery::getQuantity)
+                    .sum();
+        } catch (Exception e) {
+            log.warn("Erro ao calcular quantidade atribuída para EPI {}: {}", epiId, e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Mapeia EPICategory para o tipo esperado pelo frontend
+     */
+    private String mapCategoryToType(EPICategory category) {
+        if (category == null) {
+            return "OTHER";
+        }
+        
+        switch (category) {
+            case CABECA:
+                return "HELMET";
+            case MAOS:
+                return "GLOVES";
+            case OLHOS:
+                return "SAFETY_GLASSES";
+            case PES:
+                return "SAFETY_SHOES";
+            case CORPO:
+                return "UNIFORM";
+            case RESPIRATORIO:
+                return "RESPIRATOR";
+            default:
+                return "OTHER";
+        }
     }
 }

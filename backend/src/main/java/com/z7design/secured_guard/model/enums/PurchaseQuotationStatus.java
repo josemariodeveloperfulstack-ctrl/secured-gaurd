@@ -17,3 +17,4 @@ public enum PurchaseQuotationStatus {
         return displayName;
     }
 }
+
