@@ -99,15 +99,27 @@ ON CONFLICT (id) DO NOTHING;
 -- =====================================================
 -- 5. DEPARTAMENTO BÁSICO
 -- =====================================================
-INSERT INTO departments (id, name, description, created_at, updated_at)
-VALUES (
-    '99999999-9999-9999-9999-999999999999',
-    'Operacional',
-    'Departamento operacional para CI',
-    NOW(),
-    NOW()
-)
-ON CONFLICT (id) DO NOTHING;
+-- Garantir que o departamento "Operacional" exista
+DO $$
+BEGIN
+    -- Se não existe, criar
+    IF NOT EXISTS (SELECT 1 FROM departments WHERE name = 'Operacional') THEN
+        INSERT INTO departments (id, name, description, created_at, updated_at)
+        VALUES (
+            gen_random_uuid(),
+            'Operacional',
+            'Departamento operacional para CI',
+            NOW(),
+            NOW()
+        );
+    ELSE
+        -- Se já existe, apenas atualizar descrição
+        UPDATE departments 
+        SET description = 'Departamento operacional para CI',
+            updated_at = NOW()
+        WHERE name = 'Operacional';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 6. CLIENTE DE TESTE
@@ -204,57 +216,58 @@ ON CONFLICT (id) DO NOTHING;
 -- =====================================================
 -- 9. FROTA - VEÍCULOS DE TESTE
 -- =====================================================
+-- Usar subquery para buscar o ID do departamento "Operacional"
 INSERT INTO vehicles (id, plate, model, brand, year, color, status, fuel_type, capacity, current_mileage, department_id, company_id, created_at, updated_at)
-VALUES
-    (
-        'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        'ABC1234',
-        'Civic',
-        'Honda',
-        2020,
-        'Prata',
-        'ACTIVE',
-        'FLEX',
-        5,
-        45000,
-        '99999999-9999-9999-9999-999999999999',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        NOW(),
-        NOW()
-    ),
-    (
-        'ffffffff-ffff-ffff-ffff-ffffffffffff',
-        'DEF5678',
-        'Corolla',
-        'Toyota',
-        2019,
-        'Branco',
-        'ACTIVE',
-        'FLEX',
-        5,
-        38000,
-        '99999999-9999-9999-9999-999999999999',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        NOW(),
-        NOW()
-    ),
-    (
-        '11111111-1111-1111-1111-111111111112',
-        'GHI9012',
-        'Hilux',
-        'Toyota',
-        2021,
-        'Prata',
-        'ACTIVE',
-        'DIESEL',
-        5,
-        25000,
-        '99999999-9999-9999-9999-999999999999',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        NOW(),
-        NOW()
-    )
-ON CONFLICT (id) DO NOTHING;
+SELECT
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'ABC1234',
+    'Civic',
+    'Honda',
+    2020,
+    'Prata',
+    'ACTIVE',
+    'FLEX',
+    5,
+    45000,
+    COALESCE((SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1), '99999999-9999-9999-9999-999999999999'),
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
+UNION ALL
+SELECT
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'DEF5678',
+    'Corolla',
+    'Toyota',
+    2019,
+    'Branco',
+    'ACTIVE',
+    'FLEX',
+    5,
+    38000,
+    COALESCE((SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1), '99999999-9999-9999-9999-999999999999'),
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE id = 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+UNION ALL
+SELECT
+    '11111111-1111-1111-1111-111111111112',
+    'GHI9012',
+    'Hilux',
+    'Toyota',
+    2021,
+    'Prata',
+    'ACTIVE',
+    'DIESEL',
+    5,
+    25000,
+    COALESCE((SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1), '99999999-9999-9999-9999-999999999999'),
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE id = '11111111-1111-1111-1111-111111111112');
 
 -- =====================================================
 -- LOG DE CONCLUSÃO
