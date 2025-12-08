@@ -65,7 +65,7 @@ class DocumentProcessingServiceTest {
         });
         
         // When
-        UUID result = processingService.createProcessingJob(testFile);
+        UUID result = processingService.createProcessingJob(testFile, "HOLERITE");
         
         // Then
         assertNotNull(result);

@@ -98,7 +98,7 @@ class DocumentProcessingPipelineIntegrationTest {
         // When
         UUID jobId = null;
         try {
-            jobId = processingService.createProcessingJob(testPdfFile);
+            jobId = processingService.createProcessingJob(testPdfFile, "HOLERITE");
         } catch (Exception e) {
             fail("Erro ao criar job: " + e.getMessage(), e);
         }
@@ -118,7 +118,7 @@ class DocumentProcessingPipelineIntegrationTest {
     @Test
     void testJobExistsInDatabase() throws Exception {
         // Given
-        UUID jobId = processingService.createProcessingJob(testPdfFile);
+        UUID jobId = processingService.createProcessingJob(testPdfFile, "HOLERITE");
         assertNotNull(jobId, "Job ID não deve ser null");
         
         // Aguardar um pouco para garantir que a transação foi commitada
@@ -134,7 +134,7 @@ class DocumentProcessingPipelineIntegrationTest {
     @Test
     void testJobEnqueuedInRedis() throws Exception {
         // Given
-        UUID jobId = processingService.createProcessingJob(testPdfFile);
+        UUID jobId = processingService.createProcessingJob(testPdfFile, "HOLERITE");
         assertNotNull(jobId, "Job ID não deve ser null");
         
         // Aguardar um pouco para garantir que a transação foi commitada

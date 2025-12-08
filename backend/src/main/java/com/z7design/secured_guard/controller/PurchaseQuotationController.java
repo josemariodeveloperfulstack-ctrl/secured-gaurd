@@ -10,7 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import com.z7design.secured_guard.model.User;
 
 import java.util.List;
 import java.util.Map;
@@ -49,10 +52,23 @@ public class PurchaseQuotationController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS')")
     public ResponseEntity<PurchaseQuotationDTO> createQuotation(@RequestBody PurchaseQuotationDTO quotationDTO) {
         log.info("Criando nova cotação: {}", quotationDTO.getTitle());
-        // TODO: Obter ID do usuário logado do contexto de segurança
-        UUID currentUserId = UUID.randomUUID(); // Temporário - deve ser obtido do contexto de segurança
-        PurchaseQuotationDTO createdQuotation = purchaseQuotationService.createQuotation(quotationDTO, currentUserId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdQuotation);
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                log.error("Usuário não autenticado ao criar cotação");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            User currentUser = (User) authentication.getPrincipal();
+            UUID currentUserId = currentUser.getId();
+            log.info("Usuário atual criando cotação: {} (ID: {})", currentUser.getUsername(), currentUserId);
+            
+            PurchaseQuotationDTO createdQuotation = purchaseQuotationService.createQuotation(quotationDTO, currentUserId);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdQuotation);
+        } catch (Exception e) {
+            log.error("Erro ao criar cotação: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
     
     @PutMapping("/{id}")
