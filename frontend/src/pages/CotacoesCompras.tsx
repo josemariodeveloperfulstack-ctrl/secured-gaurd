@@ -111,12 +111,26 @@ const CotacoesCompras: React.FC = () => {
   const loadQuotations = async () => {
     try {
       setLoading(true);
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await quotationService.getAll();
-      setQuotations(mockQuotations);
+      const data = await quotationService.getAll();
+      // Mapear dados do backend para o formato esperado pelo frontend
+      const mappedData = data.map((q: any) => ({
+        ...q,
+        id: q.id?.toString() || q.id,
+        supplierId: q.supplierId?.toString() || q.supplierId || undefined,
+        unitId: q.unitId?.toString() || q.unitId || undefined,
+        createdById: q.createdById?.toString() || q.createdById || undefined,
+        assignedToId: q.assignedToId?.toString() || q.assignedToId || undefined,
+        totalValue: typeof q.totalValue === 'string' ? parseFloat(q.totalValue) : (q.totalValue || 0),
+        validUntil: q.validUntil ? (q.validUntil.includes('T') ? q.validUntil.split('T')[0] : q.validUntil) : q.validUntil,
+        createdAt: q.createdAt || new Date().toISOString(),
+        updatedAt: q.updatedAt || new Date().toISOString(),
+        status: q.status || 'DRAFT'
+      }));
+      setQuotations(mappedData);
     } catch (error) {
       console.error('Erro ao carregar cotações:', error);
-      setQuotations(mockQuotations); // Fallback to mock data
+      // Fallback para array vazio em caso de erro
+      setQuotations([]);
     } finally {
       setLoading(false);
     }

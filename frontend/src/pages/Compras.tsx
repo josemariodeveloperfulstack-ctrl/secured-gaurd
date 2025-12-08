@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,6 +40,8 @@ import { MainLayout } from '@/components/MainLayout';
 
 export default function Compras() {
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +50,38 @@ export default function Compras() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [activeMainTab, setActiveMainTab] = useState('solicitacoes');
+  
+  // Determinar tab ativa baseado na URL
+  const getActiveTabFromPath = () => {
+    const path = location.pathname;
+    if (path.includes('/fornecedores')) return 'fornecedores';
+    if (path.includes('/solicitacoes') || path.includes('/aprovacoes') || path.includes('/relatorios')) return 'solicitacoes';
+    if (path === '/compras') return 'solicitacoes'; // default para /compras
+    return 'solicitacoes'; // default
+  };
+  
+  const [activeMainTab, setActiveMainTab] = useState(getActiveTabFromPath());
+  
+  // Atualizar tab quando a rota mudar
+  useEffect(() => {
+    const tab = getActiveTabFromPath();
+    setActiveMainTab(tab);
+    
+    // Se estiver em /compras sem subrota, redirecionar para /compras/solicitacoes
+    if (location.pathname === '/compras') {
+      navigate('/compras/solicitacoes', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+  
+  // Navegar quando a tab mudar
+  const handleTabChange = (value: string) => {
+    setActiveMainTab(value);
+    if (value === 'solicitacoes') {
+      navigate('/compras/solicitacoes');
+    } else if (value === 'fornecedores') {
+      navigate('/compras/fornecedores');
+    }
+  };
   const [activeRequestTab, setActiveRequestTab] = useState('all');
   
   // Estados para Fornecedores
@@ -430,7 +464,7 @@ export default function Compras() {
         </div>
 
         {/* Tabs principais */}
-        <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
+        <Tabs value={activeMainTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border-gray-600">
             <TabsTrigger value="solicitacoes" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Solicitações
