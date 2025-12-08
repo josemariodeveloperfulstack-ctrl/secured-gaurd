@@ -5,15 +5,16 @@ import com.z7design.secured_guard.model.Lead;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.LeadSource;
 import com.z7design.secured_guard.service.LeadService;
-import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/leads")
 @Tag(name = "Leads", description = "API para gestão de leads comerciais")
+@Slf4j
 public class LeadController {
 
     @Autowired
@@ -52,10 +54,22 @@ public class LeadController {
     @PostMapping
     @Operation(summary = "Criar novo lead", description = "Cria um novo lead no sistema")
     public ResponseEntity<Lead> createLead(@RequestBody LeadDTO leadDTO) {
-        // TODO: Obter ID do usuário logado do contexto de segurança
-        UUID currentUserId = UUID.randomUUID(); // Temporário
-        Lead createdLead = leadService.create(leadDTO, currentUserId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdLead);
+        try {
+            log.info("Criando novo lead: {}", leadDTO.getName());
+            
+            // Obter username do usuário atual do contexto de segurança
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUserIdentifier = authentication != null ? authentication.getName() : "system";
+            
+            log.info("Usuário atual: {}", currentUserIdentifier);
+            
+            Lead createdLead = leadService.create(leadDTO, currentUserIdentifier);
+            log.info("✅ Lead criado com sucesso: {}", createdLead.getId());
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdLead);
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar lead: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     @PutMapping("/{id}")

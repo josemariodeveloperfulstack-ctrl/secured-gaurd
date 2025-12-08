@@ -40,7 +40,7 @@ public class LeadService {
                 .orElseThrow(() -> new ResourceNotFoundException("Lead não encontrado com ID: " + id));
     }
 
-    public Lead create(LeadDTO leadDTO, UUID createdById) {
+    public Lead create(LeadDTO leadDTO, String currentUserIdentifier) {
         Lead lead = new Lead();
         lead.setName(leadDTO.getName());
         lead.setEmail(leadDTO.getEmail());
@@ -49,8 +49,25 @@ public class LeadService {
         lead.setPosition(leadDTO.getPosition());
         lead.setSource(leadDTO.getSource());
         lead.setStatus(LeadStatus.NEW);
-        lead.setCreatedBy(userRepository.findById(createdById)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado")));
+        // Mapear description para notes se notes estiver vazio
+        if (leadDTO.getNotes() != null && !leadDTO.getNotes().isEmpty()) {
+            lead.setNotes(leadDTO.getNotes());
+        } else if (leadDTO.getDescription() != null && !leadDTO.getDescription().isEmpty()) {
+            lead.setNotes(leadDTO.getDescription());
+        }
+        lead.setEstimatedValue(leadDTO.getEstimatedValue());
+        
+        // Tentar buscar usuário por username primeiro, depois por email
+        var userOptional = userRepository.findByUsername(currentUserIdentifier);
+        if (userOptional.isEmpty()) {
+            userOptional = userRepository.findByEmail(currentUserIdentifier);
+        }
+        
+        if (userOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Usuário não encontrado com username/email: " + currentUserIdentifier);
+        }
+        
+        lead.setCreatedBy(userOptional.get());
         
         if (leadDTO.getAssignedToId() != null) {
             lead.setAssignedTo(userRepository.findById(UUID.fromString(leadDTO.getAssignedToId().toString()))
