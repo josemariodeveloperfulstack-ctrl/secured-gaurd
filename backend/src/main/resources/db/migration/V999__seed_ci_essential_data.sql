@@ -117,6 +117,133 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- =====================================================
+-- 7. EMPRESA DE TESTE
+-- =====================================================
+INSERT INTO companies (id, name, trade_name, cnpj, email, phone, address, city, state, zip_code, status, type, sector, size, created_by, created_at, updated_at)
+VALUES (
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'Empresa Teste CI',
+    'Empresa Teste CI Ltda',
+    '98.765.432/0001-10',
+    'empresa@teste.ci',
+    '(11) 2222-2222',
+    'Av. Empresa, 456',
+    'São Paulo',
+    'SP',
+    '01234-567',
+    'ACTIVE',
+    'LTDA',
+    'Segurança',
+    'Média',
+    '11111111-1111-1111-1111-111111111111',
+    NOW(),
+    NOW()
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- =====================================================
+-- 8. FUNCIONÁRIOS DE TESTE
+-- =====================================================
+INSERT INTO employees (id, user_id, position_id, registration_number, name, cpf, rg, birth_date, marital_status, address, phone, email, unit_id, company_id, hire_date, status, created_at, updated_at)
+VALUES
+    (
+        'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        '11111111-1111-1111-1111-111111111111',
+        '66666666-6666-6666-6666-666666666666',
+        'FUNC001',
+        'João Silva',
+        '123.456.789-00',
+        '12.345.678-9',
+        '1990-01-15',
+        'SOLTEIRO',
+        'Rua Funcionário, 789',
+        '(11) 98765-4321',
+        'joao.silva@teste.ci',
+        '22222222-2222-2222-2222-222222222222',
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        '2024-01-01',
+        'ACTIVE',
+        NOW(),
+        NOW()
+    ),
+    (
+        'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        NULL,
+        '77777777-7777-7777-7777-777777777777',
+        'FUNC002',
+        'Maria Santos',
+        '987.654.321-00',
+        '98.765.432-1',
+        '1985-05-20',
+        'CASADO',
+        'Av. Funcionária, 321',
+        '(11) 91234-5678',
+        'maria.santos@teste.ci',
+        '22222222-2222-2222-2222-222222222222',
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        '2024-02-01',
+        'ACTIVE',
+        NOW(),
+        NOW()
+    )
+ON CONFLICT (id) DO NOTHING;
+
+-- =====================================================
+-- 9. FROTA - VEÍCULOS DE TESTE
+-- =====================================================
+INSERT INTO vehicles (id, plate, model, brand, year, color, status, fuel_type, capacity, current_mileage, department_id, company_id, created_at, updated_at)
+VALUES
+    (
+        'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        'ABC1234',
+        'Civic',
+        'Honda',
+        2020,
+        'Prata',
+        'ACTIVE',
+        'FLEX',
+        5,
+        45000,
+        '99999999-9999-9999-9999-999999999999',
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        NOW(),
+        NOW()
+    ),
+    (
+        'ffffffff-ffff-ffff-ffff-ffffffffffff',
+        'DEF5678',
+        'Corolla',
+        'Toyota',
+        2019,
+        'Branco',
+        'ACTIVE',
+        'FLEX',
+        5,
+        38000,
+        '99999999-9999-9999-9999-999999999999',
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        NOW(),
+        NOW()
+    ),
+    (
+        '11111111-1111-1111-1111-111111111112',
+        'GHI9012',
+        'Hilux',
+        'Toyota',
+        2021,
+        'Prata',
+        'ACTIVE',
+        'DIESEL',
+        5,
+        25000,
+        '99999999-9999-9999-9999-999999999999',
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        NOW(),
+        NOW()
+    )
+ON CONFLICT (id) DO NOTHING;
+
+-- =====================================================
 -- LOG DE CONCLUSÃO
 -- =====================================================
 DO $$
@@ -128,4 +255,7 @@ BEGIN
     RAISE NOTICE '   - Cargos: Vigilante, Supervisor, Gerente';
     RAISE NOTICE '   - Departamento: Operacional';
     RAISE NOTICE '   - Cliente: Cliente Teste CI';
+    RAISE NOTICE '   - Empresa: Empresa Teste CI';
+    RAISE NOTICE '   - Funcionários: 2 funcionários de teste';
+    RAISE NOTICE '   - Frota: 3 veículos de teste';
 END $$;
