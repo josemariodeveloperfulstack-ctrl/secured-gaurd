@@ -122,14 +122,14 @@ const Dependentes: React.FC = () => {
 
   // Handle employee selection
   const handleEmployeeSelect = (employeeId: string) => {
-    setSelectedEmployeeId(employeeId);
+    setSelectedEmployeeId(employeeId === 'all' ? '' : employeeId);
     setSearchTerm('');
     setRelationshipFilter('');
   };
 
   // Handle relationship filter
   const handleRelationshipFilter = (relationship: string) => {
-    setRelationshipFilter(relationship);
+    setRelationshipFilter(relationship === 'all' ? '' : relationship);
   };
 
   // Handle clear filters
@@ -268,12 +268,12 @@ const Dependentes: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Funcionário</label>
-              <Select value={selectedEmployeeId} onValueChange={handleEmployeeSelect}>
+              <Select value={selectedEmployeeId || 'all'} onValueChange={handleEmployeeSelect}>
                 <SelectTrigger className="bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20">
                   <SelectValue placeholder="Selecione um funcionário" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-black border-gray-600">
-                  <SelectItem value="" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                  <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                     👥 Todos os funcionários
                   </SelectItem>
                   {employees.map(employee => (
@@ -287,12 +287,12 @@ const Dependentes: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Relacionamento</label>
-              <Select value={relationshipFilter} onValueChange={handleRelationshipFilter}>
+              <Select value={relationshipFilter || 'all'} onValueChange={handleRelationshipFilter}>
                 <SelectTrigger className="bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20">
                   <SelectValue placeholder="Todos os relacionamentos" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-black border-gray-600">
-                  <SelectItem value="" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                  <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                     📋 Todos
                   </SelectItem>
                   {RELATIONSHIP_OPTIONS.map(option => (

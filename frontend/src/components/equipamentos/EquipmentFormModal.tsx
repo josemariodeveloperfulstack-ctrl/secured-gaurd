@@ -430,17 +430,18 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
           <div>
             <Label htmlFor="destinationWorkPostId">Posto de Trabalho de Destino</Label>
             <Select 
-              value={formData.destinationWorkPostId || ''} 
+              value={formData.destinationWorkPostId || 'none'} 
               onValueChange={(value) => {
                 console.log('Selecionando posto de destino:', value);
-                handleInputChange('destinationWorkPostId', value);
+                // Converter "none" para string vazia para o backend
+                handleInputChange('destinationWorkPostId', value === 'none' ? '' : value);
               }}
             >
               <SelectTrigger>
                 <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de destino"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum (opcional)</SelectItem>
+                <SelectItem value="none">Nenhum (opcional)</SelectItem>
                 {workPosts.length === 0 ? (
                   <SelectItem value="loading" disabled>
                     {loadingWorkPosts ? "Carregando..." : "Nenhum posto encontrado"}

@@ -208,6 +208,11 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Não permitir submit no modo view
+    if (mode === 'view') {
+      return;
+    }
+
     if (!validateForm()) {
       toast({
         title: "Erro de Validação",
@@ -265,6 +270,24 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       setCalendarOpen(false);
     }
   }, [open]);
+
+  // Atualizar formData quando initialData mudar (importante para modo view/edit)
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+    } else if (!open) {
+      // Reset apenas quando o modal fechar sem initialData
+      setFormData({
+        employeeId: '',
+        locationId: '',
+        scheduleDate: new Date(),
+        shift: '',
+        startTime: '',
+        endTime: '',
+        observations: ''
+      });
+    }
+  }, [initialData, open]);
 
   const clientes = [
     { id: '1', nome: 'Shopping Center Norte' },
@@ -401,15 +424,16 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                   Data <span className="text-red-400">*</span>
                 </Label>
               </div>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <Popover open={calendarOpen && mode !== 'view'} onOpenChange={(open) => mode !== 'view' && setCalendarOpen(open)}>
                 <PopoverTrigger asChild>
                   <Button
                     id="date"
                     variant="outline"
+                    disabled={mode === 'view'}
                     className={`w-full justify-start text-left font-normal h-11 border-2 transition-colors ${errors.scheduleDate
                       ? 'border-red-500 focus:border-red-500 bg-seguranca-black'
                       : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow bg-seguranca-black'
-                      }`}
+                      } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {formData.scheduleDate ? (

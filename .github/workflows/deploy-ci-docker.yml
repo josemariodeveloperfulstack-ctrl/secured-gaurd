@@ -1272,19 +1272,36 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "Tentativa $ATTEMPT de $MAX_ATTEMPTS..."
             
-            # Tentar health check com timeout maior
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --connect-timeout 5 https://ci.z7botsolutions.com.br/api/health 2>&1 || echo "000")
+            # Tentar health check com timeout maior e seguir redirects
+            # Usar -L para seguir redirects (HTTP -> HTTPS)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 --connect-timeout 5 https://ci.z7botsolutions.com.br/api/health 2>&1 || echo "000")
             
             echo "HTTP Code recebido: $HTTP_CODE"
             
+            # Aceitar 200 (OK) ou 301/302 (redirect - indica que servidor está respondendo)
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health check passou! Aplicação CI está respondendo."
               
               # Verificar resposta completa
-              RESPONSE=$(curl -s --max-time 10 https://ci.z7botsolutions.com.br/api/health)
+              RESPONSE=$(curl -s -L --max-time 10 https://ci.z7botsolutions.com.br/api/health)
               echo "Resposta completa: $RESPONSE"
               
               exit 0
+            elif [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+              echo "⚠️ HTTP Code: $HTTP_CODE (redirect detectado)"
+              echo "🔄 Tentando seguir redirect para obter resposta final..."
+              
+              # Tentar novamente seguindo redirects explicitamente
+              FINAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 --connect-timeout 5 https://ci.z7botsolutions.com.br/api/health 2>&1 || echo "000")
+              
+              if [ "$FINAL_CODE" = "200" ]; then
+                echo "✅ Health check passou após seguir redirect!"
+                RESPONSE=$(curl -s -L --max-time 10 https://ci.z7botsolutions.com.br/api/health)
+                echo "Resposta completa: $RESPONSE"
+                exit 0
+              else
+                echo "⚠️ Após seguir redirect, HTTP Code: $FINAL_CODE (esperado: 200)"
+              fi
             elif [ "$HTTP_CODE" = "000" ]; then
               echo "⚠️ Timeout ou erro de conexão. Aplicação ainda pode estar iniciando..."
             else

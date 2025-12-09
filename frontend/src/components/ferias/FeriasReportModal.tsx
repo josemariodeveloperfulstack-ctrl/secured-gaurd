@@ -227,14 +227,14 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                     Funcionário
                   </Label>
                   <Select
-                    value={filters.employeeId}
-                    onValueChange={(value) => handleFilterChange('employeeId', value)}
+                    value={filters.employeeId || 'all'}
+                    onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="bg-gray-900/50 border-gray-600 text-white">
                       <SelectValue placeholder="Todos os funcionários" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-900 border-gray-600">
-                      <SelectItem value="" className="text-white hover:bg-gray-700">
+                      <SelectItem value="all" className="text-white hover:bg-gray-700">
                         Todos os funcionários
                       </SelectItem>
                       {employees?.map((employee) => (
@@ -251,14 +251,14 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                     Status
                   </Label>
                   <Select
-                    value={filters.status}
-                    onValueChange={(value) => handleFilterChange('status', value)}
+                    value={filters.status || 'all'}
+                    onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="bg-gray-900/50 border-gray-600 text-white">
                       <SelectValue placeholder="Todos os status" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-900 border-gray-600">
-                      <SelectItem value="" className="text-white hover:bg-gray-700">
+                      <SelectItem value="all" className="text-white hover:bg-gray-700">
                         Todos os status
                       </SelectItem>
                       <SelectItem value="PENDING" className="text-white hover:bg-gray-700">
@@ -282,14 +282,14 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                     Tipo
                   </Label>
                   <Select
-                    value={filters.tipo}
-                    onValueChange={(value) => handleFilterChange('tipo', value)}
+                    value={filters.tipo || 'all'}
+                    onValueChange={(value) => handleFilterChange('tipo', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="bg-gray-900/50 border-gray-600 text-white">
                       <SelectValue placeholder="Todos os tipos" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-900 border-gray-600">
-                      <SelectItem value="" className="text-white hover:bg-gray-700">
+                      <SelectItem value="all" className="text-white hover:bg-gray-700">
                         Todos os tipos
                       </SelectItem>
                       <SelectItem value="FERIAS_NORMAIS" className="text-white hover:bg-gray-700">

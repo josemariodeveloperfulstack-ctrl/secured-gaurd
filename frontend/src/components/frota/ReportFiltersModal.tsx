@@ -151,14 +151,14 @@ const ReportFiltersModal: React.FC<ReportFiltersModalProps> = ({
               <div className="space-y-2">
                 <Label htmlFor="statusFilter" className="text-gray-300">Status</Label>
                 <Select
-                  value={filters.statusFilter || ''}
-                  onValueChange={(value) => handleFilterChange('statusFilter', value)}
+                  value={filters.statusFilter || 'all'}
+                  onValueChange={(value) => handleFilterChange('statusFilter', value === 'all' ? '' : value)}
                 >
                   <SelectTrigger className="border-gray-600 bg-seguranca-black text-gray-300">
                     <SelectValue placeholder="Selecionar status" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="PENDING">Pendente</SelectItem>
                     <SelectItem value="PAID">Paga</SelectItem>
                     <SelectItem value="CANCELLED">Cancelada</SelectItem>

@@ -545,13 +545,13 @@ const Escalas = () => {
           }}
           onSave={handleSaveEscala}
           initialData={selectedEscala ? {
-            funcionarioId: selectedEscala.employee?.id || '',
-            clienteId: selectedEscala.location?.id || '',
-            data: selectedEscala.scheduleDate ? new Date(selectedEscala.scheduleDate) : new Date(),
-            turno: selectedEscala.shift || '',
-            horarioInicio: selectedEscala.startTime || '',
-            horarioFim: selectedEscala.endTime || '',
-            observacoes: selectedEscala.observations || '',
+            employeeId: selectedEscala.employee?.id || '',
+            locationId: selectedEscala.location?.id || '',
+            scheduleDate: selectedEscala.scheduleDate ? new Date(selectedEscala.scheduleDate) : new Date(),
+            shift: selectedEscala.shift || '',
+            startTime: (selectedEscala as any).startTime || (selectedEscala.shift === 'DAY' ? '08:00' : selectedEscala.shift === 'NIGHT' ? '22:00' : '14:00'),
+            endTime: (selectedEscala as any).endTime || (selectedEscala.shift === 'DAY' ? '17:00' : selectedEscala.shift === 'NIGHT' ? '06:00' : '22:00'),
+            observations: selectedEscala.observations || '',
           } : undefined}
           mode={modalMode}
         />
