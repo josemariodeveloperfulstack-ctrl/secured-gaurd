@@ -1178,6 +1178,84 @@ jobs:
           EOF
 
       # ============================================
+      # 2️⃣2️⃣5️⃣ VERIFICAR E INICIAR TRAEFIK (CRÍTICO)
+      # ============================================
+      - name: 🔄 Ensure Traefik is running
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔄 Verificando e iniciando Traefik (crítico para Cloudflare)..."
+            
+            cd /var/www/secured_guard
+            
+            # Verificar se Traefik está rodando
+            if docker ps | grep -q "traefik"; then
+              echo "✅ Traefik já está rodando"
+              docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            else
+              echo "⚠️ Traefik não está rodando! Iniciando..."
+              
+              # Verificar se a rede z7network existe
+              if ! docker network ls | grep -q "z7network"; then
+                echo "📡 Criando rede z7network..."
+                docker network create z7network
+              fi
+              
+              # Verificar se os diretórios necessários existem
+              mkdir -p /var/www/secured_guard/traefik/dynamic
+              mkdir -p /var/www/secured_guard/traefik/letsencrypt
+              mkdir -p /var/www/secured_guard/traefik/logs
+              
+              # Iniciar Traefik
+              docker-compose -f docker-compose.traefik.yml up -d
+              
+              echo "⏳ Aguardando Traefik iniciar (15s)..."
+              sleep 15
+              
+              # Verificar se iniciou
+              if docker ps | grep -q "traefik"; then
+                echo "✅ Traefik iniciado com sucesso!"
+                docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+              else
+                echo "❌ Traefik não iniciou! Verificando logs..."
+                docker logs traefik --tail 50 2>&1 || echo "Container traefik não encontrado"
+                exit 1
+              fi
+            fi
+            
+            # Verificar se Traefik está na rede z7network
+            if docker inspect traefik 2>/dev/null | grep -q "z7network"; then
+              echo "✅ Traefik está na rede z7network"
+            else
+              echo "⚠️ Traefik não está na rede z7network. Conectando..."
+              docker network connect z7network traefik 2>&1 || echo "⚠️ Pode já estar conectado ou erro ao conectar"
+            fi
+            
+            # Verificar se as portas 80 e 443 estão escutando
+            echo ""
+            echo "🔍 Verificando portas..."
+            if netstat -tlnp 2>/dev/null | grep -q ":80 " || ss -tlnp 2>/dev/null | grep -q ":80 "; then
+              echo "✅ Porta 80 está escutando"
+            else
+              echo "⚠️ Porta 80 não está escutando"
+            fi
+            
+            if netstat -tlnp 2>/dev/null | grep -q ":443 " || ss -tlnp 2>/dev/null | grep -q ":443 "; then
+              echo "✅ Porta 443 está escutando"
+            else
+              echo "⚠️ Porta 443 não está escutando"
+            fi
+            
+            # Testar Traefik dashboard
+            echo ""
+            echo "🧪 Testando Traefik dashboard..."
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/overview | grep -q "200"; then
+              echo "✅ Traefik dashboard está respondendo"
+            else
+              echo "⚠️ Traefik dashboard não está respondendo (pode ser normal se não estiver configurado)"
+            fi
+          EOF
+
+      # ============================================
       # 2️⃣3️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
       # ============================================
       - name: 🏥 Health check
