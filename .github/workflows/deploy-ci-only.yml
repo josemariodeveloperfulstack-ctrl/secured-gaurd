@@ -208,17 +208,62 @@ jobs:
             
             cd /var/www/secured_guard
             
+            # Verificar se a rede z7network existe
+            if ! docker network ls | grep -q "z7network"; then
+              echo "⚠️  Rede z7network não existe. Criando..."
+              docker network create z7network
+            fi
+            
+            # Verificar se o diretório de configuração dinâmica existe
+            mkdir -p /var/www/secured_guard/traefik/dynamic
+            mkdir -p /var/www/secured_guard/traefik/letsencrypt
+            mkdir -p /var/www/secured_guard/traefik/logs
+            
             # Reiniciar Traefik para carregar configuração dinâmica
             docker-compose -f docker-compose.traefik.yml down
             docker-compose -f docker-compose.traefik.yml up -d
             
-            echo "⏳ Aguardando Traefik iniciar (10s)..."
-            sleep 10
+            echo "⏳ Aguardando Traefik iniciar (15s)..."
+            sleep 15
             
             # Verificar se Traefik está rodando
-            docker ps | grep traefik
+            if docker ps | grep -q "traefik"; then
+              echo "✅ Traefik está rodando"
+            else
+              echo "❌ Traefik não iniciou! Verificando logs..."
+              docker logs traefik --tail 50
+              exit 1
+            fi
             
-            echo "✅ Traefik reiniciado!"
+            # Verificar se o Traefik está na rede z7network
+            if docker inspect traefik | grep -q "z7network"; then
+              echo "✅ Traefik está na rede z7network"
+            else
+              echo "⚠️  Traefik não está na rede z7network. Reconectando..."
+              docker network connect z7network traefik || echo "⚠️  Falha ao conectar (pode já estar conectado)"
+            fi
+            
+            # Verificar se o Traefik está respondendo
+            echo "🧪 Testando se o Traefik está respondendo..."
+            MAX_RETRIES=10
+            RETRY=0
+            while [ $RETRY -lt $MAX_RETRIES ]; do
+              if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/overview | grep -q "200"; then
+                echo "✅ Traefik está respondendo"
+                break
+              fi
+              RETRY=$((RETRY + 1))
+              echo "⏳ Tentativa $RETRY/$MAX_RETRIES..."
+              sleep 2
+            done
+            
+            if [ $RETRY -eq $MAX_RETRIES ]; then
+              echo "❌ Traefik não está respondendo após $MAX_RETRIES tentativas!"
+              docker logs traefik --tail 50
+              exit 1
+            fi
+            
+            echo "✅ Traefik reiniciado e funcionando!"
           EOF
 
       # ============================================
@@ -547,7 +592,76 @@ jobs:
           echo "========================================="
 
       # ============================================
-      # 1️⃣7️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
+      # 1️⃣7️⃣ VERIFICAR TRAEFIK ANTES DO HEALTH CHECK
+      # ============================================
+      - name: 🔍 Verify Traefik before health check
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "🔍 Verificando Traefik antes do health check..."
+            
+            # Verificar se o Traefik está rodando
+            if docker ps | grep -q "traefik"; then
+              echo "✅ Traefik está rodando"
+            else
+              echo "❌ Traefik não está rodando! Tentando iniciar..."
+              cd /var/www/secured_guard
+              docker-compose -f docker-compose.traefik.yml up -d
+              sleep 10
+              
+              if docker ps | grep -q "traefik"; then
+                echo "✅ Traefik iniciado"
+              else
+                echo "❌ Traefik não iniciou! Verificando logs..."
+                docker logs traefik --tail 50
+                exit 1
+              fi
+            fi
+            
+            # Verificar se o Traefik está respondendo
+            MAX_RETRIES=10
+            RETRY=0
+            while [ $RETRY -lt $MAX_RETRIES ]; do
+              if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/overview | grep -q "200"; then
+                echo "✅ Traefik está respondendo"
+                break
+              fi
+              RETRY=$((RETRY + 1))
+              echo "⏳ Tentativa $RETRY/$MAX_RETRIES..."
+              sleep 2
+            done
+            
+            if [ $RETRY -eq $MAX_RETRIES ]; then
+              echo "❌ Traefik não está respondendo após $MAX_RETRIES tentativas!"
+              docker logs traefik --tail 50
+              exit 1
+            fi
+            
+            # Verificar se o nginx-ci está na rede z7network
+            if docker ps | grep -q "nginx-ci"; then
+              if docker inspect secured-guard-nginx-ci | grep -q "z7network"; then
+                echo "✅ nginx-ci está na rede z7network"
+              else
+                echo "⚠️  nginx-ci não está na rede z7network. Reconectando..."
+                docker network connect z7network secured-guard-nginx-ci || echo "⚠️  Falha ao conectar (pode já estar conectado)"
+              fi
+            fi
+            
+            # Verificar routers do Traefik
+            echo "🔍 Verificando routers do Traefik..."
+            ROUTERS=$(curl -s http://localhost:8080/api/http/routers | grep -o '"name":"[^"]*"' | grep -i "nginx-ci" || echo "")
+            if [ -n "$ROUTERS" ]; then
+              echo "✅ Router nginx-ci está configurado no Traefik"
+            else
+              echo "⚠️  Router nginx-ci não está configurado no Traefik"
+              echo "📋 Routers disponíveis:"
+              curl -s http://localhost:8080/api/http/routers | grep -o '"name":"[^"]*"' | head -10 || echo "Não foi possível listar routers"
+            fi
+            
+            echo "✅ Verificação do Traefik concluída!"
+          EOF
+
+      # ============================================
+      # 1️⃣8️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
       # ============================================
       - name: 🏥 Health check
         run: |
@@ -612,6 +726,53 @@ jobs:
           echo "❌ Health check falhou após $MAX_ATTEMPTS tentativas!"
           echo ""
           echo "🔍 Coletando informações de diagnóstico..."
+          
+          # Verificar Traefik
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF' || true
+            echo "📋 Status do Traefik:"
+            if docker ps | grep -q "traefik"; then
+              echo "✅ Traefik está rodando"
+              docker ps | grep traefik
+            else
+              echo "❌ Traefik não está rodando!"
+            fi
+            
+            echo ""
+            echo "📋 Logs do Traefik (últimas 50 linhas):"
+            docker logs traefik --tail 50 2>&1 || echo "Container Traefik não encontrado"
+            
+            echo ""
+            echo "📋 Verificando routers do Traefik:"
+            curl -s http://localhost:8080/api/http/routers | grep -o '"name":"[^"]*"' | head -20 || echo "Não foi possível listar routers"
+            
+            echo ""
+            echo "📋 Verificando se Traefik está na rede z7network:"
+            if docker inspect traefik 2>/dev/null | grep -q "z7network"; then
+              echo "✅ Traefik está na rede z7network"
+            else
+              echo "❌ Traefik não está na rede z7network!"
+            fi
+            
+            echo ""
+            echo "📋 Verificando se nginx-ci está na rede z7network:"
+            if docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
+              echo "✅ nginx-ci está na rede z7network"
+            else
+              echo "❌ nginx-ci não está na rede z7network!"
+            fi
+            
+            echo ""
+            echo "📋 Testando conectividade entre Traefik e nginx-ci:"
+            if docker exec traefik ping -c 1 secured-guard-nginx-ci > /dev/null 2>&1; then
+              echo "✅ Traefik consegue alcançar nginx-ci"
+            else
+              echo "❌ Traefik não consegue alcançar nginx-ci"
+            fi
+            
+            echo ""
+            echo "📋 Testando se Traefik está respondendo:"
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8080/api/overview || echo "Traefik não responde"
+          EOF
           
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /var/www/secured_guard/ci && echo '📋 Status dos containers:' && docker-compose -f docker-compose.ci.yml ps" || true
           
