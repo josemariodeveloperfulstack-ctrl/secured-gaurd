@@ -39,3 +39,4 @@ git config --global --get url."https://${username}:${token}@github.com/".instead
 
 Write-Host "`n✅ Configuração concluída!" -ForegroundColor Green
 Write-Host "Teste com: git fetch" -ForegroundColor Yellow
+

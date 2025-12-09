@@ -194,3 +194,4 @@ echo "   - Porta 80 (HTTP)"
 echo "   - Porta 443 (HTTPS)"
 echo "4. Teste acessar https://ci.z7botsolutions.com.br diretamente (sem Cloudflare)"
 echo "5. Verifique os logs do Traefik para erros: docker logs traefik --tail 100"
+

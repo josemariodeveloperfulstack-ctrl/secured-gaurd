@@ -285,3 +285,4 @@ BEGIN
     RAISE NOTICE '   - Funcionários: 2 funcionários de teste';
     RAISE NOTICE '   - Frota: 3 veículos de teste';
 END $$;
+

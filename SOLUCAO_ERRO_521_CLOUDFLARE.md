@@ -219,3 +219,4 @@ curl http://localhost/api/health
 - [Erro 521 do Cloudflare](https://support.cloudflare.com/hc/en-us/articles/115003011431-Troubleshooting-Cloudflare-5XX-errors#521error)
 - [Documentação do Traefik](https://doc.traefik.io/traefik/)
 - [Docker Networking](https://docs.docker.com/network/)
+

@@ -90,3 +90,4 @@ Se ainda pedir autenticação, tente:
   git config --global --unset credential.helper
   git config --global credential.helper store
   ```
+
