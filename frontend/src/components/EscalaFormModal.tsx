@@ -73,6 +73,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   // Log para debug
   useEffect(() => {
     console.log('🎭 EscalaFormModal renderizado - open:', open, 'mode:', mode, 'initialData:', initialData);
+    console.log('🎭 EscalaFormModal - Título será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala');
   }, [open, mode, initialData]);
   // Função para obter dados padrão
   const getDefaultFormData = (): EscalaFormData => ({
@@ -376,35 +377,82 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   // Atualizar formData quando initialData mudar OU quando o modal abrir (importante para modo view/edit)
   useEffect(() => {
     console.log('🔄 EscalaFormModal useEffect - open:', open, 'initialData:', initialData, 'mode:', mode);
+    console.log('🔄 initialData completo:', JSON.stringify(initialData, null, 2));
+    console.log('🔄 postosTrabalho.length:', postosTrabalho.length);
+    console.log('🔄 usuarios.length:', usuarios.length);
+    console.log('🔄 clientes.length:', clientes.length);
     
     if (open) {
-      if (initialData) {
+      if (initialData && (mode === 'edit' || mode === 'view')) {
+        // Processar scheduleDate - garantir que seja um objeto Date válido
+        let scheduleDateValue: Date;
+        if (initialData.scheduleDate) {
+          if (initialData.scheduleDate instanceof Date) {
+            scheduleDateValue = initialData.scheduleDate;
+          } else if (typeof initialData.scheduleDate === 'string') {
+            scheduleDateValue = new Date(initialData.scheduleDate);
+          } else {
+            scheduleDateValue = new Date();
+          }
+        } else {
+          scheduleDateValue = new Date();
+        }
+        
         // Garantir que todos os valores sejam sempre strings válidas (nunca undefined)
         const newFormData = {
-          employeeId: initialData.employeeId || '',
-          locationId: initialData.locationId || '',
-          workPostId: initialData.workPostId || '',
-          scheduleDate: initialData.scheduleDate || new Date(),
-          shift: initialData.shift || '',
-          startTime: initialData.startTime || '',
-          endTime: initialData.endTime || '',
-          observations: initialData.observations || ''
+          employeeId: String(initialData.employeeId || ''),
+          locationId: String(initialData.locationId || initialData.workPostId || ''),
+          workPostId: String(initialData.workPostId || ''),
+          scheduleDate: scheduleDateValue,
+          shift: String(initialData.shift || ''),
+          startTime: String(initialData.startTime || ''),
+          endTime: String(initialData.endTime || ''),
+          observations: String(initialData.observations || '')
         };
-        console.log('📝 Atualizando formData com initialData:', newFormData);
+        console.log('📝 Atualizando formData com initialData (modo edit/view):', newFormData);
+        console.log('📝 Campos preenchidos:');
+        console.log('  - employeeId:', newFormData.employeeId);
+        console.log('  - workPostId:', newFormData.workPostId);
+        console.log('  - locationId:', newFormData.locationId);
+        console.log('  - scheduleDate:', newFormData.scheduleDate);
+        console.log('  - shift:', newFormData.shift);
+        console.log('  - startTime:', newFormData.startTime);
+        console.log('  - endTime:', newFormData.endTime);
+        console.log('  - observations:', newFormData.observations);
+        
+        // Atualizar formData imediatamente
         setFormData(newFormData);
         
-        // Mapear locationId (que agora é workPostId) de volta para clientId
-        // Se locationId = workPostId, encontrar o workPost e pegar o clientId dele
-        if (initialData.locationId && postosTrabalho.length > 0) {
-          const workPost = postosTrabalho.find(wp => wp.id === initialData.locationId);
-          if (workPost && workPost.clientId) {
-            setSelectedClientId(workPost.clientId);
-            console.log('✅ Cliente mapeado do workPostId:', workPost.clientId);
+        // Mapear workPostId para clientId
+        // Primeiro tentar usar clientId diretamente do initialData (se foi passado)
+        const clientIdFromData = (initialData as any).clientId;
+        if (clientIdFromData) {
+          const clientIdStr = String(clientIdFromData);
+          setSelectedClientId(clientIdStr);
+          console.log('✅ Cliente mapeado diretamente do initialData:', clientIdStr);
+        } else {
+          // Se não há clientId direto, buscar do workPost
+          const workPostIdToSearch = String(initialData.workPostId || initialData.locationId || '');
+          console.log('🔍 Buscando cliente pelo workPostId:', workPostIdToSearch, 'postosTrabalho.length:', postosTrabalho.length);
+          
+          if (workPostIdToSearch && postosTrabalho.length > 0) {
+            const workPost = postosTrabalho.find(wp => String(wp.id) === workPostIdToSearch);
+            console.log('🔍 WorkPost encontrado:', workPost);
+            if (workPost && workPost.clientId) {
+              const clientIdStr = String(workPost.clientId);
+              setSelectedClientId(clientIdStr);
+              console.log('✅ Cliente mapeado do workPostId:', clientIdStr, 'workPost:', workPost);
+            } else {
+              console.warn('⚠️ WorkPost não encontrado ou sem clientId. workPostId:', workPostIdToSearch);
+            }
+          } else if (workPostIdToSearch && postosTrabalho.length === 0) {
+            // Se os postos ainda não foram carregados, aguardar e tentar novamente quando carregarem
+            console.log('⏳ Aguardando carregamento dos postos de trabalho...');
           }
         }
-      } else {
-        // Se não há initialData, resetar para valores padrão
-        console.log('📝 Resetando formData (sem initialData)');
+      } else if (!initialData || mode === 'create') {
+        // Se não há initialData ou é modo create, resetar para valores padrão
+        console.log('📝 Resetando formData (sem initialData ou modo create)');
         setFormData({
           employeeId: '',
           locationId: '',
@@ -432,7 +480,94 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         observations: ''
       });
     }
-  }, [initialData, open, mode, postosTrabalho]);
+  }, [initialData, open, mode, postosTrabalho, usuarios, clientes]);
+
+  // Efeito adicional para atualizar formData e clientId quando dados forem carregados e houver initialData
+  useEffect(() => {
+    if (open && initialData && (mode === 'edit' || mode === 'view') && postosTrabalho.length > 0 && usuarios.length > 0) {
+      console.log('🔄 Efeito adicional - Atualizando dados após carregamento completo');
+      console.log('🔄 initialData completo:', JSON.stringify(initialData, null, 2));
+      console.log('🔄 initialData.employeeId:', initialData.employeeId);
+      console.log('🔄 initialData.workPostId:', initialData.workPostId);
+      console.log('🔄 initialData.startTime:', initialData.startTime);
+      console.log('🔄 initialData.endTime:', initialData.endTime);
+      
+      // Processar scheduleDate
+      let scheduleDateValue: Date;
+      if (initialData.scheduleDate) {
+        if (initialData.scheduleDate instanceof Date) {
+          scheduleDateValue = initialData.scheduleDate;
+        } else if (typeof initialData.scheduleDate === 'string') {
+          scheduleDateValue = new Date(initialData.scheduleDate);
+        } else {
+          scheduleDateValue = new Date();
+        }
+      } else {
+        scheduleDateValue = new Date();
+      }
+      
+      // Atualizar formData para garantir que os valores estejam corretos
+      const currentEmployeeId = String(initialData.employeeId || '');
+      const currentWorkPostId = String(initialData.workPostId || '');
+      const currentLocationId = String(initialData.locationId || currentWorkPostId || '');
+      const currentShift = String(initialData.shift || '');
+      const currentStartTime = String(initialData.startTime || '');
+      const currentEndTime = String(initialData.endTime || '');
+      const currentObservations = String(initialData.observations || '');
+      
+      // Verificar se os valores no formData estão corretos e atualizar se necessário
+      const needsUpdate = 
+        formData.employeeId !== currentEmployeeId || 
+        formData.workPostId !== currentWorkPostId ||
+        formData.locationId !== currentLocationId ||
+        formData.shift !== currentShift ||
+        formData.startTime !== currentStartTime ||
+        formData.endTime !== currentEndTime ||
+        formData.observations !== currentObservations ||
+        formData.scheduleDate.getTime() !== scheduleDateValue.getTime();
+      
+      if (needsUpdate) {
+        console.log('🔄 Atualizando formData com valores corretos após carregamento');
+        setFormData({
+          employeeId: currentEmployeeId,
+          workPostId: currentWorkPostId,
+          locationId: currentLocationId,
+          scheduleDate: scheduleDateValue,
+          shift: currentShift,
+          startTime: currentStartTime,
+          endTime: currentEndTime,
+          observations: currentObservations
+        });
+        console.log('✅ formData atualizado com sucesso');
+      }
+      
+      // Primeiro tentar usar clientId diretamente do initialData
+      const clientIdFromData = (initialData as any).clientId;
+      if (clientIdFromData) {
+        const clientIdStr = String(clientIdFromData);
+        if (selectedClientId !== clientIdStr) {
+          setSelectedClientId(clientIdStr);
+          console.log('✅ Cliente mapeado do initialData (após carregamento):', clientIdStr);
+        }
+        return;
+      }
+      
+      // Se não há clientId direto, buscar do workPost
+      const workPostIdToSearch = String(initialData.workPostId || initialData.locationId || '');
+      if (workPostIdToSearch) {
+        const workPost = postosTrabalho.find(wp => String(wp.id) === workPostIdToSearch);
+        if (workPost && workPost.clientId) {
+          const clientIdStr = String(workPost.clientId);
+          if (selectedClientId !== clientIdStr) {
+            setSelectedClientId(clientIdStr);
+            console.log('✅ Cliente mapeado do workPostId (após carregamento):', clientIdStr);
+          }
+        } else {
+          console.warn('⚠️ WorkPost não encontrado após carregamento. workPostId:', workPostIdToSearch);
+        }
+      }
+    }
+  }, [postosTrabalho, usuarios, open, initialData, selectedClientId, mode, formData]);
 
 
   const turnos = [
@@ -457,6 +592,21 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   ];
 
   console.log('🎭 EscalaFormModal render - open:', open, 'mode:', mode, 'initialData:', initialData);
+  console.log('🎭 Título do modal será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala');
+  console.log('🎭 formData atual:', formData);
+  console.log('🎭 selectedClientId atual:', selectedClientId);
+  console.log('🎭 usuarios.length:', usuarios.length);
+  console.log('🎭 clientes.length:', clientes.length);
+  console.log('🎭 postosTrabalho.length:', postosTrabalho.length);
+  console.log('🎭 postosFiltrados.length:', postosFiltrados.length);
+  
+  // Log quando open mudar
+  useEffect(() => {
+    console.log('🔄 EscalaFormModal - open mudou para:', open);
+    console.log('🔄 EscalaFormModal - mode:', mode);
+    console.log('🔄 EscalaFormModal - Título será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala');
+    console.log('🔄 EscalaFormModal - initialData:', initialData);
+  }, [open, mode, initialData]);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -487,20 +637,27 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
               </Label>
             </div>
             <Select
-              value={formData.employeeId || ''}
-              onValueChange={(value) => handleInputChange('employeeId', value)}
+              value={String(formData.employeeId || '')}
+              onValueChange={(value) => {
+                console.log('👤 Funcionário selecionado:', value);
+                handleInputChange('employeeId', value);
+              }}
               disabled={mode === 'view'}
             >
               <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.employeeId
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
                 } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder="Selecione um funcionário" />
+                <SelectValue placeholder="Selecione um funcionário">
+                  {formData.employeeId && usuarios.length > 0 ? (
+                    usuarios.find(u => String(u.id) === String(formData.employeeId))?.name || 'Selecione um funcionário'
+                  ) : 'Selecione um funcionário'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
                 {usuarios.length > 0 ? (
                   usuarios.map(user => (
-                    <SelectItem key={user.id} value={user.id} className="hover:bg-seguranca-black/50 cursor-pointer">
+                    <SelectItem key={String(user.id)} value={String(user.id)} className="hover:bg-seguranca-black/50 cursor-pointer">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         {user.name}
@@ -531,7 +688,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
               </Label>
             </div>
             <Select
-              value={selectedClientId || ''}
+              value={String(selectedClientId || '')}
               onValueChange={(value) => {
                 console.log('🔍 Cliente selecionado:', value);
                 setSelectedClientId(value);
@@ -552,12 +709,16 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
                 } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder="Selecione um cliente" />
+                <SelectValue placeholder="Selecione um cliente">
+                  {selectedClientId && clientes.length > 0 ? (
+                    clientes.find(c => String(c.id) === String(selectedClientId))?.name || 'Selecione um cliente'
+                  ) : 'Selecione um cliente'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
                 {clientes.length > 0 ? (
                   clientes.map(client => (
-                    <SelectItem key={client.id} value={client.id} className="hover:bg-seguranca-black/50 cursor-pointer">
+                    <SelectItem key={String(client.id)} value={String(client.id)} className="hover:bg-seguranca-black/50 cursor-pointer">
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3 h-3 text-gray-400" />
                         {client.name}
@@ -588,9 +749,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
               </Label>
             </div>
             <Select
-              value={formData.workPostId || ''}
+              value={String(formData.workPostId || '')}
               onValueChange={(value) => {
                 // Quando selecionar o Posto de Trabalho, usar o workPostId como locationId
+                console.log('🏢 Posto de Trabalho selecionado:', value);
                 handleInputChange('workPostId', value);
                 handleInputChange('locationId', value); // Posto de Trabalho = Localização
                 console.log('✅ Posto de Trabalho selecionado:', value, 'usado como locationId');
@@ -608,12 +770,16 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
                 } ${mode === 'view' || !selectedClientId ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder={selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"} />
+                <SelectValue placeholder={selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"}>
+                  {formData.workPostId && postosFiltrados.length > 0 ? (
+                    postosFiltrados.find(p => String(p.id) === String(formData.workPostId))?.name || 'Selecione um posto de trabalho'
+                  ) : selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600">
                 {postosFiltrados.length > 0 ? (
                   postosFiltrados.map(posto => (
-                    <SelectItem key={posto.id} value={posto.id} className="hover:bg-seguranca-black/50">
+                    <SelectItem key={String(posto.id)} value={String(posto.id)} className="hover:bg-seguranca-black/50">
                       <div className="flex items-center gap-2">
                         <Building className="w-3 h-3 text-gray-400" />
                         <span>{posto.name}</span>

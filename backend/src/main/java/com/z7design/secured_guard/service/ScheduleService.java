@@ -121,6 +121,26 @@ public class ScheduleService {
                     List<Unit> units = unitRepository.findByClientId(workPost.getClient().getId());
                     Unit unit = units.isEmpty() ? null : units.get(0);
                     
+                    // Se o Client não tem Units, criar uma Unit padrão automaticamente
+                    if (unit == null) {
+                        String unitName = workPost.getClient().getName() != null 
+                                ? "Unidade Principal - " + workPost.getClient().getName()
+                                : "Unidade Principal";
+                        String unitAddress = (workPost.getAddress() != null && !workPost.getAddress().trim().isEmpty()) 
+                                ? workPost.getAddress() 
+                                : "Endereço não informado";
+                        
+                        unit = Unit.builder()
+                                .name(unitName)
+                                .description("Unidade criada automaticamente para o Cliente: " + 
+                                        (workPost.getClient().getName() != null ? workPost.getClient().getName() : "Sem nome"))
+                                .address(unitAddress)
+                                .client(workPost.getClient())
+                                .active(true)
+                                .build();
+                        unit = unitRepository.save(unit);
+                    }
+                    
                     if (unit != null) {
                         // Verificar se já existe uma Location com o mesmo nome e Unit (evitar duplicatas)
                         List<Location> existingLocations = locationRepository.findByUnitId(unit.getId());

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,16 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<Schedule['status'] | 'all'>('all');
+
+  // Log para verificar se os handlers estão sendo passados
+  useEffect(() => {
+    console.log('🔍 EscalaTrabalhoTable - Handlers recebidos:', {
+      onView: typeof onView,
+      onEdit: typeof onEdit,
+      onDelete: typeof onDelete,
+      onCreate: typeof onCreate
+    });
+  }, [onView, onEdit, onDelete, onCreate]);
 
   const getStatusProps = (status: Schedule['status']) => {
     switch (status) {
@@ -200,7 +210,17 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
               const status = getStatusProps(escala.status);
               const shift = getShiftProps(escala.shift);
               return (
-                <TableRow key={escala.id} className="border-b-gray-700 hover:bg-seguranca-black/50">
+                <TableRow 
+                  key={escala.id} 
+                  className="border-b-gray-700 hover:bg-seguranca-black/50"
+                  onClick={(e) => {
+                    // Prevenir que cliques em botões propaguem para a linha
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button') || target.closest('[role="button"]')) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <div className="w-9 h-9 bg-seguranca-red/20 rounded-full flex items-center justify-center">
@@ -240,44 +260,76 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                   <TableCell>
                     <Badge className={`${status.color} border border-current`}>{status.text}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end space-x-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                  <TableCell 
+                    className="text-right"
+                    style={{ position: 'relative', zIndex: 10 }}
+                  >
+                    <div 
+                      className="flex items-center justify-end space-x-1"
+                      style={{ position: 'relative', zIndex: 10 }}
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           console.log('🔍 Botão Visualizar clicado para escala:', escala.id);
-                          onView(escala);
-                        }} 
+                          console.log('🔍 onView disponível?', typeof onView);
+                          if (onView && typeof onView === 'function') {
+                            console.log('✅ Chamando onView com escala:', escala);
+                            onView(escala);
+                            console.log('✅ onView chamado com sucesso');
+                          } else {
+                            console.error('❌ onView não está definido ou não é uma função!', onView);
+                          }
+                        }}
                         title="Visualizar"
+                        className="hover:bg-blue-500/20"
                       >
                         <Eye className="h-5 w-5 text-gray-400 hover:text-blue-400" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           console.log('✏️ Botão Editar clicado para escala:', escala.id);
-                          onEdit(escala);
-                        }} 
+                          console.log('✏️ onEdit disponível?', typeof onEdit);
+                          if (onEdit && typeof onEdit === 'function') {
+                            console.log('✅ Chamando onEdit com escala:', escala);
+                            onEdit(escala);
+                            console.log('✅ onEdit chamado com sucesso');
+                          } else {
+                            console.error('❌ onEdit não está definido ou não é uma função!', onEdit);
+                          }
+                        }}
                         title="Editar"
+                        className="hover:bg-green-500/20"
                       >
                         <Edit className="h-5 w-5 text-gray-400 hover:text-green-400" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           console.log('🗑️ Botão Excluir clicado para escala:', escala.id);
-                          onDelete(escala);
-                        }} 
+                          if (onDelete && typeof onDelete === 'function') {
+                            console.log('✅ Chamando onDelete com escala:', escala);
+                            onDelete(escala);
+                            console.log('✅ onDelete chamado com sucesso');
+                          } else {
+                            console.error('❌ onDelete não está definido ou não é uma função!', onDelete);
+                          }
+                        }}
                         title="Excluir"
+                        className="hover:bg-red-500/20"
                       >
                         <Trash2 className="h-5 w-5 text-gray-400 hover:text-red-400" />
                       </Button>

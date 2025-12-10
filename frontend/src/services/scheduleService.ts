@@ -19,6 +19,9 @@ export interface ScheduleWorkPost {
   id: string;
   name: string;
   postCode: string;
+  clientId?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 // Enum para os turnos (Shift)

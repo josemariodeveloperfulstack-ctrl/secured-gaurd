@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/components/ui/use-toast';
-import { scheduleService, Schedule, ScheduleFilters, CreateScheduleRequest } from '@/services/scheduleService';
+import { scheduleService, Schedule } from '@/services/scheduleService';
+import EscalaTrabalhoTable from '@/components/operacional/EscalaTrabalhoTable';
 import { dashboardService, ScheduleSummary } from '@/services/dashboardService';
 import {
   Popover,
@@ -68,7 +69,8 @@ const Escalas = () => {
     console.log('📊 Estado do modal mudou:', {
       isModalOpen,
       modalMode,
-      selectedEscala: selectedEscala ? selectedEscala.id : null
+      selectedEscala: selectedEscala ? selectedEscala.id : null,
+      selectedEscalaCompleto: selectedEscala
     });
   }, [isModalOpen, modalMode, selectedEscala]);
 
@@ -163,15 +165,20 @@ const Escalas = () => {
       }
       
       // Normalizar a data do schedule para comparação
-      let scheduleDateStr = s.scheduleDate;
-      if (scheduleDateStr) {
-        // Se a data vier como string completa (com hora), extrair apenas a parte da data
-        if (scheduleDateStr.includes('T')) {
-          scheduleDateStr = scheduleDateStr.split('T')[0];
-        }
-        // Se vier como Date object, converter para string
-        if (scheduleDateStr instanceof Date) {
-          scheduleDateStr = format(scheduleDateStr, 'yyyy-MM-dd');
+      let scheduleDateStr: string = '';
+      if (s.scheduleDate) {
+        const dateValue: any = s.scheduleDate;
+        if (typeof dateValue === 'string') {
+          scheduleDateStr = dateValue;
+          // Se a data vier como string completa (com hora), extrair apenas a parte da data
+          if (scheduleDateStr.includes('T')) {
+            scheduleDateStr = scheduleDateStr.split('T')[0];
+          }
+        } else if (dateValue && typeof dateValue.getTime === 'function') {
+          // É um objeto Date
+          scheduleDateStr = format(dateValue, 'yyyy-MM-dd');
+        } else {
+          scheduleDateStr = String(dateValue);
         }
       }
       
@@ -344,8 +351,19 @@ const Escalas = () => {
 
   // Função para abrir diálogo de confirmação de exclusão
   const handleDeleteClick = (escala: Schedule) => {
-    setEscalaToDelete(escala);
-    setDeleteDialogOpen(true);
+    console.log('🗑️ handleDeleteClick INICIADO - escala recebida:', escala);
+    try {
+      setEscalaToDelete(escala);
+      setDeleteDialogOpen(true);
+      console.log('🗑️ handleDeleteClick - Diálogo de exclusão aberto');
+    } catch (error) {
+      console.error('❌ handleDeleteClick - ERRO:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao abrir diálogo de exclusão.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Função para confirmar e deletar escala
@@ -375,49 +393,92 @@ const Escalas = () => {
   };
 
   // Função para editar escala
-  const handleEditEscala = (escala: Schedule) => {
+  const handleEditEscala = useCallback((escala: Schedule) => {
     console.log('✏️ handleEditEscala INICIADO - escala recebida:', escala);
-    console.log('✏️ handleEditEscala - Dados completos:', JSON.stringify(escala, null, 2));
+    console.log('✏️ Estado ANTES da atualização:', {
+      selectedEscala: selectedEscala?.id,
+      modalMode,
+      isModalOpen
+    });
     
     try {
+      // Atualizar estados na ordem correta
+      console.log('🔄 Definindo selectedEscala...');
       setSelectedEscala(escala);
+      
+      console.log('🔄 Definindo modalMode para "edit"...');
       setModalMode('edit');
+      
+      console.log('🔄 Abrindo modal (isModalOpen = true)...');
       setIsModalOpen(true);
-      console.log('✏️ handleEditEscala - CONCLUÍDO com sucesso');
+      
+      console.log('✅ handleEditEscala - Estados atualizados:', {
+        escalaId: escala.id,
+        modalMode: 'edit',
+        isModalOpen: true
+      });
+      
+      // Verificar estado após um pequeno delay
+      setTimeout(() => {
+        console.log('🔍 Estado APÓS atualização (com delay):', {
+          selectedEscala: selectedEscala?.id,
+          modalMode,
+          isModalOpen
+        });
+      }, 100);
     } catch (error) {
       console.error('❌ handleEditEscala - ERRO:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao abrir edição da escala.',
+        variant: 'destructive',
+      });
     }
-  };
+  }, [toast, selectedEscala, modalMode, isModalOpen]);
 
   // Função para visualizar escala
-  const handleViewEscala = (escala: Schedule) => {
+  const handleViewEscala = useCallback((escala: Schedule) => {
     console.log('🔍 handleViewEscala INICIADO - escala recebida:', escala);
-    console.log('🔍 handleViewEscala - Estado ANTES da atualização:', {
-      isModalOpen,
+    console.log('🔍 Estado ANTES da atualização:', {
+      selectedEscala: selectedEscala?.id,
       modalMode,
-      selectedEscala: selectedEscala?.id
+      isModalOpen
     });
     
-    // Atualizar estados de forma síncrona
-    setSelectedEscala(escala);
-    setModalMode('view');
-    setIsModalOpen(true);
-    
-    console.log('🔍 handleViewEscala - Estados atualizados (síncrono):', {
-      selectedEscala: escala.id,
-      modalMode: 'view',
-      isModalOpen: true
-    });
-    
-    // Verificar após um pequeno delay para ver se os estados foram atualizados
-    setTimeout(() => {
-      console.log('🔍 handleViewEscala - Estado DEPOIS (100ms):', {
-        isModalOpen,
-        modalMode,
-        selectedEscala: selectedEscala?.id
+    try {
+      // Atualizar estados de forma síncrona
+      console.log('🔄 Atualizando selectedEscala...');
+      setSelectedEscala(escala);
+      
+      console.log('🔄 Atualizando modalMode para "view"...');
+      setModalMode('view');
+      
+      console.log('🔄 Atualizando isModalOpen para true...');
+      setIsModalOpen(true);
+      
+      console.log('✅ handleViewEscala - Estados atualizados:', {
+        escalaId: escala.id,
+        modalMode: 'view',
+        isModalOpen: true
       });
-    }, 100);
-  };
+      
+      // Verificar estado após um pequeno delay
+      setTimeout(() => {
+        console.log('🔍 Estado APÓS atualização (com delay):', {
+          selectedEscala: selectedEscala?.id,
+          modalMode,
+          isModalOpen
+        });
+      }, 100);
+    } catch (error) {
+      console.error('❌ Erro em handleViewEscala:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao abrir visualização da escala.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
 
   // Loading state
   if (loading) {
@@ -724,25 +785,29 @@ const Escalas = () => {
         </div>
         
         {/* Modal de Formulário de Escala */}
-        {console.log('📊 Renderizando EscalaTrabalhoTable com schedules:', schedules, 'loading:', loading)}
         <EscalaTrabalhoTable
           escalas={schedules}
           isLoading={loading}
           onRefresh={loadSchedules}
-          onEdit={handleEditEscala}
+          onEdit={useCallback((escala: Schedule) => {
+            console.log('📞 onEdit chamado diretamente na prop, escala:', escala);
+            handleEditEscala(escala);
+          }, [handleEditEscala])}
           onDelete={handleDeleteClick}
-          onView={(escala) => {
+          onView={useCallback((escala: Schedule) => {
             console.log('📞 onView chamado diretamente na prop, escala:', escala);
+            console.log('📞 Chamando handleViewEscala...');
             handleViewEscala(escala);
-          }}
+            console.log('📞 handleViewEscala chamado');
+          }, [handleViewEscala])}
           onCreate={() => { setSelectedEscala(null); setModalMode('create'); setIsModalOpen(true); }}
         />
 
         <EscalaFormModal
-          key={`modal-${selectedEscala?.id || 'new'}-${modalMode}`}
+          key={`modal-${selectedEscala?.id || 'new'}-${modalMode}-${isModalOpen}`}
           open={isModalOpen}
           onOpenChange={(open) => {
-            console.log('🎭 EscalaFormModal onOpenChange chamado:', open, 'isModalOpen atual:', isModalOpen);
+            console.log('🎭 EscalaFormModal onOpenChange chamado:', open, 'isModalOpen atual:', isModalOpen, 'modalMode:', modalMode);
             setIsModalOpen(open);
             if (!open) {
               setSelectedEscala(null);
@@ -752,18 +817,124 @@ const Escalas = () => {
           onSave={handleSaveEscala}
           initialData={useMemo(() => {
             if (selectedEscala) {
+              console.log('🔍 Mapeando selectedEscala para initialData:', selectedEscala);
+              console.log('🔍 selectedEscala completo:', JSON.stringify(selectedEscala, null, 2));
+              
+              // Extrair employeeId - pode vir como objeto ou string
+              const employeeId = selectedEscala.employee?.id || 
+                                (selectedEscala as any).employeeId || 
+                                '';
+              
+              // Extrair workPostId - pode vir como objeto ou string
+              const workPostId = selectedEscala.workPost?.id || 
+                                (selectedEscala as any).workPostId || 
+                                '';
+              
+              // Extrair locationId - pode vir como objeto ou string
+              const locationId = selectedEscala.location?.id || 
+                                (selectedEscala as any).locationId || 
+                                workPostId || // Se não há locationId, usar workPostId
+                                '';
+              
+              // Extrair horários do workPost se disponível
+              const workPost = selectedEscala.workPost as any;
+              let startTime = '';
+              let endTime = '';
+              
+              console.log('🔍 WorkPost completo para extrair horários:', workPost);
+              
+              // Tentar extrair horários do workPost
+              if (workPost?.shiftStart) {
+                // Se shiftStart é uma string no formato HH:mm ou HH:mm:ss
+                if (typeof workPost.shiftStart === 'string') {
+                  // Pode vir como "HH:mm" ou "HH:mm:ss" ou "HH:mm:ss.SSS"
+                  startTime = workPost.shiftStart.substring(0, 5); // Pega apenas HH:mm
+                } else if (workPost.shiftStart instanceof Date) {
+                  // Se for Date, formatar para HH:mm
+                  const hours = String(workPost.shiftStart.getHours()).padStart(2, '0');
+                  const minutes = String(workPost.shiftStart.getMinutes()).padStart(2, '0');
+                  startTime = `${hours}:${minutes}`;
+                } else {
+                  startTime = String(workPost.shiftStart);
+                }
+                console.log('✅ startTime extraído do workPost:', startTime);
+              }
+              
+              if (workPost?.shiftEnd) {
+                // Se shiftEnd é uma string no formato HH:mm ou HH:mm:ss
+                if (typeof workPost.shiftEnd === 'string') {
+                  // Pode vir como "HH:mm" ou "HH:mm:ss" ou "HH:mm:ss.SSS"
+                  endTime = workPost.shiftEnd.substring(0, 5); // Pega apenas HH:mm
+                } else if (workPost.shiftEnd instanceof Date) {
+                  // Se for Date, formatar para HH:mm
+                  const hours = String(workPost.shiftEnd.getHours()).padStart(2, '0');
+                  const minutes = String(workPost.shiftEnd.getMinutes()).padStart(2, '0');
+                  endTime = `${hours}:${minutes}`;
+                } else {
+                  endTime = String(workPost.shiftEnd);
+                }
+                console.log('✅ endTime extraído do workPost:', endTime);
+              }
+              
+              // Se não encontrou horários no workPost, usar valores padrão baseados no turno
+              if (!startTime || !endTime) {
+                console.log('⚠️ Horários não encontrados no workPost, usando valores padrão baseados no turno:', selectedEscala.shift);
+                if (selectedEscala.shift === 'DAY') {
+                  startTime = startTime || '08:00';
+                  endTime = endTime || '17:00';
+                } else if (selectedEscala.shift === 'NIGHT') {
+                  startTime = startTime || '22:00';
+                  endTime = endTime || '06:00';
+                } else if (selectedEscala.shift === 'MIXED') {
+                  startTime = startTime || '14:00';
+                  endTime = endTime || '22:00';
+                }
+              }
+              
+              // Extrair clientId do workPost (pode vir como clientId direto ou como objeto client)
+              const clientId = workPost?.clientId || 
+                              workPost?.client?.id || 
+                              (selectedEscala.location as any)?.unit?.clientId || 
+                              (selectedEscala.location as any)?.unit?.client?.id || 
+                              '';
+              
+              // Processar scheduleDate - sempre vem como string da API
+              let scheduleDate: Date;
+              if (selectedEscala.scheduleDate) {
+                // scheduleDate sempre vem como string do backend (formato YYYY-MM-DD)
+                scheduleDate = new Date(selectedEscala.scheduleDate);
+                // Validar se a data é válida
+                if (isNaN(scheduleDate.getTime())) {
+                  scheduleDate = new Date();
+                }
+              } else {
+                scheduleDate = new Date();
+              }
+              
               const mappedData = {
-                employeeId: selectedEscala.employee?.id || '',
-                locationId: selectedEscala.location?.id || '',
-                workPostId: selectedEscala.workPost?.id || '',
-                scheduleDate: selectedEscala.scheduleDate ? new Date(selectedEscala.scheduleDate) : new Date(),
-                shift: selectedEscala.shift || '',
-                startTime: (selectedEscala as any).startTime || (selectedEscala.shift === 'DAY' ? '08:00' : selectedEscala.shift === 'NIGHT' ? '22:00' : '14:00') || '',
-                endTime: (selectedEscala as any).endTime || (selectedEscala.shift === 'DAY' ? '17:00' : selectedEscala.shift === 'NIGHT' ? '06:00' : '22:00') || '',
-                observations: selectedEscala.observations || '',
+                employeeId: String(employeeId || ''),
+                locationId: String(locationId || ''),
+                workPostId: String(workPostId || ''),
+                scheduleDate: scheduleDate,
+                shift: String(selectedEscala.shift || ''),
+                startTime: String(startTime || ''),
+                endTime: String(endTime || ''),
+                observations: String(selectedEscala.observations || ''),
+                clientId: String(clientId || ''), // Adicionar clientId para facilitar o mapeamento no modal
               };
+              
               console.log('📋 initialData mapeado (useMemo):', mappedData);
-              console.log('📋 selectedEscala original:', selectedEscala);
+              console.log('📋 Campos extraídos:');
+              console.log('  - employeeId:', mappedData.employeeId);
+              console.log('  - workPostId:', mappedData.workPostId);
+              console.log('  - locationId:', mappedData.locationId);
+              console.log('  - clientId:', mappedData.clientId);
+              console.log('  - scheduleDate:', mappedData.scheduleDate);
+              console.log('  - shift:', mappedData.shift);
+              console.log('  - startTime:', mappedData.startTime);
+              console.log('  - endTime:', mappedData.endTime);
+              console.log('  - observations:', mappedData.observations);
+              
               return mappedData;
             }
             return {

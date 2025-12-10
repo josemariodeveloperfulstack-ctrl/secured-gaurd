@@ -79,53 +79,54 @@ check_internal_health() {
 check_external_health() {
     log "🔍 Verificando health check externo (via Cloudflare)..."
     
-    # Tentar obter código HTTP com tratamento de redirecionamentos
-    # Usar -L para seguir redirecionamentos e capturar apenas o código final
-    local curl_output=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 --connect-timeout 10 --location-trusted "${HEALTH_CHECK_URL}" 2>&1)
+    # Obter resposta completa e código HTTP em uma única chamada
+    # Usar arquivo temporário para capturar resposta e código separadamente
+    local temp_response=$(mktemp)
+    local temp_stderr=$(mktemp)
+    
+    # Fazer requisição seguindo todos os redirects
+    # -L: seguir redirects
+    # -w "%{http_code}": obter código HTTP final
+    # -s: silencioso (sem progress bar)
+    # -o: salvar resposta em arquivo
+    local http_code=$(curl -s -L -w "%{http_code}" -o "$temp_response" --max-time 15 --connect-timeout 10 --location-trusted "${HEALTH_CHECK_URL}" 2>"$temp_stderr" || echo "000")
     local curl_exit_code=$?
+    
+    # Ler resposta do arquivo
+    local response=$(cat "$temp_response" 2>/dev/null || echo "")
+    local curl_error=$(cat "$temp_stderr" 2>/dev/null || echo "")
+    
+    # Limpar arquivos temporários
+    rm -f "$temp_response" "$temp_stderr" 2>/dev/null || true
     
     # Se curl falhou, tratar como erro
     if [ $curl_exit_code -ne 0 ]; then
         log "⚠️ Erro ao executar curl (código: $curl_exit_code)"
-        log "⚠️ Output: $curl_output"
-        return 1
-    fi
-    
-    # Extrair código HTTP: pegar apenas os últimos 3 dígitos válidos
-    # Se houver múltiplos códigos (ex: "301000"), pegar apenas o último código válido
-    local http_code="000"
-    
-    # Primeiro, tentar extrair todos os códigos HTTP válidos (3 dígitos começando com 1-5)
-    local all_codes=$(echo "$curl_output" | grep -oE '[1-5][0-9]{2}' 2>/dev/null || echo "")
-    
-    if [ -n "$all_codes" ]; then
-        # Pegar o último código válido
-        http_code=$(echo "$all_codes" | tail -1)
-    else
-        # Se não encontrou códigos válidos, tentar pegar qualquer sequência de 3 dígitos
-        local any_code=$(echo "$curl_output" | grep -oE '[0-9]{3}' 2>/dev/null | tail -1 || echo "000")
-        # Validar se é um código HTTP válido
-        if echo "$any_code" | grep -qE '^[1-5][0-9]{2}$'; then
-            http_code="$any_code"
+        if [ -n "$curl_error" ]; then
+            log "⚠️ Erro: $curl_error"
         fi
+        return 1
     fi
     
     # Validar que é um código HTTP válido (100-599)
     if ! echo "$http_code" | grep -qE '^[1-5][0-9]{2}$'; then
-        log "⚠️ Código HTTP inválido capturado do output: '$curl_output'"
-        log "⚠️ Código extraído: '$http_code', tratando como erro"
+        log "⚠️ Código HTTP inválido: '$http_code'"
         http_code="000"
     fi
     
     log "HTTP Code recebido: $http_code"
     
     if [ "$http_code" = "200" ]; then
-        log "✅ Health check externo passou!"
-        
-        # Obter resposta completa
-        local response=$(curl -s -L --max-time 15 --location-trusted "${HEALTH_CHECK_URL}" 2>/dev/null || echo "")
-        log "Resposta: $response"
-        return 0
+        # Validar que a resposta é JSON válido com campos esperados
+        if echo "$response" | grep -qE '"(status|database|application)"'; then
+            log "✅ Health check externo passou!"
+            log "Resposta: $response"
+            return 0
+        else
+            log "⚠️ Resposta não é JSON válido ou não contém campos esperados"
+            log "⚠️ Resposta recebida: $response"
+            return 1
+        fi
     elif [ "$http_code" = "521" ]; then
         log "❌ HTTP 521: Cloudflare não consegue conectar ao servidor de origem"
         log "💡 Possíveis causas:"
@@ -135,17 +136,33 @@ check_external_health() {
         return 1
     elif [ "$http_code" = "301" ] || [ "$http_code" = "302" ] || [ "$http_code" = "307" ] || [ "$http_code" = "308" ]; then
         log "⚠️ HTTP $http_code: Redirecionamento detectado"
-        log "💡 Verificando URL final após redirecionamento..."
-        # Tentar seguir redirecionamento e verificar código final
-        local final_url=$(curl -s -o /dev/null -w "%{url_effective}" -L --max-time 15 --location-trusted "${HEALTH_CHECK_URL}" 2>/dev/null || echo "")
-        log "💡 URL final: $final_url"
-        return 1
+        log "💡 O curl deveria ter seguido o redirect automaticamente com -L"
+        log "💡 Verificando se a resposta após redirect é válida..."
+        
+        # Se chegou aqui com código de redirect, pode ser que o curl não seguiu corretamente
+        # Tentar novamente com redirect explícito
+        if [ -n "$response" ] && echo "$response" | grep -qE '"(status|database|application)"'; then
+            log "✅ Resposta após redirect é válida!"
+            log "Resposta: $response"
+            return 0
+        else
+            local final_url=$(curl -s -o /dev/null -w "%{url_effective}" -L --max-time 15 --location-trusted "${HEALTH_CHECK_URL}" 2>/dev/null || echo "")
+            log "💡 URL final: $final_url"
+            log "💡 Resposta recebida: ${response:0:200}..." # Primeiros 200 caracteres
+            return 1
+        fi
     elif [ "$http_code" = "000" ]; then
         log "⚠️ Timeout ou erro de conexão"
+        if [ -n "$curl_error" ]; then
+            log "⚠️ Detalhes: $curl_error"
+        fi
         return 1
     else
         log "⚠️ HTTP Code: $http_code (esperado: 200)"
         log "💡 Pode ser problema de Cloudflare ou Traefik"
+        if [ -n "$response" ]; then
+            log "💡 Resposta: ${response:0:200}..." # Primeiros 200 caracteres
+        fi
         return 1
     fi
 }
