@@ -50,6 +50,9 @@ public class CreateEquipmentRequest {
     private LocalDate validityDate;
     private LocalDate weaponRegistrationValidity;
     
+    private LocalDate lastMaintenanceDate;
+    private LocalDate nextMaintenanceDate;
+    
     @Builder.Default
     private Boolean isDangerous = false;
     

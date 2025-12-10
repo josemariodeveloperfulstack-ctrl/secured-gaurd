@@ -128,6 +128,8 @@ public class EquipmentService {
                 .manufacturingDate(request.getManufacturingDate())
                 .validityDate(request.getValidityDate())
                 .weaponRegistrationValidity(request.getWeaponRegistrationValidity())
+                .lastMaintenanceDate(request.getLastMaintenanceDate())
+                .nextMaintenanceDate(request.getNextMaintenanceDate())
                 .isDangerous(request.getIsDangerous())
                 .currentUserId(request.getCurrentUserId())
                 .notes(request.getNotes())
@@ -164,6 +166,8 @@ public class EquipmentService {
         equipment.setManufacturingDate(request.getManufacturingDate());
         equipment.setValidityDate(request.getValidityDate());
         equipment.setWeaponRegistrationValidity(request.getWeaponRegistrationValidity());
+        equipment.setLastMaintenanceDate(request.getLastMaintenanceDate());
+        equipment.setNextMaintenanceDate(request.getNextMaintenanceDate());
         equipment.setIsDangerous(request.getIsDangerous());
         equipment.setCurrentUserId(request.getCurrentUserId());
         equipment.setNotes(request.getNotes());

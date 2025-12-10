@@ -41,7 +41,8 @@ log() {
 # Função para verificar Traefik
 check_traefik() {
     log "🔍 Verificando status do Traefik..."
-    if sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" "docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1" | grep -q "Up"; then
+    local traefik_status=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" "docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1" || echo "")
+    if echo "$traefik_status" | grep -q "Up" 2>/dev/null; then
         log "✅ Traefik está rodando"
         return 0
     else
@@ -82,7 +83,7 @@ check_external_health() {
     local http_code=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 --connect-timeout 10 --location-trusted "${HEALTH_CHECK_URL}" 2>/dev/null || echo "000")
     
     # Limpar código HTTP de caracteres não numéricos
-    http_code=$(echo "$http_code" | grep -oE '[0-9]+' | head -1 || echo "000")
+    http_code=$(echo "$http_code" | grep -oE '[0-9]+' 2>/dev/null | head -1 || echo "000")
     
     log "HTTP Code recebido: $http_code"
     

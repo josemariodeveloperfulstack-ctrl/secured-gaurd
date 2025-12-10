@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Filter, FileText, Calendar, DollarSign, Building2, User, AlertTriangle, Eye, Edit, Trash } from 'lucide-react';
+import { Plus, Search, Filter, FileText, Calendar, DollarSign, Building2, User, AlertTriangle, Eye, Edit, Trash, FileDown } from 'lucide-react';
 import { Quotation, QuotationStatus, quotationService } from '@/services/quotationService';
 import { purchaseRequestService, PurchaseRequest } from '@/services/purchaseRequestService';
 import { format } from 'date-fns';
@@ -14,6 +14,20 @@ import { ptBR } from 'date-fns/locale';
 import QuotationFormModal from '@/components/QuotationFormModal';
 import { QuotationViewModal } from '@/components/compras/QuotationViewModal';
 import { PurchaseRequestViewModal } from '@/components/compras/PurchaseRequestViewModal';
+import { QuotationReportModal } from '@/components/compras/QuotationReportModal';
+import { QuotationReportViewModal } from '@/components/compras/QuotationReportViewModal';
+import { quotationReportGenerator, QuotationReportFilters } from '@/utils/quotationReportGenerator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface QuotationFilters {
   status: QuotationStatus | 'ALL';
@@ -33,6 +47,13 @@ const CotacoesCompras: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingPurchaseRequest, setViewingPurchaseRequest] = useState<PurchaseRequest | null>(null);
   const [isPurchaseRequestViewOpen, setIsPurchaseRequestViewOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReportViewModalOpen, setIsReportViewModalOpen] = useState(false);
+  const [reportPdfBlob, setReportPdfBlob] = useState<Blob | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const { toast } = useToast();
   const [filters, setFilters] = useState<QuotationFilters>({
     status: 'ALL',
     supplier: '',
@@ -120,19 +141,37 @@ const CotacoesCompras: React.FC = () => {
       setLoading(true);
       const data = await quotationService.getAll();
       // Mapear dados do backend para o formato esperado pelo frontend
-      const mappedData = data.map((q: any) => ({
-        ...q,
-        id: q.id?.toString() || q.id,
-        supplierId: q.supplierId?.toString() || q.supplierId || undefined,
-        unitId: q.unitId?.toString() || q.unitId || undefined,
-        createdById: q.createdById?.toString() || q.createdById || undefined,
-        assignedToId: q.assignedToId?.toString() || q.assignedToId || undefined,
-        totalValue: typeof q.totalValue === 'string' ? parseFloat(q.totalValue) : (q.totalValue || 0),
-        validUntil: q.validUntil ? (q.validUntil.includes('T') ? q.validUntil.split('T')[0] : q.validUntil) : q.validUntil,
-        createdAt: q.createdAt || new Date().toISOString(),
-        updatedAt: q.updatedAt || new Date().toISOString(),
-        status: q.status || 'DRAFT'
-      }));
+      const mappedData = data.map((q: any) => {
+        const mapped = {
+          ...q,
+          id: q.id?.toString() || q.id,
+          supplierId: q.supplierId?.toString() || q.supplierId || q.supplier?.id?.toString() || q.supplier?.id || undefined,
+          supplierName: q.supplierName || q.supplier?.name,
+          purchaseRequestId: q.purchaseRequestId?.toString() || q.purchaseRequestId || undefined,
+          purchaseRequestNumber: q.purchaseRequestNumber || q.purchaseRequest?.requestNumber,
+          purchaseRequestTitle: q.purchaseRequestTitle || q.purchaseRequest?.title,
+          unitId: q.unitId?.toString() || q.unitId || undefined,
+          createdById: q.createdById?.toString() || q.createdById || undefined,
+          assignedToId: q.assignedToId?.toString() || q.assignedToId || undefined,
+          totalValue: typeof q.totalValue === 'string' ? parseFloat(q.totalValue) : (q.totalValue || 0),
+          validUntil: q.validUntil ? (q.validUntil.includes('T') ? q.validUntil.split('T')[0] : q.validUntil) : q.validUntil,
+          createdAt: q.createdAt || new Date().toISOString(),
+          updatedAt: q.updatedAt || new Date().toISOString(),
+          status: q.status || 'DRAFT'
+        };
+        
+        // Log para debug
+        if (mapped.purchaseRequestId || mapped.assignedToId) {
+          console.log('🔍 Cotação carregada com relacionamentos:', {
+            quoteNumber: mapped.quoteNumber,
+            purchaseRequestId: mapped.purchaseRequestId,
+            assignedToId: mapped.assignedToId,
+            rawData: q
+          });
+        }
+        
+        return mapped;
+      });
       setQuotations(mappedData);
     } catch (error) {
       console.error('Erro ao carregar cotações:', error);
@@ -229,15 +268,22 @@ const CotacoesCompras: React.FC = () => {
     setIsViewModalOpen(true);
   };
 
-  const handleDeleteQuotation = async (quotation: Quotation) => {
-    const confirmed = window.confirm(`Deseja realmente excluir a cotação ${quotation.quoteNumber}?`);
-    if (!confirmed) return;
+  const handleAskDeleteQuotation = (quotation: Quotation) => {
+    setDeleteTarget(quotation);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await quotationService.remove(quotation.id);
+      await quotationService.remove(deleteTarget.id);
       await loadQuotations();
     } catch (error) {
       console.error('Erro ao excluir cotação:', error);
       alert('Não foi possível excluir a cotação. Tente novamente.');
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -274,6 +320,29 @@ const CotacoesCompras: React.FC = () => {
     return assignees;
   };
 
+  const handleGenerateReport = async (reportFilters: QuotationReportFilters) => {
+    setIsGeneratingReport(true);
+    try {
+      const pdfBlob = await quotationReportGenerator.generatePDF(quotations, reportFilters);
+      setReportPdfBlob(pdfBlob);
+      setIsReportModalOpen(false);
+      setIsReportViewModalOpen(true);
+      toast({
+        title: "Sucesso",
+        description: "Relatório gerado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar relatório. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   return (
     <StandardLayout>
       <div className="space-y-6">
@@ -285,10 +354,19 @@ const CotacoesCompras: React.FC = () => {
               Gerencie cotações de fornecedores para solicitações de compra
             </p>
           </div>
-          <Button onClick={handleCreateQuotation}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Cotação
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsReportModalOpen(true)}
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              Gerar Relatório PDF
+            </Button>
+            <Button onClick={handleCreateQuotation}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Cotação
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -486,7 +564,7 @@ const CotacoesCompras: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteQuotation(quotation)}
+                            onClick={() => handleAskDeleteQuotation(quotation)}
                             title="Excluir"
                           >
                             <Trash className="h-4 w-4 text-destructive" />
@@ -539,6 +617,50 @@ const CotacoesCompras: React.FC = () => {
           setViewingPurchaseRequest(null);
         }}
         request={viewingPurchaseRequest || undefined}
+      />
+
+      {/* Diálogo de confirmação de exclusão */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="bg-seguranca-graphite text-white border-gray-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription className="text-seguranca-lightgray">
+              {deleteTarget
+                ? `Deseja realmente excluir a cotação ${deleteTarget.quoteNumber}?`
+                : 'Deseja realmente excluir esta cotação?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={handleConfirmDelete}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de Relatório */}
+      <QuotationReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        onGenerate={handleGenerateReport}
+        loading={isGeneratingReport}
+      />
+
+      {/* Modal de Visualização do Relatório */}
+      <QuotationReportViewModal
+        isOpen={isReportViewModalOpen}
+        onClose={() => {
+          setIsReportViewModalOpen(false);
+          setReportPdfBlob(null);
+        }}
+        pdfBlob={reportPdfBlob}
+        fileName={`relatorio-cotacoes-${new Date().toISOString().split('T')[0]}.pdf`}
       />
     </StandardLayout>
   );

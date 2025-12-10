@@ -156,14 +156,45 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     try {
       setLoading(true);
       
+      // Preparar payload apenas com campos aceitos pelo backend
+      const payload: any = {
+        serialNumber: formData.serialNumber,
+        status: formData.status,
+        model: formData.model || undefined,
+        batch: formData.batch || undefined,
+        caNumber: formData.caNumber || undefined,
+        protectionLevel: formData.protectionLevel || undefined,
+        size: formData.size || undefined,
+        usageType: formData.usageType || undefined,
+        ballisticPlate: formData.ballisticPlate || undefined,
+        manufacturingDate: formData.manufacturingDate || undefined,
+        validityDate: formData.validityDate || undefined,
+        weaponRegistrationValidity: formData.weaponRegistrationValidity || undefined,
+        lastMaintenanceDate: formData.lastMaintenanceDate && formData.lastMaintenanceDate.trim() !== '' ? formData.lastMaintenanceDate : undefined,
+        nextMaintenanceDate: formData.nextMaintenanceDate && formData.nextMaintenanceDate.trim() !== '' ? formData.nextMaintenanceDate : undefined,
+        isDangerous: formData.isDangerous ?? false,
+        currentUserId: formData.currentUserId && formData.currentUserId.trim() !== '' ? formData.currentUserId : undefined,
+        notes: formData.notes || undefined,
+      };
+
+      // Remover campos undefined, null ou string vazia para não enviar no JSON
+      Object.keys(payload).forEach(key => {
+        const value = payload[key];
+        if (value === undefined || value === null || value === '' || (typeof value === 'string' && value.trim() === '')) {
+          delete payload[key];
+        }
+      });
+
+      console.log('📤 Enviando payload para backend:', payload);
+      
       if (equipment) {
-        await equipmentService.update(equipment.id, formData);
+        await equipmentService.update(equipment.id, payload);
         toast({
           title: "Sucesso",
           description: "Equipamento atualizado com sucesso",
         });
       } else {
-        await equipmentService.create(formData);
+        await equipmentService.create(payload);
         toast({
           title: "Sucesso",
           description: "Equipamento criado com sucesso",

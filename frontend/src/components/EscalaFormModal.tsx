@@ -91,7 +91,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
 
   const [usuarios, setUsuarios] = useState<{ id: string; name: string }[]>([]);
   const [clientes, setClientes] = useState<{ id: string; name: string }[]>([]);
-  const [locations, setLocations] = useState<{ id: string; name: string; clientId?: string }[]>([]); // Mapeamento cliente -> location
   const [postosTrabalho, setPostosTrabalho] = useState<{ id: string; name: string; postCode: string; clientId?: string }[]>([]);
   const [postosFiltrados, setPostosFiltrados] = useState<{ id: string; name: string; postCode: string }[]>([]);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -136,23 +135,8 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         setClientes([]);
       }
 
-      try {
-        // Carregar localizações para mapeamento cliente -> location
-        const { locationService } = await import('@/services/locationService');
-        const locationsData = await locationService.getAllLocations();
-        // Mapear locations com clientId (via unit)
-        const mappedLocations = locationsData.map(l => ({ 
-          id: l.id, 
-          name: l.name,
-          clientId: l.unit?.clientId // Pegar clientId do unit
-        }));
-        setLocations(mappedLocations);
-        console.log('✅ Localizações carregadas para mapeamento:', mappedLocations.length);
-      } catch (error) {
-        console.error('❌ Erro ao carregar localizações:', error);
-        console.error('❌ Detalhes do erro:', error);
-        setLocations([]);
-      }
+      // Não precisamos mais carregar locations separadas
+      // O Posto de Trabalho será usado como locationId
 
       try {
         // Carregar postos de trabalho
@@ -200,8 +184,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       newErrors.employeeId = 'Funcionário é obrigatório';
     }
 
-    if (!formData.locationId) {
-      newErrors.locationId = 'Cliente/Local é obrigatório';
+    if (!selectedClientId) {
+      newErrors.locationId = 'Cliente é obrigatório';
+    }
+
+    if (!formData.workPostId) {
+      newErrors.workPostId = 'Posto de Trabalho é obrigatório';
     }
 
     if (!formData.scheduleDate) {
@@ -300,6 +288,25 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       return;
     }
 
+    // Garantir que locationId = workPostId (Posto de Trabalho = Localização)
+    if (formData.workPostId && formData.locationId !== formData.workPostId) {
+      console.log('✅ Ajustando locationId para usar workPostId:', formData.workPostId);
+      setFormData(prev => ({ ...prev, locationId: prev.workPostId }));
+      // Aguardar um momento para o state atualizar e validar novamente
+      setTimeout(() => {
+        if (!validateForm()) {
+          toast({
+            title: "Erro de Validação",
+            description: "Por favor, corrija os campos destacados.",
+            variant: "destructive"
+          });
+          return;
+        }
+        submitForm();
+      }, 100);
+      return;
+    }
+
     if (!validateForm()) {
       toast({
         title: "Erro de Validação",
@@ -309,9 +316,14 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       return;
     }
 
+    submitForm();
+  };
+
+  const submitForm = async () => {
     setIsSubmitting(true);
 
     try {
+      console.log('💾 Submetendo escala com dados:', formData);
       await onSave(formData);
       toast({
         title: "Sucesso",
@@ -320,6 +332,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       });
       onOpenChange(false);
     } catch (error) {
+      console.error('❌ Erro ao salvar escala:', error);
       toast({
         title: "Erro",
         description: "Erro ao salvar escala. Tente novamente.",
@@ -378,12 +391,13 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         console.log('📝 Atualizando formData com initialData:', newFormData);
         setFormData(newFormData);
         
-        // Mapear locationId de volta para clientId (para exibição)
-        if (initialData.locationId && locations.length > 0) {
-          const location = locations.find(l => l.id === initialData.locationId);
-          if (location && location.clientId) {
-            setSelectedClientId(location.clientId);
-            console.log('✅ Cliente mapeado do locationId:', location.clientId);
+        // Mapear locationId (que agora é workPostId) de volta para clientId
+        // Se locationId = workPostId, encontrar o workPost e pegar o clientId dele
+        if (initialData.locationId && postosTrabalho.length > 0) {
+          const workPost = postosTrabalho.find(wp => wp.id === initialData.locationId);
+          if (workPost && workPost.clientId) {
+            setSelectedClientId(workPost.clientId);
+            console.log('✅ Cliente mapeado do workPostId:', workPost.clientId);
           }
         }
       } else {
@@ -416,7 +430,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         observations: ''
       });
     }
-  }, [initialData, open, mode, locations]);
+  }, [initialData, open, mode, postosTrabalho]);
 
 
   const turnos = [
@@ -511,20 +525,18 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             <Select
               value={selectedClientId || ''}
               onValueChange={(value) => {
+                console.log('🔍 Cliente selecionado:', value);
                 setSelectedClientId(value);
-                // Encontrar a primeira location deste cliente
-                const clientLocations = locations.filter(l => l.clientId === value);
-                if (clientLocations.length > 0) {
-                  // Usar a primeira location encontrada
-                  handleInputChange('locationId', clientLocations[0].id);
-                  console.log('✅ Cliente selecionado:', value, 'Location mapeada:', clientLocations[0].id);
-                } else {
-                  console.warn('⚠️ Nenhuma location encontrada para o cliente:', value);
-                  // Limpar locationId se não houver location para este cliente
-                  handleInputChange('locationId', '');
-                }
-                // Limpar posto de trabalho selecionado quando mudar o cliente
+                // Limpar locationId e workPostId quando mudar o cliente
+                handleInputChange('locationId', '');
                 handleInputChange('workPostId', '');
+                // Limpar erros
+                if (errors.locationId) {
+                  setErrors(prev => ({ ...prev, locationId: undefined }));
+                }
+                if (errors.workPostId) {
+                  setErrors(prev => ({ ...prev, workPostId: undefined }));
+                }
               }}
               disabled={mode === 'view'}
             >
@@ -564,19 +576,31 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             <div className="flex items-center gap-2">
               <Building className="w-4 h-4 text-seguranca-yellow" />
               <Label htmlFor="workPostId" className="text-sm font-medium">
-                Posto de Trabalho
+                Posto de Trabalho <span className="text-red-400">*</span>
               </Label>
             </div>
             <Select
               value={formData.workPostId || ''}
-              onValueChange={(value) => handleInputChange('workPostId', value)}
+              onValueChange={(value) => {
+                // Quando selecionar o Posto de Trabalho, usar o workPostId como locationId
+                handleInputChange('workPostId', value);
+                handleInputChange('locationId', value); // Posto de Trabalho = Localização
+                console.log('✅ Posto de Trabalho selecionado:', value, 'usado como locationId');
+                // Limpar erro se houver
+                if (errors.workPostId) {
+                  setErrors(prev => ({ ...prev, workPostId: undefined }));
+                }
+                if (errors.locationId) {
+                  setErrors(prev => ({ ...prev, locationId: undefined }));
+                }
+              }}
               disabled={mode === 'view' || !selectedClientId}
             >
               <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.workPostId
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
                 } ${mode === 'view' || !selectedClientId ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder={selectedClientId ? "Selecione um posto de trabalho (opcional)" : "Selecione primeiro um cliente"} />
+                <SelectValue placeholder={selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"} />
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600">
                 {postosFiltrados.length > 0 ? (

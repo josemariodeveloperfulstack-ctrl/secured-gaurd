@@ -146,7 +146,7 @@ const Escalas = () => {
       const dia = weekDays.findIndex((d) => format(d, 'yyyy-MM-dd') === s.scheduleDate);
       if (dia >= 0) {
         map[employeeId].escalas[dia] = {
-          turno: s.shift,
+          turno: getTurnoLabel(s.shift), // Converter turno para português
           cliente: locationName,
           horario: `${(s as any).startTime || ''} - ${(s as any).endTime || ''}`,
         };
@@ -177,19 +177,36 @@ const Escalas = () => {
     }
   ];
 
-  const getTurnoCellClass = (turno: string) => {
+  // Função para converter turno do backend para português
+  const getTurnoLabel = (turno: string): string => {
     switch (turno) {
-      case 'Diurno':
-        return 'bg-seguranca-yellow/30 text-seguranca-black';
-      case 'Noturno':
-        return 'bg-seguranca-red/30 text-seguranca-black';
-      case 'Administrativo':
-        return 'bg-blue-500/30 text-seguranca-black';
-      case 'Folga':
-        return 'bg-gray-500/30 text-seguranca-black';
+      case 'DAY':
+        return 'Diurno';
+      case 'NIGHT':
+        return 'Noturno';
+      case 'MIXED':
+        return 'Misto';
       default:
-        return '';
+        return turno;
     }
+  };
+
+  const getTurnoCellClass = (turno: string) => {
+    // Aceitar tanto valores em português quanto do backend
+    const turnoLower = turno.toLowerCase();
+    if (turnoLower === 'day' || turnoLower === 'diurno') {
+      return 'bg-seguranca-yellow/30 text-seguranca-black';
+    }
+    if (turnoLower === 'night' || turnoLower === 'noturno') {
+      return 'bg-seguranca-red/30 text-seguranca-black';
+    }
+    if (turnoLower === 'mixed' || turnoLower === 'misto') {
+      return 'bg-blue-500/30 text-seguranca-black';
+    }
+    if (turnoLower === 'folga') {
+      return 'bg-gray-500/30 text-seguranca-black';
+    }
+    return '';
   };
 
   // Função para lidar com a criação/edição de escala
@@ -249,7 +266,10 @@ const Escalas = () => {
     }
     setIsModalOpen(false);
     setSelectedEscala(null);
-    loadSchedules();
+    // Recarregar escalas após salvar
+    console.log('🔄 Recarregando escalas após salvar...');
+    await loadSchedules();
+    console.log('✅ Escalas recarregadas após salvar');
   } catch (err: any) {
     console.error('❌ Erro detalhado ao salvar escala:', err);
     console.error('❌ Response data:', err.response?.data);
@@ -650,6 +670,7 @@ const Escalas = () => {
         </div>
         
         {/* Modal de Formulário de Escala */}
+        {console.log('📊 Renderizando EscalaTrabalhoTable com schedules:', schedules, 'loading:', loading)}
         <EscalaTrabalhoTable
           escalas={schedules}
           isLoading={loading}

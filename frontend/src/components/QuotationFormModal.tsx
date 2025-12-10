@@ -72,24 +72,69 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({ quotation, onCl
     loadSuppliers();
     loadPurchaseRequests();
     loadUsers();
+  }, []);
+
+  // Atualizar formData quando quotation mudar E quando as listas estiverem prontas
+  useEffect(() => {
     if (quotation) {
+      console.log('🔍 QuotationFormModal - Carregando dados da cotação:', quotation);
+      console.log('🔍 purchaseRequestId:', quotation.purchaseRequestId);
+      console.log('🔍 assignedToId:', quotation.assignedToId);
+      console.log('🔍 purchaseRequests carregadas:', purchaseRequests.length);
+      console.log('🔍 users carregados:', users.length);
+      
+      const purchaseRequestIdValue = quotation.purchaseRequestId 
+        ? String(quotation.purchaseRequestId).trim() 
+        : '';
+      const assignedToIdValue = quotation.assignedToId 
+        ? String(quotation.assignedToId).trim() 
+        : '';
+      
+      console.log('🔍 purchaseRequestIdValue (processado):', purchaseRequestIdValue);
+      console.log('🔍 assignedToIdValue (processado):', assignedToIdValue);
+      
       setFormData({
         title: quotation.title,
         description: quotation.description || '',
-        supplierId: quotation.supplierId || '',
-        purchaseRequestId: quotation.purchaseRequestId || '',
-        unitId: quotation.unitId || '',
+        supplierId: quotation.supplierId ? String(quotation.supplierId) : '',
+        purchaseRequestId: purchaseRequestIdValue,
+        unitId: quotation.unitId ? String(quotation.unitId) : '',
         totalValue: quotation.totalValue.toString(),
         validUntil: quotation.validUntil,
         terms: quotation.terms || '',
         paymentMethod: quotation.paymentMethod || '',
         deliveryMethod: quotation.deliveryMethod || '',
         notes: quotation.notes || '',
-        assignedToId: quotation.assignedToId || '',
+        assignedToId: assignedToIdValue,
         status: quotation.status
       });
+      
+      // Log após setFormData para verificar se foi aplicado
+      setTimeout(() => {
+        console.log('🔍 formData após atualização:', {
+          purchaseRequestId: purchaseRequestIdValue,
+          assignedToId: assignedToIdValue
+        });
+      }, 100);
+    } else {
+      // Resetar form quando não há cotação (modo criação)
+      setFormData({
+        title: '',
+        description: '',
+        supplierId: '',
+        purchaseRequestId: '',
+        unitId: '',
+        totalValue: '',
+        validUntil: '',
+        terms: '',
+        paymentMethod: '',
+        deliveryMethod: '',
+        notes: '',
+        assignedToId: '',
+        status: 'DRAFT'
+      });
     }
-  }, [quotation]);
+  }, [quotation, purchaseRequests.length, users.length]);
 
   const loadSuppliers = async () => {
     try {
@@ -121,11 +166,47 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({ quotation, onCl
     try {
       const data = await userService.getAllUsers();
       setUsers(data || []);
+      console.log('🔍 Usuários carregados:', data?.length || 0);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       setUsers([]);
     }
   };
+
+  // Forçar atualização do formData quando as listas terminarem de carregar (para garantir que os Select funcionem)
+  useEffect(() => {
+    if (quotation && !loadingPurchaseRequests && !loadingSuppliers && purchaseRequests.length > 0 && users.length > 0) {
+      console.log('🔍 Listas carregadas - Atualizando formData novamente');
+      const purchaseRequestIdValue = quotation.purchaseRequestId 
+        ? String(quotation.purchaseRequestId).trim() 
+        : '';
+      const assignedToIdValue = quotation.assignedToId 
+        ? String(quotation.assignedToId).trim() 
+        : '';
+      
+      // Verificar se os valores existem nas listas
+      const purchaseRequestExists = purchaseRequestIdValue 
+        ? purchaseRequests.some(req => String(req.id).trim() === purchaseRequestIdValue)
+        : false;
+      const userExists = assignedToIdValue 
+        ? users.some(user => String(user.id).trim() === assignedToIdValue)
+        : false;
+      
+      console.log('🔍 Verificação de existência:', {
+        purchaseRequestIdValue,
+        purchaseRequestExists,
+        assignedToIdValue,
+        userExists
+      });
+      
+      // Atualizar apenas se os valores mudaram ou se não foram aplicados corretamente
+      setFormData(prev => ({
+        ...prev,
+        purchaseRequestId: purchaseRequestIdValue,
+        assignedToId: assignedToIdValue
+      }));
+    }
+  }, [quotation, loadingPurchaseRequests, loadingSuppliers, purchaseRequests.length, users.length]);
 
   const handleSaveSupplier = async (data: CreateSupplierRequest) => {
     try {
@@ -319,7 +400,7 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({ quotation, onCl
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
                     {purchaseRequests.map((request) => (
-                      <SelectItem key={request.id} value={request.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                      <SelectItem key={request.id} value={String(request.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
                           {request.requestNumber} - {request.title}
@@ -423,7 +504,7 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({ quotation, onCl
                       </SelectTrigger>
                       <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
                         {suppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                          <SelectItem key={supplier.id} value={String(supplier.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
                             <div className="flex items-center gap-2">
                               <Building2 className="h-4 w-4" />
                               {supplier.name}
@@ -580,7 +661,7 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({ quotation, onCl
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
                     {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                      <SelectItem key={user.id} value={String(user.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
                         {user.name} ({user.username})
                       </SelectItem>
                     ))}

@@ -68,6 +68,10 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   // Verificar se escalas é um array válido
   const safeEscalas = Array.isArray(escalas) ? escalas : [];
   
+  console.log('📊 EscalaTrabalhoTable - escalas recebidas:', escalas);
+  console.log('📊 EscalaTrabalhoTable - safeEscalas:', safeEscalas);
+  console.log('📊 EscalaTrabalhoTable - quantidade:', safeEscalas.length);
+  
   const filteredEscalas = safeEscalas.filter(escala => {
     const matchesSearch = 
       (escala.employee?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -105,7 +109,7 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
       );
   }
 
-  if (escalas.length === 0 && !isLoading) {
+  if (safeEscalas.length === 0 && !isLoading) {
     return (
       <Card className="bg-seguranca-graphite border-gray-700">
         <CardContent className="p-6">
