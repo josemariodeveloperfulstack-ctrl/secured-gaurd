@@ -271,17 +271,25 @@ const Escalas = () => {
     }
     
     // Ajustar o mapeamento para o DTO correto do backend
+    // IMPORTANTE: O backend agora aceita workPostId e resolve a Location automaticamente
+    // O frontend envia locationId = workPostId, então precisamos garantir que workPostId seja enviado
     const mappedData: any = {
       employeeId: data.employeeId,
-      locationId: data.locationId,
       scheduleDate: format(data.scheduleDate, 'yyyy-MM-dd'),
       shift: data.shift, // O backend espera 'DAY', 'NIGHT', 'MIXED', etc.
       status: 'PENDING', // Status padrão
     };
     
-    // Adicionar workPostId apenas se foi selecionado (e não for string vazia)
+    // Priorizar workPostId se disponível (é o campo correto)
     if (data.workPostId && data.workPostId.trim() !== '' && data.workPostId !== 'none') {
       mappedData.workPostId = data.workPostId;
+      // Se locationId = workPostId, não enviar locationId para evitar confusão
+      // O backend vai resolver a Location automaticamente baseada no workPostId
+    } else if (data.locationId && data.locationId.trim() !== '' && data.locationId !== 'none') {
+      // Se não há workPostId mas há locationId, pode ser que locationId seja na verdade workPostId
+      // O backend vai tentar usar como workPostId primeiro
+      mappedData.workPostId = data.locationId;
+      mappedData.locationId = data.locationId; // Manter para compatibilidade
     }
     
     // Adicionar observations apenas se não for vazio

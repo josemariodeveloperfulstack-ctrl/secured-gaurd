@@ -14,9 +14,8 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # Redirecionamento HTTP → HTTPS desabilitado no entrypoint para evitar loop com Cloudflare
+      # O redirecionamento será feito apenas para hosts específicos via routers
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300"
       - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300"

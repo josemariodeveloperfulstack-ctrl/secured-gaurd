@@ -6,6 +6,12 @@
 
 http:
   middlewares:
+    # Middleware para redirecionar HTTP para HTTPS
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    
     # Middleware para permitir todos os métodos HTTP
     allow-all-methods:
       headers:
@@ -43,7 +49,8 @@ http:
         retryExpression: "IsNetworkError() && Attempts() < 2"
 
   routers:
-    # Router específico para o ambiente CI
+    # Router HTTPS específico para o ambiente CI
+    # O redirecionamento HTTP → HTTPS é feito pelo entrypoint 'web' do Traefik
     ci-backend:
       rule: "Host(`ci.z7botsolutions.com.br`)"
       entryPoints:

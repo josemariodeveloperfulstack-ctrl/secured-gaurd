@@ -152,22 +152,13 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
+      # Router HTTPS (usar configuração dinâmica ao invés de labels para evitar conflito)
       - "traefik.http.routers.nginx-ci.rule=Host(`ci.z7botsolutions.com.br`)"
       - "traefik.http.routers.nginx-ci.entrypoints=websecure"
       - "traefik.http.routers.nginx-ci.tls.certresolver=letsencryptresolver"
       - "traefik.http.services.nginx-ci.loadbalancer.server.port=80"
-      # Middleware para permitir todos os métodos HTTP
-      - "traefik.http.middlewares.nginx-ci-allowmethods.plugin.allowmethods.methods=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
-      # Middleware CORS permissivo
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolalloworiginlistregex=.*"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowcredentials=true"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolmaxage=3600"
-      # Aplicar middleware
-      - "traefik.http.routers.nginx-ci.middlewares=nginx-ci-cors"
-      # Prioridade máxima
-      - "traefik.http.routers.nginx-ci.priority=1000"
+      # Prioridade máxima para sobrescrever configuração dinâmica se necessário
+      - "traefik.http.routers.nginx-ci.priority=2000"
 
   # ========================================
   # FRONTEND CI

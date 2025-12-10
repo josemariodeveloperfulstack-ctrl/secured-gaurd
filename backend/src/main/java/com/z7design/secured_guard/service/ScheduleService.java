@@ -57,20 +57,39 @@ public class ScheduleService {
                     .orElseThrow(() -> new EntityNotFoundException("Employee not found with ID: " + dto.getEmployeeId()));
             
             Location location = null;
-            // Se workPostId foi fornecido, buscar o WorkPost primeiro
-            final WorkPost workPost = (dto.getWorkPostId() != null) 
-                    ? workPostRepository.findById(dto.getWorkPostId()).orElse(null)
-                    : null;
+            WorkPost workPost = null;
             
-            // Tentar buscar Location pelo locationId fornecido
-            if (dto.getLocationId() != null) {
-                location = locationRepository.findById(dto.getLocationId())
-                        .orElse(null);
+            // Estratégia 0: Tentar buscar WorkPost pelo workPostId fornecido
+            if (dto.getWorkPostId() != null) {
+                workPost = workPostRepository.findById(dto.getWorkPostId()).orElse(null);
+            }
+            
+            // Estratégia 0.5: Se locationId foi fornecido mas não é uma Location válida,
+            // tentar usar como workPostId (o frontend pode estar enviando workPostId como locationId)
+            if (location == null && dto.getLocationId() != null && workPost == null) {
+                // Tentar buscar Location primeiro
+                location = locationRepository.findById(dto.getLocationId()).orElse(null);
                 
-                // Se locationId não for válido mas workPostId foi fornecido,
-                // tentar encontrar Location automaticamente baseada no WorkPost
-                if (location == null && workPost != null) {
-                    // Estratégia 1: Buscar Location pelo nome do WorkPost
+                // Se não encontrou Location, tentar usar como workPostId
+                if (location == null) {
+                    workPost = workPostRepository.findById(dto.getLocationId()).orElse(null);
+                    if (workPost != null) {
+                        // Se encontrou WorkPost usando locationId, limpar locationId para evitar confusão
+                        // e usar workPostId corretamente
+                    }
+                }
+            }
+            
+            // Estratégia 1: Se workPost foi encontrado (por workPostId ou locationId), priorizar busca baseada no WorkPost
+            if (workPost != null) {
+                // Tentar buscar Location pelo locationId fornecido (se fornecido e válido)
+                if (dto.getLocationId() != null) {
+                    location = locationRepository.findById(dto.getLocationId())
+                            .orElse(null);
+                }
+                
+                // Estratégia 2: Se não encontrou pelo ID, buscar Location pelo nome do WorkPost
+                if (location == null) {
                     List<Location> allLocations = locationRepository.findAll();
                     for (Location loc : allLocations) {
                         if (loc.getName() != null && loc.getName().equals(workPost.getName())) {
@@ -78,36 +97,80 @@ public class ScheduleService {
                             break;
                         }
                     }
+                }
+                
+                // Estratégia 3: Se não encontrou pelo nome, buscar Location do Unit do Client do WorkPost
+                if (location == null && workPost.getClient() != null) {
+                    // Buscar Units associados ao Client do WorkPost
+                    List<Unit> units = unitRepository.findByClientId(workPost.getClient().getId());
                     
-                    // Estratégia 2: Se não encontrou pelo nome, buscar Location do Unit do Client do WorkPost
-                    if (location == null && workPost.getClient() != null) {
-                        // Buscar Units associados ao Client do WorkPost
-                        List<Unit> units = unitRepository.findByClientId(workPost.getClient().getId());
-                        
-                        // Para cada Unit, buscar Locations
-                        for (Unit unit : units) {
-                            List<Location> unitLocations = locationRepository.findByUnitId(unit.getId());
-                            if (!unitLocations.isEmpty()) {
-                                // Usar a primeira Location encontrada do Unit
-                                location = unitLocations.get(0);
+                    // Para cada Unit, buscar Locations
+                    for (Unit unit : units) {
+                        List<Location> unitLocations = locationRepository.findByUnitId(unit.getId());
+                        if (!unitLocations.isEmpty()) {
+                            // Usar a primeira Location encontrada do Unit
+                            location = unitLocations.get(0);
+                            break;
+                        }
+                    }
+                }
+                
+                // Estratégia 4: Se ainda não encontrou, criar uma Location automaticamente baseada no WorkPost
+                if (location == null && workPost.getClient() != null) {
+                    // Buscar o primeiro Unit do Client para associar a Location
+                    List<Unit> units = unitRepository.findByClientId(workPost.getClient().getId());
+                    Unit unit = units.isEmpty() ? null : units.get(0);
+                    
+                    if (unit != null) {
+                        // Verificar se já existe uma Location com o mesmo nome e Unit (evitar duplicatas)
+                        List<Location> existingLocations = locationRepository.findByUnitId(unit.getId());
+                        for (Location loc : existingLocations) {
+                            if (loc.getName() != null && loc.getName().equals(workPost.getName())) {
+                                location = loc;
                                 break;
                             }
                         }
+                        
+                        // Se não encontrou, criar nova Location baseada no WorkPost
+                        if (location == null) {
+                            String address = (workPost.getAddress() != null && !workPost.getAddress().trim().isEmpty()) 
+                                    ? workPost.getAddress() 
+                                    : "Endereço não informado";
+                            
+                            location = Location.builder()
+                                    .name(workPost.getName())
+                                    .description("Location criada automaticamente para o Posto de Trabalho: " + workPost.getName())
+                                    .address(address)
+                                    .unit(unit)
+                                    .build();
+                            location = locationRepository.save(location);
+                        }
                     }
-                    
-                    // Se ainda não encontrou, lançar exceção
-                    if (location == null) {
-                        throw new EntityNotFoundException(
-                            "Location not found with ID: " + dto.getLocationId() + 
-                            ". Não foi possível encontrar uma Location para o Posto de Trabalho '" + 
-                            workPost.getName() + "'. Por favor, crie uma Location primeiro."
-                        );
-                    }
-                } else if (location == null) {
-                    throw new EntityNotFoundException("Location not found with ID: " + dto.getLocationId());
                 }
-            } else {
-                throw new EntityNotFoundException("Location ID is required");
+            }
+            
+            // Estratégia 5: Se ainda não encontrou/criou e há locationId, tentar buscar diretamente
+            // (mesmo que o locationId possa ser inválido, tentamos primeiro)
+            if (location == null && dto.getLocationId() != null) {
+                location = locationRepository.findById(dto.getLocationId())
+                        .orElse(null);
+            }
+            
+            // Se ainda não encontrou/criou, lançar exceção com mensagem clara
+            if (location == null) {
+                if (workPost != null) {
+                    throw new EntityNotFoundException(
+                        "Não foi possível encontrar ou criar uma Location para o Posto de Trabalho '" + 
+                        workPost.getName() + "'. Verifique se o Posto de Trabalho está associado a um Cliente com Units cadastrados."
+                    );
+                } else if (dto.getLocationId() != null) {
+                    throw new EntityNotFoundException(
+                        "Location not found with ID: " + dto.getLocationId() + 
+                        ". Se você forneceu um workPostId, verifique se ele está correto."
+                    );
+                } else {
+                    throw new EntityNotFoundException("Location ID ou WorkPost ID é obrigatório");
+                }
             }
 
             // Criar Schedule
