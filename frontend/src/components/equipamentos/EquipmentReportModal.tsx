@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { equipmentReportService, EquipmentReportRequest } from '@/services/equipmentReportService';
+import { equipmentReportGenerator, EquipmentReportData } from '@/utils/equipmentReportGenerator';
 import ReportViewer from './ReportViewer';
 
 interface EquipmentReportModalProps {
@@ -210,19 +211,34 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
 
       let blob;
       
-      // Chamar o serviço de exportação apropriado
-      switch (format) {
-        case 'pdf':
-          blob = await equipmentReportService.exportToPdf(reportRequest);
-          break;
-        case 'excel':
-          blob = await equipmentReportService.exportToExcel(reportRequest);
-          break;
-        case 'csv':
-          blob = await equipmentReportService.exportToCsv(reportRequest);
-          break;
-        default:
-          throw new Error('Formato de exportação não suportado');
+      // Para PDF, usar o gerador do frontend quando há dados gerados
+      if (format === 'pdf' && generatedReport && generatedReport.data && generatedReport.data.length > 0) {
+        console.log('📄 Gerando PDF no frontend usando dados do relatório:', generatedReport.type);
+        blob = await equipmentReportGenerator.generatePDF(
+          generatedReport.type,
+          generatedReport.data,
+          {
+            startDate: reportRequest.startDate,
+            endDate: reportRequest.endDate,
+            status: reportRequest.status,
+            equipmentType: reportRequest.equipmentType
+          }
+        );
+      } else {
+        // Para outros formatos ou quando não há dados gerados, usar o backend
+        switch (format) {
+          case 'pdf':
+            blob = await equipmentReportService.exportToPdf(reportRequest);
+            break;
+          case 'excel':
+            blob = await equipmentReportService.exportToExcel(reportRequest);
+            break;
+          case 'csv':
+            blob = await equipmentReportService.exportToCsv(reportRequest);
+            break;
+          default:
+            throw new Error('Formato de exportação não suportado');
+        }
       }
       
       // Fazer download do arquivo

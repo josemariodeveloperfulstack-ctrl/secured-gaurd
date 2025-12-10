@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import {
   Clock,
   FileText,
   Download,
-  Eye,
   TrendingUp,
   AlertTriangle,
   CheckCircle2,
@@ -250,135 +250,6 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
     );
   };
 
-  const handleExportPdf = () => {
-    if (onExport) {
-      onExport('pdf');
-    }
-  };
-
-  const handleViewHtml = () => {
-    // Criar uma nova aba com o conteúdo HTML do relatório
-    const htmlContent = generateHtmlFromReportData();
-    const newWindow = window.open('', '_blank');
-    if (newWindow) {
-      newWindow.document.write(htmlContent);
-      newWindow.document.close();
-    }
-  };
-
-  const generateHtmlFromReportData = () => {
-    const reportTitle = getReportTitle(type);
-    const reportIcon = getReportIcon(type);
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${reportTitle}</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px; 
-            background-color: #1a1a1a; 
-            color: #e0e0e0; 
-          }
-          h1 { 
-            color: #333; 
-            text-align: center; 
-            color: #e0e0e0;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-          }
-          .report-info {
-            background-color: #2a2a2a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-          }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 15px; 
-            background-color: #2a2a2a;
-          }
-          th, td { 
-            border: 1px solid #444; 
-            padding: 12px; 
-            text-align: left; 
-          }
-          th { 
-            background-color: #333; 
-            color: #e0e0e0;
-            font-weight: bold;
-          }
-          td {
-            color: #e0e0e0;
-          }
-          .footer { 
-            text-align: center; 
-            margin-top: 30px; 
-            font-size: 0.8em; 
-            color: #888; 
-          }
-          .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: bold;
-          }
-          .badge-active { background-color: #22c55e; color: white; }
-          .badge-inactive { background-color: #ef4444; color: white; }
-          .badge-maintenance { background-color: #f59e0b; color: white; }
-        </style>
-      </head>
-      <body>
-        <h1>${reportTitle}</h1>
-        
-        <div class="report-info">
-          <p><strong>Data de Geração:</strong> ${new Date(generatedAt).toLocaleString('pt-BR')}</p>
-          <p><strong>Tipo:</strong> ${reportTitle}</p>
-        </div>
-        
-        ${generateTableFromData()}
-        
-        <div class="footer">
-          <p>Relatório gerado automaticamente pelo Sistema Secured Guard</p>
-          <p>Data: ${new Date().toLocaleString('pt-BR')}</p>
-        </div>
-      </body>
-      </html>
-    `;
-  };
-
-  const generateTableFromData = () => {
-    if (!data || data.length === 0) {
-      return '<p>Nenhum dado encontrado para exibir.</p>';
-    }
-
-    const headers = Object.keys(data[0]);
-
-    let table = '<table><thead><tr>';
-    headers.forEach(header => {
-      table += `<th>${header}</th>`;
-    });
-    table += '</tr></thead><tbody>';
-
-    data.forEach(row => {
-      table += '<tr>';
-      headers.forEach(header => {
-        const value = row[header] || '';
-        const cellClass = typeof value === 'string' && value.toLowerCase().includes('ativo') ? 'badge-active' :
-          typeof value === 'string' && value.toLowerCase().includes('inativo') ? 'badge-inactive' :
-            typeof value === 'string' && value.toLowerCase().includes('manutenção') ? 'badge-maintenance' : '';
-        table += `<td class="${cellClass}">${value}</td>`;
-      });
-      table += '</tr>';
-    });
-
-    table += '</tbody></table>';
-    return table;
-  };
 
   const renderContent = () => {
     switch (type) {
@@ -401,9 +272,21 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-seguranca-graphite rounded-lg border border-gray-700 w-full max-w-6xl max-h-[90vh] overflow-hidden">
+  const modalContent = (
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" 
+      style={{ zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="bg-seguranca-graphite rounded-lg border border-gray-700 w-full max-w-6xl max-h-[90vh] overflow-hidden" 
+        style={{ zIndex: 100000, position: 'relative' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-600">
           <div className="flex items-center gap-3">
@@ -418,15 +301,6 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleViewHtml}
-              className="bg-seguranca-black border-gray-600 hover:bg-seguranca-graphite"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              Visualizar HTML
-            </Button>
             {onExport && (
               <>
                 <Button
@@ -446,15 +320,6 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onExport('csv')}
-                  className="bg-seguranca-black border-gray-600 hover:bg-seguranca-graphite"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  CSV
                 </Button>
               </>
             )}
@@ -476,6 +341,11 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
       </div>
     </div>
   );
+
+  // Renderizar usando Portal para garantir que fique acima de tudo
+  return typeof window !== 'undefined' 
+    ? createPortal(modalContent, document.body)
+    : null;
 };
 
 export default ReportViewer;
