@@ -46,6 +46,10 @@ public class PurchaseQuotation {
     @JoinColumn(name = "unit_id")
     private Unit unit;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "purchase_request_id")
+    private PurchaseRequest purchaseRequest;
+    
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private PurchaseQuotationStatus status = PurchaseQuotationStatus.DRAFT;

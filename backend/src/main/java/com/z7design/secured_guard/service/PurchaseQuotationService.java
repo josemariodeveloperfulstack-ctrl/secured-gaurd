@@ -2,11 +2,13 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.PurchaseQuotationDTO;
 import com.z7design.secured_guard.model.PurchaseQuotation;
+import com.z7design.secured_guard.model.PurchaseRequest;
 import com.z7design.secured_guard.model.Supplier;
 import com.z7design.secured_guard.model.Unit;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.PurchaseQuotationStatus;
 import com.z7design.secured_guard.repository.PurchaseQuotationRepository;
+import com.z7design.secured_guard.repository.PurchaseRequestRepository;
 import com.z7design.secured_guard.repository.SupplierRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.repository.UserRepository;
@@ -30,12 +32,21 @@ public class PurchaseQuotationService {
     private final SupplierRepository supplierRepository;
     private final UnitRepository unitRepository;
     private final UserRepository userRepository;
+    private final PurchaseRequestRepository purchaseRequestRepository;
     
     @Transactional(readOnly = true)
     public List<PurchaseQuotationDTO> getAllQuotations() {
-        return purchaseQuotationRepository.findAll().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        try {
+            return purchaseQuotationRepository.findAllWithRelations().stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao buscar todas as cotações: {}", e.getMessage(), e);
+            // Fallback para findAll() se houver problema com fetch join
+            return purchaseQuotationRepository.findAll().stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+        }
     }
     
     @Transactional(readOnly = true)
@@ -182,37 +193,145 @@ public class PurchaseQuotationService {
     
     // Métodos de conversão
     private PurchaseQuotationDTO convertToDTO(PurchaseQuotation quotation) {
-        PurchaseQuotationDTO dto = PurchaseQuotationDTO.builder()
-                .id(quotation.getId())
-                .quoteNumber(quotation.getQuoteNumber())
-                .title(quotation.getTitle())
-                .description(quotation.getDescription())
-                .supplierId(quotation.getSupplier() != null ? quotation.getSupplier().getId() : null)
-                .supplierName(quotation.getSupplier() != null ? quotation.getSupplier().getName() : null)
-                .unitId(quotation.getUnit() != null ? quotation.getUnit().getId() : null)
-                .unitName(quotation.getUnit() != null ? quotation.getUnit().getName() : null)
-                .status(quotation.getStatus())
-                .totalValue(quotation.getTotalValue())
-                .validUntil(quotation.getValidUntil())
-                .terms(quotation.getTerms())
-                .paymentMethod(quotation.getPaymentMethod())
-                .deliveryMethod(quotation.getDeliveryMethod())
-                .notes(quotation.getNotes())
-                .createdById(quotation.getCreatedBy() != null ? quotation.getCreatedBy().getId() : null)
-                .createdByName(quotation.getCreatedBy() != null ? quotation.getCreatedBy().getName() : null)
-                .assignedToId(quotation.getAssignedTo() != null ? quotation.getAssignedTo().getId() : null)
-                .assignedToName(quotation.getAssignedTo() != null ? quotation.getAssignedTo().getName() : null)
-                .createdAt(quotation.getCreatedAt())
-                .updatedAt(quotation.getUpdatedAt())
-                .build();
-        
-        // Campos calculados
-        dto.setExpired(quotation.isExpired());
-        dto.setExpiringSoon(quotation.isExpiringSoon(7)); // 7 dias
-        dto.setCanBeApproved(quotation.canBeApproved());
-        dto.setCanBeRejected(quotation.canBeRejected());
-        
-        return dto;
+        try {
+            PurchaseQuotationDTO dto = PurchaseQuotationDTO.builder()
+                    .id(quotation.getId())
+                    .quoteNumber(quotation.getQuoteNumber())
+                    .title(quotation.getTitle())
+                    .description(quotation.getDescription())
+                    .supplierId(getSupplierId(quotation))
+                    .supplierName(getSupplierName(quotation))
+                    .unitId(getUnitId(quotation))
+                    .unitName(getUnitName(quotation))
+                    .purchaseRequestId(getPurchaseRequestId(quotation))
+                    .purchaseRequestNumber(getPurchaseRequestNumber(quotation))
+                    .purchaseRequestTitle(getPurchaseRequestTitle(quotation))
+                    .status(quotation.getStatus())
+                    .totalValue(quotation.getTotalValue())
+                    .validUntil(quotation.getValidUntil())
+                    .terms(quotation.getTerms())
+                    .paymentMethod(quotation.getPaymentMethod())
+                    .deliveryMethod(quotation.getDeliveryMethod())
+                    .notes(quotation.getNotes())
+                    .createdById(getCreatedById(quotation))
+                    .createdByName(getCreatedByName(quotation))
+                    .assignedToId(getAssignedToId(quotation))
+                    .assignedToName(getAssignedToName(quotation))
+                    .createdAt(quotation.getCreatedAt())
+                    .updatedAt(quotation.getUpdatedAt())
+                    .build();
+            
+            // Campos calculados
+            dto.setExpired(quotation.isExpired());
+            dto.setExpiringSoon(quotation.isExpiringSoon(7)); // 7 dias
+            dto.setCanBeApproved(quotation.canBeApproved());
+            dto.setCanBeRejected(quotation.canBeRejected());
+            
+            return dto;
+        } catch (Exception e) {
+            log.error("Erro ao converter PurchaseQuotation para DTO: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro ao converter cotação para DTO", e);
+        }
+    }
+    
+    // Métodos auxiliares para acesso seguro a relacionamentos
+    private UUID getSupplierId(PurchaseQuotation quotation) {
+        try {
+            return quotation.getSupplier() != null ? quotation.getSupplier().getId() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar supplier.id: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private String getSupplierName(PurchaseQuotation quotation) {
+        try {
+            return quotation.getSupplier() != null ? quotation.getSupplier().getName() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar supplier.name: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private UUID getUnitId(PurchaseQuotation quotation) {
+        try {
+            return quotation.getUnit() != null ? quotation.getUnit().getId() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar unit.id: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private String getUnitName(PurchaseQuotation quotation) {
+        try {
+            return quotation.getUnit() != null ? quotation.getUnit().getName() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar unit.name: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private UUID getPurchaseRequestId(PurchaseQuotation quotation) {
+        try {
+            return quotation.getPurchaseRequest() != null ? quotation.getPurchaseRequest().getId() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar purchaseRequest.id: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private String getPurchaseRequestNumber(PurchaseQuotation quotation) {
+        try {
+            return quotation.getPurchaseRequest() != null ? quotation.getPurchaseRequest().getRequestNumber() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar purchaseRequest.requestNumber: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private String getPurchaseRequestTitle(PurchaseQuotation quotation) {
+        try {
+            return quotation.getPurchaseRequest() != null ? quotation.getPurchaseRequest().getTitle() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar purchaseRequest.title: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private UUID getCreatedById(PurchaseQuotation quotation) {
+        try {
+            return quotation.getCreatedBy() != null ? quotation.getCreatedBy().getId() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar createdBy.id: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private String getCreatedByName(PurchaseQuotation quotation) {
+        try {
+            return quotation.getCreatedBy() != null ? quotation.getCreatedBy().getName() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar createdBy.name: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private UUID getAssignedToId(PurchaseQuotation quotation) {
+        try {
+            return quotation.getAssignedTo() != null ? quotation.getAssignedTo().getId() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar assignedTo.id: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    private String getAssignedToName(PurchaseQuotation quotation) {
+        try {
+            return quotation.getAssignedTo() != null ? quotation.getAssignedTo().getName() : null;
+        } catch (Exception e) {
+            log.warn("Erro ao acessar assignedTo.name: {}", e.getMessage());
+            return null;
+        }
     }
     
     private PurchaseQuotation convertToEntity(PurchaseQuotationDTO dto) {
@@ -236,6 +355,11 @@ public class PurchaseQuotationService {
         if (dto.getUnitId() != null) {
             Optional<Unit> unit = unitRepository.findById(dto.getUnitId());
             unit.ifPresent(quotation::setUnit);
+        }
+        
+        if (dto.getPurchaseRequestId() != null) {
+            Optional<PurchaseRequest> purchaseRequest = purchaseRequestRepository.findById(dto.getPurchaseRequestId());
+            purchaseRequest.ifPresent(quotation::setPurchaseRequest);
         }
         
         if (dto.getAssignedToId() != null) {
@@ -287,6 +411,13 @@ public class PurchaseQuotationService {
             unit.ifPresent(quotation::setUnit);
         } else if (dto.getUnitId() == null && quotation.getUnit() != null) {
             quotation.setUnit(null);
+        }
+        
+        if (dto.getPurchaseRequestId() != null) {
+            Optional<PurchaseRequest> purchaseRequest = purchaseRequestRepository.findById(dto.getPurchaseRequestId());
+            purchaseRequest.ifPresent(quotation::setPurchaseRequest);
+        } else if (dto.getPurchaseRequestId() == null && quotation.getPurchaseRequest() != null) {
+            quotation.setPurchaseRequest(null);
         }
         
         if (dto.getAssignedToId() != null) {

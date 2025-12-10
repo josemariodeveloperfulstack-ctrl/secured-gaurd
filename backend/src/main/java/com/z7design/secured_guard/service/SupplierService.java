@@ -89,6 +89,16 @@ public class SupplierService {
     public Supplier update(UUID id, SupplierDTO supplierDTO) {
         return supplierRepository.findById(id)
                 .map(supplier -> {
+                    // Verificar se o CNPJ está sendo alterado e se já existe outro fornecedor com esse CNPJ
+                    if (supplierDTO.getCnpj() != null) {
+                        String cnpjTrimmed = supplierDTO.getCnpj().trim();
+                        supplierRepository.findByCnpj(cnpjTrimmed).ifPresent(existing -> {
+                            // Se o CNPJ encontrado não é o próprio fornecedor, lançar exceção
+                            if (!existing.getId().equals(id)) {
+                                throw new com.z7design.secured_guard.exception.BusinessException("Já existe um fornecedor com este CNPJ.");
+                            }
+                        });
+                    }
                     updateSupplierFromDTO(supplier, supplierDTO);
                     return supplierRepository.save(supplier);
                 })

@@ -43,6 +43,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
   const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [requestNumber, setRequestNumber] = useState<string>('');
+  const [estimatedTotalDisplay, setEstimatedTotalDisplay] = useState<string>('');
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [requesterSearchTerm, setRequesterSearchTerm] = useState('');
@@ -74,6 +75,23 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
     approverId: '',
   });
 
+  const parseCurrencyToNumber = (value?: string) => {
+    if (!value) return 0;
+    const cleaned = value.replace(/\./g, '').replace(',', '.');
+    return parseFloat(cleaned) || 0;
+  };
+
+  const normalizeEstimatedTotal = (value: number | string | undefined | null): number => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseCurrencyToNumber(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadUnits();
@@ -82,6 +100,8 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
       loadCostCenters();
       if (request) {
         setRequestNumber(request.requestNumber || '');
+        const estimatedTotalValue = normalizeEstimatedTotal(request.estimatedTotal);
+        const requesterIdValue = request.requesterId ? String(request.requesterId) : '';
         setFormData({
           id: request.id,
           title: request.title,
@@ -89,9 +109,10 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           priority: request.priority || 'MEDIUM',
           status: request.status || 'DRAFT',
           requesterName: request.requesterName || '',
+          requesterId: requesterIdValue,
           department: request.department || '',
           justification: request.justification || '',
-          estimatedTotal: request.estimatedTotal || 0,
+          estimatedTotal: estimatedTotalValue,
           urgency: request.urgency || 'NORMAL',
           requiredDate: formatDateForInput(request.requiredDate),
           approvedBy: request.approvedBy || '',
@@ -106,9 +127,14 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           contactEmail: request.contactEmail || '',
           notes: request.notes || '',
           unitId: request.unitId ? String(request.unitId) : '',
-          requesterId: request.requesterId ? String(request.requesterId) : '',
           approverId: request.approverId ? String(request.approverId) : '',
         });
+        setEstimatedTotalDisplay(
+          estimatedTotalValue.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        );
       } else {
         setRequestNumber('');
         setFormData({
@@ -137,6 +163,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           requesterId: '',
           approverId: '',
         });
+        setEstimatedTotalDisplay('');
       }
     }
   }, [request, isOpen]);
@@ -187,6 +214,35 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
       setDepartmentSearchTerm(request.department || '');
     }
   }, [request, isOpen, employees, suppliers, costCenters]);
+
+  // Quando o requesterId vier vazio, tentar resolver pelo nome para pré-selecionar no select
+  useEffect(() => {
+    if (request && isOpen && employees.length > 0 && !request.requesterId && request.requesterName) {
+      const match = employees.find(
+        (employee) => employee.name?.toLowerCase() === request.requesterName?.toLowerCase()
+      );
+      if (match) {
+        setFormData((prev) => ({
+          ...prev,
+          requesterId: String(match.id),
+          requesterName: match.name || prev.requesterName,
+        }));
+      }
+    }
+  }, [request, isOpen, employees]);
+
+  // Sincronizar exibição quando o modal abre e há valor numérico no form
+  useEffect(() => {
+    if (isOpen) {
+      const numericValue = normalizeEstimatedTotal(formData.estimatedTotal);
+      setEstimatedTotalDisplay(
+        numericValue
+          ? numericValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : ''
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Função auxiliar para converter data ISO para formato de input date (YYYY-MM-DD)
   const formatDateForInput = (dateString?: string): string => {
@@ -377,6 +433,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                       <SelectValue placeholder="Selecione o status" />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-graphite border-gray-600">
+                      <SelectItem value="PENDING" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Pendente</SelectItem>
                       <SelectItem value="DRAFT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Rascunho</SelectItem>
                       <SelectItem value="SUBMITTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Enviada</SelectItem>
                       <SelectItem value="APPROVED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Aprovada</SelectItem>
@@ -524,10 +581,11 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                       groupSeparator="."
                       decimalsLimit={2}
                       fixedDecimalLength={2}
-                      value={formData.estimatedTotal || 0}
+                      value={estimatedTotalDisplay}
                       onValueChange={(value, name, values) => {
-                        // CurrencyInput retorna o valor formatado como string, mas também fornece values.floatValue
-                        const numValue = values?.floatValue || (value ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : 0);
+                        const displayValue = value || '';
+                        setEstimatedTotalDisplay(displayValue);
+                        const numValue = values?.floatValue ?? parseCurrencyToNumber(displayValue);
                         handleInputChange('estimatedTotal', numValue || 0);
                       }}
                       placeholder="0,00"

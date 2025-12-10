@@ -14,6 +14,14 @@ import java.util.UUID;
 @Repository
 public interface PurchaseQuotationRepository extends JpaRepository<PurchaseQuotation, UUID> {
     
+    @Query("SELECT DISTINCT pq FROM PurchaseQuotation pq " +
+           "LEFT JOIN FETCH pq.supplier " +
+           "LEFT JOIN FETCH pq.unit " +
+           "LEFT JOIN FETCH pq.createdBy " +
+           "LEFT JOIN FETCH pq.assignedTo " +
+           "LEFT JOIN FETCH pq.purchaseRequest")
+    List<PurchaseQuotation> findAllWithRelations();
+    
     List<PurchaseQuotation> findByStatus(PurchaseQuotationStatus status);
     
     List<PurchaseQuotation> findBySupplierId(UUID supplierId);

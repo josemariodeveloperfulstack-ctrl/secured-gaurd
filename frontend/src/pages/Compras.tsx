@@ -7,13 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   PurchaseRequest, 
   purchaseRequestService,
   CreatePurchaseRequestRequest 
 } from '@/services/purchaseRequestService';
 import { PurchaseRequestFormModal } from '@/components/compras/PurchaseRequestFormModal';
+import { PurchaseRequestViewModal } from '@/components/compras/PurchaseRequestViewModal';
 import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
 import { contasAPagarService, Supplier, CreateSupplierRequest } from '@/services/contasAPagarService';
 import { 
@@ -34,18 +37,30 @@ import {
   FileText,
   Building2,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  FileDown
 } from 'lucide-react';
 import { MainLayout } from '@/components/MainLayout';
+import { PurchaseRequestReportModal } from '@/components/compras/PurchaseRequestReportModal';
+import { PurchaseRequestReportViewModal } from '@/components/compras/PurchaseRequestReportViewModal';
+import { purchaseRequestReportGenerator, PurchaseRequestReportFilters } from '@/utils/purchaseRequestReportGenerator';
 
 export default function Compras() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingRequest, setViewingRequest] = useState<PurchaseRequest | undefined>();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReportViewModalOpen, setIsReportViewModalOpen] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [reportFileName, setReportFileName] = useState<string>('');
   const [editingRequest, setEditingRequest] = useState<PurchaseRequest | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -60,12 +75,29 @@ export default function Compras() {
     return 'solicitacoes'; // default
   };
   
+  // Determinar tab de solicitação ativa baseado na URL
+  const getActiveRequestTabFromPath = () => {
+    const path = location.pathname;
+    if (path.includes('/aprovacoes')) return 'approved';
+    if (path.includes('/solicitacoes')) return 'all';
+    return 'all';
+  };
+  
   const [activeMainTab, setActiveMainTab] = useState(getActiveTabFromPath());
+  const [activeRequestTab, setActiveRequestTab] = useState(() => {
+    const path = location.pathname;
+    if (path.includes('/aprovacoes')) return 'approved';
+    return 'all';
+  });
   
   // Atualizar tab quando a rota mudar
   useEffect(() => {
     const tab = getActiveTabFromPath();
     setActiveMainTab(tab);
+    
+    // Atualizar tab de solicitação baseado na rota
+    const requestTab = getActiveRequestTabFromPath();
+    setActiveRequestTab(requestTab);
     
     // Se estiver em /compras sem subrota, redirecionar para /compras/solicitacoes
     if (location.pathname === '/compras') {
@@ -82,7 +114,18 @@ export default function Compras() {
       navigate('/compras/fornecedores');
     }
   };
-  const [activeRequestTab, setActiveRequestTab] = useState('all');
+  
+  // Navegar quando a tab de solicitação mudar
+  const handleRequestTabChange = (value: string) => {
+    setActiveRequestTab(value);
+    if (value === 'approved') {
+      navigate('/compras/aprovacoes');
+    } else if (value === 'all') {
+      navigate('/compras/solicitacoes');
+    } else {
+      navigate('/compras/solicitacoes');
+    }
+  };
   
   // Estados para Fornecedores
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -135,23 +178,25 @@ export default function Compras() {
 
   const loadStats = async () => {
     try {
-      const [
-        pendingCount,
-        urgentRequests,
-        overdueRequests
-      ] = await Promise.all([
+      const [allRequests, pendingCount, urgentRequests, overdueRequests] = await Promise.all([
+        purchaseRequestService.getAllPurchaseRequests(),
         purchaseRequestService.getRequestsCountByStatus('PENDING'),
         purchaseRequestService.getUrgentRequests(),
         purchaseRequestService.getOverdueRequests(),
       ]);
 
+      const totalValue = allRequests.reduce(
+        (sum: number, req: PurchaseRequest) => sum + (req.totalValue || req.estimatedTotal || 0),
+        0
+      );
+
       setStats(prevStats => ({
         ...prevStats,
-        totalRequests: purchaseRequests.length,
+        totalRequests: allRequests.length,
         pendingRequests: pendingCount,
         urgentRequests: urgentRequests.length,
         overdueRequests: overdueRequests.length,
-        totalValue: purchaseRequests.reduce((sum, req) => sum + (req.totalValue || req.estimatedTotal || 0), 0),
+        totalValue,
       }));
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
@@ -258,7 +303,8 @@ export default function Compras() {
 
   const handleApproveRequest = async (id: string) => {
     try {
-      await purchaseRequestService.approveRequest(id, 'Sistema', 'Aprovado via sistema');
+      const approverName = user?.name || 'Sistema';
+      await purchaseRequestService.approveRequest(id, approverName, 'Aprovado via sistema');
       await loadPurchaseRequests();
       await loadStats();
       toast({
@@ -298,6 +344,11 @@ export default function Compras() {
   const handleEditRequest = (request: PurchaseRequest) => {
     setEditingRequest(request);
     setIsModalOpen(true);
+  };
+
+  const handleViewRequest = (request: PurchaseRequest) => {
+    setViewingRequest(request);
+    setIsViewModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -368,7 +419,15 @@ export default function Compras() {
       setIsSupplierModalOpen(false);
       setEditingSupplier(null);
     } catch (error: any) {
-      const msg = error?.response?.data?.message || 'Não foi possível salvar o fornecedor.';
+      let msg = 'Não foi possível salvar o fornecedor.';
+      
+      // Tratar erro de CNPJ duplicado (409 Conflict)
+      if (error?.response?.status === 409) {
+        msg = error?.response?.data?.message || 'Já existe um fornecedor cadastrado com este CNPJ.';
+      } else if (error?.response?.data?.message) {
+        msg = error.response.data.message;
+      }
+      
       toast({
         title: "Erro",
         description: msg,
@@ -421,12 +480,40 @@ export default function Compras() {
     setEditingSupplier(null);
   };
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      DRAFT: 'Rascunho',
+      SUBMITTED: 'Enviada',
+      APPROVED: 'Aprovada',
+      REJECTED: 'Rejeitada',
+      IN_PROCESS: 'Em processo',
+      COMPLETED: 'Concluída',
+      CANCELLED: 'Cancelada',
+      PENDING: 'Pendente',
+    };
+    return labels[status] || status;
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    const labels: Record<string, string> = {
+      URGENT: 'Urgente',
+      HIGH: 'Alta',
+      MEDIUM: 'Média',
+      LOW: 'Baixa',
+    };
+    return labels[priority] || priority;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'DRAFT': return 'bg-gray-200 text-gray-800';
+      case 'SUBMITTED': return 'bg-indigo-100 text-indigo-800';
       case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'IN_PROCESS': return 'bg-blue-100 text-blue-800';
       case 'APPROVED': return 'bg-green-100 text-green-800';
       case 'REJECTED': return 'bg-red-100 text-red-800';
-      case 'COMPLETED': return 'bg-blue-100 text-blue-800';
+      case 'COMPLETED': return 'bg-emerald-100 text-emerald-800';
+      case 'CANCELLED': return 'bg-rose-100 text-rose-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -441,15 +528,53 @@ export default function Compras() {
     }
   };
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | string) => {
+    const numericValue =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? parseFloat(value.replace(/\./g, '').replace(',', '.'))
+          : 0;
+    const numeric = Number.isFinite(numericValue) ? numericValue : 0;
+    // Garante exatamente 2 casas decimais usando toFixed
+    const rounded = parseFloat(numeric.toFixed(2));
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(value);
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(rounded);
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  const handleGenerateReport = async (filters: PurchaseRequestReportFilters) => {
+    try {
+      setGeneratingReport(true);
+      const blob = await purchaseRequestReportGenerator.generatePDF(purchaseRequests, filters);
+      const fileName = `relatorio-solicitacoes-compra-${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      setPdfBlob(blob);
+      setReportFileName(fileName);
+      setIsReportModalOpen(false);
+      setIsReportViewModalOpen(true);
+      
+      toast({
+        title: "Sucesso",
+        description: "Relatório PDF gerado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar relatório PDF. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   return (
@@ -479,7 +604,15 @@ export default function Compras() {
 
           {/* Aba de Solicitações */}
           <TabsContent value="solicitacoes" className="space-y-6">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsReportModalOpen(true)}
+                className="border-gray-600 text-seguranca-lightgray hover:bg-gray-700"
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                Gerar Relatório PDF
+              </Button>
               <Button onClick={() => setIsModalOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Solicitação
@@ -592,7 +725,7 @@ export default function Compras() {
                 <CardTitle>Solicitações de Compra</CardTitle>
               </CardHeader>
               <CardContent>
-                <Tabs value={activeRequestTab} onValueChange={setActiveRequestTab}>
+                <Tabs value={activeRequestTab} onValueChange={handleRequestTabChange}>
                   <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="all">Todas</TabsTrigger>
                     <TabsTrigger value="pending">Pendentes</TabsTrigger>
@@ -617,6 +750,7 @@ export default function Compras() {
                           <TableHead>Solicitante</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Prioridade</TableHead>
+                          {activeRequestTab === 'approved' && <TableHead>Aprovador por</TableHead>}
                           <TableHead>Data Necessária</TableHead>
                           <TableHead>Valor</TableHead>
                           <TableHead>Ações</TableHead>
@@ -651,7 +785,7 @@ export default function Compras() {
                             <TableCell>
                               <div className="space-y-1">
                                 <Badge className={getStatusColor(request.status)}>
-                                  {request.status}
+                                  {getStatusLabel(request.status)}
                                 </Badge>
                                 {request.urgent && (
                                   <Badge variant="destructive" className="text-xs">
@@ -667,9 +801,21 @@ export default function Compras() {
                             </TableCell>
                             <TableCell>
                               <Badge className={getPriorityColor(request.priority)}>
-                                {request.priority}
+                                {getPriorityLabel(request.priority)}
                               </Badge>
                             </TableCell>
+                            {activeRequestTab === 'approved' && (
+                              <TableCell>
+                                <div className="text-sm">
+                                  {request.approverName || request.approvedBy || '-'}
+                                  {request.approvalDate && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {formatDate(request.approvalDate)}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
                             <TableCell>
                               <div className="text-sm">
                                 {formatDate(request.requiredDate)}
@@ -694,42 +840,86 @@ export default function Compras() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditRequest(request)}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                {request.status === 'PENDING' && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleApproveRequest(request.id)}
-                                      className="text-green-600"
-                                    >
-                                      <CheckCircle className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRejectRequest(request.id)}
-                                      className="text-red-600"
-                                    >
-                                      <XCircle className="w-4 h-4" />
-                                    </Button>
-                                  </>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteRequest(request.id)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
+                              <TooltipProvider>
+                                <div className="flex items-center space-x-2">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleViewRequest(request)}
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Visualizar Solicitação</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditRequest(request)}
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Editar Solicitação</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  {request.status === 'PENDING' && (
+                                    <>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleApproveRequest(request.id)}
+                                            className="text-green-600"
+                                          >
+                                            <CheckCircle className="w-4 h-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Aprovar Solicitação</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRejectRequest(request.id)}
+                                            className="text-red-600"
+                                          >
+                                            <XCircle className="w-4 h-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Rejeitar Solicitação</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </>
+                                  )}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteRequest(request.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Excluir Solicitação</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TooltipProvider>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -887,12 +1077,44 @@ export default function Compras() {
           loading={loading}
         />
 
+        {/* Modal de Visualização de Solicitação */}
+        <PurchaseRequestViewModal
+          isOpen={isViewModalOpen}
+          onClose={() => {
+            setIsViewModalOpen(false);
+            setViewingRequest(undefined);
+          }}
+          request={viewingRequest}
+        />
+
         {/* Modal de Formulário de Fornecedor */}
         <SupplierFormModal
           isOpen={isSupplierModalOpen}
           onClose={handleCloseSupplierModal}
           supplier={editingSupplier}
           onSave={handleSaveSupplier}
+        />
+
+        {/* Modal de Relatório */}
+        <PurchaseRequestReportModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          onGenerate={handleGenerateReport}
+          loading={generatingReport}
+        />
+
+        {/* Modal de Visualização do PDF */}
+        <PurchaseRequestReportViewModal
+          isOpen={isReportViewModalOpen}
+          onClose={() => {
+            setIsReportViewModalOpen(false);
+            if (pdfBlob) {
+              URL.revokeObjectURL(URL.createObjectURL(pdfBlob));
+              setPdfBlob(null);
+            }
+          }}
+          pdfBlob={pdfBlob}
+          fileName={reportFileName}
         />
       </div>
     </MainLayout>

@@ -6,11 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Filter, FileText, Calendar, DollarSign, Building2, User, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Filter, FileText, Calendar, DollarSign, Building2, User, AlertTriangle, Eye, Edit, Trash } from 'lucide-react';
 import { Quotation, QuotationStatus, quotationService } from '@/services/quotationService';
+import { purchaseRequestService, PurchaseRequest } from '@/services/purchaseRequestService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import QuotationFormModal from '@/components/QuotationFormModal';
+import { QuotationViewModal } from '@/components/compras/QuotationViewModal';
+import { PurchaseRequestViewModal } from '@/components/compras/PurchaseRequestViewModal';
 
 interface QuotationFilters {
   status: QuotationStatus | 'ALL';
@@ -26,6 +29,10 @@ const CotacoesCompras: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+  const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingPurchaseRequest, setViewingPurchaseRequest] = useState<PurchaseRequest | null>(null);
+  const [isPurchaseRequestViewOpen, setIsPurchaseRequestViewOpen] = useState(false);
   const [filters, setFilters] = useState<QuotationFilters>({
     status: 'ALL',
     supplier: '',
@@ -215,6 +222,34 @@ const CotacoesCompras: React.FC = () => {
   const handleEditQuotation = (quotation: Quotation) => {
     setSelectedQuotation(quotation);
     setShowModal(true);
+  };
+
+  const handleViewQuotation = (quotation: Quotation) => {
+    setViewingQuotation(quotation);
+    setIsViewModalOpen(true);
+  };
+
+  const handleDeleteQuotation = async (quotation: Quotation) => {
+    const confirmed = window.confirm(`Deseja realmente excluir a cotação ${quotation.quoteNumber}?`);
+    if (!confirmed) return;
+    try {
+      await quotationService.remove(quotation.id);
+      await loadQuotations();
+    } catch (error) {
+      console.error('Erro ao excluir cotação:', error);
+      alert('Não foi possível excluir a cotação. Tente novamente.');
+    }
+  };
+
+  const handleViewPurchaseRequestFromQuotation = async (purchaseRequestId: string) => {
+    try {
+      const data = await purchaseRequestService.getPurchaseRequestById(purchaseRequestId);
+      setViewingPurchaseRequest(data);
+      setIsPurchaseRequestViewOpen(true);
+    } catch (error) {
+      console.error('Erro ao carregar solicitação de compra:', error);
+      alert('Não foi possível carregar a solicitação de compra.');
+    }
   };
 
   const handleModalClose = () => {
@@ -431,13 +466,32 @@ const CotacoesCompras: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditQuotation(quotation)}
-                        >
-                          Editar
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewQuotation(quotation)}
+                            title="Visualizar"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditQuotation(quotation)}
+                            title="Editar"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteQuotation(quotation)}
+                            title="Excluir"
+                          >
+                            <Trash className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -466,6 +520,26 @@ const CotacoesCompras: React.FC = () => {
           onClose={handleModalClose}
         />
       )}
+
+      {/* Modal de Visualização */}
+      <QuotationViewModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setViewingQuotation(null);
+        }}
+        quotation={viewingQuotation}
+        onViewPurchaseRequest={handleViewPurchaseRequestFromQuotation}
+      />
+
+      <PurchaseRequestViewModal
+        isOpen={isPurchaseRequestViewOpen}
+        onClose={() => {
+          setIsPurchaseRequestViewOpen(false);
+          setViewingPurchaseRequest(null);
+        }}
+        request={viewingPurchaseRequest || undefined}
+      />
     </StandardLayout>
   );
 };

@@ -25,6 +25,9 @@ public class PurchaseQuotationDTO {
     private String supplierName;
     private UUID unitId;
     private String unitName;
+    private UUID purchaseRequestId;
+    private String purchaseRequestNumber;
+    private String purchaseRequestTitle;
     private PurchaseQuotationStatus status;
     private BigDecimal totalValue;
     private LocalDate validUntil;
