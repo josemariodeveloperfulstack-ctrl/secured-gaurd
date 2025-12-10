@@ -89,6 +89,13 @@ const Escalas = () => {
       
       console.log('✅ Escalas recebidas do backend:', data);
       console.log('📊 Quantidade de escalas:', data?.length || 0);
+      console.log('📊 Tipo de dados:', Array.isArray(data) ? 'Array' : typeof data);
+      
+      if (data && data.length > 0) {
+        console.log('📊 Primeira escala (exemplo):', JSON.stringify(data[0], null, 2));
+        console.log('📊 ScheduleDate da primeira escala:', data[0].scheduleDate);
+        console.log('📊 Tipo do scheduleDate:', typeof data[0].scheduleDate);
+      }
       
       setSchedules(data || []);
     } catch (err: any) {
@@ -129,8 +136,19 @@ const Escalas = () => {
 
   // Agrupar escalas por funcionário para exibição semanal
   const escalasFuncionarios = React.useMemo(() => {
+    console.log('📊 escalasFuncionarios - schedules recebidos:', schedules);
+    console.log('📊 escalasFuncionarios - weekDays:', weekDays.map(d => format(d, 'yyyy-MM-dd')));
+    
     const map: { [employeeId: string]: { nome: string; cargo: string; escalas: any[] } } = {};
     schedules.forEach((s) => {
+      console.log('📊 Processando escala:', {
+        id: s.id,
+        scheduleDate: s.scheduleDate,
+        employeeId: s.employee?.id,
+        employeeName: s.employee?.name,
+        shift: s.shift
+      });
+      
       // Acessar employee como objeto (conforme interface Schedule)
       const employeeId = s.employee?.id || (s as any).employeeId || '';
       const employeeName = s.employee?.name || (s as any).employeeName || 'Sem funcionário';
@@ -143,16 +161,44 @@ const Escalas = () => {
           escalas: Array(7).fill({ turno: '', cliente: '', horario: '' }),
         };
       }
-      const dia = weekDays.findIndex((d) => format(d, 'yyyy-MM-dd') === s.scheduleDate);
+      
+      // Normalizar a data do schedule para comparação
+      let scheduleDateStr = s.scheduleDate;
+      if (scheduleDateStr) {
+        // Se a data vier como string completa (com hora), extrair apenas a parte da data
+        if (scheduleDateStr.includes('T')) {
+          scheduleDateStr = scheduleDateStr.split('T')[0];
+        }
+        // Se vier como Date object, converter para string
+        if (scheduleDateStr instanceof Date) {
+          scheduleDateStr = format(scheduleDateStr, 'yyyy-MM-dd');
+        }
+      }
+      
+      const dia = weekDays.findIndex((d) => {
+        const dayStr = format(d, 'yyyy-MM-dd');
+        const match = dayStr === scheduleDateStr;
+        if (match) {
+          console.log('✅ Data encontrada! Dia:', dayStr, 'ScheduleDate:', scheduleDateStr);
+        }
+        return match;
+      });
+      
       if (dia >= 0) {
         map[employeeId].escalas[dia] = {
           turno: getTurnoLabel(s.shift), // Converter turno para português
           cliente: locationName,
           horario: `${(s as any).startTime || ''} - ${(s as any).endTime || ''}`,
         };
+        console.log('✅ Escala adicionada ao dia', dia, 'para funcionário', employeeName);
+      } else {
+        console.log('⚠️ Data não encontrada na semana. ScheduleDate:', scheduleDateStr, 'Dias da semana:', weekDays.map(d => format(d, 'yyyy-MM-dd')));
       }
     });
-    return Object.entries(map).map(([id, v]) => ({ id, ...v }));
+    
+    const result = Object.entries(map).map(([id, v]) => ({ id, ...v }));
+    console.log('📊 escalasFuncionarios - resultado final:', result);
+    return result;
   }, [schedules, weekDays]);
 
   // Alertas de escalas

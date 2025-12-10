@@ -108,9 +108,11 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       try {
         // Carregar funcionários (employees, não users)
         const { employeeService } = await import('@/services/employeeService');
-        const employees = await employeeService.getAllEmployees();
+        const employees: any = await employeeService.getAllEmployees();
         // employeeService pode retornar um objeto com 'content' ou um array direto
-        const employeesList = Array.isArray(employees) ? employees : (employees.content || []);
+        const employeesList = Array.isArray(employees) 
+          ? employees 
+          : (employees?.content || []);
         const mappedEmployees = employeesList.map((e: any) => ({ 
           id: e.id, 
           name: e.name || e.nome || 'Funcionário sem nome' 
@@ -495,15 +497,21 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder="Selecione um funcionário" />
               </SelectTrigger>
-              <SelectContent className="bg-seguranca-graphite border-gray-600">
-                {usuarios.map(user => (
-                  <SelectItem key={user.id} value={user.id} className="hover:bg-seguranca-black/50">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      {user.name}
-                    </div>
+              <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
+                {usuarios.length > 0 ? (
+                  usuarios.map(user => (
+                    <SelectItem key={user.id} value={user.id} className="hover:bg-seguranca-black/50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        {user.name}
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="loading" disabled>
+                    Carregando funcionários...
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
             {errors.employeeId && (
@@ -546,10 +554,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder="Selecione um cliente" />
               </SelectTrigger>
-              <SelectContent className="bg-seguranca-graphite border-gray-600">
+              <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
                 {clientes.length > 0 ? (
                   clientes.map(client => (
-                    <SelectItem key={client.id} value={client.id} className="hover:bg-seguranca-black/50">
+                    <SelectItem key={client.id} value={client.id} className="hover:bg-seguranca-black/50 cursor-pointer">
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3 h-3 text-gray-400" />
                         {client.name}

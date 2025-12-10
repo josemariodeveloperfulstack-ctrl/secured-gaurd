@@ -19,6 +19,8 @@ import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.repository.PositionRepository;
 import com.z7design.secured_guard.repository.RouteRepository;
 import com.z7design.secured_guard.repository.PatrolRepository;
+import com.z7design.secured_guard.repository.UnitRepository;
+import com.z7design.secured_guard.model.Unit;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class ScheduleService {
     private final PositionRepository positionRepository;
     private final RouteRepository routeRepository;
     private final PatrolRepository patrolRepository;
+    private final UnitRepository unitRepository;
 
     @Transactional
     public Schedule create(Schedule schedule) {
@@ -49,18 +52,62 @@ public class ScheduleService {
     @Transactional
     public Schedule createFromDTO(CreateScheduleDTO dto) {
         try {
-            // Buscar Employee e Location pelos IDs
+            // Buscar Employee
             Employee employee = employeeRepository.findById(dto.getEmployeeId())
                     .orElseThrow(() -> new EntityNotFoundException("Employee not found with ID: " + dto.getEmployeeId()));
             
-            Location location = locationRepository.findById(dto.getLocationId())
-                    .orElseThrow(() -> new EntityNotFoundException("Location not found with ID: " + dto.getLocationId()));
-
-            // Buscar WorkPost se fornecido
-            WorkPost workPost = null;
-            if (dto.getWorkPostId() != null) {
-                workPost = workPostRepository.findById(dto.getWorkPostId())
-                        .orElse(null); // Opcional, não lança exceção se não encontrado
+            Location location = null;
+            // Se workPostId foi fornecido, buscar o WorkPost primeiro
+            final WorkPost workPost = (dto.getWorkPostId() != null) 
+                    ? workPostRepository.findById(dto.getWorkPostId()).orElse(null)
+                    : null;
+            
+            // Tentar buscar Location pelo locationId fornecido
+            if (dto.getLocationId() != null) {
+                location = locationRepository.findById(dto.getLocationId())
+                        .orElse(null);
+                
+                // Se locationId não for válido mas workPostId foi fornecido,
+                // tentar encontrar Location automaticamente baseada no WorkPost
+                if (location == null && workPost != null) {
+                    // Estratégia 1: Buscar Location pelo nome do WorkPost
+                    List<Location> allLocations = locationRepository.findAll();
+                    for (Location loc : allLocations) {
+                        if (loc.getName() != null && loc.getName().equals(workPost.getName())) {
+                            location = loc;
+                            break;
+                        }
+                    }
+                    
+                    // Estratégia 2: Se não encontrou pelo nome, buscar Location do Unit do Client do WorkPost
+                    if (location == null && workPost.getClient() != null) {
+                        // Buscar Units associados ao Client do WorkPost
+                        List<Unit> units = unitRepository.findByClientId(workPost.getClient().getId());
+                        
+                        // Para cada Unit, buscar Locations
+                        for (Unit unit : units) {
+                            List<Location> unitLocations = locationRepository.findByUnitId(unit.getId());
+                            if (!unitLocations.isEmpty()) {
+                                // Usar a primeira Location encontrada do Unit
+                                location = unitLocations.get(0);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Se ainda não encontrou, lançar exceção
+                    if (location == null) {
+                        throw new EntityNotFoundException(
+                            "Location not found with ID: " + dto.getLocationId() + 
+                            ". Não foi possível encontrar uma Location para o Posto de Trabalho '" + 
+                            workPost.getName() + "'. Por favor, crie uma Location primeiro."
+                        );
+                    }
+                } else if (location == null) {
+                    throw new EntityNotFoundException("Location not found with ID: " + dto.getLocationId());
+                }
+            } else {
+                throw new EntityNotFoundException("Location ID is required");
             }
 
             // Criar Schedule
@@ -118,7 +165,14 @@ public class ScheduleService {
     }
 
     public List<Schedule> findAll() {
-        return scheduleRepository.findAll();
+        try {
+            // Tentar usar o método com JOIN FETCH para carregar relacionamentos eager
+            return scheduleRepository.findAllWithRelations();
+        } catch (Exception e) {
+            // Se falhar, usar o método padrão
+            System.err.println("Erro ao buscar escalas com relacionamentos: " + e.getMessage());
+            return scheduleRepository.findAll();
+        }
     }
 
     @Transactional

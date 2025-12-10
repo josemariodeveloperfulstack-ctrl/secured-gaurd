@@ -2,6 +2,7 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.Schedule;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -13,4 +14,10 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     List<Schedule> findByScheduleDateBetween(LocalDate startDate, LocalDate endDate);
     List<Schedule> findByEmployeeId(UUID employeeId);
     List<Schedule> findByScheduleDate(LocalDate date);
+    
+    @Query("SELECT s FROM Schedule s " +
+           "LEFT JOIN FETCH s.employee " +
+           "LEFT JOIN FETCH s.location " +
+           "LEFT JOIN FETCH s.workPost")
+    List<Schedule> findAllWithRelations();
 } 

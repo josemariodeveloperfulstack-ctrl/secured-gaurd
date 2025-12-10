@@ -7,7 +7,8 @@ import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,11 +45,12 @@ public class Schedule {
     @NotNull(message = "Employee is required")
     @ManyToOne
     @JoinColumn(name = "employee_id", nullable = false)
-    @JsonBackReference
+    @JsonIgnoreProperties({"schedules", "hibernateLazyInitializer", "handler"})
     private Employee employee;
     
     @NotNull(message = "Schedule date is required")
     @Column(nullable = false)
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate scheduleDate;
     
     @NotNull(message = "Shift is required")
@@ -59,10 +61,12 @@ public class Schedule {
     @NotNull(message = "Location is required")
     @ManyToOne
     @JoinColumn(name = "location_id", nullable = false)
+    @JsonIgnoreProperties({"schedules", "hibernateLazyInitializer", "handler"})
     private Location location;
     
     @ManyToOne
     @JoinColumn(name = "work_post_id")
+    @JsonIgnoreProperties({"schedules", "hibernateLazyInitializer", "handler"})
     private WorkPost workPost;
     
     @NotNull(message = "Schedule status is required")
