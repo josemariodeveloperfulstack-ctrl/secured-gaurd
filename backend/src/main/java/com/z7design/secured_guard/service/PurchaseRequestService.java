@@ -233,6 +233,7 @@ public class PurchaseRequestService {
                 .approvalNotes(request.getApprovalNotes())
                 .supplier(request.getSupplier())
                 .paymentMethod(request.getPaymentMethod())
+                .installments(request.getInstallments())
                 .deliveryMethod(request.getDeliveryMethod())
                 .deliveryAddress(request.getDeliveryAddress())
                 .contactPerson(request.getContactPerson())
@@ -253,6 +254,12 @@ public class PurchaseRequestService {
         dto.setCanBeApproved(request.canBeApproved());
         dto.setOverdue(request.isOverdue());
         dto.setDaysUntilRequired(request.getDaysUntilRequired());
+        
+        // Se não houver itens, usar estimatedTotal como totalValue
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            dto.setTotalValue(request.getEstimatedTotal() != null ? request.getEstimatedTotal() : BigDecimal.ZERO);
+            dto.setTotalItems(0);
+        }
         
         return dto;
     }
@@ -277,6 +284,7 @@ public class PurchaseRequestService {
                 .approvalNotes(dto.getApprovalNotes())
                 .supplier(dto.getSupplier())
                 .paymentMethod(dto.getPaymentMethod())
+                .installments(dto.getInstallments())
                 .deliveryMethod(dto.getDeliveryMethod())
                 .deliveryAddress(dto.getDeliveryAddress())
                 .contactPerson(dto.getContactPerson())

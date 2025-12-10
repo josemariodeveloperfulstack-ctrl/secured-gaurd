@@ -1274,38 +1274,74 @@ jobs:
             
             # Tentar health check com timeout maior e seguir redirects
             # Usar -L para seguir redirects (HTTP -> HTTPS)
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 --connect-timeout 5 https://ci.z7botsolutions.com.br/api/health 2>&1 || echo "000")
+            # Separar stderr para evitar misturar códigos HTTP com mensagens de erro
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 --connect-timeout 10 --location-trusted https://ci.z7botsolutions.com.br/api/health 2>/dev/null)
+            CURL_EXIT=$?
             
-            echo "HTTP Code recebido: $HTTP_CODE"
+            # Se curl falhou, tentar obter código de erro
+            if [ $CURL_EXIT -ne 0 ] || [ -z "$HTTP_CODE" ]; then
+              HTTP_CODE="000"
+            fi
             
-            # Aceitar 200 (OK) ou 301/302 (redirect - indica que servidor está respondendo)
+            # Limpar HTTP_CODE de caracteres não numéricos (caso tenha mensagens de erro misturadas)
+            HTTP_CODE=$(echo "$HTTP_CODE" | grep -oE '[0-9]+' | head -1)
+            
+            echo "HTTP Code recebido: $HTTP_CODE (curl exit: $CURL_EXIT)"
+            
+            # Aceitar 200 (OK)
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health check passou! Aplicação CI está respondendo."
               
               # Verificar resposta completa
-              RESPONSE=$(curl -s -L --max-time 10 https://ci.z7botsolutions.com.br/api/health)
+              RESPONSE=$(curl -s -L --max-time 15 --location-trusted https://ci.z7botsolutions.com.br/api/health 2>/dev/null)
               echo "Resposta completa: $RESPONSE"
               
               exit 0
             elif [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
               echo "⚠️ HTTP Code: $HTTP_CODE (redirect detectado)"
-              echo "🔄 Tentando seguir redirect para obter resposta final..."
+              echo "🔄 Tentando seguir redirect explicitamente..."
               
-              # Tentar novamente seguindo redirects explicitamente
-              FINAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 --connect-timeout 5 https://ci.z7botsolutions.com.br/api/health 2>&1 || echo "000")
+              # Tentar com mais opções para seguir redirects
+              FINAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 --connect-timeout 10 --location-trusted --max-redirs 5 https://ci.z7botsolutions.com.br/api/health 2>/dev/null)
+              FINAL_EXIT=$?
+              
+              if [ $FINAL_EXIT -ne 0 ] || [ -z "$FINAL_CODE" ]; then
+                FINAL_CODE="000"
+              fi
+              
+              FINAL_CODE=$(echo "$FINAL_CODE" | grep -oE '[0-9]+' | head -1)
               
               if [ "$FINAL_CODE" = "200" ]; then
                 echo "✅ Health check passou após seguir redirect!"
-                RESPONSE=$(curl -s -L --max-time 10 https://ci.z7botsolutions.com.br/api/health)
+                RESPONSE=$(curl -s -L --max-time 15 --location-trusted https://ci.z7botsolutions.com.br/api/health 2>/dev/null)
                 echo "Resposta completa: $RESPONSE"
                 exit 0
               else
-                echo "⚠️ Após seguir redirect, HTTP Code: $FINAL_CODE (esperado: 200)"
+                echo "⚠️ Após seguir redirect, HTTP Code: $FINAL_CODE (esperado: 200, curl exit: $FINAL_EXIT)"
               fi
             elif [ "$HTTP_CODE" = "000" ]; then
               echo "⚠️ Timeout ou erro de conexão. Aplicação ainda pode estar iniciando..."
+              echo "💡 Verificando se o problema é com Cloudflare ou servidor..."
+              
+              # Tentar testar diretamente no servidor via SSH
+              echo "🔍 Testando endpoint diretamente no servidor (via SSH)..."
+              SERVER_CODE=$(sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "curl -s -o /dev/null -w '%{http_code}' -L --max-time 10 --location-trusted https://ci.z7botsolutions.com.br/api/health 2>/dev/null || echo '000'" 2>/dev/null || echo "ssh_failed")
+              
+              if [ "$SERVER_CODE" = "200" ]; then
+                echo "✅ Servidor responde corretamente! O problema pode ser com Cloudflare ou rede."
+                echo "💡 Verifique configurações do Cloudflare (SSL/TLS mode, origin certificate)"
+              elif [ "$SERVER_CODE" != "ssh_failed" ] && [ "$SERVER_CODE" != "000" ]; then
+                echo "⚠️ Servidor retornou HTTP $SERVER_CODE (pode ser problema de configuração)"
+              else
+                echo "⚠️ Não foi possível testar diretamente no servidor"
+              fi
             else
               echo "⚠️ HTTP Code: $HTTP_CODE (esperado: 200)"
+              
+              # Se recebeu um código HTTP válido mas não 200, pode ser problema de configuração
+              if [ "$HTTP_CODE" -ge 400 ] && [ "$HTTP_CODE" -lt 600 ]; then
+                echo "💡 HTTP $HTTP_CODE indica erro do servidor. Verifique logs do backend."
+              fi
             fi
             
             # A cada 3 tentativas, verificar logs e status do Traefik

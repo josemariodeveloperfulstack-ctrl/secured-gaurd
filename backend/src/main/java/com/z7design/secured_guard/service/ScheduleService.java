@@ -7,6 +7,7 @@ import com.z7design.secured_guard.model.Schedule;
 import com.z7design.secured_guard.model.EmployeeSchedule;
 import com.z7design.secured_guard.model.Location;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.Position;
 import com.z7design.secured_guard.model.Route;
 import com.z7design.secured_guard.model.Patrol;
@@ -14,6 +15,7 @@ import com.z7design.secured_guard.repository.ScheduleRepository;
 import com.z7design.secured_guard.repository.EmployeeScheduleRepository;
 import com.z7design.secured_guard.repository.LocationRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.repository.PositionRepository;
 import com.z7design.secured_guard.repository.RouteRepository;
 import com.z7design.secured_guard.repository.PatrolRepository;
@@ -34,6 +36,7 @@ public class ScheduleService {
     private final EmployeeScheduleRepository employeeScheduleRepository;
     private final LocationRepository locationRepository;
     private final EmployeeRepository employeeRepository;
+    private final WorkPostRepository workPostRepository;
     private final PositionRepository positionRepository;
     private final RouteRepository routeRepository;
     private final PatrolRepository patrolRepository;
@@ -45,24 +48,38 @@ public class ScheduleService {
 
     @Transactional
     public Schedule createFromDTO(CreateScheduleDTO dto) {
-        // Buscar Employee e Location pelos IDs
-        Employee employee = employeeRepository.findById(dto.getEmployeeId())
-                .orElseThrow(() -> new EntityNotFoundException("Employee not found with ID: " + dto.getEmployeeId()));
-        
-        Location location = locationRepository.findById(dto.getLocationId())
-                .orElseThrow(() -> new EntityNotFoundException("Location not found with ID: " + dto.getLocationId()));
+        try {
+            // Buscar Employee e Location pelos IDs
+            Employee employee = employeeRepository.findById(dto.getEmployeeId())
+                    .orElseThrow(() -> new EntityNotFoundException("Employee not found with ID: " + dto.getEmployeeId()));
+            
+            Location location = locationRepository.findById(dto.getLocationId())
+                    .orElseThrow(() -> new EntityNotFoundException("Location not found with ID: " + dto.getLocationId()));
 
-        // Criar Schedule
-        Schedule schedule = Schedule.builder()
-                .employee(employee)
-                .location(location)
-                .scheduleDate(dto.getScheduleDate())
-                .shift(dto.getShift())
-                .status(dto.getStatus())
-                .observations(dto.getObservations())
-                .build();
+            // Buscar WorkPost se fornecido
+            WorkPost workPost = null;
+            if (dto.getWorkPostId() != null) {
+                workPost = workPostRepository.findById(dto.getWorkPostId())
+                        .orElse(null); // Opcional, não lança exceção se não encontrado
+            }
 
-        return scheduleRepository.save(schedule);
+            // Criar Schedule
+            Schedule schedule = Schedule.builder()
+                    .employee(employee)
+                    .location(location)
+                    .workPost(workPost)
+                    .scheduleDate(dto.getScheduleDate())
+                    .shift(dto.getShift())
+                    .status(dto.getStatus())
+                    .observations(dto.getObservations())
+                    .build();
+
+            return scheduleRepository.save(schedule);
+        } catch (Exception e) {
+            System.err.println("Erro ao criar Schedule: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @Transactional
@@ -73,6 +90,7 @@ public class ScheduleService {
         existingSchedule.setScheduleDate(schedule.getScheduleDate());
         existingSchedule.setShift(schedule.getShift());
         existingSchedule.setLocation(schedule.getLocation());
+        existingSchedule.setWorkPost(schedule.getWorkPost());
         existingSchedule.setStatus(schedule.getStatus());
         existingSchedule.setRoute(schedule.getRoute());
         existingSchedule.setPatrol(schedule.getPatrol());

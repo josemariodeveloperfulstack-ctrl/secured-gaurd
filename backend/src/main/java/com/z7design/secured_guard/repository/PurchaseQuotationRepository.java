@@ -42,3 +42,6 @@ public interface PurchaseQuotationRepository extends JpaRepository<PurchaseQuota
 }
 
 
+
+
+

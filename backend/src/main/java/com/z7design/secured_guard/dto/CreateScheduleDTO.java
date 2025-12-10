@@ -16,6 +16,8 @@ public class CreateScheduleDTO {
     @NotNull(message = "Location ID is required")
     private UUID locationId;
     
+    private UUID workPostId; // Posto de trabalho (opcional)
+    
     @NotNull(message = "Schedule date is required")
     private LocalDate scheduleDate;
     

@@ -151,7 +151,7 @@ export default function Compras() {
         pendingRequests: pendingCount,
         urgentRequests: urgentRequests.length,
         overdueRequests: overdueRequests.length,
-        totalValue: purchaseRequests.reduce((sum, req) => sum + (req.totalValue || 0), 0),
+        totalValue: purchaseRequests.reduce((sum, req) => sum + (req.totalValue || req.estimatedTotal || 0), 0),
       }));
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
@@ -203,9 +203,9 @@ export default function Compras() {
     setFilteredRequests(filtered);
   };
 
-  const handleCreateRequest = async (requestData: CreatePurchaseRequestRequest) => {
+  const handleCreateRequest = async (requestData: CreatePurchaseRequestRequest): Promise<PurchaseRequest> => {
     try {
-      await purchaseRequestService.createPurchaseRequest(requestData);
+      const savedRequest = await purchaseRequestService.createPurchaseRequest(requestData);
       await loadPurchaseRequests();
       await loadStats();
       setIsModalOpen(false);
@@ -213,14 +213,15 @@ export default function Compras() {
         title: "Sucesso",
         description: "Solicitação de compra criada com sucesso!",
       });
+      return savedRequest;
     } catch (error) {
       throw error;
     }
   };
 
-  const handleUpdateRequest = async (requestData: any) => {
+  const handleUpdateRequest = async (requestData: any): Promise<PurchaseRequest> => {
     try {
-      await purchaseRequestService.updatePurchaseRequest(requestData.id, requestData);
+      const savedRequest = await purchaseRequestService.updatePurchaseRequest(requestData.id, requestData);
       await loadPurchaseRequests();
       await loadStats();
       setIsModalOpen(false);
@@ -229,6 +230,7 @@ export default function Compras() {
         title: "Sucesso",
         description: "Solicitação de compra atualizada com sucesso!",
       });
+      return savedRequest;
     } catch (error) {
       throw error;
     }
@@ -683,7 +685,7 @@ export default function Compras() {
                             </TableCell>
                             <TableCell>
                               <div className="text-sm">
-                                {formatCurrency(request.totalValue || 0)}
+                                {formatCurrency(request.totalValue || request.estimatedTotal || 0)}
                                 {request.totalItems && (
                                   <div className="text-xs text-muted-foreground">
                                     {request.totalItems} itens

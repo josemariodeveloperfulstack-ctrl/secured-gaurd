@@ -35,6 +35,7 @@ public class PurchaseRequestDTO {
     private String approvalNotes;
     private String supplier;
     private String paymentMethod;
+    private Integer installments;
     private String deliveryMethod;
     private String deliveryAddress;
     private String contactPerson;

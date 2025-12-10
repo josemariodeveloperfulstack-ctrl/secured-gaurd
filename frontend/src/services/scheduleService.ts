@@ -45,6 +45,7 @@ export interface Schedule {
 export interface CreateScheduleDTO {
   employeeId: string;
   locationId: string;
+  workPostId?: string; // Posto de trabalho (opcional)
   scheduleDate: string; // Formato YYYY-MM-DD
   shift: Shift;
   status: ScheduleStatus;
@@ -122,8 +123,17 @@ export const scheduleService = {
    * @param data - Os dados da nova escala.
    */
   async create(data: CreateScheduleDTO): Promise<Schedule> {
-    const response = await api.post('/api/schedules', data);
-    return response.data;
+    console.log('📤 ScheduleService.create - Enviando dados:', data);
+    try {
+      const response = await api.post('/api/schedules', data);
+      console.log('✅ ScheduleService.create - Resposta:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ ScheduleService.create - Erro:', error);
+      console.error('❌ Response data:', error.response?.data);
+      console.error('❌ Response status:', error.response?.status);
+      throw error;
+    }
   },
 
   /**

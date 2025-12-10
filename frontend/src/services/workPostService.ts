@@ -90,11 +90,26 @@ export const workPostService = {
   // Buscar todos os postos de trabalho
   async getAllWorkPosts(): Promise<WorkPost[]> {
     try {
+      console.log('🔗 workPostService.getAllWorkPosts - Fazendo requisição para /api/work-posts/all');
       const response = await api.get('/api/work-posts/all');
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar postos de trabalho:', error);
-      throw new Error('Falha ao buscar postos de trabalho');
+      console.log('✅ workPostService.getAllWorkPosts - Resposta recebida:', response.data);
+      console.log('✅ workPostService.getAllWorkPosts - Tipo de dados:', Array.isArray(response.data) ? 'Array' : typeof response.data);
+      console.log('✅ workPostService.getAllWorkPosts - Quantidade:', Array.isArray(response.data) ? response.data.length : 'N/A');
+      
+      if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data && Array.isArray(response.data.content)) {
+        return response.data.content;
+      } else {
+        console.warn('⚠️ workPostService.getAllWorkPosts - Formato de resposta inesperado:', response.data);
+        return [];
+      }
+    } catch (error: any) {
+      console.error('❌ workPostService.getAllWorkPosts - Erro:', error);
+      console.error('❌ workPostService.getAllWorkPosts - Status:', error.response?.status);
+      console.error('❌ workPostService.getAllWorkPosts - Data:', error.response?.data);
+      console.error('❌ workPostService.getAllWorkPosts - Message:', error.message);
+      throw error;
     }
   },
 

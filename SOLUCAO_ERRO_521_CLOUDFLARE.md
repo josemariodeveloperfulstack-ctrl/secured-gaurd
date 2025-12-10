@@ -220,3 +220,6 @@ curl http://localhost/api/health
 - [Documentação do Traefik](https://doc.traefik.io/traefik/)
 - [Docker Networking](https://docs.docker.com/network/)
 
+
+
+

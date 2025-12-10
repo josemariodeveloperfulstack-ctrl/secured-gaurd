@@ -286,3 +286,6 @@ BEGIN
     RAISE NOTICE '   - Frota: 3 veículos de teste';
 END $$;
 
+
+
+

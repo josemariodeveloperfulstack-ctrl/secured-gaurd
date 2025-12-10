@@ -2,7 +2,6 @@ package com.z7design.secured_guard.controller;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -33,6 +32,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.Parameter;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/schedules")
@@ -51,8 +51,13 @@ public class ScheduleController {
         })
         @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados da escala de trabalho para criação", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Schedule.class), examples = @ExampleObject(value = "{\"employeeId\":\"UUID_DO_FUNCIONARIO\", \"date\":\"2024-07-01\", \"startTime\":\"08:00:00\", \"endTime\":\"17:00:00\", \"shift\":\"DAY\", \"notes\":\"Escala normal de segunda a sexta.\"}")))
         @PostMapping
-        public ResponseEntity<Schedule> create(@RequestBody CreateScheduleDTO createScheduleDTO) {
-                return ResponseEntity.ok(scheduleService.createFromDTO(createScheduleDTO));
+        public ResponseEntity<Schedule> create(@RequestBody @Valid CreateScheduleDTO createScheduleDTO) {
+                try {
+                        return ResponseEntity.ok(scheduleService.createFromDTO(createScheduleDTO));
+                } catch (Exception e) {
+                        e.printStackTrace();
+                        throw e;
+                }
         }
 
         @Operation(summary = "Atualiza uma escala de trabalho existente", description = "Atualiza as informações de uma escala de trabalho pelo seu ID. Requer o papel de ADMIN ou GESTOR.")
@@ -120,54 +125,7 @@ public class ScheduleController {
                         @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
         })
         @GetMapping
-        public ResponseEntity<List<Map<String, Object>>> findAll() {
-                // Temporariamente retornar dados de teste para demonstrar integração
-                List<Map<String, Object>> schedules = List.of(
-                    Map.of(
-                        "id", "11111111-1111-1111-1111-111111111111",
-                        "employee", Map.of(
-                            "id", "emp-001",
-                            "name", "GIDELVAN"
-                        ),
-                        "scheduleDate", "2025-01-30",
-                        "shift", "NIGHT",
-                        "location", Map.of(
-                            "id", "loc-001",
-                            "name", "NOTURNO"
-                        ),
-                        "workPost", Map.of(
-                            "id", "wp-001",
-                            "name", "Posto Central",
-                            "postCode", "PC-001"
-                        ),
-                        "status", "PENDING",
-                        "observations", "Escala noturna - 22:00 às 06:00",
-                        "createdAt", "2025-01-29T10:00:00Z",
-                        "updatedAt", "2025-01-29T10:00:00Z"
-                    ),
-                    Map.of(
-                        "id", "22222222-2222-2222-2222-222222222222",
-                        "employee", Map.of(
-                            "id", "emp-002",
-                            "name", "ALEX"
-                        ),
-                        "scheduleDate", "2025-01-30",
-                        "shift", "DAY",
-                        "location", Map.of(
-                            "id", "loc-002",
-                            "name", "ITATIAIA"
-                        ),
-                        "workPost", Map.of(
-                            "id", "wp-002",
-                            "name", "Posto Secundário",
-                            "postCode", "PS-002"
-                        ),
-                        "status", "PENDING",
-                        "observations", "Escala diurna - 06:00 às 18:00",
-                        "createdAt", "2025-01-29T10:00:00Z",
-                        "updatedAt", "2025-01-29T10:00:00Z"
-                    )
-                );
-                return ResponseEntity.ok(schedules);
+        public ResponseEntity<List<Schedule>> findAll() {
+                return ResponseEntity.ok(scheduleService.findAll());
         }
 }

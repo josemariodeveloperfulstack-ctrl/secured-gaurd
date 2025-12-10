@@ -20,6 +20,7 @@ export interface PurchaseRequest {
   approvalNotes?: string;
   supplier?: string;
   paymentMethod?: string;
+  installments?: number;
   deliveryMethod?: string;
   deliveryAddress?: string;
   contactPerson?: string;
@@ -94,6 +95,7 @@ export interface CreatePurchaseRequestRequest {
   approvalNotes?: string;
   supplier?: string;
   paymentMethod?: string;
+  installments?: number;
   deliveryMethod?: string;
   deliveryAddress?: string;
   contactPerson?: string;

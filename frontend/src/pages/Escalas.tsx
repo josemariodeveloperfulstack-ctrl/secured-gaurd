@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -23,11 +23,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Interface para os dados do formulário de escala
 interface EscalaFormData {
   employeeId: string;
   locationId: string;
+  workPostId: string;
   scheduleDate: Date;
   shift: string;
   startTime: string;
@@ -48,6 +59,18 @@ const Escalas = () => {
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [escalaToDelete, setEscalaToDelete] = useState<Schedule | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Monitorar mudanças no estado do modal
+  useEffect(() => {
+    console.log('📊 Estado do modal mudou:', {
+      isModalOpen,
+      modalMode,
+      selectedEscala: selectedEscala ? selectedEscala.id : null
+    });
+  }, [isModalOpen, modalMode, selectedEscala]);
 
   // Gere dias da semana começando da segunda-feira
   const startDate = startOfWeek(date, { weekStartsOn: 1 });
@@ -58,17 +81,25 @@ const Escalas = () => {
     try {
       setLoading(true);
       setError(null);
-      const filters: ScheduleFilters = {
-        startDate: format(startDate, 'yyyy-MM-dd'),
-        endDate: format(addDays(startDate, 6), 'yyyy-MM-dd'),
-      };
-      const data = await scheduleService.getSchedules(filters);
-      setSchedules(data);
-    } catch (err) {
+      console.log('🔄 Carregando escalas...');
+      
+      // Por enquanto, buscar todas as escalas sem filtros de data
+      // O backend pode não suportar filtros ainda
+      const data = await scheduleService.getSchedules();
+      
+      console.log('✅ Escalas recebidas do backend:', data);
+      console.log('📊 Quantidade de escalas:', data?.length || 0);
+      
+      setSchedules(data || []);
+    } catch (err: any) {
+      console.error('❌ Erro ao carregar escalas:', err);
+      console.error('❌ Status:', err.response?.status);
+      console.error('❌ Mensagem:', err.response?.data);
+      
       setError('Erro ao carregar escalas. Tente novamente.');
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar as escalas.',
+        description: err.response?.data?.message || 'Não foi possível carregar as escalas.',
         variant: 'destructive',
       });
     } finally {
@@ -100,19 +131,24 @@ const Escalas = () => {
   const escalasFuncionarios = React.useMemo(() => {
     const map: { [employeeId: string]: { nome: string; cargo: string; escalas: any[] } } = {};
     schedules.forEach((s) => {
-      if (!map[s.employeeId]) {
-        map[s.employeeId] = {
-          nome: s.employeeName,
+      // Acessar employee como objeto (conforme interface Schedule)
+      const employeeId = s.employee?.id || (s as any).employeeId || '';
+      const employeeName = s.employee?.name || (s as any).employeeName || 'Sem funcionário';
+      const locationName = s.location?.name || (s as any).locationName || (s as any).clientName || 'Sem local';
+      
+      if (!map[employeeId]) {
+        map[employeeId] = {
+          nome: employeeName,
           cargo: '', // Pode ser preenchido se vier do backend
           escalas: Array(7).fill({ turno: '', cliente: '', horario: '' }),
         };
       }
-      const dia = weekDays.findIndex((d) => format(d, 'yyyy-MM-dd') === s.date);
+      const dia = weekDays.findIndex((d) => format(d, 'yyyy-MM-dd') === s.scheduleDate);
       if (dia >= 0) {
-        map[s.employeeId].escalas[dia] = {
+        map[employeeId].escalas[dia] = {
           turno: s.shift,
-          cliente: s.clientName,
-          horario: `${s.startTime} - ${s.endTime}`,
+          cliente: locationName,
+          horario: `${(s as any).startTime || ''} - ${(s as any).endTime || ''}`,
         };
       }
     });
@@ -159,17 +195,45 @@ const Escalas = () => {
   // Função para lidar com a criação/edição de escala
   const handleSaveEscala = async (data: EscalaFormData) => {
   try {
+    console.log('💾 Salvando escala com dados:', data);
+    
+    // Validação: verificar se todos os campos obrigatórios estão preenchidos
+    if (!data.employeeId || !data.locationId || !data.shift || !data.scheduleDate) {
+      toast({
+        title: 'Erro de validação',
+        description: 'Por favor, preencha todos os campos obrigatórios.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     // Ajustar o mapeamento para o DTO correto do backend
-    const mappedData = {
+    const mappedData: any = {
       employeeId: data.employeeId,
       locationId: data.locationId,
       scheduleDate: format(data.scheduleDate, 'yyyy-MM-dd'),
-      shift: data.shift as any, // O backend espera 'DAY', 'NIGHT', 'MIXED', etc.
-      startTime: data.startTime,
-      endTime: data.endTime,
-      observations: data.observations,
-      status: data.status || 'PENDING',
+      shift: data.shift, // O backend espera 'DAY', 'NIGHT', 'MIXED', etc.
+      status: 'PENDING', // Status padrão
     };
+    
+    // Adicionar workPostId apenas se foi selecionado (e não for string vazia)
+    if (data.workPostId && data.workPostId.trim() !== '' && data.workPostId !== 'none') {
+      mappedData.workPostId = data.workPostId;
+    }
+    
+    // Adicionar observations apenas se não for vazio
+    if (data.observations && data.observations.trim() !== '') {
+      mappedData.observations = data.observations;
+    }
+    
+    // Remover campos undefined para evitar problemas de serialização
+    Object.keys(mappedData).forEach(key => {
+      if (mappedData[key] === undefined) {
+        delete mappedData[key];
+      }
+    });
+    
+    console.log('📤 Dados mapeados para envio:', mappedData);
     if (modalMode === 'edit' && selectedEscala) {
       await scheduleService.update(selectedEscala.id, mappedData);
       toast({
@@ -186,40 +250,99 @@ const Escalas = () => {
     setIsModalOpen(false);
     setSelectedEscala(null);
     loadSchedules();
-  } catch (err) {
+  } catch (err: any) {
+    console.error('❌ Erro detalhado ao salvar escala:', err);
+    console.error('❌ Response data:', err.response?.data);
+    console.error('❌ Response status:', err.response?.status);
+    
+    const errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error || 
+                        err.message || 
+                        'Não foi possível salvar a escala.';
+    
     toast({
-      title: 'Erro',
-      description: 'Não foi possível salvar a escala.',
+      title: 'Erro ao salvar escala',
+      description: errorMessage,
       variant: 'destructive',
     });
     }
   };
 
-  // Função para deletar escala
-  const handleDeleteEscala = async (escala: Schedule) => {
+  // Função para abrir diálogo de confirmação de exclusão
+  const handleDeleteClick = (escala: Schedule) => {
+    setEscalaToDelete(escala);
+    setDeleteDialogOpen(true);
+  };
+
+  // Função para confirmar e deletar escala
+  const handleDeleteConfirm = async () => {
+    if (!escalaToDelete) return;
+    
+    setIsDeleting(true);
     try {
-      await scheduleService.deleteSchedule(escala.id);
-      toast({ title: 'Excluída com sucesso!', description: 'A escala foi removida.' });
+      await scheduleService.deleteSchedule(escalaToDelete.id);
+      toast({ 
+        title: 'Excluída com sucesso!', 
+        description: `A escala de ${escalaToDelete.employee?.name || 'funcionário'} foi removida.` 
+      });
+      setDeleteDialogOpen(false);
+      setEscalaToDelete(null);
       loadSchedules();
     } catch (err) {
-      toast({ title: 'Erro ao excluir', description: 'Não foi possível excluir a escala.', variant: 'destructive' });
+      console.error('Erro ao excluir escala:', err);
+      toast({ 
+        title: 'Erro ao excluir', 
+        description: 'Não foi possível excluir a escala. Tente novamente.', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   // Função para editar escala
   const handleEditEscala = (escala: Schedule) => {
-    console.log('✏️ handleEditEscala chamado para:', escala);
-    setSelectedEscala(escala);
-    setModalMode('edit');
-    setIsModalOpen(true);
+    console.log('✏️ handleEditEscala INICIADO - escala recebida:', escala);
+    console.log('✏️ handleEditEscala - Dados completos:', JSON.stringify(escala, null, 2));
+    
+    try {
+      setSelectedEscala(escala);
+      setModalMode('edit');
+      setIsModalOpen(true);
+      console.log('✏️ handleEditEscala - CONCLUÍDO com sucesso');
+    } catch (error) {
+      console.error('❌ handleEditEscala - ERRO:', error);
+    }
   };
 
   // Função para visualizar escala
   const handleViewEscala = (escala: Schedule) => {
-    console.log('🔍 handleViewEscala chamado para:', escala);
+    console.log('🔍 handleViewEscala INICIADO - escala recebida:', escala);
+    console.log('🔍 handleViewEscala - Estado ANTES da atualização:', {
+      isModalOpen,
+      modalMode,
+      selectedEscala: selectedEscala?.id
+    });
+    
+    // Atualizar estados de forma síncrona
     setSelectedEscala(escala);
     setModalMode('view');
     setIsModalOpen(true);
+    
+    console.log('🔍 handleViewEscala - Estados atualizados (síncrono):', {
+      selectedEscala: escala.id,
+      modalMode: 'view',
+      isModalOpen: true
+    });
+    
+    // Verificar após um pequeno delay para ver se os estados foram atualizados
+    setTimeout(() => {
+      console.log('🔍 handleViewEscala - Estado DEPOIS (100ms):', {
+        isModalOpen,
+        modalMode,
+        selectedEscala: selectedEscala?.id
+      });
+    }, 100);
   };
 
   // Loading state
@@ -532,29 +655,95 @@ const Escalas = () => {
           isLoading={loading}
           onRefresh={loadSchedules}
           onEdit={handleEditEscala}
-          onDelete={handleDeleteEscala}
-          onView={handleViewEscala}
+          onDelete={handleDeleteClick}
+          onView={(escala) => {
+            console.log('📞 onView chamado diretamente na prop, escala:', escala);
+            handleViewEscala(escala);
+          }}
           onCreate={() => { setSelectedEscala(null); setModalMode('create'); setIsModalOpen(true); }}
         />
 
         <EscalaFormModal
+          key={`modal-${selectedEscala?.id || 'new'}-${modalMode}`}
           open={isModalOpen}
           onOpenChange={(open) => {
+            console.log('🎭 EscalaFormModal onOpenChange chamado:', open, 'isModalOpen atual:', isModalOpen);
             setIsModalOpen(open);
-            if (!open) setSelectedEscala(null);
+            if (!open) {
+              setSelectedEscala(null);
+              setModalMode('create');
+            }
           }}
           onSave={handleSaveEscala}
-          initialData={selectedEscala ? {
-            employeeId: selectedEscala.employee?.id || '',
-            locationId: selectedEscala.location?.id || '',
-            scheduleDate: selectedEscala.scheduleDate ? new Date(selectedEscala.scheduleDate) : new Date(),
-            shift: selectedEscala.shift || '',
-            startTime: (selectedEscala as any).startTime || (selectedEscala.shift === 'DAY' ? '08:00' : selectedEscala.shift === 'NIGHT' ? '22:00' : '14:00'),
-            endTime: (selectedEscala as any).endTime || (selectedEscala.shift === 'DAY' ? '17:00' : selectedEscala.shift === 'NIGHT' ? '06:00' : '22:00'),
-            observations: selectedEscala.observations || '',
-          } : undefined}
+          initialData={useMemo(() => {
+            if (selectedEscala) {
+              const mappedData = {
+                employeeId: selectedEscala.employee?.id || '',
+                locationId: selectedEscala.location?.id || '',
+                workPostId: selectedEscala.workPost?.id || '',
+                scheduleDate: selectedEscala.scheduleDate ? new Date(selectedEscala.scheduleDate) : new Date(),
+                shift: selectedEscala.shift || '',
+                startTime: (selectedEscala as any).startTime || (selectedEscala.shift === 'DAY' ? '08:00' : selectedEscala.shift === 'NIGHT' ? '22:00' : '14:00') || '',
+                endTime: (selectedEscala as any).endTime || (selectedEscala.shift === 'DAY' ? '17:00' : selectedEscala.shift === 'NIGHT' ? '06:00' : '22:00') || '',
+                observations: selectedEscala.observations || '',
+              };
+              console.log('📋 initialData mapeado (useMemo):', mappedData);
+              console.log('📋 selectedEscala original:', selectedEscala);
+              return mappedData;
+            }
+            return {
+              employeeId: '',
+              locationId: '',
+              workPostId: '',
+              scheduleDate: new Date(),
+              shift: '',
+              startTime: '',
+              endTime: '',
+              observations: '',
+            };
+          }, [selectedEscala])}
           mode={modalMode}
         />
+
+        {/* Diálogo de Confirmação de Exclusão */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-seguranca-graphite border-gray-600">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-seguranca-lightgray">
+                Confirmar Exclusão
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                Tem certeza que deseja excluir a escala de{' '}
+                <span className="font-semibold text-white">
+                  {escalaToDelete?.employee?.name || 'funcionário'}
+                </span>
+                {' '}para o dia{' '}
+                <span className="font-semibold text-white">
+                  {escalaToDelete?.scheduleDate ? format(new Date(escalaToDelete.scheduleDate), 'dd/MM/yyyy', { locale: ptBR }) : 'data'}
+                </span>?
+                <br />
+                <span className="text-xs text-gray-500 mt-2 block">
+                  Esta ação não pode ser desfeita.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel 
+                className="bg-seguranca-graphite text-seguranca-lightgray border-gray-600 hover:bg-gray-700"
+                disabled={isDeleting}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? 'Excluindo...' : 'Excluir'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </StandardLayout>
   );

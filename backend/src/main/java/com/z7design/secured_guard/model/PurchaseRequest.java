@@ -76,6 +76,9 @@ public class PurchaseRequest {
     @Column(length = 20)
     private String paymentMethod;
     
+    @Column(name = "installments")
+    private Integer installments;
+    
     @Column(length = 20)
     private String deliveryMethod;
     

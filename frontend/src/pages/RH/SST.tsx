@@ -285,10 +285,14 @@ const SST: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-seguranca-lightgray">
-                    {sstStats ? `${sstStats.asoUpToDate}/${sstStats.totalEmployees}` : '0/0'}
+                    {sstStats 
+                      ? `${sstStats.asoUpToDate ?? 0}/${sstStats.totalEmployees ?? 0}` 
+                      : '0/0'}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {sstStats ? `${((sstStats.asoUpToDate / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários` : '0% dos funcionários'}
+                    {sstStats && sstStats.totalEmployees && sstStats.totalEmployees > 0
+                      ? `${(((sstStats.asoUpToDate ?? 0) / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários`
+                      : '0% dos funcionários'}
                   </p>
                 </CardContent>
               </Card>
@@ -300,10 +304,14 @@ const SST: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-seguranca-lightgray">
-                    {sstStats ? `${sstStats.epiValid}/${sstStats.totalEmployees}` : '0/0'}
+                    {sstStats 
+                      ? `${sstStats.epiValid ?? 0}/${sstStats.totalEmployees ?? 0}` 
+                      : '0/0'}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {sstStats ? `${((sstStats.epiValid / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários` : '0% dos funcionários'}
+                    {sstStats && sstStats.totalEmployees && sstStats.totalEmployees > 0
+                      ? `${(((sstStats.epiValid ?? 0) / sstStats.totalEmployees) * 100).toFixed(1)}% dos funcionários`
+                      : '0% dos funcionários'}
                   </p>
                 </CardContent>
               </Card>
