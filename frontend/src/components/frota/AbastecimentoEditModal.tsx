@@ -14,6 +14,8 @@ import { Driver } from '@/types/driver';
 import { FuelRecord } from '@/types/fleet';
 import { Plus, User, Eye } from 'lucide-react';
 import api from '@/lib/axios';
+import { contasAPagarService, Supplier, CreateSupplierRequest } from '@/services/contasAPagarService';
+import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
 
 interface Veiculo {
   id: string;
@@ -42,22 +44,12 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
-  const [fuelStations, setFuelStations] = useState<string[]>([]);
-  const [loadingStations, setLoadingStations] = useState(false);
   const [showNewDriverModal, setShowNewDriverModal] = useState(false);
   const [newDriverData, setNewDriverData] = useState({
     name: '',
     licenseNumber: ''
   });
-  const [showNewStationModal, setShowNewStationModal] = useState(false);
-  const [newStationData, setNewStationData] = useState({
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    phone: '',
-    brand: ''
-  });
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
   
   const [formData, setFormData] = useState({
     veiculo_id: '',
@@ -134,9 +126,6 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
       
       console.log('🔍 Centro de Custo recebido:', abastecimento.costCenter);
       console.log('🔍 Centro de Custo no formData:', abastecimento.costCenter || '');
-      
-      // Carregar postos de combustível
-      loadFuelStations();
     }
   }, [abastecimento, isOpen]);
 
@@ -197,49 +186,46 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
     value: cc.id || ''
   }));
 
-  // Carregar postos de combustível
-  const loadFuelStations = async () => {
-    setLoadingStations(true);
-    try {
-      console.log('🔍 Carregando postos de combustível...');
-      
-      // Tentar buscar da nova tabela de postos
+  // Query para carregar fornecedores ativos
+  const { data: suppliers = [], isLoading: suppliersLoading, refetch: refetchSuppliers } = useQuery<Supplier[]>({
+    queryKey: ['suppliers', 'active'],
+    queryFn: async () => {
       try {
-        const stationsResponse = await api.get('/fuel-stations');
-        console.log('✅ Postos carregados da tabela fuel_stations:', stationsResponse.data);
-        
-        if (stationsResponse.data && Array.isArray(stationsResponse.data)) {
-          const stationNames = stationsResponse.data.map((station: any) => station.name);
-          console.log('📝 Nomes dos postos extraídos:', stationNames);
-          setFuelStations(stationNames);
-          return;
-        } else {
-          console.log('⚠️ Resposta não é array válido:', stationsResponse.data);
-        }
+        const suppliers = await contasAPagarService.getFornecedoresAtivos();
+        return suppliers || [];
       } catch (error) {
-        console.log('⚠️ Erro ao buscar da tabela fuel_stations:', error);
+        console.error('Erro ao carregar fornecedores:', error);
+        return [];
       }
-      
-      // Fallback: buscar dos registros de combustível
-      console.log('🔄 Tentando fallback para registros de combustível...');
-      const fuelRecordsResponse = await api.get('/fuel-records');
-      console.log('📊 Registros de combustível para fallback:', fuelRecordsResponse.data);
-      
-      if (fuelRecordsResponse.data && Array.isArray(fuelRecordsResponse.data)) {
-        const uniqueStations = [...new Set(fuelRecordsResponse.data.map((record: any) => record.station))];
-        const filteredStations = uniqueStations.filter((station: any) => station && typeof station === 'string' && station.trim() !== '');
-        console.log('🔄 Postos extraídos dos registros:', filteredStations);
-        setFuelStations(filteredStations as string[]);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar postos:', error);
+    },
+    enabled: isOpen,
+  });
+
+  // Handler para criar fornecedor
+  const handleCreateSupplier = async (payload: CreateSupplierRequest) => {
+    try {
+      const newSupplier = await contasAPagarService.createFornecedor(payload);
       toast({
-        title: "⚠️ Aviso",
-        description: "Não foi possível carregar os postos de combustível.",
-        variant: "default"
+        title: "✅ Sucesso",
+        description: "Fornecedor criado com sucesso!",
       });
-    } finally {
-      setLoadingStations(false);
+      
+      // Recarregar lista de fornecedores
+      await refetchSuppliers();
+      
+      // Selecionar o novo fornecedor no formulário
+      setFormData(prev => ({ ...prev, posto: newSupplier.name }));
+      
+      // Fechar modal
+      setShowSupplierModal(false);
+    } catch (error: any) {
+      console.error('Erro ao criar fornecedor:', error);
+      toast({
+        title: "❌ Erro",
+        description: error.response?.data?.message || "Erro ao criar fornecedor",
+        variant: "destructive"
+      });
+      throw error;
     }
   };
 
@@ -278,69 +264,6 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
     }
   });
 
-  // Criar novo posto de combustível
-  const createNewStation = async () => {
-    if (!newStationData.name.trim() || !newStationData.address.trim()) {
-      toast({
-        title: "⚠️ Campos obrigatórios",
-        description: "Nome e endereço são obrigatórios para o posto.",
-        variant: "default"
-      });
-      return;
-    }
-
-    try {
-      const response = await api.post('/fuel-stations', {
-        name: newStationData.name.trim(),
-        address: newStationData.address.trim(),
-        city: newStationData.city.trim() || null,
-        state: newStationData.state.trim() || null,
-        phone: newStationData.phone.trim() || null,
-        brand: newStationData.brand.trim() || null
-      });
-
-      console.log('✅ Novo posto criado:', response.data);
-      
-      // Adicionar o novo posto à lista
-      setFuelStations(prev => [...prev, newStationData.name.trim()]);
-      
-      // Selecionar o novo posto no formulário
-      setFormData(prev => ({ ...prev, posto: newStationData.name.trim() }));
-      
-      // Limpar dados do novo posto
-      setNewStationData({
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        phone: '',
-        brand: ''
-      });
-      
-      // Fechar modal
-      setShowNewStationModal(false);
-      
-      toast({
-        title: "✅ Sucesso",
-        description: "Novo posto de combustível criado com sucesso!",
-        variant: "default"
-      });
-      
-    } catch (error: any) {
-      console.error('❌ Erro ao criar posto:', error);
-      
-      let errorMessage = 'Erro ao criar posto de combustível';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
-      
-      toast({
-        title: "❌ Erro",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
 
   // Validação de quilometragem
   const validateMileage = (newMileage: number): string | null => {
@@ -949,11 +872,11 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowNewStationModal(true)}
+                onClick={() => setShowSupplierModal(true)}
                 className="h-8 px-3 text-xs border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black transition-colors"
               >
                 <Plus size={14} className="mr-1" />
-                Novo Posto
+                Novo Fornecedor
               </Button>
             </div>
             <Select 
@@ -967,24 +890,27 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
                     : 'border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow'
                 }`}
               >
-                <SelectValue placeholder="Selecionar posto" />
+                <SelectValue placeholder={suppliersLoading ? "Carregando fornecedores..." : "Selecionar fornecedor"} />
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-60">
-                {fuelStations && fuelStations.length > 0 ? (
-                  fuelStations.map((station) => (
-                    <SelectItem key={station} value={station}>
-                      {station}
+                {suppliers.length > 0 ? (
+                  suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.name}>
+                      {supplier.name}
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="no-stations" disabled>
-                    Nenhum posto disponível
+                  <SelectItem value="no-suppliers" disabled>
+                    {suppliersLoading ? "Carregando fornecedores..." : "Nenhum fornecedor disponível"}
                   </SelectItem>
                 )}
               </SelectContent>
             </Select>
             {isFieldInvalid('posto') && (
-              <p className="text-sm text-seguranca-red mt-1">Nome do posto é obrigatório</p>
+              <p className="text-sm text-seguranca-red mt-1">Fornecedor é obrigatório</p>
+            )}
+            {suppliersLoading && (
+              <p className="text-xs text-gray-400 mt-1">Carregando fornecedores...</p>
             )}
           </div>
 
@@ -1108,112 +1034,12 @@ const AbastecimentoEditModal: React.FC<AbastecimentoEditModalProps> = ({
         </Dialog>
       )}
 
-      {/* Modal para criar novo posto */}
-      {showNewStationModal && (
-        <Dialog open={showNewStationModal} onOpenChange={setShowNewStationModal}>
-          <DialogContent className="w-[95vw] max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg text-seguranca-lightgray">Novo Posto de Combustível</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createNewStation(); }} className="space-y-4">
-              <div className="flex flex-col">
-                <Label htmlFor="stationName" className="text-sm text-seguranca-lightgray mb-2">
-                  Nome <span className="text-seguranca-red">*</span>
-                </Label>
-                <Input
-                  id="stationName"
-                  value={newStationData.name}
-                  onChange={(e) => setNewStationData(prev => ({ ...prev, name: e.target.value }))}
-                  required
-                  className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-                  placeholder="Nome do posto"
-                />
-              </div>
-              <div className="flex flex-col">
-                <Label htmlFor="stationAddress" className="text-sm text-seguranca-lightgray mb-2">
-                  Endereço <span className="text-seguranca-red">*</span>
-                </Label>
-                <Input
-                  id="stationAddress"
-                  value={newStationData.address}
-                  onChange={(e) => setNewStationData(prev => ({ ...prev, address: e.target.value }))}
-                  required
-                  className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-                  placeholder="Endereço completo"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <Label htmlFor="stationCity" className="text-sm text-seguranca-lightgray mb-2">
-                    Cidade
-                  </Label>
-                  <Input
-                    id="stationCity"
-                    value={newStationData.city}
-                    onChange={(e) => setNewStationData(prev => ({ ...prev, city: e.target.value }))}
-                    className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-                    placeholder="Cidade"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="stationState" className="text-sm text-seguranca-lightgray mb-2">
-                    Estado
-                  </Label>
-                  <Input
-                    id="stationState"
-                    value={newStationData.state}
-                    onChange={(e) => setNewStationData(prev => ({ ...prev, state: e.target.value }))}
-                    className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-                    placeholder="Estado"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <Label htmlFor="stationPhone" className="text-sm text-seguranca-lightgray mb-2">
-                    Telefone
-                  </Label>
-                  <Input
-                    id="stationPhone"
-                    value={newStationData.phone}
-                    onChange={(e) => setNewStationData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-                    placeholder="Telefone"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="stationBrand" className="text-sm text-seguranca-lightgray mb-2">
-                    Bandeira
-                  </Label>
-                  <Input
-                    id="stationBrand"
-                    value={newStationData.brand}
-                    onChange={(e) => setNewStationData(prev => ({ ...prev, brand: e.target.value }))}
-                    className="h-10 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors"
-                    placeholder="Bandeira"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowNewStationModal(false)}
-                  className="flex-1 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-seguranca-red hover:bg-seguranca-darkred text-white"
-                >
-                  Criar Posto
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Modal para Novo Fornecedor */}
+      <SupplierFormModal
+        isOpen={showSupplierModal}
+        onClose={() => setShowSupplierModal(false)}
+        onSave={handleCreateSupplier}
+      />
 
       {/* Modal para Visualizar Imagem */}
       <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>

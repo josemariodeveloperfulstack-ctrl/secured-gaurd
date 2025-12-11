@@ -167,9 +167,84 @@ VALUES (
 ON CONFLICT (cnpj) DO NOTHING;
 
 -- =====================================================
--- 8. FUNCIONÁRIOS DE TESTE
+-- 8. DADOS DA TABELA EMPLOYEES
 -- =====================================================
-INSERT INTO employees (id, user_id, position_id, registration_number, name, cpf, rg, birth_date, marital_status, address, phone, email, unit_id, company_id, hire_date, status, created_at, updated_at)
+-- INSTRUÇÕES PARA INCLUIR DADOS REAIS DA TABELA EMPLOYEES:
+-- 1. Execute o script: migration-ci/export_all_employees_for_ci.sql no banco de produção/desenvolvimento
+-- 2. Copie todos os INSERTs gerados e cole abaixo, substituindo este comentário
+-- 3. Os INSERTs já incluem ON CONFLICT (id) DO NOTHING para evitar duplicatas
+--
+-- Exemplo de estrutura (substitua pelos dados reais exportados):
+-- INSERT INTO employees (
+--     id, user_id, position_id, registration_number, name, document, cpf, rg, 
+--     birth_date, gender, marital_status, nationality, address, phone, email, 
+--     unit_id, company_id, hire_date, termination_date, status, notes, photo_url,
+--     cnh_number, cnh_expiration_date, cnh_category,
+--     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency, ctps_rural,
+--     titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao,
+--     carteira_identidade_orgao_emissor, carteira_identidade_data_emissao, certificado_militar,
+--     cbo, pis, salario, salario_por_extenso, periodo_pagamento, horario_trabalho, folga_semanal,
+--     fgts_optante, fgts_data_opcao, fgts_banco_depositario, fgts_data_retratacao,
+--     pis_data_cadastro, pis_banco_depositario, pis_endereco_banco, pis_codigo_banco, pis_codigo_agencia,
+--     visto_fiscalizacao, nome_pai, nome_mae, local_nascimento, grau_instrucao,
+--     carteira_modelo_19, registro_geral_estrangeiro,
+--     casado_brasileiro, nome_conjuge_estrangeiro,
+--     spouse_name, spouse_cpf, spouse_rg, spouse_birth_date, spouse_phone, spouse_email,
+--     tem_filhos_brasileiros, quantidade_filhos_brasileiros,
+--     data_chegada_brasil, naturalizado, decreto_naturalizacao,
+--     assinatura_funcionario, data_rescisao,
+--     created_at, updated_at
+-- ) VALUES (
+--     'uuid-aqui', 
+--     'user-id-aqui' ou NULL, 
+--     'position-id-aqui' ou NULL,
+--     'REG001',
+--     'Nome do Funcionário',
+--     '123.456.789-00',
+--     '12.345.678-9',
+--     '1990-01-15',
+--     'M',
+--     'SOLTEIRO',
+--     'Brasileiro',
+--     'Endereço completo',
+--     '(11) 99999-9999',
+--     'email@example.com',
+--     'unit-id-aqui' ou NULL,
+--     'company-id-aqui' ou NULL,
+--     '2024-01-01',
+--     NULL,
+--     'ACTIVE',
+--     NULL,
+--     NULL,
+--     '12345678901',
+--     '2025-12-31',
+--     'B',
+--     ... (outros campos)
+--     NOW(),
+--     NOW()
+-- ) ON CONFLICT (id) DO NOTHING;
+
+-- COLE OS INSERTs EXPORTADOS AQUI ABAIXO:
+-- (Execute o script export_all_employees_for_ci.sql no banco de origem e cole os resultados aqui)
+
+-- =====================================================
+-- 8.1. FUNCIONÁRIOS DE TESTE (FALLBACK - apenas se não houver dados reais)
+-- =====================================================
+-- Estes funcionários de teste serão inseridos apenas se não houver conflito
+-- com os funcionários reais inseridos acima
+INSERT INTO employees (
+    id, user_id, position_id, registration_number, name, document, cpf, rg, 
+    birth_date, gender, marital_status, nationality, address, phone, email, 
+    unit_id, company_id, hire_date, termination_date, status, notes,
+    cnh_number, cnh_expiration_date, cnh_category,
+    ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
+    titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao,
+    cbo, pis, salario, periodo_pagamento, horario_trabalho, folga_semanal,
+    fgts_optante, fgts_data_opcao, fgts_banco_depositario,
+    pis_data_cadastro, pis_banco_depositario,
+    nome_pai, nome_mae, local_nascimento, grau_instrucao,
+    created_at, updated_at
+)
 VALUES
     (
         'cccccccc-cccc-cccc-cccc-cccccccccccc',
@@ -178,16 +253,46 @@ VALUES
         'FUNC001',
         'João Silva',
         '123.456.789-00',
+        '123.456.789-00',
         '12.345.678-9',
         '1990-01-15',
+        'M',
         'SOLTEIRO',
-        'Rua Funcionário, 789',
+        'Brasileiro',
+        'Rua Funcionário, 789 - São Paulo, SP',
         '(11) 98765-4321',
         'joao.silva@teste.ci',
         '22222222-2222-2222-2222-222222222222',
         'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         '2024-01-01',
+        NULL,
         'ACTIVE',
+        'Funcionário de teste para ambiente CI',
+        '12345678901',
+        '2025-12-31',
+        'B',
+        '1234567890',
+        '123',
+        '2020-01-15',
+        'SSP/SP',
+        '123456789012',
+        '123',
+        '456',
+        '5172-10',
+        '12345678901',
+        2500.00,
+        'Mensal',
+        '08:00 às 17:00',
+        'Domingo',
+        true,
+        '2024-01-01',
+        'Banco do Brasil',
+        '2024-01-01',
+        'Banco do Brasil',
+        'José Silva',
+        'Maria Silva',
+        'São Paulo, SP',
+        'Ensino Médio Completo',
         NOW(),
         NOW()
     ),
@@ -198,16 +303,46 @@ VALUES
         'FUNC002',
         'Maria Santos',
         '987.654.321-00',
+        '987.654.321-00',
         '98.765.432-1',
         '1985-05-20',
+        'F',
         'CASADO',
-        'Av. Funcionária, 321',
+        'Brasileiro',
+        'Av. Funcionária, 321 - São Paulo, SP',
         '(11) 91234-5678',
         'maria.santos@teste.ci',
         '22222222-2222-2222-2222-222222222222',
         'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         '2024-02-01',
+        NULL,
         'ACTIVE',
+        'Funcionária de teste para ambiente CI',
+        '98765432109',
+        '2026-06-30',
+        'AB',
+        '9876543210',
+        '456',
+        '2019-05-20',
+        'SSP/SP',
+        '987654321098',
+        '456',
+        '789',
+        '5172-10',
+        '98765432109',
+        3000.00,
+        'Mensal',
+        '08:00 às 17:00',
+        'Sábado',
+        true,
+        '2024-02-01',
+        'Caixa Econômica Federal',
+        '2024-02-01',
+        'Caixa Econômica Federal',
+        'Carlos Santos',
+        'Ana Santos',
+        'Rio de Janeiro, RJ',
+        'Ensino Superior Completo',
         NOW(),
         NOW()
     )
@@ -282,9 +417,11 @@ BEGIN
     RAISE NOTICE '   - Departamento: Operacional';
     RAISE NOTICE '   - Cliente: Cliente Teste CI';
     RAISE NOTICE '   - Empresa: Empresa Teste CI';
-    RAISE NOTICE '   - Funcionários: 2 funcionários de teste';
+    RAISE NOTICE '   - Funcionários: Dados da tabela employees incluídos + 2 funcionários de teste completos (fallback)';
     RAISE NOTICE '   - Frota: 3 veículos de teste';
 END $$;
+
+
 
 
 

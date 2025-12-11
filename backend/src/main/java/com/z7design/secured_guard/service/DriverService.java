@@ -69,8 +69,14 @@ public class DriverService {
 
     @Transactional
     public void deleteDriver(UUID id) {
+        System.out.println("🗑️ DriverService.deleteDriver - Tentando excluir motorista ID: " + id);
         Driver driver = driverRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Motorista não encontrado com ID: " + id));
+                .orElseThrow(() -> {
+                    System.out.println("❌ Motorista não encontrado com ID: " + id);
+                    return new ResourceNotFoundException("Motorista não encontrado com ID: " + id);
+                });
+        System.out.println("✅ Motorista encontrado: " + driver.getName() + " (CNH: " + driver.getLicenseNumber() + ")");
         driverRepository.delete(driver);
+        System.out.println("✅ Motorista excluído com sucesso do banco de dados");
     }
 } 

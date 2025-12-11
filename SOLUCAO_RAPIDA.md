@@ -141,3 +141,5 @@ wsl bash -c "cd ~/secured-guard && docker-compose -f docker-compose.local.yml do
 
 
 
+
+

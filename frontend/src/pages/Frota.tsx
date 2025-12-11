@@ -24,12 +24,13 @@ import { ManutencaoViewModal } from '@/components/frota/ManutencaoViewModal';
 import { ManutencaoDeleteDialog } from '@/components/frota/ManutencaoDeleteDialog';
 import MotoristasTable from '@/components/frota/MotoristasTable';
 import DriverFormModal from '@/components/frota/DriverFormModal';
+import { DriverDeleteDialog } from '@/components/frota/DriverDeleteDialog';
 import KmControlTable from '@/components/frota/KmControlTable';
 import KmControlFormModal from '@/components/frota/KmControlFormModal';
 import KmControlViewModal from '@/components/frota/KmControlViewModal';
 import KmControlDeleteDialog from '@/components/frota/KmControlDeleteDialog';
 import VehicleReportModal from '@/components/frota/VehicleReportModal';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import fleetService from '@/services/fleetService';
 import jsPDF from 'jspdf';
@@ -161,6 +162,7 @@ const Frota: React.FC = () => {
   const [isMultaViewModalOpen, setIsMultaViewModalOpen] = useState(false);
   const [isMultaDeleteDialogOpen, setIsMultaDeleteDialogOpen] = useState(false);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [isDriverDeleteDialogOpen, setIsDriverDeleteDialogOpen] = useState(false);
   const [isKmControlModalOpen, setIsKmControlModalOpen] = useState(false);
   const [isKmControlViewModalOpen, setIsKmControlViewModalOpen] = useState(false);
   const [isKmControlDeleteDialogOpen, setIsKmControlDeleteDialogOpen] = useState(false);
@@ -169,6 +171,7 @@ const Frota: React.FC = () => {
   const [selectedMulta, setSelectedMulta] = useState<MultaComponent | null>(null);
   const [selectedManutencao, setSelectedManutencao] = useState<VehicleMaintenance | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [selectedKmControl, setSelectedKmControl] = useState<KmControl | null>(null);
   
   // Estados para relatórios
@@ -257,6 +260,30 @@ const Frota: React.FC = () => {
     queryFn: driverService.getDrivers,
     retry: 2,
     retryDelay: 1000
+  });
+
+  // Exclusão de motoristas
+  const deleteDriverMutation = useMutation<void, any, string>({
+    mutationFn: async (id: string) => {
+      console.log('🗑️ Frota - Tentando excluir motorista ID:', id);
+      await driverService.deleteDriver(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      toast({
+        title: "✅ Sucesso",
+        description: "Motorista excluído com sucesso!"
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erro ao excluir motorista';
+      console.error('❌ Frota - Erro ao excluir motorista:', error);
+      toast({
+        title: "❌ Erro",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
   });
 
   // Buscar registros de manutenção
@@ -1699,7 +1726,10 @@ const Frota: React.FC = () => {
                   drivers={drivers || []}
                   onAdd={() => handleOpenDriverModal()}
                   onEdit={handleOpenDriverModal}
-                  onDelete={(driver) => {/* TODO: Implementar exclusão */ }}
+                  onDelete={(driver) => {
+                    setDriverToDelete(driver);
+                    setIsDriverDeleteDialogOpen(true);
+                  }}
                 />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <DriverFuelConsumptionStats drivers={drivers || []} />
@@ -1973,6 +2003,22 @@ const Frota: React.FC = () => {
           onOpenChange={setIsDriverModalOpen}
           onSuccess={handleDriverSuccess}
           driver={selectedDriver}
+        />
+
+        {/* Dialog de Exclusão de Motorista */}
+        <DriverDeleteDialog
+          isOpen={isDriverDeleteDialogOpen}
+          onClose={() => {
+            setIsDriverDeleteDialogOpen(false);
+            setDriverToDelete(null);
+          }}
+          driver={driverToDelete}
+          onConfirm={(driver) => {
+            deleteDriverMutation.mutate(driver.id);
+            setIsDriverDeleteDialogOpen(false);
+            setDriverToDelete(null);
+          }}
+          isDeleting={deleteDriverMutation.isPending}
         />
 
         {/* Modais de Controle de KM */}

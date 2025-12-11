@@ -31,7 +31,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Calendar as CalendarLucide,
-  Users
+  Users,
+  Eye
 } from 'lucide-react';
 
 interface EscalaFormModalProps {
@@ -73,7 +74,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   // Log para debug
   useEffect(() => {
     console.log('🎭 EscalaFormModal renderizado - open:', open, 'mode:', mode, 'initialData:', initialData);
-    console.log('🎭 EscalaFormModal - Título será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala');
+    console.log('🎭 EscalaFormModal - Título será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Edição de Escala' : 'Nova Escala');
   }, [open, mode, initialData]);
   // Função para obter dados padrão
   const getDefaultFormData = (): EscalaFormData => ({
@@ -102,21 +103,21 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   // Carregar dados do backend quando o modal abrir
   useEffect(() => {
     if (!open) return; // Não carregar se o modal estiver fechado
-    
+
     const loadData = async () => {
       console.log('🔄 Carregando dados para o modal de escala...');
-      
+
       try {
         // Carregar funcionários (employees, não users)
         const { employeeService } = await import('@/services/employeeService');
         const employees: any = await employeeService.getAllEmployees();
         // employeeService pode retornar um objeto com 'content' ou um array direto
-        const employeesList = Array.isArray(employees) 
-          ? employees 
+        const employeesList = Array.isArray(employees)
+          ? employees
           : (employees?.content || []);
-        const mappedEmployees = employeesList.map((e: any) => ({ 
-          id: e.id, 
-          name: e.name || e.nome || 'Funcionário sem nome' 
+        const mappedEmployees = employeesList.map((e: any) => ({
+          id: e.id,
+          name: e.name || e.nome || 'Funcionário sem nome'
         }));
         setUsuarios(mappedEmployees);
         console.log('✅ Funcionários carregados:', mappedEmployees.length);
@@ -145,11 +146,11 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         // Carregar postos de trabalho
         const { workPostService } = await import('@/services/workPostService');
         const workPosts = await workPostService.getAllWorkPosts();
-        const mappedWorkPosts = workPosts.map(wp => ({ 
-          id: wp.id, 
-          name: wp.name, 
+        const mappedWorkPosts = workPosts.map(wp => ({
+          id: wp.id,
+          name: wp.name,
           postCode: wp.postCode || '',
-          clientId: wp.clientId 
+          clientId: wp.clientId
         }));
         setPostosTrabalho(mappedWorkPosts);
         setPostosFiltrados(mappedWorkPosts); // Inicializar com todos os postos
@@ -178,6 +179,41 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       setPostosFiltrados(postosTrabalho);
     }
   }, [postosTrabalho, selectedClientId]);
+
+  // Labels para turno
+  const shiftLabels: Record<string, { label: string; badgeClass: string }> = {
+    DAY: { label: 'Diurno', badgeClass: 'bg-blue-600/20 text-blue-300 border border-blue-500/40' },
+    NIGHT: { label: 'Noturno', badgeClass: 'bg-purple-600/20 text-purple-300 border border-purple-500/40' },
+    MIXED: { label: 'Misto', badgeClass: 'bg-amber-600/20 text-amber-200 border border-amber-500/40' },
+  };
+
+  // Função para calcular duração do turno
+  const calculateShiftDuration = (): string => {
+    if (!formData.startTime || !formData.endTime) return '';
+
+    const start = new Date(`2000-01-01T${formData.startTime}`);
+    let end = new Date(`2000-01-01T${formData.endTime}`);
+
+    // Se o horário de fim for menor que o de início, assumir que é no dia seguinte
+    if (end <= start) {
+      end = new Date(`2000-01-02T${formData.endTime}`);
+    }
+
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    return `${diffHours}h${diffMinutes > 0 ? ` ${diffMinutes}min` : ''}`;
+  };
+
+  const employeeName = usuarios.find(u => String(u.id) === String(formData.employeeId))?.name || '—';
+  const clientName = clientes.find(c => String(c.id) === String(selectedClientId))?.name || '—';
+  const workPost = postosTrabalho.find(p => String(p.id) === String(formData.workPostId));
+  const workPostName = workPost?.name || '—';
+  const workPostCode = workPost?.postCode;
+  const scheduleDateFormatted = formData.scheduleDate ? format(formData.scheduleDate, "dd/MM/yyyy", { locale: ptBR }) : '—';
+  const shiftInfo = shiftLabels[formData.shift] || { label: formData.shift || '—', badgeClass: 'bg-gray-700 text-gray-200 border border-gray-600' };
+  const duration = calculateShiftDuration();
 
   // Validação de formulário
   const validateForm = (): boolean => {
@@ -346,25 +382,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     }
   };
 
-  // Função para calcular duração do turno
-  const calculateShiftDuration = (): string => {
-    if (!formData.startTime || !formData.endTime) return '';
-
-    const start = new Date(`2000-01-01T${formData.startTime}`);
-    let end = new Date(`2000-01-01T${formData.endTime}`);
-
-    // Se o horário de fim for menor que o de início, assumir que é no dia seguinte
-    if (end <= start) {
-      end = new Date(`2000-01-02T${formData.endTime}`);
-    }
-
-    const diffMs = end.getTime() - start.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    return `${diffHours}h${diffMinutes > 0 ? ` ${diffMinutes}min` : ''}`;
-  };
-
   // Reset form when modal closes
   useEffect(() => {
     if (!open) {
@@ -381,9 +398,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     console.log('🔄 postosTrabalho.length:', postosTrabalho.length);
     console.log('🔄 usuarios.length:', usuarios.length);
     console.log('🔄 clientes.length:', clientes.length);
-    
+
     if (open) {
-      if (initialData && (mode === 'edit' || mode === 'view')) {
+      // Check if we have data to populate (checking employeeId is a good proxy for existing record)
+      const hasData = initialData && initialData.employeeId && String(initialData.employeeId) !== '';
+
+      if (initialData && (mode === 'edit' || mode === 'view' || hasData)) {
         // Processar scheduleDate - garantir que seja um objeto Date válido
         let scheduleDateValue: Date;
         if (initialData.scheduleDate) {
@@ -397,44 +417,80 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         } else {
           scheduleDateValue = new Date();
         }
-        
-        // Garantir que todos os valores sejam sempre strings válidas (nunca undefined)
+
+        // Helper safely access nested properties
+        const getProperty = (obj: any, path: string): string => {
+          return path.split('.').reduce((o, i) => (o ? o[i] : undefined), obj) || '';
+        };
+
+        // Extract IDs handling both flat EscalaFormData and nested Schedule object structures
+        const employeeId = String(initialData.employeeId || getProperty(initialData, 'employee.id') || '');
+
+        let workPostId = String(initialData.workPostId || getProperty(initialData, 'workPost.id') || '');
+
+        // Sometimes workPostId is passed but empty, check if we can get it from location if it's actually a workPost
+        if (!workPostId) {
+          const nestedWorkPostId = getProperty(initialData, 'workPost.id');
+          if (nestedWorkPostId) workPostId = String(nestedWorkPostId);
+        }
+
+        let locationId = String(initialData.locationId || getProperty(initialData, 'location.id') || '');
+        // Fallback: If no locationId but we have workPostId, use workPostId as locationId (common in this app)
+        if (!locationId && workPostId) {
+          locationId = workPostId;
+        }
+
+        // Handle Shift - check both shift (string) and shift object variants if they exist
+        const shift = String(initialData.shift || '');
+
+        // Handle Times
+        let startTime = String(initialData.startTime || '');
+        let endTime = String(initialData.endTime || '');
+
+        // Basic time extraction from Schedule object if simple props are missing
+        if (!startTime && getProperty(initialData, 'workPost.shiftStart')) {
+          const start = getProperty(initialData, 'workPost.shiftStart');
+          startTime = typeof start === 'string' && start.length >= 5 ? start.substring(0, 5) : String(start);
+        }
+        if (!endTime && getProperty(initialData, 'workPost.shiftEnd')) {
+          const end = getProperty(initialData, 'workPost.shiftEnd');
+          endTime = typeof end === 'string' && end.length >= 5 ? end.substring(0, 5) : String(end);
+        }
+
+        // Garantir que todos os valores sejam sempre strings válidas
         const newFormData = {
-          employeeId: String(initialData.employeeId || ''),
-          locationId: String(initialData.locationId || initialData.workPostId || ''),
-          workPostId: String(initialData.workPostId || ''),
+          employeeId,
+          locationId,
+          workPostId,
           scheduleDate: scheduleDateValue,
-          shift: String(initialData.shift || ''),
-          startTime: String(initialData.startTime || ''),
-          endTime: String(initialData.endTime || ''),
+          shift,
+          startTime,
+          endTime,
           observations: String(initialData.observations || '')
         };
-        console.log('📝 Atualizando formData com initialData (modo edit/view):', newFormData);
-        console.log('📝 Campos preenchidos:');
-        console.log('  - employeeId:', newFormData.employeeId);
-        console.log('  - workPostId:', newFormData.workPostId);
-        console.log('  - locationId:', newFormData.locationId);
-        console.log('  - scheduleDate:', newFormData.scheduleDate);
-        console.log('  - shift:', newFormData.shift);
-        console.log('  - startTime:', newFormData.startTime);
-        console.log('  - endTime:', newFormData.endTime);
-        console.log('  - observations:', newFormData.observations);
-        
+        console.log('📝 Atualizando formData com dados processados:', newFormData);
+
         // Atualizar formData imediatamente
         setFormData(newFormData);
-        
+
         // Mapear workPostId para clientId
-        // Primeiro tentar usar clientId diretamente do initialData (se foi passado)
-        const clientIdFromData = (initialData as any).clientId;
+        // Primeiro tentar usar clientId diretamente do initialData
+        const clientIdFromData = (initialData as any).clientId || getProperty(initialData, 'workPost.clientId') || getProperty(initialData, 'client.id');
         if (clientIdFromData) {
           const clientIdStr = String(clientIdFromData);
           setSelectedClientId(clientIdStr);
           console.log('✅ Cliente mapeado diretamente do initialData:', clientIdStr);
+          // Forçar atualização dos postos filtrados imediatamente se possível
+          if (postosTrabalho.length > 0) {
+            const filtered = postosTrabalho.filter(posto => posto.clientId === clientIdStr);
+            setPostosFiltrados(filtered);
+            console.log('✅ Postos filtrados forçados:', filtered.length);
+          }
         } else {
           // Se não há clientId direto, buscar do workPost
           const workPostIdToSearch = String(initialData.workPostId || initialData.locationId || '');
           console.log('🔍 Buscando cliente pelo workPostId:', workPostIdToSearch, 'postosTrabalho.length:', postosTrabalho.length);
-          
+
           if (workPostIdToSearch && postosTrabalho.length > 0) {
             const workPost = postosTrabalho.find(wp => String(wp.id) === workPostIdToSearch);
             console.log('🔍 WorkPost encontrado:', workPost);
@@ -477,97 +533,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         shift: '',
         startTime: '',
         endTime: '',
-        observations: ''
       });
     }
   }, [initialData, open, mode, postosTrabalho, usuarios, clientes]);
 
-  // Efeito adicional para atualizar formData e clientId quando dados forem carregados e houver initialData
-  useEffect(() => {
-    if (open && initialData && (mode === 'edit' || mode === 'view') && postosTrabalho.length > 0 && usuarios.length > 0) {
-      console.log('🔄 Efeito adicional - Atualizando dados após carregamento completo');
-      console.log('🔄 initialData completo:', JSON.stringify(initialData, null, 2));
-      console.log('🔄 initialData.employeeId:', initialData.employeeId);
-      console.log('🔄 initialData.workPostId:', initialData.workPostId);
-      console.log('🔄 initialData.startTime:', initialData.startTime);
-      console.log('🔄 initialData.endTime:', initialData.endTime);
-      
-      // Processar scheduleDate
-      let scheduleDateValue: Date;
-      if (initialData.scheduleDate) {
-        if (initialData.scheduleDate instanceof Date) {
-          scheduleDateValue = initialData.scheduleDate;
-        } else if (typeof initialData.scheduleDate === 'string') {
-          scheduleDateValue = new Date(initialData.scheduleDate);
-        } else {
-          scheduleDateValue = new Date();
-        }
-      } else {
-        scheduleDateValue = new Date();
-      }
-      
-      // Atualizar formData para garantir que os valores estejam corretos
-      const currentEmployeeId = String(initialData.employeeId || '');
-      const currentWorkPostId = String(initialData.workPostId || '');
-      const currentLocationId = String(initialData.locationId || currentWorkPostId || '');
-      const currentShift = String(initialData.shift || '');
-      const currentStartTime = String(initialData.startTime || '');
-      const currentEndTime = String(initialData.endTime || '');
-      const currentObservations = String(initialData.observations || '');
-      
-      // Verificar se os valores no formData estão corretos e atualizar se necessário
-      const needsUpdate = 
-        formData.employeeId !== currentEmployeeId || 
-        formData.workPostId !== currentWorkPostId ||
-        formData.locationId !== currentLocationId ||
-        formData.shift !== currentShift ||
-        formData.startTime !== currentStartTime ||
-        formData.endTime !== currentEndTime ||
-        formData.observations !== currentObservations ||
-        formData.scheduleDate.getTime() !== scheduleDateValue.getTime();
-      
-      if (needsUpdate) {
-        console.log('🔄 Atualizando formData com valores corretos após carregamento');
-        setFormData({
-          employeeId: currentEmployeeId,
-          workPostId: currentWorkPostId,
-          locationId: currentLocationId,
-          scheduleDate: scheduleDateValue,
-          shift: currentShift,
-          startTime: currentStartTime,
-          endTime: currentEndTime,
-          observations: currentObservations
-        });
-        console.log('✅ formData atualizado com sucesso');
-      }
-      
-      // Primeiro tentar usar clientId diretamente do initialData
-      const clientIdFromData = (initialData as any).clientId;
-      if (clientIdFromData) {
-        const clientIdStr = String(clientIdFromData);
-        if (selectedClientId !== clientIdStr) {
-          setSelectedClientId(clientIdStr);
-          console.log('✅ Cliente mapeado do initialData (após carregamento):', clientIdStr);
-        }
-        return;
-      }
-      
-      // Se não há clientId direto, buscar do workPost
-      const workPostIdToSearch = String(initialData.workPostId || initialData.locationId || '');
-      if (workPostIdToSearch) {
-        const workPost = postosTrabalho.find(wp => String(wp.id) === workPostIdToSearch);
-        if (workPost && workPost.clientId) {
-          const clientIdStr = String(workPost.clientId);
-          if (selectedClientId !== clientIdStr) {
-            setSelectedClientId(clientIdStr);
-            console.log('✅ Cliente mapeado do workPostId (após carregamento):', clientIdStr);
-          }
-        } else {
-          console.warn('⚠️ WorkPost não encontrado após carregamento. workPostId:', workPostIdToSearch);
-        }
-      }
-    }
-  }, [postosTrabalho, usuarios, open, initialData, selectedClientId, mode, formData]);
+  // Efeito adicional removido - a lógica foi consolidada no primeiro useEffect
+  // para evitar conflitos de reescrita de dados.
 
 
   const turnos = [
@@ -592,22 +563,147 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   ];
 
   console.log('🎭 EscalaFormModal render - open:', open, 'mode:', mode, 'initialData:', initialData);
-  console.log('🎭 Título do modal será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala');
+  console.log('🎭 Título do modal será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Edição de Escala' : 'Nova Escala');
   console.log('🎭 formData atual:', formData);
   console.log('🎭 selectedClientId atual:', selectedClientId);
   console.log('🎭 usuarios.length:', usuarios.length);
   console.log('🎭 clientes.length:', clientes.length);
   console.log('🎭 postosTrabalho.length:', postosTrabalho.length);
   console.log('🎭 postosFiltrados.length:', postosFiltrados.length);
-  
+
   // Log quando open mudar
   useEffect(() => {
     console.log('🔄 EscalaFormModal - open mudou para:', open);
     console.log('🔄 EscalaFormModal - mode:', mode);
-    console.log('🔄 EscalaFormModal - Título será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala');
+    console.log('🔄 EscalaFormModal - Título será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Edição de Escala' : 'Nova Escala');
     console.log('🔄 EscalaFormModal - initialData:', initialData);
   }, [open, mode, initialData]);
-  
+
+  console.log('🎭 EscalaFormModal renderizando - open:', open, 'mode:', mode);
+  console.log('🎭 EscalaFormModal - initialData:', initialData);
+
+  // Layout de visualização (estilo cartão, semelhante ao modal de Troca de Plantão)
+  if (mode === 'view') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-seguranca-graphite text-seguranca-lightgray border-gray-700 sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-seguranca-yellow/20 rounded-lg flex items-center justify-center">
+                <Eye className="w-5 h-5 text-seguranca-yellow" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-semibold text-seguranca-lightgray flex items-center gap-2">
+                  Detalhes da Escala
+                  <Badge className={`${shiftInfo.badgeClass} text-xs px-2 py-1`}>
+                    {shiftInfo.label}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="text-gray-400 mt-1">
+                  Visualize as informações completas da escala selecionada.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Cabeçalho resumido */}
+            <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-seguranca-yellow/15 border border-seguranca-yellow/30 flex items-center justify-center">
+                  <CalendarLucide className="w-6 h-6 text-seguranca-yellow" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Data da Escala</p>
+                  <p className="text-lg font-semibold text-seguranca-lightgray">{scheduleDateFormatted}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm text-gray-400">Duração</p>
+                  <p className="text-lg font-semibold text-seguranca-lightgray">{duration || '—'}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-blue-300" />
+                </div>
+              </div>
+            </div>
+
+            {/* Dados principais */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="w-4 h-4 text-seguranca-yellow" />
+                  <h3 className="text-base font-semibold text-seguranca-lightgray">Dados do Funcionário</h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Nome:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">{employeeName}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Cliente:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">{clientName}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Posto:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">
+                      {workPostName}
+                      {workPostCode ? ` (${workPostCode})` : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-seguranca-yellow" />
+                  <h3 className="text-base font-semibold text-seguranca-lightgray">Horário</h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Turno:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">{shiftInfo.label}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Início:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">{formData.startTime || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Fim:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">{formData.endTime || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-400">Duração:</span>
+                    <span className="text-seguranca-lightgray font-medium text-right">{duration || '—'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Observações */}
+            <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-seguranca-yellow" />
+                <h3 className="text-base font-semibold text-seguranca-lightgray">Observações</h3>
+              </div>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                {formData.observations?.trim() ? formData.observations : 'Nenhuma observação adicionada.'}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-4">
+            <Button type="button" variant="outline" className="border-gray-600 text-seguranca-lightgray hover:bg-gray-800" onClick={() => onOpenChange(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Sempre renderizar o Dialog, mesmo quando fechado, para permitir animações
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-seguranca-graphite text-seguranca-lightgray border-gray-700 sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -618,10 +714,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             </div>
             <div>
               <DialogTitle className="text-xl font-semibold">
-                {mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Editar Escala' : 'Nova Escala'}
+                {mode === 'view' ? 'Visualizar Escala' : (mode === 'edit' || (initialData?.employeeId && String(initialData.employeeId) !== '')) ? 'Edição de Escala' : 'Nova Escala'}
               </DialogTitle>
               <DialogDescription className="text-gray-400 mt-1">
-                {mode === 'view' ? 'Visualize as informações da escala' : mode === 'edit' ? 'Atualize as informações da escala' : 'Preencha os dados para criar uma nova escala de trabalho'}
+                {mode === 'view' ? 'Visualize as informações da escala' : (mode === 'edit' || (initialData?.employeeId && String(initialData.employeeId) !== '')) ? 'Atualize as informações da escala' : 'Preencha os dados para criar uma nova escala de trabalho'}
               </DialogDescription>
             </div>
           </div>
@@ -791,10 +887,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                   ))
                 ) : (
                   <SelectItem value="loading" disabled>
-                    {!selectedClientId 
-                      ? 'Selecione primeiro um cliente' 
-                      : postosTrabalho.length === 0 
-                        ? 'Carregando postos de trabalho...' 
+                    {!selectedClientId
+                      ? 'Selecione primeiro um cliente'
+                      : postosTrabalho.length === 0
+                        ? 'Carregando postos de trabalho...'
                         : 'Nenhum posto disponível para este cliente'}
                   </SelectItem>
                 )}
@@ -1049,6 +1145,18 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             </div>
           </DialogFooter>
         </form>
+
+        {/* Debug Info Helper */}
+        <div className="mt-4 p-4 bg-black/50 rounded text-xs font-mono text-gray-400 overflow-auto max-h-40 border border-gray-700">
+          <p className="font-bold text-gray-200">DEBUG INFO:</p>
+          <p>Mode: {mode}</p>
+          <p>Employees Loaded: {usuarios.length}</p>
+          <p>Clients Loaded: {clientes.length}</p>
+          <p>Postos Loaded: {postosTrabalho.length}</p>
+          <p>Current EmployeeId: {formData.employeeId}</p>
+          <p>Current ClientId: {selectedClientId}</p>
+          <p>Current WorkPostId: {formData.workPostId}</p>
+        </div>
       </DialogContent>
     </Dialog>
   );

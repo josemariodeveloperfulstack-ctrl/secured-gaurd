@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Eye, Edit, Trash2, Search, Plus, RefreshCw, Clock, User, Building, Sun, Moon } from 'lucide-react';
+import { Edit, Trash2, Search, Plus, RefreshCw, Clock, User, Building, Sun, Moon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Schedule } from '@/services/scheduleService';
 
@@ -14,7 +14,6 @@ interface EscalaTrabalhoTableProps {
   onRefresh: () => void;
   onEdit: (escala: Schedule) => void;
   onDelete: (escala: Schedule) => void;
-  onView: (escala: Schedule) => void;
   onCreate: () => void;
 }
 
@@ -24,7 +23,6 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   onRefresh,
   onEdit,
   onDelete,
-  onView,
   onCreate
 }) => {
   const { toast } = useToast();
@@ -34,12 +32,11 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   // Log para verificar se os handlers estão sendo passados
   useEffect(() => {
     console.log('🔍 EscalaTrabalhoTable - Handlers recebidos:', {
-      onView: typeof onView,
       onEdit: typeof onEdit,
       onDelete: typeof onDelete,
       onCreate: typeof onCreate
     });
-  }, [onView, onEdit, onDelete, onCreate]);
+  }, [onEdit, onDelete, onCreate]);
 
   const getStatusProps = (status: Schedule['status']) => {
     switch (status) {
@@ -213,13 +210,6 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                 <TableRow 
                   key={escala.id} 
                   className="border-b-gray-700 hover:bg-seguranca-black/50"
-                  onClick={(e) => {
-                    // Prevenir que cliques em botões propaguem para a linha
-                    const target = e.target as HTMLElement;
-                    if (target.closest('button') || target.closest('[role="button"]')) {
-                      e.stopPropagation();
-                    }
-                  }}
                 >
                   <TableCell>
                     <div className="flex items-center space-x-3">
@@ -262,34 +252,12 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                   </TableCell>
                   <TableCell 
                     className="text-right"
-                    style={{ position: 'relative', zIndex: 10 }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <div 
                       className="flex items-center justify-end space-x-1"
-                      style={{ position: 'relative', zIndex: 10 }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log('🔍 Botão Visualizar clicado para escala:', escala.id);
-                          console.log('🔍 onView disponível?', typeof onView);
-                          if (onView && typeof onView === 'function') {
-                            console.log('✅ Chamando onView com escala:', escala);
-                            onView(escala);
-                            console.log('✅ onView chamado com sucesso');
-                          } else {
-                            console.error('❌ onView não está definido ou não é uma função!', onView);
-                          }
-                        }}
-                        title="Visualizar"
-                        className="hover:bg-blue-500/20"
-                      >
-                        <Eye className="h-5 w-5 text-gray-400 hover:text-blue-400" />
-                      </Button>
                       <Button
                         type="button"
                         variant="ghost"
@@ -305,33 +273,55 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                             console.log('✅ onEdit chamado com sucesso');
                           } else {
                             console.error('❌ onEdit não está definido ou não é uma função!', onEdit);
+                            toast({
+                              title: 'Erro',
+                              description: 'Função de edição não disponível.',
+                              variant: 'destructive',
+                            });
                           }
                         }}
                         title="Editar"
-                        className="hover:bg-green-500/20"
+                        className="h-8 w-8 p-0 border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-white cursor-pointer"
                       >
-                        <Edit className="h-5 w-5 text-gray-400 hover:text-green-400" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon"
+                        variant="outline"
+                        size="sm"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           console.log('🗑️ Botão Excluir clicado para escala:', escala.id);
+                          console.log('🗑️ Escala completa:', escala);
+                          console.log('🗑️ onDelete disponível?', typeof onDelete);
+                          console.log('🗑️ onDelete:', onDelete);
                           if (onDelete && typeof onDelete === 'function') {
                             console.log('✅ Chamando onDelete com escala:', escala);
-                            onDelete(escala);
-                            console.log('✅ onDelete chamado com sucesso');
+                            try {
+                              onDelete(escala);
+                              console.log('✅ onDelete chamado com sucesso');
+                            } catch (error) {
+                              console.error('❌ Erro ao chamar onDelete:', error);
+                              toast({
+                                title: 'Erro',
+                                description: 'Erro ao chamar função de exclusão.',
+                                variant: 'destructive',
+                              });
+                            }
                           } else {
                             console.error('❌ onDelete não está definido ou não é uma função!', onDelete);
+                            toast({
+                              title: 'Erro',
+                              description: 'Função de exclusão não disponível.',
+                              variant: 'destructive',
+                            });
                           }
                         }}
                         title="Excluir"
-                        className="hover:bg-red-500/20"
+                        className="h-8 w-8 p-0 border-red-500 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer"
                       >
-                        <Trash2 className="h-5 w-5 text-gray-400 hover:text-red-400" />
+                        <Trash2 size={14} />
                       </Button>
                     </div>
                   </TableCell>

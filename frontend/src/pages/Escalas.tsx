@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -52,27 +52,45 @@ const Escalas = () => {
   const { toast } = useToast();
   const [date, setDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEscala, setSelectedEscala] = useState<Schedule | null>(null);
-  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [modalState, setModalState] = useState<{
+    open: boolean;
+    mode: 'create' | 'edit' | 'view';
+    escala: Schedule | null;
+  }>({
+    open: false,
+    mode: 'create',
+    escala: null,
+  });
   const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [escalaToDelete, setEscalaToDelete] = useState<Schedule | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isOpeningModalRef = useRef(false);
+
+  // Monitorar mudanças no estado do diálogo de exclusão
+  useEffect(() => {
+    console.log('🗑️ Estado do diálogo de exclusão mudou:', {
+      deleteDialogOpen,
+      escalaToDelete: escalaToDelete ? escalaToDelete.id : null,
+      isDeleting
+    });
+  }, [deleteDialogOpen, escalaToDelete, isDeleting]);
 
   // Monitorar mudanças no estado do modal
   useEffect(() => {
     console.log('📊 Estado do modal mudou:', {
-      isModalOpen,
-      modalMode,
-      selectedEscala: selectedEscala ? selectedEscala.id : null,
-      selectedEscalaCompleto: selectedEscala
+      isModalOpen: modalState.open,
+      modalMode: modalState.mode,
+      selectedEscala: modalState.escala ? modalState.escala.id : null,
+      selectedEscalaCompleto: modalState.escala
     });
-  }, [isModalOpen, modalMode, selectedEscala]);
+    console.log('📊 modalState.open:', modalState.open);
+    console.log('📊 modalState.mode:', modalState.mode);
+  }, [modalState]);
 
   // Gere dias da semana começando da segunda-feira
   const startDate = startOfWeek(date, { weekStartsOn: 1 });
@@ -312,8 +330,8 @@ const Escalas = () => {
     });
     
     console.log('📤 Dados mapeados para envio:', mappedData);
-    if (modalMode === 'edit' && selectedEscala) {
-      await scheduleService.update(selectedEscala.id, mappedData);
+    if (modalState.mode === 'edit' && modalState.escala) {
+      await scheduleService.update(modalState.escala.id, mappedData);
       toast({
         title: 'Escala editada com sucesso!',
         description: `Escala para ${data.shift} no dia ${format(data.scheduleDate, 'dd/MM/yyyy')}`,
@@ -325,8 +343,11 @@ const Escalas = () => {
         description: `Escala para ${data.shift} no dia ${format(data.scheduleDate, 'dd/MM/yyyy')}`,
       });
     }
-    setIsModalOpen(false);
-    setSelectedEscala(null);
+    setModalState({
+      open: false,
+      mode: 'create',
+      escala: null,
+    });
     // Recarregar escalas após salvar
     console.log('🔄 Recarregando escalas após salvar...');
     await loadSchedules();
@@ -350,12 +371,15 @@ const Escalas = () => {
   };
 
   // Função para abrir diálogo de confirmação de exclusão
-  const handleDeleteClick = (escala: Schedule) => {
+  const handleDeleteClick = useCallback((escala: Schedule) => {
     console.log('🗑️ handleDeleteClick INICIADO - escala recebida:', escala);
+    console.log('🗑️ handleDeleteClick - ID da escala:', escala.id);
+    console.log('🗑️ handleDeleteClick - Nome do funcionário:', escala.employee?.name);
     try {
       setEscalaToDelete(escala);
+      console.log('🗑️ handleDeleteClick - escalaToDelete definido');
       setDeleteDialogOpen(true);
-      console.log('🗑️ handleDeleteClick - Diálogo de exclusão aberto');
+      console.log('🗑️ handleDeleteClick - deleteDialogOpen definido como true');
     } catch (error) {
       console.error('❌ handleDeleteClick - ERRO:', error);
       toast({
@@ -364,7 +388,7 @@ const Escalas = () => {
         variant: 'destructive',
       });
     }
-  };
+  }, []);
 
   // Função para confirmar e deletar escala
   const handleDeleteConfirm = async () => {
@@ -392,93 +416,64 @@ const Escalas = () => {
     }
   };
 
-  // Função para editar escala
+  // Função para editar escala (abre modal logo após definir estado)
   const handleEditEscala = useCallback((escala: Schedule) => {
-    console.log('✏️ handleEditEscala INICIADO - escala recebida:', escala);
-    console.log('✏️ Estado ANTES da atualização:', {
-      selectedEscala: selectedEscala?.id,
-      modalMode,
-      isModalOpen
-    });
+    console.log('✏️ handleEditEscala - INÍCIO');
+    console.log('✏️ Escala recebida:', escala);
     
-    try {
-      // Atualizar estados na ordem correta
-      console.log('🔄 Definindo selectedEscala...');
-      setSelectedEscala(escala);
-      
-      console.log('🔄 Definindo modalMode para "edit"...');
-      setModalMode('edit');
-      
-      console.log('🔄 Abrindo modal (isModalOpen = true)...');
-      setIsModalOpen(true);
-      
-      console.log('✅ handleEditEscala - Estados atualizados:', {
-        escalaId: escala.id,
-        modalMode: 'edit',
-        isModalOpen: true
-      });
-      
-      // Verificar estado após um pequeno delay
-      setTimeout(() => {
-        console.log('🔍 Estado APÓS atualização (com delay):', {
-          selectedEscala: selectedEscala?.id,
-          modalMode,
-          isModalOpen
-        });
-      }, 100);
-    } catch (error) {
-      console.error('❌ handleEditEscala - ERRO:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao abrir edição da escala.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast, selectedEscala, modalMode, isModalOpen]);
+    // Marcar que estamos abrindo o modal programaticamente
+    isOpeningModalRef.current = true;
+    
+    const newState = {
+      open: true,
+      mode: 'edit' as const,
+      escala,
+    };
+    
+    console.log('✏️ Novo estado que será definido:', newState);
+    setModalState(newState);
+    console.log('✏️ setModalState chamado com sucesso');
+    
+    // Resetar a flag após um pequeno delay
+    setTimeout(() => {
+      isOpeningModalRef.current = false;
+    }, 100);
+  }, []);
 
-  // Função para visualizar escala
+  // Função para visualizar escala (abre modal logo após definir estado)
   const handleViewEscala = useCallback((escala: Schedule) => {
-    console.log('🔍 handleViewEscala INICIADO - escala recebida:', escala);
-    console.log('🔍 Estado ANTES da atualização:', {
-      selectedEscala: selectedEscala?.id,
-      modalMode,
-      isModalOpen
-    });
+    console.log('👁️ handleViewEscala - INÍCIO');
+    console.log('👁️ Escala recebida:', escala);
     
-    try {
-      // Atualizar estados de forma síncrona
-      console.log('🔄 Atualizando selectedEscala...');
-      setSelectedEscala(escala);
-      
-      console.log('🔄 Atualizando modalMode para "view"...');
-      setModalMode('view');
-      
-      console.log('🔄 Atualizando isModalOpen para true...');
-      setIsModalOpen(true);
-      
-      console.log('✅ handleViewEscala - Estados atualizados:', {
-        escalaId: escala.id,
-        modalMode: 'view',
-        isModalOpen: true
-      });
-      
-      // Verificar estado após um pequeno delay
-      setTimeout(() => {
-        console.log('🔍 Estado APÓS atualização (com delay):', {
-          selectedEscala: selectedEscala?.id,
-          modalMode,
-          isModalOpen
-        });
-      }, 100);
-    } catch (error) {
-      console.error('❌ Erro em handleViewEscala:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao abrir visualização da escala.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+    // Marcar que estamos abrindo o modal programaticamente
+    isOpeningModalRef.current = true;
+    
+    const newState = {
+      open: true,
+      mode: 'view' as const,
+      escala,
+    };
+    
+    console.log('👁️ Novo estado que será definido:', newState);
+    setModalState(newState);
+    console.log('👁️ setModalState chamado com sucesso');
+    
+    // Resetar a flag após um pequeno delay
+    setTimeout(() => {
+      isOpeningModalRef.current = false;
+    }, 100);
+  }, []);
+
+  // Handlers para a tabela
+  const handleEditClick = useCallback((escala: Schedule) => {
+    console.log('✏️ handleEditClick chamado com escala:', escala);
+    handleEditEscala(escala);
+  }, [handleEditEscala]);
+
+  const handleViewClick = useCallback((escala: Schedule) => {
+    console.log('👁️ handleViewClick chamado com escala:', escala);
+    handleViewEscala(escala);
+  }, [handleViewEscala]);
 
   // Loading state
   if (loading) {
@@ -521,7 +516,13 @@ const Escalas = () => {
             </Button>
             <Button 
               className="bg-seguranca-red hover:bg-seguranca-darkred"
-              onClick={() => { setSelectedEscala(null); setModalMode('create'); setIsModalOpen(true); }}
+              onClick={() => { 
+                setModalState({
+                  open: true,
+                  mode: 'create',
+                  escala: null,
+                });
+              }}
             >
               + Nova Escala
             </Button>
@@ -784,60 +785,78 @@ const Escalas = () => {
           </Card>
         </div>
         
-        {/* Modal de Formulário de Escala */}
+        {/* Tabela de Escalas */}
         <EscalaTrabalhoTable
           escalas={schedules}
           isLoading={loading}
           onRefresh={loadSchedules}
-          onEdit={useCallback((escala: Schedule) => {
-            console.log('📞 onEdit chamado diretamente na prop, escala:', escala);
-            handleEditEscala(escala);
-          }, [handleEditEscala])}
+          onEdit={handleEditClick}
           onDelete={handleDeleteClick}
-          onView={useCallback((escala: Schedule) => {
-            console.log('📞 onView chamado diretamente na prop, escala:', escala);
-            console.log('📞 Chamando handleViewEscala...');
-            handleViewEscala(escala);
-            console.log('📞 handleViewEscala chamado');
-          }, [handleViewEscala])}
-          onCreate={() => { setSelectedEscala(null); setModalMode('create'); setIsModalOpen(true); }}
+          onCreate={() => { 
+            setModalState({
+              open: true,
+              mode: 'create',
+              escala: null,
+            });
+          }}
         />
 
         <EscalaFormModal
-          key={`modal-${selectedEscala?.id || 'new'}-${modalMode}-${isModalOpen}`}
-          open={isModalOpen}
+          open={modalState.open}
           onOpenChange={(open) => {
-            console.log('🎭 EscalaFormModal onOpenChange chamado:', open, 'isModalOpen atual:', isModalOpen, 'modalMode:', modalMode);
-            setIsModalOpen(open);
-            if (!open) {
-              setSelectedEscala(null);
-              setModalMode('create');
+            console.log('🎭 EscalaFormModal onOpenChange chamado com open:', open);
+            console.log('🎭 modalState.open atual:', modalState.open);
+            console.log('🎭 modalState.mode:', modalState.mode);
+            console.log('🎭 isOpeningModalRef.current:', isOpeningModalRef.current);
+            
+            // Se estamos abrindo o modal programaticamente, ignorar onOpenChange(true)
+            if (open && isOpeningModalRef.current) {
+              console.log('🎭 Ignorando onOpenChange(true) - modal está sendo aberto programaticamente');
+              return;
             }
+            
+            // Só atualizar se realmente for para fechar
+            if (!open) {
+              console.log('🎭 Fechando modal...');
+              setModalState((prev) => ({
+                ...prev,
+                open: false,
+                mode: 'create' as const,
+                escala: null,
+              }));
+              setEscalaToDelete(null);
+            }
+            // Se open === true e não estamos abrindo programaticamente, pode ser uma tentativa de abrir manualmente
+            // Nesse caso, não fazer nada pois o estado já foi definido pelos handlers
           }}
           onSave={handleSaveEscala}
           initialData={useMemo(() => {
-            if (selectedEscala) {
-              console.log('🔍 Mapeando selectedEscala para initialData:', selectedEscala);
-              console.log('🔍 selectedEscala completo:', JSON.stringify(selectedEscala, null, 2));
+            console.log('🔍 useMemo initialData - modalState.escala:', modalState.escala);
+            console.log('🔍 useMemo initialData - modalState.mode:', modalState.mode);
+            console.log('🔍 useMemo initialData - modalState.open:', modalState.open);
+            
+            if (modalState.escala) {
+              console.log('🔍 Mapeando selectedEscala para initialData:', modalState.escala);
+              console.log('🔍 selectedEscala completo:', JSON.stringify(modalState.escala, null, 2));
               
               // Extrair employeeId - pode vir como objeto ou string
-              const employeeId = selectedEscala.employee?.id || 
-                                (selectedEscala as any).employeeId || 
+              const employeeId = modalState.escala.employee?.id || 
+                                (modalState.escala as any).employeeId || 
                                 '';
               
               // Extrair workPostId - pode vir como objeto ou string
-              const workPostId = selectedEscala.workPost?.id || 
-                                (selectedEscala as any).workPostId || 
+              const workPostId = modalState.escala.workPost?.id || 
+                                (modalState.escala as any).workPostId || 
                                 '';
               
               // Extrair locationId - pode vir como objeto ou string
-              const locationId = selectedEscala.location?.id || 
-                                (selectedEscala as any).locationId || 
+              const locationId = modalState.escala.location?.id || 
+                                (modalState.escala as any).locationId || 
                                 workPostId || // Se não há locationId, usar workPostId
                                 '';
               
               // Extrair horários do workPost se disponível
-              const workPost = selectedEscala.workPost as any;
+              const workPost = modalState.escala.workPost as any;
               let startTime = '';
               let endTime = '';
               
@@ -878,14 +897,14 @@ const Escalas = () => {
               
               // Se não encontrou horários no workPost, usar valores padrão baseados no turno
               if (!startTime || !endTime) {
-                console.log('⚠️ Horários não encontrados no workPost, usando valores padrão baseados no turno:', selectedEscala.shift);
-                if (selectedEscala.shift === 'DAY') {
+                console.log('⚠️ Horários não encontrados no workPost, usando valores padrão baseados no turno:', modalState.escala.shift);
+                if (modalState.escala.shift === 'DAY') {
                   startTime = startTime || '08:00';
                   endTime = endTime || '17:00';
-                } else if (selectedEscala.shift === 'NIGHT') {
+                } else if (modalState.escala.shift === 'NIGHT') {
                   startTime = startTime || '22:00';
                   endTime = endTime || '06:00';
-                } else if (selectedEscala.shift === 'MIXED') {
+                } else if (modalState.escala.shift === 'MIXED') {
                   startTime = startTime || '14:00';
                   endTime = endTime || '22:00';
                 }
@@ -894,15 +913,15 @@ const Escalas = () => {
               // Extrair clientId do workPost (pode vir como clientId direto ou como objeto client)
               const clientId = workPost?.clientId || 
                               workPost?.client?.id || 
-                              (selectedEscala.location as any)?.unit?.clientId || 
-                              (selectedEscala.location as any)?.unit?.client?.id || 
+                              (modalState.escala.location as any)?.unit?.clientId || 
+                              (modalState.escala.location as any)?.unit?.client?.id || 
                               '';
               
               // Processar scheduleDate - sempre vem como string da API
               let scheduleDate: Date;
-              if (selectedEscala.scheduleDate) {
+              if (modalState.escala.scheduleDate) {
                 // scheduleDate sempre vem como string do backend (formato YYYY-MM-DD)
-                scheduleDate = new Date(selectedEscala.scheduleDate);
+                scheduleDate = new Date(modalState.escala.scheduleDate);
                 // Validar se a data é válida
                 if (isNaN(scheduleDate.getTime())) {
                   scheduleDate = new Date();
@@ -916,10 +935,10 @@ const Escalas = () => {
                 locationId: String(locationId || ''),
                 workPostId: String(workPostId || ''),
                 scheduleDate: scheduleDate,
-                shift: String(selectedEscala.shift || ''),
+                shift: String(modalState.escala.shift || ''),
                 startTime: String(startTime || ''),
                 endTime: String(endTime || ''),
-                observations: String(selectedEscala.observations || ''),
+                observations: String(modalState.escala.observations || ''),
                 clientId: String(clientId || ''), // Adicionar clientId para facilitar o mapeamento no modal
               };
               
@@ -947,12 +966,27 @@ const Escalas = () => {
               endTime: '',
               observations: '',
             };
-          }, [selectedEscala])}
-          mode={modalMode}
+          }, [modalState.escala])}
+          mode={modalState.mode}
         />
 
         {/* Diálogo de Confirmação de Exclusão */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialog 
+          open={deleteDialogOpen} 
+          onOpenChange={(open) => {
+            console.log('🗑️ AlertDialog onOpenChange chamado com open:', open);
+            console.log('🗑️ deleteDialogOpen atual:', deleteDialogOpen);
+            console.log('🗑️ escalaToDelete:', escalaToDelete);
+            if (!open) {
+              console.log('🗑️ Fechando diálogo de exclusão');
+              setDeleteDialogOpen(false);
+              setEscalaToDelete(null);
+            } else {
+              console.log('🗑️ Tentando abrir diálogo de exclusão');
+              setDeleteDialogOpen(true);
+            }
+          }}
+        >
           <AlertDialogContent className="bg-seguranca-graphite border-gray-600">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-seguranca-lightgray">

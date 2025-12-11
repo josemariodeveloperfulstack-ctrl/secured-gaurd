@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Wrench, DollarSign, MapPin, Car, AlertTriangle, Image, FileText, X } from 'lucide-react';
+import { Calendar, Wrench, DollarSign, MapPin, Car, AlertTriangle, Image, FileText, X, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import maintenanceService from '@/services/maintenanceService';
+import { contasAPagarService, Supplier, CreateSupplierRequest } from '@/services/contasAPagarService';
+import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
 import { Vehicle } from '@/types/fleet';
 import { VehicleMaintenance } from '@/types/maintenance';
 
@@ -52,6 +54,8 @@ const ManutencaoFormModal: React.FC<ManutencaoFormModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [formData, setFormData] = useState({
     vehicleId: '',
     date: '',
@@ -139,6 +143,20 @@ const ManutencaoFormModal: React.FC<ManutencaoFormModalProps> = ({
       setSelectedFiles(null);
     }
   }, [manutencao, isOpen]);
+
+  // Carregar fornecedores quando modal abrir
+  useEffect(() => {
+    if (!isOpen) return;
+    const loadSuppliers = async () => {
+      try {
+        const list = await contasAPagarService.getFornecedoresAtivos();
+        setSuppliers(list);
+      } catch (error) {
+        console.error('❌ Erro ao carregar fornecedores:', error);
+      }
+    };
+    loadSuppliers();
+  }, [isOpen]);
 
   const handleInputChange = (field: string, value: string) => {
     // Validação específica para campos numéricos
@@ -324,6 +342,30 @@ const ManutencaoFormModal: React.FC<ManutencaoFormModalProps> = ({
     }
   };
 
+  // Criação de fornecedor direto da modal
+  const handleCreateSupplier = async (payload: CreateSupplierRequest) => {
+    try {
+      const created = await contasAPagarService.createFornecedor(payload);
+      toast({
+        title: '✅ Fornecedor cadastrado',
+        description: `Fornecedor "${created.name}" criado com sucesso.`,
+      });
+      // Recarrega lista e seleciona o recém-criado
+      const list = await contasAPagarService.getFornecedoresAtivos();
+      setSuppliers(list);
+      if (created.name) {
+        setFormData(prev => ({ ...prev, provider: created.name }));
+      }
+      setIsSupplierModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao cadastrar fornecedor',
+        description: error.message || 'Não foi possível cadastrar o fornecedor.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getSelectedVehicle = () => {
     return veiculos.find(v => v.id === formData.vehicleId);
   };
@@ -485,16 +527,35 @@ const ManutencaoFormModal: React.FC<ManutencaoFormModalProps> = ({
               <Label htmlFor="provider" className="text-seguranca-lightgray">
                 Fornecedor/Oficina
               </Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  id="provider"
-                  value={formData.provider}
-                  onChange={(e) => handleInputChange('provider', e.target.value)}
-                  placeholder="Nome da oficina ou fornecedor"
-                  className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    value={formData.provider}
+                    onValueChange={(value) => handleInputChange('provider', value)}
+                  >
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      <SelectValue placeholder="Selecione ou cadastre um fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600 max-h-60">
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.name}>
+                          {s.name} {s.city ? `- ${s.city}` : ''} {s.isActive === false ? ' (inativo)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-gray-600 text-gray-200 hover:border-seguranca-yellow hover:text-white"
+                  onClick={() => setIsSupplierModalOpen(true)}
+                  title="Cadastrar fornecedor"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
               </div>
+              <p className="text-xs text-gray-400">Se não encontrar, cadastre um novo fornecedor/oficina.</p>
             </div>
           </div>
 
@@ -836,6 +897,12 @@ const ManutencaoFormModal: React.FC<ManutencaoFormModalProps> = ({
           </div>
         </form>
       </DialogContent>
+
+      <SupplierFormModal
+        isOpen={isSupplierModalOpen}
+        onClose={() => setIsSupplierModalOpen(false)}
+        onSave={handleCreateSupplier}
+      />
     </Dialog>
   );
 };

@@ -198,3 +198,5 @@ echo "5. Verifique os logs do Traefik para erros: docker logs traefik --tail 100
 
 
 
+
+

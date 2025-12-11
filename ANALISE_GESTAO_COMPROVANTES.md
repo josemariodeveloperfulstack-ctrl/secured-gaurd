@@ -310,3 +310,5 @@ A gestão de **Comprovantes de Pagamento** está **100% INTEGRADA** ao backend, 
 **Status:** ✅ **INTEGRAÇÃO COMPLETA E FUNCIONAL**
 
 
+
+

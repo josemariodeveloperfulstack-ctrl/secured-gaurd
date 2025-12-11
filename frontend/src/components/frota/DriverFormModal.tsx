@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import driverService from '@/services/driverService';
 import { useToast } from '@/hooks/use-toast';
 import { Driver } from '@/types/driver';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import employeeService from '@/services/employeeService';
 
 interface DriverFormModalProps {
   isOpen: boolean;
@@ -23,6 +25,7 @@ interface DriverFormModalProps {
 }
 
 const DriverFormModal: React.FC<DriverFormModalProps> = ({ isOpen, onOpenChange, onSuccess, driver }) => {
+  const [employeeId, setEmployeeId] = useState('');
   const [name, setName] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [status, setStatus] = useState<'ATIVO' | 'INATIVO'>('ATIVO');
@@ -33,18 +36,72 @@ const DriverFormModal: React.FC<DriverFormModalProps> = ({ isOpen, onOpenChange,
 
   useEffect(() => {
     if (driver) {
+      setEmployeeId('');
       setName(driver.name);
       setLicenseNumber(driver.licenseNumber || '');
       setStatus(driver.status);
     } else {
+      setEmployeeId('');
       setName('');
       setLicenseNumber('');
       setStatus('ATIVO');
     }
   }, [driver, isOpen]);
 
+  // Quando escolher um funcionário, preencher nome e CNH automaticamente
+  useEffect(() => {
+    const loadEmployee = async () => {
+      if (!employeeId) return;
+      try {
+        const emp = await employeeService.getEmployeeById(employeeId);
+        if (emp) {
+          setName(emp.name || '');
+          if (emp.cnhNumber) setLicenseNumber(emp.cnhNumber);
+          if (emp.status && ['ACTIVE', 'ATIVO'].includes(emp.status)) {
+            setStatus('ATIVO');
+          } else if (emp.status && ['INACTIVE', 'INATIVO'].includes(emp.status)) {
+            setStatus('INATIVO');
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar funcionário:', error);
+      }
+    };
+    loadEmployee();
+  }, [employeeId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!employeeId) {
+      toast({
+        title: 'Selecione o funcionário',
+        description: 'Escolha um funcionário para vincular como motorista.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Validar se já existe motorista com essa CNH (apenas na criação)
+    if (!isEditing && licenseNumber && licenseNumber.trim()) {
+      try {
+        const existingDrivers = await driverService.getDrivers();
+        const driverWithSameCNH = existingDrivers.find(
+          d => d.licenseNumber && d.licenseNumber.trim() === licenseNumber.trim()
+        );
+        if (driverWithSameCNH) {
+          toast({
+            title: 'CNH já cadastrada',
+            description: `Já existe um motorista cadastrado com esta CNH: ${licenseNumber}. Por favor, edite o motorista existente ou use uma CNH diferente.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Erro ao verificar CNH existente:', error);
+        // Continua mesmo se houver erro na verificação
+      }
+    }
+    
     setIsLoading(true);
 
     try {
@@ -62,10 +119,11 @@ const DriverFormModal: React.FC<DriverFormModalProps> = ({ isOpen, onOpenChange,
       });
       onSuccess();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || `Não foi possível ${isEditing ? 'atualizar' : 'criar'} o motorista.`;
       toast({
         title: 'Erro',
-        description: `Não foi possível ${isEditing ? 'atualizar' : 'criar'} o motorista.`,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -82,8 +140,24 @@ const DriverFormModal: React.FC<DriverFormModalProps> = ({ isOpen, onOpenChange,
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">
+                Funcionário (busca)
+              </Label>
+              <div className="col-span-3">
+                <EmployeeCombobox
+                  value={employeeId}
+                  onChange={(value) => setEmployeeId(value)}
+                  placeholder="Buscar funcionário pelo nome..."
+                  searchPlaceholder="Digite pelo menos 2 letras"
+                  emptyPlaceholder="Nenhum funcionário encontrado"
+                  disabled={isEditing} // edição mantém o vínculo atual
+                />
+                <p className="mt-1 text-xs text-gray-400">O motorista é sempre um funcionário da empresa.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">
-                Nome
+                Nome do motorista
               </Label>
               <Input
                 id="name"
