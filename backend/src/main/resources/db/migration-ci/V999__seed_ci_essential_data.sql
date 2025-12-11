@@ -12,7 +12,7 @@
 -- 1. USUÁRIO ADMINISTRADOR CI
 -- =====================================================
 INSERT INTO users (id, username, password, email, name, status, active, created_at, updated_at)
-VALUES (
+SELECT 
     '11111111-1111-1111-1111-111111111111',
     'admin@ci',
     '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa',
@@ -22,8 +22,9 @@ VALUES (
     true,
     NOW(),
     NOW()
-)
-ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM users WHERE id = '11111111-1111-1111-1111-111111111111'
+);
 
 -- Atribuir role ADMIN ao usuário admin@ci
 INSERT INTO user_roles (user_id, role_id, created_at)
@@ -43,7 +44,7 @@ WHERE r.name = 'ADMIN'
 -- 2. UNIDADE MATRIZ CI
 -- =====================================================
 INSERT INTO units (id, name, description, address, phone, email, created_at, updated_at)
-VALUES (
+SELECT 
     '22222222-2222-2222-2222-222222222222',
     'Unidade Matriz CI',
     'Unidade matriz para ambiente de CI',
@@ -52,49 +53,35 @@ VALUES (
     'matriz@ci.z7botsolutions.com.br',
     NOW(),
     NOW()
-)
-ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM units WHERE id = '22222222-2222-2222-2222-222222222222'
+);
 
 -- =====================================================
 -- 3. TURNOS PADRÃO
 -- =====================================================
 INSERT INTO shifts (id, name, start_time, end_time, created_at, updated_at)
-VALUES
-    ('33333333-3333-3333-3333-333333333333', 'Manhã', '08:00:00', '16:00:00', NOW(), NOW()),
-    ('44444444-4444-4444-4444-444444444444', 'Tarde', '16:00:00', '00:00:00', NOW(), NOW()),
-    ('55555555-5555-5555-5555-555555555555', 'Noite', '00:00:00', '08:00:00', NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
+SELECT '33333333-3333-3333-3333-333333333333', 'Manhã', '08:00:00', '16:00:00', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '33333333-3333-3333-3333-333333333333')
+UNION ALL
+SELECT '44444444-4444-4444-4444-444444444444', 'Tarde', '16:00:00', '00:00:00', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '44444444-4444-4444-4444-444444444444')
+UNION ALL
+SELECT '55555555-5555-5555-5555-555555555555', 'Noite', '00:00:00', '08:00:00', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '55555555-5555-5555-5555-555555555555');
 
 -- =====================================================
 -- 4. CARGOS/POSIÇÕES BÁSICAS
 -- =====================================================
 INSERT INTO positions (id, name, description, unit_id, created_at, updated_at)
-VALUES
-    (
-        '66666666-6666-6666-6666-666666666666',
-        'Vigilante',
-        'Vigilante de segurança',
-        '22222222-2222-2222-2222-222222222222',
-        NOW(),
-        NOW()
-    ),
-    (
-        '77777777-7777-7777-7777-777777777777',
-        'Supervisor',
-        'Supervisor de segurança',
-        '22222222-2222-2222-2222-222222222222',
-        NOW(),
-        NOW()
-    ),
-    (
-        '88888888-8888-8888-8888-888888888888',
-        'Gerente',
-        'Gerente de segurança',
-        '22222222-2222-2222-2222-222222222222',
-        NOW(),
-        NOW()
-    )
-ON CONFLICT (id) DO NOTHING;
+SELECT '66666666-6666-6666-6666-666666666666', 'Vigilante', 'Vigilante de segurança', '22222222-2222-2222-2222-222222222222', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '66666666-6666-6666-6666-666666666666')
+UNION ALL
+SELECT '77777777-7777-7777-7777-777777777777', 'Supervisor', 'Supervisor de segurança', '22222222-2222-2222-2222-222222222222', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '77777777-7777-7777-7777-777777777777')
+UNION ALL
+SELECT '88888888-8888-8888-8888-888888888888', 'Gerente', 'Gerente de segurança', '22222222-2222-2222-2222-222222222222', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '88888888-8888-8888-8888-888888888888');
 
 -- =====================================================
 -- 5. DEPARTAMENTO BÁSICO
@@ -125,7 +112,7 @@ END $$;
 -- 6. CLIENTE DE TESTE
 -- =====================================================
 INSERT INTO clients (id, name, cnpj, email, phone, address, city, state, zip_code, status, created_at, updated_at)
-VALUES (
+SELECT 
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     'Cliente Teste CI',
     '12.345.678/0001-90',
@@ -138,14 +125,15 @@ VALUES (
     'ACTIVE',
     NOW(),
     NOW()
-)
-ON CONFLICT (cnpj) DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM clients WHERE cnpj = '12.345.678/0001-90'
+);
 
 -- =====================================================
 -- 7. EMPRESA DE TESTE
 -- =====================================================
 INSERT INTO companies (id, name, trade_name, cnpj, email, phone, address, city, state, zip_code, status, type, sector, size, created_by, created_at, updated_at)
-VALUES (
+SELECT 
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     'Empresa Teste CI',
     'Empresa Teste CI Ltda',
@@ -163,8 +151,9 @@ VALUES (
     '11111111-1111-1111-1111-111111111111',
     NOW(),
     NOW()
-)
-ON CONFLICT (cnpj) DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM companies WHERE cnpj = '98.765.432/0001-10'
+);
 
 -- =====================================================
 -- 8. DADOS DA TABELA EMPLOYEES
@@ -245,164 +234,176 @@ INSERT INTO employees (
     nome_pai, nome_mae, local_nascimento, grau_instrucao,
     created_at, updated_at
 )
-VALUES
-    (
-        'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        '11111111-1111-1111-1111-111111111111',
-        '66666666-6666-6666-6666-666666666666',
-        'FUNC001',
-        'João Silva',
-        '123.456.789-00',
-        '123.456.789-00',
-        '12.345.678-9',
-        '1990-01-15',
-        'M',
-        'SOLTEIRO',
-        'Brasileiro',
-        'Rua Funcionário, 789 - São Paulo, SP',
-        '(11) 98765-4321',
-        'joao.silva@teste.ci',
-        '22222222-2222-2222-2222-222222222222',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        '2024-01-01',
-        NULL,
-        'ACTIVE',
-        'Funcionário de teste para ambiente CI',
-        '12345678901',
-        '2025-12-31',
-        'B',
-        '1234567890',
-        '123',
-        '2020-01-15',
-        'SSP/SP',
-        '123456789012',
-        '123',
-        '456',
-        '5172-10',
-        '12345678901',
-        2500.00,
-        'Mensal',
-        '08:00 às 17:00',
-        'Domingo',
-        true,
-        '2024-01-01',
-        'Banco do Brasil',
-        '2024-01-01',
-        'Banco do Brasil',
-        'José Silva',
-        'Maria Silva',
-        'São Paulo, SP',
-        'Ensino Médio Completo',
-        NOW(),
-        NOW()
-    ),
-    (
-        'dddddddd-dddd-dddd-dddd-dddddddddddd',
-        NULL,
-        '77777777-7777-7777-7777-777777777777',
-        'FUNC002',
-        'Maria Santos',
-        '987.654.321-00',
-        '987.654.321-00',
-        '98.765.432-1',
-        '1985-05-20',
-        'F',
-        'CASADO',
-        'Brasileiro',
-        'Av. Funcionária, 321 - São Paulo, SP',
-        '(11) 91234-5678',
-        'maria.santos@teste.ci',
-        '22222222-2222-2222-2222-222222222222',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        '2024-02-01',
-        NULL,
-        'ACTIVE',
-        'Funcionária de teste para ambiente CI',
-        '98765432109',
-        '2026-06-30',
-        'AB',
-        '9876543210',
-        '456',
-        '2019-05-20',
-        'SSP/SP',
-        '987654321098',
-        '456',
-        '789',
-        '5172-10',
-        '98765432109',
-        3000.00,
-        'Mensal',
-        '08:00 às 17:00',
-        'Sábado',
-        true,
-        '2024-02-01',
-        'Caixa Econômica Federal',
-        '2024-02-01',
-        'Caixa Econômica Federal',
-        'Carlos Santos',
-        'Ana Santos',
-        'Rio de Janeiro, RJ',
-        'Ensino Superior Completo',
-        NOW(),
-        NOW()
-    )
-ON CONFLICT (id) DO NOTHING;
+SELECT 
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    '11111111-1111-1111-1111-111111111111',
+    '66666666-6666-6666-6666-666666666666',
+    'FUNC001',
+    'João Silva',
+    '123.456.789-00',
+    '123.456.789-00',
+    '12.345.678-9',
+    '1990-01-15',
+    'M',
+    'SOLTEIRO',
+    'Brasileiro',
+    'Rua Funcionário, 789 - São Paulo, SP',
+    '(11) 98765-4321',
+    'joao.silva@teste.ci',
+    '22222222-2222-2222-2222-222222222222',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '2024-01-01',
+    NULL,
+    'ACTIVE',
+    'Funcionário de teste para ambiente CI',
+    '12345678901',
+    '2025-12-31',
+    'B',
+    '1234567890',
+    '123',
+    '2020-01-15',
+    'SSP/SP',
+    '123456789012',
+    '123',
+    '456',
+    '5172-10',
+    '12345678901',
+    2500.00,
+    'Mensal',
+    '08:00 às 17:00',
+    'Domingo',
+    true,
+    '2024-01-01',
+    'Banco do Brasil',
+    '2024-01-01',
+    'Banco do Brasil',
+    'José Silva',
+    'Maria Silva',
+    'São Paulo, SP',
+    'Ensino Médio Completo',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+INSERT INTO employees (
+    id, user_id, position_id, registration_number, name, document, cpf, rg, 
+    birth_date, gender, marital_status, nationality, address, phone, email, 
+    unit_id, company_id, hire_date, termination_date, status, notes,
+    cnh_number, cnh_expiration_date, cnh_category,
+    ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
+    titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao,
+    cbo, pis, salario, periodo_pagamento, horario_trabalho, folga_semanal,
+    fgts_optante, fgts_data_opcao, fgts_banco_depositario,
+    pis_data_cadastro, pis_banco_depositario,
+    nome_pai, nome_mae, local_nascimento, grau_instrucao,
+    created_at, updated_at
+)
+SELECT 
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    NULL,
+    '77777777-7777-7777-7777-777777777777',
+    'FUNC002',
+    'Maria Santos',
+    '987.654.321-00',
+    '987.654.321-00',
+    '98.765.432-1',
+    '1985-05-20',
+    'F',
+    'CASADO',
+    'Brasileiro',
+    'Av. Funcionária, 321 - São Paulo, SP',
+    '(11) 91234-5678',
+    'maria.santos@teste.ci',
+    '22222222-2222-2222-2222-222222222222',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '2024-02-01',
+    NULL,
+    'ACTIVE',
+    'Funcionária de teste para ambiente CI',
+    '98765432109',
+    '2026-06-30',
+    'AB',
+    '9876543210',
+    '456',
+    '2019-05-20',
+    'SSP/SP',
+    '987654321098',
+    '456',
+    '789',
+    '5172-10',
+    '98765432109',
+    3000.00,
+    'Mensal',
+    '08:00 às 17:00',
+    'Sábado',
+    true,
+    '2024-02-01',
+    'Caixa Econômica Federal',
+    '2024-02-01',
+    'Caixa Econômica Federal',
+    'Carlos Santos',
+    'Ana Santos',
+    'Rio de Janeiro, RJ',
+    'Ensino Superior Completo',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'dddddddd-dddd-dddd-dddd-dddddddddddd');
 
 -- =====================================================
 -- 9. FROTA - VEÍCULOS DE TESTE
 -- =====================================================
 -- Usar subquery para buscar o ID do departamento "Operacional"
 INSERT INTO vehicles (id, plate, model, brand, year, color, status, fuel_type, capacity, current_mileage, department_id, company_id, created_at, updated_at)
-VALUES
-    (
-        'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        'ABC1234',
-        'Civic',
-        'Honda',
-        2020,
-        'Prata',
-        'ACTIVE',
-        'FLEX',
-        5,
-        45000,
-        (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        NOW(),
-        NOW()
-    ),
-    (
-        'ffffffff-ffff-ffff-ffff-ffffffffffff',
-        'DEF5678',
-        'Corolla',
-        'Toyota',
-        2019,
-        'Branco',
-        'ACTIVE',
-        'FLEX',
-        5,
-        38000,
-        (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        NOW(),
-        NOW()
-    ),
-    (
-        '11111111-1111-1111-1111-111111111112',
-        'GHI9012',
-        'Hilux',
-        'Toyota',
-        2021,
-        'Prata',
-        'ACTIVE',
-        'DIESEL',
-        5,
-        25000,
-        (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        NOW(),
-        NOW()
-    )
-ON CONFLICT (plate) DO NOTHING;
+SELECT 
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'ABC1234',
+    'Civic',
+    'Honda',
+    2020,
+    'Prata',
+    'ACTIVE',
+    'FLEX',
+    5,
+    45000,
+    (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE plate = 'ABC1234')
+UNION ALL
+SELECT 
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'DEF5678',
+    'Corolla',
+    'Toyota',
+    2019,
+    'Branco',
+    'ACTIVE',
+    'FLEX',
+    5,
+    38000,
+    (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE plate = 'DEF5678')
+UNION ALL
+SELECT 
+    '11111111-1111-1111-1111-111111111112',
+    'GHI9012',
+    'Hilux',
+    'Toyota',
+    2021,
+    'Prata',
+    'ACTIVE',
+    'DIESEL',
+    5,
+    25000,
+    (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    NOW(),
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE plate = 'GHI9012');
 
 -- =====================================================
 -- LOG DE CONCLUSÃO
