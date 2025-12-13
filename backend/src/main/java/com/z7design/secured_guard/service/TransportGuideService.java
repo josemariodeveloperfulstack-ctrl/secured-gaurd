@@ -1,5 +1,13 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.TransportGuideDTO;
 import com.z7design.secured_guard.model.TransportGuide;
 import com.z7design.secured_guard.model.enums.TransportGuideStatus;
@@ -10,12 +18,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -164,6 +175,173 @@ public class TransportGuideService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(TransportGuideStatus status, String empresa, String startDate) throws IOException {
+        log.info("Gerando relatório PDF de guias de transporte - Status: {}, Empresa: {}, Data: {}", status, empresa, startDate);
+        
+        // Buscar guias com filtros
+        List<TransportGuide> guides;
+        if (status != null) {
+            guides = transportGuideRepository.findByStatus(status);
+        } else if (empresa != null) {
+            guides = transportGuideRepository.findByEmpresa(empresa);
+        } else {
+            guides = transportGuideRepository.findAll();
+        }
+        
+        // Filtrar por data se fornecida
+        if (startDate != null && !startDate.isEmpty()) {
+            LocalDate filterDate = LocalDate.parse(startDate);
+            guides = guides.stream()
+                    .filter(guide -> guide.getCreatedAt() != null && 
+                            guide.getCreatedAt().toLocalDate().equals(filterDate))
+                    .collect(Collectors.toList());
+        }
+        
+        log.info("Gerando PDF com {} guias de transporte", guides.size());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+        
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+            
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+            
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+            
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE GUIAS DE TRANSPORTE")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+            
+            // Filtros aplicados
+            if (status != null || empresa != null || startDate != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+                
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + status).setFontSize(10).setMarginBottom(2));
+                }
+                if (empresa != null) {
+                    document.add(new Paragraph("Empresa: " + empresa).setFontSize(10).setMarginBottom(2));
+                }
+                if (startDate != null) {
+                    document.add(new Paragraph("Data: " + startDate).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+            
+            // Total de guias
+            Paragraph totalInfo = new Paragraph("Total de guias: " + guides.size())
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(totalInfo);
+            
+            // Tabela de guias
+            if (guides.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhuma guia encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(6).setWidth(UnitValue.createPercentValue(100));
+                
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Empresa"));
+                table.addHeaderCell(createHeaderCell("CNPJ"));
+                table.addHeaderCell(createHeaderCell("Arma"));
+                table.addHeaderCell(createHeaderCell("Calibre"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Data"));
+                
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (TransportGuide guide : guides) {
+                    table.addCell(createCell(guide.getEmpresa() != null ? guide.getEmpresa() : ""));
+                    table.addCell(createCell(guide.getCnpj() != null ? guide.getCnpj() : ""));
+                    table.addCell(createCell(guide.getNumeroArma() != null ? guide.getNumeroArma() : ""));
+                    table.addCell(createCell(guide.getCalibre() != null ? guide.getCalibre() : ""));
+                    table.addCell(createCell(guide.getStatus() != null ? guide.getStatus().toString() : ""));
+                    String dateStr = guide.getCreatedAt() != null ? 
+                            guide.getCreatedAt().format(dateFormatter) : "";
+                    table.addCell(createCell(dateStr));
+                }
+                
+                document.add(table);
+            }
+            
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de guias de transporte: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+            if (pdfDoc != null) {
+                pdfDoc.close();
+            }
+            if (writer != null) {
+                writer.close();
+            }
+        }
+        
+        byte[] result = baos.toByteArray();
+        log.info("PDF de guias de transporte gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+    
+    private Cell createHeaderCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+    
+    private Cell createCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setTextAlignment(TextAlignment.LEFT);
+    }
+
     private String saveFile(MultipartFile file) {
         try {
             Path uploadPath = Paths.get(UPLOAD_DIR);
@@ -195,6 +373,8 @@ public class TransportGuideService {
         }
     }
 }
+
+
 
 
 

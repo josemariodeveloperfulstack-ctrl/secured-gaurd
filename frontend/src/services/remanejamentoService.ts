@@ -29,10 +29,12 @@ export interface Remanejamento {
 export interface CreateRemanejamentoDTO {
   employeeId: string;
   tipo: RemanejamentoTipo;
-  origem: string;
-  destino: string;
+  origem?: string;
+  destino?: string;
   dataRemanejamento: string;
   observacao?: string;
+  originWorkstationId?: string;
+  destinationWorkstationId?: string;
 }
 
 class RemanejamentoService {
@@ -68,6 +70,34 @@ class RemanejamentoService {
 
   async deleteRemanejamento(id: string): Promise<void> {
     await api.delete(`/api/remanejamentos/${id}`);
+  }
+
+  // Gerar relatório PDF de remanejamentos
+  async exportRemanejamentosReportPDF(filters: {
+    employeeId?: string;
+    tipo?: string;
+    origem?: string;
+    destino?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      if (filters.employeeId) params.append('employeeId', filters.employeeId);
+      if (filters.tipo) params.append('tipo', filters.tipo);
+      if (filters.origem) params.append('origem', filters.origem);
+      if (filters.destino) params.append('destino', filters.destino);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+
+      const response = await api.get(`/api/remanejamentos/report/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório PDF:', error);
+      throw new Error('Falha ao gerar relatório PDF');
+    }
   }
 }
 

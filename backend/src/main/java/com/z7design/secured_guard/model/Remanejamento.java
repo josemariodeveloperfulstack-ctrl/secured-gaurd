@@ -33,6 +33,14 @@ public class Remanejamento {
     @Column(length = 500)
     private String observacao;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "origin_workstation_id")
+    private WorkPost originWorkstation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destination_workstation_id")
+    private WorkPost destinationWorkstation;
+
     // Getters e setters
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -48,4 +56,8 @@ public class Remanejamento {
     public void setDataRemanejamento(LocalDate dataRemanejamento) { this.dataRemanejamento = dataRemanejamento; }
     public String getObservacao() { return observacao; }
     public void setObservacao(String observacao) { this.observacao = observacao; }
+    public WorkPost getOriginWorkstation() { return originWorkstation; }
+    public void setOriginWorkstation(WorkPost originWorkstation) { this.originWorkstation = originWorkstation; }
+    public WorkPost getDestinationWorkstation() { return destinationWorkstation; }
+    public void setDestinationWorkstation(WorkPost destinationWorkstation) { this.destinationWorkstation = destinationWorkstation; }
 } 

@@ -530,10 +530,11 @@ public class FuelRecordController {
             @RequestParam(required = false) LocalDate endDate,
             @RequestParam(required = false) UUID vehicleId,
             @RequestParam(required = false) String posto,
-            @RequestParam(required = false) UUID driverId) {
+            @RequestParam(required = false) UUID driverId,
+            @RequestParam(required = false) String fuelType) {
         
         try {
-            byte[] pdfBytes = fuelRecordReportService.generatePdfReport(startDate, endDate, vehicleId, posto, driverId);
+            byte[] pdfBytes = fuelRecordReportService.generatePdfReport(startDate, endDate, vehicleId, posto, driverId, fuelType);
             
             return ResponseEntity.ok()
                     .header("Content-Type", "application/pdf")
@@ -558,10 +559,11 @@ public class FuelRecordController {
             @RequestParam(required = false) LocalDate endDate,
             @RequestParam(required = false) UUID vehicleId,
             @RequestParam(required = false) String posto,
-            @RequestParam(required = false) UUID driverId) {
+            @RequestParam(required = false) UUID driverId,
+            @RequestParam(required = false) String fuelType) {
         
         try {
-            byte[] excelBytes = fuelRecordReportService.generateExcelReport(startDate, endDate, vehicleId, posto, driverId);
+            byte[] excelBytes = fuelRecordReportService.generateExcelReport(startDate, endDate, vehicleId, posto, driverId, fuelType);
             
             return ResponseEntity.ok()
                     .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

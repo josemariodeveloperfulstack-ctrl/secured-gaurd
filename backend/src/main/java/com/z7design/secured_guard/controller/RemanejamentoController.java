@@ -10,9 +10,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +25,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/remanejamentos")
 @Tag(name = "Remanejamentos", description = "Endpoints para gestão de remanejamentos de funcionários")
+@Slf4j
 public class RemanejamentoController {
     @Autowired
     private RemanejamentoService remanejamentoService;
@@ -40,12 +41,20 @@ public class RemanejamentoController {
     @PostMapping
     public ResponseEntity<RemanejamentoDTO> create(@RequestBody RemanejamentoDTO dto, 
                                               HttpServletRequest request) {
-        User usuarioAtual = getUsuarioAtual();
-        String ipUsuario = getClientIpAddress(request);
-        
-        RemanejamentoDTO created = remanejamentoService.createFromDTO(dto, usuarioAtual, 
-            "Criação via API - IP: " + ipUsuario);
-        return ResponseEntity.ok(created);
+        try {
+            User usuarioAtual = getUsuarioAtual();
+            String ipUsuario = getClientIpAddress(request);
+            
+            RemanejamentoDTO created = remanejamentoService.createFromDTO(dto, usuarioAtual, 
+                "Criação via API - IP: " + ipUsuario);
+            return ResponseEntity.ok(created);
+        } catch (RuntimeException e) {
+            log.error("Erro ao criar remanejamento: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Erro inesperado ao criar remanejamento: {}", e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @Operation(summary = "Atualiza um remanejamento existente",
@@ -121,6 +130,37 @@ public class RemanejamentoController {
     @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<RemanejamentoDTO>> findByEmployeeId(@PathVariable UUID employeeId) {
         return ResponseEntity.ok(remanejamentoService.findByEmployeeIdAsDTO(employeeId));
+    }
+    
+    @Operation(summary = "Gerar relatório PDF de remanejamentos",
+               description = "Gera relatório PDF filtrado por funcionário, tipo, origem, destino e período")
+    @GetMapping("/report/pdf")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) String origem,
+            @RequestParam(required = false) String destino,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate) {
+        try {
+            com.z7design.secured_guard.model.RemanejamentoTipo tipoEnum = null;
+            if (tipo != null && !tipo.isEmpty() && !"all".equals(tipo)) {
+                try {
+                    tipoEnum = com.z7design.secured_guard.model.RemanejamentoTipo.valueOf(tipo);
+                } catch (IllegalArgumentException e) {
+                    // Tipo inválido, ignorar
+                }
+            }
+
+            byte[] pdfBytes = remanejamentoService.generatePDFReport(employeeId, tipoEnum, origem, destino, startDate, endDate);
+            String fileName = "relatorio-remanejamentos-" + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
     
     /**

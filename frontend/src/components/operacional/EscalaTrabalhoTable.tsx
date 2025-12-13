@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Edit, Trash2, Search, Plus, RefreshCw, Clock, User, Building, Sun, Moon } from 'lucide-react';
+import { Edit, Trash2, Search, Plus, RefreshCw, Clock, User, Building, Sun, Moon, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Schedule } from '@/services/scheduleService';
+import { Schedule, scheduleService } from '@/services/scheduleService';
 
 interface EscalaTrabalhoTableProps {
   escalas: Schedule[];
@@ -70,6 +70,47 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
     if (!dateString) return '-';
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
+  };
+
+  const handleGeneratePDF = async () => {
+    try {
+      toast({
+        title: 'Gerando relatório...',
+        description: 'Por favor, aguarde enquanto o PDF é gerado.',
+      });
+
+      // Preparar filtros baseados nos filtros atuais
+      const filters: any = {};
+      
+      // Se houver filtro de status, incluir
+      if (statusFilter && statusFilter !== 'all') {
+        filters.status = statusFilter;
+      }
+
+      const blob = await scheduleService.generatePDFReport(filters);
+      
+      // Criar URL do blob e fazer download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio-escalas-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Relatório gerado!',
+        description: 'O PDF foi baixado com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Erro ao gerar relatório PDF:', error);
+      toast({
+        title: 'Erro ao gerar relatório',
+        description: error.message || 'Não foi possível gerar o relatório PDF.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Verificar se escalas é um array válido
@@ -169,6 +210,14 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
             </select>
           </div>
           <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={handleGeneratePDF}
+              className="bg-seguranca-yellow hover:bg-yellow-600 text-seguranca-black"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Gerar Relatório PDF
+            </Button>
             <Button
               variant="outline"
               onClick={handleRefresh}

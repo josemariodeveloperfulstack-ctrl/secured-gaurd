@@ -2,15 +2,20 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.OperationalOccurrence;
 import com.z7design.secured_guard.service.OperationalOccurrenceService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -374,6 +379,61 @@ public class OperationalOccurrenceController {
         } catch (Exception e) {
             log.error("Erro ao gerar próximo número de advertência: {}", e.getMessage(), e);
             throw e;
+        }
+    }
+
+    /**
+     * Gerar relatório PDF de ocorrências
+     */
+    @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(summary = "Gerar relatório PDF de ocorrências", description = "Gera relatório PDF filtrado por funcionário, tipo, status, prioridade, data, responsável e local")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String responsible,
+            @RequestParam(required = false) String location) {
+        try {
+            OperationalOccurrence.OccurrenceType typeEnum = null;
+            if (type != null && !type.isEmpty() && !"all".equals(type)) {
+                try {
+                    typeEnum = OperationalOccurrence.OccurrenceType.valueOf(type.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    log.warn("Tipo inválido: {}", type);
+                }
+            }
+
+            OperationalOccurrence.OccurrenceStatus statusEnum = null;
+            if (status != null && !status.isEmpty() && !"all".equals(status)) {
+                try {
+                    statusEnum = OperationalOccurrence.OccurrenceStatus.valueOf(status.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    log.warn("Status inválido: {}", status);
+                }
+            }
+
+            OperationalOccurrence.OccurrencePriority priorityEnum = null;
+            if (priority != null && !priority.isEmpty() && !"all".equals(priority)) {
+                try {
+                    priorityEnum = OperationalOccurrence.OccurrencePriority.valueOf(priority.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    log.warn("Prioridade inválida: {}", priority);
+                }
+            }
+
+            byte[] pdfBytes = occurrenceService.generatePDFReport(employeeId, typeEnum, statusEnum, priorityEnum,
+                    startDate, endDate, responsible, location);
+            String fileName = "relatorio-ocorrencias-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de ocorrências: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

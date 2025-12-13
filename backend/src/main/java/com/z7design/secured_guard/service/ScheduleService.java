@@ -26,12 +26,27 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
@@ -303,5 +318,217 @@ public class ScheduleService {
 
     public List<EmployeeSchedule> findByScheduleId(UUID scheduleId) {
         return employeeScheduleRepository.findByScheduleId(scheduleId);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(LocalDate startDate, LocalDate endDate, UUID employeeId, UUID workPostId, String status) throws IOException {
+        log.info("Gerando relatório PDF de escalas - StartDate: {}, EndDate: {}, EmployeeId: {}, WorkPostId: {}, Status: {}", 
+                startDate, endDate, employeeId, workPostId, status);
+        
+        // Buscar escalas com filtros
+        List<Schedule> schedules;
+        if (startDate != null && endDate != null) {
+            schedules = scheduleRepository.findByScheduleDateBetween(startDate, endDate);
+        } else {
+            schedules = scheduleRepository.findAllWithRelations();
+        }
+        
+        // Aplicar filtros adicionais
+        if (employeeId != null) {
+            schedules = schedules.stream()
+                    .filter(s -> s.getEmployee() != null && s.getEmployee().getId().equals(employeeId))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        
+        if (workPostId != null) {
+            schedules = schedules.stream()
+                    .filter(s -> s.getWorkPost() != null && s.getWorkPost().getId().equals(workPostId))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        
+        if (status != null && !status.isEmpty()) {
+            try {
+                com.z7design.secured_guard.model.enums.ScheduleStatus statusEnum = 
+                        com.z7design.secured_guard.model.enums.ScheduleStatus.valueOf(status);
+                schedules = schedules.stream()
+                        .filter(s -> s.getStatus() == statusEnum)
+                        .collect(java.util.stream.Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                log.warn("Status inválido: {}", status);
+            }
+        }
+        
+        log.info("Total de escalas encontradas para o relatório: {}", schedules.size());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+        
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+            
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+            
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+            
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE ESCALAS DE TRABALHO")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+            
+            // Filtros aplicados
+            if (startDate != null || endDate != null || employeeId != null || workPostId != null || status != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+                
+                if (startDate != null) {
+                    document.add(new Paragraph("Data Início: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (endDate != null) {
+                    document.add(new Paragraph("Data Fim: " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (employeeId != null) {
+                    document.add(new Paragraph("Funcionário: ID " + employeeId).setFontSize(10).setMarginBottom(2));
+                }
+                if (workPostId != null) {
+                    document.add(new Paragraph("Posto de Trabalho: ID " + workPostId).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null && !status.isEmpty()) {
+                    document.add(new Paragraph("Status: " + status).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+            
+            // Total de escalas
+            Paragraph totalInfo = new Paragraph("Total de escalas: " + schedules.size())
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(totalInfo);
+            
+            // Tabela de escalas
+            if (schedules.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhuma escala encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(6).setWidth(UnitValue.createPercentValue(100));
+                
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Funcionário"));
+                table.addHeaderCell(createHeaderCell("Localização"));
+                table.addHeaderCell(createHeaderCell("Posto de Trabalho"));
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Turno"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (Schedule schedule : schedules) {
+                    table.addCell(createCell(schedule.getEmployee() != null ? schedule.getEmployee().getName() : ""));
+                    table.addCell(createCell(schedule.getLocation() != null ? schedule.getLocation().getName() : ""));
+                    table.addCell(createCell(schedule.getWorkPost() != null ? schedule.getWorkPost().getName() : ""));
+                    table.addCell(createCell(schedule.getScheduleDate() != null ? 
+                            schedule.getScheduleDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(schedule.getShift() != null ? getShiftLabel(schedule.getShift()) : ""));
+                    table.addCell(createCell(schedule.getStatus() != null ? getStatusLabel(schedule.getStatus()) : ""));
+                }
+                
+                document.add(table);
+            }
+            
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de escalas: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+            if (pdfDoc != null) {
+                pdfDoc.close();
+            }
+            if (writer != null) {
+                writer.close();
+            }
+        }
+        
+        byte[] result = baos.toByteArray();
+        log.info("PDF de escalas gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+    
+    private String getShiftLabel(com.z7design.secured_guard.model.enums.Shift shift) {
+        if (shift == null) return "";
+        switch (shift) {
+            case DAY: return "Diurno";
+            case NIGHT: return "Noturno";
+            case MIXED: return "Misto";
+            default: return shift.toString();
+        }
+    }
+    
+    private String getStatusLabel(com.z7design.secured_guard.model.enums.ScheduleStatus status) {
+        if (status == null) return "";
+        switch (status) {
+            case PENDING: return "Pendente";
+            case APPROVED: return "Aprovada";
+            case REJECTED: return "Rejeitada";
+            case IN_PROGRESS: return "Em Andamento";
+            case COMPLETED: return "Concluída";
+            case CANCELLED: return "Cancelada";
+            default: return status.toString();
+        }
+    }
+    
+    // Método auxiliar para criar células de cabeçalho
+    
+    private Cell createHeaderCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+    
+    private Cell createCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setTextAlignment(TextAlignment.LEFT);
     }
 } 

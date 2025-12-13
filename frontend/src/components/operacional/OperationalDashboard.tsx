@@ -27,11 +27,13 @@ import {
   Trash2,
   Loader2,
   PlayCircle,
-  ArrowRightLeft
+  ArrowRightLeft,
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity, CreateAbsenceDTO, CreateWorkPostAssignmentDTO, CreateSpecificActivityDTO, CreateVacationCoverageDTO } from '@/services/operationalService';
 import { remanejamentoService, Remanejamento, CreateRemanejamentoDTO } from '@/services/remanejamentoService';
+import operationalReportGenerator from '@/utils/operationalReportGenerator';
 import OperationalStatsCards from './OperationalStatsCards';
 import AbsenceFormModal from './AbsenceFormModal';
 import WorkPostAssignmentFormModal from './WorkPostAssignmentFormModal';
@@ -468,6 +470,137 @@ const OperationalDashboard: React.FC = () => {
     }
   };
 
+  // Funções para gerar relatórios em PDF
+  const handleGenerateVacationCoverageReport = async () => {
+    try {
+      const blob = await operationalReportGenerator.generateVacationCoverageReport(vacationCoverages);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-cobertura-ferias-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório de Cobertura de Férias gerado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleGenerateAbsenceReport = async () => {
+    try {
+      const blob = await operationalReportGenerator.generateAbsenceReport(absences);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-controle-faltas-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório de Controle de Faltas gerado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleGenerateWorkPostAssignmentReport = async () => {
+    try {
+      const blob = await operationalReportGenerator.generateWorkPostAssignmentReport(workPostAssignments);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-atribuicoes-posto-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório de Atribuições de Posto gerado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleGenerateSpecificActivityReport = async () => {
+    try {
+      const blob = await operationalReportGenerator.generateSpecificActivityReport(specificActivities);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-atividades-especificas-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório de Atividades Específicas gerado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleGenerateRemanejamentoReport = async () => {
+    try {
+      const blob = await operationalReportGenerator.generateRemanejamentoReport(remanejamentos);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-remanejamentos-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório de Remanejamentos gerado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleSubmitAssignment = async (data: CreateWorkPostAssignmentDTO) => {
     try {
       if (selectedAssignment) {
@@ -797,10 +930,16 @@ const OperationalDashboard: React.FC = () => {
                   <Calendar className="h-5 w-5" />
                   Cobertura de Férias ({vacationCoverages.length})
                 </CardTitle>
-                <Button onClick={handleCreateVacationCoverage} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Cobertura
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleGenerateVacationCoverageReport} size="sm" variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Gerar Relatório
+                  </Button>
+                  <Button onClick={handleCreateVacationCoverage} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Cobertura
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -886,10 +1025,16 @@ const OperationalDashboard: React.FC = () => {
                   <UserX className="h-5 w-5" />
                   Controle de Faltas ({absences.length})
                 </CardTitle>
-                <Button onClick={handleCreateAbsence} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Falta
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleGenerateAbsenceReport} size="sm" variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Gerar Relatório
+                  </Button>
+                  <Button onClick={handleCreateAbsence} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Falta
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -955,10 +1100,16 @@ const OperationalDashboard: React.FC = () => {
                   <MapPin className="h-5 w-5" />
                   Atribuições de Posto ({workPostAssignments.length})
                 </CardTitle>
-                <Button onClick={handleCreateAssignment} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Atribuição
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleGenerateWorkPostAssignmentReport} size="sm" variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Gerar Relatório
+                  </Button>
+                  <Button onClick={handleCreateAssignment} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Atribuição
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1043,10 +1194,16 @@ const OperationalDashboard: React.FC = () => {
                   <Activity className="h-5 w-5" />
                   Atividades Específicas ({specificActivities.length})
                 </CardTitle>
-                <Button onClick={handleCreateActivity} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Atividade
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleGenerateSpecificActivityReport} size="sm" variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Gerar Relatório
+                  </Button>
+                  <Button onClick={handleCreateActivity} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Atividade
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1138,10 +1295,16 @@ const OperationalDashboard: React.FC = () => {
                   <ArrowRightLeft className="h-5 w-5" />
                   Remanejamentos ({remanejamentos.length})
                 </CardTitle>
-                <Button onClick={handleCreateRemanejamento} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Remanejamento
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleGenerateRemanejamentoReport} size="sm" variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Gerar Relatório
+                  </Button>
+                  <Button onClick={handleCreateRemanejamento} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Remanejamento
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

@@ -41,6 +41,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     replacingDayOffDate: null as Date | null,
     shiftTime: '',
     status: undefined as any,
+    approvedBy: '' as string | undefined,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,6 +56,12 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     { value: 'SHIFT_18H_6H', label: '18h às 6h' },
     { value: 'SHIFT_7H_19H', label: '7h às 19h' },
     { value: 'SHIFT_19H_7H', label: '19h às 7h' },
+  ];
+
+  const statusOptions = [
+    { value: 'PENDING', label: 'Pendente' },
+    { value: 'APPROVED', label: 'Aprovado' },
+    { value: 'REJECTED', label: 'Rejeitado' },
   ];
 
   // Carregar funcionários
@@ -115,6 +122,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
           replacingDayOffDate: null,
           shiftTime: '',
           status: undefined,
+          approvedBy: undefined,
         });
       }
       setErrors({});
@@ -146,6 +154,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
         replacingDayOffDate: shiftChange.replacingDayOffDate ? new Date(shiftChange.replacingDayOffDate) : null,
         shiftTime: shiftChange.shiftTime || '',
         status: shiftChange.status,
+        approvedBy: shiftChange.approvedBy || undefined,
       });
     }
   }, [shiftChange, employees, workPosts]);
@@ -191,6 +200,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
         replacingDayOffDate: formData.replacingDayOffDate ? formatDateForBackend(formData.replacingDayOffDate) : null,
         // Inclui o status se estiver editando, caso contrário deixa undefined
         status: formData.status || undefined,
+        approvedBy: formData.approvedBy || undefined,
       };
 
       await onSave(submitData);
@@ -261,9 +271,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                     <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o funcionário"} />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    {employees.map((employee) => (
+                    {employees.map((employee, index) => (
                       <SelectItem 
-                        key={employee.id} 
+                        key={employee.id || `requester-employee-${index}-${employee.name}`} 
                         value={employee.id} 
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
@@ -362,9 +372,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                     <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o funcionário"} />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    {employees.map((employee) => (
+                    {employees.map((employee, index) => (
                       <SelectItem 
-                        key={employee.id} 
+                        key={employee.id || `replacing-employee-${index}-${employee.name}`} 
                         value={employee.id} 
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
@@ -459,6 +469,63 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             {errors.shiftTime && (
               <span className="text-red-400 text-sm">{errors.shiftTime}</span>
             )}
+          </div>
+
+          {/* Status e Aprovado por */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">
+                Status
+              </label>
+              <Select 
+                value={formData.status || 'PENDING'} 
+                onValueChange={(value) => handleInputChange('status', value)}
+              >
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600">
+                  {statusOptions.map(option => (
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value}
+                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">
+                Aprovado por:
+              </label>
+              <Select 
+                value={formData.approvedBy || ''} 
+                onValueChange={(value) => handleInputChange('approvedBy', value)}
+                disabled={formData.status !== 'APPROVED' && !shiftChange}
+              >
+                <SelectTrigger className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11 ${formData.status !== 'APPROVED' && !shiftChange ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <SelectValue placeholder={loadingEmployees ? "Carregando..." : formData.status === 'APPROVED' || shiftChange ? "Selecione o aprovador" : "Status deve ser Aprovado"} />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600">
+                  {employees.map((employee, index) => (
+                    <SelectItem 
+                      key={employee.id || `approved-by-${index}-${employee.name}`} 
+                      value={employee.name}
+                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                    >
+                      {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.status !== 'APPROVED' && !shiftChange && (
+                <p className="text-xs text-gray-500">Selecione "Aprovado" no status para habilitar este campo</p>
+              )}
+            </div>
           </div>
 
           {/* Botões */}

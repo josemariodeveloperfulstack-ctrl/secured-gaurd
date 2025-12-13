@@ -49,6 +49,8 @@ public class ShiftChangeFormDTO {
 
     private ShiftChangeStatus status;
 
+    private String approvedBy;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -65,6 +67,7 @@ public class ShiftChangeFormDTO {
         this.replacingDayOffDate = entity.getReplacingDayOffDate();
         this.shiftTime = entity.getShiftTime();
         this.status = entity.getStatus();
+        this.approvedBy = entity.getApprovedBy();
         this.createdAt = entity.getCreatedAt();
         this.updatedAt = entity.getUpdatedAt();
     }
@@ -83,6 +86,7 @@ public class ShiftChangeFormDTO {
         entity.setReplacingDayOffDate(this.replacingDayOffDate);
         entity.setShiftTime(this.shiftTime);
         entity.setStatus(this.status);
+        entity.setApprovedBy(this.approvedBy);
         // createdAt e updatedAt serão gerenciados pela entidade
         return entity;
     }

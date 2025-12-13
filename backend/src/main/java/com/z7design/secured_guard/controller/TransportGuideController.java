@@ -157,5 +157,27 @@ public class TransportGuideController {
         TransportGuideDTO rejected = transportGuideService.rejectTransportGuide(id, supervisorId, reason);
         return ResponseEntity.ok(rejected);
     }
+
+    @GetMapping(value = "/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(summary = "Gerar relatório PDF de guias de transporte")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) TransportGuideStatus status,
+            @RequestParam(required = false) String empresa,
+            @RequestParam(required = false) String startDate
+    ) {
+        log.info("GET /api/transport-guides/pdf - Gerando relatório PDF");
+        try {
+            byte[] pdfBytes = transportGuideService.generatePDFReport(status, empresa, startDate);
+            String fileName = "guias-transporte-" + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
+            
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de guias de transporte: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
 

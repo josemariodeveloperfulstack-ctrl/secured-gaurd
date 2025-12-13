@@ -14,10 +14,12 @@ import {
   Calendar, 
   FileText,
   Save,
-  Loader2
+  Loader2,
+  Edit
 } from 'lucide-react';
 import { EPIControlFormData, EPIEquipmentItem } from '@/types/epiControl';
-import { employeeService } from '@/services/employeeService';
+import { employeeService, Employee } from '@/services/employeeService';
+import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 
 interface EPIControlFormProps {
   initialData?: Partial<EPIControlFormData>;
@@ -59,6 +61,8 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
   const [employees, setEmployees] = useState<any[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [responsibleDeliveryId, setResponsibleDeliveryId] = useState<string>('');
+  const [editEmployeeModalOpen, setEditEmployeeModalOpen] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
 
   // Carregar funcionários
   useEffect(() => {
@@ -120,10 +124,10 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
         ...prev,
         employeeId: employee.id,
         employeeName: employee.name || '',
-        employeeFunction: employee.position || employee.function || prev.employeeFunction,
-        employeeCpf: employee.cpf || prev.employeeCpf,
-        employeeRg: employee.rg || employee.document || prev.employeeRg,
-        admissionDate: employee.admissionDate || employee.hireDate || prev.admissionDate
+        employeeFunction: employee.position || employee.function || '',
+        employeeCpf: employee.cpf || '',
+        employeeRg: employee.rg || employee.document || '',
+        admissionDate: employee.admissionDate || employee.hireDate || ''
       }));
     }
 
@@ -132,11 +136,11 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
       const fullEmployee = await employeeService.getEmployeeById(employeeId);
       if (fullEmployee) {
         // O EmployeeDTO do backend tem: cpf, rg, hireDate, jobInfo.function, jobInfo.position, position.name
-        // Prioridade: jobInfo.function > jobInfo.position > position.name > function (campo direto)
+        // Prioridade: position.name > jobInfo.function > jobInfo.position (position.name é mais confiável)
         const employeeData = fullEmployee as any;
-        const functionName = employeeData.jobInfo?.function || 
+        const functionName = employeeData.position?.name || 
+                            employeeData.jobInfo?.function || 
                             employeeData.jobInfo?.position ||
-                            employeeData.position?.name || 
                             employeeData.function ||
                             '';
         
@@ -154,7 +158,7 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
           ...prev,
           employeeId: fullEmployee.id,
           employeeName: fullEmployee.name || prev.employeeName,
-          employeeFunction: functionName || prev.employeeFunction,
+          employeeFunction: functionName, // Sempre usar a função do banco, mesmo se vazia
           employeeCpf: fullEmployee.cpf || prev.employeeCpf,
           employeeRg: employeeData.rg || prev.employeeRg,
           admissionDate: fullEmployee.hireDate || 
@@ -262,12 +266,45 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
               
               <div className="space-y-2">
                 <Label className="text-seguranca-lightgray">Função</Label>
-                <Input 
-                  value={formData.employeeFunction} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, employeeFunction: e.target.value }))}
-                  placeholder="Função do funcionário (preenchido automaticamente ao selecionar)"
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray placeholder:text-gray-400"
-                />
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={formData.employeeFunction} 
+                    readOnly
+                    placeholder="Função do funcionário (preenchido automaticamente ao selecionar)"
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 cursor-not-allowed opacity-75 flex-1"
+                    title="Este campo é preenchido automaticamente com base no funcionário selecionado"
+                  />
+                  {!formData.employeeFunction && formData.employeeId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          // Buscar dados completos do funcionário
+                          const fullEmployee = await employeeService.getEmployeeById(formData.employeeId);
+                          if (fullEmployee) {
+                            setEmployeeToEdit(fullEmployee as Employee);
+                            setEditEmployeeModalOpen(true);
+                          }
+                        } catch (error) {
+                          console.error('Erro ao buscar dados do funcionário:', error);
+                        }
+                      }}
+                      className="border-yellow-600 text-yellow-500 hover:bg-yellow-600 hover:text-white whitespace-nowrap"
+                      title="Editar funcionário para adicionar cargo/função"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar Funcionário
+                    </Button>
+                  )}
+                </div>
+                {!formData.employeeFunction && formData.employeeId && (
+                  <p className="text-xs text-yellow-500 mt-1 flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    Este funcionário não possui cargo/função definido. Clique em "Editar Funcionário" para adicionar.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -535,6 +572,41 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de edição de funcionário */}
+      <FuncionarioNovoModal
+        open={editEmployeeModalOpen}
+        onClose={() => {
+          setEditEmployeeModalOpen(false);
+          setEmployeeToEdit(null);
+        }}
+        onCreated={async () => {
+          // Após salvar, recarregar os dados do funcionário para atualizar a função
+          if (formData.employeeId) {
+            try {
+              const updatedEmployee = await employeeService.getEmployeeById(formData.employeeId);
+              if (updatedEmployee) {
+                const employeeData = updatedEmployee as any;
+                const functionName = employeeData.position?.name || 
+                                    employeeData.jobInfo?.function || 
+                                    employeeData.jobInfo?.position ||
+                                    employeeData.function ||
+                                    '';
+                
+                setFormData(prev => ({
+                  ...prev,
+                  employeeFunction: functionName
+                }));
+              }
+            } catch (error) {
+              console.error('Erro ao recarregar dados do funcionário:', error);
+            }
+          }
+          setEditEmployeeModalOpen(false);
+          setEmployeeToEdit(null);
+        }}
+        employeeToEdit={employeeToEdit}
+      />
     </form>
   );
 };

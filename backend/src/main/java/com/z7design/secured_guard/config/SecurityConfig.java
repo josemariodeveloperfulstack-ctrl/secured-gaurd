@@ -186,6 +186,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/equipment/**").permitAll()
                 .requestMatchers("/api/alerts/**").permitAll()
                 .requestMatchers("/api/visit-controls/**").permitAll()
+                // Endpoints de relatórios de visitas - requerem autenticação
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/api/visit-control-reports/**").permitAll()
+                .requestMatchers("/api/visit-control-reports/**").authenticated()
                 // Endpoints de dados de teste - públicos para desenvolvimento
                 .requestMatchers("/api/test-data/**").permitAll()
                 // Endpoints de controle de visitas - temporariamente públicos para desenvolvimento

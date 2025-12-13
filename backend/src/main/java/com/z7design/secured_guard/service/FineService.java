@@ -1,5 +1,12 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.FineDTO;
 import com.z7design.secured_guard.dto.FineReportDTO;
 import com.z7design.secured_guard.model.Fine;
@@ -14,8 +21,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -348,6 +359,305 @@ public class FineService {
         html.append("</body></html>");
         
         return html.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+    
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(String vehiclePlate, String driverName, String infraction,
+                                    LocalDate startDate, LocalDate endDate,
+                                    LocalDate dueDateStart, LocalDate dueDateEnd,
+                                    BigDecimal minValue, BigDecimal maxValue,
+                                    Fine.FineStatus status) throws IOException {
+        log.info("Gerando relatório PDF de multas - VehiclePlate: {}, DriverName: {}, Infraction: {}, " +
+                "StartDate: {}, EndDate: {}, DueDateStart: {}, DueDateEnd: {}, MinValue: {}, MaxValue: {}, Status: {}",
+                vehiclePlate, driverName, infraction, startDate, endDate, dueDateStart, dueDateEnd, minValue, maxValue, status);
+
+        List<Fine> fines = getFinesFiltered(vehiclePlate, driverName, infraction, startDate, endDate,
+                dueDateStart, dueDateEnd, minValue, maxValue, status);
+        log.info("Total de multas encontradas para o relatório: {}", fines.size());
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE MULTAS")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+
+            // Filtros aplicados
+            if (vehiclePlate != null || driverName != null || infraction != null || startDate != null || endDate != null ||
+                dueDateStart != null || dueDateEnd != null || minValue != null || maxValue != null || status != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+
+                if (vehiclePlate != null && !vehiclePlate.isEmpty()) {
+                    document.add(new Paragraph("Placa: " + vehiclePlate).setFontSize(10).setMarginBottom(2));
+                }
+                if (driverName != null && !driverName.isEmpty()) {
+                    document.add(new Paragraph("Motorista: " + driverName).setFontSize(10).setMarginBottom(2));
+                }
+                if (infraction != null && !infraction.isEmpty()) {
+                    document.add(new Paragraph("Infração: " + infraction).setFontSize(10).setMarginBottom(2));
+                }
+                if (startDate != null && endDate != null) {
+                    document.add(new Paragraph("Data Infração: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                            " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (dueDateStart != null && dueDateEnd != null) {
+                    document.add(new Paragraph("Vencimento: " + dueDateStart.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                            " a " + dueDateEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (minValue != null || maxValue != null) {
+                    String valueRange = "Valor: ";
+                    if (minValue != null) valueRange += "R$ " + minValue.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",");
+                    if (minValue != null && maxValue != null) valueRange += " a ";
+                    if (maxValue != null) valueRange += "R$ " + maxValue.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",");
+                    document.add(new Paragraph(valueRange).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + getStatusLabel(status)).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+
+            // Estatísticas
+            BigDecimal totalAmount = fines.stream()
+                    .map(Fine::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            long pendingCount = fines.stream().filter(f -> f.getStatus() == Fine.FineStatus.PENDING).count();
+            long paidCount = fines.stream().filter(f -> f.getStatus() == Fine.FineStatus.PAID).count();
+            long cancelledCount = fines.stream().filter(f -> f.getStatus() == Fine.FineStatus.CANCELLED).count();
+
+            Paragraph stats = new Paragraph(String.format(
+                    "Total de multas: %d | Pendentes: %d | Pagas: %d | Canceladas: %d | Valor Total: R$ %s",
+                    fines.size(), pendingCount, paidCount, cancelledCount,
+                    totalAmount.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",")))
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(stats);
+
+            // Tabela de multas
+            if (fines.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhuma multa encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(9).setWidth(UnitValue.createPercentValue(100));
+
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Placa"));
+                table.addHeaderCell(createHeaderCell("Motorista"));
+                table.addHeaderCell(createHeaderCell("Infração"));
+                table.addHeaderCell(createHeaderCell("Data Infração"));
+                table.addHeaderCell(createHeaderCell("Vencimento"));
+                table.addHeaderCell(createHeaderCell("Valor"));
+                table.addHeaderCell(createHeaderCell("Local"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Pagamento"));
+
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (Fine fine : fines) {
+                    table.addCell(createCell(fine.getVehicle() != null ? fine.getVehicle().getPlate() : ""));
+                    table.addCell(createCell(fine.getDriver() != null ? fine.getDriver().getName() : "Não informado"));
+                    
+                    // Descrição (truncar se muito longa)
+                    String desc = fine.getDescription() != null ? fine.getDescription() : "";
+                    if (desc.length() > 40) {
+                        desc = desc.substring(0, 37) + "...";
+                    }
+                    table.addCell(createCell(desc));
+                    
+                    table.addCell(createCell(fine.getDate() != null ? fine.getDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(fine.getDueDate() != null ? fine.getDueDate().format(dateFormatter) : ""));
+                    
+                    // Valor formatado
+                    String amount = fine.getAmount() != null ?
+                            "R$ " + fine.getAmount().setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",") : "";
+                    table.addCell(createCell(amount));
+                    
+                    // Local (truncar se muito longo)
+                    String location = fine.getLocation() != null ? fine.getLocation() : "";
+                    if (location.length() > 30) {
+                        location = location.substring(0, 27) + "...";
+                    }
+                    table.addCell(createCell(location));
+                    
+                    table.addCell(createCell(fine.getStatus() != null ? getStatusLabel(fine.getStatus()) : ""));
+                    table.addCell(createCell(fine.getPaymentDate() != null ? fine.getPaymentDate().format(dateFormatter) : "-"));
+                }
+
+                document.add(table);
+            }
+
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de multas: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+            if (pdfDoc != null) {
+                pdfDoc.close();
+            }
+            if (writer != null) {
+                writer.close();
+            }
+        }
+
+        byte[] result = baos.toByteArray();
+        log.info("PDF de multas gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+
+    private List<Fine> getFinesFiltered(String vehiclePlate, String driverName, String infraction,
+                                       LocalDate startDate, LocalDate endDate,
+                                       LocalDate dueDateStart, LocalDate dueDateEnd,
+                                       BigDecimal minValue, BigDecimal maxValue,
+                                       Fine.FineStatus status) {
+        log.debug("Aplicando filtros - vehiclePlate: {}, driverName: {}, infraction: {}, " +
+                "startDate: {}, endDate: {}, dueDateStart: {}, dueDateEnd: {}, minValue: {}, maxValue: {}, status: {}",
+                vehiclePlate, driverName, infraction, startDate, endDate, dueDateStart, dueDateEnd, minValue, maxValue, status);
+
+        try {
+            List<Fine> fines = fineRepository.findAllWithRelations();
+
+            // Aplicar filtros
+            if (vehiclePlate != null && !vehiclePlate.isEmpty()) {
+                fines = fines.stream()
+                        .filter(f -> f.getVehicle() != null && f.getVehicle().getPlate().equalsIgnoreCase(vehiclePlate))
+                        .collect(Collectors.toList());
+            }
+
+            if (driverName != null && !driverName.isEmpty()) {
+                fines = fines.stream()
+                        .filter(f -> f.getDriver() != null && f.getDriver().getName().equalsIgnoreCase(driverName))
+                        .collect(Collectors.toList());
+            }
+
+            if (infraction != null && !infraction.isEmpty()) {
+                fines = fines.stream()
+                        .filter(f -> f.getDescription() != null && f.getDescription().toLowerCase().contains(infraction.toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+
+            if (startDate != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getDate() != null && !f.getDate().isBefore(startDate))
+                        .collect(Collectors.toList());
+            }
+
+            if (endDate != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getDate() != null && !f.getDate().isAfter(endDate))
+                        .collect(Collectors.toList());
+            }
+
+            if (dueDateStart != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getDueDate() != null && !f.getDueDate().isBefore(dueDateStart))
+                        .collect(Collectors.toList());
+            }
+
+            if (dueDateEnd != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getDueDate() != null && !f.getDueDate().isAfter(dueDateEnd))
+                        .collect(Collectors.toList());
+            }
+
+            if (minValue != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getAmount() != null && f.getAmount().compareTo(minValue) >= 0)
+                        .collect(Collectors.toList());
+            }
+
+            if (maxValue != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getAmount() != null && f.getAmount().compareTo(maxValue) <= 0)
+                        .collect(Collectors.toList());
+            }
+
+            if (status != null) {
+                fines = fines.stream()
+                        .filter(f -> f.getStatus() == status)
+                        .collect(Collectors.toList());
+            }
+
+            log.info("Filtros aplicados. {} multas encontradas", fines.size());
+            return fines;
+
+        } catch (Exception e) {
+            log.error("Erro ao aplicar filtros nas multas", e);
+            throw new RuntimeException("Erro ao buscar multas: " + e.getMessage(), e);
+        }
+    }
+
+    private String getStatusLabel(Fine.FineStatus status) {
+        if (status == null) return "";
+        switch (status) {
+            case PENDING: return "Pendente";
+            case PAID: return "Paga";
+            case CANCELLED: return "Cancelada";
+            default: return status.toString();
+        }
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(9))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(8))
+                .setTextAlignment(TextAlignment.LEFT);
     }
     
 }

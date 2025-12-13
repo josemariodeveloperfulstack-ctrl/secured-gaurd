@@ -27,6 +27,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Eye, Calendar, Wrench, Download, FileText, Trash2Icon, Edit3, Filter, Settings, AlertTriangle, Search, RefreshCw, BarChart3, Edit } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import fleetService from '@/services/fleetService';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -389,6 +392,85 @@ export function ManutencoesTable({ data, onRefresh, onView, onEdit, onDelete }: 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // State for PDF report modal
+  const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
+  const [pdfFilters, setPdfFilters] = useState({
+    startDate: '',
+    endDate: '',
+    vehiclePlate: '',
+    status: '',
+    maintenanceType: '',
+    description: ''
+  });
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  
+  // Get unique vehicle plates from data
+  const uniquePlates = React.useMemo(() => {
+    const plates = new Set(data.map(m => m.vehiclePlate));
+    return Array.from(plates).sort();
+  }, [data]);
+
+  const handleGeneratePDF = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      const filters: any = {};
+      
+      if (pdfFilters.startDate) filters.startDate = pdfFilters.startDate;
+      if (pdfFilters.endDate) filters.endDate = pdfFilters.endDate;
+      if (pdfFilters.vehiclePlate && pdfFilters.vehiclePlate !== 'all') {
+        // Find vehicleId from plate
+        const maintenance = data.find(m => m.vehiclePlate === pdfFilters.vehiclePlate);
+        if (maintenance) {
+          filters.vehicleId = maintenance.vehicleId;
+        }
+      }
+      if (pdfFilters.status && pdfFilters.status !== 'all') {
+        filters.status = pdfFilters.status;
+      }
+      if (pdfFilters.maintenanceType && pdfFilters.maintenanceType !== 'all') {
+        filters.maintenanceType = pdfFilters.maintenanceType;
+      }
+      if (pdfFilters.description && pdfFilters.description.trim() !== '') {
+        filters.description = pdfFilters.description.trim();
+      }
+
+      const blob = await fleetService.exportMaintenancesReportPDF(filters);
+      
+      // Criar URL para download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Definir nome do arquivo
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+      link.download = `relatorio_manutencoes_${timestamp}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Relatório gerado com sucesso!",
+        description: "O relatório de manutenções foi baixado com sucesso.",
+        variant: "default",
+      });
+      
+      setIsPDFModalOpen(false);
+    } catch (error: any) {
+      console.error('Erro ao gerar relatório PDF:', error);
+      const errorMessage = error?.message || 'Ocorreu um erro ao gerar o relatório PDF. Tente novamente.';
+      toast({
+        title: "Erro ao gerar relatório",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (selectedForDelete.length === 0) return;
 
@@ -480,20 +562,11 @@ export function ManutencoesTable({ data, onRefresh, onView, onEdit, onDelete }: 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.print()}
-              className="border-gray-600 text-gray-400 hover:bg-gray-700"
+              onClick={() => setIsPDFModalOpen(true)}
+              className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
             >
               <FileText size={16} className="mr-2" />
-              Imprimir
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
-            >
-              <Download size={16} className="mr-2" />
-              Exportar
+              Gerar Relatório PDF
             </Button>
           </div>
         </div>
@@ -750,6 +823,131 @@ export function ManutencoesTable({ data, onRefresh, onView, onEdit, onDelete }: 
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Geração de PDF */}
+      <Dialog open={isPDFModalOpen} onOpenChange={setIsPDFModalOpen}>
+        <DialogContent className="sm:max-w-2xl bg-seguranca-graphite border-gray-600 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray">
+              Gerar Relatório PDF de Manutenções
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Data Início</Label>
+                <Input
+                  type="date"
+                  value={pdfFilters.startDate}
+                  onChange={(e) => setPdfFilters({ ...pdfFilters, startDate: e.target.value })}
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Data Fim</Label>
+                <Input
+                  type="date"
+                  value={pdfFilters.endDate}
+                  onChange={(e) => setPdfFilters({ ...pdfFilters, endDate: e.target.value })}
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Placa</Label>
+                <Select 
+                  value={pdfFilters.vehiclePlate} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, vehiclePlate: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todas as placas" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todas as placas</SelectItem>
+                    {uniquePlates.map((plate) => (
+                      <SelectItem key={plate} value={plate}>
+                        {plate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Status</Label>
+                <Select 
+                  value={pdfFilters.status} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, status: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todos os status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="SCHEDULED">Agendada</SelectItem>
+                    <SelectItem value="IN_PROGRESS">Em Andamento</SelectItem>
+                    <SelectItem value="COMPLETED">Concluída</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Tipo</Label>
+                <Select 
+                  value={pdfFilters.maintenanceType} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, maintenanceType: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todos os tipos" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="PREVENTIVE">Preventiva</SelectItem>
+                    <SelectItem value="CORRECTIVE">Corretiva</SelectItem>
+                    <SelectItem value="PREDICTIVE">Preditiva</SelectItem>
+                    <SelectItem value="IMPROVEMENT">Melhoria</SelectItem>
+                    <SelectItem value="OTHER">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Descrição (busca parcial)</Label>
+                <Input
+                  value={pdfFilters.description}
+                  onChange={(e) => setPdfFilters({ ...pdfFilters, description: e.target.value })}
+                  placeholder="Digite parte da descrição..."
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4 border-t border-gray-700">
+              <Button
+                variant="outline"
+                onClick={() => setIsPDFModalOpen(false)}
+                className="border-gray-600 text-gray-400 hover:bg-gray-700"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleGeneratePDF}
+                disabled={isGeneratingPDF}
+                className="bg-seguranca-red hover:bg-seguranca-darkred"
+              >
+                {isGeneratingPDF ? 'Gerando...' : 'Gerar PDF'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

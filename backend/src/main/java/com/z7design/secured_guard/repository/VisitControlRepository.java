@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface VisitControlRepository extends JpaRepository<VisitControl, UUID> {
+public interface VisitControlRepository extends JpaRepository<VisitControl, UUID>, VisitControlRepositoryCustom {
 
     List<VisitControl> findByVisitDate(LocalDate visitDate);
 
@@ -42,4 +42,5 @@ public interface VisitControlRepository extends JpaRepository<VisitControl, UUID
     @Query("SELECT CAST(COUNT(v) * 100.0 / NULLIF((SELECT COUNT(v2) FROM VisitControl v2 WHERE v2.status IN ('COMPLETED', 'CANCELLED')), 0) AS double) " +
            "FROM VisitControl v WHERE v.status = 'COMPLETED' AND v.isSuccessful = true")
     Double calculateSuccessRate();
+
 }

@@ -1,5 +1,12 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.VehicleMaintenanceDTO;
 import com.z7design.secured_guard.model.Vehicle;
 import com.z7design.secured_guard.model.VehicleMaintenance;
@@ -10,8 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -563,5 +574,276 @@ public class VehicleMaintenanceService {
             log.error("Erro ao buscar manutenções: {}", e.getMessage(), e);
             throw e;
         }
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(LocalDate startDate, LocalDate endDate, UUID vehicleId, 
+                                    VehicleMaintenance.MaintenanceStatus status, 
+                                    VehicleMaintenance.MaintenanceType maintenanceType,
+                                    String description) throws IOException {
+        log.info("Gerando relatório PDF de manutenções - StartDate: {}, EndDate: {}, VehicleId: {}, Status: {}, Type: {}, Description: {}",
+                startDate, endDate, vehicleId, status, maintenanceType, description);
+
+        List<VehicleMaintenance> maintenances = getMaintenancesFiltered(startDate, endDate, vehicleId, status, maintenanceType, description);
+        log.info("Total de manutenções encontradas para o relatório: {}", maintenances.size());
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE MANUTENÇÕES")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+
+            // Filtros aplicados
+            if (startDate != null || endDate != null || vehicleId != null || status != null || maintenanceType != null || description != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+
+                if (startDate != null && endDate != null) {
+                    document.add(new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + 
+                            " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (vehicleId != null) {
+                    Vehicle vehicle = vehicleRepository.findById(vehicleId).orElse(null);
+                    String vehiclePlate = vehicle != null ? vehicle.getPlate() : "ID: " + vehicleId;
+                    document.add(new Paragraph("Placa: " + vehiclePlate).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + getStatusLabel(status)).setFontSize(10).setMarginBottom(2));
+                }
+                if (maintenanceType != null) {
+                    document.add(new Paragraph("Tipo: " + getTypeLabel(maintenanceType)).setFontSize(10).setMarginBottom(2));
+                }
+                if (description != null && !description.trim().isEmpty()) {
+                    document.add(new Paragraph("Descrição contém: " + description).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+
+            // Total de manutenções
+            Paragraph totalInfo = new Paragraph("Total de manutenções: " + maintenances.size())
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(totalInfo);
+
+            // Tabela de manutenções
+            if (maintenances.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhuma manutenção encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
+
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Placa"));
+                table.addHeaderCell(createHeaderCell("Tipo"));
+                table.addHeaderCell(createHeaderCell("Descrição"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Prioridade"));
+                table.addHeaderCell(createHeaderCell("Quilometragem"));
+                table.addHeaderCell(createHeaderCell("Custo"));
+
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (VehicleMaintenance maintenance : maintenances) {
+                    table.addCell(createCell(maintenance.getDate() != null ? 
+                            maintenance.getDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(maintenance.getVehicle() != null ? maintenance.getVehicle().getPlate() : ""));
+                    table.addCell(createCell(maintenance.getMaintenanceType() != null ? getTypeLabel(maintenance.getMaintenanceType()) : ""));
+                    
+                    // Descrição (truncar se muito longa)
+                    String desc = maintenance.getDescription() != null ? maintenance.getDescription() : "";
+                    if (desc.length() > 50) {
+                        desc = desc.substring(0, 47) + "...";
+                    }
+                    table.addCell(createCell(desc));
+                    
+                    table.addCell(createCell(maintenance.getStatus() != null ? getStatusLabel(maintenance.getStatus()) : ""));
+                    table.addCell(createCell(maintenance.getPriority() != null ? getPriorityLabel(maintenance.getPriority()) : ""));
+                    
+                    // Quilometragem formatada
+                    String mileage = "";
+                    if (maintenance.getMileage() != null) {
+                        mileage = String.format("%,.0f km", maintenance.getMileage().doubleValue()).replace(",", ".");
+                    }
+                    table.addCell(createCell(mileage));
+                    
+                    // Custo formatado
+                    String cost = "";
+                    if (maintenance.getCost() != null) {
+                        cost = "R$ " + maintenance.getCost().setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",");
+                    }
+                    table.addCell(createCell(cost));
+                }
+
+                document.add(table);
+            }
+
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de manutenções: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+            if (pdfDoc != null) {
+                pdfDoc.close();
+            }
+            if (writer != null) {
+                writer.close();
+            }
+        }
+
+        byte[] result = baos.toByteArray();
+        log.info("PDF de manutenções gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+
+    private List<VehicleMaintenance> getMaintenancesFiltered(LocalDate startDate, LocalDate endDate, UUID vehicleId,
+                                                             VehicleMaintenance.MaintenanceStatus status,
+                                                             VehicleMaintenance.MaintenanceType maintenanceType,
+                                                             String description) {
+        log.debug("Aplicando filtros - startDate: {}, endDate: {}, vehicleId: {}, status: {}, type: {}, description: {}",
+                startDate, endDate, vehicleId, status, maintenanceType, description);
+
+        try {
+            List<VehicleMaintenance> maintenances;
+
+            // Aplicar filtros de data e veículo primeiro
+            if (startDate != null && endDate != null) {
+                if (vehicleId != null) {
+                    maintenances = maintenanceRepository.findByVehicleIdAndDateBetweenOrderByDateDesc(vehicleId, startDate, endDate);
+                } else {
+                    maintenances = maintenanceRepository.findByDateBetweenOrderByDateDesc(startDate, endDate);
+                }
+            } else if (vehicleId != null) {
+                maintenances = maintenanceRepository.findByVehicleIdOrderByDateDesc(vehicleId);
+            } else {
+                maintenances = maintenanceRepository.findAllWithVehicle();
+            }
+
+            // Aplicar filtros adicionais em memória
+            if (status != null) {
+                maintenances = maintenances.stream()
+                        .filter(m -> m.getStatus() == status)
+                        .collect(Collectors.toList());
+            }
+
+            if (maintenanceType != null) {
+                maintenances = maintenances.stream()
+                        .filter(m -> m.getMaintenanceType() == maintenanceType)
+                        .collect(Collectors.toList());
+            }
+
+            if (description != null && !description.trim().isEmpty()) {
+                String descLower = description.toLowerCase();
+                maintenances = maintenances.stream()
+                        .filter(m -> m.getDescription() != null && 
+                                m.getDescription().toLowerCase().contains(descLower))
+                        .collect(Collectors.toList());
+            }
+
+            log.info("Filtros aplicados. {} manutenções encontradas", maintenances.size());
+            return maintenances;
+
+        } catch (Exception e) {
+            log.error("Erro ao aplicar filtros nas manutenções", e);
+            throw new RuntimeException("Erro ao buscar manutenções: " + e.getMessage(), e);
+        }
+    }
+
+    private String getStatusLabel(VehicleMaintenance.MaintenanceStatus status) {
+        if (status == null) return "";
+        switch (status) {
+            case SCHEDULED: return "Agendada";
+            case IN_PROGRESS: return "Em Andamento";
+            case COMPLETED: return "Concluída";
+            case CANCELLED: return "Cancelada";
+            default: return status.toString();
+        }
+    }
+
+    private String getTypeLabel(VehicleMaintenance.MaintenanceType type) {
+        if (type == null) return "";
+        switch (type) {
+            case PREVENTIVE: return "Preventiva";
+            case CORRECTIVE: return "Corretiva";
+            case PREDICTIVE: return "Preditiva";
+            case IMPROVEMENT: return "Melhoria";
+            case OTHER: return "Outro";
+            default: return type.toString();
+        }
+    }
+
+    private String getPriorityLabel(VehicleMaintenance.MaintenancePriority priority) {
+        if (priority == null) return "";
+        switch (priority) {
+            case LOW: return "Baixa";
+            case MEDIUM: return "Média";
+            case HIGH: return "Alta";
+            case URGENT: return "Urgente";
+            default: return priority.toString();
+        }
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setTextAlignment(TextAlignment.LEFT);
     }
 }

@@ -1,5 +1,12 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.model.FuelRecord;
 import com.z7design.secured_guard.repository.FuelRecordRepository;
 import com.z7design.secured_guard.dto.FuelRecordReportDTO;
@@ -10,12 +17,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.z7design.secured_guard.service.JasperReportService;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -30,13 +39,13 @@ public class FuelRecordReportService {
     private final CostCenterRepository costCenterRepository;
     private final JasperReportService jasperReportService;
     
-    public byte[] generateExcelReport(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId) throws IOException {
-        log.info("Gerando relatório Excel de abastecimentos - Período: {} a {}, Veículo: {}, Posto: {}, Motorista: {}", 
-                startDate, endDate, vehicleId, posto, driverId);
+    public byte[] generateExcelReport(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId, String fuelType) throws IOException {
+        log.info("Gerando relatório Excel de abastecimentos - Período: {} a {}, Veículo: {}, Posto: {}, Motorista: {}, Combustível: {}", 
+                startDate, endDate, vehicleId, posto, driverId, fuelType);
         
         try {
             // Buscar dados filtrados
-            List<FuelRecord> fuelRecords = getFuelRecordsFiltered(startDate, endDate, vehicleId, posto, driverId);
+            List<FuelRecord> fuelRecords = getFuelRecordsFiltered(startDate, endDate, vehicleId, posto, driverId, fuelType);
             log.info("Dados obtidos: {} registros de abastecimento", fuelRecords.size());
             
             try (Workbook workbook = new XSSFWorkbook()) {
@@ -81,38 +90,46 @@ public class FuelRecordReportService {
         }
     }
     
-    public byte[] generatePdfReport(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId) throws IOException {
-        log.info("Gerando relatório PDF de abastecimentos com JasperReports - Período: {} a {}, Veículo: {}, Posto: {}, Motorista: {}", 
-                startDate, endDate, vehicleId, posto, driverId);
+    @Transactional(readOnly = true)
+    public byte[] generatePdfReport(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId, String fuelType) throws IOException {
+        log.info("Gerando relatório PDF de abastecimentos - Período: {} a {}, Veículo: {}, Posto: {}, Motorista: {}, Combustível: {}", 
+                startDate, endDate, vehicleId, posto, driverId, fuelType);
         
         try {
             // Buscar dados filtrados
-            List<FuelRecord> fuelRecords = getFuelRecordsFiltered(startDate, endDate, vehicleId, posto, driverId);
+            List<FuelRecord> fuelRecords = getFuelRecordsFiltered(startDate, endDate, vehicleId, posto, driverId, fuelType);
             log.info("Dados obtidos: {} registros de abastecimento", fuelRecords.size());
             
-            // Converter para DTOs com nomes de centros de custo
-            List<FuelRecordReportDTO> reportDTOs = fuelRecords.stream()
-                    .map(this::convertToReportDTO)
-                    .collect(Collectors.toList());
-            
-            log.info("DTOs convertidos: {} registros", reportDTOs.size());
-            
-            // Preparar filtros para o relatório
-            String vehicleFilter = vehicleId != null ? "Veículo específico" : "Todos os veículos";
-            String driverFilter = driverId != null ? "Motorista específico" : "Todos os motoristas";
-            
-            // Gerar PDF usando JasperReports
-            byte[] result = jasperReportService.generateFuelReportPDF(
-                    reportDTOs, 
-                    startDate, 
-                    endDate, 
-                    vehicleFilter, 
-                    driverFilter
-            );
-            
-            log.info("Relatório PDF gerado com sucesso usando JasperReports. {} registros processados, {} bytes gerados", 
-                    fuelRecords.size(), result.length);
-            return result;
+            // Tentar usar JasperReports primeiro, se falhar usar iText como fallback
+            try {
+                // Converter para DTOs com nomes de centros de custo
+                List<FuelRecordReportDTO> reportDTOs = fuelRecords.stream()
+                        .map(this::convertToReportDTO)
+                        .collect(Collectors.toList());
+                
+                log.info("DTOs convertidos: {} registros", reportDTOs.size());
+                
+                // Preparar filtros para o relatório
+                String vehicleFilter = vehicleId != null ? "Veículo específico" : "Todos os veículos";
+                String driverFilter = driverId != null ? "Motorista específico" : "Todos os motoristas";
+                
+                // Gerar PDF usando JasperReports
+                byte[] result = jasperReportService.generateFuelReportPDF(
+                        reportDTOs, 
+                        startDate, 
+                        endDate, 
+                        vehicleFilter, 
+                        driverFilter
+                );
+                
+                log.info("Relatório PDF gerado com sucesso usando JasperReports. {} registros processados, {} bytes gerados", 
+                        fuelRecords.size(), result.length);
+                return result;
+            } catch (Exception jasperException) {
+                log.warn("Erro ao gerar PDF com JasperReports, usando iText como fallback: {}", jasperException.getMessage());
+                // Fallback para iText
+                return generatePdfReportWithIText(fuelRecords, startDate, endDate, vehicleId, posto, driverId, fuelType);
+            }
             
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF", e);
@@ -121,9 +138,206 @@ public class FuelRecordReportService {
         }
     }
     
-    private List<FuelRecord> getFuelRecordsFiltered(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId) {
-        log.debug("Aplicando filtros - startDate: {}, endDate: {}, vehicleId: {}, posto: {}, driverId: {}", 
-                startDate, endDate, vehicleId, posto, driverId);
+    private byte[] generatePdfReportWithIText(List<FuelRecord> fuelRecords, LocalDate startDate, LocalDate endDate, 
+                                             UUID vehicleId, String posto, UUID driverId, String fuelType) throws IOException {
+        log.info("Gerando relatório PDF de abastecimentos com iText - {} registros", fuelRecords.size());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+        
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+            
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+            
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+            
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE ABASTECIMENTOS")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+            
+            // Filtros aplicados
+            if (startDate != null || endDate != null || vehicleId != null || posto != null || driverId != null || fuelType != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+                
+                if (startDate != null && endDate != null) {
+                    document.add(new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + 
+                            " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (vehicleId != null) {
+                    document.add(new Paragraph("Veículo: Específico").setFontSize(10).setMarginBottom(2));
+                }
+                if (posto != null && !posto.trim().isEmpty() && !"all".equals(posto)) {
+                    document.add(new Paragraph("Posto: " + posto).setFontSize(10).setMarginBottom(2));
+                }
+                if (driverId != null) {
+                    document.add(new Paragraph("Motorista: Específico").setFontSize(10).setMarginBottom(2));
+                }
+                if (fuelType != null && !fuelType.trim().isEmpty() && !"all".equals(fuelType)) {
+                    document.add(new Paragraph("Combustível: " + getFuelTypeLabel(fuelType)).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+            
+            // Estatísticas
+            BigDecimal totalCost = fuelRecords.stream()
+                    .map(FuelRecord::getCost)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalQuantity = fuelRecords.stream()
+                    .map(FuelRecord::getQuantity)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            
+            Paragraph stats = new Paragraph(String.format(
+                    "Total de registros: %d | Total de litros: %s L | Valor total: R$ %s",
+                    fuelRecords.size(), 
+                    totalQuantity.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ","),
+                    totalCost.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",")))
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(stats);
+            
+            // Tabela de abastecimentos
+            if (fuelRecords.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhum abastecimento encontrado com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(9).setWidth(UnitValue.createPercentValue(100));
+                
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Veículo"));
+                table.addHeaderCell(createHeaderCell("Motorista"));
+                table.addHeaderCell(createHeaderCell("Combustível"));
+                table.addHeaderCell(createHeaderCell("Litros"));
+                table.addHeaderCell(createHeaderCell("Valor/Litro"));
+                table.addHeaderCell(createHeaderCell("Valor Total"));
+                table.addHeaderCell(createHeaderCell("Posto"));
+                table.addHeaderCell(createHeaderCell("Quilometragem"));
+                
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (FuelRecord record : fuelRecords) {
+                    table.addCell(createCell(record.getDate() != null ? 
+                            record.getDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(record.getVehicle() != null ? record.getVehicle().getPlate() : ""));
+                    table.addCell(createCell(record.getDriver() != null ? record.getDriver().getName() : "Não informado"));
+                    table.addCell(createCell(record.getFuelType() != null ? getFuelTypeLabel(record.getFuelType().toString()) : ""));
+                    
+                    // Litros
+                    String quantity = record.getQuantity() != null ? 
+                            record.getQuantity().setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",") + " L" : "";
+                    table.addCell(createCell(quantity));
+                    
+                    // Valor por litro
+                    String pricePerLiter = "";
+                    if (record.getQuantity() != null && record.getCost() != null && 
+                        record.getQuantity().compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal price = record.getCost().divide(record.getQuantity(), 2, java.math.RoundingMode.HALF_UP);
+                        pricePerLiter = "R$ " + price.toString().replace(".", ",");
+                    }
+                    table.addCell(createCell(pricePerLiter));
+                    
+                    // Valor total
+                    String cost = record.getCost() != null ? 
+                            "R$ " + record.getCost().setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",") : "";
+                    table.addCell(createCell(cost));
+                    
+                    table.addCell(createCell(record.getStation() != null ? record.getStation() : ""));
+                    table.addCell(createCell(record.getMileage() != null ? record.getMileage().toString() + " km" : ""));
+                }
+                
+                document.add(table);
+            }
+            
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de abastecimentos com iText: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+            if (pdfDoc != null) {
+                pdfDoc.close();
+            }
+            if (writer != null) {
+                writer.close();
+            }
+        }
+        
+        byte[] result = baos.toByteArray();
+        log.info("PDF de abastecimentos gerado com sucesso usando iText, tamanho: {} bytes", result.length);
+        return result;
+    }
+    
+    private String getFuelTypeLabel(String fuelType) {
+        if (fuelType == null) return "";
+        switch (fuelType.toUpperCase()) {
+            case "GASOLINE": return "Gasolina";
+            case "ETHANOL": return "Etanol";
+            case "DIESEL": return "Diesel";
+            case "FLEX": return "Flex";
+            default: return fuelType;
+        }
+    }
+    
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+    
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setTextAlignment(TextAlignment.LEFT);
+    }
+    
+    private List<FuelRecord> getFuelRecordsFiltered(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId, String fuelType) {
+        log.debug("Aplicando filtros - startDate: {}, endDate: {}, vehicleId: {}, posto: {}, driverId: {}, fuelType: {}", 
+                startDate, endDate, vehicleId, posto, driverId, fuelType);
         
         try {
             List<FuelRecord> records;
@@ -141,7 +355,7 @@ public class FuelRecordReportService {
                 records = fuelRecordRepository.findAll();
             }
             
-            // Aplicar filtros adicionais em memória (posto e motorista)
+            // Aplicar filtros adicionais em memória (posto, motorista e combustível)
             if (posto != null && !posto.trim().isEmpty() && !"all".equals(posto)) {
                 records = records.stream()
                         .filter(record -> record.getStation() != null && record.getStation().toLowerCase().contains(posto.toLowerCase()))
@@ -151,6 +365,12 @@ public class FuelRecordReportService {
             if (driverId != null) {
                 records = records.stream()
                         .filter(record -> record.getDriver() != null && record.getDriver().getId().equals(driverId))
+                        .collect(Collectors.toList());
+            }
+            
+            if (fuelType != null && !fuelType.trim().isEmpty() && !"all".equals(fuelType)) {
+                records = records.stream()
+                        .filter(record -> record.getFuelType() != null && record.getFuelType().toString().equalsIgnoreCase(fuelType))
                         .collect(Collectors.toList());
             }
             
@@ -322,19 +542,6 @@ public class FuelRecordReportService {
         countCell.setCellValue(fuelRecords.size() + " registros");
     }
     
-    private String formatPeriod(LocalDate startDate, LocalDate endDate) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        
-        if (startDate != null && endDate != null) {
-            return startDate.format(formatter) + " a " + endDate.format(formatter);
-        } else if (startDate != null) {
-            return "A partir de " + startDate.format(formatter);
-        } else if (endDate != null) {
-            return "Até " + endDate.format(formatter);
-        } else {
-            return "Todos os períodos";
-        }
-    }
     
     private FuelRecordReportDTO convertToReportDTO(FuelRecord fuelRecord) {
         String costCenterName = "-";

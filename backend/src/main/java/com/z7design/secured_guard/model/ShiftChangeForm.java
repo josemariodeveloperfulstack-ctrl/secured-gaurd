@@ -59,6 +59,10 @@ public class ShiftChangeForm {
     @Column(nullable = false)
     private ShiftChangeStatus status;
 
+    // Aprovado por (nome do aprovador)
+    @Column(nullable = true)
+    private String approvedBy;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

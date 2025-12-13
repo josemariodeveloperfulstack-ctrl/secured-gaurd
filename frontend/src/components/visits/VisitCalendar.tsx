@@ -10,6 +10,7 @@ interface VisitCalendarProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
   onEventClick: (event: VisitCalendarEvent) => void;
+  onDayClick?: (date: Date, events: VisitCalendarEvent[]) => void;
   loading?: boolean;
 }
 
@@ -18,6 +19,7 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
   selectedDate,
   onDateChange,
   onEventClick,
+  onDayClick,
   loading = false,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date(selectedDate));
@@ -120,6 +122,14 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
       const newDate = new Date(currentMonth);
       newDate.setDate(day.date);
       onDateChange(newDate);
+      
+      // Se houver callback onDayClick e o dia tiver eventos, chamá-lo
+      if (onDayClick && day.events && day.events.length > 0) {
+        onDayClick(newDate, day.events);
+      } else if (onDayClick) {
+        // Chamar mesmo sem eventos para mostrar que não há visitas
+        onDayClick(newDate, []);
+      }
     }
   };
 

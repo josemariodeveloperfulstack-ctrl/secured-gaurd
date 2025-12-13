@@ -48,18 +48,20 @@ export default function ConfirmDeleteModal({
           </DialogTitle>
           
           {/* Descrição */}
-          <DialogDescription className="text-center text-sm sm:text-base text-seguranca-lightgray space-y-2">
-            <p>{description}</p>
-            {itemName && (
-              <div className="mt-3 p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                <p className="text-white font-medium text-sm sm:text-base break-words">
-                  {itemName}
-                </p>
-              </div>
-            )}
-            <p className="text-xs sm:text-sm text-gray-400 mt-3">
-              Esta ação não pode ser desfeita.
-            </p>
+          <DialogDescription asChild>
+            <div className="text-center text-sm sm:text-base text-seguranca-lightgray space-y-2">
+              <p>{description}</p>
+              {itemName && (
+                <div className="mt-3 p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                  <span className="text-white font-medium text-sm sm:text-base break-words block">
+                    {itemName}
+                  </span>
+                </div>
+              )}
+              <p className="text-xs sm:text-sm text-gray-400 mt-3">
+                Esta ação não pode ser desfeita.
+              </p>
+            </div>
           </DialogDescription>
         </DialogHeader>
 
@@ -84,6 +86,8 @@ export default function ConfirmDeleteModal({
     </Dialog>
   );
 }
+
+
 
 
 

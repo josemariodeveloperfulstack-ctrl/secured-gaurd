@@ -5,11 +5,22 @@ export const unitService = {
   // Buscar todas as unidades
   async getAllUnits(): Promise<Unit[]> {
     try {
-      const response = await api.get('/units');
+      const response = await api.get('/api/units');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar unidades:', error);
       throw new Error('Falha ao buscar unidades');
+    }
+  },
+
+  // Buscar apenas unidades ativas
+  async getActiveUnits(): Promise<Unit[]> {
+    try {
+      const response = await api.get('/api/units/active');
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar unidades ativas:', error);
+      throw new Error('Falha ao buscar unidades ativas');
     }
   },
 

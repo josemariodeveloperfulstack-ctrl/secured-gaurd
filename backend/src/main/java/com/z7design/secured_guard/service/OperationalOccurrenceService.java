@@ -7,14 +7,26 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.OperationalOccurrence;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.OperationalOccurrenceRepository;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -378,5 +390,225 @@ public class OperationalOccurrenceService {
             .createdAt(occurrence.getCreatedAt())
             .updatedAt(occurrence.getUpdatedAt())
             .build();
+    }
+
+    /**
+     * Gerar relatório PDF de ocorrências com filtros
+     */
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(UUID employeeId, OperationalOccurrence.OccurrenceType type,
+                                   OperationalOccurrence.OccurrenceStatus status,
+                                   OperationalOccurrence.OccurrencePriority priority,
+                                   LocalDate startDate, LocalDate endDate,
+                                   String responsible, String location) throws IOException {
+        log.info("Gerando relatório PDF de ocorrências - EmployeeId: {}, Type: {}, Status: {}, Priority: {}, " +
+                "StartDate: {}, EndDate: {}, Responsible: {}, Location: {}",
+                employeeId, type, status, priority, startDate, endDate, responsible, location);
+
+        // Buscar todas as ocorrências
+        List<OperationalOccurrence> allOccurrences = occurrenceRepository.findAll();
+
+        // Aplicar filtros
+        List<OperationalOccurrence> filteredOccurrences = allOccurrences.stream()
+                .filter(o -> employeeId == null || (o.getEmployee() != null && o.getEmployee().getId().equals(employeeId)))
+                .filter(o -> type == null || o.getType().equals(type))
+                .filter(o -> status == null || o.getStatus().equals(status))
+                .filter(o -> priority == null || o.getPriority().equals(priority))
+                .filter(o -> startDate == null || !o.getDate().toLocalDate().isBefore(startDate))
+                .filter(o -> endDate == null || !o.getDate().toLocalDate().isAfter(endDate))
+                .filter(o -> responsible == null || responsible.isEmpty() || 
+                        (o.getResponsible() != null && o.getResponsible().toLowerCase().contains(responsible.toLowerCase())))
+                .filter(o -> location == null || location.isEmpty() || 
+                        (o.getLocation() != null && o.getLocation().toLowerCase().contains(location.toLowerCase())))
+                .collect(Collectors.toList());
+
+        log.info("Total de ocorrências encontradas para o relatório: {}", filteredOccurrences.size());
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
+        try (PdfWriter writer = new PdfWriter(baos);
+             PdfDocument pdfDoc = new PdfDocument(writer);
+             Document document = new Document(pdfDoc)) {
+            document.setMargins(50, 50, 50, 50);
+
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE OCORRÊNCIAS")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+
+            // Filtros aplicados
+            if (employeeId != null || type != null || status != null || priority != null || 
+                startDate != null || endDate != null || (responsible != null && !responsible.isEmpty()) || 
+                (location != null && !location.isEmpty())) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+
+                if (employeeId != null) {
+                    employeeRepository.findById(employeeId).ifPresent(emp ->
+                            document.add(new Paragraph("Funcionário: " + emp.getName()).setFontSize(10).setMarginBottom(2)));
+                }
+                if (type != null) {
+                    document.add(new Paragraph("Tipo: " + getTypeLabel(type)).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + getStatusLabel(status)).setFontSize(10).setMarginBottom(2));
+                }
+                if (priority != null) {
+                    document.add(new Paragraph("Prioridade: " + getPriorityLabel(priority)).setFontSize(10).setMarginBottom(2));
+                }
+                if (startDate != null) {
+                    document.add(new Paragraph("Data Início: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (endDate != null) {
+                    document.add(new Paragraph("Data Fim: " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (responsible != null && !responsible.isEmpty()) {
+                    document.add(new Paragraph("Responsável: " + responsible).setFontSize(10).setMarginBottom(2));
+                }
+                if (location != null && !location.isEmpty()) {
+                    document.add(new Paragraph("Local: " + location).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+
+            // Estatísticas
+            long pendentes = filteredOccurrences.stream().filter(o -> o.getStatus() == OperationalOccurrence.OccurrenceStatus.PENDENTE).count();
+            long emAndamento = filteredOccurrences.stream().filter(o -> o.getStatus() == OperationalOccurrence.OccurrenceStatus.EM_ANDAMENTO).count();
+            long resolvidas = filteredOccurrences.stream().filter(o -> o.getStatus() == OperationalOccurrence.OccurrenceStatus.RESOLVIDO).count();
+            long concluidas = filteredOccurrences.stream().filter(o -> o.getStatus() == OperationalOccurrence.OccurrenceStatus.CONCLUIDO).count();
+
+            Paragraph stats = new Paragraph(String.format(
+                    "Total de ocorrências: %d | Pendentes: %d | Em Andamento: %d | Resolvidas: %d | Concluídas: %d",
+                    filteredOccurrences.size(), pendentes, emAndamento, resolvidas, concluidas))
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(stats);
+
+            // Tabela de ocorrências
+            if (filteredOccurrences.isEmpty()) {
+                document.add(new Paragraph("Nenhuma ocorrência encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20));
+            } else {
+                Table table = new Table(UnitValue.createPercentArray(new float[]{2f, 1.5f, 2f, 1.5f, 1.5f, 1.5f, 1.5f, 1.5f}))
+                        .useAllAvailableWidth()
+                        .setMarginBottom(20);
+
+                table.addHeaderCell(createHeaderCell("Funcionário"));
+                table.addHeaderCell(createHeaderCell("Tipo"));
+                table.addHeaderCell(createHeaderCell("Título"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Prioridade"));
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Responsável"));
+                table.addHeaderCell(createHeaderCell("Local"));
+
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+                for (OperationalOccurrence occurrence : filteredOccurrences) {
+                    table.addCell(createCell(occurrence.getEmployee() != null ? occurrence.getEmployee().getName() : ""));
+                    table.addCell(createCell(getTypeLabel(occurrence.getType())));
+                    table.addCell(createCell(occurrence.getTitle() != null ? occurrence.getTitle() : ""));
+                    table.addCell(createCell(getStatusLabel(occurrence.getStatus())));
+                    table.addCell(createCell(getPriorityLabel(occurrence.getPriority())));
+                    table.addCell(createCell(occurrence.getDate() != null ? occurrence.getDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(occurrence.getResponsible() != null ? occurrence.getResponsible() : ""));
+                    table.addCell(createCell(occurrence.getLocation() != null ? occurrence.getLocation() : ""));
+                }
+
+                document.add(table);
+            }
+
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de ocorrências: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        }
+
+        byte[] result = baos.toByteArray();
+        log.info("PDF de ocorrências gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+
+    private String getTypeLabel(OperationalOccurrence.OccurrenceType type) {
+        if (type == null) return "";
+        switch (type) {
+            case SEGURANCA: return "Segurança";
+            case DISCIPLINAR: return "Disciplinar";
+            case EQUIPAMENTO: return "Equipamento";
+            case INCIDENTE: return "Incidente";
+            case MANUTENCAO: return "Manutenção";
+            default: return type.name();
+        }
+    }
+
+    private String getStatusLabel(OperationalOccurrence.OccurrenceStatus status) {
+        if (status == null) return "";
+        switch (status) {
+            case PENDENTE: return "Pendente";
+            case EM_ANDAMENTO: return "Em Andamento";
+            case RESOLVIDO: return "Resolvido";
+            case CONCLUIDO: return "Concluído";
+            default: return status.name();
+        }
+    }
+
+    private String getPriorityLabel(OperationalOccurrence.OccurrencePriority priority) {
+        if (priority == null) return "";
+        switch (priority) {
+            case BAIXA: return "Baixa";
+            case MEDIA: return "Média";
+            case ALTA: return "Alta";
+            default: return priority.name();
+        }
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                .setPadding(5);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setPadding(5);
     }
 }

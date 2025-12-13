@@ -61,6 +61,11 @@ export interface CreateVisitRequest {
   attachedFiles?: string[];
   photos?: string[];
   
+  // Funcionário identificado no local (quando QR Code não funciona)
+  employeeId?: string;
+  employeeCpf?: string;
+  employeeRegistrationNumber?: string;
+  
   // Geolocalização
   latitude?: number;
   longitude?: number;

@@ -32,3 +32,7 @@ SELECT
 FROM pg_stat_activity
 WHERE application_name LIKE '%Flyway%' OR query LIKE '%flyway%';
 
+
+
+
+

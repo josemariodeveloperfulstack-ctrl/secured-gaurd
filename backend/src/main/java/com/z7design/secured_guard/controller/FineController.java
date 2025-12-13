@@ -6,7 +6,9 @@ import com.z7design.secured_guard.model.Driver;
 import com.z7design.secured_guard.repository.DriverRepository;
 import com.z7design.secured_guard.service.FineService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -80,6 +83,40 @@ public class FineController {
     }
     
     // ===== RELATÓRIOS =====
+    
+    @GetMapping("/report/pdf")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) String vehiclePlate,
+            @RequestParam(required = false) String driverName,
+            @RequestParam(required = false) String infraction,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateEnd,
+            @RequestParam(required = false) BigDecimal minValue,
+            @RequestParam(required = false) BigDecimal maxValue,
+            @RequestParam(required = false) String status) {
+        try {
+            Fine.FineStatus statusEnum = null;
+            if (status != null && !status.isEmpty() && !"all".equals(status)) {
+                try {
+                    statusEnum = Fine.FineStatus.valueOf(status);
+                } catch (IllegalArgumentException e) {
+                    // Status inválido, ignorar
+                }
+            }
+
+            byte[] pdfBytes = fineService.generatePDFReport(vehiclePlate, driverName, infraction,
+                    startDate, endDate, dueDateStart, dueDateEnd, minValue, maxValue, statusEnum);
+            String fileName = "relatorio-multas-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
     
     @GetMapping("/reports/pdf")
     public ResponseEntity<List<Object>> generateFineReportPDF(

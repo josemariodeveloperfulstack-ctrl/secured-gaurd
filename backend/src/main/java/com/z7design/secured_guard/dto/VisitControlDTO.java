@@ -29,6 +29,12 @@ public class VisitControlDTO {
 
     private UUID workPostId;
 
+    private UUID employeeId; // ID do funcionário identificado no local
+
+    private String employeeCpf; // CPF informado manualmente (quando QR Code não funciona)
+
+    private String employeeRegistrationNumber; // Matrícula informada manualmente
+
     @NotNull(message = "Data da visita é obrigatória")
     private LocalDate visitDate;
 
@@ -60,7 +66,10 @@ public class VisitControlDTO {
     private String supervisorName;
     private String workPostName;
     private String createdByName;
+    private String employeeName; // Nome do funcionário identificado
 }
+
+
 
 
 

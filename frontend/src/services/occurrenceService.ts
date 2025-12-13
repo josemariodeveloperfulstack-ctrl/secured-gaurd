@@ -27,6 +27,8 @@ export interface OccurrenceFilters {
   priority?: string;
   startDate?: string;
   endDate?: string;
+  responsible?: string;
+  location?: string;
 }
 
 export interface CreateOccurrenceRequest {
@@ -121,6 +123,24 @@ export const occurrenceService = {
     } catch (error) {
       console.error('❌ Erro ao excluir ocorrência:', error);
       throw new Error(`Falha ao excluir ocorrência ${id} no servidor`);
+    }
+  },
+
+  // Gerar relatório PDF de ocorrências
+  async generatePDFReport(filters: OccurrenceFilters): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+
+      const response = await api.get(`/api/operational/occurrences/report/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório PDF:', error);
+      throw new Error('Falha ao gerar relatório PDF');
     }
   }
 }; 

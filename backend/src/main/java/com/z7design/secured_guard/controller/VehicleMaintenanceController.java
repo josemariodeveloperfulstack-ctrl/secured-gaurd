@@ -1,10 +1,13 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.VehicleMaintenanceDTO;
+import com.z7design.secured_guard.model.VehicleMaintenance;
 import com.z7design.secured_guard.service.VehicleMaintenanceService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -296,6 +300,47 @@ public class VehicleMaintenanceController {
         } catch (Exception e) {
             log.error("Erro ao atualizar manutenção com arquivos: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // GET /api/maintenances/report/pdf - Gerar relatório PDF de manutenções
+    @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(summary = "Gerar relatório PDF de manutenções", description = "Gera relatório PDF filtrado por data, placa, status, tipo e descrição")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) UUID vehicleId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String maintenanceType,
+            @RequestParam(required = false) String description) {
+        try {
+            VehicleMaintenance.MaintenanceStatus statusEnum = null;
+            if (status != null && !status.isEmpty() && !"all".equals(status)) {
+                try {
+                    statusEnum = VehicleMaintenance.MaintenanceStatus.valueOf(status);
+                } catch (IllegalArgumentException e) {
+                    log.warn("Status inválido fornecido: {}", status);
+                }
+            }
+
+            VehicleMaintenance.MaintenanceType typeEnum = null;
+            if (maintenanceType != null && !maintenanceType.isEmpty() && !"all".equals(maintenanceType)) {
+                try {
+                    typeEnum = VehicleMaintenance.MaintenanceType.valueOf(maintenanceType);
+                } catch (IllegalArgumentException e) {
+                    log.warn("Tipo inválido fornecido: {}", maintenanceType);
+                }
+            }
+
+            byte[] pdfBytes = maintenanceService.generatePDFReport(startDate, endDate, vehicleId, statusEnum, typeEnum, description);
+            String fileName = "relatorio-manutencoes-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de manutenções: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

@@ -1,6 +1,15 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.VisitControlDTO;
+import com.z7design.secured_guard.dto.VisitControlReportDTO;
 import com.z7design.secured_guard.dto.VisitControlStatsDTO;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.User;
@@ -11,25 +20,35 @@ import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.VisitControlRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
+import com.z7design.secured_guard.repository.WorkPostAssignmentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class VisitControlService {
 
     private final VisitControlRepository visitControlRepository;
     private final EmployeeRepository employeeRepository;
     private final WorkPostRepository workPostRepository;
     private final UserRepository userRepository;
+    private final VisitControlReportService reportService;
+    private final WorkPostAssignmentRepository workPostAssignmentRepository;
 
     @Transactional(readOnly = true)
     public List<VisitControlDTO> getAllVisitControls() {
@@ -174,6 +193,17 @@ public class VisitControlService {
             entity.setWorkPost(workPost);
         }
 
+        // Mapear funcionário identificado no local
+        if (dto.getEmployeeId() != null) {
+            Employee employee = employeeRepository.findById(dto.getEmployeeId())
+                    .orElse(null);
+            entity.setEmployee(employee);
+        }
+        
+        // Armazenar CPF e matrícula informados manualmente
+        entity.setEmployeeCpf(dto.getEmployeeCpf());
+        entity.setEmployeeRegistrationNumber(dto.getEmployeeRegistrationNumber());
+
         if (dto.getCreatedBy() != null) {
             User user = userRepository.findById(dto.getCreatedBy())
                     .orElse(null);
@@ -216,6 +246,14 @@ public class VisitControlService {
             dto.setWorkPostName(entity.getWorkPost().getName());
         }
 
+        // Mapear funcionário identificado
+        if (entity.getEmployee() != null) {
+            dto.setEmployeeId(entity.getEmployee().getId());
+            dto.setEmployeeName(entity.getEmployee().getName());
+        }
+        dto.setEmployeeCpf(entity.getEmployeeCpf());
+        dto.setEmployeeRegistrationNumber(entity.getEmployeeRegistrationNumber());
+
         if (entity.getCreatedBy() != null) {
             dto.setCreatedBy(entity.getCreatedBy().getId());
             dto.setCreatedByName(entity.getCreatedBy().getUsername());
@@ -223,7 +261,353 @@ public class VisitControlService {
 
         return dto;
     }
+
+    @Transactional(readOnly = true)
+    public List<VisitControlDTO> getVisitControlsByFilters(UUID workPostId, VisitControlStatus status, LocalDate startDate, LocalDate endDate) {
+        log.info("Buscando visitas com filtros - WorkPost: {}, Status: {}, StartDate: {}, EndDate: {}", 
+                workPostId, status, startDate, endDate);
+        
+        // Usar Criteria API para buscar visitas com filtros
+        List<VisitControl> visits = visitControlRepository.findByFiltersWithFetch(workPostId, status, startDate, endDate);
+        log.info("Query findByFiltersWithFetch retornou {} visitas", visits.size());
+        
+        return visits.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(UUID workPostId, VisitControlStatus status, LocalDate startDate, LocalDate endDate) throws IOException {
+        log.info("Gerando relatório PDF de visitas - WorkPost: {}, Status: {}, StartDate: {}, EndDate: {}", 
+                workPostId, status, startDate, endDate);
+        
+        // Buscar visitas com filtros usando Criteria API
+        List<VisitControl> visits = visitControlRepository.findByFiltersWithFetch(workPostId, status, startDate, endDate);
+        log.info("Query findByFiltersWithFetch retornou {} visitas", visits.size());
+        
+        // Verificar se as relações foram carregadas
+        if (!visits.isEmpty()) {
+            VisitControl first = visits.get(0);
+            log.debug("Primeira visita - WorkPost: {}, Supervisor: {}", 
+                first.getWorkPost() != null ? first.getWorkPost().getName() : "null",
+                first.getSupervisor() != null ? first.getSupervisor().getName() : "null");
+        }
+        
+        log.info("Gerando PDF com {} visitas", visits.size());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+        
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+            
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+            
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+            
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE CONTROLE DE VISITAS")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+            
+            // Filtros aplicados
+            if (workPostId != null || status != null || startDate != null || endDate != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+                
+                if (workPostId != null) {
+                    WorkPost workPost = workPostRepository.findById(workPostId).orElse(null);
+                    String workPostName = workPost != null ? workPost.getName() : "ID: " + workPostId;
+                    document.add(new Paragraph("Posto de Trabalho: " + workPostName).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + getStatusLabel(status)).setFontSize(10).setMarginBottom(2));
+                }
+                if (startDate != null) {
+                    document.add(new Paragraph("Data Início: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                if (endDate != null) {
+                    document.add(new Paragraph("Data Fim: " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+            
+            // Total de visitas
+            Paragraph totalInfo = new Paragraph("Total de visitas: " + visits.size())
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(totalInfo);
+            
+            // Tabela de visitas
+            if (visits.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhuma visita encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Local"));
+                table.addHeaderCell(createHeaderCell("Posto de Trabalho"));
+                table.addHeaderCell(createHeaderCell("Responsável"));
+                table.addHeaderCell(createHeaderCell("Supervisor"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Sucesso"));
+                
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (VisitControl visit : visits) {
+                    // Debug: verificar se as relações foram carregadas
+                    String workPostName = "";
+                    String supervisorName = "";
+                    
+                    if (visit.getWorkPost() != null) {
+                        workPostName = visit.getWorkPost().getName();
+                        log.debug("Visit {} - WorkPost carregado: {}", visit.getId(), workPostName);
+                    } else {
+                        log.warn("Visit {} - WorkPost é null", visit.getId());
+                    }
+                    
+                    if (visit.getSupervisor() != null) {
+                        supervisorName = visit.getSupervisor().getName();
+                        log.debug("Visit {} - Supervisor carregado: {}", visit.getId(), supervisorName);
+                    } else {
+                        log.warn("Visit {} - Supervisor é null", visit.getId());
+                    }
+                    
+                    table.addCell(createCell(visit.getVisitDate() != null ? 
+                            visit.getVisitDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(visit.getLocation() != null ? visit.getLocation() : ""));
+                    table.addCell(createCell(workPostName != null ? workPostName : ""));
+                    table.addCell(createCell(visit.getAssignedTo() != null ? visit.getAssignedTo() : ""));
+                    table.addCell(createCell(supervisorName != null ? supervisorName : ""));
+                    table.addCell(createCell(visit.getStatus() != null ? getStatusLabel(visit.getStatus()) : ""));
+                    table.addCell(createCell(visit.getIsSuccessful() != null && visit.getIsSuccessful() ? "Sim" : "Não"));
+                }
+                
+                document.add(table);
+            }
+            
+            // Rodapé
+            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(8)
+                    .setMarginTop(30);
+            document.add(footer);
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de visitas: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+            if (pdfDoc != null) {
+                pdfDoc.close();
+            }
+            if (writer != null) {
+                writer.close();
+            }
+        }
+        
+        byte[] result = baos.toByteArray();
+        log.info("PDF de visitas gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+
+    @Transactional
+    public VisitControlReportDTO generateAndSavePDFReport(UUID workPostId, VisitControlStatus status, 
+                                                          LocalDate startDate, LocalDate endDate, UUID createdBy) throws IOException {
+        log.info("Gerando e salvando relatório PDF - WorkPost: {}, Status: {}, StartDate: {}, EndDate: {}, CreatedBy: {}", 
+                workPostId, status, startDate, endDate, createdBy);
+        
+        // Buscar visitas uma única vez para usar tanto no PDF quanto na contagem
+        List<VisitControl> visits = visitControlRepository.findByFiltersWithFetch(workPostId, status, startDate, endDate);
+        int totalVisits = visits.size();
+        log.info("Total de visitas encontradas para o relatório: {} (WorkPost: {}, Status: {}, StartDate: {}, EndDate: {})", 
+                totalVisits, workPostId, status, startDate, endDate);
+        
+        if (totalVisits == 0) {
+            log.warn("⚠️ Nenhuma visita encontrada com os filtros aplicados");
+        } else {
+            log.info("✅ Visitas encontradas: {}", totalVisits);
+            // Log das primeiras 3 visitas para debug
+            for (int i = 0; i < Math.min(3, visits.size()); i++) {
+                VisitControl v = visits.get(i);
+                log.debug("Visita {}: ID={}, Data={}, Local={}, WorkPost={}, Supervisor={}", 
+                        i + 1, v.getId(), v.getVisitDate(), v.getLocation(),
+                        v.getWorkPost() != null ? v.getWorkPost().getName() : "null",
+                        v.getSupervisor() != null ? v.getSupervisor().getName() : "null");
+            }
+        }
+        
+        // Gerar PDF (que também busca as visitas internamente, mas vamos usar a contagem acima)
+        byte[] pdfBytes = generatePDFReport(workPostId, status, startDate, endDate);
+        
+        // Salvar relatório com o total correto de visitas
+        return reportService.saveReport(pdfBytes, workPostId, status, startDate, endDate, totalVisits, createdBy);
+    }
+    
+    @Transactional(readOnly = true)
+    public Map<String, Object> findEmployeeByCpfOrRegistration(String cpf, String registrationNumber, UUID workPostId) {
+        log.info("Buscando funcionário - CPF: {}, Matrícula: {}, WorkPost: {}", cpf, registrationNumber, workPostId);
+        
+        Map<String, Object> result = new HashMap<>();
+        
+        // Validar que pelo menos CPF ou matrícula foi informado
+        if ((cpf == null || cpf.trim().isEmpty()) && (registrationNumber == null || registrationNumber.trim().isEmpty())) {
+            result.put("success", false);
+            result.put("error", "Informe CPF ou matrícula do funcionário");
+            return result;
+        }
+        
+        // Validar que workPostId foi informado
+        if (workPostId == null) {
+            result.put("success", false);
+            result.put("error", "Posto de trabalho é obrigatório");
+            return result;
+        }
+        
+        // Verificar se o posto de trabalho existe
+        WorkPost workPost = workPostRepository.findById(workPostId)
+                .orElse(null);
+        if (workPost == null) {
+            result.put("success", false);
+            result.put("error", "Posto de trabalho não encontrado");
+            return result;
+        }
+        
+        Optional<Employee> employeeOpt = Optional.empty();
+        
+        // Buscar por CPF se informado
+        if (cpf != null && !cpf.trim().isEmpty()) {
+            String normalizedCpf = cpf.replaceAll("[^0-9]", "");
+            log.debug("Buscando funcionário por CPF normalizado: {}", normalizedCpf);
+            
+            // Tentar buscar por CPF
+            employeeOpt = employeeRepository.findByCpf(normalizedCpf);
+            
+            // Se não encontrou, tentar buscar por document
+            if (employeeOpt.isEmpty()) {
+                employeeOpt = employeeRepository.findByDocument(normalizedCpf);
+            }
+            
+            // Se ainda não encontrou, tentar buscar por username do User
+            if (employeeOpt.isEmpty()) {
+                Optional<User> userOpt = userRepository.findByUsername(normalizedCpf);
+                if (userOpt.isPresent()) {
+                    employeeOpt = employeeRepository.findByUserId(userOpt.get().getId());
+                }
+            }
+        }
+        
+        // Se não encontrou por CPF, tentar buscar por matrícula
+        if (employeeOpt.isEmpty() && registrationNumber != null && !registrationNumber.trim().isEmpty()) {
+            log.debug("Buscando funcionário por matrícula: {}", registrationNumber);
+            employeeOpt = employeeRepository.findByRegistrationNumber(registrationNumber.trim());
+        }
+        
+        if (employeeOpt.isEmpty()) {
+            result.put("success", false);
+            result.put("error", "Funcionário não encontrado com os dados informados");
+            return result;
+        }
+        
+        Employee employee = employeeOpt.get();
+        log.info("✅ Funcionário encontrado: {} (ID: {})", employee.getName(), employee.getId());
+        
+        // Verificar se o funcionário está atribuído ao posto de trabalho
+        LocalDate today = LocalDate.now();
+        List<com.z7design.secured_guard.model.WorkPostAssignment> assignments = 
+                workPostAssignmentRepository.findByWorkPostId(workPostId);
+        
+        boolean isAssigned = assignments.stream()
+                .anyMatch(assignment -> 
+                    assignment.getEmployee().getId().equals(employee.getId()) &&
+                    (assignment.getAssignmentDate().equals(today) || 
+                     assignment.getAssignmentDate().isBefore(today)) &&
+                    assignment.getStatus() == com.z7design.secured_guard.model.WorkPostAssignment.AssignmentStatus.ACTIVE
+                );
+        
+        // Montar resposta
+        result.put("success", true);
+        result.put("employee", Map.of(
+            "id", employee.getId().toString(),
+            "name", employee.getName() != null ? employee.getName() : "",
+            "cpf", employee.getDocument() != null ? employee.getDocument() : "",
+            "registrationNumber", employee.getRegistrationNumber() != null ? employee.getRegistrationNumber() : "",
+            "position", employee.getPosition() != null ? employee.getPosition().getName() : ""
+        ));
+        result.put("isAssignedToWorkPost", isAssigned);
+        result.put("workPostName", workPost.getName());
+        
+        if (!isAssigned) {
+            result.put("warning", "Funcionário não está atribuído ao posto de trabalho na data atual");
+        }
+        
+        return result;
+    }
+    
+    private String getStatusLabel(VisitControlStatus status) {
+        if (status == null) return "";
+        switch (status) {
+            case SCHEDULED: return "Agendada";
+            case IN_PROGRESS: return "Em Andamento";
+            case COMPLETED: return "Concluída";
+            case CANCELLED: return "Cancelada";
+            case PENDING: return "Pendente";
+            default: return status.toString();
+        }
+    }
+    
+    private Cell createHeaderCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+    
+    private Cell createCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setTextAlignment(TextAlignment.LEFT);
+    }
 }
+
+
 
 
 

@@ -103,12 +103,20 @@ export default function RemanejamentoFormModal({
 
   useEffect(() => {
     if (remanejamento) {
+      // Converter data para formato YYYY-MM-DD se necessário
+      let dataFormatada = '';
+      if (remanejamento.dataRemanejamento) {
+        dataFormatada = remanejamento.dataRemanejamento.split('T')[0];
+      } else if (remanejamento.remanejamentoDate) {
+        dataFormatada = remanejamento.remanejamentoDate.split('T')[0];
+      }
+      
       setValue('employeeId', remanejamento.employeeId || '');
       setValue('tipo', remanejamento.tipo || 'TRANSFERENCIA_UNIDADE');
       setValue('origem', remanejamento.origem || '');
       setValue('destino', remanejamento.destino || '');
-      setValue('dataRemanejamento', remanejamento.dataRemanejamento);
-      setValue('observacao', remanejamento.observacao || '');
+      setValue('dataRemanejamento', dataFormatada);
+      setValue('observacao', remanejamento.observacao || remanejamento.notes || '');
     } else {
       reset({
         employeeId: '',

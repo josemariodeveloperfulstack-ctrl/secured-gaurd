@@ -79,6 +79,14 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
   const [allWorkPosts, setAllWorkPosts] = useState<WorkPost[]>([]);
   const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
   
+  // Dados do funcionário identificado no local
+  const [employeeCpf, setEmployeeCpf] = useState('');
+  const [employeeRegistration, setEmployeeRegistration] = useState('');
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [loadingEmployee, setLoadingEmployee] = useState(false);
+  const [employeeWarning, setEmployeeWarning] = useState<string | null>(null);
+  
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -187,6 +195,111 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
       });
     } finally {
       setLoadingSupervisor(false);
+    }
+  };
+
+  const handleEmployeeCpfChange = (cpf: string) => {
+    setEmployeeCpf(cpf);
+    // Limpar dados se CPF for apagado
+    if (!cpf) {
+      setEmployeeName('');
+      setEmployeeId(null);
+      setEmployeeWarning(null);
+      setFormData(prev => ({ ...prev, employeeId: undefined, employeeCpf: undefined }));
+    }
+  };
+
+  const handleEmployeeRegistrationChange = (registration: string) => {
+    setEmployeeRegistration(registration);
+    // Limpar dados se matrícula for apagada
+    if (!registration) {
+      setEmployeeName('');
+      setEmployeeId(null);
+      setEmployeeWarning(null);
+      setFormData(prev => ({ ...prev, employeeId: undefined, employeeRegistrationNumber: undefined }));
+    }
+  };
+
+  const handleEmployeeCpfBlur = async () => {
+    if (!employeeCpf || employeeCpf.length < 11 || !formData.workPostId) {
+      return;
+    }
+    await searchEmployee(employeeCpf, null);
+  };
+
+  const handleEmployeeRegistrationBlur = async () => {
+    if (!employeeRegistration || !formData.workPostId) {
+      return;
+    }
+    await searchEmployee(null, employeeRegistration);
+  };
+
+  const searchEmployee = async (cpf: string | null, registrationNumber: string | null) => {
+    if (!formData.workPostId) {
+      toast({
+        title: "Atenção",
+        description: "Selecione o posto de trabalho primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoadingEmployee(true);
+    setEmployeeName('');
+    setEmployeeId(null);
+    setEmployeeWarning(null);
+
+    try {
+      const params = new URLSearchParams();
+      if (cpf) params.append('cpf', cpf);
+      if (registrationNumber) params.append('registrationNumber', registrationNumber);
+      params.append('workPostId', formData.workPostId);
+
+      const response = await api.get(`/api/visit-controls/find-employee?${params.toString()}`);
+      
+      if (response.data.success) {
+        const employee = response.data.employee;
+        setEmployeeName(employee.name);
+        setEmployeeId(employee.id);
+        setFormData(prev => ({ 
+          ...prev, 
+          employeeId: employee.id,
+          employeeCpf: employee.cpf,
+          employeeRegistrationNumber: employee.registrationNumber
+        }));
+        
+        if (!response.data.isAssignedToWorkPost) {
+          setEmployeeWarning(response.data.warning || 'Funcionário não está atribuído ao posto de trabalho');
+        } else {
+          setEmployeeWarning(null);
+        }
+        
+        toast({
+          title: "Funcionário encontrado",
+          description: `${employee.name}`,
+        });
+      } else {
+        setEmployeeName('');
+        setEmployeeId(null);
+        setEmployeeWarning(null);
+        toast({
+          title: "Funcionário não encontrado",
+          description: response.data.error || "Funcionário não encontrado com os dados informados",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao buscar funcionário:', error);
+      setEmployeeName('');
+      setEmployeeId(null);
+      setEmployeeWarning(null);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.error || "Erro ao buscar funcionário",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingEmployee(false);
     }
   };
 
@@ -563,6 +676,60 @@ export const VisitFormModal: React.FC<VisitFormModalProps> = ({
                       ✓ {formData.presentEmployees.length} funcionário(s) registrado(s)
                     </p>
                   </div>
+                )}
+              </div>
+
+              {/* Identificação Manual do Funcionário (quando QR Code não funciona) */}
+              <div className="space-y-2 mt-4 pt-4 border-t border-gray-700">
+                <Label className="text-seguranca-lightgray flex items-center gap-2">
+                  <User size={16} />
+                  Identificar Funcionário Manualmente (CPF ou Matrícula)
+                </Label>
+                <p className="text-xs text-gray-400">
+                  Use este campo quando a leitura do QR Code não funcionar
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray text-sm">CPF do Funcionário</Label>
+                    <Input
+                      id="employeeCpf"
+                      value={employeeCpf}
+                      onChange={(e) => handleEmployeeCpfChange(e.target.value)}
+                      onBlur={handleEmployeeCpfBlur}
+                      placeholder="000.000.000-00"
+                      className="bg-white text-black"
+                      disabled={loadingEmployee || !formData.workPostId}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray text-sm">Matrícula do Funcionário</Label>
+                    <Input
+                      id="employeeRegistration"
+                      value={employeeRegistration}
+                      onChange={(e) => handleEmployeeRegistrationChange(e.target.value)}
+                      onBlur={handleEmployeeRegistrationBlur}
+                      placeholder="Digite a matrícula"
+                      className="bg-white text-black"
+                      disabled={loadingEmployee || !formData.workPostId}
+                    />
+                  </div>
+                </div>
+                {employeeName && (
+                  <div className="mt-2 p-3 bg-green-900/30 border border-green-700 rounded-lg">
+                    <p className="text-sm text-green-300 font-medium">
+                      ✓ Funcionário encontrado: {employeeName}
+                    </p>
+                    {employeeWarning && (
+                      <p className="text-xs text-yellow-400 mt-1">
+                        ⚠️ {employeeWarning}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!formData.workPostId && (
+                  <p className="text-xs text-yellow-500">
+                    Selecione o posto de trabalho primeiro
+                  </p>
                 )}
               </div>
             </CardContent>

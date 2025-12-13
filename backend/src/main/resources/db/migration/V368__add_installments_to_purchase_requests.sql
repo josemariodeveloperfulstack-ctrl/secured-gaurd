@@ -5,3 +5,7 @@ ADD COLUMN IF NOT EXISTS installments INTEGER;
 
 
 
+
+
+
+

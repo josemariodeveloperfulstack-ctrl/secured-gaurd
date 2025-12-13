@@ -106,3 +106,7 @@ Alguns campos podem ser NULL. Os principais são:
 5. **ON CONFLICT**: Sempre use `ON CONFLICT (id) DO NOTHING;` para evitar erros em execuções repetidas
 
 
+
+
+
+

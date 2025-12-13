@@ -192,4 +192,32 @@ export const scheduleService = {
   async deleteSchedule(id: string): Promise<void> {
     await this.delete(id);
   },
+
+  /**
+   * Gera relatório PDF de escalas com filtros opcionais
+   */
+  async generatePDFReport(filters: {
+    startDate?: string;
+    endDate?: string;
+    employeeId?: string;
+    workPostId?: string;
+    status?: string;
+  }): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.employeeId) params.append('employeeId', filters.employeeId);
+      if (filters.workPostId) params.append('workPostId', filters.workPostId);
+      if (filters.status) params.append('status', filters.status);
+
+      const response = await api.get(`/api/schedules/report/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório PDF:', error);
+      throw new Error('Falha ao gerar relatório PDF');
+    }
+  },
 }; 

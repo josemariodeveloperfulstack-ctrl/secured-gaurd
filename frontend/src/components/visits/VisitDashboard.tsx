@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, User, Building, Camera, Upload, QrCode, Map } from 'lucide-react';
+import { Calendar, MapPin, Clock, User, Building, Camera, Upload, QrCode, Map, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,9 @@ import { Visit, VisitFilters, VisitCalendarEvent } from '@/types/visit';
 import { VisitCalendar } from './VisitCalendar';
 import VisitList from './VisitList';
 import { VisitFormModal } from './VisitFormModal';
+import VisitControlReports from '@/components/operacional/VisitControlReports';
 import { VisitViewModal } from './VisitViewModal';
+import DayVisitsModal from './DayVisitsModal';
 
 interface VisitDashboardProps {
   supervisorId?: string;
@@ -27,6 +29,9 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showDayVisitsModal, setShowDayVisitsModal] = useState(false);
+  const [selectedDayVisits, setSelectedDayVisits] = useState<Visit[]>([]);
+  const [selectedDayDate, setSelectedDayDate] = useState<Date>(new Date());
   const [filters, setFilters] = useState<VisitFilters>({});
   const [activeTab, setActiveTab] = useState('calendar');
 
@@ -179,6 +184,28 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
     });
   };
 
+  const handleDayClick = async (date: Date, dayEvents: any[]) => {
+    try {
+      // Buscar todas as visitas do dia selecionado
+      const dateString = date.toISOString().split('T')[0];
+      const dayVisits = visits.filter(visit => {
+        const visitDate = new Date(visit.visitDate);
+        return visitDate.toISOString().split('T')[0] === dateString;
+      });
+
+      setSelectedDayDate(date);
+      setSelectedDayVisits(dayVisits);
+      setShowDayVisitsModal(true);
+    } catch (error) {
+      console.error('Erro ao carregar visitas do dia:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao carregar visitas do dia',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const todayVisits = visits.filter(visit => {
     const visitDate = new Date(visit.visitDate);
     const today = new Date();
@@ -323,6 +350,10 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
             <User className="w-4 h-4 mr-2" />
             Lista
           </TabsTrigger>
+          <TabsTrigger value="reports" className="text-gray-300 data-[state='active']:text-white">
+            <FileText className="w-4 h-4 mr-2" />
+            Relatórios
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="calendar" className="space-y-4">
@@ -336,6 +367,7 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
                 selectedDate={selectedDate}
                 onDateChange={handleDateChange}
                 onEventClick={handleViewVisit}
+                onDayClick={handleDayClick}
                 loading={loading}
               />
             </CardContent>
@@ -358,6 +390,10 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <VisitControlReports />
+        </TabsContent>
       </Tabs>
 
       {/* Modals */}
@@ -374,6 +410,14 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
         visit={selectedVisit}
         onEdit={handleEditVisit}
         onDelete={handleDeleteVisit}
+      />
+
+      <DayVisitsModal
+        open={showDayVisitsModal}
+        onOpenChange={setShowDayVisitsModal}
+        visits={selectedDayVisits}
+        date={selectedDayDate}
+        onVisitClick={handleViewVisit}
       />
     </div>
   );

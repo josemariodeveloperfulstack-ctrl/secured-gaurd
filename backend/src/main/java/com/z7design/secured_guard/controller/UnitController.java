@@ -54,8 +54,11 @@ public class UnitController {
     }
     
     @GetMapping("/active")
-    @PreAuthorize("hasAnyAuthority('HR_READ','ADMIN','SUPER_ADMIN','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @Operation(summary = "Listar unidades ativas", description = "Retorna uma lista de todas as unidades ativas")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de unidades ativas retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
     public ResponseEntity<List<UnitDTO>> getAllActive() {
         log.debug("Buscando unidades ativas");
         List<UnitDTO> units = unitService.findAllActiveAsDTO();

@@ -38,6 +38,16 @@ public class VisitControl {
     @JoinColumn(name = "work_post_id")
     private WorkPost workPost;
 
+    @ManyToOne
+    @JoinColumn(name = "employee_id")
+    private Employee employee; // Funcionário identificado no local da visita
+
+    @Column(name = "employee_cpf")
+    private String employeeCpf; // CPF informado manualmente (quando QR Code não funciona)
+
+    @Column(name = "employee_registration_number")
+    private String employeeRegistrationNumber; // Matrícula informada manualmente
+
     @Column(nullable = false)
     private LocalDate visitDate;
 
