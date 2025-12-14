@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { orderOfServiceService } from '@/services/orderOfServiceService';
+import { orderOfServiceService, OrderOfService } from '@/services/orderOfServiceService';
 import { CreateOrderOfServiceDTO } from '@/types/orderOfService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
@@ -32,7 +32,7 @@ interface Unit {
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import FuncionarioEditModal from '@/components/funcionarios/FuncionarioEditModal';
 import { ordemServicoPDFGenerator } from '@/utils/ordemServicoPDFGenerator';
-import { Search, Plus, AlertCircle, CalendarDays, Loader2, Building, User, Briefcase, MapPin, Edit, FileText } from 'lucide-react';
+import { Search, Plus, AlertCircle, CalendarDays, Loader2, Building, User, Briefcase, MapPin, Edit, FileText, RefreshCw } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale';
@@ -69,6 +69,7 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [salaryInput, setSalaryInput] = useState<string>('');
+  const [orderNumber, setOrderNumber] = useState<string>('');
 
   // Estados para os dados dos selects
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -113,32 +114,60 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
     return `${sign}R$ ${formattedInteger},${decimalPart}`;
   };
 
+  // Função para gerar número amigável da ordem
+  const generateOrderNumber = (): string => {
+    const year = new Date().getFullYear();
+    // Gera um número sequencial baseado no timestamp (últimos 4 dígitos)
+    const sequence = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `OS-${year}-${sequence}`;
+  };
+
+  // Função para converter UUID em número amigável (para edição)
+  const formatOrderNumberFromId = (id: string): string => {
+    if (!id) return generateOrderNumber();
+    // Pega os primeiros 8 caracteres do UUID e converte para número
+    const uuidPart = id.replace(/-/g, '').substring(0, 8);
+    const year = new Date().getFullYear();
+    // Converte hex para decimal e pega últimos 4 dígitos
+    const sequence = (parseInt(uuidPart, 16) % 10000).toString().padStart(4, '0');
+    return `OS-${year}-${sequence}`;
+  };
+
   const handleSalaryChange = (value: string) => {
-    let cleaned = value.replace(/R\$\s?/g, '').trim();
+    // Remove tudo exceto números, vírgula e ponto
+    let cleaned = value.replace(/[^\d,.]/g, '');
     
-    const parts = cleaned.split(/[,.]/);
-    if (parts.length > 2) {
-      cleaned = parts[0] + ',' + parts.slice(1).join('');
+    // Substitui ponto por vírgula (padrão brasileiro)
+    cleaned = cleaned.replace(/\./g, ',');
+    
+    // Permite apenas uma vírgula
+    const commaIndex = cleaned.indexOf(',');
+    if (commaIndex !== -1) {
+      // Remove vírgulas extras após a primeira
+      cleaned = cleaned.substring(0, commaIndex + 1) + cleaned.substring(commaIndex + 1).replace(/,/g, '');
+      
+      // Limita a 2 casas decimais após a vírgula
+      const parts = cleaned.split(',');
+      if (parts.length === 2 && parts[1].length > 2) {
+        cleaned = parts[0] + ',' + parts[1].substring(0, 2);
+      }
     }
     
-    if (parts.length === 2 && parts[1].length > 2) {
-      cleaned = parts[0] + ',' + parts[1].substring(0, 2);
-    }
+    // Atualiza o input diretamente para permitir digitação livre
+    setSalaryInput(cleaned);
     
+    // Converte para número (substituindo vírgula por ponto para parseFloat)
     const normalizedValue = cleaned.replace(',', '.');
     
-    if (normalizedValue === '' || normalizedValue === '.' || normalizedValue === '-') {
+    if (normalizedValue === '' || normalizedValue === '.' || normalizedValue === ',') {
       setForm((prev) => ({ ...prev, salary: 0 }));
       return;
     }
     
     const numValue = parseFloat(normalizedValue);
-    if (!isNaN(numValue)) {
-      const absValue = Math.abs(numValue);
-      const integerPart = Math.floor(absValue).toString();
-      const decimalPart = normalizedValue.includes('.') ? normalizedValue.split('.')[1] : '';
-      
-      if (integerPart.length + decimalPart.length <= 15 && decimalPart.length <= 2) {
+    if (!isNaN(numValue) && numValue >= 0) {
+      // Limita o valor total (ex: 999999999,99)
+      if (numValue <= 999999999.99) {
         const roundedValue = Math.round(numValue * 100) / 100;
         setForm((prev) => ({ ...prev, salary: roundedValue }));
       }
@@ -166,13 +195,10 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
         setStartDate(order.startDate ? parseDateFromBackend(order.startDate) : new Date());
         setEndDate(order.endDate ? parseDateFromBackend(order.endDate) : null);
         setSalaryInput(order.salary && order.salary > 0 ? order.salary.toString().replace('.', ',') : '');
+        setOrderNumber(formatOrderNumberFromId(order.id));
         
-        // Buscar funcionário selecionado
-        const employee = employees.find(emp => emp.id === order.employeeId);
-        if (employee) {
-          setSelectedEmployee(employee);
-          setEmployeeSearchTerm(employee.name || '');
-        }
+        // Preencher funcionário imediatamente
+        setEmployeeSearchTerm(order.employeeName || '');
       } else {
         setForm(initialState);
         setStartDate(new Date());
@@ -185,6 +211,7 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
         setSelectedClientId(null);
         setError(null);
         setSalaryInput('');
+        setOrderNumber(generateOrderNumber());
       }
     } else {
         setForm(initialState);
@@ -202,6 +229,7 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
         setEditEmployeeModalOpen(false);
         setError(null);
         setSalaryInput('');
+        setOrderNumber('');
     }
   }, [open, order]);
 
@@ -238,6 +266,52 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
       setFilteredWorkPosts(workPostsData);
       setUnits(unitsData);
       setPositions(positionsData);
+      
+      // Se estiver editando e os dados já foram carregados, preencher funcionário e cargo
+      if (order && employeesData.length > 0) {
+        const employee = employeesData.find(emp => emp.id === order.employeeId);
+        if (employee) {
+          setSelectedEmployee(employee);
+          setEmployeeSearchTerm(employee.name || order.employeeName || '');
+          
+          // Buscar dados completos do funcionário para preencher cargo
+          employeeService.getEmployeeById(employee.id).then((fullEmployee) => {
+            if (fullEmployee) {
+              setFullEmployeeData(fullEmployee);
+              // Usar o cargo do funcionário se disponível, senão usar o da ordem
+              const positionName = (fullEmployee as any).position?.name || order.role;
+              if (positionName) {
+                setForm(prev => ({
+                  ...prev,
+                  role: positionName,
+                  employeeName: fullEmployee.name || prev.employeeName,
+                  employeeCpf: fullEmployee.document || fullEmployee.cpf || prev.employeeCpf
+                }));
+              }
+            }
+          }).catch(err => {
+            console.warn('Erro ao buscar dados completos do funcionário:', err);
+          });
+        } else if (order.employeeId) {
+          // Se não encontrou na lista, buscar diretamente
+          employeeService.getEmployeeById(order.employeeId).then((fullEmployee) => {
+            if (fullEmployee) {
+              setSelectedEmployee(fullEmployee);
+              setFullEmployeeData(fullEmployee);
+              setEmployeeSearchTerm(fullEmployee.name || order.employeeName || '');
+              const positionName = (fullEmployee as any).position?.name || order.role;
+              if (positionName) {
+                setForm(prev => ({
+                  ...prev,
+                  role: positionName
+                }));
+              }
+            }
+          }).catch(err => {
+            console.warn('Erro ao buscar funcionário:', err);
+          });
+        }
+      }
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
       setError('Erro ao carregar dados. Tente novamente.');
@@ -536,11 +610,23 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
                 {/* Número da Ordem */}
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray font-medium">Número da Ordem</Label>
-                  <Input 
-                    value={order ? order.id : `OS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`} 
-                    disabled 
-                    className="bg-seguranca-graphite border-gray-600 text-gray-400 h-11"
-                  />
+                  <div className="flex gap-2">
+                    <Input 
+                      value={orderNumber || generateOrderNumber()} 
+                      onChange={(e) => setOrderNumber(e.target.value)}
+                      placeholder="Ex: OS-2025-0001"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11 flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOrderNumber(generateOrderNumber())}
+                      className="px-3 border-gray-600 text-seguranca-yellow hover:bg-gray-700"
+                      title="Gerar novo número"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Modelo */}
@@ -675,19 +761,28 @@ const EmitirOrdemServicoModal: React.FC<EmitirOrdemServicoModalProps> = ({ open,
                 <Label className="text-seguranca-lightgray font-medium">Valor do Salário</Label>
                 <Input
                   type="text"
-                  placeholder="Digite o valor (ex: 1500,50 ou 1500.50)"
+                  inputMode="decimal"
+                  placeholder="Ex: 1500,50"
                   value={salaryInput}
                   onChange={(e) => handleSalaryChange(e.target.value)}
                   onBlur={() => {
-                    // Formatar ao perder o foco
+                    // Formatar ao perder o foco: garantir 2 casas decimais
                     if (form.salary > 0) {
-                      setSalaryInput(form.salary.toString().replace('.', ','));
+                      const formatted = form.salary.toFixed(2).replace('.', ',');
+                      setSalaryInput(formatted);
+                    } else if (salaryInput && !salaryInput.includes(',')) {
+                      // Se digitou apenas números sem vírgula, adicionar ,00
+                      const numValue = parseFloat(salaryInput.replace(',', '.'));
+                      if (!isNaN(numValue) && numValue > 0) {
+                        setSalaryInput(numValue.toFixed(2).replace('.', ','));
+                        setForm((prev) => ({ ...prev, salary: numValue }));
+                      }
                     }
                   }}
                   className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
                 />
                 <p className="text-xs text-gray-400">
-                  Digite o valor do salário do funcionário
+                  Digite o valor do salário com 2 casas decimais (ex: 1500,50)
                 </p>
               </div>
             </CardContent>

@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { isConnectionError } from '@/utils/connectionError';
 
 export interface OrderOfService {
   id: string;
@@ -157,16 +158,10 @@ export const orderOfServiceService = {
       console.error('❌ Status:', error.response?.status);
       console.error('❌ Data:', error.response?.data);
       console.error('❌ Message:', error.message);
+      console.error('❌ Is Connection Error:', isConnectionError(error));
       
-      // Se o erro for 404 ou 500, retornar array vazio ao invés de fallback
-      // para não confundir o usuário com dados falsos
-      if (error.response?.status === 404 || error.response?.status >= 500) {
-        console.warn('⚠️ Erro do servidor, retornando array vazio');
-        return [];
-      }
-      
-      // Apenas usar fallback se for erro de rede/conexão
-      if (!error.response) {
+      // Verificar se é erro de conexão (backend não disponível)
+      if (isConnectionError(error) || !error.response) {
         console.warn('⚠️ Erro de conexão, usando dados de fallback:', error);
         
         // Aplicar filtros nos dados de fallback
@@ -190,6 +185,19 @@ export const orderOfServiceService = {
         
         console.log('📱 Usando dados de fallback - Ordens de serviço:', filteredData.length);
         return filteredData;
+      }
+      
+      // Se o erro for 404, retornar array vazio (recurso não encontrado)
+      if (error.response?.status === 404) {
+        console.warn('⚠️ Recurso não encontrado (404), retornando array vazio');
+        return [];
+      }
+      
+      // Se o erro for 500 ou outro erro do servidor, retornar array vazio
+      // para não confundir o usuário com dados falsos
+      if (error.response?.status >= 500) {
+        console.warn('⚠️ Erro do servidor, retornando array vazio');
+        return [];
       }
       
       // Para outros erros (400, 401, 403), retornar array vazio

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { OrderOfService } from '@/services/orderOfServiceService';
 import { ordemServicoPDFGenerator } from '@/utils/ordemServicoPDFGenerator';
@@ -22,6 +22,28 @@ const OrdemServicoViewModal: React.FC<OrdemServicoViewModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+
+  // Limpar blob URL quando o componente for desmontado ou o modal fechar
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(pdfBlobUrl);
+      }
+    };
+  }, [pdfBlobUrl]);
+
+  // Limpar quando o modal principal fechar
+  useEffect(() => {
+    if (!open) {
+      if (pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl(null);
+      }
+      setShowPDFViewer(false);
+    }
+  }, [open, pdfBlobUrl]);
 
   if (!orderOfService) return null;
 
@@ -55,12 +77,21 @@ const OrdemServicoViewModal: React.FC<OrdemServicoViewModalProps> = ({
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      // Buscar dados completos para gerar o PDF
-      const [companies, clients, positions] = await Promise.all([
-        companyService.getAllCompanies(),
-        clientService.getAllClients(),
-        positionService.getPositions()
-      ]);
+      // Buscar dados completos para gerar o PDF (com fallback se backend não estiver disponível)
+      let companies: any[] = [];
+      let clients: any[] = [];
+      let positions: any[] = [];
+
+      try {
+        [companies, clients, positions] = await Promise.all([
+          companyService.getAllCompanies().catch(() => []),
+          clientService.getAllClients().catch(() => []),
+          positionService.getPositions().catch(() => [])
+        ]);
+      } catch (error) {
+        console.warn('Erro ao buscar dados adicionais, usando dados da ordem:', error);
+        // Continuar mesmo sem dados adicionais
+      }
 
       const selectedCompany = companies.find(c => c.name === orderOfService.company || c.sigla === orderOfService.company);
       const selectedClient = clients.find(c => c.name === orderOfService.client);
@@ -99,18 +130,21 @@ const OrdemServicoViewModal: React.FC<OrdemServicoViewModalProps> = ({
         }
       };
 
-      // Gerar PDF
-      await ordemServicoPDFGenerator.generatePDF(pdfData);
+      // Gerar PDF e obter blob
+      const pdfBlob = await ordemServicoPDFGenerator.generatePDF(pdfData);
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      setPdfBlobUrl(blobUrl);
+      setShowPDFViewer(true);
       
       toast({
         title: 'Sucesso!',
         description: 'PDF gerado com sucesso.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao gerar PDF:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível gerar o PDF. Tente novamente.',
+        description: error.message || 'Não foi possível gerar o PDF. Tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -232,7 +266,72 @@ const OrdemServicoViewModal: React.FC<OrdemServicoViewModalProps> = ({
                         size="sm"
                         variant="outline"
                         className="text-seguranca-yellow border-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0"
-                        onClick={() => window.open(orderOfService.documentUrl, '_blank')}
+                        onClick={async () => {
+                          try {
+                            const docUrl = orderOfService.documentUrl;
+                            
+                            // Verificar se é uma URL de exemplo/teste
+                            if (docUrl?.includes('example.com') || docUrl?.includes('localhost') === false && !docUrl?.startsWith('blob:') && !docUrl?.startsWith('http://localhost') && !docUrl?.startsWith('https://')) {
+                              toast({
+                                title: 'PDF não disponível',
+                                description: 'O PDF ainda não foi gerado. Clique em "Gerar PDF" para criar o documento.',
+                                variant: 'default',
+                              });
+                              return;
+                            }
+
+                            // Se for uma URL de blob, usar diretamente
+                            if (docUrl?.startsWith('blob:')) {
+                              setPdfBlobUrl(docUrl);
+                              setShowPDFViewer(true);
+                            } else if (docUrl?.startsWith('http://localhost') || docUrl?.startsWith('https://')) {
+                              // Se for uma URL HTTP local, fazer fetch e criar blob
+                              try {
+                                const response = await fetch(docUrl, {
+                                  method: 'GET',
+                                  headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                                  }
+                                });
+                                
+                                if (!response.ok) {
+                                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                }
+                                
+                                const blob = await response.blob();
+                                
+                                // Verificar se é realmente um PDF
+                                if (!blob.type.includes('pdf') && blob.size === 0) {
+                                  throw new Error('Arquivo não é um PDF válido');
+                                }
+                                
+                                const blobUrl = URL.createObjectURL(blob);
+                                setPdfBlobUrl(blobUrl);
+                                setShowPDFViewer(true);
+                              } catch (fetchError: any) {
+                                console.error('Erro ao buscar PDF:', fetchError);
+                                toast({
+                                  title: 'Erro ao carregar PDF',
+                                  description: 'Não foi possível carregar o PDF. Tente gerar um novo usando o botão "Gerar PDF".',
+                                  variant: 'destructive',
+                                });
+                              }
+                            } else {
+                              toast({
+                                title: 'PDF não disponível',
+                                description: 'URL do PDF inválida. Tente gerar um novo PDF.',
+                                variant: 'default',
+                              });
+                            }
+                          } catch (error) {
+                            console.error('Erro ao carregar PDF:', error);
+                            toast({
+                              title: 'Erro',
+                              description: 'Não foi possível carregar o PDF. Tente gerar um novo.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
                       >
                         <Eye size={14} className="sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                         Visualizar
@@ -241,11 +340,67 @@ const OrdemServicoViewModal: React.FC<OrdemServicoViewModalProps> = ({
                         size="sm"
                         variant="outline"
                         className="text-seguranca-yellow border-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = orderOfService.documentUrl!;
-                          link.download = `OS_${orderOfService.employeeName}_${orderOfService.id}.pdf`;
-                          link.click();
+                        onClick={async () => {
+                          try {
+                            const docUrl = orderOfService.documentUrl;
+                            
+                            // Verificar se é uma URL de exemplo/teste
+                            if (docUrl?.includes('example.com')) {
+                              toast({
+                                title: 'PDF não disponível',
+                                description: 'O PDF ainda não foi gerado. Clique em "Gerar PDF" para criar o documento.',
+                                variant: 'default',
+                              });
+                              return;
+                            }
+
+                            let blob: Blob;
+                            let url: string;
+                            
+                            if (docUrl?.startsWith('blob:')) {
+                              // Se for blob URL, fazer fetch
+                              const response = await fetch(docUrl);
+                              blob = await response.blob();
+                              url = URL.createObjectURL(blob);
+                            } else if (docUrl?.startsWith('http://localhost') || docUrl?.startsWith('https://')) {
+                              // Se for HTTP URL, fazer fetch com autenticação
+                              const token = localStorage.getItem('token') || '';
+                              const response = await fetch(docUrl, {
+                                headers: {
+                                  'Authorization': `Bearer ${token}`
+                                }
+                              });
+                              
+                              if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                              }
+                              
+                              blob = await response.blob();
+                              url = URL.createObjectURL(blob);
+                            } else {
+                              toast({
+                                title: 'Erro',
+                                description: 'URL do PDF inválida.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `OS_${orderOfService.employeeName}_${orderOfService.id}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch (error: any) {
+                            console.error('Erro ao fazer download:', error);
+                            toast({
+                              title: 'Erro',
+                              description: error.message || 'Não foi possível fazer o download do PDF.',
+                              variant: 'destructive',
+                            });
+                          }
                         }}
                       >
                         <Download size={14} className="sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -292,6 +447,40 @@ const OrdemServicoViewModal: React.FC<OrdemServicoViewModalProps> = ({
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal para visualizar PDF */}
+      <Dialog open={showPDFViewer} onOpenChange={(open) => {
+        setShowPDFViewer(open);
+        if (!open && pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(pdfBlobUrl);
+          setPdfBlobUrl(null);
+        }
+      }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden bg-seguranca-graphite border-gray-600 p-0">
+          <DialogHeader className="p-4 sm:p-6 border-b border-gray-700 bg-seguranca-black/30">
+            <DialogTitle className="text-seguranca-lightgray text-lg sm:text-xl flex items-center gap-2">
+              <FileText className="h-5 w-5 text-seguranca-yellow" />
+              Visualizar PDF - Ordem de Serviço
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm mt-2">
+              Visualização do documento da ordem de serviço de {orderOfService?.employeeName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="w-full h-[calc(90vh-120px)] p-4 sm:p-6">
+            {pdfBlobUrl ? (
+              <iframe
+                src={pdfBlobUrl}
+                className="w-full h-full border border-gray-600 rounded-md"
+                title="Visualização do PDF"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };

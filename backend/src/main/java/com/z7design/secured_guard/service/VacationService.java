@@ -99,7 +99,11 @@ public class VacationService {
     }
     
     public List<Vacation> findAll() {
-        return vacationRepository.findAll();
+        return vacationRepository.findAllWithEmployee();
+    }
+    
+    public List<Vacation> findByStatus(VacationStatus status) {
+        return vacationRepository.findByStatusWithEmployee(status);
     }
     
     private void validateVacationDates(Vacation vacation) {

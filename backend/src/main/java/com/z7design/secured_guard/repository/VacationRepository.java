@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.z7design.secured_guard.model.Vacation;
@@ -17,4 +18,10 @@ public interface VacationRepository extends JpaRepository<Vacation, UUID> {
     List<Vacation> findByStartDateBetween(LocalDate startDate, LocalDate endDate);
     List<Vacation> findByStatus(VacationStatus status);
     long countByStatus(VacationStatus status);
+    
+    @Query("SELECT v FROM Vacation v LEFT JOIN FETCH v.employee LEFT JOIN FETCH v.approvedBy")
+    List<Vacation> findAllWithEmployee();
+    
+    @Query("SELECT v FROM Vacation v LEFT JOIN FETCH v.employee LEFT JOIN FETCH v.approvedBy WHERE v.status = :status")
+    List<Vacation> findByStatusWithEmployee(VacationStatus status);
 } 

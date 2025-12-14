@@ -3,6 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { orderOfServiceService } from '@/services/orderOfServiceService';
 import { OrderOfService } from '@/types/orderOfService';
+import { ordemServicoPDFGenerator } from '@/utils/ordemServicoPDFGenerator';
+import { companyService } from '@/services/companyService';
+import { clientService } from '@/services/clientService';
+import { positionService } from '@/services/positionService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Plus, FileText, Eye, Filter, RefreshCw, Download, Search, Edit, Trash2 } from 'lucide-react';
@@ -100,28 +104,201 @@ const OrdemServicoPage: React.FC = () => {
 
   const handleDownloadPDF = async (order: OrderOfService) => {
     try {
-      if (order.documentUrl) {
-        // Se já existe um PDF, fazer download
-        window.open(order.documentUrl, '_blank');
+      const docUrl = order.documentUrl;
+      
+      // Verificar se é uma URL de exemplo/teste
+      if (docUrl?.includes('example.com')) {
+        toast({
+          title: 'PDF não disponível',
+          description: 'O PDF ainda não foi gerado. Gerando agora...',
+          variant: 'default',
+        });
+        // Gerar PDF
+        await generateAndDownloadPDF(order);
+        return;
+      }
+
+      // Se for uma URL de blob, fazer download diretamente
+      if (docUrl?.startsWith('blob:')) {
+        try {
+          const response = await fetch(docUrl);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `OS_${order.employeeName}_${order.id}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          toast({
+            title: 'Sucesso',
+            description: 'PDF baixado com sucesso.',
+          });
+        } catch (error) {
+          console.error('Erro ao fazer download do blob:', error);
+          // Se falhar, tentar gerar novo PDF
+          await generateAndDownloadPDF(order);
+        }
+      } else if (docUrl?.startsWith('http://localhost') || docUrl?.startsWith('https://')) {
+        // Se for uma URL HTTP, fazer fetch com autenticação
+        try {
+          const token = localStorage.getItem('token') || '';
+          const response = await fetch(docUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            if (response.status === 404) {
+              // PDF não encontrado, gerar novo
+              toast({
+                title: 'PDF não encontrado',
+                description: 'Gerando novo PDF...',
+                variant: 'default',
+              });
+              await generateAndDownloadPDF(order);
+              return;
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const blob = await response.blob();
+          
+          // Verificar se é realmente um PDF
+          if (!blob.type.includes('pdf') && blob.size === 0) {
+            throw new Error('Arquivo não é um PDF válido');
+          }
+          
+          const url = URL.createObjectURL(blob);
+          
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `OS_${order.employeeName}_${order.id}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          toast({
+            title: 'Sucesso',
+            description: 'PDF baixado com sucesso.',
+          });
+        } catch (fetchError: any) {
+          console.error('Erro ao buscar PDF:', fetchError);
+          // Se falhar, tentar gerar novo PDF
+          await generateAndDownloadPDF(order);
+        }
       } else {
-        // Gerar PDF se não existir
+        // URL inválida ou não existe, gerar PDF
         toast({
           title: 'Gerando PDF',
-          description: 'O PDF será gerado em breve...',
+          description: 'O PDF será gerado agora...',
         });
-        // Aqui você pode chamar uma função para gerar o PDF
+        await generateAndDownloadPDF(order);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao fazer download do PDF:', error);
       toast({
         title: 'Erro',
-        description: 'Erro ao fazer download do PDF.',
+        description: error.message || 'Erro ao fazer download do PDF. Tente gerar um novo PDF.',
         variant: 'destructive',
       });
     }
   };
 
-  const { data, isLoading, refetch } = useQuery<OrderOfService[]>({
+  const generateAndDownloadPDF = async (order: OrderOfService) => {
+    try {
+      // Buscar dados completos para gerar o PDF
+      let companies: any[] = [];
+      let clients: any[] = [];
+      let positions: any[] = [];
+
+      try {
+        [companies, clients, positions] = await Promise.all([
+          companyService.getAllCompanies().catch(() => []),
+          clientService.getAllClients().catch(() => []),
+          positionService.getPositions().catch(() => [])
+        ]);
+      } catch (error) {
+        console.warn('Erro ao buscar dados adicionais, usando dados da ordem:', error);
+      }
+
+      const selectedCompany = companies.find(c => c.name === order.company || c.sigla === order.company);
+      const selectedClient = clients.find(c => c.name === order.client);
+      const selectedPosition = positions.find(p => p.name === order.role || p.description === order.role);
+
+      // Preparar dados para o PDF
+      const pdfData = {
+        ordem: {
+          numero: order.id?.toString() || Date.now().toString(),
+          dataInicio: order.startDate,
+          dataFim: order.endDate || '',
+          observacoes: '',
+          modelo: 'CSN',
+          status: order.signed ? 'ASSINADA' : 'PENDENTE'
+        },
+        funcionario: {
+          name: order.employeeName,
+          document: order.employeeCpf,
+          position: selectedPosition ? { name: selectedPosition.name || selectedPosition.description || order.role } : undefined,
+          unit: undefined
+        },
+        cliente: {
+          name: order.client,
+          document: selectedClient?.cnpj || ''
+        },
+        empresa: {
+          name: order.company,
+          document: selectedCompany?.cnpj || ''
+        },
+        unidade: {
+          name: order.workplace,
+          code: ''
+        },
+        cargo: {
+          name: order.role
+        }
+      };
+
+      // Gerar PDF
+      const pdfBlob = await ordemServicoPDFGenerator.generatePDF(pdfData);
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      
+      // Fazer download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `OS_${order.employeeName}_${order.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      
+      // Salvar URL do documento no banco de dados
+      if (order.id) {
+        try {
+          await orderOfServiceService.updateDocumentUrl(order.id, blobUrl);
+          console.log('✅ URL do PDF salva no banco de dados');
+        } catch (error) {
+          console.warn('⚠️ Não foi possível salvar a URL do PDF no banco:', error);
+        }
+      }
+      
+      toast({
+        title: 'Sucesso',
+        description: 'PDF gerado e baixado com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF:', error);
+      throw new Error(error.message || 'Não foi possível gerar o PDF.');
+    }
+  };
+
+  const { data, isLoading, refetch, isError, error } = useQuery<OrderOfService[]>({
     queryKey: ['orders-of-service', employeeId],
     queryFn: async () => {
       console.log('🔍 Buscando ordens de serviço...', { employeeId });
@@ -135,16 +312,91 @@ const OrdemServicoPage: React.FC = () => {
           result = await orderOfServiceService.getOrders();
         }
         console.log('✅ Ordens retornadas:', result?.length || 0, result);
+        
+        // Verificar se são dados de fallback (IDs '1', '2', '3')
+        const isFallbackData = result && result.length > 0 && result.some(order => 
+          order.id === '1' || order.id === '2' || order.id === '3'
+        );
+        
+        if (isFallbackData) {
+          console.warn('⚠️ Detectados dados de fallback. Backend pode não estar disponível.');
+          // Retornar array vazio para forçar nova tentativa
+          return [];
+        }
+        
         return result || [];
       } catch (error) {
         console.error('❌ Erro ao buscar ordens:', error);
+        // Se for erro de conexão, retornar array vazio para que o React Query tente novamente
         return [];
       }
     },
     enabled: true, // Sempre habilitado para buscar todas as ordens
     refetchOnWindowFocus: true, // Recarregar quando a janela receber foco
-    refetchOnMount: true, // Recarregar quando o componente montar
+    refetchOnMount: 'always', // Sempre recarregar quando o componente montar (ignora cache)
+    retry: (failureCount, error) => {
+      // Tentar indefinidamente se for erro de conexão
+      const isConnectionError = error && (
+        (error as any)?.isConnectionError === true ||
+        (error as any)?.code === 'ERR_CONNECTION_REFUSED' ||
+        (error as any)?.code === 'ECONNREFUSED' ||
+        (error as any)?.message?.includes('Backend não está disponível')
+      );
+      
+      if (isConnectionError) {
+        // Tentar até 10 vezes com intervalo crescente
+        return failureCount < 10;
+      }
+      // Para outros erros, tentar apenas 3 vezes
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Backoff exponencial
+    staleTime: 0, // Dados sempre considerados stale para forçar refetch
+    gcTime: 5 * 60 * 1000, // Manter cache por 5 minutos
+    refetchInterval: (query) => {
+      // Se houver erro de conexão, tentar refazer a cada 5 segundos
+      const isConnectionError = query.state.error && (
+        (query.state.error as any)?.isConnectionError === true ||
+        (query.state.error as any)?.code === 'ERR_CONNECTION_REFUSED' ||
+        (query.state.error as any)?.code === 'ECONNREFUSED' ||
+        (query.state.error as any)?.message?.includes('Backend não está disponível')
+      );
+      
+      if (isConnectionError) {
+        return 5000; // Tentar a cada 5 segundos quando backend não está disponível
+      }
+      return false; // Não fazer polling quando tudo está OK
+    },
   });
+
+  // Efeito para detectar quando o backend volta e limpar cache de fallback
+  useEffect(() => {
+    if (isError && error) {
+      const isConnectionError = (error as any)?.isConnectionError === true ||
+        (error as any)?.code === 'ERR_CONNECTION_REFUSED' ||
+        (error as any)?.code === 'ECONNREFUSED' ||
+        (error as any)?.message?.includes('Backend não está disponível');
+      
+      if (isConnectionError) {
+        console.log('⚠️ Backend não está disponível. Tentando reconectar...');
+      }
+    } else if (!isError && data) {
+      // Se não há erro e há dados, verificar se são dados de fallback
+      // Dados de fallback têm IDs específicos ('1', '2', '3')
+      const isFallbackData = data.length > 0 && data.some(order => 
+        order.id === '1' || order.id === '2' || order.id === '3'
+      );
+      
+      if (isFallbackData) {
+        console.log('⚠️ Detectados dados de fallback. Tentando buscar do backend...');
+        // Invalidar cache e tentar buscar novamente
+        queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
+        refetch();
+      } else {
+        console.log('✅ Backend está disponível. Dados carregados:', data.length);
+      }
+    }
+  }, [isError, error, data, queryClient, refetch]);
 
   const clearFilters = () => {
     setEmployeeId('');
@@ -153,10 +405,21 @@ const OrdemServicoPage: React.FC = () => {
   const handleRefresh = async () => {
     console.log('🔄 Atualizando lista manualmente...');
     try {
+      // Invalidar cache antes de refetch para garantir busca fresca
+      queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
       await refetch();
       console.log('✅ Lista atualizada');
+      toast({
+        title: 'Sucesso',
+        description: 'Lista atualizada com sucesso.',
+      });
     } catch (error) {
       console.error('❌ Erro ao atualizar lista:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar a lista. Verifique se o backend está rodando.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -173,7 +436,7 @@ const OrdemServicoPage: React.FC = () => {
             <Button 
               variant="outline" 
               className="border-gray-600 text-seguranca-lightgray hover:bg-gray-600"
-              onClick={() => refetch()}
+              onClick={handleRefresh}
               disabled={isLoading}
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />

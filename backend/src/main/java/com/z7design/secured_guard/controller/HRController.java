@@ -97,7 +97,7 @@ public class HRController {
         // Se status foi fornecido, filtrar por status
         if (status != null && !status.isEmpty()) {
             // Mapear 'PLANNED' do frontend para 'PENDING' do backend
-            VacationStatus vacationStatus;
+            VacationStatus vacationStatus = null;
             try {
                 if ("PLANNED".equalsIgnoreCase(status)) {
                     vacationStatus = VacationStatus.PENDING;
@@ -109,10 +109,10 @@ public class HRController {
                 vacationStatus = null;
             }
             
-            if (vacationStatus != null) {
-                // Filtrar por status
-                vacations = vacationService.findAll().stream()
-                    .filter(v -> v.getStatus() == vacationStatus)
+            final VacationStatus finalStatus = vacationStatus;
+            if (finalStatus != null) {
+                // Filtrar por status usando método otimizado
+                vacations = vacationService.findByStatus(finalStatus).stream()
                     .map(VacationDTO::fromEntity)
                     .collect(Collectors.toList());
             } else {
