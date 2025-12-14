@@ -4,7 +4,7 @@
 -- Remover a tabela antiga se existir
 DROP TABLE IF EXISTS visit_controls CASCADE;
 
--- Criar tabela de controle de visitas com estrutura correta
+-- Criar tabela de controle de visitas com estrutura correta sem foreign keys inicialmente
 CREATE TABLE visit_controls (
     id UUID PRIMARY KEY,
     location VARCHAR(255) NOT NULL,
@@ -22,11 +22,69 @@ CREATE TABLE visit_controls (
     is_successful BOOLEAN NOT NULL DEFAULT FALSE,
     created_by UUID,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (supervisor_id) REFERENCES employees(id),
-    FOREIGN KEY (work_post_id) REFERENCES work_posts(id),
-    FOREIGN KEY (created_by) REFERENCES users(id)
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Adicionar foreign keys apenas se as tabelas referenciadas existirem e tiverem PRIMARY KEY
+DO $$
+BEGIN
+    -- Adicionar foreign key para employees se existir e tiver PRIMARY KEY
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE table_name = 'employees' 
+        AND constraint_type = 'PRIMARY KEY'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'visit_controls' 
+            AND constraint_name = 'fk_visit_controls_supervisor'
+        ) THEN
+            ALTER TABLE visit_controls
+            ADD CONSTRAINT fk_visit_controls_supervisor
+            FOREIGN KEY (supervisor_id) REFERENCES employees(id);
+        END IF;
+    END IF;
+
+    -- Adicionar foreign key para work_posts se existir e tiver PRIMARY KEY
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE table_name = 'work_posts' 
+        AND constraint_type = 'PRIMARY KEY'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'visit_controls' 
+            AND constraint_name = 'fk_visit_controls_work_post'
+        ) THEN
+            ALTER TABLE visit_controls
+            ADD CONSTRAINT fk_visit_controls_work_post
+            FOREIGN KEY (work_post_id) REFERENCES work_posts(id);
+        END IF;
+    END IF;
+
+    -- Adicionar foreign key para users se existir e tiver PRIMARY KEY
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE table_name = 'users' 
+        AND constraint_type = 'PRIMARY KEY'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'visit_controls' 
+            AND constraint_name = 'fk_visit_controls_created_by'
+        ) THEN
+            ALTER TABLE visit_controls
+            ADD CONSTRAINT fk_visit_controls_created_by
+            FOREIGN KEY (created_by) REFERENCES users(id);
+        END IF;
+    END IF;
+END $$;
 
 -- Criar índices para melhorar performance
 CREATE INDEX IF NOT EXISTS idx_visit_controls_visit_date ON visit_controls(visit_date);
