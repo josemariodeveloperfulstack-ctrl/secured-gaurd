@@ -13,7 +13,7 @@
 -- =====================================================
 INSERT INTO users (id, username, password, email, name, status, active, created_at, updated_at)
 SELECT 
-    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-1111-1111-111111111111'::uuid,
     'admin@ci',
     '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa',
     'admin@ci.z7botsolutions.com.br',
@@ -23,20 +23,20 @@ SELECT
     NOW(),
     NOW()
 WHERE NOT EXISTS (
-    SELECT 1 FROM users WHERE id = '11111111-1111-1111-1111-111111111111'
+    SELECT 1 FROM users WHERE id = '11111111-1111-1111-1111-111111111111'::uuid
 );
 
 -- Atribuir role ADMIN ao usuário admin@ci
 INSERT INTO user_roles (user_id, role_id, created_at)
 SELECT 
-    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-1111-1111-111111111111'::uuid,
     r.id,
     NOW()
 FROM roles r
 WHERE r.name = 'ADMIN'
   AND NOT EXISTS (
       SELECT 1 FROM user_roles ur 
-      WHERE ur.user_id = '11111111-1111-1111-1111-111111111111' 
+      WHERE ur.user_id = '11111111-1111-1111-1111-111111111111'::uuid 
         AND ur.role_id = r.id
   );
 
@@ -45,7 +45,7 @@ WHERE r.name = 'ADMIN'
 -- =====================================================
 INSERT INTO units (id, name, description, address, phone, email, created_at, updated_at)
 SELECT 
-    '22222222-2222-2222-2222-222222222222',
+    '22222222-2222-2222-2222-222222222222'::uuid,
     'Unidade Matriz CI',
     'Unidade matriz para ambiente de CI',
     'Rua CI, 123 - São Paulo, SP',
@@ -54,34 +54,34 @@ SELECT
     NOW(),
     NOW()
 WHERE NOT EXISTS (
-    SELECT 1 FROM units WHERE id = '22222222-2222-2222-2222-222222222222'
+    SELECT 1 FROM units WHERE id = '22222222-2222-2222-2222-222222222222'::uuid
 );
 
 -- =====================================================
 -- 3. TURNOS PADRÃO
 -- =====================================================
 INSERT INTO shifts (id, name, start_time, end_time, created_at, updated_at)
-SELECT '33333333-3333-3333-3333-333333333333', 'Manhã', '08:00:00', '16:00:00', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '33333333-3333-3333-3333-333333333333')
+SELECT '33333333-3333-3333-3333-333333333333'::uuid, 'Manhã', '08:00:00', '16:00:00', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '33333333-3333-3333-3333-333333333333'::uuid)
 UNION ALL
-SELECT '44444444-4444-4444-4444-444444444444', 'Tarde', '16:00:00', '00:00:00', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '44444444-4444-4444-4444-444444444444')
+SELECT '44444444-4444-4444-4444-444444444444'::uuid, 'Tarde', '16:00:00', '00:00:00', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '44444444-4444-4444-4444-444444444444'::uuid)
 UNION ALL
-SELECT '55555555-5555-5555-5555-555555555555', 'Noite', '00:00:00', '08:00:00', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '55555555-5555-5555-5555-555555555555');
+SELECT '55555555-5555-5555-5555-555555555555'::uuid, 'Noite', '00:00:00', '08:00:00', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '55555555-5555-5555-5555-555555555555'::uuid);
 
 -- =====================================================
 -- 4. CARGOS/POSIÇÕES BÁSICAS
 -- =====================================================
 INSERT INTO positions (id, name, description, unit_id, created_at, updated_at)
-SELECT '66666666-6666-6666-6666-666666666666', 'Vigilante', 'Vigilante de segurança', '22222222-2222-2222-2222-222222222222', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '66666666-6666-6666-6666-666666666666')
+SELECT '66666666-6666-6666-6666-666666666666'::uuid, 'Vigilante', 'Vigilante de segurança', '22222222-2222-2222-2222-222222222222'::uuid, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '66666666-6666-6666-6666-666666666666'::uuid)
 UNION ALL
-SELECT '77777777-7777-7777-7777-777777777777', 'Supervisor', 'Supervisor de segurança', '22222222-2222-2222-2222-222222222222', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '77777777-7777-7777-7777-777777777777')
+SELECT '77777777-7777-7777-7777-777777777777'::uuid, 'Supervisor', 'Supervisor de segurança', '22222222-2222-2222-2222-222222222222'::uuid, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '77777777-7777-7777-7777-777777777777'::uuid)
 UNION ALL
-SELECT '88888888-8888-8888-8888-888888888888', 'Gerente', 'Gerente de segurança', '22222222-2222-2222-2222-222222222222', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '88888888-8888-8888-8888-888888888888');
+SELECT '88888888-8888-8888-8888-888888888888'::uuid, 'Gerente', 'Gerente de segurança', '22222222-2222-2222-2222-222222222222'::uuid, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM positions WHERE id = '88888888-8888-8888-8888-888888888888'::uuid);
 
 -- =====================================================
 -- 5. DEPARTAMENTO BÁSICO
@@ -113,7 +113,7 @@ END $$;
 -- =====================================================
 INSERT INTO clients (id, name, cnpj, email, phone, address, city, state, zip_code, status, created_at, updated_at)
 SELECT 
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid,
     'Cliente Teste CI',
     '12.345.678/0001-90',
     'cliente@teste.ci',
@@ -134,7 +134,7 @@ WHERE NOT EXISTS (
 -- =====================================================
 INSERT INTO companies (id, name, trade_name, cnpj, email, phone, address, city, state, zip_code, status, type, sector, size, created_by, created_at, updated_at)
 SELECT 
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     'Empresa Teste CI',
     'Empresa Teste CI Ltda',
     '98.765.432/0001-10',
@@ -148,7 +148,7 @@ SELECT
     'LTDA',
     'Segurança',
     'Média',
-    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-1111-1111-111111111111'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (
@@ -235,9 +235,9 @@ INSERT INTO employees (
     created_at, updated_at
 )
 SELECT 
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    '11111111-1111-1111-1111-111111111111',
-    '66666666-6666-6666-6666-666666666666',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    '66666666-6666-6666-6666-666666666666'::uuid,
     'FUNC001',
     'João Silva',
     '123.456.789-00',
@@ -250,8 +250,8 @@ SELECT
     'Rua Funcionário, 789 - São Paulo, SP',
     '(11) 98765-4321',
     'joao.silva@teste.ci',
-    '22222222-2222-2222-2222-222222222222',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '22222222-2222-2222-2222-222222222222'::uuid,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     '2024-01-01',
     NULL,
     'ACTIVE',
@@ -283,7 +283,7 @@ SELECT
     'Ensino Médio Completo',
     NOW(),
     NOW()
-WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'cccccccc-cccc-cccc-cccc-cccccccccccc');
+WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid);
 
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
@@ -299,9 +299,9 @@ INSERT INTO employees (
     created_at, updated_at
 )
 SELECT 
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'::uuid,
     NULL,
-    '77777777-7777-7777-7777-777777777777',
+    '77777777-7777-7777-7777-777777777777'::uuid,
     'FUNC002',
     'Maria Santos',
     '987.654.321-00',
@@ -314,8 +314,8 @@ SELECT
     'Av. Funcionária, 321 - São Paulo, SP',
     '(11) 91234-5678',
     'maria.santos@teste.ci',
-    '22222222-2222-2222-2222-222222222222',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '22222222-2222-2222-2222-222222222222'::uuid,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     '2024-02-01',
     NULL,
     'ACTIVE',
@@ -347,7 +347,7 @@ SELECT
     'Ensino Superior Completo',
     NOW(),
     NOW()
-WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'dddddddd-dddd-dddd-dddd-dddddddddddd');
+WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'dddddddd-dddd-dddd-dddd-dddddddddddd'::uuid);
 
 -- =====================================================
 -- 9. FROTA - VEÍCULOS DE TESTE
@@ -355,7 +355,7 @@ WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'dddddddd-dddd-dddd-dddd-dd
 -- Usar subquery para buscar o ID do departamento "Operacional"
 INSERT INTO vehicles (id, plate, model, brand, year, color, status, fuel_type, capacity, current_mileage, department_id, company_id, created_at, updated_at)
 SELECT 
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'::uuid,
     'ABC1234',
     'Civic',
     'Honda',
@@ -366,13 +366,13 @@ SELECT
     5,
     45000,
     (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE plate = 'ABC1234')
 UNION ALL
 SELECT 
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
     'DEF5678',
     'Corolla',
     'Toyota',
@@ -383,13 +383,13 @@ SELECT
     5,
     38000,
     (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE plate = 'DEF5678')
 UNION ALL
 SELECT 
-    '11111111-1111-1111-1111-111111111112',
+    '11111111-1111-1111-1111-111111111112'::uuid,
     'GHI9012',
     'Hilux',
     'Toyota',
@@ -400,7 +400,7 @@ SELECT
     5,
     25000,
     (SELECT id FROM departments WHERE name = 'Operacional' LIMIT 1),
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (SELECT 1 FROM vehicles WHERE plate = 'GHI9012');
