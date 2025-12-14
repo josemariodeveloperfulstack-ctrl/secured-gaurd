@@ -1,6 +1,45 @@
 import api from '@/lib/axios';
 import { Unit } from '@/types/visit';
 
+// Tipos para requisições
+export interface CreateUnitRequest {
+  name: string;
+  description?: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  code?: string;
+  manager?: string;
+  parentId?: string;
+  clientId?: number;
+}
+
+export interface UpdateUnitRequest {
+  name?: string;
+  description?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  code?: string;
+  manager?: string;
+  parentId?: string;
+  clientId?: number;
+}
+
+export interface DeleteCheckResponse {
+  canDelete: boolean;
+  unitName?: string;
+  dependenciesCount?: number;
+  dependencies?: {
+    positions?: number;
+    employees?: number;
+    payrolls?: number;
+    locations?: number;
+    children?: number;
+  };
+  message?: string;
+}
+
 export const unitService = {
   // Buscar todas as unidades
   async getAllUnits(): Promise<Unit[]> {
@@ -27,7 +66,7 @@ export const unitService = {
   // Buscar unidade por ID
   async getUnitById(id: string): Promise<Unit> {
     try {
-      const response = await api.get(`/units/${id}`);
+      const response = await api.get(`/api/units/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar unidade:', error);
@@ -38,7 +77,7 @@ export const unitService = {
   // Buscar unidades por cliente
   async getUnitsByClient(clientId: string): Promise<Unit[]> {
     try {
-      const response = await api.get(`/units/client/${clientId}`);
+      const response = await api.get(`/api/units/client/${clientId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar unidades do cliente:', error);
@@ -47,9 +86,9 @@ export const unitService = {
   },
 
   // Criar nova unidade
-  async createUnit(unitData: Partial<Unit>): Promise<Unit> {
+  async createUnit(unitData: CreateUnitRequest): Promise<Unit> {
     try {
-      const response = await api.post('/units', unitData);
+      const response = await api.post('/api/units', unitData);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao criar unidade:', error);
@@ -61,9 +100,9 @@ export const unitService = {
   },
 
   // Atualizar unidade
-  async updateUnit(id: string, unitData: Partial<Unit>): Promise<Unit> {
+  async updateUnit(id: string, unitData: UpdateUnitRequest): Promise<Unit> {
     try {
-      const response = await api.put(`/units/${id}`, unitData);
+      const response = await api.put(`/api/units/${id}`, unitData);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao atualizar unidade:', error);
@@ -77,10 +116,49 @@ export const unitService = {
   // Excluir unidade
   async deleteUnit(id: string): Promise<void> {
     try {
-      await api.delete(`/units/${id}`);
-    } catch (error) {
+      await api.delete(`/api/units/${id}`);
+    } catch (error: any) {
       console.error('Erro ao excluir unidade:', error);
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
       throw new Error('Falha ao excluir unidade');
+    }
+  },
+
+  // Excluir unidade com dependências
+  async deleteUnitWithDependencies(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/units/${id}/with-dependencies`);
+    } catch (error: any) {
+      console.error('Erro ao excluir unidade com dependências:', error);
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error('Falha ao excluir unidade com dependências');
+    }
+  },
+
+  // Verificar possibilidade de exclusão
+  async checkDeletePossibility(id: string): Promise<DeleteCheckResponse> {
+    try {
+      const response = await api.get(`/api/units/${id}/can-delete`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao verificar possibilidade de exclusão:', error);
+      // Fallback se endpoint não existir
+      if (error.response?.status === 404) {
+        return {
+          canDelete: true,
+          dependenciesCount: 0,
+          dependencies: {},
+          message: 'Unidade pode ser excluída'
+        };
+      }
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error('Falha ao verificar possibilidade de exclusão');
     }
   },
 

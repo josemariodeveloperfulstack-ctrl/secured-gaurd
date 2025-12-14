@@ -1,8 +1,11 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.EmployeeDTO;
+import com.z7design.secured_guard.dto.VacationDTO;
+import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.service.HRService;
+import com.z7design.secured_guard.service.VacationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/hr")
@@ -20,6 +24,7 @@ public class HRController {
     
     private final EmployeeService employeeService;
     private final HRService hrService;
+    private final VacationService vacationService;
     
     @GetMapping("/employees/probation-expiring")
     @Operation(summary = "Buscar funcionários com experiência vencendo", 
@@ -76,5 +81,54 @@ public class HRController {
     public ResponseEntity<List<EmployeeDTO>> getEmployeesByPosition(@PathVariable String positionId) {
         List<EmployeeDTO> employees = hrService.getEmployeesByPosition(positionId);
         return ResponseEntity.ok(employees);
+    }
+    
+    @GetMapping("/vacations")
+    @Operation(summary = "Buscar férias", 
+               description = "Retorna lista de férias com filtros opcionais (status, employeeId, dateFrom, dateTo)")
+    public ResponseEntity<List<VacationDTO>> getVacations(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String employeeId,
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo) {
+        
+        List<VacationDTO> vacations;
+        
+        // Se status foi fornecido, filtrar por status
+        if (status != null && !status.isEmpty()) {
+            // Mapear 'PLANNED' do frontend para 'PENDING' do backend
+            VacationStatus vacationStatus;
+            try {
+                if ("PLANNED".equalsIgnoreCase(status)) {
+                    vacationStatus = VacationStatus.PENDING;
+                } else {
+                    vacationStatus = VacationStatus.valueOf(status.toUpperCase());
+                }
+            } catch (IllegalArgumentException e) {
+                // Se status inválido, retornar todas as férias
+                vacationStatus = null;
+            }
+            
+            if (vacationStatus != null) {
+                // Filtrar por status
+                vacations = vacationService.findAll().stream()
+                    .filter(v -> v.getStatus() == vacationStatus)
+                    .map(VacationDTO::fromEntity)
+                    .collect(Collectors.toList());
+            } else {
+                vacations = vacationService.findAll().stream()
+                    .map(VacationDTO::fromEntity)
+                    .collect(Collectors.toList());
+            }
+        } else {
+            // Retornar todas as férias
+            vacations = vacationService.findAll().stream()
+                .map(VacationDTO::fromEntity)
+                .collect(Collectors.toList());
+        }
+        
+        // TODO: Implementar filtros adicionais (employeeId, dateFrom, dateTo) se necessário
+        
+        return ResponseEntity.ok(vacations);
     }
 } 

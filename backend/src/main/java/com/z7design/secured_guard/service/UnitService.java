@@ -3,6 +3,8 @@ package com.z7design.secured_guard.service;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -22,8 +24,14 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.model.Unit;
 import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.Position;
+import com.z7design.secured_guard.model.Payroll;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.PositionRepository;
+import com.z7design.secured_guard.repository.PayrollRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +44,9 @@ public class UnitService {
     
     private final UnitRepository unitRepository;
     private final ClientRepository clientRepository;
+    private final EmployeeRepository employeeRepository;
+    private final PositionRepository positionRepository;
+    private final PayrollRepository payrollRepository;
     
     // Métodos de busca com paginação
     @Cacheable("units")
@@ -223,6 +234,81 @@ public class UnitService {
         
         unitRepository.delete(unit);
         log.info("Unidade deletada com sucesso: {}", unit.getName());
+    }
+    
+    /**
+     * Verifica se uma unidade pode ser excluída verificando suas dependências
+     */
+    public Map<String, Object> checkDeletePossibility(UUID id) {
+        Unit unit = unitRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + id));
+        
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Long> dependencies = new HashMap<>();
+        
+        // Verificar funcionários vinculados
+        long employeesCount = employeeRepository.findByUnitId(id).size();
+        dependencies.put("employees", employeesCount);
+        
+        // Verificar cargos vinculados
+        long positionsCount = 0;
+        try {
+            positionsCount = positionRepository.findAll().stream()
+                    .filter(p -> p.getUnit() != null && p.getUnit().getId().equals(id))
+                    .count();
+        } catch (Exception e) {
+            log.debug("Erro ao verificar cargos: {}", e.getMessage());
+        }
+        dependencies.put("positions", positionsCount);
+        
+        // Verificar folhas de pagamento vinculadas
+        long payrollsCount = payrollRepository.findByUnitId(id).size();
+        dependencies.put("payrolls", payrollsCount);
+        
+        // Verificar subunidades (children)
+        long childrenCount = unitRepository.findByParentId(id).size();
+        dependencies.put("children", childrenCount);
+        
+        // Verificar localizações (se houver relação)
+        long locationsCount = 0; // Implementar se necessário
+        dependencies.put("locations", locationsCount);
+        
+        // Calcular total de dependências
+        long totalDependencies = employeesCount + positionsCount + payrollsCount + childrenCount + locationsCount;
+        
+        result.put("canDelete", totalDependencies == 0);
+        result.put("unitName", unit.getName());
+        result.put("dependencies", dependencies);
+        result.put("dependenciesCount", totalDependencies);
+        
+        return result;
+    }
+    
+    /**
+     * Exclui uma unidade e todas as suas dependências
+     */
+    public void deleteUnitWithDependencies(UUID id) {
+        Unit unit = unitRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + id));
+        
+        log.warn("Excluindo unidade {} com todas as dependências", unit.getName());
+        
+        // Excluir funcionários vinculados
+        List<Employee> employees = employeeRepository.findByUnitId(id);
+        if (!employees.isEmpty()) {
+            log.warn("Excluindo {} funcionário(s) vinculado(s) à unidade", employees.size());
+            employeeRepository.deleteAll(employees);
+        }
+        
+        // Excluir subunidades recursivamente
+        List<Unit> children = unitRepository.findByParentId(id);
+        for (Unit child : children) {
+            deleteUnitWithDependencies(child.getId());
+        }
+        
+        // Excluir a unidade
+        unitRepository.delete(unit);
+        log.info("Unidade {} e dependências excluídas com sucesso", unit.getName());
     }
     
     // Métodos de busca internos

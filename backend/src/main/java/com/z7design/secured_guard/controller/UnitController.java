@@ -197,6 +197,34 @@ public class UnitController {
         return ResponseEntity.noContent().build();
     }
     
+    @DeleteMapping("/{id}/with-dependencies")
+    @PreAuthorize("hasAnyAuthority('HR_DELETE','ADMIN','SUPER_ADMIN','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    @Operation(summary = "Excluir unidade com dependências", description = "Exclui uma unidade e todas as suas dependências (funcionários, subunidades, etc)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Unidade e dependências excluídas com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Unidade não encontrada"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Void> deleteUnitWithDependencies(@PathVariable UUID id) {
+        log.warn("Excluindo unidade {} com todas as dependências", id);
+        unitService.deleteUnitWithDependencies(id);
+        return ResponseEntity.noContent().build();
+    }
+    
+    @GetMapping("/{id}/can-delete")
+    @PreAuthorize("hasAnyAuthority('HR_READ','ADMIN','SUPER_ADMIN','ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    @Operation(summary = "Verificar possibilidade de exclusão", description = "Verifica se uma unidade pode ser excluída verificando suas dependências")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Verificação realizada com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Unidade não encontrada"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Map<String, Object>> checkDeletePossibility(@PathVariable UUID id) {
+        log.debug("Verificando possibilidade de exclusão da unidade: {}", id);
+        Map<String, Object> result = unitService.checkDeletePossibility(id);
+        return ResponseEntity.ok(result);
+    }
+    
     @GetMapping("/stats/count-active")
     @Operation(summary = "Contar unidades ativas", description = "Retorna o número total de unidades ativas")
     public ResponseEntity<Long> countActiveUnits() {

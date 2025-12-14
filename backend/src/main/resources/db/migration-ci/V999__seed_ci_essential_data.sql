@@ -61,13 +61,13 @@ WHERE NOT EXISTS (
 -- 3. TURNOS PADRÃO
 -- =====================================================
 INSERT INTO shifts (id, name, start_time, end_time, created_at, updated_at)
-SELECT '33333333-3333-3333-3333-333333333333'::uuid, 'Manhã', '08:00:00', '16:00:00', NOW(), NOW()
+SELECT '33333333-3333-3333-3333-333333333333'::uuid, 'Manhã', '08:00:00'::time, '16:00:00'::time, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '33333333-3333-3333-3333-333333333333'::uuid)
 UNION ALL
-SELECT '44444444-4444-4444-4444-444444444444'::uuid, 'Tarde', '16:00:00', '00:00:00', NOW(), NOW()
+SELECT '44444444-4444-4444-4444-444444444444'::uuid, 'Tarde', '16:00:00'::time, '00:00:00'::time, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '44444444-4444-4444-4444-444444444444'::uuid)
 UNION ALL
-SELECT '55555555-5555-5555-5555-555555555555'::uuid, 'Noite', '00:00:00', '08:00:00', NOW(), NOW()
+SELECT '55555555-5555-5555-5555-555555555555'::uuid, 'Noite', '00:00:00'::time, '08:00:00'::time, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE id = '55555555-5555-5555-5555-555555555555'::uuid);
 
 -- =====================================================

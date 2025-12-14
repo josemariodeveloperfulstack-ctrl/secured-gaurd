@@ -5,18 +5,34 @@ import { orderOfServiceService } from '@/services/orderOfServiceService';
 import { OrderOfService } from '@/types/orderOfService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Plus, FileText, Eye, Filter, RefreshCw, Download, Search } from 'lucide-react';
+import { Loader2, Plus, FileText, Eye, Filter, RefreshCw, Download, Search, Edit, Trash2 } from 'lucide-react';
 import EmitirOrdemServicoModal from '@/components/ordemServico/EmitirOrdemServicoModal';
 import OrdemServicoViewModal from '@/components/ordemServico/OrdemServicoViewModal';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const OrdemServicoPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [employeeId, setEmployeeId] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderOfService | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<OrderOfService | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
@@ -44,6 +60,65 @@ const OrdemServicoPage: React.FC = () => {
   const handleCloseViewModal = () => {
     setViewModalOpen(false);
     setSelectedOrder(null);
+  };
+
+  const handleEditOrder = (order: OrderOfService) => {
+    setSelectedOrder(order);
+    setEditModalOpen(true);
+  };
+
+  const handleDeleteOrder = (order: OrderOfService) => {
+    setOrderToDelete(order);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!orderToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await orderOfServiceService.deleteOrder(orderToDelete.id);
+      toast({
+        title: 'Sucesso',
+        description: 'Ordem de serviço excluída com sucesso.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
+      await refetch();
+      setDeleteDialogOpen(false);
+      setOrderToDelete(null);
+    } catch (error) {
+      console.error('Erro ao excluir ordem:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao excluir ordem de serviço.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDownloadPDF = async (order: OrderOfService) => {
+    try {
+      if (order.documentUrl) {
+        // Se já existe um PDF, fazer download
+        window.open(order.documentUrl, '_blank');
+      } else {
+        // Gerar PDF se não existir
+        toast({
+          title: 'Gerando PDF',
+          description: 'O PDF será gerado em breve...',
+        });
+        // Aqui você pode chamar uma função para gerar o PDF
+      }
+    } catch (error) {
+      console.error('Erro ao fazer download do PDF:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao fazer download do PDF.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const { data, isLoading, refetch } = useQuery<OrderOfService[]>({
@@ -213,29 +288,51 @@ const OrdemServicoPage: React.FC = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-seguranca-yellow border-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
+                              className="text-blue-400 border-blue-400 hover:bg-blue-400 hover:text-white"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewOrder(os);
                               }}
+                              title="Visualizar"
                             >
-                              <Eye size={16} className="mr-1" />
-                              Ver
+                              <Eye size={16} />
                             </Button>
-                            {os.documentUrl && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-seguranca-yellow border-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(os.documentUrl, '_blank');
-                                }}
-                              >
-                                <FileText size={16} className="mr-1" />
-                                Doc
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-seguranca-yellow border-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditOrder(os);
+                              }}
+                              title="Editar"
+                            >
+                              <Edit size={16} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-400 border-green-400 hover:bg-green-400 hover:text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadPDF(os);
+                              }}
+                              title="Download PDF"
+                            >
+                              <Download size={16} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteOrder(os);
+                              }}
+                              title="Excluir"
+                            >
+                              <Trash2 size={16} />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -263,10 +360,13 @@ const OrdemServicoPage: React.FC = () => {
         onClose={handleCloseModal} 
         onCreated={async () => {
           console.log('🔄 Recarregando lista após criar ordem...');
-          // Invalidar cache e recarregar
-          await queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
-          await refetch();
           handleCloseModal();
+          // Aguardar um pouco para garantir que o backend processou
+          await new Promise(resolve => setTimeout(resolve, 500));
+          // Invalidar cache e recarregar
+          queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
+          await refetch();
+          console.log('✅ Lista atualizada após criar ordem');
         }} 
       />
       {/* Modal para visualizar OS */}
@@ -275,6 +375,62 @@ const OrdemServicoPage: React.FC = () => {
         onClose={handleCloseViewModal} 
         orderOfService={selectedOrder} 
       />
+      
+      {/* Modal para editar OS */}
+      <EmitirOrdemServicoModal 
+        open={editModalOpen} 
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedOrder(null);
+        }} 
+        onCreated={async () => {
+          console.log('🔄 Recarregando lista após editar ordem...');
+          setEditModalOpen(false);
+          setSelectedOrder(null);
+          await new Promise(resolve => setTimeout(resolve, 500));
+          queryClient.invalidateQueries({ queryKey: ['orders-of-service'] });
+          await refetch();
+          console.log('✅ Lista atualizada após editar ordem');
+        }}
+        order={selectedOrder}
+      />
+
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-seguranca-graphite border-gray-600">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-seguranca-lightgray">
+              Confirmar Exclusão
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Tem certeza que deseja excluir a ordem de serviço de <strong>{orderToDelete?.employeeName}</strong>?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="border-gray-600 text-seguranca-lightgray hover:bg-gray-600"
+              disabled={isDeleting}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                'Excluir'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </StandardLayout>
   );
 };

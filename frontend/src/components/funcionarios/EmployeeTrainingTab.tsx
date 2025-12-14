@@ -148,20 +148,32 @@ const EmployeeTrainingTab = () => {
       try {
         // Buscar certificações de funcionários (histórico de treinamentos concluídos)
         const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
+        
+        // Buscar dados completos dos funcionários para obter position e sector
+        const { employeeService } = await import('@/services/employeeService');
+        const employees = await employeeService.getAllEmployees();
+        const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
+        
         const rows: TrainingRow[] = certs.map(c => {
           const validUntil = c.expirationDate || '';
           const status = getTrainingStatus(validUntil);
+          const employee = employeeMap.get(c.employeeId) as any;
+          
           return {
             id: c.id,
-            employee: (c as any).employee?.name || (c as any).employee?.id || 'Funcionário',
+            employee: c.employeeName || employee?.name || 'Funcionário',
+            cpf: c.employeeDocument || employee?.document || employee?.cpf,
+            position: employee?.position?.name || '',
+            sector: employee?.unit?.name || '',
             validUntil,
             status,
-            trainingType: c.training?.name || 'Treinamento',
-            hours: c.training?.duration,
+            trainingType: c.trainingName || 'Treinamento',
+            hours: c.renewalPeriodMonths ? c.renewalPeriodMonths * 8 : undefined, // Estimativa: 8h por mês
           };
         });
         setTrainings(rows);
       } catch (e) {
+        console.error('Erro ao carregar treinamentos:', e);
         toast({ title: 'Erro', description: 'Falha ao carregar treinamentos.', variant: 'destructive' });
       } finally {
         setLoading(false);
@@ -411,14 +423,13 @@ const EmployeeTrainingTab = () => {
                   <th className="px-3 py-2 border text-left">Treinamento</th>
                   <th className="px-3 py-2 border text-left">Validade</th>
                   <th className="px-3 py-2 border text-left">Status</th>
-                  <th className="px-3 py-2 border text-left">Instrutor</th>
                   <th className="px-3 py-2 border text-left">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTrainings.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-seguranca-lightgray">
+                    <td colSpan={7} className="text-center py-8 text-seguranca-lightgray">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-8 w-8 text-gray-400" />
                         <p>Nenhum treinamento encontrado</p>
@@ -457,7 +468,6 @@ const EmployeeTrainingTab = () => {
                           {getStatusBadge(t.status)}
                         </div>
                       </td>
-                      <td className="px-3 py-3 border">{t.instructor}</td>
                       <td className="px-3 py-3 border">
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(t)}>
@@ -497,12 +507,11 @@ const EmployeeTrainingTab = () => {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                      <div className="text-seguranca-lightgray"><span className="font-medium">Cargo:</span> {t.position}</div>
-                      <div className="text-seguranca-lightgray"><span className="font-medium">Setor:</span> {t.sector}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Cargo:</span> {t.position || 'N/A'}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Setor:</span> {t.sector || 'N/A'}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Treinamento:</span> {t.trainingType}</div>
-                      <div className="text-seguranca-lightgray"><span className="font-medium">Instrutor:</span> {t.instructor}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Validade:</span> {new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
-                      <div className="text-seguranca-lightgray"><span className="font-medium">Carga Horária:</span> {t.hours}h</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Carga Horária:</span> {t.hours || 0}h</div>
                     </div>
                     
                     <div className="flex gap-2">

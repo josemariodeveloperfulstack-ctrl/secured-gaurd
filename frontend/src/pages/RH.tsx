@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -131,14 +131,6 @@ const RH: React.FC = () => {
             >
               <UserPlus size={16} className="mr-2" />
               Novo Funcionário
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => navigate('/rh/vagas/nova')}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-            >
-              <Plus size={16} className="mr-2" />
-              Nova Vaga
             </Button>
           </div>
         </div>
@@ -626,20 +618,6 @@ const RH: React.FC = () => {
                 <CardContent>
                   <p className="text-gray-400 text-sm">
                     Gestão centralizada de documentos e contratos
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/certificacoes')}>
-                <CardHeader>
-                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                    <Award className="h-5 w-5 text-purple-500" />
-                    Certificações
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-400 text-sm">
-                    Controle de certificações e treinamentos obrigatórios
                   </p>
                 </CardContent>
               </Card>

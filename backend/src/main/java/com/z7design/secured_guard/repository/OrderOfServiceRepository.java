@@ -16,7 +16,12 @@ public interface OrderOfServiceRepository extends JpaRepository<OrderOfService, 
     
     List<OrderOfService> findBySigned(Boolean signed);
     
-    @Query("SELECT os FROM OrderOfService os WHERE os.employeeName LIKE %:searchTerm% OR os.role LIKE %:searchTerm% OR os.company LIKE %:searchTerm% OR os.client LIKE %:searchTerm%")
+    @Query("SELECT os FROM OrderOfService os WHERE " +
+           "LOWER(os.employeeName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(os.role) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(os.company) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(os.client) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(os.workplace) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<OrderOfService> searchByTerm(@Param("searchTerm") String searchTerm);
     
     @Query("SELECT os FROM OrderOfService os WHERE os.employeeId = :employeeId AND os.signed = :signed")
