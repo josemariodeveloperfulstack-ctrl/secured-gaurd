@@ -1,3 +1,4 @@
+-- Criar tabela sem foreign keys inicialmente
 CREATE TABLE IF NOT EXISTS visit_control_reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     file_name VARCHAR(255) NOT NULL,
@@ -12,21 +13,38 @@ CREATE TABLE IF NOT EXISTS visit_control_reports (
     total_visits INTEGER NOT NULL,
     created_by UUID,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_visit_control_report_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Adicionar foreign key para work_posts apenas se a tabela existir e tiver PRIMARY KEY
+-- Adicionar foreign keys apenas se as tabelas referenciadas existirem e tiverem PRIMARY KEY
 DO $$
 BEGIN
-    -- Verificar se a tabela work_posts existe e tem PRIMARY KEY
+    -- Adicionar foreign key para users se existir e tiver PRIMARY KEY
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE table_name = 'users' 
+        AND constraint_type = 'PRIMARY KEY'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'visit_control_reports' 
+            AND constraint_name = 'fk_visit_control_report_created_by'
+        ) THEN
+            ALTER TABLE visit_control_reports
+            ADD CONSTRAINT fk_visit_control_report_created_by 
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+
+    -- Adicionar foreign key para work_posts se existir e tiver PRIMARY KEY
     IF EXISTS (
         SELECT 1 
         FROM information_schema.table_constraints 
         WHERE table_name = 'work_posts' 
         AND constraint_type = 'PRIMARY KEY'
     ) THEN
-        -- Adicionar foreign key para work_posts
         IF NOT EXISTS (
             SELECT 1 
             FROM information_schema.table_constraints 
