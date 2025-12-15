@@ -32,13 +32,69 @@ CREATE TABLE IF NOT EXISTS admission_requests (
     approver_id UUID,
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_admission_request_unit FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL,
-    CONSTRAINT fk_admission_request_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT fk_admission_request_rejected_by FOREIGN KEY (rejected_by) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT fk_admission_request_requester FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT fk_admission_request_approver FOREIGN KEY (approver_id) REFERENCES users(id) ON DELETE SET NULL
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Adicionar FKs com verificação de constraints existentes
+DO $$
+BEGIN
+    -- Só cria FK para units se existir PK/UNIQUE em units(id)
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+        WHERE c.conrelid = 'units'::regclass
+          AND a.attname = 'id'
+          AND c.contype IN ('p','u')
+    ) THEN
+        ALTER TABLE admission_requests
+            ADD CONSTRAINT fk_admission_request_unit
+            FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL;
+    ELSE
+        RAISE NOTICE 'FK fk_admission_request_unit não criada: units.id não é UNIQUE/PK';
+    END IF;
+
+    -- Demais FKs apontam para users(id), que já é PK/UNIQUE
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_admission_request_approved_by'
+          AND conrelid = 'admission_requests'::regclass
+    ) THEN
+        ALTER TABLE admission_requests
+            ADD CONSTRAINT fk_admission_request_approved_by
+            FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_admission_request_rejected_by'
+          AND conrelid = 'admission_requests'::regclass
+    ) THEN
+        ALTER TABLE admission_requests
+            ADD CONSTRAINT fk_admission_request_rejected_by
+            FOREIGN KEY (rejected_by) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_admission_request_requester'
+          AND conrelid = 'admission_requests'::regclass
+    ) THEN
+        ALTER TABLE admission_requests
+            ADD CONSTRAINT fk_admission_request_requester
+            FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_admission_request_approver'
+          AND conrelid = 'admission_requests'::regclass
+    ) THEN
+        ALTER TABLE admission_requests
+            ADD CONSTRAINT fk_admission_request_approver
+            FOREIGN KEY (approver_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- Criar índices para melhorar performance
 CREATE INDEX IF NOT EXISTS idx_admission_requests_type ON admission_requests(type);
