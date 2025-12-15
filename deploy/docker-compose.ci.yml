@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: secured_guard_test
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CI}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "55432:5432"
@@ -36,7 +36,7 @@ services:
       - redis_data_ci:/data
     networks:
       - secured-guard-ci
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD_CI}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -56,9 +56,11 @@ services:
       SPRING_PROFILES_ACTIVE: test
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_test
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_CI}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD_CI}
+      JWT_SECRET: ${JWT_SECRET_CI}
       # WhatsApp/Baileys REST API
       BAILEYS_REST_URL: http://whatsapp-service-ci:3333
       BAILEYS_INSTANCE_KEY: securedguard
