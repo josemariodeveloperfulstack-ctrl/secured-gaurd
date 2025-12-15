@@ -14,16 +14,18 @@ import { workPostService, WorkPost } from '@/services/workPostService';
 import { Company } from '@/types/company';
 import { Unit } from '@/types/unit';
 import { Position } from '@/services/positionService';
+import { admissionRequestService } from '@/services/admissionRequestService';
 
 interface AdmissaoDemissaoFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (data: any) => void;
+  request?: AdmissionRequest | null;
 }
 
 // Removido mocks - agora usando dados reais da API
 
-const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ isOpen, onClose, onSuccess, request }) => {
   const [form, setForm] = useState({
     tipo: 'admissao',
     funcionario: '',
@@ -59,8 +61,22 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
   // Carregar dados quando o modal abrir
   useEffect(() => {
     if (isOpen) {
-      setForm({ tipo: 'admissao', funcionario: '', data: '', solicitante: '', empresa: '', unidade: '', cliente: '', posto: '', motivo: '' });
       setErrors({});
+      // Limpar formulário primeiro
+      if (!request) {
+        setForm({ 
+          tipo: 'admissao', 
+          funcionario: '', 
+          data: '', 
+          solicitante: '', 
+          empresa: '', 
+          unidade: '', 
+          cliente: '', 
+          posto: '', 
+          motivo: '' 
+        });
+      }
+      // Carregar dados
       loadFuncionarios();
       loadEmpresas();
       loadUnidades();
@@ -68,6 +84,76 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
       loadPostos();
     }
   }, [isOpen]);
+  
+  // Preencher formulário quando os dados e o request estiverem disponíveis
+  useEffect(() => {
+    if (isOpen && request && funcionarios.length > 0 && empresas.length > 0 && unidades.length > 0) {
+      fillFormFromRequest(request);
+    }
+  }, [isOpen, request, funcionarios, empresas, unidades]);
+  
+  // Função para preencher formulário a partir do request
+  const fillFormFromRequest = (req: AdmissionRequest) => {
+    console.log('📝 Preenchendo formulário com dados do request:', req);
+    console.log('📋 Funcionários disponíveis:', funcionarios.length);
+    console.log('📋 Empresas disponíveis:', empresas.length);
+    console.log('📋 Unidades disponíveis:', unidades.length);
+    
+    // Buscar funcionário pelo nome ou CPF
+    const funcionario = funcionarios.find(f => 
+      f.name === req.employeeName || 
+      f.cpf === req.employeeCpf ||
+      (req.employeeCpf && f.cpf?.replace(/\D/g, '') === req.employeeCpf.replace(/\D/g, ''))
+    );
+    
+    console.log('👤 Funcionário encontrado:', funcionario);
+    
+    // Buscar empresa - pode estar relacionada à unidade
+    let empresaEncontrada = empresas.find(e => e.id === req.unitId);
+    if (!empresaEncontrada && req.unitName) {
+      empresaEncontrada = empresas.find(e => e.name === req.unitName || e.sigla === req.unitName);
+    }
+    
+    // Buscar unidade
+    const unidade = unidades.find(u => 
+      u.id === req.unitId || 
+      u.name === req.unitName
+    );
+    
+    console.log('🏢 Empresa encontrada:', empresaEncontrada);
+    console.log('🏛️ Unidade encontrada:', unidade);
+    
+    // Formatar data - usar startDate para admissão, endDate para demissão
+    let dataFormatada = '';
+    if (req.type === 'ADMISSION' && req.startDate) {
+      dataFormatada = req.startDate.split('T')[0];
+    } else if (req.type === 'DISMISSAL' && req.endDate) {
+      dataFormatada = req.endDate.split('T')[0];
+    } else if (req.requestDate) {
+      dataFormatada = req.requestDate.split('T')[0];
+    }
+    
+    const formData = {
+      tipo: req.type === 'ADMISSION' ? 'admissao' : 'demissao',
+      funcionario: funcionario?.id || '',
+      data: dataFormatada,
+      solicitante: req.requesterName || '',
+      empresa: empresaEncontrada?.id || '',
+      unidade: unidade?.id || req.unitId || '',
+      cliente: '', // Não temos cliente no request
+      posto: '', // Não temos posto no request
+      motivo: req.reason || req.justification || req.notes || ''
+    };
+    
+    console.log('✅ Formulário preenchido:', formData);
+    setForm(formData);
+    
+    // Se houver unidade, tentar buscar cliente relacionado
+    if (unidade && clientes.length > 0) {
+      // Tentar encontrar cliente relacionado (pode precisar de lógica adicional)
+      // Por enquanto, deixamos vazio
+    }
+  };
 
   const loadFuncionarios = async () => {
     setLoadingFuncionarios(true);
@@ -94,7 +180,7 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     }
   };
 
-  const loadEmpresas = async () => {
+  const loadEmpresas = async (): Promise<void> => {
     setLoadingEmpresas(true);
     try {
       const response = await companyService.getAllCompanies();
@@ -107,7 +193,7 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     }
   };
 
-  const loadUnidades = async () => {
+  const loadUnidades = async (): Promise<void> => {
     setLoadingUnidades(true);
     try {
       const response = await unitService.getAllUnits();
@@ -120,7 +206,7 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     }
   };
 
-  const loadClientes = async () => {
+  const loadClientes = async (): Promise<void> => {
     setLoadingClientes(true);
     try {
       const response = await clientService.getAllClients();
@@ -133,7 +219,7 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     }
   };
 
-  const loadPostos = async (clientId?: string) => {
+  const loadPostos = async (clientId?: string): Promise<void> => {
     setLoadingPostos(true);
     try {
       let response: WorkPost[];
@@ -166,15 +252,43 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const payload = {
+        type: form.tipo === 'admissao' ? 'ADMISSION' : 'DISMISSAL' as 'ADMISSION' | 'DISMISSAL',
+        employeeName: funcionarios.find(f => f.id === form.funcionario)?.name || form.funcionario,
+        employeeCpf: funcionarios.find(f => f.id === form.funcionario)?.cpf,
+        employeeEmail: funcionarios.find(f => f.id === form.funcionario)?.email,
+        position: funcionarios.find(f => f.id === form.funcionario)?.positionName,
+        unitId: form.unidade,
+        startDate: form.tipo === 'admissao' ? form.data : undefined,
+        endDate: form.tipo === 'demissao' ? form.data : undefined,
+        reason: form.motivo,
+        justification: form.motivo,
+        requesterName: form.solicitante,
+        priority: 'MEDIUM' as const,
+        notes: form.motivo
+      };
+      
+      if (request) {
+        // Modo de edição
+        await admissionRequestService.updateAdmissionRequest(request.id, { ...payload, id: request.id });
+      } else {
+        // Modo de criação
+        await admissionRequestService.createAdmissionRequest(payload);
+      }
+      
       onSuccess(form);
       onClose();
-    }, 800);
+    } catch (error) {
+      console.error('Erro ao salvar solicitação:', error);
+      setErrors({ submit: 'Erro ao salvar solicitação. Tente novamente.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNavigateToNewEmployee = () => {
@@ -228,7 +342,9 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
             <div className="w-8 h-8 bg-seguranca-yellow rounded-lg flex items-center justify-center">
               <UserPlus className="h-4 w-4 text-black" />
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-white">Nova Solicitação</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-white">
+              {request ? 'Editar Solicitação' : 'Nova Solicitação'}
+            </h2>
           </div>
           <Button 
             variant="ghost" 

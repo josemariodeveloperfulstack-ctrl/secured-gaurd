@@ -6,8 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Filter, Plus, Download, Search, Eye, Edit, Trash2, Calendar, User, FileText, Loader2 } from 'lucide-react';
 import AdmissaoDemissaoFormModal from '@/components/admissaoDemissao/AdmissaoDemissaoFormModal';
 import { admissionRequestService, AdmissionRequest } from '@/services/admissionRequestService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 const AdmissaoDemissao: React.FC = () => {
+  const { toast } = useToast();
+  
   // Estados para filtros
   const [filters, setFilters] = useState({
     tipo: '',
@@ -21,7 +27,8 @@ const AdmissaoDemissao: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [selectedRecord, setSelectedRecord] = useState<AdmissionRequest | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Estados para dados
   const [requests, setRequests] = useState<AdmissionRequest[]>([]);
@@ -29,10 +36,50 @@ const AdmissaoDemissao: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Funções de ação
-  const handleCreate = () => setShowCreateModal(true);
-  const handleView = (record: any) => { setSelectedRecord(record); setShowViewModal(true); };
-  const handleEdit = (record: any) => { setSelectedRecord(record); setShowEditModal(true); };
-  const handleDelete = (record: any) => { setSelectedRecord(record); setShowDeleteModal(true); };
+  const handleCreate = () => {
+    console.log('🔄 Abrindo modal de criação');
+    setShowCreateModal(true);
+  };
+  const handleView = (record: AdmissionRequest) => { 
+    console.log('👁️ Visualizando solicitação:', record);
+    setSelectedRecord(record); 
+    setShowViewModal(true); 
+  };
+  const handleEdit = (record: AdmissionRequest) => { 
+    console.log('✏️ Editando solicitação:', record);
+    setSelectedRecord(record); 
+    setShowEditModal(true); 
+  };
+  const handleDelete = (record: AdmissionRequest) => { 
+    console.log('🗑️ Excluindo solicitação:', record);
+    setSelectedRecord(record); 
+    setShowDeleteModal(true); 
+  };
+  
+  const handleConfirmDelete = async () => {
+    if (!selectedRecord) return;
+    
+    setIsDeleting(true);
+    try {
+      await admissionRequestService.deleteAdmissionRequest(selectedRecord.id);
+      toast({
+        title: 'Sucesso',
+        description: 'Solicitação excluída com sucesso.',
+      });
+      setShowDeleteModal(false);
+      setSelectedRecord(null);
+      loadRequests(); // Recarregar a lista
+    } catch (err) {
+      console.error('Erro ao excluir solicitação:', err);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao excluir solicitação.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleClearFilters = () => setFilters({ tipo: '', funcionario: '', dataInicio: '', dataFim: '' });
 
@@ -56,12 +103,29 @@ const AdmissaoDemissao: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const searchFilters = {
-        type: filters.tipo || undefined,
-        searchTerm: filters.funcionario || undefined,
-        startDate: filters.dataInicio || undefined,
-        endDate: filters.dataFim || undefined
-      };
+      const searchFilters: {
+        type?: string;
+        searchTerm?: string;
+        startDate?: string;
+        endDate?: string;
+      } = {};
+      
+      // Mapear filtros do frontend para o formato esperado
+      if (filters.tipo) {
+        // Converter 'admissao'/'demissao' para 'ADMISSION'/'DISMISSAL'
+        searchFilters.type = filters.tipo.toUpperCase() === 'ADMISSAO' ? 'ADMISSION' : 
+                             filters.tipo.toUpperCase() === 'DEMISSAO' ? 'DISMISSAL' : 
+                             filters.tipo.toUpperCase();
+      }
+      if (filters.funcionario) {
+        searchFilters.searchTerm = filters.funcionario;
+      }
+      if (filters.dataInicio) {
+        searchFilters.startDate = filters.dataInicio;
+      }
+      if (filters.dataFim) {
+        searchFilters.endDate = filters.dataFim;
+      }
       
       const data = await admissionRequestService.searchRequests(searchFilters);
       setRequests(data);
@@ -289,7 +353,7 @@ const AdmissaoDemissao: React.FC = () => {
                         </td>
                         <td className="px-4 py-4">
                           <Badge className={getTypeBadgeColor(request.type)}>
-                            {request.type === 'ADMISSAO' ? 'Admissão' : 'Demissão'}
+                            {request.type === 'ADMISSION' || request.type === 'ADMISSAO' ? 'Admissão' : 'Demissão'}
                           </Badge>
                         </td>
                         <td className="px-4 py-4 text-seguranca-lightgray">
@@ -305,7 +369,10 @@ const AdmissaoDemissao: React.FC = () => {
                             <Button 
                               size="sm" 
                               variant="ghost" 
-                              onClick={() => handleView(request)} 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleView(request);
+                              }} 
                               className="text-blue-400 hover:text-blue-300"
                               title="Visualizar"
                             >
@@ -314,7 +381,10 @@ const AdmissaoDemissao: React.FC = () => {
                             <Button 
                               size="sm" 
                               variant="ghost" 
-                              onClick={() => handleEdit(request)} 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(request);
+                              }} 
                               className="text-green-400 hover:text-green-300"
                               title="Editar"
                             >
@@ -323,7 +393,10 @@ const AdmissaoDemissao: React.FC = () => {
                             <Button 
                               size="sm" 
                               variant="ghost" 
-                              onClick={() => handleDelete(request)} 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(request);
+                              }} 
                               className="text-red-400 hover:text-red-300"
                               title="Excluir"
                             >
@@ -363,7 +436,7 @@ const AdmissaoDemissao: React.FC = () => {
                       </div>
                       <div className="flex gap-2">
                         <Badge className={getTypeBadgeColor(request.type)}>
-                          {request.type === 'ADMISSAO' ? 'Admissão' : 'Demissão'}
+                          {request.type === 'ADMISSION' || request.type === 'ADMISSAO' ? 'Admissão' : 'Demissão'}
                         </Badge>
                         <Badge className={getStatusBadgeColor(request.status)}>
                           {request.status}
@@ -374,7 +447,10 @@ const AdmissaoDemissao: React.FC = () => {
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        onClick={() => handleView(request)} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleView(request);
+                        }} 
                         className="text-blue-400 hover:text-blue-300"
                         title="Visualizar"
                       >
@@ -384,7 +460,10 @@ const AdmissaoDemissao: React.FC = () => {
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        onClick={() => handleEdit(request)} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(request);
+                        }} 
                         className="text-green-400 hover:text-green-300"
                         title="Editar"
                       >
@@ -394,7 +473,10 @@ const AdmissaoDemissao: React.FC = () => {
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        onClick={() => handleDelete(request)} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(request);
+                        }} 
                         className="text-red-400 hover:text-red-300"
                         title="Excluir"
                       >
@@ -409,15 +491,181 @@ const AdmissaoDemissao: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Modais de criar, visualizar, editar, excluir (implementar) */}
+        {/* Modal de Criar */}
         <AdmissaoDemissaoFormModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={(data) => { 
-            alert('Solicitação criada com sucesso!');
+            toast({
+              title: 'Sucesso',
+              description: 'Solicitação criada com sucesso!',
+            });
             loadRequests(); // Recarregar a lista
           }}
         />
+        
+        {/* Modal de Visualizar */}
+        <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+            <DialogHeader>
+              <DialogTitle className="text-seguranca-lightgray flex items-center gap-2">
+                <Eye className="h-5 w-5 text-blue-400" />
+                Visualizar Solicitação
+              </DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Detalhes da solicitação de {selectedRecord?.type === 'ADMISSION' ? 'Admissão' : 'Demissão'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedRecord && (
+              <div className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-400 text-sm">Número da Solicitação</Label>
+                    <p className="text-seguranca-lightgray font-medium">{selectedRecord.requestNumber}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">Tipo</Label>
+                    <p className="text-seguranca-lightgray font-medium">
+                      {selectedRecord.type === 'ADMISSION' ? 'Admissão' : 'Demissão'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">Funcionário</Label>
+                    <p className="text-seguranca-lightgray font-medium">{selectedRecord.employeeName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">CPF</Label>
+                    <p className="text-seguranca-lightgray font-medium">{selectedRecord.employeeCpf || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">Data da Solicitação</Label>
+                    <p className="text-seguranca-lightgray font-medium">{formatDate(selectedRecord.requestDate)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">Status</Label>
+                    <Badge className={getStatusBadgeColor(selectedRecord.status)}>
+                      {selectedRecord.status}
+                    </Badge>
+                  </div>
+                  {selectedRecord.startDate && (
+                    <div>
+                      <Label className="text-gray-400 text-sm">Data de Início</Label>
+                      <p className="text-seguranca-lightgray font-medium">{formatDate(selectedRecord.startDate)}</p>
+                    </div>
+                  )}
+                  {selectedRecord.endDate && (
+                    <div>
+                      <Label className="text-gray-400 text-sm">Data de Fim</Label>
+                      <p className="text-seguranca-lightgray font-medium">{formatDate(selectedRecord.endDate)}</p>
+                    </div>
+                  )}
+                  {selectedRecord.position && (
+                    <div>
+                      <Label className="text-gray-400 text-sm">Cargo</Label>
+                      <p className="text-seguranca-lightgray font-medium">{selectedRecord.position}</p>
+                    </div>
+                  )}
+                  {selectedRecord.unitName && (
+                    <div>
+                      <Label className="text-gray-400 text-sm">Unidade</Label>
+                      <p className="text-seguranca-lightgray font-medium">{selectedRecord.unitName}</p>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedRecord.reason && (
+                  <div>
+                    <Label className="text-gray-400 text-sm">Motivo</Label>
+                    <p className="text-seguranca-lightgray mt-1">{selectedRecord.reason}</p>
+                  </div>
+                )}
+                
+                {selectedRecord.justification && (
+                  <div>
+                    <Label className="text-gray-400 text-sm">Justificativa</Label>
+                    <p className="text-seguranca-lightgray mt-1">{selectedRecord.justification}</p>
+                  </div>
+                )}
+                
+                {selectedRecord.notes && (
+                  <div>
+                    <Label className="text-gray-400 text-sm">Observações</Label>
+                    <p className="text-seguranca-lightgray mt-1">{selectedRecord.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowViewModal(false)}
+                className="border-gray-600 text-seguranca-lightgray hover:bg-gray-600"
+              >
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Modal de Editar */}
+        <AdmissaoDemissaoFormModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedRecord(null);
+          }}
+          onSuccess={(data) => {
+            toast({
+              title: 'Sucesso',
+              description: 'Solicitação atualizada com sucesso!',
+            });
+            setShowEditModal(false);
+            setSelectedRecord(null);
+            loadRequests();
+          }}
+          request={selectedRecord}
+        />
+        
+        {/* Modal de Excluir */}
+        <AlertDialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+          <AlertDialogContent className="bg-seguranca-graphite border-gray-600">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-seguranca-lightgray">
+                Confirmar Exclusão
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                Tem certeza que deseja excluir a solicitação de{' '}
+                <strong>{selectedRecord?.employeeName}</strong>?
+                <br />
+                Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                className="border-gray-600 text-seguranca-lightgray hover:bg-gray-600"
+                disabled={isDeleting}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  'Excluir'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </StandardLayout>
   );

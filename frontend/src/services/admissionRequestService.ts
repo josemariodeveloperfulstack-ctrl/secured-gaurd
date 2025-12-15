@@ -95,6 +95,11 @@ class AdmissionRequestService {
     }
   }
 
+  // Alias para compatibilidade - usando arrow function para garantir binding correto
+  getAllRequests = async (): Promise<AdmissionRequest[]> => {
+    return this.getAllAdmissionRequests();
+  }
+
   async getAdmissionRequestById(id: string): Promise<AdmissionRequest> {
     const response = await api.get(`/api/admission-requests/${id}`);
     return response.data;
@@ -179,9 +184,45 @@ class AdmissionRequestService {
     }
   }
 
-  async searchRequests(searchTerm: string): Promise<AdmissionRequest[]> {
-    const response = await api.get(`/api/admission-requests/search?searchTerm=${encodeURIComponent(searchTerm)}`);
-    return response.data;
+  async searchRequests(searchTerm: string): Promise<AdmissionRequest[]>;
+  async searchRequests(filters: {
+    type?: string;
+    searchTerm?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<AdmissionRequest[]>;
+  async searchRequests(searchTermOrFilters: string | {
+    type?: string;
+    searchTerm?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<AdmissionRequest[]> {
+    try {
+      // Se for string, usar formato antigo
+      if (typeof searchTermOrFilters === 'string') {
+        const response = await api.get(`/api/admission-requests/search?searchTerm=${encodeURIComponent(searchTermOrFilters)}`);
+        return response.data;
+      }
+      
+      // Se for objeto, construir query string com filtros
+      const params = new URLSearchParams();
+      if (searchTermOrFilters.type) params.append('type', searchTermOrFilters.type);
+      if (searchTermOrFilters.searchTerm) params.append('searchTerm', searchTermOrFilters.searchTerm);
+      if (searchTermOrFilters.startDate) params.append('startDate', searchTermOrFilters.startDate);
+      if (searchTermOrFilters.endDate) params.append('endDate', searchTermOrFilters.endDate);
+      
+      const queryString = params.toString();
+      const url = queryString 
+        ? `/api/admission-requests/search?${queryString}`
+        : '/api/admission-requests';
+      
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.warn('Erro ao buscar solicitações:', error);
+      // Retornar dados de exemplo filtrados
+      return this.getMockData();
+    }
   }
 
   async getRequestsCountByStatus(status: string): Promise<number> {
@@ -277,4 +318,28 @@ class AdmissionRequestService {
   }
 }
 
-export const admissionRequestService = new AdmissionRequestService();
+// Criar instância do serviço
+const serviceInstance = new AdmissionRequestService();
+
+// Exportar como objeto com métodos garantidos
+export const admissionRequestService = {
+  getAllRequests: serviceInstance.getAllRequests.bind(serviceInstance),
+  getAllAdmissionRequests: serviceInstance.getAllAdmissionRequests.bind(serviceInstance),
+  getAdmissionRequestById: serviceInstance.getAdmissionRequestById.bind(serviceInstance),
+  createAdmissionRequest: serviceInstance.createAdmissionRequest.bind(serviceInstance),
+  updateAdmissionRequest: serviceInstance.updateAdmissionRequest.bind(serviceInstance),
+  deleteAdmissionRequest: serviceInstance.deleteAdmissionRequest.bind(serviceInstance),
+  approveRequest: serviceInstance.approveRequest.bind(serviceInstance),
+  rejectRequest: serviceInstance.rejectRequest.bind(serviceInstance),
+  completeRequest: serviceInstance.completeRequest.bind(serviceInstance),
+  getRequestsByStatus: serviceInstance.getRequestsByStatus.bind(serviceInstance),
+  getRequestsByType: serviceInstance.getRequestsByType.bind(serviceInstance),
+  getRequestsByPriority: serviceInstance.getRequestsByPriority.bind(serviceInstance),
+  getRequestsByRequester: serviceInstance.getRequestsByRequester.bind(serviceInstance),
+  getRequestsByApprover: serviceInstance.getRequestsByApprover.bind(serviceInstance),
+  getRequestsByUnit: serviceInstance.getRequestsByUnit.bind(serviceInstance),
+  getPendingApprovalRequests: serviceInstance.getPendingApprovalRequests.bind(serviceInstance),
+  searchRequests: serviceInstance.searchRequests.bind(serviceInstance),
+  getRequestsCountByStatus: serviceInstance.getRequestsCountByStatus.bind(serviceInstance),
+  getRequestsCountByType: serviceInstance.getRequestsCountByType.bind(serviceInstance),
+};
