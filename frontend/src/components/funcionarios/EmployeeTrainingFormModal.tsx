@@ -54,17 +54,85 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
   const { toast } = useToast();
 
   useEffect(() => {
-    if (editData) {
-      setForm(editData);
-    } else {
-      setForm({
-        employeeId: '', employee: '', cpf: '', position: '', validUntil: '', sector: '', workSchedule: '', asoDate: '', psicotecnicoDate: '', id: undefined
-      });
-    }
-    // Resetar selectedEmployee e positionSelectKey quando o modal abrir
+    const loadEditData = async () => {
+      if (editData) {
+        console.log('📝 Modo edição - editData recebido:', editData);
+        
+        // Garantir que editData tenha todas as propriedades necessárias
+        const safeEditData = {
+          employeeId: editData.employeeId || '',
+          employee: editData.employee || '',
+          cpf: editData.cpf || '',
+          position: editData.position || '',
+          validUntil: editData.validUntil || '',
+          sector: editData.sector || '',
+          workSchedule: editData.workSchedule || '',
+          asoDate: editData.asoDate || '',
+          psicotecnicoDate: editData.psicotecnicoDate || '',
+          id: editData.id,
+        };
+        
+        setForm(safeEditData);
+        console.log('✅ Form inicial definido:', safeEditData);
+        
+        // Se temos employeeId, buscar dados completos do funcionário
+        if (safeEditData.employeeId) {
+          try {
+            console.log('🔍 Buscando dados completos do funcionário:', safeEditData.employeeId);
+            const fullEmployee = await employeeService.getEmployeeById(safeEditData.employeeId);
+            
+            if (fullEmployee) {
+              console.log('✅ Dados completos do funcionário carregados:', fullEmployee);
+              
+              // Extrair CPF
+              const cpfValue = fullEmployee.cpf || (fullEmployee as any).document || safeEditData.cpf || '';
+              
+              // Extrair cargo
+              let positionId = '';
+              let positionName = '';
+              if (fullEmployee.position && typeof fullEmployee.position === 'object') {
+                positionId = (fullEmployee.position as any).id ? String((fullEmployee.position as any).id) : '';
+                positionName = (fullEmployee.position as any).name || '';
+              }
+              
+              // Extrair setor (unit)
+              let sectorName = '';
+              if (fullEmployee.unit && typeof fullEmployee.unit === 'object') {
+                sectorName = (fullEmployee.unit as any).name || '';
+              }
+              
+              // Atualizar formulário com dados do funcionário
+              setForm(prev => ({
+                ...prev,
+                employee: fullEmployee.name,
+                cpf: cpfValue,
+                position: positionId || positionName || prev.position || '',
+                sector: sectorName || prev.sector || '',
+                workSchedule: (fullEmployee as any).workSchedule || prev.workSchedule || '',
+              }));
+              
+              setSelectedEmployee(fullEmployee);
+              console.log('✅ Formulário atualizado com dados do funcionário');
+            }
+          } catch (error) {
+            console.error('❌ Erro ao buscar dados do funcionário:', error);
+          }
+        }
+      } else {
+        setForm({
+          employeeId: '', employee: '', cpf: '', position: '', validUntil: '', sector: '', workSchedule: '', asoDate: '', psicotecnicoDate: '', id: undefined
+        });
+      }
+      
+      // Resetar selectedEmployee e positionSelectKey quando o modal abrir
+      if (open && !editData) {
+        setSelectedEmployee(null);
+        setPositionSelectKey(0);
+      }
+    };
+    
     if (open) {
-      setSelectedEmployee(null);
-      setPositionSelectKey(0);
+      loadEditData();
     }
   }, [editData, open]);
 
@@ -174,6 +242,12 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
 
   // Ao selecionar funcionário, preenche CPF e Cargo
   const handleEmployeeChange = async (val) => {
+    // Ignorar valores vazios (pode acontecer durante inicialização do componente)
+    if (!val || val === '') {
+      console.log('⚠️ handleEmployeeChange: valor vazio ignorado');
+      return;
+    }
+    
     const emp = employees.find(e => String(e.id) === val);
     
     if (!emp) {
@@ -695,7 +769,41 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
     
     try {
       setSaving(true);
-      // Criar um treinamento genérico primeiro
+      
+      // MODO EDIÇÃO: atualizar certificação existente
+      if (form.id) {
+        console.log('🔄 Modo edição - atualizando certificação:', form.id);
+        
+        // Buscar TODAS as certificações para encontrar a que está sendo editada
+        const allCertifications = await trainingService.getEmployeeCertifications();
+        const existingCert = allCertifications.find(c => c.id === form.id);
+        
+        if (!existingCert) {
+          console.error('❌ Certificação não encontrada. ID:', form.id);
+          console.error('📋 Certificações disponíveis:', allCertifications.map(c => c.id));
+          throw new Error('Certificação não encontrada');
+        }
+        
+        console.log('✅ Certificação encontrada:', existingCert);
+        
+        // Atualizar certificação existente
+        const certification = await trainingService.updateEmployeeCertification(form.id, {
+          employeeId: form.employeeId,
+          trainingId: existingCert.trainingId,
+          certificationNumber: existingCert.certificationNumber,
+          issueDate: existingCert.issueDate,
+          expirationDate: form.validUntil,
+          workPostName: form.sector, // Enviar o nome do posto de trabalho atualizado
+        });
+        
+        console.log('✅ Certificação atualizada:', certification);
+        toast({ title: 'Sucesso', description: 'Treinamento atualizado com sucesso!' });
+        onSave({ ...form });
+        onOpenChange(false);
+        return;
+      }
+      
+      // MODO CRIAÇÃO: criar novo treinamento e certificação
       const training = await trainingService.createTraining({
         name: `Treinamento ${form.position} - ${form.sector || 'Geral'}`,
         description: `Treinamento específico para ${form.position}`,
@@ -710,15 +818,21 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         certificationNumber: `CERT-${Date.now()}`,
         issueDate: new Date().toISOString().slice(0,10),
         expirationDate: form.validUntil,
+        workPostName: form.sector, // Enviar o nome do posto de trabalho
       });
       console.log('✅ Treinamento e certificação criados:', { training, certification });
       toast({ title: 'Sucesso', description: 'Treinamento registrado com sucesso!' });
-      onSave({ ...form, id: Date.now() });
+      onSave({ ...form, id: certification.id });
       // Fechar o modal após salvar
       onOpenChange(false);
     } catch (e) {
-      console.error('❌ Erro ao criar treinamento/certificação:', e);
-      toast({ title: 'Erro', description: 'Falha ao salvar treinamento.', variant: 'destructive' });
+      console.error('❌ Erro ao salvar treinamento/certificação:', e);
+      const isEdit = !!form.id;
+      toast({ 
+        title: 'Erro', 
+        description: `Falha ao ${isEdit ? 'atualizar' : 'criar'} treinamento.`, 
+        variant: 'destructive' 
+      });
     } finally {
       setSaving(false);
     }
@@ -844,6 +958,13 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
                       })()}
                       onValueChange={(value) => {
                         console.log('🔍 Select onValueChange:', value);
+                        
+                        // Ignorar valores vazios (pode acontecer durante inicialização)
+                        if (!value || value === '') {
+                          console.log('⚠️ Valor vazio ignorado no onValueChange do cargo');
+                          return;
+                        }
+                        
                         const position = positions.find(p => String(p.id) === String(value));
                         const positionName = position?.name || '';
                         console.log('🔍 Position encontrada:', positionName);

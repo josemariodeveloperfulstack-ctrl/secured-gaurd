@@ -26,6 +26,7 @@ public class EmployeeCertificationService {
     private final EmployeeCertificationRepository certificationRepository;
     private final EmployeeRepository employeeRepository;
     private final TrainingRepository trainingRepository;
+    private final com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
     
     @Transactional
     public EmployeeCertification create(CreateEmployeeCertificationRequest request) {
@@ -36,10 +37,20 @@ public class EmployeeCertificationService {
         Training training = trainingRepository.findById(request.getTrainingId())
             .orElseThrow(() -> new ResourceNotFoundException("Treinamento não encontrado"));
         
+        // Buscar WorkPost se fornecido (por ID ou nome)
+        com.z7design.secured_guard.model.WorkPost workPost = null;
+        if (request.getWorkPostId() != null) {
+            workPost = workPostRepository.findById(request.getWorkPostId()).orElse(null);
+        } else if (request.getWorkPostName() != null && !request.getWorkPostName().trim().isEmpty()) {
+            // Buscar por nome exato
+            workPost = workPostRepository.findByName(request.getWorkPostName()).orElse(null);
+        }
+        
         // Criar entidade EmployeeCertification
         EmployeeCertification certification = EmployeeCertification.builder()
             .employee(employee)
             .training(training)
+            .workPost(workPost)
             .certificationNumber(request.getCertificationNumber())
             .issueDate(request.getIssueDate())
             .expirationDate(request.getExpirationDate())
@@ -49,7 +60,8 @@ public class EmployeeCertificationService {
             .status(CertificationStatus.ACTIVE)
             .build();
         
-        System.out.println("✅ EmployeeCertificationService.create - Certificação criada: " + certification.getId());
+        System.out.println("✅ EmployeeCertificationService.create - Certificação criada: " + certification.getId() + 
+            (workPost != null ? " com WorkPost: " + workPost.getName() : ""));
         
         validateCertification(certification);
         return certificationRepository.save(certification);
@@ -76,6 +88,39 @@ public class EmployeeCertificationService {
     }
     
     @Transactional
+    public EmployeeCertification update(UUID id, com.z7design.secured_guard.dto.UpdateEmployeeCertificationRequest request) {
+        EmployeeCertification existingCertification = findById(id);
+        
+        // Converter DTO para entidade para validação
+        EmployeeCertification certificationForValidation = new EmployeeCertification();
+        certificationForValidation.setIssueDate(request.getIssueDate());
+        certificationForValidation.setExpirationDate(request.getExpirationDate());
+        validateCertification(certificationForValidation);
+        
+        // Buscar WorkPost se fornecido (por ID ou nome)
+        if (request.getWorkPostId() != null) {
+            com.z7design.secured_guard.model.WorkPost workPost = workPostRepository.findById(request.getWorkPostId()).orElse(null);
+            existingCertification.setWorkPost(workPost);
+        } else if (request.getWorkPostName() != null && !request.getWorkPostName().trim().isEmpty()) {
+            com.z7design.secured_guard.model.WorkPost workPost = workPostRepository.findByName(request.getWorkPostName()).orElse(null);
+            existingCertification.setWorkPost(workPost);
+        }
+        
+        // Atualizar campos da certificação existente
+        existingCertification.setCertificationNumber(request.getCertificationNumber());
+        existingCertification.setIssueDate(request.getIssueDate());
+        existingCertification.setExpirationDate(request.getExpirationDate());
+        if (request.getDocumentUrl() != null) {
+            existingCertification.setDocumentUrl(request.getDocumentUrl());
+        }
+        
+        System.out.println("✅ EmployeeCertificationService.update - Certificação atualizada: " + id + 
+            (existingCertification.getWorkPost() != null ? " com WorkPost: " + existingCertification.getWorkPost().getName() : ""));
+        
+        return certificationRepository.save(existingCertification);
+    }
+    
+    @Transactional
     public EmployeeCertification renew(UUID id, LocalDate newExpirationDate) {
         EmployeeCertification certification = findById(id);
         certification.setExpirationDate(newExpirationDate);
@@ -84,10 +129,11 @@ public class EmployeeCertificationService {
     }
     
     @Transactional
-    public EmployeeCertification cancel(UUID id) {
+    public void cancel(UUID id) {
         EmployeeCertification certification = findById(id);
-        certification.setStatus(CertificationStatus.CANCELLED);
-        return certificationRepository.save(certification);
+        System.out.println("🗑️ EmployeeCertificationService.cancel - Deletando certificação: " + id);
+        certificationRepository.delete(certification);
+        System.out.println("✅ EmployeeCertificationService.cancel - Certificação deletada com sucesso");
     }
     
     public EmployeeCertification findById(UUID id) {

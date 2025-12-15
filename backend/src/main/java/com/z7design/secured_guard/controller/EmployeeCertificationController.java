@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.z7design.secured_guard.dto.CreateEmployeeCertificationRequest;
+import com.z7design.secured_guard.dto.UpdateEmployeeCertificationRequest;
 import com.z7design.secured_guard.dto.EmployeeCertificationResponse;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
@@ -88,8 +89,8 @@ public class EmployeeCertificationController {
     @Operation(summary = "Atualiza certificação")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<EmployeeCertificationResponse> update(@PathVariable UUID id, @RequestBody EmployeeCertification certification) {
-        EmployeeCertification updated = certificationService.update(id, certification);
+    public ResponseEntity<EmployeeCertificationResponse> update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeCertificationRequest request) {
+        EmployeeCertification updated = certificationService.update(id, request);
         EmployeeCertification loaded = certificationService.findById(updated.getId());
         return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
     }

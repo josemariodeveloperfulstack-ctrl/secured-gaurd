@@ -77,6 +77,7 @@ const TermoResponsabilidadeEquipamentoForm = () => {
 
   const funcionario = employees.find(f => f.id === form.funcionarioId);
   const empresa = companies.find(e => e.id === form.empresaId);
+  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
 
   const estadosEquipamento = [
     'Novo',
@@ -106,9 +107,9 @@ const TermoResponsabilidadeEquipamentoForm = () => {
         templateName: 'termo-responsabilidade-equipamento.html',
         // Dados do Funcionário
         funcionario: funcionario.name,
-        cpf: funcionario.cpf,
-        cargo: funcionario.position?.name,
-        setor: funcionario.position?.name, // Using position name as sector/department if unit not available
+        cpf: funcionario.cpf || funcionario.document || '',
+        cargo: funcionario.position?.name || '',
+        setor: funcionario.unit?.name || '', // Buscar o Posto de Trabalho (unit)
         telefone: funcionario.phone,
         email: funcionario.email,
         endereco: typeof funcionario.address === 'string' 
@@ -119,7 +120,14 @@ const TermoResponsabilidadeEquipamentoForm = () => {
         // Dados da Empresa
         empresa: empresa.name,
         cnpj: empresa.cnpj,
-        enderecoEmpresa: empresa.address ? `${empresa.address.street}, ${empresa.address.number}, ${empresa.address.neighborhood}, ${empresa.address.city}/${empresa.address.state}` : '',
+        enderecoEmpresa: empresa.address && empresa.address.street
+          ? [
+              empresa.address.street,
+              empresa.address.number,
+              empresa.address.neighborhood,
+              `${empresa.address.city || ''}/${empresa.address.state || ''}`
+            ].filter(Boolean).join(', ')
+          : '',
         // Dados do Equipamento
         equipamento: form.equipamento,
         marca: form.marca,
@@ -130,7 +138,7 @@ const TermoResponsabilidadeEquipamentoForm = () => {
         // Dados da Entrega
         dataEntrega: form.dataEntrega,
         dataDevolucao: form.dataDevolucao,
-        responsavelEntrega: form.responsavelEntrega,
+        responsavelEntrega: responsavel?.name || '',
         condicoes: form.condicoes,
         observacoes: form.observacoes,
         dataAtual: new Date().toLocaleDateString('pt-BR')
@@ -214,8 +222,8 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                         <SelectItem key={f.id} value={f.id}>
                           <div className="flex flex-col py-1">
                             <span className="font-medium text-base">{f.name}</span>
-                            {f.cpf && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.cpf}</span>
+                            {(f.cpf || f.document) && (
+                              <span className="text-xs text-muted-foreground">CPF: {f.cpf || f.document}</span>
                             )}
                           </div>
                         </SelectItem>
@@ -283,7 +291,7 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                      <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || '-'}
+                        {funcionario.cpf || funcionario.document || '-'}
                       </div>
                     </div>
                   </div>
@@ -296,9 +304,9 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                       </div>
                     </div>
                      <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor</Label>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor (Posto de Trabalho)</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                         {funcionario.unit?.name || funcionario.position?.name || '-'}
+                         {funcionario.unit?.name || '-'}
                       </div>
                     </div>
                   </div>
@@ -352,7 +360,11 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                    <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {empresa.address ? `${empresa.address.street}, ${empresa.address.number}` : '-'}
+                      {empresa.address && empresa.address.street
+                        ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
+                            .filter(Boolean)
+                            .join(', ')
+                        : '-'}
                     </div>
                   </div>
                 </div>
@@ -443,36 +455,90 @@ const TermoResponsabilidadeEquipamentoForm = () => {
           <Separator />
 
           {/* Datas e Responsável */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <Label>Data de Entrega</Label>
-              <Input 
-                type="date" 
-                value={form.dataEntrega} 
-                onChange={(e) => setForm(prev => ({ ...prev, dataEntrega: e.target.value }))}
-                className="bg-background h-11"
-              />
+          <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+              <Calendar className="h-4 w-4" />
+              <span>Datas e Responsável</span>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Data de Devolução</Label>
-              <Input 
-                type="date" 
-                value={form.dataDevolucao} 
-                onChange={(e) => setForm(prev => ({ ...prev, dataDevolucao: e.target.value }))}
-                className="bg-background h-11"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Data de Entrega</Label>
+                <Input 
+                  type="date" 
+                  value={form.dataEntrega} 
+                  onChange={(e) => setForm(prev => ({ ...prev, dataEntrega: e.target.value }))}
+                  className="bg-background h-11"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Data de Devolução</Label>
+                <Input 
+                  type="date" 
+                  value={form.dataDevolucao} 
+                  onChange={(e) => setForm(prev => ({ ...prev, dataDevolucao: e.target.value }))}
+                  className="bg-background h-11"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Responsável pela Entrega</Label>
+                <Select 
+                  value={form.responsavelEntregaId} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="h-11 bg-background">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o responsável"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingData ? (
+                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
+                    ) : employees.length > 0 ? (
+                      employees.map(f => (
+                        <SelectItem key={f.id} value={f.id}>
+                          <div className="flex flex-col py-1">
+                            <span className="font-medium text-base">{f.name}</span>
+                            {(f.cpf || f.document) && (
+                              <span className="text-xs text-muted-foreground">CPF: {f.cpf || f.document}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Responsável pela Entrega</Label>
-              <Input 
-                value={form.responsavelEntrega} 
-                onChange={(e) => setForm(prev => ({ ...prev, responsavelEntrega: e.target.value }))}
-                placeholder="Nome do responsável"
-                className="bg-background h-11"
-              />
-            </div>
+
+            {/* Exibir dados do responsável quando selecionado */}
+            {responsavel && (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 pt-2">
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="flex items-center gap-2 font-medium text-sm">
+                    <User className="h-4 w-4 text-primary" />
+                    Dados do Responsável pela Entrega
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome Completo</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {responsavel.name}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                      {responsavel.cpf || responsavel.document || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Condições e Observações */}

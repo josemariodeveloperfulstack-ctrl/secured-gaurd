@@ -32,6 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 // Estrutura local da linha para a UI
 type TrainingRow = {
   id: string;
+  employeeId: string; // ID do funcionário para edição
   employee: string;
   cpf?: string;
   position?: string;
@@ -47,15 +48,14 @@ type TrainingRow = {
 
 const mockTrainings: TrainingRow[] = [
   {
-    id: 1,
+    id: '1',
+    employeeId: '00000000-0000-0000-0000-000000000001',
     employee: 'João Silva',
     cpf: '123.456.789-00',
     position: 'Vigilante',
     sector: 'Posto 1',
     workSchedule: '07:00-19:00',
     validUntil: '2026-07-20',
-    asoDate: '2025-07-20',
-    psicotecnicoDate: '2025-07-20',
     status: 'valid',
     lastUpdate: '2025-01-15',
     trainingType: 'NR-33',
@@ -63,15 +63,14 @@ const mockTrainings: TrainingRow[] = [
     hours: 40,
   },
   {
-    id: 2,
+    id: '2',
+    employeeId: '00000000-0000-0000-0000-000000000002',
     employee: 'Maria Souza',
     cpf: '987.654.321-00',
     position: 'Porteiro',
     sector: 'Posto 2',
     workSchedule: '19:00-07:00',
     validUntil: '2025-12-10',
-    asoDate: '',
-    psicotecnicoDate: '',
     status: 'expiring',
     lastUpdate: '2025-01-10',
     trainingType: 'NR-35',
@@ -79,15 +78,14 @@ const mockTrainings: TrainingRow[] = [
     hours: 32,
   },
   {
-    id: 3,
+    id: '3',
+    employeeId: '00000000-0000-0000-0000-000000000003',
     employee: 'Pedro Costa',
     cpf: '111.222.333-44',
     position: 'Supervisor',
     sector: 'Administrativo',
     workSchedule: '08:00-18:00',
     validUntil: '2024-11-15',
-    asoDate: '2024-11-15',
-    psicotecnicoDate: '2024-11-15',
     status: 'expired',
     lastUpdate: '2024-11-15',
     trainingType: 'NR-10',
@@ -95,15 +93,14 @@ const mockTrainings: TrainingRow[] = [
     hours: 48,
   },
   {
-    id: 4,
+    id: '4',
+    employeeId: '00000000-0000-0000-0000-000000000004',
     employee: 'Ana Santos',
     cpf: '555.666.777-88',
     position: 'Vigilante',
     sector: 'Posto 3',
     workSchedule: '06:00-18:00',
     validUntil: '2027-03-20',
-    asoDate: '2025-03-20',
-    psicotecnicoDate: '2025-03-20',
     status: 'valid',
     lastUpdate: '2025-01-20',
     trainingType: 'NR-33',
@@ -159,12 +156,25 @@ const EmployeeTrainingTab = () => {
           const status = getTrainingStatus(validUntil);
           const employee = employeeMap.get(c.employeeId) as any;
           
+          // Priorizar workPostName da certificação, senão pegar unit do employee
+          let sectorName = '';
+          if (c.workPostName) {
+            sectorName = c.workPostName;
+          } else if (employee?.unit) {
+            if (typeof employee.unit === 'string') {
+              sectorName = employee.unit;
+            } else if (employee.unit.name) {
+              sectorName = employee.unit.name;
+            }
+          }
+          
           return {
             id: c.id,
+            employeeId: c.employeeId, // ID do funcionário para edição
             employee: c.employeeName || employee?.name || 'Funcionário',
             cpf: c.employeeDocument || employee?.document || employee?.cpf,
             position: employee?.position?.name || '',
-            sector: employee?.unit?.name || '',
+            sector: sectorName,
             validUntil,
             status,
             trainingType: c.trainingName || 'Treinamento',
@@ -226,20 +236,92 @@ const EmployeeTrainingTab = () => {
     setOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Tem certeza que deseja excluir este treinamento?')) {
+  const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este treinamento?')) {
+      return;
+    }
+
+    try {
+      console.log('🗑️ Excluindo certificação:', id);
+      
+      // Chamar API para excluir do banco
+      await trainingService.deleteEmployeeCertification(id);
+      
+      console.log('✅ Certificação excluída com sucesso');
+      
+      // Atualizar lista local
       setTrainings(trainings.filter(t => t.id !== id));
+      
+      toast({ 
+        title: 'Sucesso', 
+        description: 'Treinamento excluído com sucesso!' 
+      });
+    } catch (error) {
+      console.error('❌ Erro ao excluir certificação:', error);
+      toast({ 
+        title: 'Erro', 
+        description: 'Falha ao excluir treinamento. Tente novamente.', 
+        variant: 'destructive' 
+      });
     }
   };
 
   // Salvar novo ou editar
-  const handleSave = (data: any) => {
-    if (data.id) {
-      setTrainings(trainings.map(t => t.id === data.id ? data : t));
-    } else {
-      setTrainings([...trainings, { ...data, id: Date.now() }]);
+  const handleSave = async (data: any) => {
+    console.log('📝 handleSave chamado com:', data);
+    
+    // Recarregar lista completa do backend
+    setLoading(true);
+    try {
+      // Buscar certificações de funcionários (histórico de treinamentos concluídos)
+      const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
+      
+      // Buscar dados completos dos funcionários para obter position e sector
+      const { employeeService } = await import('@/services/employeeService');
+      const employees = await employeeService.getAllEmployees();
+      const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
+      
+      const rows: TrainingRow[] = certs.map(c => {
+        const validUntil = c.expirationDate || '';
+        const status = getTrainingStatus(validUntil);
+        const employee = employeeMap.get(c.employeeId) as any;
+        
+        // Priorizar workPostName da certificação, senão pegar unit do employee
+        let sectorName = '';
+        if (c.workPostName) {
+          sectorName = c.workPostName;
+        } else if (employee?.unit) {
+          if (typeof employee.unit === 'string') {
+            sectorName = employee.unit;
+          } else if (employee.unit.name) {
+            sectorName = employee.unit.name;
+          }
+        }
+        
+        return {
+          id: c.id,
+          employeeId: c.employeeId, // ID do funcionário para edição
+          employee: c.employeeName || employee?.name || 'Funcionário',
+          cpf: c.employeeDocument || employee?.document || employee?.cpf,
+          position: employee?.position?.name || '',
+          sector: sectorName,
+          validUntil,
+          status,
+          trainingType: c.trainingName || 'Treinamento',
+          hours: c.renewalPeriodMonths ? c.renewalPeriodMonths * 8 : undefined, // Estimativa: 8h por mês
+        };
+      });
+      
+      console.log('✅ Lista de treinamentos recarregada:', rows.length);
+      setTrainings(rows);
+      toast({ title: 'Sucesso', description: 'Lista atualizada com sucesso!' });
+    } catch (e) {
+      console.error('❌ Erro ao recarregar treinamentos:', e);
+      toast({ title: 'Erro', description: 'Falha ao recarregar lista.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setOpen(false);
     }
-    setOpen(false);
   };
 
   const getStatusBadge = (status: string) => {

@@ -23,6 +23,10 @@ public class CreateEmployeeCertificationRequest {
     private UUID trainingId;
     private TrainingRef training;
     
+    // Posto de trabalho (opcional)
+    private UUID workPostId;
+    private String workPostName; // Para busca por nome
+    
     @NotBlank(message = "Certification number is required")
     @Size(min = 1, max = 100, message = "Certification number must be between 1 and 100 characters")
     private String certificationNumber;

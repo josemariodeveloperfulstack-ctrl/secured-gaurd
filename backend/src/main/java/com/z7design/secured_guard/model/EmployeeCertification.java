@@ -38,6 +38,10 @@ public class EmployeeCertification {
     @JoinColumn(name = "training_id")
     private Training training;
     
+    @ManyToOne
+    @JoinColumn(name = "work_post_id")
+    private WorkPost workPost;
+    
     @NotBlank(message = "Certification number is required")
     @Size(min = 1, max = 100, message = "Certification number must be between 1 and 100 characters")
     @Column(name = "certification_number")

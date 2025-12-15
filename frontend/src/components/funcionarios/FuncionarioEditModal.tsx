@@ -544,10 +544,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     if (!funcionario) return;
     
     // Validações
-    if (!form.user?.id) {
-      setError('Usuário é obrigatório para editar um funcionário.');
-      return;
-    }
     if (!form.address) {
       setError('Endereço é obrigatório para editar um funcionário.');
       return;

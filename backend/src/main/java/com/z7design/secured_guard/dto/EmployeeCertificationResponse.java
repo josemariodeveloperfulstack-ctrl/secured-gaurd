@@ -16,6 +16,8 @@ public record EmployeeCertificationResponse(
         UUID trainingId,
         String trainingName,
         Integer renewalPeriodMonths,
+        UUID workPostId,
+        String workPostName,
         String certificationNumber,
         LocalDate issueDate,
         LocalDate expirationDate,
@@ -31,6 +33,8 @@ public record EmployeeCertificationResponse(
                 .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
                 .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
                 .renewalPeriodMonths(certification.getTraining() != null ? certification.getTraining().getRenewalPeriodMonths() : null)
+                .workPostId(certification.getWorkPost() != null ? certification.getWorkPost().getId() : null)
+                .workPostName(certification.getWorkPost() != null ? certification.getWorkPost().getName() : null)
                 .certificationNumber(certification.getCertificationNumber())
                 .issueDate(certification.getIssueDate())
                 .expirationDate(certification.getExpirationDate())

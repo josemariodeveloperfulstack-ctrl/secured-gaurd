@@ -99,13 +99,17 @@ const TermoLGPDForm = () => {
       const payload = {
         templateName: 'termo-consentimento-lgpd.html',
         funcionario: funcionario.name,
-        cpf: funcionario.cpf,
+        cpf: funcionario.cpf || funcionario.document || '',
         cargo: funcionario.position?.name,
         departamento: funcionario.unit?.name || funcionario.position?.name,
         endereco: addressValue,
         empresa: empresa.name,
         cnpj: empresa.cnpj,
-        enderecoEmpresa: empresa.address ? `${empresa.address.street}, ${empresa.address.number}` : '',
+        enderecoEmpresa: empresa.address && empresa.address.street
+          ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
+              .filter(Boolean)
+              .join(', ')
+          : '',
         tiposConsentimento: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label).join(', '),
         finalidadeUso: formData.dataUsage,
         prazoRetencao: formData.dataRetention,
@@ -166,13 +170,17 @@ const TermoLGPDForm = () => {
         const payload = {
             templateName: 'termo-consentimento-lgpd.html',
             funcionario: funcionario.name,
-            cpf: funcionario.cpf,
+            cpf: funcionario.cpf || funcionario.document || '',
             cargo: funcionario.position?.name,
             departamento: funcionario.unit?.name || funcionario.position?.name,
             endereco: addressValue,
             empresa: empresa.name,
             cnpj: empresa.cnpj,
-            enderecoEmpresa: empresa.address ? `${empresa.address.street}, ${empresa.address.number}` : '',
+            enderecoEmpresa: empresa.address && empresa.address.street
+              ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
+                  .filter(Boolean)
+                  .join(', ')
+              : '',
             tiposConsentimento: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label).join(', '),
             finalidadeUso: formData.dataUsage,
             prazoRetencao: formData.dataRetention,
@@ -253,8 +261,8 @@ const TermoLGPDForm = () => {
                         <SelectItem key={f.id} value={f.id}>
                           <div className="flex flex-col py-1">
                             <span className="font-medium text-base">{f.name}</span>
-                            {f.cpf && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.cpf}</span>
+                            {(f.cpf || f.document) && (
+                              <span className="text-xs text-muted-foreground">CPF: {f.cpf || f.document}</span>
                             )}
                           </div>
                         </SelectItem>
@@ -322,7 +330,7 @@ const TermoLGPDForm = () => {
                      <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || '-'}
+                        {funcionario.cpf || funcionario.document || '-'}
                       </div>
                     </div>
                   </div>

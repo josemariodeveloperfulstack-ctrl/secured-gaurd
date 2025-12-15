@@ -7,12 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
-import { advertenciaDisciplinarGenerator } from '@/utils/advertenciaDisciplinarGenerator';
+import { FileText, Download, Eye, User, Building, Calendar, AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { documentService } from '@/services/documentService';
 import { Employee } from '@/types/employee';
-import { Company } from '@/types/company'; // Assuming this type exists or can be inferred as any
+import { Company } from '@/types/company';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 
 const AdvertenciaDisciplinarForm = () => {
   const [form, setForm] = useState({
@@ -29,6 +37,8 @@ const AdvertenciaDisciplinarForm = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -78,14 +88,40 @@ const AdvertenciaDisciplinarForm = () => {
     }
   };
 
-  const handlePreview = () => {
+  const handlePreview = async () => {
     if (!funcionario || !empresa) {
       alert('Selecione funcionário e empresa!');
       return;
     }
     
-    // TODO: Implementar preview da advertência
-    console.log('Preview da advertência:', form);
+    setLoading(true);
+    try {
+      const payload = {
+        templateName: 'advertencia-disciplinar.html',
+        funcionario: funcionario.name,
+        cpf: funcionario.cpf || funcionario.document || '',
+        cargo: (funcionario as any).position?.name || '',
+        empresa: empresa.sigla || empresa.tradeName || empresa.name,
+        cnpj: empresa.cnpj || '',
+        enderecoEmpresa: empresa.address || '',
+        motivo: form.motivo,
+        dataFaltas: form.dataFaltas,
+        dataRetorno: form.dataRetorno,
+        observacoes: form.observacoes,
+        dataEmissao: formatDateToBrazilian(form.dataEmissao),
+        dataAtual: formatDateToBrazilian(new Date().toISOString().split('T')[0]),
+      };
+
+      const blob = await documentService.generatePDF(payload);
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      setShowModal(true);
+    } catch (err) {
+      console.error('Erro ao gerar preview:', err);
+      alert('Erro ao gerar preview. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGerarPDF = async (e: React.FormEvent) => {
@@ -97,33 +133,33 @@ const AdvertenciaDisciplinarForm = () => {
     
     setLoading(true);
     try {
-      const advertenciaData = {
-        funcionario: {
-          nome: funcionario.name,
-          cpf: funcionario.cpf || '',
-          cargo: (funcionario as any).position?.name || '',
-          dataAdmissao: funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '',
-          endereco: typeof funcionario.address === 'string' 
-            ? funcionario.address 
-            : funcionario.address 
-              ? `${funcionario.address.street}, ${funcionario.address.number || ''}` 
-              : '',
-        },
-        empresa: {
-          nome: empresa.name,
-          cnpj: empresa.cnpj,
-          endereco: empresa.address
-        },
-        advertencia: {
-          motivo: form.motivo,
-          dataFaltas: form.dataFaltas,
-          dataRetorno: form.dataRetorno,
-          observacoes: form.observacoes,
-          dataEmissao: formatDateToBrazilian(form.dataEmissao),
-        }
+      const payload = {
+        templateName: 'advertencia-disciplinar.html',
+        funcionario: funcionario.name,
+        cpf: funcionario.cpf || funcionario.document || '',
+        cargo: (funcionario as any).position?.name || '',
+        empresa: empresa.sigla || empresa.tradeName || empresa.name,
+        cnpj: empresa.cnpj || '',
+        enderecoEmpresa: empresa.address || '',
+        motivo: form.motivo,
+        dataFaltas: form.dataFaltas,
+        dataRetorno: form.dataRetorno,
+        observacoes: form.observacoes,
+        dataEmissao: formatDateToBrazilian(form.dataEmissao),
+        dataAtual: formatDateToBrazilian(new Date().toISOString().split('T')[0]),
       };
 
-      await advertenciaDisciplinarGenerator.generatePDF(advertenciaData);
+      const blob = await documentService.generatePDF(payload);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `advertencia-disciplinar-${funcionario.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      alert('Advertência gerada com sucesso!');
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Erro ao gerar PDF. Tente novamente.');
@@ -132,7 +168,27 @@ const AdvertenciaDisciplinarForm = () => {
     }
   };
 
+  const handleDownloadFromModal = () => {
+    if (!pdfUrl || !funcionario) return;
+    
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = `advertencia-disciplinar-${funcionario.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    if (pdfUrl) {
+      URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(null);
+    }
+  };
+
   return (
+    <>
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Card className="border-t-4 border-t-red-500 shadow-md">
         <CardHeader className="pb-4">
@@ -429,6 +485,62 @@ const AdvertenciaDisciplinarForm = () => {
         </CardContent>
       </Card>
     </div>
+
+    {/* Modal de Visualização do PDF */}
+    <Dialog open={showModal} onOpenChange={setShowModal}>
+      <DialogContent className="max-w-4xl h-[90vh] p-0">
+        <DialogHeader className="p-6 pb-4 border-b">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                Advertência Disciplinar
+              </DialogTitle>
+              <DialogDescription>
+                Visualize o documento gerado antes de fazer o download
+              </DialogDescription>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleCloseModal}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-hidden p-6 pt-0">
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-[calc(90vh-200px)] border rounded-lg"
+              title="Visualização da Advertência Disciplinar"
+            />
+          )}
+        </div>
+
+        <DialogFooter className="p-6 pt-4 border-t">
+          <Button 
+            onClick={handleCloseModal}
+            variant="outline"
+            className="gap-2"
+          >
+            <X className="h-4 w-4" />
+            Fechar
+          </Button>
+          <Button 
+            onClick={handleDownloadFromModal}
+            className="gap-2 bg-red-600 hover:bg-red-700"
+          >
+            <Download className="h-4 w-4" />
+            Baixar Advertência
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

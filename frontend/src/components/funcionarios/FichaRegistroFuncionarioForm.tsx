@@ -15,11 +15,22 @@ import api from '@/lib/axios';
 
 const FichaRegistroFuncionarioForm = () => {
   const { toast } = useToast();
+  
+  // Função auxiliar para formatar data ISO para BR
+  const formatDateToBR = (isoDate: string | null | undefined): string => {
+    if (!isoDate) return '';
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return isoDate;
+    }
+  };
   const [form, setForm] = useState({
     funcionarioId: '',
     empresaId: '',
     dataRegistro: '',
-    responsavelRegistro: '',
+    responsavelRegistroId: '', // ID do funcionário responsável
     observacoes: '',
     documentosEntregues: [] as string[],
   });
@@ -33,6 +44,7 @@ const FichaRegistroFuncionarioForm = () => {
 
   const funcionario = employees.find(f => f.id === form.funcionarioId);
   const empresa = companies.find(e => e.id === form.empresaId);
+  const responsavel = employees.find(f => f.id === form.responsavelRegistroId);
 
   // Carregar dados completos do funcionário quando selecionado
   useEffect(() => {
@@ -151,7 +163,7 @@ const FichaRegistroFuncionarioForm = () => {
         rg: fullEmployee.rg || '',
         pis: fullEmployee.pis || '',
         ctps: fullEmployee.ctps || '',
-        dataNascimento: fullEmployee.birthDate || '',
+        dataNascimento: formatDateToBR(fullEmployee.birthDate),
         nacionalidade: fullEmployee.nationality || 'Brasileira',
         naturalidade: fullEmployee.localNascimento || '',
         estadoCivil: fullEmployee.maritalStatus || '',
@@ -164,11 +176,11 @@ const FichaRegistroFuncionarioForm = () => {
         cnpj: empresa.cnpj || '',
         enderecoEmpresa: empresa.address || '',
         // Dados do Registro
-        dataAdmissao: fullEmployee.hireDate || '',
+        dataAdmissao: formatDateToBR(fullEmployee.hireDate),
         cargo: (fullEmployee as any).position?.name || '',
         setor: (fullEmployee as any).unit?.name || '',
-        dataRegistro: form.dataRegistro,
-        responsavelRegistro: form.responsavelRegistro || '',
+        dataRegistro: formatDateToBR(form.dataRegistro),
+        responsavelRegistro: responsavel?.name || '',
         documentosEntregues: form.documentosEntregues || [],
         observacoes: form.observacoes || '',
         dataAtual: new Date().toLocaleDateString('pt-BR')
@@ -240,7 +252,7 @@ const FichaRegistroFuncionarioForm = () => {
         rg: fullEmployee.rg || '',
         pis: fullEmployee.pis || '',
         ctps: fullEmployee.ctps || '',
-        dataNascimento: fullEmployee.birthDate || '',
+        dataNascimento: formatDateToBR(fullEmployee.birthDate),
         nacionalidade: fullEmployee.nationality || 'Brasileira',
         naturalidade: fullEmployee.localNascimento || '',
         estadoCivil: fullEmployee.maritalStatus || '',
@@ -253,11 +265,11 @@ const FichaRegistroFuncionarioForm = () => {
         cnpj: empresa.cnpj || '',
         enderecoEmpresa: empresa.address || '',
         // Dados do Registro
-        dataAdmissao: fullEmployee.hireDate || '',
+        dataAdmissao: formatDateToBR(fullEmployee.hireDate),
         cargo: (fullEmployee as any).position?.name || '',
         setor: (fullEmployee as any).unit?.name || '',
-        dataRegistro: form.dataRegistro,
-        responsavelRegistro: form.responsavelRegistro || '',
+        dataRegistro: formatDateToBR(form.dataRegistro),
+        responsavelRegistro: responsavel?.name || '',
         documentosEntregues: form.documentosEntregues || [],
         observacoes: form.observacoes || '',
         dataAtual: new Date().toLocaleDateString('pt-BR')
@@ -550,15 +562,15 @@ const FichaRegistroFuncionarioForm = () => {
           {(funcionario || empresa) && <Separator />}
 
           {/* Dados do Registro */}
-          <div className="space-y-6">
-             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
+             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <Calendar className="h-4 w-4" />
               <span>Dados do Registro</span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label>Data do Registro</Label>
+                <Label className="text-base font-semibold">Data do Registro</Label>
                 <Input 
                   type="date" 
                   value={form.dataRegistro} 
@@ -568,15 +580,62 @@ const FichaRegistroFuncionarioForm = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>Responsável pelo Registro</Label>
-                <Input 
-                  value={form.responsavelRegistro} 
-                  onChange={(e) => setForm(prev => ({ ...prev, responsavelRegistro: e.target.value }))}
-                  placeholder="Nome do responsável"
-                  className="bg-background h-11"
-                />
+                <Label className="text-base font-semibold">Responsável pelo Registro</Label>
+                <Select 
+                  value={form.responsavelRegistroId} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, responsavelRegistroId: value }))}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="h-11 bg-background">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o responsável"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingData ? (
+                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
+                    ) : employees.length > 0 ? (
+                      employees.map(f => (
+                        <SelectItem key={f.id} value={f.id}>
+                          <div className="flex flex-col py-1">
+                            <span className="font-medium text-base">{f.name}</span>
+                            {f.document && (
+                              <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
+            {/* Exibir dados do responsável quando selecionado */}
+            {responsavel && (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 pt-2">
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="flex items-center gap-2 font-medium text-sm">
+                    <User className="h-4 w-4 text-primary" />
+                    Dados do Responsável
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome Completo</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {responsavel.name}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                      {responsavel.cpf || responsavel.document || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Documentos Entregues */}

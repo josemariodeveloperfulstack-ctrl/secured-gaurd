@@ -37,6 +37,8 @@ export interface EmployeeCertification {
   trainingId: string;
   trainingName?: string;
   renewalPeriodMonths?: number;
+  workPostId?: string;
+  workPostName?: string;
   certificationNumber: string;
   issueDate: string;
   expirationDate?: string;
@@ -77,6 +79,7 @@ class TrainingService {
     issueDate: string; // ISO date
     expirationDate?: string; // ISO date
     documentUrl?: string;
+    workPostName?: string;
   }): Promise<EmployeeCertification> {
     const response = await api.post('/employee-certifications', {
       employee: { id: payload.employeeId },
@@ -84,7 +87,29 @@ class TrainingService {
       certificationNumber: payload.certificationNumber,
       issueDate: payload.issueDate,
       expirationDate: payload.expirationDate || null,
-      documentUrl: payload.documentUrl ?? 'N/A'
+      documentUrl: payload.documentUrl ?? 'N/A',
+      workPostName: payload.workPostName || null
+    });
+    return response.data;
+  }
+
+  async updateEmployeeCertification(id: string, payload: {
+    employeeId: string;
+    trainingId: string;
+    certificationNumber: string;
+    issueDate: string;
+    expirationDate?: string;
+    documentUrl?: string;
+    workPostName?: string;
+  }): Promise<EmployeeCertification> {
+    const response = await api.put(`/employee-certifications/${id}`, {
+      employee: { id: payload.employeeId },
+      training: { id: payload.trainingId },
+      certificationNumber: payload.certificationNumber,
+      issueDate: payload.issueDate,
+      expirationDate: payload.expirationDate || null,
+      documentUrl: payload.documentUrl ?? 'N/A',
+      workPostName: payload.workPostName || null
     });
     return response.data;
   }
@@ -94,6 +119,10 @@ class TrainingService {
       params: { expirationDate }
     });
     return response.data;
+  }
+
+  async deleteEmployeeCertification(id: string): Promise<void> {
+    await api.delete(`/employee-certifications/${id}`);
   }
 }
 

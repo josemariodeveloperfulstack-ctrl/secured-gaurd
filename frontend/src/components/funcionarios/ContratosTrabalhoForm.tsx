@@ -10,6 +10,7 @@ import { Separator } from '../ui/separator';
 import { Calendar, User, Building, FileText, Download, Eye, Loader2, CheckCircle2, DollarSign, Clock, Briefcase } from 'lucide-react';
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
@@ -28,15 +29,18 @@ const ContratosTrabalhoForm = () => {
     supervisor: '',
     benefits: [] as string[],
     observations: '',
+    experienceDuration: '', // 45, 60 ou 90 dias
   });
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
 
   const funcionario = employees.find(f => f.id === form.employeeId);
   const empresa = companies.find(e => e.id === form.companyId);
+  const costCenter = costCenters.find(cc => cc.id === form.department || cc.name === form.department);
 
   useEffect(() => {
     loadData();
@@ -45,17 +49,20 @@ const ContratosTrabalhoForm = () => {
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData] = await Promise.all([
+      const [employeesData, companiesData, costCentersData] = await Promise.all([
         employeeService.getAllEmployees(),
-        companyService.getAllCompanies()
+        companyService.getAllCompanies(),
+        costCenterService.listActive()
       ]);
       setEmployees(employeesData);
       setCompanies(companiesData);
+      setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
+      console.log('📊 Centros de Custo carregados:', costCentersData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar funcionários e empresas.',
+        description: 'Não foi possível carregar funcionários, empresas e centros de custos.',
         variant: 'destructive'
       });
     } finally {
@@ -66,23 +73,54 @@ const ContratosTrabalhoForm = () => {
   // Pre-fill some fields when employee is selected
   useEffect(() => {
     if (funcionario) {
+      // Try to find cost center by unit name
+      const unitName = (funcionario as any).unit?.name;
+      const matchingCostCenter = unitName 
+        ? costCenters.find(cc => cc.name.toLowerCase() === unitName.toLowerCase())
+        : null;
+      
       setForm(prev => ({
         ...prev,
         position: (funcionario as any).position?.name || prev.position,
-        department: (funcionario as any).unit?.name || prev.department,
+        department: matchingCostCenter?.id || prev.department,
         startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
       }));
     }
-  }, [funcionario]);
+  }, [funcionario, costCenters]);
+
+  // Auto-calculate end date for experience contracts
+  useEffect(() => {
+    if (form.contractType === 'Contrato de Experiência' && form.startDate && form.experienceDuration) {
+      const startDate = new Date(form.startDate);
+      const durationDays = parseInt(form.experienceDuration);
+      
+      if (!isNaN(startDate.getTime()) && !isNaN(durationDays)) {
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + durationDays);
+        
+        setForm(prev => ({
+          ...prev,
+          endDate: endDate.toISOString().split('T')[0]
+        }));
+      }
+    }
+  }, [form.contractType, form.startDate, form.experienceDuration]);
 
   const contractTypes = [
     'CLT - Efetivo',
     'CLT - Temporário',
+    'Contrato de Experiência',
     'PJ - Prestador de Serviços',
     'Estagiário',
     'Aprendiz',
     'Terceirizado',
     'Intermitente',
+  ];
+
+  const experienceDurations = [
+    { value: '45', label: '45 dias' },
+    { value: '60', label: '60 dias' },
+    { value: '90', label: '90 dias' },
   ];
 
   const benefitOptions = [
@@ -123,6 +161,14 @@ const ContratosTrabalhoForm = () => {
       });
       return false;
     }
+    if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
+      toast({
+        title: 'Atenção',
+        description: 'Selecione a duração do período de experiência (45, 60 ou 90 dias)!',
+        variant: 'destructive'
+      });
+      return false;
+    }
     return true;
   };
 
@@ -158,11 +204,15 @@ const ContratosTrabalhoForm = () => {
       dataFim: form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : 'Indeterminado',
       salario: form.salary,
       jornada: form.workSchedule || '44 horas semanais',
-      departamento: form.department,
+      departamento: costCenter?.name || form.department || '',
+      departamentoCode: costCenter?.code || '',
       supervisor: form.supervisor,
       beneficios: form.benefits.join(', '),
       observacoes: form.observations,
-      dataAtual: new Date().toLocaleDateString('pt-BR')
+      dataAtual: new Date().toLocaleDateString('pt-BR'),
+      // Dados do Contrato de Experiência
+      isExperienceContract: form.contractType === 'Contrato de Experiência',
+      experienceDuration: form.experienceDuration ? `${form.experienceDuration} dias` : ''
     };
   };
 
@@ -330,7 +380,13 @@ const ContratosTrabalhoForm = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`grid grid-cols-1 gap-6 ${
+            funcionario && empresa && costCenter 
+              ? 'lg:grid-cols-3' 
+              : funcionario && empresa 
+                ? 'lg:grid-cols-2' 
+                : 'lg:grid-cols-1'
+          }`}>
             {/* Detalhes do Funcionário */}
             {funcionario && (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
@@ -398,9 +454,45 @@ const ContratosTrabalhoForm = () => {
                 </div>
               </div>
             )}
+
+            {/* Detalhes do Centro de Custos */}
+            {costCenter && (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-200">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Briefcase className="h-4 w-4 text-primary" />
+                    Centro de Custos Selecionado
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {costCenter.name}
+                      </div>
+                    </div>
+                     <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Código</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {costCenter.code || '-'}
+                      </div>
+                    </div>
+                  </div>
+                  {costCenter.description && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Descrição</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {costCenter.description}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           
-          {(funcionario || empresa) && <Separator />}
+          {(funcionario || empresa || costCenter) && <Separator />}
 
           {/* Detalhes do Contrato */}
           <div className="space-y-6">
@@ -433,7 +525,54 @@ const ContratosTrabalhoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
+            {/* Campo de Duração da Experiência (aparece apenas para Contrato de Experiência) */}
+            {form.contractType === 'Contrato de Experiência' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border-2 border-orange-300 rounded-lg animate-in fade-in zoom-in-95 duration-300">
+                <div className="space-y-2 md:col-span-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                    <Label className="text-orange-700 font-bold text-base">⚠️ Configuração do Contrato de Experiência</Label>
+                  </div>
+                  <p className="text-sm text-orange-700">
+                    Selecione a duração do período de experiência. A data de término será calculada automaticamente.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-orange-700 font-semibold">Duração da Experiência *</Label>
+                  <Select 
+                    value={form.experienceDuration} 
+                    onValueChange={(value) => setForm(prev => ({ ...prev, experienceDuration: value }))}
+                  >
+                    <SelectTrigger className="bg-white h-12 border-orange-400 focus:border-orange-600 text-base font-semibold">
+                      <SelectValue placeholder="Selecione o período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {experienceDurations.map(duration => (
+                        <SelectItem key={duration.value} value={duration.value} className="text-base font-medium">
+                          {duration.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.experienceDuration && form.startDate && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="text-orange-700 font-semibold">Data de Término Calculada</Label>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 border-orange-400">
+                      <Calendar className="h-5 w-5 text-orange-600" />
+                      <span className="font-bold text-base">
+                        {form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : 'Calculando...'}
+                      </span>
+                      <Badge className="ml-auto bg-orange-600">Automático</Badge>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label>Data de Início</Label>
                 <Input 
@@ -481,13 +620,34 @@ const ContratosTrabalhoForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Departamento</Label>
-                <Input 
+                <Label>Departamento (Centro de Custo)</Label>
+                <Select 
                   value={form.department} 
-                  onChange={(e) => setForm(prev => ({ ...prev, department: e.target.value }))}
-                  placeholder="Ex: Operacional"
-                  className="bg-background h-11"
-                />
+                  onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="h-11 bg-background">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o departamento"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingData ? (
+                      <div className="p-2 text-center text-sm text-gray-500">Carregando centros de custo...</div>
+                    ) : costCenters.length > 0 ? (
+                      costCenters.map(cc => (
+                        <SelectItem key={cc.id} value={cc.id || cc.name}>
+                          <div className="flex flex-col py-1">
+                            <span className="font-medium text-base">{cc.name}</span>
+                            {cc.code && (
+                              <span className="text-xs text-muted-foreground">Código: {cc.code}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-center text-sm text-gray-500">Nenhum centro de custo encontrado</div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
