@@ -55,7 +55,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
 
   useEffect(() => {
     const loadEditData = async () => {
-      if (editData) {
+    if (editData) {
         console.log('📝 Modo edição - editData recebido:', editData);
         
         // Garantir que editData tenha todas as propriedades necessárias
@@ -118,16 +118,16 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
             console.error('❌ Erro ao buscar dados do funcionário:', error);
           }
         }
-      } else {
-        setForm({
-          employeeId: '', employee: '', cpf: '', position: '', validUntil: '', sector: '', workSchedule: '', asoDate: '', psicotecnicoDate: '', id: undefined
-        });
-      }
+    } else {
+      setForm({
+        employeeId: '', employee: '', cpf: '', position: '', validUntil: '', sector: '', workSchedule: '', asoDate: '', psicotecnicoDate: '', id: undefined
+      });
+    }
       
-      // Resetar selectedEmployee e positionSelectKey quando o modal abrir
+    // Resetar selectedEmployee e positionSelectKey quando o modal abrir
       if (open && !editData) {
-        setSelectedEmployee(null);
-        setPositionSelectKey(0);
+      setSelectedEmployee(null);
+      setPositionSelectKey(0);
       }
     };
     

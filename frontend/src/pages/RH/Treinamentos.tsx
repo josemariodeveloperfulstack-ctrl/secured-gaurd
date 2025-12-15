@@ -45,6 +45,8 @@ import {
   Plus,
   Link as LinkIcon,
   Calendar,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 
 type CertificationFilter = 'all' | 'dueSoon' | 'expired' | 'compliant';
@@ -106,6 +108,10 @@ const Treinamentos: React.FC = () => {
   const [isSavingTraining, setIsSavingTraining] = useState(false);
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
   const [renewingCertificationId, setRenewingCertificationId] = useState<string | null>(null);
+  const [editingTrainingId, setEditingTrainingId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [trainingToDelete, setTrainingToDelete] = useState<Training | null>(null);
+  const [isDeletingTraining, setIsDeletingTraining] = useState(false);
 
   const [trainingForm, setTrainingForm] = useState({
     name: '',
@@ -269,22 +275,101 @@ const Treinamentos: React.FC = () => {
     setAssignmentModalOpen(true);
   };
 
+  const openEditTrainingModal = (training: Training) => {
+    setEditingTrainingId(training.id);
+    setTrainingForm({
+      name: training.name,
+      description: training.description || '',
+      provider: training.provider || '',
+      duration: training.duration ?? 8,
+      renewalPeriodMonths: training.renewalPeriodMonths ?? 12,
+      mandatoryForGuards: training.mandatoryForGuards !== false,
+    });
+    setTrainingModalOpen(true);
+  };
+
+  const openNewTrainingModal = () => {
+    setEditingTrainingId(null);
+    setTrainingForm({
+      name: '',
+      description: '',
+      provider: '',
+      duration: 8,
+      renewalPeriodMonths: 12,
+      mandatoryForGuards: true,
+    });
+    setTrainingModalOpen(true);
+  };
+
+  const openDeleteDialog = (training: Training) => {
+    setTrainingToDelete(training);
+    setIsDeleteDialogOpen(true);
+  };
+
   const handleCreateTraining = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSavingTraining(true);
     try {
-      const newTraining = await trainingService.createTraining({
-        name: trainingForm.name.trim(),
-        description: trainingForm.description.trim(),
-        provider: trainingForm.provider.trim(),
-        duration: trainingForm.duration,
-        renewalPeriodMonths: trainingForm.renewalPeriodMonths,
-        mandatoryForGuards: trainingForm.mandatoryForGuards,
-      });
-      toast({
-        title: 'Treinamento cadastrado',
-        description: 'O treinamento foi registrado com sucesso.',
-      });
+      if (editingTrainingId) {
+        // Modo de edição
+        await trainingService.updateTraining(editingTrainingId, {
+          name: trainingForm.name.trim(),
+          description: trainingForm.description.trim(),
+          provider: trainingForm.provider.trim(),
+          duration: trainingForm.duration,
+          renewalPeriodMonths: trainingForm.renewalPeriodMonths,
+          mandatoryForGuards: trainingForm.mandatoryForGuards,
+        });
+        toast({
+          title: 'Treinamento atualizado',
+          description: 'As alterações foram salvas com sucesso.',
+        });
+        setEditingTrainingId(null);
+      } else {
+        // Modo de criação
+        const newTraining = await trainingService.createTraining({
+          name: trainingForm.name.trim(),
+          description: trainingForm.description.trim(),
+          provider: trainingForm.provider.trim(),
+          duration: trainingForm.duration,
+          renewalPeriodMonths: trainingForm.renewalPeriodMonths,
+          mandatoryForGuards: trainingForm.mandatoryForGuards,
+        });
+        toast({
+          title: 'Treinamento cadastrado',
+          description: 'O treinamento foi registrado com sucesso.',
+        });
+        
+        // Se estava vindo do modal de reciclagem, reabrir e selecionar o novo treinamento
+        if (assignmentForm.trainingId === '') {
+          setTrainingModalOpen(false);
+          setTimeout(() => {
+            setAssignmentModalOpen(true);
+            if (newTraining?.id) {
+              const expiration = addMonthsToDate(todayIso, trainingForm.renewalPeriodMonths);
+              const defaultCertification = trainingForm.name
+                ? `${trainingForm.name.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date().getFullYear()}`
+                : '';
+              setAssignmentForm((prev) => ({
+                ...prev,
+                trainingId: newTraining.id,
+                expirationDate: expiration,
+                certificationNumber: defaultCertification,
+              }));
+            }
+          }, 100);
+          setTrainingForm({
+            name: '',
+            description: '',
+            provider: '',
+            duration: 8,
+            renewalPeriodMonths: 12,
+            mandatoryForGuards: true,
+          });
+          return;
+        }
+      }
+      
       setTrainingForm({
         name: '',
         description: '',
@@ -294,37 +379,41 @@ const Treinamentos: React.FC = () => {
         mandatoryForGuards: true,
       });
       await loadData();
-      
-      // Se estava vindo do modal de reciclagem, reabrir e selecionar o novo treinamento
-      if (assignmentForm.trainingId === '') {
-        setTrainingModalOpen(false);
-        setTimeout(() => {
-          setAssignmentModalOpen(true);
-          if (newTraining?.id) {
-            const expiration = addMonthsToDate(todayIso, trainingForm.renewalPeriodMonths);
-            const defaultCertification = trainingForm.name
-              ? `${trainingForm.name.slice(0, 12).replace(/\s+/g, '').toUpperCase()}-${new Date().getFullYear()}`
-              : '';
-            setAssignmentForm((prev) => ({
-              ...prev,
-              trainingId: newTraining.id,
-              expirationDate: expiration,
-              certificationNumber: defaultCertification,
-            }));
-          }
-        }, 100);
-      } else {
-        setTrainingModalOpen(false);
-      }
+      setTrainingModalOpen(false);
     } catch (error) {
-      console.error('Erro ao criar treinamento', error);
+      console.error('Erro ao salvar treinamento', error);
       toast({
         title: 'Erro ao salvar',
-        description: 'Não foi possível criar o treinamento. Verifique os dados e tente novamente.',
+        description: `Não foi possível ${editingTrainingId ? 'atualizar' : 'criar'} o treinamento. Verifique os dados e tente novamente.`,
         variant: 'destructive',
       });
     } finally {
       setIsSavingTraining(false);
+    }
+  };
+
+  const handleDeleteTraining = async () => {
+    if (!trainingToDelete) return;
+    
+    setIsDeletingTraining(true);
+    try {
+      await trainingService.deleteTraining(trainingToDelete.id);
+      toast({
+        title: 'Treinamento excluído',
+        description: 'O treinamento foi removido com sucesso.',
+      });
+      setIsDeleteDialogOpen(false);
+      setTrainingToDelete(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao excluir treinamento', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir o treinamento. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingTraining(false);
     }
   };
 
@@ -509,7 +598,7 @@ const Treinamentos: React.FC = () => {
               </CardDescription>
             </div>
             <Button 
-              onClick={() => setTrainingModalOpen(true)} 
+              onClick={openNewTrainingModal} 
               className="gap-2 w-full sm:w-auto"
               size="sm"
             >
@@ -645,14 +734,32 @@ const Treinamentos: React.FC = () => {
                           </div>
                         </td>
                         <td className="py-3 px-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-gray-600 text-gray-200"
-                            onClick={() => openAssignmentModal(training.id)}
-                          >
-                            Registrar reciclagem
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-gray-600 text-gray-200"
+                              onClick={() => openAssignmentModal(training.id)}
+                            >
+                              Registrar reciclagem
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-blue-600/50 text-blue-400 hover:bg-blue-600/10"
+                              onClick={() => openEditTrainingModal(training)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-red-600/50 text-red-400 hover:bg-red-600/10"
+                              onClick={() => openDeleteDialog(training)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -838,12 +945,19 @@ const Treinamentos: React.FC = () => {
         </Card>
       </div>
 
-      <Dialog open={isTrainingModalOpen} onOpenChange={setTrainingModalOpen}>
+      <Dialog open={isTrainingModalOpen} onOpenChange={(open) => {
+        setTrainingModalOpen(open);
+        if (!open) setEditingTrainingId(null);
+      }}>
         <DialogContent className="w-[95vw] sm:max-w-lg bg-seguranca-black border-gray-700 text-gray-200 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Novo treinamento obrigatório</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">
+              {editingTrainingId ? 'Editar treinamento' : 'Novo treinamento obrigatório'}
+            </DialogTitle>
             <DialogDescription className="text-gray-400 text-sm">
-              Cadastre cursos e reciclagens que devem ser renovados periodicamente pelos vigilantes.
+              {editingTrainingId 
+                ? 'Atualize as informações do treinamento selecionado.'
+                : 'Cadastre cursos e reciclagens que devem ser renovados periodicamente pelos vigilantes.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateTraining} className="space-y-4 sm:space-y-5 mt-4">
@@ -986,12 +1100,12 @@ const Treinamentos: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   className="h-auto py-1.5 px-2 text-xs text-seguranca-red hover:text-seguranca-red/90 hover:bg-seguranca-red/10 border border-seguranca-red/30 rounded-md transition-colors w-full sm:w-auto"
-                  onClick={() => {
-                    setAssignmentModalOpen(false);
-                    setTimeout(() => {
-                      setTrainingModalOpen(true);
-                    }, 100);
-                  }}
+                            onClick={() => {
+                              setAssignmentModalOpen(false);
+                              setTimeout(() => {
+                                openNewTrainingModal();
+                              }, 100);
+                            }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   <span className="hidden sm:inline">Cadastrar novo treinamento</span>
@@ -1041,7 +1155,7 @@ const Treinamentos: React.FC = () => {
                               e.stopPropagation();
                               setAssignmentModalOpen(false);
                               setTimeout(() => {
-                                setTrainingModalOpen(true);
+                                openNewTrainingModal();
                               }, 100);
                             }}
                           >
@@ -1172,6 +1286,64 @@ const Treinamentos: React.FC = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="w-[95vw] sm:max-w-md bg-seguranca-black border-gray-700 text-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-lg text-red-400 flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5" />
+              Confirmar exclusão
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm">
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          {trainingToDelete && (
+            <div className="py-4 space-y-3">
+              <p className="text-gray-300">
+                Tem certeza que deseja excluir o treinamento:
+              </p>
+              <div className="bg-seguranca-graphite border border-gray-700 rounded-lg p-3">
+                <p className="font-semibold text-white">{trainingToDelete.name}</p>
+                {trainingToDelete.description && (
+                  <p className="text-sm text-gray-400 mt-1">{trainingToDelete.description}</p>
+                )}
+              </div>
+              <p className="text-sm text-amber-400 flex items-start gap-2">
+                <ShieldAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  Todos os registros de reciclagem vinculados a este treinamento também serão removidos.
+                </span>
+              </p>
+            </div>
+          )}
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-gray-600 text-gray-200 w-full sm:w-auto"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setTrainingToDelete(null);
+              }}
+              disabled={isDeletingTraining}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="gap-2 w-full sm:w-auto bg-red-600 hover:bg-red-700"
+              onClick={handleDeleteTraining}
+              disabled={isDeletingTraining}
+            >
+              {isDeletingTraining && <Loader2 className="h-4 w-4 animate-spin" />}
+              Excluir treinamento
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </StandardLayout>

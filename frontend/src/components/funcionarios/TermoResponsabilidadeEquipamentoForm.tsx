@@ -461,28 +461,28 @@ const TermoResponsabilidadeEquipamentoForm = () => {
               <span>Datas e Responsável</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
                 <Label className="text-base font-semibold">Data de Entrega</Label>
-                <Input 
-                  type="date" 
-                  value={form.dataEntrega} 
-                  onChange={(e) => setForm(prev => ({ ...prev, dataEntrega: e.target.value }))}
-                  className="bg-background h-11"
-                />
-              </div>
-              
-              <div className="space-y-2">
+              <Input 
+                type="date" 
+                value={form.dataEntrega} 
+                onChange={(e) => setForm(prev => ({ ...prev, dataEntrega: e.target.value }))}
+                className="bg-background h-11"
+              />
+            </div>
+            
+            <div className="space-y-2">
                 <Label className="text-base font-semibold">Data de Devolução</Label>
-                <Input 
-                  type="date" 
-                  value={form.dataDevolucao} 
-                  onChange={(e) => setForm(prev => ({ ...prev, dataDevolucao: e.target.value }))}
-                  className="bg-background h-11"
-                />
-              </div>
-              
-              <div className="space-y-2">
+              <Input 
+                type="date" 
+                value={form.dataDevolucao} 
+                onChange={(e) => setForm(prev => ({ ...prev, dataDevolucao: e.target.value }))}
+                className="bg-background h-11"
+              />
+            </div>
+            
+            <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pela Entrega</Label>
                 <Select 
                   value={form.responsavelEntregaId} 

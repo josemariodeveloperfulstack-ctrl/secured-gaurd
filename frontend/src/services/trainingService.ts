@@ -72,6 +72,15 @@ class TrainingService {
     return response.data;
   }
 
+  async updateTraining(id: string, training: Partial<Omit<Training, 'id'>>): Promise<Training> {
+    const response = await api.put(`/trainings/${id}`, training);
+    return response.data;
+  }
+
+  async deleteTraining(id: string): Promise<void> {
+    await api.delete(`/trainings/${id}`);
+  }
+
   async createEmployeeCertification(payload: {
     employeeId: string;
     trainingId: string;

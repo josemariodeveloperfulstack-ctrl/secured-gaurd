@@ -320,7 +320,7 @@ const EmployeeTrainingTab = () => {
       toast({ title: 'Erro', description: 'Falha ao recarregar lista.', variant: 'destructive' });
     } finally {
       setLoading(false);
-      setOpen(false);
+    setOpen(false);
     }
   };
 
