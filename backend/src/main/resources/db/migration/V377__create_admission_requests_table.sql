@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS admission_requests (
 -- Adicionar FKs com verificação de constraints existentes
 DO $$
 BEGIN
+    -- Verificar se units.id tem PK/UNIQUE
+    PERFORM 1
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+    WHERE c.conrelid = 'units'::regclass
+      AND a.attname = 'id'
+      AND c.contype IN ('p','u');
+
     -- Só cria FK para units se existir PK/UNIQUE em units(id)
     IF EXISTS (
         SELECT 1
@@ -54,7 +62,20 @@ BEGIN
         RAISE NOTICE 'FK fk_admission_request_unit não criada: units.id não é UNIQUE/PK';
     END IF;
 
-    -- Demais FKs apontam para users(id), que já é PK/UNIQUE
+    -- Verificar se users.id tem PK/UNIQUE
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+        WHERE c.conrelid = 'users'::regclass
+          AND a.attname = 'id'
+          AND c.contype IN ('p','u')
+    ) THEN
+        RAISE NOTICE 'FKs de admission_requests para users não criadas: users.id não é UNIQUE/PK';
+        RETURN;
+    END IF;
+
+    -- Demais FKs apontam para users(id) (se tiver PK/UNIQUE)
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
         WHERE conname = 'fk_admission_request_approved_by'
