@@ -47,7 +47,7 @@ public class UpdateUserRequest {
     )
     private String whatsapp;
     
-    private List<RoleDTO> roles;
+    private List<String> roles;  // Array de Strings com nomes dos roles
     
     private Boolean active;
     

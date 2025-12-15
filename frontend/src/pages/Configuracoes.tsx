@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,11 @@ import {
   CheckCircle,
   Building2,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Edit,
+  Power,
+  Trash2,
+  MoreHorizontal
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -872,16 +876,16 @@ const Configuracoes = () => {
                     <span className="text-seguranca-lightgray">Carregando usuários...</span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-lg border border-gray-600">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-seguranca-lightgray">Nome</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Email</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
-                        <TableHead className="text-seguranca-lightgray">Funções</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Ações</TableHead>
+                      <TableHead className="text-seguranca-lightgray w-[200px]">Nome</TableHead>
+                      <TableHead className="text-seguranca-lightgray w-[220px]">Email</TableHead>
+                        <TableHead className="text-seguranca-lightgray w-[130px]">Usuário</TableHead>
+                        <TableHead className="text-seguranca-lightgray w-[140px]">Funções</TableHead>
+                      <TableHead className="text-seguranca-lightgray w-[90px] text-center">Status</TableHead>
+                      <TableHead className="text-seguranca-lightgray w-[140px] text-center">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -896,28 +900,36 @@ const Configuracoes = () => {
                           <TableRow key={userItem.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-seguranca-red/20 flex items-center justify-center text-seguranca-darkred">
+                          <div className="h-8 w-8 rounded-full bg-seguranca-red/20 flex items-center justify-center text-seguranca-darkred flex-shrink-0">
                                   {userItem.name.charAt(0).toUpperCase()}
                           </div>
-                                <span className="text-seguranca-lightgray">{userItem.name}</span>
+                                <span className="text-seguranca-lightgray truncate max-w-[140px]" title={userItem.name}>{userItem.name}</span>
                         </div>
                       </TableCell>
-                            <TableCell className="text-seguranca-lightgray">{userItem.email}</TableCell>
-                            <TableCell className="text-seguranca-lightgray">{userItem.username}</TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              <div className="truncate max-w-[200px]" title={userItem.email}>
+                                {userItem.email}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-seguranca-lightgray">
+                              <div className="truncate max-w-[110px]" title={userItem.username}>
+                                {userItem.username}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-seguranca-lightgray">
                               <div className="flex flex-wrap gap-1">
                                 {userItem.roles.map((role) => (
                                   <span 
                                     key={role}
-                                    className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                    className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-nowrap"
                                   >
                                     {role}
                                   </span>
                                 ))}
                               </div>
                             </TableCell>
-                      <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs ${
+                      <TableCell className="text-center">
+                              <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap inline-block ${
                                 userItem.active 
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                   : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -926,34 +938,37 @@ const Configuracoes = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                              <div className="flex gap-2">
+                              <div className="flex gap-1 justify-center">
                                 <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                  variant="ghost" 
+                                  size="icon"
                                   onClick={() => handleEditUser(userItem)}
-                                  className="border-gray-600 text-seguranca-lightgray hover:bg-gray-700"
+                                  className="h-8 w-8 text-seguranca-lightgray hover:bg-gray-700 hover:text-seguranca-yellow"
+                                  title="Editar usuário"
                                 >
-                          Editar
+                                  <Edit className="h-4 w-4" />
                         </Button>
                                 <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                  variant="ghost" 
+                                  size="icon"
                                   onClick={() => handleToggleUserStatus(userItem)}
-                                  className={`${
+                                  className={`h-8 w-8 ${
                                     userItem.active 
-                                      ? 'border-orange-500 text-orange-500 hover:bg-orange-50' 
-                                      : 'border-green-500 text-green-500 hover:bg-green-50'
+                                      ? 'text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20' 
+                                      : 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
                                   }`}
+                                  title={userItem.active ? 'Desativar usuário' : 'Ativar usuário'}
                                 >
-                                  {userItem.active ? 'Desativar' : 'Ativar'}
+                                  <Power className="h-4 w-4" />
                         </Button>
                                 <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                  variant="ghost" 
+                                  size="icon"
                                   onClick={() => handleDeleteUser(userItem)}
-                                  className="border-red-500 text-red-500 hover:bg-red-50"
+                                  className="h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  title="Excluir usuário"
                                 >
-                                  Excluir
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                       </TableCell>

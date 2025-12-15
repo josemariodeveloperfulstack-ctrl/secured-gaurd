@@ -255,9 +255,7 @@ public class UserService {
         
         // Atualizar roles se fornecidas
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
-            var roleNames = request.getRoles().stream()
-                    .map(com.z7design.secured_guard.dto.RoleDTO::getName)
-                    .toList();
+            var roleNames = request.getRoles(); // Já é uma lista de strings
             var rolesFromDb = roleRepository.findByNames(roleNames);
             existingUser.setRoles(new java.util.HashSet<>(rolesFromDb));
         }
