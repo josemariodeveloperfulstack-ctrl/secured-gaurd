@@ -49,16 +49,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         
         if (userRepository.existsByUsername(request.getUsername())) {
             log.warn("Username already exists: {}", request.getUsername());
-            throw new RuntimeException("Username already exists");
+            throw new IllegalArgumentException("Username already exists");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("Email already exists: {}", request.getEmail());
-            throw new RuntimeException("Email already exists");
+            throw new IllegalArgumentException("Email already exists");
         }
 
         if (request.getFullName() == null || request.getFullName().trim().isEmpty()) {
             log.warn("Full name is required for registration");
-            throw new RuntimeException("Full name is required");
+            throw new IllegalArgumentException("Full name is required");
         }
 
         java.util.List<String> requestedRoles = request.getRoles();
@@ -67,11 +67,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             userRoles = new java.util.HashSet<>(roleRepository.findByNames(requestedRoles));
             if (userRoles.isEmpty()) {
                 log.error("Nenhum dos roles informados foi encontrado: {}", requestedRoles);
-                throw new RuntimeException("Nenhum dos roles informados foi encontrado: " + requestedRoles);
+                throw new IllegalArgumentException("Nenhum dos roles informados foi encontrado: " + requestedRoles);
             }
         } else {
             Role defaultRole = roleRepository.findByName("COLABORADOR")
-                .orElseThrow(() -> new RuntimeException("Role padrão COLABORADOR não encontrado"));
+                .orElseThrow(() -> new IllegalArgumentException("Role padrão COLABORADOR não encontrado"));
             userRoles = java.util.Set.of(defaultRole);
         }
         
@@ -93,7 +93,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         User verifyUser = userRepository.findById(savedUser.getId()).orElse(null);
         if (verifyUser == null) {
             log.error("User was not persisted to database after save!");
-            throw new RuntimeException("Failed to persist user to database");
+            throw new IllegalStateException("Failed to persist user to database");
         }
         log.info("User verified in database: {}", verifyUser.getUsername());
 

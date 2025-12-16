@@ -12,6 +12,15 @@
 -- =====================================================
 DO $$
 BEGIN
+    -- Garantir que os roles essenciais existam no ambiente CI
+    INSERT INTO roles (id, name, description)
+    SELECT gen_random_uuid(), 'SUPER_ADMIN', 'Super Administrador com acesso total ao sistema (CI)'
+    WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name = 'SUPER_ADMIN');
+
+    INSERT INTO roles (id, name, description)
+    SELECT gen_random_uuid(), 'COLABORADOR', 'Colaborador padrão do sistema (CI)'
+    WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name = 'COLABORADOR');
+
     -- Ambiente legado: tabela users ainda possui coluna "role" (NOT NULL)
     IF EXISTS (
         SELECT 1
