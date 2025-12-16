@@ -1,15 +1,19 @@
--- Garante que a tabela employees tenha todas as colunas bancárias esperadas pelo código Java
--- Especialmente para ambientes onde o schema foi criado de forma incompleta (como o CI)
-
+-- Garante que a tabela 'employees' tenha todas as colunas usadas pelo modelo Java,
+-- servindo como fallback para ambientes onde migrations anteriores não rodaram.
 DO $$
 BEGIN
-    -- Campos bancários básicos usados pelo modelo Employee
+    -- Campos bancários básicos
     ALTER TABLE employees
-        ADD COLUMN IF NOT EXISTS banco          VARCHAR(100),
-        ADD COLUMN IF NOT EXISTS agencia        VARCHAR(20),
-        ADD COLUMN IF NOT EXISTS conta_corrente VARCHAR(20);
+        ADD COLUMN IF NOT EXISTS banco            VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS agencia          VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS conta_corrente   VARCHAR(20);
 
-    RAISE NOTICE 'Colunas bancárias em employees verificadas/atualizadas com sucesso.';
+    -- Campos de empresa usados pelo modelo Employee
+    ALTER TABLE employees
+        ADD COLUMN IF NOT EXISTS empresa_nome     VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS empresa_endereco VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS empresa_cnpj     VARCHAR(20);
+
+    RAISE NOTICE 'Colunas da tabela employees verificadas/atualizadas com sucesso.';
 END $$;
-
 
