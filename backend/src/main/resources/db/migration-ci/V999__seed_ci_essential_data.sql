@@ -1,4 +1,4 @@
--- =====================================================
+﻿-- =====================================================
 -- SEED DE DADOS ESSENCIAIS PARA AMBIENTE CI
 -- Executado automaticamente via Flyway após migrations
 -- =====================================================
@@ -194,36 +194,30 @@ WHERE NOT EXISTS (
 -- =====================================================
 -- 7.1. USUÁRIOS DO BANCO secured_guard_test
 -- =====================================================
--- INSTRUÇÕES PARA INCLUIR USUÁRIOS DO BANCO DE TESTE:
--- 1. Conecte-se ao banco secured_guard_test: psql -U postgres -d secured_guard_test
--- 2. Execute o script: \i backend/src/main/resources/db/migration-ci/export_users_from_test_db.sql
--- 3. Copie todos os INSERTs gerados (primeira query) e cole abaixo
--- 4. Os INSERTs já incluem ON CONFLICT (id) DO NOTHING para evitar duplicatas
---
--- COLE OS INSERTs DE USUÁRIOS EXPORTADOS AQUI ABAIXO:
--- (Execute o script export_users_from_test_db.sql no banco secured_guard_test e cole os resultados da primeira query aqui)
+-- INSERTs hardcoded de usuários exportados do banco secured_guard_test
+-- Para gerar estes INSERTs, execute o script: generate_inserts_and_update_migration.ps1
+-- no ambiente onde o banco secured_guard_test está disponível
+
+-- COLE OS INSERTs DE USUÁRIOS AQUI:
+-- (Execute generate_inserts_and_update_migration.ps1 para gerar automaticamente)
 
 -- =====================================================
--- 7.2. USER_ROLES DOS USUÁRIOS DO BANCO secured_guard_test
+-- 7.2. USER_ROLES DOS USUÁRIOS
 -- =====================================================
--- INSTRUÇÕES PARA INCLUIR RELACIONAMENTOS USER_ROLES:
--- 1. Execute o script: export_users_from_test_db.sql (segunda query)
--- 2. Copie todos os INSERTs de user_roles gerados e cole abaixo
---
--- COLE OS INSERTs DE USER_ROLES EXPORTADOS AQUI ABAIXO:
--- (Execute o script export_users_from_test_db.sql no banco secured_guard_test e cole os resultados da segunda query aqui)
+-- INSERTs hardcoded de user_roles exportados do banco secured_guard_test
+
+-- COLE OS INSERTs DE USER_ROLES AQUI:
+-- (Execute generate_inserts_and_update_migration.ps1 para gerar automaticamente)
 
 -- =====================================================
 -- 8. FUNCIONÁRIOS DO BANCO secured_guard_test
 -- =====================================================
--- INSTRUÇÕES PARA INCLUIR FUNCIONÁRIOS DO BANCO DE TESTE:
--- 1. Conecte-se ao banco secured_guard_test: psql -U postgres -d secured_guard_test
--- 2. Execute o script: \i backend/src/main/resources/db/migration-ci/export_employees_from_test_db.sql
--- 3. Copie todos os INSERTs gerados e cole abaixo
--- 4. Os INSERTs já incluem ON CONFLICT (id) DO NOTHING para evitar duplicatas
---
--- COLE OS INSERTs DE FUNCIONÁRIOS EXPORTADOS AQUI ABAIXO:
--- (Execute o script export_employees_from_test_db.sql no banco secured_guard_test e cole os resultados aqui)
+-- INSERTs hardcoded de funcionários exportados do banco secured_guard_test
+-- Para gerar estes INSERTs, execute o script: generate_inserts_and_update_migration.ps1
+-- no ambiente onde o banco secured_guard_test está disponível
+
+-- COLE OS INSERTs DE FUNCIONÁRIOS AQUI:
+-- (Execute generate_inserts_and_update_migration.ps1 para gerar automaticamente)
 
 -- =====================================================
 -- 8.1. DADOS DA TABELA EMPLOYEES (LEGADO - manter para referência)
@@ -482,14 +476,14 @@ DO $$
 BEGIN
     RAISE NOTICE '✅ Seed de dados essenciais para CI concluído com sucesso!';
     RAISE NOTICE '   - Usuário admin: admin@ci (senha: Admin123!)';
-    RAISE NOTICE '   - Usuários do banco secured_guard_test: Incluídos (se exportados)';
+    RAISE NOTICE '   - Usuários do banco secured_guard_test: Incluídos via INSERTs hardcoded';
     RAISE NOTICE '   - Unidade: Unidade Matriz CI';
     RAISE NOTICE '   - Turnos: Manhã, Tarde, Noite';
     RAISE NOTICE '   - Cargos: Vigilante, Supervisor, Gerente';
     RAISE NOTICE '   - Departamento: Operacional';
     RAISE NOTICE '   - Cliente: Cliente Teste CI';
     RAISE NOTICE '   - Empresa: Empresa Teste CI';
-    RAISE NOTICE '   - Funcionários do banco secured_guard_test: Incluídos (se exportados)';
+    RAISE NOTICE '   - Funcionários do banco secured_guard_test: Incluídos via INSERTs hardcoded';
     RAISE NOTICE '   - Funcionários de teste (fallback): 2 funcionários completos';
     RAISE NOTICE '   - Frota: 3 veículos de teste';
 END $$;
