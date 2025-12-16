@@ -84,8 +84,11 @@ jobs:
           docker build -t z7design/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend
           
-          # Build frontend image
+          # Build frontend image com variáveis de ambiente do CI
           docker build -t z7design/secured-guard-frontend:ci \
+            --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
+            --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
+            --build-arg VITE_ENVIRONMENT=ci \
             -f frontend/Dockerfile.prod ./frontend
           
           # Build WhatsApp service image (Baileys)

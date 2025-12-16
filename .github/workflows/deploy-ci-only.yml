@@ -79,7 +79,11 @@ jobs:
         run: |
           echo "🐳 Construindo imagens Docker..."
           docker build -t z7design/secured-guard-backend:ci -f backend/Dockerfile.prod ./backend
-          docker build -t z7design/secured-guard-frontend:ci -f frontend/Dockerfile.prod ./frontend
+          docker build -t z7design/secured-guard-frontend:ci \
+            --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
+            --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
+            --build-arg VITE_ENVIRONMENT=ci \
+            -f frontend/Dockerfile.prod ./frontend
           docker build -t z7design/secured-guard-whatsapp:ci -f whatsapp-service/Dockerfile ./whatsapp-service
           echo "✅ Imagens construídas!"
 

@@ -10,6 +10,16 @@ FROM node:20-alpine AS builder
 
 WORKDIR /build
 
+# Argumentos de build (variáveis de ambiente do Vite)
+ARG VITE_API_URL
+ARG VITE_WS_URL
+ARG VITE_ENVIRONMENT
+
+# Definir como variáveis de ambiente para o Vite usar durante o build
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_WS_URL=${VITE_WS_URL}
+ENV VITE_ENVIRONMENT=${VITE_ENVIRONMENT}
+
 # Copiar package files
 COPY package*.json ./
 

@@ -164,11 +164,16 @@ services:
   # FRONTEND CI
   # ========================================
   frontend-ci:
+    # Se precisar fazer build local na VPS, descomente as linhas abaixo e comente a linha 'image'
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile.prod
+    #   args:
+    #     VITE_API_URL: https://ci.z7botsolutions.com.br/api
+    #     VITE_WS_URL: wss://ci.z7botsolutions.com.br/ws
+    #     VITE_ENVIRONMENT: ci
     image: z7design/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
-    environment:
-      VITE_API_URL: https://ci.z7botsolutions.com.br/api
-      VITE_WS_URL: wss://ci.z7botsolutions.com.br/ws
     ports:
       - "3000:80"
     depends_on:
