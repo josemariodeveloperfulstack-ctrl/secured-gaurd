@@ -1,5 +1,5 @@
--- Criação da tabela de logs do sistema
-CREATE TABLE system_logs (
+-- Criação da tabela de logs do sistema (idempotente)
+CREATE TABLE IF NOT EXISTS system_logs (
     id UUID PRIMARY KEY,
     user_id UUID,
     action VARCHAR(50) NOT NULL,
@@ -10,8 +10,8 @@ CREATE TABLE system_logs (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Criação da tabela de logs de auditoria
-CREATE TABLE audit_logs (
+-- Criação da tabela de logs de auditoria (idempotente)
+CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY,
     user_id UUID,
     action VARCHAR(50) NOT NULL,
