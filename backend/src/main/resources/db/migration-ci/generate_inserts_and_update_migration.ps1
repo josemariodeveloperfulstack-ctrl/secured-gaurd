@@ -14,36 +14,37 @@ Write-Host "[*] Gerando INSERTs do banco $DB_NAME" -ForegroundColor Green
 Write-Host "=" * 50
 Write-Host ""
 
-# Verificar se psql está disponível ou se Docker está disponível
-$useDocker = $false
-$dockerContainer = $null
+# Verificar se psql está disponível
+$psqlPath = $null
 
-if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
-    Write-Host "[*] psql nao encontrado, tentando usar Docker..." -ForegroundColor Yellow
-    if (Get-Command docker -ErrorAction SilentlyContinue) {
-        # Procurar container PostgreSQL
-        $containersOutput = docker ps --format "{{.Names}}"
-        $containerList = @()
-        foreach ($line in $containersOutput) {
-            if ($line -and $line.ToString().Trim() -match "postgres|db|secured-guard") {
-                $containerList += $line.ToString().Trim()
-            }
+# Tentar encontrar psql no PATH
+if (Get-Command psql -ErrorAction SilentlyContinue) {
+    $psqlPath = "psql"
+} else {
+    # Procurar em locais comuns do PostgreSQL no Windows
+    $commonPaths = @(
+        "C:\Program Files\PostgreSQL\16\bin\psql.exe",
+        "C:\Program Files\PostgreSQL\15\bin\psql.exe",
+        "C:\Program Files\PostgreSQL\14\bin\psql.exe",
+        "C:\Program Files\PostgreSQL\13\bin\psql.exe",
+        "C:\Program Files (x86)\PostgreSQL\16\bin\psql.exe",
+        "C:\Program Files (x86)\PostgreSQL\15\bin\psql.exe",
+        "C:\Program Files (x86)\PostgreSQL\14\bin\psql.exe",
+        "C:\Program Files (x86)\PostgreSQL\13\bin\psql.exe"
+    )
+    
+    foreach ($path in $commonPaths) {
+        if (Test-Path $path) {
+            $psqlPath = $path
+            Write-Host "[OK] psql encontrado em: $path" -ForegroundColor Green
+            break
         }
-        if ($containerList.Count -gt 0) {
-            # Priorizar secured-guard-local-db se existir
-            $dockerContainer = if ($containerList -contains "secured-guard-local-db") { 
-                "secured-guard-local-db" 
-            } else { 
-                $containerList[0] 
-            }
-            $useDocker = $true
-            Write-Host "[OK] Usando Docker container: $dockerContainer" -ForegroundColor Green
-        } else {
-            Write-Host "[ERRO] Nenhum container PostgreSQL encontrado. Instale psql ou inicie um container Docker." -ForegroundColor Red
-            exit 1
-        }
-    } else {
-        Write-Host "[ERRO] psql e Docker nao encontrados. Instale o PostgreSQL client ou Docker." -ForegroundColor Red
+    }
+    
+    if (-not $psqlPath) {
+        Write-Host "[ERRO] psql nao encontrado. Instale o PostgreSQL client." -ForegroundColor Red
+        Write-Host "       Download: https://www.postgresql.org/download/windows/" -ForegroundColor Yellow
+        Write-Host "       Ou adicione o PostgreSQL ao PATH do sistema." -ForegroundColor Yellow
         exit 1
     }
 }
@@ -97,16 +98,10 @@ WHERE username != 'admin@ci'
 ORDER BY username;
 '@
     
-    if ($useDocker) {
-        $env:PGPASSWORD = $DB_PASSWORD
-        docker exec -e PGPASSWORD=$DB_PASSWORD $dockerContainer psql -U $DB_USER -d $DB_NAME -t -A -c $usersQuery | 
-            Where-Object { $_ -match "INSERT INTO users" } | 
-            Out-File -FilePath $usersFile -Encoding UTF8
-    } else {
-        psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -c $usersQuery | 
-            Where-Object { $_ -match "INSERT INTO users" } | 
-            Out-File -FilePath $usersFile -Encoding UTF8
-    }
+    $env:PGPASSWORD = $DB_PASSWORD
+    & $psqlPath -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -c $usersQuery | 
+        Where-Object { $_ -match "INSERT INTO users" } | 
+        Out-File -FilePath $usersFile -Encoding UTF8
     
     $userCount = (Get-Content $usersFile | Measure-Object -Line).Lines
     Write-Host "[OK] $userCount usuarios gerados" -ForegroundColor Green
@@ -134,15 +129,9 @@ WHERE u.username != 'admin@ci'
 ORDER BY u.username, r.name;
 '@
     
-    if ($useDocker) {
-        docker exec -e PGPASSWORD=$DB_PASSWORD $dockerContainer psql -U $DB_USER -d $DB_NAME -t -A -c $userRolesQuery | 
-            Where-Object { $_ -match "INSERT INTO user_roles" } | 
-            Out-File -FilePath $userRolesFile -Encoding UTF8
-    } else {
-        psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -c $userRolesQuery | 
-            Where-Object { $_ -match "INSERT INTO user_roles" } | 
-            Out-File -FilePath $userRolesFile -Encoding UTF8
-    }
+    & $psqlPath -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -c $userRolesQuery | 
+        Where-Object { $_ -match "INSERT INTO user_roles" } | 
+        Out-File -FilePath $userRolesFile -Encoding UTF8
     
     $roleCount = (Get-Content $userRolesFile | Measure-Object -Line).Lines
     Write-Host "[OK] $roleCount user_roles gerados" -ForegroundColor Green
@@ -153,19 +142,9 @@ ORDER BY u.username, r.name;
     $exportScript = Join-Path $SCRIPT_DIR "export_employees_from_test_db.sql"
     
     if (Test-Path $exportScript) {
-        if ($useDocker) {
-            # Copiar script para o container temporariamente
-            $scriptContent = Get-Content $exportScript -Raw -Encoding UTF8
-            docker exec -i $dockerContainer sh -c "cat > /tmp/export_employees.sql" | Out-Null
-            Get-Content $exportScript -Raw -Encoding UTF8 | docker exec -i $dockerContainer sh -c "cat > /tmp/export_employees.sql"
-            docker exec -e PGPASSWORD=$DB_PASSWORD $dockerContainer psql -U $DB_USER -d $DB_NAME -t -A -f /tmp/export_employees.sql | 
-                Where-Object { $_ -match "INSERT INTO employees" } | 
-                Out-File -FilePath $employeesFile -Encoding UTF8
-        } else {
-            psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -f $exportScript | 
-                Where-Object { $_ -match "INSERT INTO employees" } | 
-                Out-File -FilePath $employeesFile -Encoding UTF8
-        }
+        & $psqlPath -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -f $exportScript | 
+            Where-Object { $_ -match "INSERT INTO employees" } | 
+            Out-File -FilePath $employeesFile -Encoding UTF8
     } else {
         Write-Host "[AVISO] Script de exportacao nao encontrado, pulando funcionarios" -ForegroundColor Yellow
         "" | Out-File -FilePath $employeesFile -Encoding UTF8
