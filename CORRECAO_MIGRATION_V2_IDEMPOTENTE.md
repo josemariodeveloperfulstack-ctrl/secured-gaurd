@@ -112,3 +112,4 @@ Após o deploy, verifique:
 - ✅ Funciona mesmo se as tabelas já existirem
 - ✅ Não requer limpeza manual do banco
 - ✅ Mais resiliente a falhas parciais de deploy
+
