@@ -57,13 +57,18 @@ const Login = () => {
   }, []);
 
   // If already logged in, redirect to dashboard
+  // Usar um pequeno delay para evitar conflito com o login em andamento
   useEffect(() => {
-    console.log('🔍 Login useEffect - user check:', user);
-    if (user) {
-      console.log('🔍 User already logged in, redirecting to dashboard');
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
+    const timer = setTimeout(() => {
+      console.log('🔍 Login useEffect - user check:', user);
+      if (user && !loading) {
+        console.log('🔍 User already logged in, redirecting to dashboard');
+        navigate('/dashboard');
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [user, navigate, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

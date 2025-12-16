@@ -207,15 +207,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       localStorage.setItem('user', JSON.stringify(userData));
 
+      // IMPORTANTE: Setar o user ANTES de qualquer outra operação assíncrona
+      // para garantir que o ProtectedRoute veja o usuário autenticado
       setUser(userData);
       setRefreshToken(response.data.token);
+      
+      console.log('✅ Usuário setado no estado:', userData.name, userData.role);
 
+      // Carregar grupos em background (não bloquear navegação)
       const roleKey = (userData.role ?? '').toUpperCase();
       if (!['COLABORADOR', 'ROLE_COLABORADOR'].includes(roleKey) && userData.id) {
-        await loadUserGroups(userData.id);
+        // Carregar grupos sem await para não bloquear a navegação
+        loadUserGroups(userData.id).catch(err => {
+          console.warn('⚠️ Erro ao carregar grupos (não crítico):', err);
+        });
       }
 
-      // Navegar apenas após login bem-sucedido
+      // Aguardar um tick do React para garantir que o estado foi atualizado
+      // antes de navegar
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // Navegar apenas após login bem-sucedido e estado atualizado
+      console.log('🚀 Navegando para /dashboard');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('❌ Erro no login:', error);
