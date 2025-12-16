@@ -26,3 +26,4 @@ COMMENT ON COLUMN remanejamentos_historico.tipo IS 'Tipo do remanejamento (TRANS
 
 
 
+

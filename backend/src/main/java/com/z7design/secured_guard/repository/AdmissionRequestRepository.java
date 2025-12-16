@@ -63,3 +63,4 @@ public interface AdmissionRequestRepository extends JpaRepository<AdmissionReque
     long countByType(@Param("type") AdmissionRequestType type);
 }
 
+
