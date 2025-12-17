@@ -31,7 +31,7 @@ public class CrmController {
 
     @GetMapping("/dashboard/metrics")
     @Operation(summary = "Obter métricas do CRM", description = "Retorna métricas agregadas para o dashboard do CRM")
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> getCrmMetrics() {
         try {
             log.info("Buscando métricas do CRM");
@@ -121,8 +121,8 @@ public class CrmController {
             metrics.put("totalProposals", totalProposals);
             metrics.put("totalQuotes", totalQuotes);
             metrics.put("conversionRate", Math.round(conversionRate * 10.0) / 10.0);
-            metrics.put("estimatedRevenue", estimatedRevenue);
-            metrics.put("totalValue", estimatedRevenue);
+            metrics.put("estimatedRevenue", estimatedRevenue != null ? estimatedRevenue : BigDecimal.ZERO);
+            metrics.put("totalValue", estimatedRevenue != null ? estimatedRevenue : BigDecimal.ZERO);
             metrics.put("monthlyCount", monthlyCount);
             metrics.put("statusHistory", statusHistory);
             
@@ -136,7 +136,7 @@ public class CrmController {
 
     @GetMapping("/dashboard/kanban-summary")
     @Operation(summary = "Obter resumo do Kanban", description = "Retorna resumo de leads por status para o Kanban")
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> getKanbanSummary() {
         try {
             log.info("Buscando resumo do Kanban");

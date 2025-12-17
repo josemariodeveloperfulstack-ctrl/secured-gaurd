@@ -76,7 +76,24 @@ public class MeasurementService {
             return bulletins.stream()
                     .map(bulletin -> {
                         try {
-                            return MeasurementBulletinDTO.fromEntity(bulletin);
+                            MeasurementBulletinDTO dto = MeasurementBulletinDTO.fromEntity(bulletin);
+                            
+                            // Se o subtotal estiver zerado ou nulo, calcular a partir dos itens
+                            if (dto.getSubtotal() == null || dto.getSubtotal().compareTo(BigDecimal.ZERO) == 0) {
+                                if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+                                    BigDecimal calculatedSubtotal = dto.getItems().stream()
+                                            .map(item -> {
+                                                BigDecimal quantity = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+                                                BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+                                                return quantity.multiply(unitPrice);
+                                            })
+                                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                                    dto.setSubtotal(calculatedSubtotal);
+                                    log.debug("Subtotal calculado para boletim {}: {}", bulletin.getId(), calculatedSubtotal);
+                                }
+                            }
+                            
+                            return dto;
                         } catch (Exception e) {
                             log.error("Erro ao converter boletim {}: {}", bulletin.getId(), e.getMessage());
                             // Retornar DTO básico em caso de erro
@@ -286,22 +303,52 @@ public class MeasurementService {
         MeasurementBulletin existingBulletin = bulletinRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Boletim de medição não encontrado: " + id));
 
-        // Atualizar campos básicos
-        existingBulletin.setCompanyName(dto.getCompanyName());
-        existingBulletin.setPeriodStart(dto.getPeriodStart());
-        existingBulletin.setPeriodEnd(dto.getPeriodEnd());
-        existingBulletin.setContractNumber(dto.getContractNumber());
-        existingBulletin.setContractStart(dto.getContractStart());
-        existingBulletin.setContractEnd(dto.getContractEnd());
-        existingBulletin.setNfNumber(dto.getNfNumber());
-        existingBulletin.setElaboratedBy(dto.getElaboratedBy());
-        existingBulletin.setMeasuredBy(dto.getMeasuredBy());
-        existingBulletin.setNotes(dto.getNotes());
+        // Atualizar campos básicos (apenas se não forem nulos)
+        if (dto.getCompanyName() != null) {
+            existingBulletin.setCompanyName(dto.getCompanyName());
+        }
+        if (dto.getPeriodStart() != null) {
+            existingBulletin.setPeriodStart(dto.getPeriodStart());
+        }
+        if (dto.getPeriodEnd() != null) {
+            existingBulletin.setPeriodEnd(dto.getPeriodEnd());
+        }
+        if (dto.getContractNumber() != null) {
+            existingBulletin.setContractNumber(dto.getContractNumber());
+        }
+        if (dto.getContractStart() != null) {
+            existingBulletin.setContractStart(dto.getContractStart());
+        }
+        if (dto.getContractEnd() != null) {
+            existingBulletin.setContractEnd(dto.getContractEnd());
+        }
+        if (dto.getNfNumber() != null) {
+            existingBulletin.setNfNumber(dto.getNfNumber());
+        }
+        if (dto.getElaboratedBy() != null) {
+            existingBulletin.setElaboratedBy(dto.getElaboratedBy());
+        }
+        if (dto.getMeasuredBy() != null) {
+            existingBulletin.setMeasuredBy(dto.getMeasuredBy());
+        }
+        if (dto.getNotes() != null) {
+            existingBulletin.setNotes(dto.getNotes());
+        }
+        
+        // Atualizar status se fornecido
+        if (dto.getStatus() != null) {
+            existingBulletin.setStatus(dto.getStatus());
+        }
 
         // Atualizar entidades relacionadas
         if (dto.getClientId() != null) {
             existingBulletin.setClient(clientRepository.findById(dto.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado: " + dto.getClientId())));
+        }
+
+        if (dto.getContractId() != null) {
+            existingBulletin.setContract(contractRepository.findById(dto.getContractId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + dto.getContractId())));
         }
 
         if (dto.getUnitId() != null) {
@@ -312,24 +359,48 @@ public class MeasurementService {
         // Atualizar itens se fornecidos
         if (dto.getItems() != null) {
             // Remover itens existentes
-            itemRepository.deleteByBulletinId(id);
-            existingBulletin.getItems().clear();
+            try {
+                itemRepository.deleteByBulletinId(id);
+                existingBulletin.getItems().clear();
+            } catch (Exception e) {
+                log.warn("Erro ao deletar itens existentes (pode não existir): {}", e.getMessage());
+                // Limpar lista mesmo se houver erro
+                existingBulletin.getItems().clear();
+            }
             
-            // Adicionar novos itens
-            for (MeasurementItemDTO itemDto : dto.getItems()) {
-                MeasurementItem item = MeasurementItemDTO.toEntity(itemDto);
-                item.setBulletin(existingBulletin);
-                
-                if (itemDto.getCostCenterId() != null) {
-                    item.setCostCenterId(itemDto.getCostCenterId());
+            // Adicionar novos itens se houver
+            if (!dto.getItems().isEmpty()) {
+                for (MeasurementItemDTO itemDto : dto.getItems()) {
+                    try {
+                        MeasurementItem item = MeasurementItemDTO.toEntity(itemDto);
+                        item.setBulletin(existingBulletin);
+                        
+                        // Calcular valor total do item
+                        if (item.getQuantity() != null && item.getUnitPrice() != null) {
+                            item.calculateTotalValue();
+                        }
+                        
+                        if (itemDto.getCostCenterId() != null) {
+                            item.setCostCenterId(itemDto.getCostCenterId());
+                        }
+                        
+                        existingBulletin.addItem(item);
+                    } catch (Exception e) {
+                        log.error("Erro ao adicionar item ao boletim: {}", e.getMessage(), e);
+                        throw new RuntimeException("Erro ao processar item: " + e.getMessage(), e);
+                    }
                 }
-                
-                existingBulletin.addItem(item);
             }
         }
 
-        // Recalcular subtotal
-        existingBulletin.calculateSubtotal();
+        // Atualizar subtotal se fornecido diretamente, senão recalcular
+        if (dto.getSubtotal() != null && dto.getSubtotal().compareTo(BigDecimal.ZERO) > 0) {
+            existingBulletin.setSubtotal(dto.getSubtotal());
+        } else {
+            // Recalcular subtotal a partir dos itens
+            existingBulletin.calculateSubtotal();
+        }
+        
         existingBulletin = bulletinRepository.save(existingBulletin);
         
         log.info("Boletim atualizado com sucesso - ID: {}, Subtotal: {}", existingBulletin.getId(), existingBulletin.getSubtotal());

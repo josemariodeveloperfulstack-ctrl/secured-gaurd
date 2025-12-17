@@ -52,6 +52,7 @@ public class KanbanStatusController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public KanbanStatusDTO create(@Valid @RequestBody KanbanStatusDTO dto) {
         KanbanStatus s = fromDTO(dto);
         KanbanStatus saved = kanbanStatusService.save(s);
@@ -59,6 +60,7 @@ public class KanbanStatusController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<KanbanStatusDTO> update(@PathVariable String id, @Valid @RequestBody KanbanStatusDTO dto) {
         if (!kanbanStatusService.findById(UUID.fromString(id)).isPresent()) {
             return ResponseEntity.notFound().build();
@@ -70,6 +72,7 @@ public class KanbanStatusController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         if (!kanbanStatusService.findById(UUID.fromString(id)).isPresent()) {
             return ResponseEntity.notFound().build();

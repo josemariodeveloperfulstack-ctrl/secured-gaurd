@@ -52,8 +52,12 @@ public class MeasurementItemDTO {
         entity.setUnit(dto.getUnit());
         entity.setQuantity(dto.getQuantity());
         entity.setUnitPrice(dto.getUnitPrice());
-        entity.setTotalValue(dto.getTotalValue());
+        // Não definir totalValue - será calculado automaticamente pelo banco de dados
+        // entity.setTotalValue(dto.getTotalValue());
         entity.setCostCenterName(dto.getCostCenterName());
+        if (dto.getCostCenterId() != null) {
+            entity.setCostCenterId(dto.getCostCenterId());
+        }
         return entity;
     }
 }

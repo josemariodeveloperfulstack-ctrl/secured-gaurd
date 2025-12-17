@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.model.ContractPayrollConfig;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.PayPeriod;
 import com.z7design.secured_guard.model.PayrollClosure;
 import com.z7design.secured_guard.model.TimeRecord;
 import com.z7design.secured_guard.repository.EmployeeRepository;
@@ -32,34 +34,57 @@ public class PayrollClosureService {
     private final PayrollClosureRepository payrollClosureRepository;
     private final EmployeeRepository employeeRepository;
     private final TimeRecordService timeRecordService;
+    private final ContractPayrollConfigService contractPayrollConfigService;
+    private final PayPeriodService payPeriodService;
+    private final BankHoursService bankHoursService;
 
+    /**
+     * Gera fechamento para um período mensal (compatibilidade com código existente)
+     */
     @Transactional
     public PayrollClosure generateClosure(UUID employeeId, int month, int year, UUID closedById) {
-        log.info("📊 Gerando fechamento - Employee: {}, Período: {}/{}", employeeId, month, year);
+        // Buscar ou criar período mensal
+        PayPeriod period = payPeriodService.getOrCreateMonthlyPeriod(year, month);
+        return generateClosureForPeriod(employeeId, period.getId(), closedById);
+    }
+
+    /**
+     * Gera fechamento para um período específico (mensal, quinzenal, customizado)
+     */
+    @Transactional
+    public PayrollClosure generateClosureForPeriod(UUID employeeId, UUID payPeriodId, UUID closedById) {
+        log.info("📊 Gerando fechamento - Employee: {}, PayPeriod: {}", employeeId, payPeriodId);
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
-        // Verificar se já existe fechamento
-        payrollClosureRepository.findByEmployeeIdAndReferenceMonthAndReferenceYear(
-                employeeId, month, year
-        ).ifPresent(existing -> {
-            throw new RuntimeException("Já existe fechamento para este período");
-        });
+        PayPeriod payPeriod = payPeriodService.findById(payPeriodId);
 
-        // Definir período
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.with(TemporalAdjusters.lastDayOfMonth());
+        // Verificar se já existe fechamento para este período
+        payrollClosureRepository.findByEmployeeIdAndPayPeriodId(employeeId, payPeriodId)
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Já existe fechamento para este período");
+                });
+
+        // Usar datas do período
+        LocalDate startDate = payPeriod.getStartDate();
+        LocalDate endDate = payPeriod.getEndDate();
+        int month = payPeriod.getReferenceMonth() != null ? payPeriod.getReferenceMonth() : startDate.getMonthValue();
+        int year = payPeriod.getReferenceYear() != null ? payPeriod.getReferenceYear() : startDate.getYear();
 
         // Buscar registros do período
         List<TimeRecord> records = timeRecordService.getRecordsByPeriod(employeeId, startDate, endDate);
 
-        // Calcular métricas
-        Map<String, Object> metrics = calculateMetrics(records, startDate, endDate);
+        // Buscar configuração de folha para o funcionário
+        ContractPayrollConfig config = contractPayrollConfigService.getConfigForEmployee(employeeId);
+
+        // Calcular métricas usando configurações
+        Map<String, Object> metrics = calculateMetrics(records, startDate, endDate, config);
 
         // Criar fechamento
         PayrollClosure closure = new PayrollClosure();
         closure.setEmployee(employee);
+        closure.setPayPeriod(payPeriod);
         closure.setReferenceMonth(month);
         closure.setReferenceYear(year);
         closure.setStartDate(startDate);
@@ -81,10 +106,31 @@ public class PayrollClosureService {
         PayrollClosure saved = payrollClosureRepository.save(closure);
         log.info("✅ Fechamento gerado - ID: {}", saved.getId());
 
+        // Processar banco de horas se habilitado (após salvar o fechamento)
+        // Por enquanto, contractId será null (será melhorado quando houver relação Employee-Contract)
+        try {
+            UUID contractId = null; // TODO: Buscar contrato do funcionário quando houver relação
+            bankHoursService.processOvertimeForBankHours(employeeId, contractId, saved);
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao processar banco de horas (não crítico): {}", e.getMessage());
+            // Não falha o fechamento se houver erro no banco de horas
+        }
+
+        // Gerar itens de folha (PayrollItems) a partir do fechamento
+        try {
+            // Calcular valor por hora: salário / divisor de horas
+            BigDecimal hourlyRate = calculateHourlyRate(employee, config);
+            payrollItemService.generateItemsFromClosure(saved.getId(), hourlyRate);
+            log.info("✅ Itens de folha gerados para fechamento {}", saved.getId());
+        } catch (Exception e) {
+            log.warn("⚠️ Erro ao gerar itens de folha (não crítico): {}", e.getMessage());
+            // Não falha o fechamento se houver erro na geração de itens
+        }
+
         return saved;
     }
 
-    private Map<String, Object> calculateMetrics(List<TimeRecord> records, LocalDate startDate, LocalDate endDate) {
+    private Map<String, Object> calculateMetrics(List<TimeRecord> records, LocalDate startDate, LocalDate endDate, ContractPayrollConfig config) {
         Map<String, Object> metrics = new HashMap<>();
 
         // Agrupar registros por dia
@@ -144,15 +190,15 @@ public class PayrollClosureService {
                 
                 totalHours = totalHours.add(hoursWorked);
 
-                // Calcular horas regulares e extras (baseado em 8h/dia)
-                BigDecimal regularDailyHours = BigDecimal.valueOf(8);
+                // Calcular horas regulares e extras usando configuração
+                BigDecimal regularDailyHours = config.getDailyHours();
                 if (hoursWorked.compareTo(regularDailyHours) <= 0) {
                     regularHours = regularHours.add(hoursWorked);
                 } else {
                     regularHours = regularHours.add(regularDailyHours);
                     BigDecimal extraHours = hoursWorked.subtract(regularDailyHours);
                     
-                    // Primeiras 2h extras = 50%, restante = 100%
+                    // Primeiras 2h extras = 50%, restante = 100% (configurável)
                     BigDecimal firstTwoHours = extraHours.min(BigDecimal.valueOf(2));
                     overtime50 = overtime50.add(firstTwoHours);
                     
@@ -162,15 +208,16 @@ public class PayrollClosureService {
                     }
                 }
 
-                // Calcular adicional noturno (22h às 5h)
-                BigDecimal nightHours = calculateNightShiftHours(entrada, saida);
+                // Calcular adicional noturno usando configuração
+                BigDecimal nightHours = calculateNightShiftHours(entrada, saida, config);
                 nightShiftHours = nightShiftHours.add(nightHours);
 
-                // Calcular atrasos (tolerância de 10 minutos)
-                LocalTime expectedStart = LocalTime.of(8, 0); // Configurável
+                // Calcular atrasos usando tolerância configurável
+                LocalTime expectedStart = config.getDefaultEntryTime();
                 LocalTime actualStart = entrada.toLocalTime();
+                int toleranceMinutes = config.getDelayToleranceMinutes();
                 
-                if (actualStart.isAfter(expectedStart.plusMinutes(10))) {
+                if (actualStart.isAfter(expectedStart.plusMinutes(toleranceMinutes))) {
                     long delayMinutes = Duration.between(expectedStart, actualStart).toMinutes();
                     totalDelays += delayMinutes;
                 }
@@ -194,10 +241,10 @@ public class PayrollClosureService {
         return metrics;
     }
 
-    private BigDecimal calculateNightShiftHours(LocalDateTime start, LocalDateTime end) {
-        // Período noturno: 22h às 5h
-        LocalTime nightStart = LocalTime.of(22, 0);
-        LocalTime nightEnd = LocalTime.of(5, 0);
+    private BigDecimal calculateNightShiftHours(LocalDateTime start, LocalDateTime end, ContractPayrollConfig config) {
+        // Período noturno configurável
+        LocalTime nightStart = config.getNightShiftStart();
+        LocalTime nightEnd = config.getNightShiftEnd();
         
         BigDecimal nightHours = BigDecimal.ZERO;
         LocalDateTime current = start;
@@ -209,8 +256,17 @@ public class PayrollClosureService {
                 nextHour = end;
             }
 
-            // Verificar se está no período noturno
-            if (currentTime.isAfter(nightStart) || currentTime.isBefore(nightEnd)) {
+            // Verificar se está no período noturno (considera período que atravessa meia-noite)
+            boolean isNightTime = false;
+            if (nightStart.isAfter(nightEnd)) {
+                // Período atravessa meia-noite (ex: 22h às 5h)
+                isNightTime = currentTime.isAfter(nightStart) || currentTime.isBefore(nightEnd);
+            } else {
+                // Período normal (ex: 20h às 22h)
+                isNightTime = currentTime.isAfter(nightStart) && currentTime.isBefore(nightEnd);
+            }
+
+            if (isNightTime) {
                 long minutes = Duration.between(current, nextHour).toMinutes();
                 nightHours = nightHours.add(BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
             }
@@ -236,6 +292,26 @@ public class PayrollClosureService {
         return workingDays;
     }
 
+    /**
+     * Calcula valor por hora baseado no salário e divisor de horas
+     */
+    private BigDecimal calculateHourlyRate(Employee employee, ContractPayrollConfig config) {
+        // Buscar salário do funcionário (pode ser null)
+        BigDecimal salary = employee.getSalario();
+        if (salary == null || salary.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Salário não encontrado para funcionário {}, usando valor padrão 0", employee.getId());
+            return BigDecimal.ZERO;
+        }
+
+        // Calcular valor por hora: salário / divisor de horas
+        BigDecimal hourDivisor = config.getHourDivisor();
+        if (hourDivisor == null || hourDivisor.compareTo(BigDecimal.ZERO) <= 0) {
+            hourDivisor = BigDecimal.valueOf(220.0); // Padrão CLT
+        }
+
+        return salary.divide(hourDivisor, 4, RoundingMode.HALF_UP);
+    }
+
     @Transactional
     public PayrollClosure closeClosure(UUID closureId, UUID closedById) {
         PayrollClosure closure = payrollClosureRepository.findById(closureId)
@@ -250,6 +326,11 @@ public class PayrollClosureService {
         closure.setClosedById(closedById);
 
         return payrollClosureRepository.save(closure);
+    }
+
+    public PayrollClosure getClosureById(UUID closureId) {
+        return payrollClosureRepository.findById(closureId)
+                .orElseThrow(() -> new RuntimeException("Fechamento não encontrado: " + closureId));
     }
 
     public Page<PayrollClosure> getClosuresByEmployee(UUID employeeId, Pageable pageable) {
@@ -278,6 +359,7 @@ public class PayrollClosureService {
                 log.info("✅ Fechamento gerado para: {}", employee.getName());
             } catch (Exception e) {
                 log.error("❌ Erro ao gerar fechamento para {}: {}", employee.getName(), e.getMessage());
+                // Continua processando os outros funcionários mesmo se um falhar
             }
         }
 

@@ -24,15 +24,6 @@ if [ ! -f "docker-compose.ci.yml" ]; then
     exit 1
 fi
 
-echo -e "${YELLOW}📁 Criando diretórios necessários...${NC}"
-sudo mkdir -p /var/www/secured_guard/ci/postgres_data
-sudo mkdir -p /var/www/secured_guard/ci/redis_data
-sudo mkdir -p /var/www/secured_guard/ci/uploads
-sudo mkdir -p /var/www/secured_guard/ci/logs
-sudo mkdir -p /var/www/secured_guard/ci/whatsapp_sessions
-sudo chown -R $USER:$USER /var/www/secured_guard/ci 2>/dev/null || true
-sudo chmod -R 755 /var/www/secured_guard/ci 2>/dev/null || true
-
 echo -e "${YELLOW}🔗 Criando redes Docker...${NC}"
 docker network create secured-guard-ci-network 2>/dev/null || true
 docker network create z7network 2>/dev/null || true

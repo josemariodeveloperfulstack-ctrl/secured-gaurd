@@ -135,8 +135,20 @@ export const rondasService = {
     if (filters.tipo) params.append('tipo', filters.tipo);
     if (filters.responsavelId) params.append('responsavelId', filters.responsavelId);
     if (filters.localId) params.append('localId', filters.localId);
-    if (filters.dataInicio) params.append('dataInicio', filters.dataInicio);
-    if (filters.dataFim) params.append('dataFim', filters.dataFim);
+    
+    // Converter datas para formato ISO DateTime (YYYY-MM-DDTHH:mm:ss)
+    if (filters.dataInicio) {
+      const dataInicioISO = filters.dataInicio.includes('T') 
+        ? filters.dataInicio 
+        : `${filters.dataInicio}T00:00:00`;
+      params.append('dataInicio', dataInicioISO);
+    }
+    if (filters.dataFim) {
+      const dataFimISO = filters.dataFim.includes('T')
+        ? filters.dataFim
+        : `${filters.dataFim}T23:59:59`;
+      params.append('dataFim', dataFimISO);
+    }
     
     const response = await api.get(`/api/rondas/relatorio?${params.toString()}`);
     return response.data || [];

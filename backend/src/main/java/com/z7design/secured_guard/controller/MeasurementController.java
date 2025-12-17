@@ -131,11 +131,19 @@ public class MeasurementController {
             @ApiResponse(responseCode = "200", description = "Boletim atualizado com sucesso"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "404", description = "Boletim não encontrado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
     public ResponseEntity<MeasurementBulletinDTO> update(@PathVariable String id, @Valid @RequestBody MeasurementBulletinDTO measurementDTO) {
-        MeasurementBulletinDTO updated = measurementService.updateBulletin(UUID.fromString(id), measurementDTO);
-        return ResponseEntity.ok(updated);
+        try {
+            log.info("Recebendo requisição para atualizar boletim {} com dados: {}", id, measurementDTO);
+            MeasurementBulletinDTO updated = measurementService.updateBulletin(UUID.fromString(id), measurementDTO);
+            log.info("Boletim {} atualizado com sucesso", id);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            log.error("Erro ao atualizar boletim {}: {}", id, e.getMessage(), e);
+            throw e; // Re-throw para ser capturado pelo GlobalExceptionHandler
+        }
     }
     
     @GetMapping("/search")

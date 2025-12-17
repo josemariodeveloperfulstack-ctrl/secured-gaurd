@@ -18,8 +18,13 @@ public interface PayrollClosureRepository extends JpaRepository<PayrollClosure, 
     Optional<PayrollClosure> findByEmployeeIdAndReferenceMonthAndReferenceYear(
             UUID employeeId, Integer month, Integer year);
 
+    Optional<PayrollClosure> findByEmployeeIdAndPayPeriodId(UUID employeeId, UUID payPeriodId);
+
     List<PayrollClosure> findByReferenceMonthAndReferenceYearOrderByEmployeeNameAsc(
             Integer month, Integer year);
+    
+    @Query("SELECT pc FROM PayrollClosure pc WHERE pc.payPeriod.id = :payPeriodId")
+    List<PayrollClosure> findByPayPeriodId(@Param("payPeriodId") UUID payPeriodId);
 
     Page<PayrollClosure> findByEmployeeIdOrderByReferenceYearDescReferenceMonthDesc(
             UUID employeeId, Pageable pageable);

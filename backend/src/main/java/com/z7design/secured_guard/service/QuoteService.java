@@ -175,7 +175,8 @@ public class QuoteService {
     }
 
     public BigDecimal getTotalValueByStatus(QuoteStatus status) {
-        return quoteRepository.getTotalValueByStatus(status);
+        BigDecimal value = quoteRepository.getTotalValueByStatus(status);
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     public List<Quote> searchQuotes(String searchTerm) {

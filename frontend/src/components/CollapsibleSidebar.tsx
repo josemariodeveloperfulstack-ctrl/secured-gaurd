@@ -133,7 +133,6 @@ const sstMenuItems = [
 const departamentoPessoalMenuItems = [
   // Gestão de Funcionários
   { icon: Users, text: 'Funcionários', to: '/rh/funcionarios', id: 'dp-funcionarios' },
-  { icon: Upload, text: 'Importar WhatsApp (PDF)', to: '/rh/funcionarios/importar-whatsapp', id: 'dp-funcionarios-importar-whatsapp' },
   { icon: Banknote, text: 'Importar Dados Bancários', to: '/rh/funcionarios/importar-dados-bancarios', id: 'dp-funcionarios-importar-bancarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
@@ -141,7 +140,7 @@ const departamentoPessoalMenuItems = [
   // Gestão de Tempo e Frequência
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
   { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
-  { icon: Clock3, text: 'Horas Extras', to: '/rh/horas-extras', id: 'dp-horas-extras' },
+  { icon: FileText, text: 'Fechamento de Horas', to: '/rh/fechamento-horas', id: 'rh-fechamento-horas' },
   
   // Gestão de Ocorrências e Eventos
   { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'dp-ocorrencias' },
@@ -156,7 +155,6 @@ const departamentoPessoalMenuItems = [
   
   // Segurança e Compliance
   { icon: Shield, text: 'EPIs', to: '/rh/epis', id: 'dp-epis' },
-  { icon: UserCheck, text: 'LGPD', to: '/rh/lgpd', id: 'dp-lgpd' },
   
   // Documentos e Contratos
   { icon: FileSignature, text: 'Documentos', to: '/rh/documentos', id: 'dp-documentos' },
@@ -238,6 +236,7 @@ const sistemaMenuItems = [
   { icon: UserCog, text: 'Usuários', to: '/usuarios', id: 'usuarios' },
   { icon: UserCheck, text: 'Grupos', to: '/grupos', id: 'grupos' },
   { icon: MessageCircle, text: 'Conexão WhatsApp', to: '/whatsapp-connection', id: 'whatsapp-connection' },
+  { icon: Upload, text: 'Importar WhatsApp (PDF)', to: '/sistema/importar-whatsapp', id: 'sistema-importar-whatsapp' },
   { icon: Settings, text: 'Gestão de Atividades', to: '/atividades', id: 'atividades' },
   { icon: Shield, text: 'Sistema', to: '/sistema', id: 'sistema' },
   { icon: Database, text: 'Backup', to: '/configuracoes/backup', id: 'backup' },

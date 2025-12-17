@@ -2,9 +2,11 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.MeasurementItem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,5 +28,8 @@ public interface MeasurementItemRepository extends JpaRepository<MeasurementItem
     List<MeasurementItem> findByDescriptionContaining(@Param("description") String description);
 
     // Deletar todos os itens de um boletim
-    void deleteByBulletinId(UUID bulletinId);
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM MeasurementItem mi WHERE mi.bulletin.id = :bulletinId")
+    void deleteByBulletinId(@Param("bulletinId") UUID bulletinId);
 }

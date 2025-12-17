@@ -18,7 +18,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - /var/www/secured_guard/ci/postgres_data:/var/lib/postgresql/data
+      - postgres_data_ci:/var/lib/postgresql/data
     networks:
       - secured-guard-ci-network
       - z7network
@@ -38,7 +38,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - /var/www/secured_guard/ci/redis_data:/data
+      - redis_data_ci:/data
     networks:
       - secured-guard-ci-network
       - z7network
@@ -73,8 +73,8 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - /var/www/secured_guard/ci/uploads:/var/www/secured_guard/ci/uploads
-      - /var/www/secured_guard/ci/logs:/var/www/secured_guard/ci/logs
+      - uploads_ci:/var/www/secured_guard/ci/uploads
+      - logs_ci:/var/www/secured_guard/ci/logs
     depends_on:
       postgres-ci:
         condition: service_healthy
@@ -109,8 +109,8 @@ services:
     ports:
       - "3333:3333"
     volumes:
-      - /var/www/secured_guard/ci/whatsapp_sessions:/app/sessions
-      - /var/www/secured_guard/ci/uploads:/app/uploads
+      - whatsapp_sessions_ci:/app/sessions
+      - uploads_ci:/app/uploads
     depends_on:
       backend-ci:
         condition: service_started
@@ -192,9 +192,19 @@ services:
       - "traefik.enable=false"
 
 # ========================================
-# VOLUMES CI (usando bind mounts)
+# VOLUMES CI (usando volumes nomeados para WSL)
 # ========================================
-# Os volumes são mapeados diretamente para /var/www/secured_guard/ci/
+volumes:
+  postgres_data_ci:
+    driver: local
+  redis_data_ci:
+    driver: local
+  uploads_ci:
+    driver: local
+  logs_ci:
+    driver: local
+  whatsapp_sessions_ci:
+    driver: local
 
 # ========================================
 # NETWORKS CI
@@ -204,5 +214,6 @@ networks:
     driver: bridge
     name: secured-guard-ci
   z7network:
-    external: true
+    external: false
+    driver: bridge
     name: z7network

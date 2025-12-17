@@ -24,13 +24,14 @@ public class PayrollClosureController {
     private final PayrollClosureService payrollClosureService;
 
     @PostMapping("/generate")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> generateClosure(@RequestBody Map<String, Object> request) {
         try {
             UUID employeeId = UUID.fromString((String) request.get("employeeId"));
             int month = (Integer) request.get("month");
             int year = (Integer) request.get("year");
-            UUID closedById = UUID.fromString((String) request.get("closedById"));
+            UUID closedById = request.get("closedById") != null ? 
+                    UUID.fromString((String) request.get("closedById")) : null;
 
             PayrollClosure closure = payrollClosureService.generateClosure(
                     employeeId, month, year, closedById);
@@ -50,13 +51,40 @@ public class PayrollClosureController {
         }
     }
 
+    @PostMapping("/generate-for-period")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> generateClosureForPeriod(@RequestBody Map<String, Object> request) {
+        try {
+            UUID employeeId = UUID.fromString((String) request.get("employeeId"));
+            UUID payPeriodId = UUID.fromString((String) request.get("payPeriodId"));
+            UUID closedById = request.get("closedById") != null ? 
+                    UUID.fromString((String) request.get("closedById")) : null;
+
+            PayrollClosure closure = payrollClosureService.generateClosureForPeriod(
+                    employeeId, payPeriodId, closedById);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Fechamento gerado com sucesso",
+                    "data", closure
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao gerar fechamento para período: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
     @PostMapping("/generate-batch")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> generateBatchClosures(@RequestBody Map<String, Object> request) {
         try {
             int month = (Integer) request.get("month");
             int year = (Integer) request.get("year");
-            UUID closedById = UUID.fromString((String) request.get("closedById"));
+            UUID closedById = request.get("closedById") != null ? 
+                    UUID.fromString((String) request.get("closedById")) : null;
 
             List<PayrollClosure> closures = payrollClosureService.generateBatchClosures(
                     month, year, closedById);
@@ -104,6 +132,42 @@ public class PayrollClosureController {
         }
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('PAYROLL_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getClosures(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) UUID employeeId) {
+        try {
+            List<PayrollClosure> closures;
+            
+            if (month != null && year != null) {
+                // Buscar por período
+                closures = payrollClosureService.getClosuresByPeriod(month, year);
+            } else if (employeeId != null) {
+                // Buscar por funcionário (primeira página)
+                Pageable pageable = PageRequest.of(0, 100);
+                Page<PayrollClosure> page = payrollClosureService.getClosuresByEmployee(employeeId, pageable);
+                closures = page.getContent();
+            } else {
+                // Retornar lista vazia se não houver filtros
+                closures = List.of();
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", closures,
+                    "total", closures.size()
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao buscar fechamentos: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
     @GetMapping("/period")
     @PreAuthorize("hasAnyAuthority('PAYROLL_READ', 'SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> getClosuresByPeriod(
@@ -125,13 +189,14 @@ public class PayrollClosureController {
         }
     }
 
-    @PutMapping("/{closureId}/close")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PostMapping("/{closureId}/close")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_MANAGE') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> closeClosure(
             @PathVariable UUID closureId,
-            @RequestBody Map<String, String> request) {
+            @RequestBody(required = false) Map<String, String> request) {
         try {
-            UUID closedById = UUID.fromString(request.get("closedById"));
+            UUID closedById = (request != null && request.get("closedById") != null) ? 
+                    UUID.fromString(request.get("closedById")) : null;
             PayrollClosure closure = payrollClosureService.closeClosure(closureId, closedById);
             
             return ResponseEntity.ok(Map.of(
@@ -140,7 +205,7 @@ public class PayrollClosureController {
                     "data", closure
             ));
         } catch (Exception e) {
-            log.error("Erro ao finalizar fechamento: {}", e.getMessage());
+            log.error("Erro ao finalizar fechamento: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "error", e.getMessage()
@@ -149,16 +214,16 @@ public class PayrollClosureController {
     }
 
     @GetMapping("/{closureId}")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> getClosureById(@PathVariable UUID closureId) {
         try {
-            // Implementar quando necessário
+            PayrollClosure closure = payrollClosureService.getClosureById(closureId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Endpoint em desenvolvimento"
+                    "data", closure
             ));
         } catch (Exception e) {
-            log.error("Erro ao buscar fechamento: {}", e.getMessage());
+            log.error("Erro ao buscar fechamento: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "error", e.getMessage()

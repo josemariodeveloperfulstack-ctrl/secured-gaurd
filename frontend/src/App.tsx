@@ -71,6 +71,9 @@ const SSTCIPA = lazy(() => import('@/pages/RH/SST/CIPA'));
 const SSTTreinamentos = lazy(() => import('@/pages/RH/SST/Treinamentos'));
 const Treinamentos = lazy(() => import('@/pages/RH/Treinamentos'));
 const PontoEletronico = lazy(() => import('@/pages/RH/PontoEletronico'));
+const FechamentoHoras = lazy(() => import('@/pages/RH/FechamentoHoras'));
+const FechamentoHorasDetalhes = lazy(() => import('@/pages/RH/FechamentoHorasDetalhes'));
+const ImportarBatidas = lazy(() => import('@/pages/RH/ImportarBatidas'));
 const AvaliacaoDesempenho = lazy(() => import('@/pages/RH/AvaliacaoDesempenho'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
@@ -110,6 +113,7 @@ const Beneficios = lazy(() => import('@/pages/Beneficios'));
 const AdmissaoDemissao = lazy(() => import('@/pages/AdmissaoDemissao'));
 const CentrosDeCusto = lazy(() => import('@/pages/CentrosDeCusto'));
 const ImportarDadosBancarios = lazy(() => import('@/pages/ImportarDadosBancarios'));
+const ImportarWhatsappPDF = lazy(() => import('@/pages/ImportarWhatsappPDF'));
 
 // Páginas adicionais
 const Filiais = lazy(() => import('@/pages/Filiais'));
@@ -209,6 +213,13 @@ function App() {
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Index />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/sistema/importar-whatsapp" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ImportarWhatsappPDF />
                         </Suspense>
                       </ProtectedRoute>
                     } />
@@ -689,6 +700,27 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
+                    <Route path="/rh/fechamento-horas" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <FechamentoHoras />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/fechamento-horas/:id" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <FechamentoHorasDetalhes />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/fechamento-horas/importar" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ImportarBatidas />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
                     <Route path="/rh/avaliacao-desempenho" element={
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
@@ -793,6 +825,11 @@ function App() {
                     <Route path="/rh/relatorios" element={
                       <ProtectedRoute>
                         <Relatorios />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/documentos" element={
+                      <ProtectedRoute>
+                        <GestaoDocumentos />
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/gestao-documentos" element={

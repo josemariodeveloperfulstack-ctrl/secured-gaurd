@@ -38,7 +38,7 @@ public class MeasurementItem {
     @Column(name = "unit_price", nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice = BigDecimal.ZERO;
 
-    @Column(name = "total_value", precision = 15, scale = 2)
+    @Column(name = "total_value", precision = 15, scale = 2, insertable = false, updatable = false)
     private BigDecimal totalValue = BigDecimal.ZERO;
 
     @Column(name = "cost_center_id")
@@ -97,9 +97,7 @@ public class MeasurementItem {
         }
     }
 
-    @PrePersist
-    @PreUpdate
-    private void prePersist() {
-        calculateTotalValue();
-    }
+    // Removido @PrePersist e @PreUpdate para totalValue
+    // A coluna total_value é gerada automaticamente pelo banco de dados
+    // O método calculateTotalValue() ainda pode ser usado para cálculos em memória
 }

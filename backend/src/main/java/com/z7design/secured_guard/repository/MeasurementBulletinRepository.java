@@ -85,6 +85,7 @@ public interface MeasurementBulletinRepository extends JpaRepository<Measurement
     List<MeasurementBulletin> findAllBasicData();
     
     // Método alternativo mais simples para evitar problemas de lazy loading
-    @Query("SELECT mb FROM MeasurementBulletin mb")
+    // Carrega os itens também para calcular o subtotal
+    @Query("SELECT DISTINCT mb FROM MeasurementBulletin mb LEFT JOIN FETCH mb.items")
     List<MeasurementBulletin> findAllSimple();
 }

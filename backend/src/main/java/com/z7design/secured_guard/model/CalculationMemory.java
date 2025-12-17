@@ -5,8 +5,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -29,7 +32,8 @@ public class CalculationMemory {
     private String monthReference;
 
     @Column(name = "calculation_items", columnDefinition = "JSONB")
-    private String calculationItems; // JSON string com itens de cálculo
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<String> calculationItems; // Lista de strings armazenada como JSONB
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bulletin_id", nullable = false)
@@ -73,21 +77,20 @@ public class CalculationMemory {
         return "";
     }
 
-    // Método para obter itens de cálculo como lista
+    // Método para obter itens de cálculo como array (mantido para compatibilidade)
     public String[] getCalculationItemsList() {
-        if (calculationItems != null && !calculationItems.trim().isEmpty()) {
-            // Simples parsing de JSON string - em produção usar Jackson ou Gson
-            return calculationItems.replaceAll("[\\[\\]\"]", "").split(",");
+        if (calculationItems != null && !calculationItems.isEmpty()) {
+            return calculationItems.toArray(new String[0]);
         }
         return new String[0];
     }
 
-    // Método para definir itens de cálculo
+    // Método para definir itens de cálculo a partir de array (mantido para compatibilidade)
     public void setCalculationItemsList(String[] items) {
         if (items != null && items.length > 0) {
-            this.calculationItems = "[" + String.join(",", items) + "]";
+            this.calculationItems = List.of(items);
         } else {
-            this.calculationItems = "[]";
+            this.calculationItems = List.of();
         }
     }
 }

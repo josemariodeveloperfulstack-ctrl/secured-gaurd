@@ -595,7 +595,7 @@ export function DynamicSidebar() {
         ['dashboard', 'operacional', 'controle-visitas', 'guia-transporte'].includes(item.id)
       ),
       rh: filteredItems.filter(item =>
-        ['rh', 'rh-funcionarios', 'rh-vagas', 'rh-remanejamentos', 'rh-ferias', 'rh-ocorrencias', 'rh-beneficios', 'rh-funcoes', 'rh-cargos', 'postos', 'rh-epis', 'rh-ordens-servico', 'rh-admissao-demissao', 'rh-admissao-funcionarios', 'rh-lgpd', 'rh-relatorios', 'rh-gestao-documentos', 'envio-holerites'].includes(item.id)
+        ['rh', 'rh-funcionarios', 'rh-vagas', 'rh-remanejamentos', 'rh-ferias', 'rh-ocorrencias', 'rh-beneficios', 'rh-funcoes', 'rh-cargos', 'postos', 'rh-epis', 'rh-ordens-servico', 'rh-admissao-demissao', 'rh-admissao-funcionarios', 'rh-relatorios', 'rh-gestao-documentos', 'envio-holerites'].includes(item.id)
       ),
       sst: filteredItems.filter(item =>
         ['rh-sst', 'rh-sst-exames', 'rh-sst-epis', 'rh-sst-acidentes', 'rh-sst-treinamentos', 'rh-sst-inspecoes', 'rh-sst-cipa', 'rh-sst-relatorios'].includes(item.id)

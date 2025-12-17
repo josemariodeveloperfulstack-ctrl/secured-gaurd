@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import KanbanBoard from '../components/comercial/KanbanBoard';
 import CrmDashboard from '../components/comercial/CrmDashboard';
 import { StandardLayout } from '@/components/StandardLayout';
@@ -66,7 +66,7 @@ export default function CrmKanban() {
 
   return (
     <StandardLayout title="CRM Comercial">
-      <div className="space-y-6">
+      <div className="space-y-6 w-full min-w-0">
         {/* Header com estatísticas rápidas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-seguranca-graphite border-gray-600">
@@ -143,7 +143,7 @@ export default function CrmKanban() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
           <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border border-gray-600">
             <TabsTrigger 
               value="kanban" 
@@ -161,7 +161,7 @@ export default function CrmKanban() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="kanban" className="space-y-4">
+          <TabsContent value="kanban" className="space-y-4 w-full min-w-0">
             <KanbanBoard />
           </TabsContent>
 

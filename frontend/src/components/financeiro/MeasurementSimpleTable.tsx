@@ -148,6 +148,52 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     loadBulletins();
   }, [filters, searchTerm]);
 
+  // Função helper para determinar se uma medição é simplificada
+  const isSimplifiedMeasurement = (bulletin: MeasurementBulletin): boolean => {
+    // Priorizar notas explícitas
+    const hasSimplifiedNote = bulletin.notes?.toLowerCase().includes('simplificada') || 
+                             bulletin.notes?.toLowerCase().includes('rápida');
+    if (hasSimplifiedNote) return true;
+    
+    // Se tiver nota de completa, não é simplificada
+    const hasCompleteNote = bulletin.notes?.toLowerCase().includes('completa') || 
+                          bulletin.notes?.toLowerCase().includes('detalhada');
+    if (hasCompleteNote) return false;
+    
+    // Medição simplificada: item único OU valor baixo
+    const hasSingleItem = bulletin.items && bulletin.items.length === 1;
+    const totalValue = bulletin.items?.reduce((sum, item) => {
+      const itemValue = item.totalValue || ((item.quantity || 0) * (item.unitPrice || 0));
+      return sum + itemValue;
+    }, 0) || 0;
+    const hasLowValue = totalValue <= 10000;
+    
+    // Se não tem itens ou itens não carregados, considerar como simplificada se não for completa
+    if (!bulletin.items || bulletin.items.length === 0) {
+      return !hasCompleteNote;
+    }
+    
+    // Retornar true se tiver 1 item OU valor baixo
+    return hasSingleItem || hasLowValue;
+  };
+
+  // Filtrar apenas medições simplificadas
+  const filteredBulletins = safeBulletins.filter(bulletin => {
+    const isSimplified = isSimplifiedMeasurement(bulletin);
+    if (isSimplified) {
+      console.log('✅ Medição simplificada encontrada:', {
+        id: bulletin.id,
+        contractNumber: bulletin.contractNumber,
+        itemsCount: bulletin.items?.length || 0,
+        notes: bulletin.notes,
+        subtotal: bulletin.subtotal
+      });
+    }
+    return isSimplified;
+  });
+  
+  console.log(`📊 Total de boletins: ${safeBulletins.length}, Simplificados: ${filteredBulletins.length}`);
+
   const handleRefresh = async () => {
     try {
       await loadBulletins();
@@ -174,7 +220,7 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   // Funções para seleção múltipla
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(safeBulletins.map(bulletin => bulletin.id));
+      const allIds = new Set(filteredBulletins.map(bulletin => bulletin.id));
       setSelectedBulletins(allIds);
       setIsAllSelected(true);
     } else {
@@ -193,7 +239,7 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     setSelectedBulletins(newSelected);
     
     // Verificar se todos estão selecionados
-    setIsAllSelected(newSelected.size === safeBulletins.length && safeBulletins.length > 0);
+    setIsAllSelected(newSelected.size === filteredBulletins.length && filteredBulletins.length > 0);
   };
 
   const handleBulkDelete = () => {
@@ -317,7 +363,7 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     );
   }
 
-  if (safeBulletins.length === 0 && !loading) {
+  if (filteredBulletins.length === 0 && !loading) {
     return (
       <Card className="bg-seguranca-graphite border-gray-700">
         <CardContent className="p-6">
@@ -342,11 +388,11 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     );
   }
 
-  // Calcular estatísticas
-  const totalBulletins = safeBulletins.length;
-  const pendingBulletins = safeBulletins.filter(b => b.status === 'PENDING').length;
-  const validatedBulletins = safeBulletins.filter(b => b.status === 'VALIDATED').length;
-  const totalValue = safeBulletins.reduce((sum, b) => {
+  // Calcular estatísticas apenas para medições simplificadas
+  const totalBulletins = filteredBulletins.length;
+  const pendingBulletins = filteredBulletins.filter(b => b.status === 'PENDING').length;
+  const validatedBulletins = filteredBulletins.filter(b => b.status === 'VALIDATED').length;
+  const totalValue = filteredBulletins.reduce((sum, b) => {
     const itemsValue = b.items?.reduce((itemSum, item) => itemSum + (item.quantity * item.unitPrice), 0) || 0;
     return sum + itemsValue;
   }, 0);
@@ -516,7 +562,7 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {safeBulletins.map((bulletin) => {
+            {filteredBulletins.map((bulletin) => {
               const status = getStatusProps(bulletin.status);
               return (
                 <TableRow key={bulletin.id} className="border-b-gray-700 hover:bg-seguranca-black/50">

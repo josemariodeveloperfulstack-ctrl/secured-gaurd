@@ -456,7 +456,7 @@ const RelatoriosTab: React.FC = () => {
       // Gerar arquivo no formato selecionado
       switch (selectedFormat) {
         case 'PDF':
-          ReportGenerator.generatePDF(data);
+          await ReportGenerator.generatePDF(data);
           toast({
             title: "Sucesso",
             description: "Relatório PDF gerado e baixado com sucesso!",
@@ -494,11 +494,11 @@ const RelatoriosTab: React.FC = () => {
     }
   };
 
-  const handleExportarPDF = () => {
+  const handleExportarPDF = async () => {
     if (!reportData) return;
     
     try {
-      ReportGenerator.generatePDF(reportData);
+      await ReportGenerator.generatePDF(reportData);
       toast({
         title: "Sucesso",
         description: "Relatório PDF gerado com sucesso!",

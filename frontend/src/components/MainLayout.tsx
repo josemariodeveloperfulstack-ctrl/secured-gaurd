@@ -55,7 +55,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       />
 
       {/* Conteúdo principal */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${
+      <div className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${
         isMobile ? 'ml-0' : (collapsed ? 'ml-16' : 'ml-64')
       }`}>
         {/* Header com botão de toggle */}
@@ -119,7 +119,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         </header>
 
         {/* Conteúdo da página */}
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 p-4 md:p-6 overflow-visible">
           {/* Breadcrumb */}
           <Breadcrumb />
           
@@ -140,8 +140,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           )}
 
           {/* Conteúdo principal */}
-          <div className="bg-seguranca-black rounded-lg border border-gray-700 p-2 sm:p-4 md:p-6 w-full">
-            {children}
+          <div className="bg-seguranca-black rounded-lg border border-gray-700 p-2 sm:p-4 md:p-6 w-full overflow-x-auto overflow-y-visible">
+            <div className="min-w-0 w-full">
+              {children}
+            </div>
           </div>
         </main>
       </div>

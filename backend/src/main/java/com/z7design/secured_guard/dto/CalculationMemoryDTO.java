@@ -23,17 +23,9 @@ public class CalculationMemoryDTO {
         dto.setId(entity.getId());
         dto.setDetails(entity.getDetails());
         dto.setEvidencePath(entity.getEvidencePath());
-        dto.setMonthReference(entity.getMonthReference()); // Linha adicionada
-        // Converter String para List<String> se necessário
-        if (entity.getCalculationItems() != null && !entity.getCalculationItems().isEmpty()) {
-            try {
-                // Se for JSON array, converter para List
-                dto.setCalculationItems(java.util.Arrays.asList(entity.getCalculationItems().split(",")));
-            } catch (Exception e) {
-                // Se não conseguir converter, usar como string única
-                dto.setCalculationItems(java.util.Arrays.asList(entity.getCalculationItems()));
-            }
-        }
+        dto.setMonthReference(entity.getMonthReference());
+        // calculationItems já é List<String> na entidade
+        dto.setCalculationItems(entity.getCalculationItems());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setBulletinId(entity.getBulletin() != null ? entity.getBulletin().getId() : null);
@@ -45,11 +37,9 @@ public class CalculationMemoryDTO {
         memory.setId(dto.getId());
         memory.setDetails(dto.getDetails());
         memory.setEvidencePath(dto.getEvidencePath());
-        memory.setMonthReference(dto.getMonthReference()); // Linha adicionada
-        // Converter List<String> para String se necessário
-        if (dto.getCalculationItems() != null && !dto.getCalculationItems().isEmpty()) {
-            memory.setCalculationItems(String.join(",", dto.getCalculationItems()));
-        }
+        memory.setMonthReference(dto.getMonthReference());
+        // calculationItems já é List<String> no DTO e na entidade
+        memory.setCalculationItems(dto.getCalculationItems());
         memory.setCreatedAt(dto.getCreatedAt());
         memory.setUpdatedAt(dto.getUpdatedAt());
         return memory;

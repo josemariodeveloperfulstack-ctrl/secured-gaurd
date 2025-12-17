@@ -43,6 +43,11 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '@/lib/axios';
+import { contractService, Contract } from '@/services/contractService';
+import { employeeService, Employee } from '@/services/employeeService';
+import { companyService } from '@/services/companyService';
+import { Company } from '@/types/company';
+import { measurementService } from '@/services/measurementService';
 
 interface MeasurementItem {
   id: string;
@@ -73,14 +78,18 @@ interface MeasurementBulletin {
   status: 'DRAFT' | 'PENDING' | 'VALIDATED' | 'CANCELLED';
   subtotal: number;
   items: MeasurementItem[];
+  clientId?: string;
+  clientName?: string;
   client?: {
     id: string;
     name: string;
   };
+  contractId?: string;
   contract?: {
     id: string;
     number: string;
   };
+  unitId?: string;
   unit?: {
     id: string;
     name: string;
@@ -123,9 +132,15 @@ const MedicoesTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
   const [contractFilter, setContractFilter] = useState<string>('');
   
+  // Dados para os selects
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
+  
   // Formulário
   const [formData, setFormData] = useState<Partial<MeasurementBulletin>>({
-    companyName: 'PROMOVER VIGILÂNCIA PATRIMONIAL LTDA',
+    companyName: '',
     periodStart: '',
     periodEnd: '',
     contractNumber: '',
@@ -134,12 +149,87 @@ const MedicoesTab: React.FC = () => {
     status: 'DRAFT',
     notes: ''
   });
+  
+  // IDs auxiliares para os selects (armazenam IDs, mas formData armazena nomes)
+  const [companyId, setCompanyId] = useState<string>('');
+  const [contractId, setContractId] = useState<string>('');
+  const [elaboratedById, setElaboratedById] = useState<string>('');
+  const [measuredById, setMeasuredById] = useState<string>('');
+
+  // Estado para controlar a aba ativa
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  // Função helper para determinar se uma medição é completa
+  const isCompleteMeasurement = (bulletin: MeasurementBulletin): boolean => {
+    // Priorizar notas explícitas
+    const hasCompleteNote = bulletin.notes?.toLowerCase().includes('completa') || 
+                          bulletin.notes?.toLowerCase().includes('detalhada');
+    if (hasCompleteNote) return true;
+    
+    // Se tiver nota de simplificada, não é completa
+    const hasSimplifiedNote = bulletin.notes?.toLowerCase().includes('simplificada') || 
+                             bulletin.notes?.toLowerCase().includes('rápida');
+    if (hasSimplifiedNote) return false;
+    
+    // Medição completa: múltiplos itens OU valor alto
+    const hasMultipleItems = bulletin.items && bulletin.items.length > 1;
+    const totalValue = bulletin.items?.reduce((sum, item) => {
+      const itemValue = item.totalValue || ((item.quantity || 0) * (item.unitPrice || 0));
+      return sum + itemValue;
+    }, 0) || 0;
+    const hasHighValue = totalValue > 10000;
+    
+    return hasMultipleItems || hasHighValue;
+  };
+
+  // Função helper para determinar se uma medição é simplificada
+  const isSimplifiedMeasurement = (bulletin: MeasurementBulletin): boolean => {
+    // Priorizar notas explícitas
+    const hasSimplifiedNote = bulletin.notes?.toLowerCase().includes('simplificada') || 
+                             bulletin.notes?.toLowerCase().includes('rápida');
+    if (hasSimplifiedNote) return true;
+    
+    // Se tiver nota de completa, não é simplificada
+    const hasCompleteNote = bulletin.notes?.toLowerCase().includes('completa') || 
+                          bulletin.notes?.toLowerCase().includes('detalhada');
+    if (hasCompleteNote) return false;
+    
+    // Medição simplificada: item único OU valor baixo
+    const hasSingleItem = bulletin.items && bulletin.items.length === 1;
+    const totalValue = bulletin.items?.reduce((sum, item) => {
+      const itemValue = item.totalValue || ((item.quantity || 0) * (item.unitPrice || 0));
+      return sum + itemValue;
+    }, 0) || 0;
+    const hasLowValue = totalValue <= 10000;
+    
+    // Se não tem itens ou itens não carregados, considerar como simplificada se não for completa
+    if (!bulletin.items || bulletin.items.length === 0) {
+      return !hasCompleteNote;
+    }
+    
+    // Retornar true se tiver 1 item OU valor baixo
+    return hasSingleItem || hasLowValue;
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
+  };
+
+  // Função para calcular subtotal a partir dos itens se necessário
+  const calculateSubtotalFromItems = (bulletin: MeasurementBulletin): number => {
+    if (bulletin.subtotal && bulletin.subtotal > 0) {
+      return bulletin.subtotal;
+    }
+    if (bulletin.items && bulletin.items.length > 0) {
+      return bulletin.items.reduce((sum: number, item: any) => {
+        const itemValue = item.totalValue || ((item.quantity || 0) * (item.unitPrice || 0));
+        return sum + itemValue;
+      }, 0);
+    }
+    return 0;
   };
 
   const getStatusColor = (status: string) => {
@@ -178,14 +268,25 @@ const MedicoesTab: React.FC = () => {
       
       // Carregar boletins de medição da API
       const response = await api.get('/measurements/all');
-      setBulletins(response.data);
+      // Garantir que o subtotal seja calculado se necessário
+      const bulletinsWithSubtotal = response.data.map((bulletin: MeasurementBulletin) => {
+        if (!bulletin.subtotal || bulletin.subtotal === 0) {
+          const calculatedSubtotal = calculateSubtotalFromItems(bulletin);
+          return { ...bulletin, subtotal: calculatedSubtotal };
+        }
+        return bulletin;
+      });
+      setBulletins(bulletinsWithSubtotal);
 
       // Calcular resumo
       const totalBulletins = response.data.length;
       const draftBulletins = response.data.filter((b: MeasurementBulletin) => b.status === 'DRAFT').length;
       const pendingBulletins = response.data.filter((b: MeasurementBulletin) => b.status === 'PENDING').length;
       const validatedBulletins = response.data.filter((b: MeasurementBulletin) => b.status === 'VALIDATED').length;
-      const totalValue = response.data.reduce((sum: number, b: MeasurementBulletin) => sum + b.subtotal, 0);
+      const totalValue = response.data.reduce((sum: number, b: MeasurementBulletin) => {
+        const subtotal = calculateSubtotalFromItems(b);
+        return sum + subtotal;
+      }, 0);
       const averageValue = totalBulletins > 0 ? totalValue / totalBulletins : 0;
 
       setSummary({
@@ -211,16 +312,44 @@ const MedicoesTab: React.FC = () => {
 
   const handleSalvarBoletim = async () => {
     try {
+      // Criar payload limpo sem campos não aceitos pelo DTO
+      const payload: any = {
+        periodStart: formData.periodStart,
+        periodEnd: formData.periodEnd,
+        contractNumber: formData.contractNumber,
+        contractStart: formData.contractStart,
+        contractEnd: formData.contractEnd,
+        nfNumber: formData.nfNumber || '',
+        elaboratedBy: formData.elaboratedBy,
+        measuredBy: formData.measuredBy,
+        status: formData.status || 'DRAFT',
+        notes: formData.notes || '',
+        items: formData.items || []
+      };
+
+      // Adicionar subtotal se estiver definido
+      if (formData.subtotal !== undefined && formData.subtotal !== null) {
+        payload.subtotal = formData.subtotal;
+      }
+
+      // Adicionar IDs apenas se estiverem definidos
+      if (contractId) {
+        payload.contractId = contractId;
+      }
+      if (companyId) {
+        payload.clientId = companyId; // O backend espera clientId
+      }
+
       if (editingBulletin) {
         // Atualizar boletim existente
-        await api.put(`/measurements/${editingBulletin.id}`, formData);
+        await api.put(`/measurements/${editingBulletin.id}`, payload);
         toast({
           title: "Sucesso",
           description: "Boletim de medição atualizado com sucesso",
         });
       } else {
         // Criar novo boletim
-        await api.post('/measurements', formData);
+        await api.post('/measurements', payload);
         toast({
           title: "Sucesso",
           description: "Boletim de medição criado com sucesso",
@@ -230,7 +359,7 @@ const MedicoesTab: React.FC = () => {
       setShowFormModal(false);
       setEditingBulletin(null);
       setFormData({
-        companyName: 'PROMOVER VIGILÂNCIA PATRIMONIAL LTDA',
+        companyName: '',
         periodStart: '',
         periodEnd: '',
         contractNumber: '',
@@ -239,6 +368,10 @@ const MedicoesTab: React.FC = () => {
         status: 'DRAFT',
         notes: ''
       });
+      setElaboratedById('');
+      setMeasuredById('');
+      setContractId('');
+      setCompanyId('');
       
       carregarDados();
     } catch (error) {
@@ -294,18 +427,80 @@ const MedicoesTab: React.FC = () => {
     }
   };
 
-  const handleEditarBoletim = (bulletin: MeasurementBulletin) => {
+  const handleEditarBoletim = async (bulletin: MeasurementBulletin) => {
     setEditingBulletin(bulletin);
     setFormData({
       companyName: bulletin.companyName,
       periodStart: bulletin.periodStart,
       periodEnd: bulletin.periodEnd,
       contractNumber: bulletin.contractNumber,
+      contractStart: bulletin.contractStart,
+      contractEnd: bulletin.contractEnd,
+      nfNumber: bulletin.nfNumber,
       elaboratedBy: bulletin.elaboratedBy,
       measuredBy: bulletin.measuredBy,
       status: bulletin.status,
-      notes: bulletin.notes || ''
+      notes: bulletin.notes || '',
+      items: bulletin.items || [],
+      subtotal: bulletin.subtotal || 0
     });
+    
+    // Carregar dados primeiro
+    const { contracts: contractsData, employees: employeesData, companies: companiesData } = await carregarDadosParaModal();
+    
+    // Encontrar empresa - priorizar clientId, depois client.id, depois busca por nome
+    let companyIdToSet = '';
+    if (bulletin.clientId) {
+      // Usar clientId diretamente se disponível
+      companyIdToSet = bulletin.clientId;
+      console.log('🔍 Usando clientId do boletim:', companyIdToSet);
+    } else if (bulletin.client?.id) {
+      companyIdToSet = bulletin.client.id;
+      console.log('🔍 Usando client.id do boletim:', companyIdToSet);
+    } else if (bulletin.companyName) {
+      // Buscar por nome (case-insensitive e trim)
+      const company = companiesData.find(c => {
+        const companyName = c.name?.trim().toLowerCase() || '';
+        const bulletinName = bulletin.companyName?.trim().toLowerCase() || '';
+        return companyName === bulletinName || companyName.includes(bulletinName) || bulletinName.includes(companyName);
+      });
+      companyIdToSet = company?.id || '';
+      console.log('🔍 Buscando empresa por nome:', bulletin.companyName, 'Encontrada:', company?.name, 'ID:', companyIdToSet);
+    }
+    
+    // Se ainda não encontrou, tentar buscar na lista de empresas carregadas
+    if (!companyIdToSet && bulletin.companyName && companiesData.length > 0) {
+      const company = companiesData.find(c => 
+        c.name?.trim().toLowerCase().includes(bulletin.companyName?.trim().toLowerCase() || '') ||
+        bulletin.companyName?.trim().toLowerCase().includes(c.name?.trim().toLowerCase() || '')
+      );
+      if (company) {
+        companyIdToSet = company.id;
+        console.log('🔍 Empresa encontrada por busca parcial:', company.name, 'ID:', companyIdToSet);
+      }
+    }
+    
+    setCompanyId(companyIdToSet);
+    console.log('✅ companyId definido:', companyIdToSet);
+    
+    // Encontrar contrato - priorizar contractId, depois contract.id, depois busca por número
+    let contractIdToSet = '';
+    if (bulletin.contractId) {
+      contractIdToSet = bulletin.contractId;
+    } else if (bulletin.contract?.id) {
+      contractIdToSet = bulletin.contract.id;
+    } else if (bulletin.contractNumber) {
+      const contract = contractsData.find(c => c.contractNumber === bulletin.contractNumber);
+      contractIdToSet = contract?.id || '';
+    }
+    setContractId(contractIdToSet);
+    
+    // Encontrar funcionários pelo nome
+    const elaboratedEmployee = employeesData.find(e => e.name === bulletin.elaboratedBy);
+    const measuredEmployee = employeesData.find(e => e.name === bulletin.measuredBy);
+    setElaboratedById(elaboratedEmployee?.id || '');
+    setMeasuredById(measuredEmployee?.id || '');
+    
     setShowFormModal(true);
   };
 
@@ -314,10 +509,36 @@ const MedicoesTab: React.FC = () => {
     setShowViewModal(true);
   };
 
-  const handleNovoBoletim = () => {
+  const carregarDadosParaModal = async (): Promise<{ contracts: Contract[], employees: Employee[], companies: Company[] }> => {
+    try {
+      setLoadingData(true);
+      // Carregar contratos, funcionários e empresas em paralelo
+      const [contractsData, employeesData, companiesData] = await Promise.all([
+        contractService.getContracts(),
+        employeeService.getAllEmployees(),
+        companyService.getAllCompanies()
+      ]);
+      setContracts(contractsData);
+      setEmployees(employeesData);
+      setCompanies(companiesData as Company[]);
+      return { contracts: contractsData, employees: employeesData, companies: companiesData as Company[] };
+    } catch (error) {
+      console.error('Erro ao carregar dados para modal:', error);
+      toast({
+        title: "Aviso",
+        description: "Erro ao carregar dados. Alguns campos podem não estar disponíveis.",
+        variant: "destructive",
+      });
+      return { contracts: [], employees: [], companies: [] };
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const handleNovoBoletim = async () => {
     setEditingBulletin(null);
     setFormData({
-      companyName: 'PROMOVER VIGILÂNCIA PATRIMONIAL LTDA',
+      companyName: '',
       periodStart: '',
       periodEnd: '',
       contractNumber: '',
@@ -326,11 +547,26 @@ const MedicoesTab: React.FC = () => {
       status: 'DRAFT',
       notes: ''
     });
+    setContractId('');
+    setCompanyId('');
+    setElaboratedById('');
+    setMeasuredById('');
+    await carregarDadosParaModal();
     setShowFormModal(true);
   };
 
-  // Filtrar boletins
+  // Filtrar boletins baseado na aba ativa e filtros
   const filteredBulletins = bulletins.filter(bulletin => {
+    // Filtro por tipo de medição baseado na aba ativa
+    let matchesType = true;
+    if (activeTab === 'completa') {
+      matchesType = isCompleteMeasurement(bulletin);
+    } else if (activeTab === 'simplificada') {
+      matchesType = isSimplifiedMeasurement(bulletin);
+    }
+    // Se estiver na aba dashboard (activeTab === 'dashboard'), matchesType permanece true
+    // isso significa que todas as medições serão exibidas no dashboard
+    
     const matchesSearch = searchTerm === '' || 
       bulletin.contractNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       bulletin.elaboratedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -339,12 +575,43 @@ const MedicoesTab: React.FC = () => {
     const matchesStatus = statusFilter === 'TODOS' || bulletin.status === statusFilter;
     const matchesContract = contractFilter === '' || bulletin.contractNumber.includes(contractFilter);
     
-    return matchesSearch && matchesStatus && matchesContract;
+    return matchesType && matchesSearch && matchesStatus && matchesContract;
   });
+  
+  // Debug: log da contagem de medições
+  console.log(`📊 Dashboard - Total: ${bulletins.length}, Filtrados: ${filteredBulletins.length}, Aba ativa: ${activeTab}`);
 
   useEffect(() => {
     carregarDados();
   }, []);
+
+  // Atualizar companyId quando empresas forem carregadas e estiver editando
+  useEffect(() => {
+    if (editingBulletin && companies.length > 0 && !companyId) {
+      // Tentar encontrar empresa novamente agora que as empresas foram carregadas
+      let foundCompanyId = '';
+      
+      if (editingBulletin.clientId) {
+        foundCompanyId = editingBulletin.clientId;
+      } else if (editingBulletin.client?.id) {
+        foundCompanyId = editingBulletin.client.id;
+      } else if (editingBulletin.companyName) {
+        const company = companies.find(c => {
+          const companyName = c.name?.trim().toLowerCase() || '';
+          const bulletinName = editingBulletin.companyName?.trim().toLowerCase() || '';
+          return companyName === bulletinName || 
+                 companyName.includes(bulletinName) || 
+                 bulletinName.includes(companyName);
+        });
+        foundCompanyId = company?.id || '';
+      }
+      
+      if (foundCompanyId) {
+        setCompanyId(foundCompanyId);
+        console.log('✅ companyId atualizado via useEffect:', foundCompanyId);
+      }
+    }
+  }, [companies, editingBulletin, companyId]);
 
   if (loading) {
     return (
@@ -388,7 +655,7 @@ const MedicoesTab: React.FC = () => {
       </div>
 
       {/* Tabs - Padrão SST */}
-      <Tabs defaultValue="dashboard" className="w-full">
+      <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border-gray-600">
           <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
             Dashboard
@@ -548,7 +815,7 @@ const MedicoesTab: React.FC = () => {
                       {bulletin.measuredBy}
                     </TableCell>
                     <TableCell className="text-white font-medium">
-                      {formatCurrency(bulletin.subtotal)}
+                      {formatCurrency(calculateSubtotalFromItems(bulletin))}
                     </TableCell>
                     <TableCell>
                       <Badge className={`${getStatusColor(bulletin.status)} flex items-center gap-1 w-fit`}>
@@ -612,9 +879,9 @@ const MedicoesTab: React.FC = () => {
           <MeasurementCompleteTable
             onView={handleVisualizarBoletim}
             onEdit={handleEditarBoletim}
-            onDelete={handleExcluirBoletim}
+            onDelete={(bulletin) => handleExcluirBoletim(bulletin.id)}
             onCreate={handleNovoBoletim}
-            onValidate={handleValidarBoletim}
+            onValidate={(bulletin) => handleValidarBoletim(bulletin.id)}
           />
         </TabsContent>
 
@@ -623,9 +890,9 @@ const MedicoesTab: React.FC = () => {
           <MeasurementSimpleTable
             onView={handleVisualizarBoletim}
             onEdit={handleEditarBoletim}
-            onDelete={handleExcluirBoletim}
+            onDelete={(bulletin) => handleExcluirBoletim(bulletin.id)}
             onCreate={handleNovoBoletim}
-            onValidate={handleValidarBoletim}
+            onValidate={(bulletin) => handleValidarBoletim(bulletin.id)}
           />
         </TabsContent>
       </Tabs>
@@ -644,23 +911,81 @@ const MedicoesTab: React.FC = () => {
           
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Nome da Empresa</label>
-              <Input
-                value={formData.companyName}
-                onChange={(e) => setFormData({...formData, companyName: e.target.value})}
-                className="bg-seguranca-black border-gray-600 text-white"
-              />
+              <label className="text-sm font-medium text-gray-300">Nome da Empresa *</label>
+              <Select
+                value={(() => {
+                  // Priorizar companyId se estiver definido
+                  if (companyId) {
+                    return companyId;
+                  }
+                  // Tentar encontrar empresa por nome se companyId não estiver definido
+                  if (formData.companyName && companies.length > 0) {
+                    const found = companies.find(c => {
+                      const companyName = c.name?.trim().toLowerCase() || '';
+                      const formName = formData.companyName?.trim().toLowerCase() || '';
+                      return companyName === formName || 
+                             companyName.includes(formName) || 
+                             formName.includes(companyName);
+                    });
+                    if (found) {
+                      // Atualizar companyId se encontrou
+                      setCompanyId(found.id);
+                      return found.id;
+                    }
+                  }
+                  return '';
+                })()}
+                onValueChange={(value) => {
+                  const selectedCompany = companies.find(c => c.id === value);
+                  setCompanyId(value);
+                  setFormData({
+                    ...formData,
+                    companyName: selectedCompany?.name || ''
+                  });
+                }}
+                disabled={loadingData}
+              >
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
+                  <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600">
+                  {companies.map(company => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Número do Contrato *</label>
-                <Input
+                <Select
                   value={formData.contractNumber}
-                  onChange={(e) => setFormData({...formData, contractNumber: e.target.value})}
-                  placeholder="Ex: CONT-2024-001"
-                  className="bg-seguranca-black border-gray-600 text-white"
-                />
+                  onValueChange={(value) => {
+                    const selectedContract = contracts.find(c => c.contractNumber === value);
+                    setContractId(selectedContract?.id || '');
+                    setFormData({
+                      ...formData,
+                      contractNumber: value,
+                      contractStart: selectedContract?.startDate || '',
+                      contractEnd: selectedContract?.endDate || ''
+                    });
+                  }}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o contrato"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {contracts.map(contract => (
+                      <SelectItem key={contract.id} value={contract.contractNumber}>
+                        {contract.contractNumber} - {contract.clientName || contract.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
@@ -704,23 +1029,81 @@ const MedicoesTab: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Elaborado por *</label>
-                <Input
-                  value={formData.elaboratedBy}
-                  onChange={(e) => setFormData({...formData, elaboratedBy: e.target.value})}
-                  placeholder="Nome do responsável"
-                  className="bg-seguranca-black border-gray-600 text-white"
-                />
+                <Select
+                  value={elaboratedById || (formData.elaboratedBy ? employees.find(e => e.name === formData.elaboratedBy)?.id || '' : '')}
+                  onValueChange={(value) => {
+                    const selectedEmployee = employees.find(e => e.id === value);
+                    setElaboratedById(value);
+                    setFormData({
+                      ...formData,
+                      elaboratedBy: selectedEmployee?.name || ''
+                    });
+                  }}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {employees.map(employee => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Medido por *</label>
+                <Select
+                  value={measuredById || (formData.measuredBy ? employees.find(e => e.name === formData.measuredBy)?.id || '' : '')}
+                  onValueChange={(value) => {
+                    const selectedEmployee = employees.find(e => e.id === value);
+                    setMeasuredById(value);
+                    setFormData({
+                      ...formData,
+                      measuredBy: selectedEmployee?.name || ''
+                    });
+                  }}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {employees.map(employee => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Valor Total (R$)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">R$</span>
                 <Input
-                  value={formData.measuredBy}
-                  onChange={(e) => setFormData({...formData, measuredBy: e.target.value})}
-                  placeholder="Nome do responsável"
-                  className="bg-seguranca-black border-gray-600 text-white"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.subtotal || ''}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    setFormData({...formData, subtotal: value});
+                  }}
+                  placeholder="0.00"
+                  className="bg-seguranca-black border-gray-600 text-white pl-10"
                 />
               </div>
+              {formData.subtotal && formData.subtotal > 0 && (
+                <p className="text-sm text-gray-400">
+                  {formatCurrency(formData.subtotal)}
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -735,20 +1118,57 @@ const MedicoesTab: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowFormModal(false)}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSalvarBoletim}
-              className="bg-seguranca-yellow hover:bg-yellow-600 text-black"
-            >
-              {editingBulletin ? 'Atualizar' : 'Criar'} Boletim
-            </Button>
+          <div className="flex justify-between gap-2 pt-4">
+            {editingBulletin && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    if (!editingBulletin?.id) return;
+                    const blob = await measurementService.generateBulletinPDF(editingBulletin.id);
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `boletim_medicao_${editingBulletin.id}.pdf`;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                    toast({
+                      title: "Sucesso",
+                      description: `PDF gerado com sucesso! (${Math.round(blob.size / 1024)} KB)`,
+                    });
+                  } catch (error) {
+                    console.error('Erro ao gerar PDF:', error);
+                    toast({
+                      title: "Erro",
+                      description: `Erro ao gerar PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="border-gray-600 text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Gerar PDF
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button
+                variant="outline"
+                onClick={() => setShowFormModal(false)}
+                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSalvarBoletim}
+                className="bg-seguranca-yellow hover:bg-yellow-600 text-black"
+              >
+                {editingBulletin ? 'Atualizar' : 'Criar'} Boletim
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -137,8 +137,34 @@ export default function MeasurementCompleteTable({
     loadBulletins();
   }, []);
 
-  // Filtrar boletins
+  // Função helper para determinar se uma medição é completa
+  const isCompleteMeasurement = (bulletin: MeasurementBulletin): boolean => {
+    // Priorizar notas explícitas
+    const hasCompleteNote = bulletin.notes?.toLowerCase().includes('completa') || 
+                          bulletin.notes?.toLowerCase().includes('detalhada');
+    if (hasCompleteNote) return true;
+    
+    // Se tiver nota de simplificada, não é completa
+    const hasSimplifiedNote = bulletin.notes?.toLowerCase().includes('simplificada') || 
+                             bulletin.notes?.toLowerCase().includes('rápida');
+    if (hasSimplifiedNote) return false;
+    
+    // Medição completa: múltiplos itens OU valor alto
+    const hasMultipleItems = bulletin.items && bulletin.items.length > 1;
+    const totalValue = bulletin.items?.reduce((sum, item) => {
+      const itemValue = item.totalValue || ((item.quantity || 0) * (item.unitPrice || 0));
+      return sum + itemValue;
+    }, 0) || 0;
+    const hasHighValue = totalValue > 10000;
+    
+    return hasMultipleItems || hasHighValue;
+  };
+
+  // Filtrar boletins - apenas medições completas
   const filteredBulletins = Array.isArray(bulletins) ? bulletins.filter(bulletin => {
+    // Filtrar apenas medições completas
+    const matchesType = isCompleteMeasurement(bulletin);
+    
     const matchesSearch = 
       bulletin.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       bulletin.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -147,7 +173,7 @@ export default function MeasurementCompleteTable({
     const matchesStatus = statusFilter === 'all' || bulletin.status === statusFilter;
     const matchesContract = contractFilter === 'all' || bulletin.contractNumber === contractFilter;
 
-    return matchesSearch && matchesStatus && matchesContract;
+    return matchesType && matchesSearch && matchesStatus && matchesContract;
   }) : [];
 
   // Obter contratos únicos para filtro

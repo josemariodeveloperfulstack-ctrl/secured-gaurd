@@ -80,6 +80,10 @@ public class PayrollClosure {
     @Lob
     private String observations;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pay_period_id")
+    private PayPeriod payPeriod;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -175,7 +175,8 @@ public class ProposalService {
     }
 
     public BigDecimal getTotalValueByStatus(ProposalStatus status) {
-        return proposalRepository.getTotalValueByStatus(status);
+        BigDecimal value = proposalRepository.getTotalValueByStatus(status);
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     public List<Proposal> searchProposals(String searchTerm) {

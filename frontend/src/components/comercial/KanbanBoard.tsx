@@ -24,13 +24,15 @@ import {
 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import styles from './KanbanBoard.module.css';
+import { fetchOpportunities, fetchKanbanStatuses, createOpportunity, updateOpportunity } from '@/services/crmService';
+import { useToast } from '@/hooks/use-toast';
 
 interface KanbanStatus {
-  id: number;
+  id: string | number;
   name: string;
   orderIndex: number;
-  color: string;
-  bgColor: string;
+  color?: string;
+  bgColor?: string;
 }
 
 interface Lead {
@@ -226,17 +228,96 @@ const mockOpportunities: Opportunity[] = [
 ];
 
 export default function KanbanBoard() {
-  const [statuses, setStatuses] = useState<KanbanStatus[]>(mockStatuses);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities);
-  const [filteredOpportunities, setFilteredOpportunities] = useState<Opportunity[]>(mockOpportunities);
-  const [loading, setLoading] = useState(false);
+  const [statuses, setStatuses] = useState<KanbanStatus[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [filteredOpportunities, setFilteredOpportunities] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Opportunity | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', statusId: 0 });
+  const [form, setForm] = useState({ title: '', description: '', statusId: '' });
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
+  const [hasValidStatuses, setHasValidStatuses] = useState(false);
+  const { toast } = useToast();
+
+  // Carregar dados do backend
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Carregar status e oportunidades em paralelo
+      const [statusesData, opportunitiesData] = await Promise.all([
+        fetchKanbanStatuses(),
+        fetchOpportunities()
+      ]);
+
+      // Mapear status do backend (adicionar cores padrão se não existirem)
+      const mappedStatuses = statusesData.map((status: any, index: number) => ({
+        id: status.id,
+        name: status.name,
+        orderIndex: status.orderIndex || index + 1,
+        color: mockStatuses[index]?.color || '#3B82F6',
+        bgColor: mockStatuses[index]?.bgColor || '#DBEAFE'
+      })).sort((a, b) => a.orderIndex - b.orderIndex);
+
+      // Se não houver status no backend, usar os mockados apenas para exibição
+      // Mas não permitir criar oportunidades sem status válidos do backend
+      if (mappedStatuses.length === 0) {
+        console.warn('Nenhum status encontrado no backend. Usando dados mockados apenas para exibição.');
+        setStatuses(mockStatuses);
+        toast({
+          title: "Aviso",
+          description: "Nenhum status do Kanban encontrado no backend. Por favor, crie status antes de adicionar oportunidades.",
+          variant: "default"
+        });
+      } else {
+        setStatuses(mappedStatuses);
+      }
+
+      // Mapear oportunidades do backend
+      const mappedOpportunities = opportunitiesData.map((opp: any) => ({
+        id: opp.id,
+        title: opp.title,
+        description: opp.description || '',
+        statusId: opp.statusId,
+        leadId: opp.leadId,
+        value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
+        estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
+        expectedCloseDate: opp.closeDate || '',
+        closeDate: opp.closeDate || '',
+        assignedToId: opp.assignedToId,
+        assignedTo: opp.assignedTo || 'Não atribuído',
+        probability: 50, // Valor padrão, pode ser calculado depois
+        priority: 'MEDIUM' as const,
+        lastContact: opp.updatedAt || opp.createdAt || '',
+        tags: []
+      }));
+
+      setOpportunities(mappedOpportunities);
+      setFilteredOpportunities(mappedOpportunities);
+    } catch (err: any) {
+      console.error('Erro ao carregar dados do Kanban:', err);
+      setError(err.message || 'Erro ao carregar dados');
+      // Em caso de erro, usar dados mockados como fallback
+      setStatuses(mockStatuses);
+      setOpportunities(mockOpportunities);
+      setFilteredOpportunities(mockOpportunities);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar dados do backend. Usando dados de exemplo.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = opportunities;
@@ -261,17 +342,125 @@ export default function KanbanBoard() {
     setFilteredOpportunities(filtered);
   }, [opportunities, searchTerm, selectedStatus, selectedPriority]);
 
-  function openModal(statusId: number) {
-    setForm({ title: '', description: '', statusId });
+  function openModal(statusId: string | number) {
+    // Validar se é um UUID válido antes de abrir o modal
+    const statusIdStr = String(statusId);
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    if (!hasValidStatuses) {
+      toast({
+        title: "Erro",
+        description: "Nenhum status válido encontrado no backend. Por favor, crie status antes de adicionar oportunidades.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!uuidRegex.test(statusIdStr)) {
+      toast({
+        title: "Erro",
+        description: "Status inválido. Por favor, certifique-se de que há status válidos cadastrados no backend.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setForm({ title: '', description: '', statusId: statusIdStr });
     setEditing(null);
     setShowModal(true);
   }
 
   function openEditModal(opp: Opportunity) {
-    setForm({ title: opp.title, description: opp.description, statusId: opp.statusId });
+    setForm({ title: opp.title, description: opp.description || '', statusId: String(opp.statusId) });
     setEditing(opp);
     setShowModal(true);
   }
+
+  const handleSaveOpportunity = async () => {
+    try {
+      // Validação básica
+      if (!form.title || !form.title.trim()) {
+        toast({
+          title: "Erro",
+          description: "Por favor, preencha o título da oportunidade.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!form.description || !form.description.trim()) {
+        toast({
+          title: "Erro",
+          description: "Por favor, preencha a descrição da oportunidade.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!form.statusId || !form.statusId.trim()) {
+        toast({
+          title: "Erro",
+          description: "Por favor, selecione um status para a oportunidade.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validar se o statusId é um UUID válido (não pode ser um número mockado)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(form.statusId)) {
+        toast({
+          title: "Erro",
+          description: "Status inválido. Por favor, selecione um status válido do backend.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (editing) {
+        // Atualizar oportunidade existente
+        await updateOpportunity(String(editing.id), {
+          title: form.title.trim(),
+          description: form.description.trim(),
+          statusId: form.statusId
+        });
+        toast({
+          title: "Sucesso",
+          description: "Oportunidade atualizada com sucesso!",
+        });
+      } else {
+        // Criar nova oportunidade
+        console.log('Criando oportunidade com dados:', { 
+          title: form.title.trim(), 
+          description: form.description.trim(), 
+          statusId: form.statusId 
+        });
+        
+        await createOpportunity({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          statusId: form.statusId
+        });
+        
+        toast({
+          title: "Sucesso",
+          description: "Oportunidade criada com sucesso!",
+        });
+      }
+      
+      setShowModal(false);
+      // Recarregar dados
+      await loadData();
+    } catch (err: any) {
+      console.error('Erro ao salvar oportunidade:', err);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Não foi possível salvar a oportunidade.";
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -324,7 +513,7 @@ export default function KanbanBoard() {
   if (error) return <div className="text-red-500 p-8">{error}</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       {/* Header com estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-seguranca-graphite border-gray-600">
@@ -396,7 +585,7 @@ export default function KanbanBoard() {
               />
             </div>
             
-            <Select value={selectedStatus?.toString() || 'all'} onValueChange={(value) => setSelectedStatus(value === 'all' ? null : Number(value))}>
+            <Select value={selectedStatus?.toString() || 'all'} onValueChange={(value) => setSelectedStatus(value === 'all' ? null : value)}>
               <SelectTrigger className="w-48 bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -435,7 +624,7 @@ export default function KanbanBoard() {
       {/* Kanban Board */}
       <div className={styles['kanban-board-scroll']}>
         {statuses.map(status => {
-          const statusOpportunities = filteredOpportunities.filter(opp => opp.statusId === status.id);
+          const statusOpportunities = filteredOpportunities.filter(opp => String(opp.statusId) === String(status.id));
           const totalValue = statusOpportunities.reduce((sum, opp) => sum + opp.value, 0);
           
           return (
@@ -479,7 +668,9 @@ export default function KanbanBoard() {
               <Button 
                 variant="outline"
                 onClick={() => openModal(status.id)}
-                className="w-full mt-4 border-dashed border-gray-600 text-gray-400 hover:bg-seguranca-black"
+                disabled={!hasValidStatuses}
+                className="w-full mt-4 border-dashed border-gray-600 text-gray-400 hover:bg-seguranca-black disabled:opacity-50 disabled:cursor-not-allowed"
+                title={!hasValidStatuses ? "Crie status no backend antes de adicionar oportunidades" : "Adicionar oportunidade"}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Adicionar Oportunidade
@@ -499,7 +690,7 @@ export default function KanbanBoard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={(e) => { e.preventDefault(); setShowModal(false); }} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveOpportunity(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Título</label>
                   <Input
@@ -520,6 +711,21 @@ export default function KanbanBoard() {
                     className="w-full p-3 bg-seguranca-black border border-gray-600 rounded-md text-seguranca-lightgray resize-none"
                     rows={3}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Status <span className="text-red-500">*</span></label>
+                  <Select value={form.statusId || ''} onValueChange={(value) => setForm(f => ({ ...f, statusId: value }))} required>
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map(status => (
+                        <SelectItem key={String(status.id)} value={String(status.id)}>
+                          {status.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1 bg-seguranca-yellow text-black hover:bg-yellow-500">

@@ -124,27 +124,35 @@ export default function KanbanCard({
         </div>
 
         {/* Informações do Lead */}
-        <div className="mb-3 p-2 bg-seguranca-graphite rounded-md">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <User className="h-3 w-3 text-gray-400" />
-              <span className="text-xs font-medium text-seguranca-lightgray">
-                {opportunity.lead.name}
-              </span>
+        {opportunity.lead && (
+          <div className="mb-3 p-2 bg-seguranca-graphite rounded-md">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <User className="h-3 w-3 text-gray-400" />
+                <span className="text-xs font-medium text-seguranca-lightgray">
+                  {opportunity.lead.name || 'Sem nome'}
+                </span>
+              </div>
+              {opportunity.lead.status && (
+                <Badge className={`${getLeadStatusColor(opportunity.lead.status)} text-white text-xs`}>
+                  {getLeadStatusText(opportunity.lead.status)}
+                </Badge>
+              )}
             </div>
-            <Badge className={`${getLeadStatusColor(opportunity.lead.status)} text-white text-xs`}>
-              {getLeadStatusText(opportunity.lead.status)}
-            </Badge>
+            {opportunity.lead.company && (
+              <div className="flex items-center gap-2 mb-1">
+                <Building2 className="h-3 w-3 text-gray-400" />
+                <span className="text-xs text-gray-400">{opportunity.lead.company}</span>
+              </div>
+            )}
+            {opportunity.lead.email && (
+              <div className="flex items-center gap-2">
+                <Mail className="h-3 w-3 text-gray-400" />
+                <span className="text-xs text-gray-400">{opportunity.lead.email}</span>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-2 mb-1">
-            <Building2 className="h-3 w-3 text-gray-400" />
-            <span className="text-xs text-gray-400">{opportunity.lead.company}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Mail className="h-3 w-3 text-gray-400" />
-            <span className="text-xs text-gray-400">{opportunity.lead.email}</span>
-          </div>
-        </div>
+        )}
 
         {/* Tags */}
         {opportunity.tags.length > 0 && (
