@@ -38,3 +38,4 @@ public interface PayPeriodRepository extends JpaRepository<PayPeriod, UUID> {
     Optional<PayPeriod> findMonthlyPeriod(@Param("year") int year, @Param("month") int month);
 }
 
+

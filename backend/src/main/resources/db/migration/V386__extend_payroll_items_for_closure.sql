@@ -89,3 +89,4 @@ BEGIN
     COMMENT ON COLUMN payroll_items.reference_data IS 'Metadados adicionais em formato JSON';
 END $$;
 
+

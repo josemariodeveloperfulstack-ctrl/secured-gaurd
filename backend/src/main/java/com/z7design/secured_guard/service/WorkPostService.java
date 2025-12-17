@@ -14,6 +14,7 @@ import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.ContractRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +30,7 @@ import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class WorkPostService {
     
@@ -38,8 +40,15 @@ public class WorkPostService {
     private final UserRepository userRepository;
     
     // Métodos básicos CRUD
+    @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
-        return workPostRepository.findAllWithRelations(); // Usar método com JOIN FETCH
+        try {
+            return workPostRepository.findAllWithRelations(); // Usar método com JOIN FETCH
+        } catch (Exception e) {
+            log.error("Erro ao buscar postos com relacionamentos, tentando busca simples: {}", e.getMessage());
+            // Fallback para busca simples se houver erro com JOIN FETCH
+            return workPostRepository.findAll();
+        }
     }
     
     public Page<WorkPost> findAll(Pageable pageable) {
@@ -250,21 +259,44 @@ public class WorkPostService {
     
     // Métodos para conversão DTO
     public WorkPostDTO convertToDTO(WorkPost workPost) {
+        if (workPost == null) {
+            return null;
+        }
+        
         WorkPostDTO dto = new WorkPostDTO();
-        BeanUtils.copyProperties(workPost, dto);
+        
+        try {
+            BeanUtils.copyProperties(workPost, dto);
+        } catch (Exception e) {
+            log.warn("Erro ao copiar propriedades do WorkPost {}: {}", workPost.getId(), e.getMessage());
+            // Continuar mesmo com erro na cópia, preenchendo manualmente os campos essenciais
+            dto.setId(workPost.getId());
+            dto.setPostCode(workPost.getPostCode());
+            dto.setName(workPost.getName());
+            dto.setDescription(workPost.getDescription());
+            dto.setType(workPost.getType());
+            dto.setStatus(workPost.getStatus());
+        }
         
         // Tratar relacionamentos de forma segura
         try {
             if (workPost.getClient() != null) {
-                dto.setClientId(workPost.getClient().getId());
-                dto.setClientName(workPost.getClient().getName());
-                dto.setClientCnpj(workPost.getClient().getCnpj());
+                try {
+                    dto.setClientId(workPost.getClient().getId());
+                    dto.setClientName(workPost.getClient().getName());
+                    dto.setClientCnpj(workPost.getClient().getCnpj() != null ? workPost.getClient().getCnpj() : "N/A");
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                    dto.setClientName("Cliente não encontrado");
+                    dto.setClientCnpj("N/A");
+                }
             } else {
                 // Cliente não encontrado - definir valores padrão
                 dto.setClientName("Cliente não encontrado");
                 dto.setClientCnpj("N/A");
             }
         } catch (Exception e) {
+            log.warn("Erro ao processar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
             // Em caso de erro ao acessar o cliente, definir valores padrão
             dto.setClientName("Cliente não encontrado");
             dto.setClientCnpj("N/A");
@@ -272,18 +304,30 @@ public class WorkPostService {
         
         try {
             if (workPost.getContract() != null) {
-                dto.setContractId(workPost.getContract().getId());
+                try {
+                    dto.setContractId(workPost.getContract().getId());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar contrato do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                    // Não definir contractId em caso de erro
+                }
             }
         } catch (Exception e) {
+            log.warn("Erro ao processar contrato do WorkPost {}: {}", workPost.getId(), e.getMessage());
             // Contrato não encontrado - não definir contractId
         }
         
         try {
             if (workPost.getResponsible() != null) {
-                dto.setResponsibleId(workPost.getResponsible().getId());
-                dto.setResponsibleName(workPost.getResponsible().getName());
+                try {
+                    dto.setResponsibleId(workPost.getResponsible().getId());
+                    dto.setResponsibleName(workPost.getResponsible().getName());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar responsável do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                    // Não definir responsibleId em caso de erro
+                }
             }
         } catch (Exception e) {
+            log.warn("Erro ao processar responsável do WorkPost {}: {}", workPost.getId(), e.getMessage());
             // Responsável não encontrado - não definir responsibleId
         }
         
@@ -295,8 +339,13 @@ public class WorkPostService {
     }
     
     public List<WorkPostDTO> convertToDTOList(List<WorkPost> workPosts) {
+        if (workPosts == null) {
+            return List.of();
+        }
+        
         return workPosts.stream()
                 .map(this::convertToDTO)
+                .filter(dto -> dto != null) // Filtrar DTOs nulos
                 .toList();
     }
     

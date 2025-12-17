@@ -54,3 +54,4 @@ echo "Próximos passos:"
 echo "  1. docker-compose -f docker-compose.ci.yml down -v"
 echo "  2. docker-compose -f docker-compose.ci.yml up -d"
 
+

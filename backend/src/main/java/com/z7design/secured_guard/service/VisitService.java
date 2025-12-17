@@ -8,6 +8,7 @@ import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +32,27 @@ public class VisitService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
 
+    @Transactional(readOnly = true)
     public Page<VisitDTO> findAll(Pageable pageable) {
         log.info("Buscando todas as visitas com paginação");
         try {
             Page<Visit> visits = visitRepository.findAll(pageable);
             log.info("Encontradas {} visitas", visits.getTotalElements());
-            return visits.map(this::convertToDTO);
+            
+            // Converter com tratamento de erro individual para cada visita
+            List<VisitDTO> dtos = visits.getContent().stream()
+                    .map(visit -> {
+                        try {
+                            return convertToDTO(visit);
+                        } catch (Exception e) {
+                            log.warn("Erro ao converter visita {} para DTO, pulando: {}", visit != null ? visit.getId() : "null", e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(dto -> dto != null)
+                    .collect(java.util.stream.Collectors.toList());
+            
+            return new PageImpl<>(dtos, pageable, visits.getTotalElements());
         } catch (Exception e) {
             log.error("Erro ao buscar visitas: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao buscar visitas", e);
@@ -53,25 +69,71 @@ public class VisitService {
     public Page<VisitDTO> findBySupervisorId(UUID supervisorId, Pageable pageable) {
         log.info("Buscando visitas por supervisor: {}", supervisorId);
         Page<Visit> visits = visitRepository.findBySupervisorId(supervisorId, pageable);
-        return visits.map(this::convertToDTO);
+        
+        List<VisitDTO> dtos = visits.getContent().stream()
+                .map(visit -> {
+                    try {
+                        return convertToDTO(visit);
+                    } catch (Exception e) {
+                        log.warn("Erro ao converter visita {} para DTO, pulando: {}", visit != null ? visit.getId() : "null", e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(dto -> dto != null)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(dtos, pageable, visits.getTotalElements());
     }
 
     public Page<VisitDTO> findByVisitDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable) {
         log.info("Buscando visitas entre {} e {}", startDate, endDate);
         Page<Visit> visits = visitRepository.findByVisitDateBetween(startDate, endDate, pageable);
-        return visits.map(this::convertToDTO);
+        
+        List<VisitDTO> dtos = visits.getContent().stream()
+                .map(visit -> {
+                    try {
+                        return convertToDTO(visit);
+                    } catch (Exception e) {
+                        log.warn("Erro ao converter visita {} para DTO, pulando: {}", visit != null ? visit.getId() : "null", e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(dto -> dto != null)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(dtos, pageable, visits.getTotalElements());
     }
 
     public List<VisitDTO> findScheduledVisitsForToday() {
         log.info("Buscando visitas agendadas para hoje");
         List<Visit> visits = visitRepository.findScheduledVisitsForToday();
-        return visits.stream().map(this::convertToDTO).collect(Collectors.toList());
+        return visits.stream()
+                .map(visit -> {
+                    try {
+                        return convertToDTO(visit);
+                    } catch (Exception e) {
+                        log.warn("Erro ao converter visita {} para DTO, pulando: {}", visit != null ? visit.getId() : "null", e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(dto -> dto != null)
+                .collect(Collectors.toList());
     }
 
     public List<VisitDTO> findSupervisorVisitsForToday(UUID supervisorId) {
         log.info("Buscando visitas do supervisor {} para hoje", supervisorId);
         List<Visit> visits = visitRepository.findSupervisorVisitsForToday(supervisorId);
-        return visits.stream().map(this::convertToDTO).collect(Collectors.toList());
+        return visits.stream()
+                .map(visit -> {
+                    try {
+                        return convertToDTO(visit);
+                    } catch (Exception e) {
+                        log.warn("Erro ao converter visita {} para DTO, pulando: {}", visit != null ? visit.getId() : "null", e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(dto -> dto != null)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -258,40 +320,124 @@ public class VisitService {
     */
 
     private VisitDTO convertToDTO(Visit visit) {
-        try {
-            return VisitDTO.builder()
-                    .id(visit.getId())
-                    .supervisorId(visit.getSupervisor() != null ? visit.getSupervisor().getId() : null)
-                    .supervisorName(visit.getSupervisor() != null ? visit.getSupervisor().getName() : "N/A")
-                    .workPostId(visit.getWorkPost() != null ? visit.getWorkPost().getId() : null)
-                    .workPostName(visit.getWorkPost() != null ? visit.getWorkPost().getName() : "N/A")
-                    .clientId(visit.getClient() != null ? visit.getClient().getId() : null)
-                    .clientName(visit.getClient() != null ? visit.getClient().getName() : "N/A")
-                    // .unitId(visit.getUnit()...) // Removido - usar workPost
-                    .visitScheduleId(visit.getVisitSchedule() != null ? visit.getVisitSchedule().getId() : null)
-                    .visitDate(visit.getVisitDate())
-                    .visitTime(visit.getVisitTime())
-                    .description(visit.getDescription())
-                    .observations(visit.getObservations())
-                    .status(visit.getStatus())
-                    .cancellationReason(visit.getCancellationReason())
-                    .latitude(visit.getLatitude())
-                    .longitude(visit.getLongitude())
-                    .locationAddress(visit.getLocationAddress())
-                    .qrCodeScanned(visit.getQrCodeScanned())
-                    .qrCodeVerified(visit.getQrCodeVerified())
-                    .presentEmployees(java.util.Collections.emptyList()) // Lista vazia por enquanto
-                    .attachedFiles(java.util.Collections.emptyList()) // Lista vazia por enquanto
-                    .photos(java.util.Collections.emptyList()) // Lista vazia por enquanto
-                    .createdAt(visit.getCreatedAt())
-                    .updatedAt(visit.getUpdatedAt())
-                    .createdByName(visit.getCreatedBy() != null ? visit.getCreatedBy().getName() : null)
-                    .updatedByName(visit.getUpdatedBy() != null ? visit.getUpdatedBy().getName() : null)
-                    .build();
-        } catch (Exception e) {
-            log.error("Erro ao converter visita {} para DTO: {}", visit.getId(), e.getMessage(), e);
-            throw new RuntimeException("Erro ao converter visita para DTO", e);
+        if (visit == null) {
+            return null;
         }
+        
+        VisitDTO.VisitDTOBuilder builder = VisitDTO.builder()
+                .id(visit.getId())
+                .visitDate(visit.getVisitDate())
+                .visitTime(visit.getVisitTime())
+                .description(visit.getDescription())
+                .observations(visit.getObservations())
+                .status(visit.getStatus())
+                .cancellationReason(visit.getCancellationReason())
+                .latitude(visit.getLatitude())
+                .longitude(visit.getLongitude())
+                .locationAddress(visit.getLocationAddress())
+                .qrCodeScanned(visit.getQrCodeScanned())
+                .qrCodeVerified(visit.getQrCodeVerified())
+                .presentEmployees(java.util.Collections.emptyList()) // Lista vazia por enquanto
+                .attachedFiles(java.util.Collections.emptyList()) // Lista vazia por enquanto
+                .photos(java.util.Collections.emptyList()) // Lista vazia por enquanto
+                .createdAt(visit.getCreatedAt())
+                .updatedAt(visit.getUpdatedAt());
+        
+        // Tratar relacionamentos de forma segura
+        try {
+            if (visit.getSupervisor() != null) {
+                try {
+                    builder.supervisorId(visit.getSupervisor().getId());
+                    builder.supervisorName(visit.getSupervisor().getName());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar supervisor da visita {}: {}", visit.getId(), e.getMessage());
+                    builder.supervisorName("N/A");
+                }
+            } else {
+                builder.supervisorName("N/A");
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar supervisor da visita {}: {}", visit.getId(), e.getMessage());
+            builder.supervisorName("N/A");
+        }
+        
+        try {
+            if (visit.getWorkPost() != null) {
+                try {
+                    builder.workPostId(visit.getWorkPost().getId());
+                    builder.workPostName(visit.getWorkPost().getName());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar posto de trabalho da visita {}: {}", visit.getId(), e.getMessage());
+                    builder.workPostName("N/A");
+                }
+            } else {
+                builder.workPostName("N/A");
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar posto de trabalho da visita {}: {}", visit.getId(), e.getMessage());
+            builder.workPostName("N/A");
+        }
+        
+        try {
+            if (visit.getClient() != null) {
+                try {
+                    builder.clientId(visit.getClient().getId());
+                    builder.clientName(visit.getClient().getName());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar cliente da visita {}: {}", visit.getId(), e.getMessage());
+                    builder.clientName("N/A");
+                }
+            } else {
+                builder.clientName("N/A");
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar cliente da visita {}: {}", visit.getId(), e.getMessage());
+            builder.clientName("N/A");
+        }
+        
+        try {
+            if (visit.getVisitSchedule() != null) {
+                try {
+                    builder.visitScheduleId(visit.getVisitSchedule().getId());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar agendamento da visita {}: {}", visit.getId(), e.getMessage());
+                    // Não definir visitScheduleId em caso de erro
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar agendamento da visita {}: {}", visit.getId(), e.getMessage());
+            // Não definir visitScheduleId em caso de erro
+        }
+        
+        try {
+            if (visit.getCreatedBy() != null) {
+                try {
+                    builder.createdByName(visit.getCreatedBy().getName());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar criador da visita {}: {}", visit.getId(), e.getMessage());
+                    // Não definir createdByName em caso de erro
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar criador da visita {}: {}", visit.getId(), e.getMessage());
+            // Não definir createdByName em caso de erro
+        }
+        
+        try {
+            if (visit.getUpdatedBy() != null) {
+                try {
+                    builder.updatedByName(visit.getUpdatedBy().getName());
+                } catch (Exception e) {
+                    log.warn("Erro ao acessar atualizador da visita {}: {}", visit.getId(), e.getMessage());
+                    // Não definir updatedByName em caso de erro
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar atualizador da visita {}: {}", visit.getId(), e.getMessage());
+            // Não definir updatedByName em caso de erro
+        }
+        
+        return builder.build();
     }
 
     public List<String> getPresentEmployeeNames(List<UUID> employeeIds) {

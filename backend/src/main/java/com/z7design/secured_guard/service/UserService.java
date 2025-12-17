@@ -225,6 +225,30 @@ public class UserService {
             throw new IllegalArgumentException("Nome não pode ser vazio");
         }
 
+        // Validar username único (se estiver sendo alterado)
+        String existingUsername = existingUser.getUsername();
+        String newUsername = request.getUsername();
+        if (existingUsername == null || newUsername == null || !existingUsername.equals(newUsername)) {
+            if (newUsername != null) {
+                Optional<User> userWithUsername = userRepository.findByUsername(newUsername);
+                if (userWithUsername.isPresent() && !userWithUsername.get().getId().equals(id)) {
+                    throw new IllegalArgumentException("Nome de usuário já está em uso");
+                }
+            }
+        }
+
+        // Validar email único (se estiver sendo alterado)
+        String existingEmail = existingUser.getEmail();
+        String newEmail = request.getEmail();
+        if (existingEmail == null || newEmail == null || !existingEmail.equals(newEmail)) {
+            if (newEmail != null) {
+                Optional<User> userWithEmail = userRepository.findByEmail(newEmail);
+                if (userWithEmail.isPresent() && !userWithEmail.get().getId().equals(id)) {
+                    throw new IllegalArgumentException("Email já está em uso");
+                }
+            }
+        }
+
         // Atualizar campos básicos
         existingUser.setName(request.getName());
         existingUser.setEmail(request.getEmail());

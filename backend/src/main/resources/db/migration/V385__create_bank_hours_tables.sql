@@ -128,3 +128,4 @@ INSERT INTO permissions (id, name, description) VALUES
 (gen_random_uuid(), 'BANK_HOURS_TRANSACTION_READ', 'Visualizar transações de banco de horas')
 ON CONFLICT (name) DO NOTHING;
 
+

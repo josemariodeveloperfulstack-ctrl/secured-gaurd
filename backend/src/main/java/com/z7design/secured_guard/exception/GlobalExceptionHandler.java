@@ -12,6 +12,7 @@ import org.springframework.web.context.request.WebRequest;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -124,6 +125,32 @@ public class GlobalExceptionHandler {
                 .build();
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) {
+        log.warn("Violação de integridade de dados: {}", ex.getMessage());
+        
+        String message = "Erro ao salvar dados. Verifique se os dados já existem (ex: username ou email já cadastrado).";
+        
+        // Tentar extrair uma mensagem mais específica da exceção
+        if (ex.getMessage() != null) {
+            if (ex.getMessage().contains("username") || ex.getMessage().contains("UK_") && ex.getMessage().contains("username")) {
+                message = "Nome de usuário já está em uso";
+            } else if (ex.getMessage().contains("email") || ex.getMessage().contains("UK_") && ex.getMessage().contains("email")) {
+                message = "Email já está em uso";
+            }
+        }
+        
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error("DATA_INTEGRITY_VIOLATION")
+                .message(message)
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)

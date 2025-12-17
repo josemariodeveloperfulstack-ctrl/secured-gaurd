@@ -114,3 +114,4 @@ Após o deploy, verifique:
 - ✅ Mais resiliente a falhas parciais de deploy
 
 
+

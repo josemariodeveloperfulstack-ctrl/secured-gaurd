@@ -90,8 +90,19 @@ public class AccountsReceivableService {
         account.setDueDate(dto.getDueDate());
         account.setPaymentDate(dto.getPaymentDate());
         account.setStatus(dto.getStatus() != null ? dto.getStatus() : ReceivableStatus.PENDING);
+        
+        // Validar categoria obrigatória
+        if (dto.getCategory() == null) {
+            throw new IllegalArgumentException("Categoria é obrigatória");
+        }
         account.setCategory(dto.getCategory());
+        
+        // Validar forma de pagamento obrigatória
+        if (dto.getPaymentMethod() == null) {
+            throw new IllegalArgumentException("Forma de pagamento é obrigatória");
+        }
         account.setPaymentMethod(dto.getPaymentMethod());
+        
         account.setOverdueDays(dto.getOverdueDays() != null ? dto.getOverdueDays() : 0);
         account.setLateFee(dto.getLateFee() != null ? dto.getLateFee() : BigDecimal.ZERO);
         account.setLatePenalty(dto.getLatePenalty() != null ? dto.getLatePenalty() : BigDecimal.ZERO);
@@ -137,9 +148,22 @@ public class AccountsReceivableService {
         account.setIssueDate(dto.getIssueDate());
         account.setDueDate(dto.getDueDate());
         account.setPaymentDate(dto.getPaymentDate());
-        account.setStatus(dto.getStatus());
-        account.setCategory(dto.getCategory());
-        account.setPaymentMethod(dto.getPaymentMethod());
+        
+        // Atualizar status se fornecido
+        if (dto.getStatus() != null) {
+            account.setStatus(dto.getStatus());
+        }
+        
+        // Atualizar categoria se fornecida (obrigatória se fornecida)
+        if (dto.getCategory() != null) {
+            account.setCategory(dto.getCategory());
+        }
+        
+        // Atualizar forma de pagamento se fornecida (obrigatória se fornecida)
+        if (dto.getPaymentMethod() != null) {
+            account.setPaymentMethod(dto.getPaymentMethod());
+        }
+        
         account.setOverdueDays(dto.getOverdueDays() != null ? dto.getOverdueDays() : 0);
         account.setLateFee(dto.getLateFee() != null ? dto.getLateFee() : BigDecimal.ZERO);
         account.setLatePenalty(dto.getLatePenalty() != null ? dto.getLatePenalty() : BigDecimal.ZERO);

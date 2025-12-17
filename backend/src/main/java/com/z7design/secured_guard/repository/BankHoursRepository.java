@@ -27,3 +27,4 @@ public interface BankHoursRepository extends JpaRepository<BankHours, UUID> {
     List<BankHours> findNonZeroBalances();
 }
 
+
