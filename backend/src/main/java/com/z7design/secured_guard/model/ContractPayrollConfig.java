@@ -77,3 +77,4 @@ public class ContractPayrollConfig {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
+

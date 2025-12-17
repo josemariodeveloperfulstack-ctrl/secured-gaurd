@@ -100,3 +100,4 @@ BEGIN
         FOREIGN KEY (processed_from_raw_id) REFERENCES ponto_raw(id) ON DELETE SET NULL;
     END IF;
 END $$;
+

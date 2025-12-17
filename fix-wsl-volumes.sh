@@ -26,3 +26,4 @@ echo "✅ Limpeza concluída!"
 echo ""
 echo "Agora você pode executar:"
 echo "  docker-compose -f docker-compose.ci.yml up -d"
+

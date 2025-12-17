@@ -31,3 +31,4 @@ public interface PayrollItemRepository extends JpaRepository<PayrollItem, UUID> 
 
     void deleteByPayrollClosureId(UUID payrollClosureId);
 }
+

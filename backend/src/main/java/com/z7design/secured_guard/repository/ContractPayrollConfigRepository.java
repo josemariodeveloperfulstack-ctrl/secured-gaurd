@@ -14,3 +14,4 @@ public interface ContractPayrollConfigRepository extends JpaRepository<ContractP
 
     boolean existsByContractId(UUID contractId);
 }
+

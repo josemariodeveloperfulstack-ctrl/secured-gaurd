@@ -51,3 +51,4 @@ public interface PontoRawRepository extends JpaRepository<PontoRaw, UUID> {
     @Query("SELECT COUNT(pr) FROM PontoRaw pr WHERE pr.importJobId = :importJobId AND pr.processed = true")
     Long countProcessedByImportJobId(@Param("importJobId") UUID importJobId);
 }
+

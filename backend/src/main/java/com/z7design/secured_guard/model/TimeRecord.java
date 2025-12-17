@@ -76,6 +76,9 @@ public class TimeRecord {
     @Enumerated(EnumType.STRING)
     private RecordStatus status = RecordStatus.APPROVED;
 
+    @Column(name = "processing_notes")
+    private String processingNotes;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

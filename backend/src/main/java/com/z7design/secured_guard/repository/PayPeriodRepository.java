@@ -37,3 +37,4 @@ public interface PayPeriodRepository extends JpaRepository<PayPeriod, UUID> {
     @Query("SELECT pp FROM PayPeriod pp WHERE pp.type = 'MONTHLY' AND pp.referenceYear = :year AND pp.referenceMonth = :month")
     Optional<PayPeriod> findMonthlyPeriod(@Param("year") int year, @Param("month") int month);
 }
+

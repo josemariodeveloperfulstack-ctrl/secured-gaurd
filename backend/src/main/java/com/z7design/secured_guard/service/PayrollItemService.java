@@ -30,6 +30,7 @@ public class PayrollItemService {
     private final EmployeeRepository employeeRepository;
     private final ContractPayrollConfigService contractPayrollConfigService;
     private final ObjectMapper objectMapper;
+    private final PayrollRepository payrollRepository;
 
     /**
      * Gera itens de folha a partir de um PayrollClosure
@@ -300,3 +301,4 @@ public class PayrollItemService {
         log.info("✅ {} itens marcados como reemitidos", items.size());
     }
 }
+

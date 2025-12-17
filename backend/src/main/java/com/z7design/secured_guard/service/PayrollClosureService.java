@@ -37,6 +37,7 @@ public class PayrollClosureService {
     private final ContractPayrollConfigService contractPayrollConfigService;
     private final PayPeriodService payPeriodService;
     private final BankHoursService bankHoursService;
+    private final PayrollItemService payrollItemService;
 
     /**
      * Gera fechamento para um período mensal (compatibilidade com código existente)

@@ -26,3 +26,4 @@ public interface BankHoursTransactionRepository extends JpaRepository<BankHoursT
 
     List<BankHoursTransaction> findByTransactionType(BankHoursTransaction.TransactionType type);
 }
+

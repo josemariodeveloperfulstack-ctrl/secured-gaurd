@@ -114,3 +114,4 @@ public class ContractPayrollConfigService {
         log.info("✅ Configuração deletada com sucesso - ID: {}", id);
     }
 }
+

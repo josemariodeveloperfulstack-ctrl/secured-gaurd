@@ -37,3 +37,4 @@ public interface ImportJobLogRepository extends JpaRepository<ImportJobLog, UUID
            "ORDER BY ijl.importedAt ASC")
     List<ImportJobLog> findPendingOrProcessing();
 }
+

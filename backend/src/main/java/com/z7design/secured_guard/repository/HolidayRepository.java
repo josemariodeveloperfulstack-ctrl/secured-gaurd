@@ -39,3 +39,4 @@ public interface HolidayRepository extends JpaRepository<Holiday, UUID> {
 
     boolean existsByDateAndName(LocalDate date, String name);
 }
+

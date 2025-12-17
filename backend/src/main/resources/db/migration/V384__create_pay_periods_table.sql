@@ -88,3 +88,4 @@ BEGIN
         FOREIGN KEY (pay_period_id) REFERENCES pay_periods(id) ON DELETE SET NULL;
     END IF;
 END $$;
+

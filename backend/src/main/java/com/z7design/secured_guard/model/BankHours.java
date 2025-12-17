@@ -58,3 +58,4 @@ public class BankHours {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
+

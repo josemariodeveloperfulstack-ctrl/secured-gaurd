@@ -185,3 +185,4 @@ INSERT INTO permissions (id, name, description) VALUES
 (gen_random_uuid(), 'HOLIDAY_UPDATE', 'Editar feriados'),
 (gen_random_uuid(), 'HOLIDAY_DELETE', 'Excluir feriados')
 ON CONFLICT (name) DO NOTHING;
+

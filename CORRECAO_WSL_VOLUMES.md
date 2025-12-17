@@ -96,3 +96,4 @@ docker volume rm secured-guard_whatsapp_sessions_ci
 - Os dados ainda são **persistentes** - ficam salvos mesmo após `docker-compose down`
 - Para limpar completamente, use `docker-compose down -v`
 - A rede `z7network` foi configurada como não-externa (será criada automaticamente se não existir)
+

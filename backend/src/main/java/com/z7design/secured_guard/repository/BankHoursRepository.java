@@ -26,3 +26,4 @@ public interface BankHoursRepository extends JpaRepository<BankHours, UUID> {
     @Query("SELECT bh FROM BankHours bh WHERE bh.balanceHours != 0 ORDER BY bh.lastUpdatedAt DESC")
     List<BankHours> findNonZeroBalances();
 }
+
