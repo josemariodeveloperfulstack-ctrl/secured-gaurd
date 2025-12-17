@@ -70,7 +70,16 @@ public class EmployeeCertificationController {
         });
 
         List<EmployeeCertificationResponse> payload = results.stream()
-                .map(EmployeeCertificationResponse::fromEntity)
+                .map(cert -> {
+                    try {
+                        return EmployeeCertificationResponse.fromEntity(cert);
+                    } catch (Exception e) {
+                        System.err.println("❌ Erro ao converter certificação " + (cert != null ? cert.getId() : "null") + " para DTO: " + e.getMessage());
+                        e.printStackTrace();
+                        return null;
+                    }
+                })
+                .filter(response -> response != null)
                 .toList();
         
         System.out.println("📋 EmployeeCertificationController.find - Total de responses criadas: " + payload.size());

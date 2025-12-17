@@ -219,26 +219,37 @@ export const contasAPagarService = {
     
     console.log('🔍 DEBUG: Invoices processados:', invoices);
     
-    return invoices.map((invoice: any): ContaAPagar => ({
-      id: invoice.id,
-      dataEmissao: parseDateFromBackend(invoice.issueDate),
-      vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
-      fornecedor: invoice.supplierName || 'Não informado',
-      fornecedorId: invoice.supplierId,
-      empresa: invoice.companyName || (invoice.company && invoice.company.name) || undefined,
-      empresaId: invoice.companyId || (invoice.company && invoice.company.id) || undefined,
-      companySigla: invoice.companySigla || (invoice.company && invoice.company.sigla) || undefined,
-      descricao: invoice.description,
-      tipo: invoice.type || 'VARIAVEL',
-      valor: parseFloat(invoice.amount),
-      codigoBarras: invoice.barcode,
-      status: mapBackendStatusToFrontend(invoice.status),
-      baixa: invoice.baixa || false,
-      dataPagamento: parseDateFromBackend(invoice.paymentDate),
-      observacoes: invoice.notes,
-      categoria: invoice.category,
-      centroCusto: invoice.centroCusto
-    }));
+    return invoices.map((invoice: any): ContaAPagar => {
+      // Garantir que supplierId seja convertido para string
+      const fornecedorId = invoice.supplierId 
+        ? (typeof invoice.supplierId === 'string' ? invoice.supplierId : String(invoice.supplierId))
+        : undefined;
+      
+      // Se não houver supplierName mas houver supplierId, usar 'Não informado' 
+      // (o nome será preenchido quando o fornecedor for carregado)
+      const fornecedorNome = invoice.supplierName || 'Não informado';
+      
+      return {
+        id: invoice.id,
+        dataEmissao: parseDateFromBackend(invoice.issueDate),
+        vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
+        fornecedor: fornecedorNome,
+        fornecedorId: fornecedorId || '',
+        empresa: invoice.companyName || (invoice.company && invoice.company.name) || undefined,
+        empresaId: invoice.companyId || (invoice.company && invoice.company.id) || undefined,
+        companySigla: invoice.companySigla || (invoice.company && invoice.company.sigla) || undefined,
+        descricao: invoice.description,
+        tipo: invoice.type || 'VARIAVEL',
+        valor: parseFloat(invoice.amount),
+        codigoBarras: invoice.barcode,
+        status: mapBackendStatusToFrontend(invoice.status),
+        baixa: invoice.baixa || false,
+        dataPagamento: parseDateFromBackend(invoice.paymentDate),
+        observacoes: invoice.notes,
+        categoria: invoice.category,
+        centroCusto: invoice.centroCusto
+      };
+    });
   },
 
   // Buscar conta por ID
@@ -246,12 +257,19 @@ export const contasAPagarService = {
       const response = await api.get(`/api/invoices/${id}`);
     const invoice = response.data;
     
+    // Garantir que supplierId seja convertido para string
+    const fornecedorId = invoice.supplierId 
+      ? (typeof invoice.supplierId === 'string' ? invoice.supplierId : String(invoice.supplierId))
+      : undefined;
+    
+    const fornecedorNome = invoice.supplierName || 'Não informado';
+    
     return {
       id: invoice.id,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
-      fornecedor: invoice.supplierName || 'Não informado',
-      fornecedorId: invoice.supplierId,
+      fornecedor: fornecedorNome,
+      fornecedorId: fornecedorId || '',
       empresa: invoice.companyName || (invoice.company && invoice.company.name) || undefined,
       empresaId: invoice.companyId || (invoice.company && invoice.company.id) || undefined,
       companySigla: invoice.companySigla || (invoice.company && invoice.company.sigla) || undefined,
@@ -450,15 +468,29 @@ export const contasAPagarService = {
   // Buscar todos os fornecedores
   async getFornecedores(): Promise<Supplier[]> {
     try {
+      console.log('📦 contasAPagarService.getFornecedores: Iniciando chamada para /api/suppliers/all');
       const response = await api.get('/api/suppliers/all');
-      console.log('🔍 DEBUG: Resposta da API /api/suppliers/all:', response.data);
+      console.log('📦 contasAPagarService.getFornecedores: Resposta recebida:', {
+        status: response.status,
+        data: response.data,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+        length: Array.isArray(response.data) ? response.data.length : 'N/A'
+      });
       const data = response.data;
-      return Array.isArray(data) ? data : [];
+      const result = Array.isArray(data) ? data : [];
+      console.log('📦 contasAPagarService.getFornecedores: Retornando', result.length, 'fornecedores');
+      return result;
     } catch (error: any) {
+      console.error('❌ contasAPagarService.getFornecedores: Erro ao buscar fornecedores:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        error
+      });
       if (isConnectionError(error)) {
         console.warn('⚠️ Backend não está disponível. Retornando array vazio para fornecedores.');
-      } else {
-        console.error('Erro ao carregar dados:', error);
       }
       return [];
     }

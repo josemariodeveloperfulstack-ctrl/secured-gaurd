@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,6 +64,7 @@ import { activityReportService } from '@/services/activityReportService';
 import { ActivityReport, CreateActivityReportDTO, ActivityReportFilters } from '@/types/activityReport';
 import ActivityReportsTable from '@/components/operacional/ActivityReportsTable';
 import ActivityReportModal from '@/components/operacional/ActivityReportModal';
+import ActivityReportViewModal from '@/components/operacional/ActivityReportViewModal';
 import ShiftChangeTable from '@/components/operacional/ShiftChangeTable';
 import OrderOfServiceTable from '@/components/operacional/OrderOfServiceTable';
 import OrderOfServiceFormModal from '@/components/operacional/OrderOfServiceFormModal';
@@ -91,6 +92,7 @@ const Operacional: React.FC = () => {
   const [activityReports, setActivityReports] = useState<ActivityReport[]>([]);
   const [isLoadingActivityReports, setIsLoadingActivityReports] = useState(false);
   const [showActivityReportModal, setShowActivityReportModal] = useState(false);
+  const [showActivityReportViewModal, setShowActivityReportViewModal] = useState(false);
   const [selectedActivityReport, setSelectedActivityReport] = useState<ActivityReport | null>(null);
   const [selectedOcorrencia, setSelectedOcorrencia] = useState<Occurrence | null>(null);
   const [showEscalaModal, setShowEscalaModal] = useState(false);
@@ -1195,6 +1197,17 @@ const Operacional: React.FC = () => {
           onOpenChange={setShowActivityReportModal}
           report={selectedActivityReport}
           onSave={handleSaveActivityReport}
+        />
+
+        {/* Modal de Visualização de Relatório de Atividade */}
+        <ActivityReportViewModal
+          open={showActivityReportViewModal}
+          onOpenChange={setShowActivityReportViewModal}
+          report={selectedActivityReport}
+          onEdit={() => {
+            setShowActivityReportViewModal(false);
+            setShowActivityReportModal(true);
+          }}
         />
 
         {/* Modal de Ordem de Serviço (Criar/Editar) */}

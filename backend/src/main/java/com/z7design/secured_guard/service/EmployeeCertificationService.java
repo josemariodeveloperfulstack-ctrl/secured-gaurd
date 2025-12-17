@@ -161,7 +161,9 @@ public class EmployeeCertificationService {
         return certificationRepository.findByExpirationDateBetween(startDate, endDate);
     }
     
+    @Transactional(readOnly = true)
     public List<EmployeeCertification> findAll() {
+        // O findAll() já usa @EntityGraph para carregar relacionamentos
         return certificationRepository.findAll();
     }
     

@@ -6,17 +6,19 @@ export interface CreateContaAReceberRequest {
   invoiceNumber?: string;
   description: string;
   clientId: string | null;
-  unitId: string;
+  // unitId removido - AccountsReceivableDTO não possui esse campo
   amount: number;
-  type: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO';
-  status: 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA';
   dueDate: string;
   issueDate: string;
   paymentDate?: string;
   barcode?: string;
-  category?: string;
+  category: string; // ReceivableCategory enum: INVOICE, NOTE, ADVANCE, SERVICE, PRODUCT, OTHER
+  paymentMethod: string; // PaymentMethod enum: PIX, BOLETO, TRANSFER, CASH, CARD
+  status?: string; // ReceivableStatus enum: PENDING, PAID, OVERDUE, CANCELLED
   notes?: string;
-  centroCusto?: string;
+  measurementNumber?: string;
+  measurementId?: string;
+  // centroCusto removido - AccountsReceivableDTO não possui esse campo
 }
 
 export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberRequest> {
@@ -136,7 +138,8 @@ export const contasAReceberService = {
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
       categoria: account.category,
-      centroCusto: account.centroCusto
+      centroCusto: account.centroCusto,
+      paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
     }));
   },
 
@@ -162,39 +165,43 @@ export const contasAReceberService = {
       baixa: account.baixa || false,
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
-      categoria: account.category,
-      centroCusto: account.centroCusto
+      categoria: account.category || 'INVOICE', // Garantir categoria
+      centroCusto: account.centroCusto,
+      paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
     };
   },
 
   // Criar nova conta
   async createContaAReceber(conta: Omit<ContaAReceber, 'id'>): Promise<ContaAReceber> {
-    // Buscar uma unidade padrão ou usar UUID padrão
-    let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+    // unitId removido - AccountsReceivableDTO não possui esse campo e não é necessário para contas a receber
+
+    // Categoria já deve vir como enum válido do formulário (INVOICE, NOTE, ADVANCE, SERVICE, PRODUCT, OTHER)
+    // Se não vier ou for 'NENHUMA', usar tipo para determinar categoria
+    const validCategories = ['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'];
+    let category = conta.categoria && conta.categoria !== 'NENHUMA' && validCategories.includes(conta.categoria.toUpperCase())
+      ? conta.categoria.toUpperCase() // Já deve ser um valor válido do enum
+      : mapTypeToCategory(conta.tipo);
     
-    try {
-      const unitsResponse = await api.get('/units');
-      if (unitsResponse.data && unitsResponse.data.length > 0) {
-        unitId = unitsResponse.data[0].id;
-      }
-    } catch (error) {
-      console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
+    // Garantir que seja um valor válido do enum
+    if (!validCategories.includes(category)) {
+      category = 'INVOICE'; // Valor padrão seguro
     }
+
+    // Definir paymentMethod padrão se não fornecido
+    const paymentMethod = conta.paymentMethod || 'PIX';
 
     const requestData: CreateContaAReceberRequest = {
       description: conta.descricao,
       clientId: conta.clienteId || null,
-      unitId: unitId,
       amount: Number(conta.valor) || 0,
-      type: mapFrontendTypeToBackend(conta.tipo),
-      status: mapFrontendStatusToBackend(conta.status) as any,
       dueDate: formatDateForBackend(conta.vencimento) || '',
       issueDate: formatDateForBackend(conta.dataEmissao) || '',
       paymentDate: formatDateForBackend(conta.dataPagamento),
       barcode: conta.codigoBarras,
-      category: conta.categoria === 'NENHUMA' ? undefined : conta.categoria,
-      notes: conta.observacoes,
-      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto
+      category: category,
+      paymentMethod: paymentMethod,
+      status: mapFrontendStatusToBackend(conta.status) || 'PENDING',
+      notes: conta.observacoes
     };
 
     // Adicionar invoiceNumber apenas se fornecido
@@ -222,30 +229,32 @@ export const contasAReceberService = {
     if (conta.descricao) requestData.description = conta.descricao;
     if (conta.clienteId) requestData.clientId = conta.clienteId;
     if (conta.valor !== undefined) requestData.amount = conta.valor;
-    if (conta.tipo) requestData.type = mapFrontendTypeToBackend(conta.tipo);
-    if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) as any;
+    if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) || 'PENDING';
     if (conta.dataEmissao) requestData.issueDate = formatDateForBackend(conta.dataEmissao);
     if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
     if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
     if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
-    if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
     if (conta.observacoes) requestData.notes = conta.observacoes;
-    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
     
-    // Se não há unitId, buscar uma unidade padrão
-    if (!requestData.unitId) {
-      try {
-        const unitsResponse = await api.get('/api/units');
-        if (unitsResponse.data && unitsResponse.data.length > 0) {
-          requestData.unitId = unitsResponse.data[0].id;
-        } else {
-          requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
-        }
-      } catch (error) {
-        console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
-        requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
-      }
+    // Mapear categoria - já deve vir como enum válido do formulário
+    if (conta.categoria && conta.categoria !== 'NENHUMA') {
+      const validCategories = ['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'];
+      const catUpper = conta.categoria.toUpperCase();
+      requestData.category = validCategories.includes(catUpper) ? catUpper : 'INVOICE';
+    } else if (conta.tipo) {
+      requestData.category = mapTypeToCategory(conta.tipo);
+    } else {
+      requestData.category = 'INVOICE'; // Valor padrão
     }
+    
+    // Garantir paymentMethod se não fornecido
+    if (!requestData.paymentMethod && conta.paymentMethod) {
+      requestData.paymentMethod = conta.paymentMethod;
+    } else if (!requestData.paymentMethod) {
+      requestData.paymentMethod = 'PIX'; // Valor padrão
+    }
+    
+    // Removido type, unitId e centroCusto pois AccountsReceivableDTO não possui esses campos
 
     console.log('Dados da requisição de atualização:', requestData);
     console.log('ID da conta:', id);
@@ -269,20 +278,29 @@ export const contasAReceberService = {
 
   async getCategories(): Promise<string[]> {
     try {
-      const response = await api.get('/api/accounts-receivable/categories');
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-      throw new Error('Resposta inválida da API');
+      // Usar endpoint de busca com termo vazio para obter todas as categorias
+      // Ou retornar valores padrão do enum ReceivableCategory
+      const enumValues = ['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'];
+      return enumValues.map(value => {
+        // Mapear para nomes amigáveis
+        const nameMap: Record<string, string> = {
+          'INVOICE': 'Fatura',
+          'NOTE': 'Nota Fiscal',
+          'ADVANCE': 'Adiantamento',
+          'SERVICE': 'Serviço',
+          'PRODUCT': 'Produto',
+          'OTHER': 'Outros'
+        };
+        return nameMap[value] || value;
+      });
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
       return [
-        'Serviços de Segurança',
-        'Consultoria',
-        'Manutenção',
-        'Equipamentos',
-        'Treinamento',
-        'Auditoria',
+        'Fatura',
+        'Nota Fiscal',
+        'Adiantamento',
+        'Serviço',
+        'Produto',
         'Outros'
       ];
     }
@@ -450,13 +468,13 @@ export const contasAReceberService = {
   }
 };
 
-// Função auxiliar para mapear tipo do frontend para backend
-function mapFrontendTypeToBackend(frontendType: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO'): string {
+// Função auxiliar para mapear tipo do frontend para categoria do backend
+function mapTypeToCategory(frontendType: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO'): string {
   switch (frontendType) {
     case 'FATURA':
       return 'INVOICE';
     case 'MEDICAO':
-      return 'MEASUREMENT';
+      return 'INVOICE'; // Measurement não existe no enum, usar INVOICE
     case 'SERVICO':
       return 'SERVICE';
     case 'PRODUTO':
@@ -466,17 +484,24 @@ function mapFrontendTypeToBackend(frontendType: 'FATURA' | 'MEDICAO' | 'SERVICO'
   }
 }
 
-// Função auxiliar para mapear tipo do backend para frontend
-function mapBackendTypeToFrontend(backendType: string): 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO' {
-  switch (backendType) {
+// Função auxiliar para mapear tipo do frontend para backend (mantida para compatibilidade)
+function mapFrontendTypeToBackend(frontendType: 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO'): string {
+  return mapTypeToCategory(frontendType);
+}
+
+// Função auxiliar para mapear categoria do backend para tipo do frontend
+function mapCategoryToFrontendType(category: string | undefined): 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO' {
+  if (!category) return 'FATURA';
+  switch (category.toUpperCase()) {
     case 'INVOICE':
+    case 'NOTE':
+    case 'ADVANCE':
       return 'FATURA';
-    case 'MEASUREMENT':
-      return 'MEDICAO';
     case 'SERVICE':
       return 'SERVICO';
     case 'PRODUCT':
       return 'PRODUTO';
+    case 'OTHER':
     default:
       return 'FATURA';
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,7 +115,12 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
 
   useEffect(() => {
     if (open) {
+      console.log('📦 StockItemModal: Modal aberto, carregando fornecedores...');
       loadSuppliers();
+    } else {
+      // Reset suppliers quando modal fecha
+      console.log('📦 StockItemModal: Modal fechado, resetando lista de fornecedores');
+      setSuppliers([]);
     }
   }, [open]);
 
@@ -161,20 +166,90 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
   const loadSuppliers = async () => {
     try {
       setLoadingSuppliers(true);
+      console.log('📦 StockItemModal: Carregando fornecedores...');
       const data = await contasAPagarService.getFornecedores();
-      setSuppliers(Array.isArray(data) ? data.filter(s => s.isActive !== false) : []);
-    } catch (error) {
-      console.error('Erro ao carregar fornecedores:', error);
+      console.log('📦 StockItemModal: Dados recebidos da API:', data);
+      console.log('📦 StockItemModal: Tipo dos dados:', typeof data, 'É array?', Array.isArray(data));
+      console.log('📦 StockItemModal: Tamanho do array:', Array.isArray(data) ? data.length : 'N/A');
+      
+      if (Array.isArray(data)) {
+        console.log('📦 StockItemModal: Total de fornecedores recebidos:', data.length);
+        
+        if (data.length > 0) {
+          // Log detalhado de cada fornecedor
+          data.forEach((s, idx) => {
+            console.log(`📦 StockItemModal: Fornecedor ${idx + 1}:`, {
+              id: s?.id,
+              name: s?.name,
+              cnpj: s?.cnpj,
+              isActive: s?.isActive,
+              isActiveType: typeof s?.isActive,
+              isActiveCheck: s?.isActive !== false,
+              object: s
+            });
+          });
+          
+          // Filtrar apenas fornecedores válidos (não nulos) e que não estejam explicitamente inativos
+          // Aceitar: isActive === true, isActive === undefined, isActive === null (tratar como ativo)
+          // Remover apenas se isActive === false explicitamente
+          const filtered = data.filter(s => {
+            if (!s) {
+              console.warn('📦 StockItemModal: Fornecedor nulo encontrado, removendo');
+              return false;
+            }
+            if (!s.id || !s.name) {
+              console.warn('📦 StockItemModal: Fornecedor sem ID ou nome encontrado, removendo:', s);
+              return false;
+            }
+            // Se isActive é explicitamente false, remover. Caso contrário, incluir
+            const isIncluded = s.isActive !== false;
+            if (!isIncluded) {
+              console.log(`📦 StockItemModal: Fornecedor ${s.name} (ID: ${s.id}) removido porque isActive = ${s.isActive}`);
+            }
+            return isIncluded;
+          });
+          
+          console.log('📦 StockItemModal: Fornecedores após filtro:', filtered.length);
+          console.log('📦 StockItemModal: Fornecedores filtrados:', filtered.map(s => ({ id: s.id, name: s.name, isActive: s.isActive })));
+          
+          setSuppliers(filtered);
+        } else {
+          console.warn('📦 StockItemModal: Array vazio recebido da API');
+          setSuppliers([]);
+        }
+      } else {
+        console.warn('📦 StockItemModal: Dados não são um array, definindo lista vazia');
+        console.warn('📦 StockItemModal: Tipo:', typeof data, 'Valor:', data);
+        setSuppliers([]);
+      }
+    } catch (error: any) {
+      console.error('❌ StockItemModal: Erro ao carregar fornecedores:', error);
+      console.error('❌ StockItemModal: Erro detalhado:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      setSuppliers([]);
     } finally {
       setLoadingSuppliers(false);
     }
   };
 
-  const filteredSuppliers = suppliers.filter(s => 
-    !supplierSearchTerm || 
-    s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
-    (s.cnpj || '').toLowerCase().includes(supplierSearchTerm.toLowerCase())
-  );
+  const filteredSuppliers = useMemo(() => {
+    console.log('📦 StockItemModal: Filtrando fornecedores. Total:', suppliers.length, 'Termo de busca:', supplierSearchTerm);
+    if (!supplierSearchTerm) {
+      console.log('📦 StockItemModal: Sem termo de busca, retornando todos os', suppliers.length, 'fornecedores');
+      return suppliers;
+    }
+    const term = supplierSearchTerm.toLowerCase();
+    const filtered = suppliers.filter(s => {
+      const nameMatch = s?.name?.toLowerCase().includes(term);
+      const cnpjMatch = s?.cnpj?.toLowerCase().includes(term);
+      return nameMatch || cnpjMatch;
+    });
+    console.log('📦 StockItemModal: Após filtro por termo,', filtered.length, 'fornecedores encontrados');
+    return filtered;
+  }, [suppliers, supplierSearchTerm]);
 
   const selectedSupplier = suppliers.find(s => s.name === formData.supplier);
 
@@ -475,11 +550,22 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                     <Building2 className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
                     Fornecedor
                   </Label>
-                  {suppliers.length === 0 ? (
+                  {loadingSuppliers ? (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <p className="text-xs sm:text-sm text-blue-400 text-center">
+                        Carregando fornecedores...
+                      </p>
+                    </div>
+                  ) : suppliers.length === 0 ? (
                     <div className="space-y-2">
                       <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                         <p className="text-xs sm:text-sm text-yellow-400 mb-2">
-                          Nenhum fornecedor cadastrado. Cadastre um fornecedor para continuar.
+                          {loadingSuppliers 
+                            ? 'Carregando fornecedores...' 
+                            : 'Nenhum fornecedor cadastrado. Cadastre um fornecedor para continuar.'}
+                        </p>
+                        <p className="text-xs text-gray-400 mb-2">
+                          Verifique o console do navegador (F12) para mais detalhes.
                         </p>
                         <Button
                           type="button"
@@ -517,7 +603,11 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-seguranca-graphite border-gray-600" align="start">
+                        <PopoverContent 
+                          className="w-[var(--radix-popover-trigger-width)] p-0 bg-seguranca-graphite border-gray-600 z-[10020] !z-[10020]" 
+                          align="start"
+                          style={{ zIndex: 10020 }}
+                        >
                           <Command className="bg-seguranca-graphite text-white">
                             <CommandInput 
                               placeholder="Buscar fornecedor..." 
@@ -527,33 +617,41 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                             />
                             <CommandList>
                               <CommandEmpty className="text-gray-400 py-4 text-center text-sm">
-                                Nenhum fornecedor encontrado.
+                                {supplierSearchTerm 
+                                  ? 'Nenhum fornecedor encontrado com o termo buscado.'
+                                  : 'Nenhum fornecedor disponível.'}
                               </CommandEmpty>
                               <CommandGroup>
-                                {filteredSuppliers.map((supplier) => (
-                                  <CommandItem
-                                    key={supplier.id}
-                                    value={supplier.name}
-                                    onSelect={() => {
-                                      handleInputChange('supplier', supplier.name);
-                                      setSupplierComboboxOpen(false);
-                                      setSupplierSearchTerm('');
-                                    }}
-                                    className="text-white hover:bg-seguranca-black focus:bg-seguranca-black cursor-pointer"
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${
-                                        formData.supplier === supplier.name ? 'opacity-100' : 'opacity-0'
-                                      }`}
-                                    />
-                                    <div className="flex flex-col">
-                                      <span>{supplier.name}</span>
-                                      {supplier.cnpj && (
-                                        <span className="text-xs text-gray-400">{supplier.cnpj}</span>
-                                      )}
-                                    </div>
-                                  </CommandItem>
-                                ))}
+                                {filteredSuppliers.length > 0 ? (
+                                  filteredSuppliers.map((supplier) => (
+                                    <CommandItem
+                                      key={supplier.id}
+                                      value={supplier.name}
+                                      onSelect={() => {
+                                        handleInputChange('supplier', supplier.name);
+                                        setSupplierComboboxOpen(false);
+                                        setSupplierSearchTerm('');
+                                      }}
+                                      className="text-white hover:bg-seguranca-black focus:bg-seguranca-black cursor-pointer"
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${
+                                          formData.supplier === supplier.name ? 'opacity-100' : 'opacity-0'
+                                        }`}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span>{supplier.name}</span>
+                                        {supplier.cnpj && (
+                                          <span className="text-xs text-gray-400">{supplier.cnpj}</span>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-sm text-gray-400">
+                                    Nenhum fornecedor disponível
+                                  </div>
+                                )}
                               </CommandGroup>
                             </CommandList>
                           </Command>

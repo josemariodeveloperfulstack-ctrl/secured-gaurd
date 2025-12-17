@@ -32,6 +32,8 @@ import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewM
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { format, addDays, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const ContasAPagarTab: React.FC = () => {
   const { toast } = useToast();
@@ -587,7 +589,7 @@ const ContasAPagarTab: React.FC = () => {
     }
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (!reportData || !filteredReportDisplayData || filteredReportDisplayData.length === 0) {
       toast({
         title: "Erro",
@@ -598,114 +600,123 @@ const ContasAPagarTab: React.FC = () => {
     }
 
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: "Erro",
-          description: "Não foi possível abrir a janela de impressão",
-          variant: "destructive"
-        });
-        return;
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape para mais espaço
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 15;
+      let yPos = margin;
+
+      // Cabeçalho
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(reportData.title || 'Relatório de Contas a Pagar', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(reportData.subtitle || 'Detalhamento de contas a pagar', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.text(`Período: ${reportData.period || 'Não informado'}`, margin, yPos);
+      yPos += 6;
+      
+      if (empresaFilterRelatorio !== 'TODAS') {
+        doc.text(`Filtrado por: Empresa ${empresaFilterRelatorio}`, margin, yPos);
+        yPos += 6;
       }
 
-      const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa'];
-      
-      let summaryHtml = '';
+      doc.text(`Data de geração: ${new Date().toLocaleString('pt-BR')}`, margin, yPos);
+      yPos += 6;
+      doc.text(`Total de registros: ${filteredReportDisplayData.length}`, margin, yPos);
+      yPos += 10;
+
+      // Resumo (se disponível)
       if (displaySummary && Object.keys(displaySummary).length > 0) {
-        summaryHtml = `
-          <div class="summary">
-            <h3>Resumo</h3>
-            <p><strong>Total de Contas:</strong> ${displaySummary.totalContas || 0}</p>
-            <p><strong>Valor Total:</strong> ${formatCurrency(displaySummary.valorTotal || 0)}</p>
-            ${displaySummary.contasPagas !== undefined ? `<p><strong>Contas Pagas:</strong> ${displaySummary.contasPagas}</p>` : ''}
-            ${displaySummary.contasAbertas !== undefined ? `<p><strong>Contas Abertas:</strong> ${displaySummary.contasAbertas}</p>` : ''}
-            ${displaySummary.contasVencidas !== undefined ? `<p><strong>Contas Vencidas:</strong> ${displaySummary.contasVencidas}</p>` : ''}
-          </div>
-        `;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Resumo', margin, yPos);
+        yPos += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total de Contas: ${displaySummary.totalContas || 0}`, margin, yPos);
+        yPos += 6;
+        doc.text(`Valor Total: ${formatCurrency(displaySummary.valorTotal || 0)}`, margin, yPos);
+        yPos += 6;
+        
+        if (displaySummary.contasPagas !== undefined) {
+          doc.text(`Contas Pagas: ${displaySummary.contasPagas}`, margin, yPos);
+          yPos += 6;
+        }
+        if (displaySummary.contasAbertas !== undefined) {
+          doc.text(`Contas Abertas: ${displaySummary.contasAbertas}`, margin, yPos);
+          yPos += 6;
+        }
+        if (displaySummary.contasVencidas !== undefined) {
+          doc.text(`Contas Vencidas: ${displaySummary.contasVencidas}`, margin, yPos);
+          yPos += 6;
+        }
+        yPos += 5;
       }
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${reportData.title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #333; font-size: 24px; margin-bottom: 10px; }
-            h2 { color: #666; font-size: 18px; margin-bottom: 5px; }
-            p { margin: 5px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
-            .summary { margin: 20px 0; padding: 15px; background-color: #f0f0f0; border-radius: 5px; }
-            .filter-info { background-color: #e3f2fd; padding: 10px; border-left: 4px solid #2196f3; margin: 10px 0; }
-            @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <h1>${reportData.title}</h1>
-          <h2>${reportData.subtitle}</h2>
-          <p><strong>Período:</strong> ${reportData.period}</p>
-          ${empresaFilterRelatorio !== 'TODAS' ? `
-            <div class="filter-info">
-              <strong>🔍 Filtro Aplicado:</strong> Empresa ${empresaFilterRelatorio}
-            </div>
-          ` : ''}
-          <p><strong>Data de geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-          <p><strong>Total de registros:</strong> ${filteredReportDisplayData.length}</p>
-          
-          ${summaryHtml}
-          
-          <table>
-            <thead>
-              <tr>
-                ${headers.map(header => `<th>${header}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredReportDisplayData.map((conta: ContaAPagar) => `
-                <tr>
-                  <td>${conta.descricao}</td>
-                  <td>${conta.fornecedor}</td>
-                  <td>${formatCurrency(conta.valor)}</td>
-                  <td>${format(conta.vencimento, 'dd/MM/yyyy')}</td>
-                  <td>${getStatusDisplayName(conta.status)}</td>
-                  <td>${conta.tipo}</td>
-                  <td>${conta.empresa || conta.companySigla || 'Não informado'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="no-print" style="margin-top: 30px; text-align: center;">
-            <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-              Imprimir PDF
-            </button>
-            <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
-              Fechar
-            </button>
-          </div>
-        </body>
-        </html>
-      `;
 
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
+      // Preparar dados da tabela
+      const headers = [['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa']];
+      const rows = filteredReportDisplayData.map((conta: ContaAPagar) => [
+        conta.descricao || '',
+        conta.fornecedor || 'Não informado',
+        formatCurrency(conta.valor),
+        format(conta.vencimento, 'dd/MM/yyyy'),
+        getStatusDisplayName(conta.status),
+        conta.tipo || '',
+        conta.empresa || conta.companySigla || 'Não informado'
+      ]);
+
+      // Adicionar tabela
+      autoTable(doc, {
+        startY: yPos,
+        head: headers,
+        body: rows,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 10
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: [50, 50, 50]
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { left: margin, right: margin },
+        styles: {
+          cellPadding: 3,
+          overflow: 'linebreak',
+          halign: 'left'
+        },
+        columnStyles: {
+          2: { halign: 'right' }, // Valor
+          3: { halign: 'center' } // Vencimento
+        }
+      });
+
+      // Gerar nome do arquivo
+      const filename = `relatorio_contas_pagar_${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      // Salvar PDF
+      doc.save(filename);
       
       toast({
         title: "Sucesso",
-        description: `Relatório PDF preparado! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
+        description: `Relatório PDF gerado com sucesso! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
       });
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       toast({
         title: "Erro",
-        description: "Erro ao exportar arquivo PDF",
+        description: "Erro ao exportar arquivo PDF. Tente novamente.",
         variant: "destructive"
       });
     }
@@ -849,6 +860,16 @@ const ContasAPagarTab: React.FC = () => {
         </div>
       </div>
 
+      {/* Dashboard de Gráficos - Renderizado fora das abas para aparecer em ambas */}
+      {showDashboard && (
+        <div className="w-full mb-6">
+          <ContasAPagarDashboard
+            contas={contas || []}
+            refreshData={loadData}
+          />
+        </div>
+      )}
+
       {/* Abas principais */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'contas' | 'relatorios')}>
         <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border-gray-600">
@@ -864,14 +885,6 @@ const ContasAPagarTab: React.FC = () => {
 
         {/* Aba de Contas */}
         <TabsContent value="contas" className="space-y-6">
-
-      {/* Dashboard de Gráficos */}
-      {showDashboard && (
-        <ContasAPagarDashboard
-          contas={contas}
-          refreshData={loadData}
-        />
-      )}
 
       {/* Alertas de Vencimento */}
       {alertasVencimento.length > 0 && (

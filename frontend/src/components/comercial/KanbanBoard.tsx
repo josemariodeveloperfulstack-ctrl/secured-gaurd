@@ -24,7 +24,9 @@ import {
 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import styles from './KanbanBoard.module.css';
-import { fetchOpportunities, fetchKanbanStatuses, createOpportunity, updateOpportunity } from '@/services/crmService';
+import { fetchOpportunities, fetchKanbanStatuses, createOpportunity, updateOpportunity, createKanbanStatus } from '@/services/crmService';
+import { userService } from '@/services/userService';
+import leadService from '@/services/leadService';
 import { useToast } from '@/hooks/use-toast';
 
 interface KanbanStatus {
@@ -235,7 +237,18 @@ export default function KanbanBoard() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Opportunity | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', statusId: '' });
+  const [form, setForm] = useState({ 
+    title: '', 
+    description: '', 
+    statusId: '',
+    closeDate: '',
+    estimatedValue: '',
+    assignedToId: '',
+    leadId: '',
+    leadSource: ''
+  });
+  const [users, setUsers] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
@@ -244,13 +257,42 @@ export default function KanbanBoard() {
 
   // Carregar dados do backend
   useEffect(() => {
-    loadData();
+    // Carregar usuários e leads primeiro para ter o mapa disponível
+    loadUsersAndLeads().then(() => {
+      loadData();
+    });
   }, []);
+
+  const loadUsersAndLeads = async () => {
+    try {
+      const [usersData, leadsData] = await Promise.all([
+        userService.getAllUsers(),
+        leadService.getAllLeads().catch(() => []) // Se não houver leadService, retornar array vazio
+      ]);
+      setUsers(usersData || []);
+      setLeads(leadsData || []);
+    } catch (err) {
+      console.error('Erro ao carregar usuários e leads:', err);
+      // Não bloquear a aplicação se falhar
+    }
+  };
+  
+  // Re-carregar usuários e leads quando necessário para garantir que estão atualizados
+  useEffect(() => {
+    if (opportunities.length > 0 && users.length === 0) {
+      loadUsersAndLeads();
+    }
+  }, [opportunities]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Garantir que usuários estão carregados antes de mapear oportunidades
+      if (users.length === 0) {
+        await loadUsersAndLeads();
+      }
       
       // Carregar status e oportunidades em paralelo
       const [statusesData, opportunitiesData] = await Promise.all([
@@ -267,48 +309,251 @@ export default function KanbanBoard() {
         bgColor: mockStatuses[index]?.bgColor || '#DBEAFE'
       })).sort((a, b) => a.orderIndex - b.orderIndex);
 
-      // Se não houver status no backend, usar os mockados apenas para exibição
-      // Mas não permitir criar oportunidades sem status válidos do backend
+      // Se não houver status no backend, criar status padrão automaticamente
       if (mappedStatuses.length === 0) {
-        console.warn('Nenhum status encontrado no backend. Usando dados mockados apenas para exibição.');
-        setStatuses(mockStatuses);
-        toast({
-          title: "Aviso",
-          description: "Nenhum status do Kanban encontrado no backend. Por favor, crie status antes de adicionar oportunidades.",
-          variant: "default"
-        });
+        console.warn('Nenhum status encontrado no backend. Criando status padrão...');
+        try {
+          // Criar status padrão
+          const defaultStatuses = [
+            { name: 'Novos Leads', orderIndex: 1 },
+            { name: 'Em Contato', orderIndex: 2 },
+            { name: 'Proposta Enviada', orderIndex: 3 },
+            { name: 'Em Negociação', orderIndex: 4 },
+            { name: 'Fechado', orderIndex: 5 }
+          ];
+          
+          const createdStatuses = [];
+          for (const statusData of defaultStatuses) {
+            try {
+              const created = await createKanbanStatus(statusData);
+              createdStatuses.push({
+                id: created.id,
+                name: created.name,
+                orderIndex: created.orderIndex || statusData.orderIndex,
+                color: mockStatuses[statusData.orderIndex - 1]?.color || '#3B82F6',
+                bgColor: mockStatuses[statusData.orderIndex - 1]?.bgColor || '#DBEAFE'
+              });
+            } catch (err) {
+              console.error(`Erro ao criar status ${statusData.name}:`, err);
+            }
+          }
+          
+          if (createdStatuses.length > 0) {
+            setStatuses(createdStatuses);
+            setHasValidStatuses(true);
+            toast({
+              title: "Sucesso",
+              description: `${createdStatuses.length} status padrão foram criados automaticamente.`,
+              variant: "default"
+            });
+          } else {
+            setStatuses(mockStatuses);
+            setHasValidStatuses(false);
+            toast({
+              title: "Aviso",
+              description: "Não foi possível criar status padrão. Por favor, crie manualmente antes de adicionar oportunidades.",
+              variant: "default"
+            });
+          }
+        } catch (err) {
+          console.error('Erro ao criar status padrão:', err);
+          setStatuses(mockStatuses);
+          setHasValidStatuses(false);
+          toast({
+            title: "Aviso",
+            description: "Nenhum status do Kanban encontrado no backend. Por favor, crie status antes de adicionar oportunidades.",
+            variant: "default"
+          });
+        }
       } else {
+        // Verificar se todos os status têm UUIDs válidos
+        const validStatuses = mappedStatuses.filter(s => {
+          const idStr = String(s.id);
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return uuidRegex.test(idStr);
+        });
+        
         setStatuses(mappedStatuses);
+        setHasValidStatuses(validStatuses.length > 0);
       }
 
+      // Criar mapa de usuários para buscar nomes
+      const usersMap = new Map(users.map(u => [u.id, u.name]));
+      
       // Mapear oportunidades do backend
-      const mappedOpportunities = opportunitiesData.map((opp: any) => ({
-        id: opp.id,
-        title: opp.title,
-        description: opp.description || '',
-        statusId: opp.statusId,
-        leadId: opp.leadId,
-        value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
-        estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
-        expectedCloseDate: opp.closeDate || '',
-        closeDate: opp.closeDate || '',
-        assignedToId: opp.assignedToId,
-        assignedTo: opp.assignedTo || 'Não atribuído',
-        probability: 50, // Valor padrão, pode ser calculado depois
-        priority: 'MEDIUM' as const,
-        lastContact: opp.updatedAt || opp.createdAt || '',
-        tags: []
-      }));
+      const mappedOpportunities = opportunitiesData.map((opp: any) => {
+        // Buscar nome do responsável usando o ID
+        let assignedToName = 'Não atribuído';
+        if (opp.assignedToId) {
+          const userName = usersMap.get(opp.assignedToId);
+          if (userName) {
+            assignedToName = userName;
+          } else if (opp.assignedTo) {
+            // Se vier o nome diretamente do backend (fallback)
+            assignedToName = opp.assignedTo;
+          }
+        }
+        
+        return {
+          id: opp.id,
+          title: opp.title,
+          description: opp.description || '',
+          statusId: opp.statusId,
+          leadId: opp.leadId,
+          value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
+          estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
+          expectedCloseDate: opp.closeDate || '',
+          closeDate: opp.closeDate || '',
+          assignedToId: opp.assignedToId,
+          assignedTo: assignedToName,
+          probability: 50, // Valor padrão, pode ser calculado depois
+          priority: 'MEDIUM' as const,
+          lastContact: opp.updatedAt || opp.createdAt || '',
+          tags: [],
+          // Incluir lead se vier do backend, caso contrário criar objeto vazio
+          lead: opp.lead ? {
+            id: opp.lead.id || opp.leadId || 0,
+            name: opp.lead.name || 'Sem nome',
+            company: opp.lead.company || opp.lead.companyName || '',
+            email: opp.lead.email || '',
+            phone: opp.lead.phone || '',
+            status: opp.lead.status || 'NEW' as const,
+            source: opp.lead.source || 'Não informado',
+            value: opp.lead.value || opp.estimatedValue || 0,
+            createdAt: opp.lead.createdAt || opp.createdAt || ''
+          } : {
+            id: opp.leadId || 0,
+            name: 'Lead não encontrado',
+            company: '',
+            email: '',
+            phone: '',
+            status: 'NEW' as const,
+            source: 'Não informado',
+            value: 0,
+            createdAt: opp.createdAt || ''
+          }
+        };
+      });
 
       setOpportunities(mappedOpportunities);
       setFilteredOpportunities(mappedOpportunities);
     } catch (err: any) {
       console.error('Erro ao carregar dados do Kanban:', err);
       setError(err.message || 'Erro ao carregar dados');
+      
+      // Se o erro for porque não há status, tentar criar status padrão
+      if (err.response?.status === 404 || err.response?.status === 400 || err.message?.includes('status')) {
+        try {
+          console.log('Tentando criar status padrão devido ao erro...');
+          const defaultStatuses = [
+            { name: 'Novos Leads', orderIndex: 1 },
+            { name: 'Em Contato', orderIndex: 2 },
+            { name: 'Proposta Enviada', orderIndex: 3 },
+            { name: 'Em Negociação', orderIndex: 4 },
+            { name: 'Fechado', orderIndex: 5 }
+          ];
+          
+          const createdStatuses = [];
+          for (const statusData of defaultStatuses) {
+            try {
+              const created = await createKanbanStatus(statusData);
+              createdStatuses.push({
+                id: created.id,
+                name: created.name,
+                orderIndex: created.orderIndex || statusData.orderIndex,
+                color: mockStatuses[statusData.orderIndex - 1]?.color || '#3B82F6',
+                bgColor: mockStatuses[statusData.orderIndex - 1]?.bgColor || '#DBEAFE'
+              });
+            } catch (createErr) {
+              console.error(`Erro ao criar status ${statusData.name}:`, createErr);
+            }
+          }
+          
+          if (createdStatuses.length > 0) {
+            setStatuses(createdStatuses);
+            setHasValidStatuses(true);
+            toast({
+              title: "Status Criados",
+              description: `${createdStatuses.length} status padrão foram criados automaticamente.`,
+              variant: "default"
+            });
+            // Recarregar oportunidades após criar status
+            try {
+              // Garantir que usuários estão carregados antes de mapear
+              if (users.length === 0) {
+                await loadUsersAndLeads();
+              }
+              
+              const opportunitiesData = await fetchOpportunities();
+              const usersMap = new Map(users.map(u => [u.id, u.name]));
+              
+              const mappedOpportunities = opportunitiesData.map((opp: any) => {
+                // Buscar nome do responsável
+                let assignedToName = 'Não atribuído';
+                if (opp.assignedToId) {
+                  const userName = usersMap.get(opp.assignedToId);
+                  if (userName) {
+                    assignedToName = userName;
+                  }
+                }
+                
+                return {
+                  id: opp.id,
+                  title: opp.title,
+                  description: opp.description || '',
+                  statusId: opp.statusId,
+                  leadId: opp.leadId,
+                  value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
+                  estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
+                  expectedCloseDate: opp.closeDate || '',
+                  closeDate: opp.closeDate || '',
+                  assignedToId: opp.assignedToId,
+                  assignedTo: assignedToName,
+                  probability: 50,
+                  priority: 'MEDIUM' as const,
+                  lastContact: opp.updatedAt || opp.createdAt || '',
+                  tags: [],
+                  // Criar objeto lead padrão para evitar erros
+                  lead: opp.lead ? {
+                    id: opp.lead.id || opp.leadId || 0,
+                    name: opp.lead.name || 'Sem nome',
+                    company: opp.lead.company || opp.lead.companyName || '',
+                    email: opp.lead.email || '',
+                    phone: opp.lead.phone || '',
+                    status: opp.lead.status || 'NEW' as const,
+                    source: opp.lead.source || 'Não informado',
+                    value: opp.lead.value || opp.estimatedValue || 0,
+                    createdAt: opp.lead.createdAt || opp.createdAt || ''
+                  } : {
+                    id: opp.leadId || 0,
+                    name: 'Lead não encontrado',
+                    company: '',
+                    email: '',
+                    phone: '',
+                    status: 'NEW' as const,
+                    source: 'Não informado',
+                    value: 0,
+                    createdAt: opp.createdAt || ''
+                  }
+                };
+              });
+              setOpportunities(mappedOpportunities);
+              setFilteredOpportunities(mappedOpportunities);
+            } catch (oppErr) {
+              console.error('Erro ao carregar oportunidades após criar status:', oppErr);
+            }
+            return; // Sair aqui para não definir hasValidStatuses como false
+          }
+        } catch (createErr) {
+          console.error('Erro ao criar status padrão:', createErr);
+        }
+      }
+      
       // Em caso de erro, usar dados mockados como fallback
       setStatuses(mockStatuses);
-      setOpportunities(mockOpportunities);
-      setFilteredOpportunities(mockOpportunities);
+      setOpportunities(mockOpportunities || []);
+      setFilteredOpportunities(mockOpportunities || []);
+      setHasValidStatuses(false);
       toast({
         title: "Erro",
         description: "Não foi possível carregar dados do backend. Usando dados de exemplo.",
@@ -365,13 +610,84 @@ export default function KanbanBoard() {
       return;
     }
     
-    setForm({ title: '', description: '', statusId: statusIdStr });
+    setForm({ 
+      title: '', 
+      description: '', 
+      statusId: statusIdStr,
+      closeDate: '',
+      estimatedValue: '',
+      assignedToId: '',
+      leadId: ''
+    });
     setEditing(null);
     setShowModal(true);
   }
 
   function openEditModal(opp: Opportunity) {
-    setForm({ title: opp.title, description: opp.description || '', statusId: String(opp.statusId) });
+    // Converter data de LocalDateTime para formato de input date (YYYY-MM-DD)
+    let closeDateFormatted = '';
+    if (opp.expectedCloseDate || (opp as any).closeDate) {
+      const dateStr = opp.expectedCloseDate || (opp as any).closeDate;
+      try {
+        // Se vier como LocalDateTime do backend (formato ISO), extrair apenas a data
+        if (dateStr.includes('T')) {
+          closeDateFormatted = dateStr.split('T')[0];
+        } else {
+          // Se já vier como data apenas, usar diretamente
+          closeDateFormatted = dateStr.substring(0, 10);
+        }
+      } catch (e) {
+        console.error('Erro ao formatar data:', e);
+      }
+    }
+    
+    // Buscar assignedToId - pode estar em diferentes formatos
+    let assignedToIdValue = '';
+    if ((opp as any).assignedToId) {
+      assignedToIdValue = String((opp as any).assignedToId);
+    } else if ((opp as any).assignedTo?.id) {
+      assignedToIdValue = String((opp as any).assignedTo.id);
+    }
+    
+    // Buscar leadId e leadSource
+    let leadIdValue = '';
+    let leadSourceValue = '';
+    if ((opp as any).leadId) {
+      leadIdValue = String((opp as any).leadId);
+    } else if ((opp.lead as any)?.id) {
+      leadIdValue = String((opp.lead as any).id);
+    }
+    
+    // Buscar fonte do lead se disponível
+    if ((opp.lead as any)?.source) {
+      const source = (opp.lead as any).source;
+      // Se for string, usar diretamente; se for objeto enum, usar toString ou pegar valor
+      if (typeof source === 'string') {
+        leadSourceValue = source;
+      } else if (source && typeof source === 'object') {
+        // Se for objeto enum, tentar pegar o valor
+        leadSourceValue = source.toString();
+      }
+    }
+    
+    // Formatar valor estimado - pode estar em opp.value ou opp.estimatedValue
+    let estimatedValueFormatted = '';
+    const valueToUse = (opp as any).estimatedValue !== undefined ? (opp as any).estimatedValue : (opp.value !== undefined ? opp.value : 0);
+    if (valueToUse && valueToUse > 0) {
+      // Converter para número e formatar com ponto como separador decimal (padrão para input type="number")
+      estimatedValueFormatted = Number(valueToUse).toFixed(2);
+    }
+    
+    setForm({ 
+      title: opp.title, 
+      description: opp.description || '', 
+      statusId: String(opp.statusId),
+      closeDate: closeDateFormatted,
+      estimatedValue: estimatedValueFormatted,
+      assignedToId: assignedToIdValue,
+      leadId: leadIdValue,
+      leadSource: leadSourceValue
+    });
     setEditing(opp);
     setShowModal(true);
   }
@@ -417,30 +733,50 @@ export default function KanbanBoard() {
         return;
       }
 
+      const opportunityData: any = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        statusId: form.statusId
+      };
+
+      // Adicionar campos opcionais se preenchidos
+      if (form.closeDate) {
+        // Converter data para LocalDateTime (adicionar hora 00:00:00)
+        opportunityData.closeDate = form.closeDate + 'T00:00:00';
+      }
+      
+      if (form.estimatedValue) {
+        opportunityData.estimatedValue = parseFloat(form.estimatedValue.replace(/[^\d,.-]/g, '').replace(',', '.'));
+      }
+      
+      if (form.assignedToId) {
+        opportunityData.assignedToId = form.assignedToId;
+      }
+      
+      if (form.leadId) {
+        opportunityData.leadId = form.leadId;
+      }
+
+      // Atualizar fonte do lead se especificada (fazer antes de salvar a oportunidade)
+      if (form.leadId && form.leadSource) {
+        try {
+          await leadService.updateLead(form.leadId, { source: form.leadSource });
+        } catch (err) {
+          console.error('Erro ao atualizar fonte do lead:', err);
+          // Não bloquear a atualização da oportunidade se falhar
+        }
+      }
+
       if (editing) {
         // Atualizar oportunidade existente
-        await updateOpportunity(String(editing.id), {
-          title: form.title.trim(),
-          description: form.description.trim(),
-          statusId: form.statusId
-        });
+        await updateOpportunity(String(editing.id), opportunityData);
         toast({
           title: "Sucesso",
           description: "Oportunidade atualizada com sucesso!",
         });
       } else {
         // Criar nova oportunidade
-        console.log('Criando oportunidade com dados:', { 
-          title: form.title.trim(), 
-          description: form.description.trim(), 
-          statusId: form.statusId 
-        });
-        
-        await createOpportunity({
-          title: form.title.trim(),
-          description: form.description.trim(),
-          statusId: form.statusId
-        });
+        await createOpportunity(opportunityData);
         
         toast({
           title: "Sucesso",
@@ -449,7 +785,8 @@ export default function KanbanBoard() {
       }
       
       setShowModal(false);
-      // Recarregar dados
+      // Recarregar dados (inclui usuários e oportunidades)
+      await loadUsersAndLeads();
       await loadData();
     } catch (err: any) {
       console.error('Erro ao salvar oportunidade:', err);
@@ -727,6 +1064,111 @@ export default function KanbanBoard() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Data de Fechamento</label>
+                    <Input
+                      type="date"
+                      value={form.closeDate}
+                      onChange={e => setForm(f => ({ ...f, closeDate: e.target.value }))}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Valor Estimado (R$)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={form.estimatedValue}
+                      onChange={e => setForm(f => ({ ...f, estimatedValue: e.target.value }))}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Responsável</label>
+                  <Select 
+                    value={form.assignedToId ? form.assignedToId : undefined} 
+                    onValueChange={(value) => setForm(f => ({ ...f, assignedToId: value }))}
+                  >
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      <SelectValue placeholder="Selecione o responsável (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map(user => (
+                        <SelectItem key={String(user.id)} value={String(user.id)}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Lead</label>
+                  <Select 
+                    value={form.leadId ? form.leadId : undefined} 
+                    onValueChange={(value) => {
+                      const selectedLead = leads.find(l => String(l.id) === value);
+                      // Buscar source do lead - pode estar como objeto (enum) ou string
+                      let sourceValue = '';
+                      if (selectedLead) {
+                        if (typeof selectedLead.source === 'string') {
+                          sourceValue = selectedLead.source;
+                        } else if (selectedLead.source && typeof selectedLead.source === 'object') {
+                          // Se for um objeto enum, pegar a chave
+                          sourceValue = Object.keys(selectedLead.source)[0] || selectedLead.source.toString();
+                        }
+                      }
+                      setForm(f => ({ 
+                        ...f, 
+                        leadId: value,
+                        leadSource: sourceValue
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                      <SelectValue placeholder="Selecione o lead (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {leads.map(lead => (
+                        <SelectItem key={String(lead.id)} value={String(lead.id)}>
+                          {lead.name || lead.company || `Lead #${lead.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.leadId && (
+                  <div>
+                    <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Fonte do Lead</label>
+                    <Select 
+                      value={form.leadSource || undefined} 
+                      onValueChange={(value) => setForm(f => ({ ...f, leadSource: value }))}
+                    >
+                      <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                        <SelectValue placeholder="Selecione a fonte do lead" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="WEBSITE">Website</SelectItem>
+                        <SelectItem value="REFERRAL">Indicação</SelectItem>
+                        <SelectItem value="COLD_CALL">Ligação a Frio</SelectItem>
+                        <SelectItem value="EMAIL_MARKETING">Email Marketing</SelectItem>
+                        <SelectItem value="SOCIAL_MEDIA">Redes Sociais</SelectItem>
+                        <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
+                        <SelectItem value="EVENT">Evento</SelectItem>
+                        <SelectItem value="PARTNER">Parceiro</SelectItem>
+                        <SelectItem value="OTHER">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1 bg-seguranca-yellow text-black hover:bg-yellow-500">
                     {editing ? 'Atualizar' : 'Criar'}

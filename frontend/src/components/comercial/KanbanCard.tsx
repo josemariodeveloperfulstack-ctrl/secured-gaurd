@@ -222,26 +222,51 @@ export default function KanbanCard({
         </div>
 
         {/* Detalhes expandidos */}
-        {showDetails && (
+        {showDetails && opportunity.lead && (
           <div className="mt-4 pt-4 border-t border-gray-700 space-y-3">
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
                 <p className="text-gray-400 mb-1">Fonte do Lead:</p>
-                <p className="text-seguranca-lightgray">{opportunity.lead.source}</p>
+                <p className="text-seguranca-lightgray">
+                  {(() => {
+                    const source = opportunity.lead.source;
+                    if (!source || source === 'Não informado') return 'Não informado';
+                    // Mapear valores do enum para nomes amigáveis
+                    const sourceMap: Record<string, string> = {
+                      'WEBSITE': 'Website',
+                      'REFERRAL': 'Indicação',
+                      'COLD_CALL': 'Ligação a Frio',
+                      'EMAIL_MARKETING': 'Email Marketing',
+                      'SOCIAL_MEDIA': 'Redes Sociais',
+                      'GOOGLE_ADS': 'Google Ads',
+                      'EVENT': 'Evento',
+                      'PARTNER': 'Parceiro',
+                      'OTHER': 'Outro'
+                    };
+                    // Se source for um objeto com displayName, usar isso
+                    if (typeof source === 'object' && (source as any).displayName) {
+                      return (source as any).displayName;
+                    }
+                    // Se for string, mapear
+                    return sourceMap[String(source)] || String(source);
+                  })()}
+                </p>
               </div>
               <div>
                 <p className="text-gray-400 mb-1">Data de criação:</p>
-                <p className="text-seguranca-lightgray">{formatDate(opportunity.lead.createdAt)}</p>
+                <p className="text-seguranca-lightgray">{opportunity.lead.createdAt ? formatDate(opportunity.lead.createdAt) : 'Não disponível'}</p>
               </div>
             </div>
             
-            <div>
-              <p className="text-gray-400 mb-1 text-xs">Contato:</p>
-              <div className="flex items-center gap-2 text-xs">
-                <Phone className="h-3 w-3 text-gray-400" />
-                <span className="text-seguranca-lightgray">{opportunity.lead.phone}</span>
+            {opportunity.lead.phone && (
+              <div>
+                <p className="text-gray-400 mb-1 text-xs">Contato:</p>
+                <div className="flex items-center gap-2 text-xs">
+                  <Phone className="h-3 w-3 text-gray-400" />
+                  <span className="text-seguranca-lightgray">{opportunity.lead.phone}</span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <p className="text-gray-400 mb-1 text-xs">Dias até fechamento:</p>

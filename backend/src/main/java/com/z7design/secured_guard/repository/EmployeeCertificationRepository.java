@@ -15,24 +15,24 @@ import com.z7design.secured_guard.model.enums.CertificationStatus;
 @Repository
 public interface EmployeeCertificationRepository extends JpaRepository<EmployeeCertification, UUID> {
     @Override
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     List<EmployeeCertification> findAll();
 
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     List<EmployeeCertification> findByEmployeeId(UUID employeeId);
 
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     List<EmployeeCertification> findByEmployeeIdAndStatus(UUID employeeId, CertificationStatus status);
 
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     List<EmployeeCertification> findByTrainingId(UUID trainingId);
 
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     List<EmployeeCertification> findByExpirationDateBefore(LocalDate date);
 
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     List<EmployeeCertification> findByExpirationDateBetween(LocalDate startDate, LocalDate endDate);
 
-    @EntityGraph(attributePaths = {"employee", "training"})
+    @EntityGraph(attributePaths = {"employee", "training", "workPost"})
     Optional<EmployeeCertification> findWithDetailsById(UUID id);
 } 

@@ -43,11 +43,23 @@ public class WorkPostService {
     @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
         try {
-            return workPostRepository.findAllWithRelations(); // Usar método com JOIN FETCH
+            log.debug("Buscando postos com relacionamentos usando findAllWithRelations");
+            List<WorkPost> workPosts = workPostRepository.findAllWithRelations();
+            log.debug("Encontrados {} postos com relacionamentos", workPosts.size());
+            return workPosts;
         } catch (Exception e) {
-            log.error("Erro ao buscar postos com relacionamentos, tentando busca simples: {}", e.getMessage());
+            log.error("Erro ao buscar postos com relacionamentos, tentando busca simples: {}", e.getMessage(), e);
             // Fallback para busca simples se houver erro com JOIN FETCH
-            return workPostRepository.findAll();
+            try {
+                List<WorkPost> workPosts = workPostRepository.findAll();
+                log.debug("Fallback: Encontrados {} postos sem relacionamentos", workPosts.size());
+                return workPosts;
+            } catch (Exception fallbackError) {
+                log.error("Erro também no fallback findAll: {}", fallbackError.getMessage(), fallbackError);
+                // Retornar lista vazia em vez de lançar exceção para evitar 500
+                log.warn("Retornando lista vazia devido a erro na busca");
+                return List.of();
+            }
         }
     }
     
@@ -344,7 +356,15 @@ public class WorkPostService {
         }
         
         return workPosts.stream()
-                .map(this::convertToDTO)
+                .map(workPost -> {
+                    try {
+                        return convertToDTO(workPost);
+                    } catch (Exception e) {
+                        log.error("Erro ao converter WorkPost {} para DTO: {}", 
+                                workPost != null ? workPost.getId() : "null", e.getMessage(), e);
+                        return null;
+                    }
+                })
                 .filter(dto -> dto != null) // Filtrar DTOs nulos
                 .toList();
     }

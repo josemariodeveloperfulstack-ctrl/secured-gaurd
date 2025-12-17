@@ -110,17 +110,43 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
         .then(data => {
           const fornecedoresArray = Array.isArray(data) ? data : [];
           setFornecedores(fornecedoresArray);
-          // Pré-selecionar fornecedor em modo edição
+          // Pré-selecionar fornecedor em modo edição - fazer depois que os fornecedores são carregados
           if (editMode && initialData) {
-            const byId = fornecedoresArray.find((f: any) => f.id === (initialData.fornecedorId || initialData.fornecedor?.id));
-            const byName = fornecedoresArray.find((f: any) => (f.name || '').toLowerCase() === (initialData.fornecedor || '').toLowerCase());
-            const chosen = byId || byName;
+            // Tentar encontrar o fornecedor por ID primeiro
+            const fornecedorIdToMatch = initialData.fornecedorId 
+              ? (typeof initialData.fornecedorId === 'string' ? initialData.fornecedorId : String(initialData.fornecedorId))
+              : null;
+            
+            let chosen = null;
+            if (fornecedorIdToMatch) {
+              chosen = fornecedoresArray.find((f: any) => String(f.id) === fornecedorIdToMatch);
+            }
+            
+            // Se não encontrou por ID, tentar por nome
+            if (!chosen && initialData.fornecedor) {
+              chosen = fornecedoresArray.find((f: any) => 
+                (f.name || '').toLowerCase() === (initialData.fornecedor || '').toLowerCase()
+              );
+            }
+            
             if (chosen) {
+              console.log('✅ Fornecedor encontrado para pré-seleção:', chosen);
+              // Atualizar formData com o fornecedor encontrado
               setFormData(prev => ({
                 ...prev,
-                fornecedorId: chosen.id,
+                fornecedorId: String(chosen.id), // Garantir que seja string
                 fornecedor: chosen.name
               }));
+            } else if (fornecedorIdToMatch || initialData.fornecedor) {
+              console.warn('⚠️ Fornecedor não encontrado na lista. ID:', fornecedorIdToMatch, 'Nome:', initialData.fornecedor);
+              // Manter o ID e nome mesmo que não esteja na lista (pode ter sido removido)
+              if (fornecedorIdToMatch) {
+                setFormData(prev => ({
+                  ...prev,
+                  fornecedorId: fornecedorIdToMatch,
+                  fornecedor: initialData.fornecedor || 'Fornecedor não encontrado'
+                }));
+              }
             }
           }
         })
@@ -217,13 +243,24 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   useEffect(() => {
     if (open) {
       if (editMode && initialData) {
+        // Converter fornecedorId para string se necessário
+        const fornecedorIdStr = initialData.fornecedorId 
+          ? (typeof initialData.fornecedorId === 'string' ? initialData.fornecedorId : String(initialData.fornecedorId))
+          : '';
+        
+        console.log('📝 Carregando dados iniciais para edição:', {
+          fornecedorId: initialData.fornecedorId,
+          fornecedorIdStr,
+          fornecedor: initialData.fornecedor
+        });
+        
         setFormData({
           dataEmissao: (typeof initialData.dataEmissao === 'string' ? parseDateFromBackend(initialData.dataEmissao) : initialData.dataEmissao) || new Date(),
           vencimento: (typeof initialData.vencimento === 'string' ? parseDateFromBackend(initialData.vencimento) : initialData.vencimento) || new Date(),
           fornecedor: initialData.fornecedor || '',
-          fornecedorId: initialData.fornecedorId || '',
+          fornecedorId: fornecedorIdStr, // Usar string convertida
           empresa: initialData.empresa || '',
-          empresaId: initialData.empresaId || '',
+          empresaId: initialData.empresaId ? (typeof initialData.empresaId === 'string' ? initialData.empresaId : String(initialData.empresaId)) : '',
           companySigla: initialData.companySigla || '',
           descricao: initialData.descricao || '',
           tipo: initialData.tipo || 'VARIAVEL',
@@ -263,6 +300,32 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       }
     }
   }, [editMode, initialData, open]);
+
+  // Sincronizar fornecedor quando fornecedores e formData.fornecedorId estiverem disponíveis
+  useEffect(() => {
+    if (open && editMode && initialData && fornecedores.length > 0 && formData.fornecedorId) {
+      // Verificar se o fornecedorId no formData corresponde a um fornecedor na lista
+      const fornecedorAtual = fornecedores.find((f: any) => String(f.id) === String(formData.fornecedorId));
+      if (!fornecedorAtual && formData.fornecedorId) {
+        // Se não encontrou, tentar novamente buscar pelo initialData
+        const fornecedorIdToMatch = initialData.fornecedorId 
+          ? (typeof initialData.fornecedorId === 'string' ? initialData.fornecedorId : String(initialData.fornecedorId))
+          : null;
+        
+        if (fornecedorIdToMatch) {
+          const fornecedorEncontrado = fornecedores.find((f: any) => String(f.id) === fornecedorIdToMatch);
+          if (fornecedorEncontrado) {
+            console.log('✅ Sincronizando fornecedor encontrado:', fornecedorEncontrado);
+            setFormData(prev => ({
+              ...prev,
+              fornecedorId: String(fornecedorEncontrado.id),
+              fornecedor: fornecedorEncontrado.name
+            }));
+          }
+        }
+      }
+    }
+  }, [open, editMode, initialData, fornecedores, formData.fornecedorId]);
 
   const handleInputChange = (field: keyof ContaAPagar, value: any) => {
     setFormData(prev => ({

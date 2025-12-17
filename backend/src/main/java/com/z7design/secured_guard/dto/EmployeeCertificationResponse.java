@@ -25,22 +25,31 @@ public record EmployeeCertificationResponse(
         String documentUrl
 ) {
     public static EmployeeCertificationResponse fromEntity(EmployeeCertification certification) {
-        return EmployeeCertificationResponse.builder()
-                .id(certification.getId())
-                .employeeId(certification.getEmployee() != null ? certification.getEmployee().getId() : null)
-                .employeeName(certification.getEmployee() != null ? certification.getEmployee().getName() : null)
-                .employeeDocument(certification.getEmployee() != null ? certification.getEmployee().getDocument() : null)
-                .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
-                .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
-                .renewalPeriodMonths(certification.getTraining() != null ? certification.getTraining().getRenewalPeriodMonths() : null)
-                .workPostId(certification.getWorkPost() != null ? certification.getWorkPost().getId() : null)
-                .workPostName(certification.getWorkPost() != null ? certification.getWorkPost().getName() : null)
-                .certificationNumber(certification.getCertificationNumber())
-                .issueDate(certification.getIssueDate())
-                .expirationDate(certification.getExpirationDate())
-                .status(certification.getStatus())
-                .documentUrl(certification.getDocumentUrl())
-                .build();
+        if (certification == null) {
+            return null;
+        }
+        
+        try {
+            return EmployeeCertificationResponse.builder()
+                    .id(certification.getId())
+                    .employeeId(certification.getEmployee() != null ? certification.getEmployee().getId() : null)
+                    .employeeName(certification.getEmployee() != null ? certification.getEmployee().getName() : null)
+                    .employeeDocument(certification.getEmployee() != null ? certification.getEmployee().getDocument() : null)
+                    .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
+                    .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
+                    .renewalPeriodMonths(certification.getTraining() != null ? certification.getTraining().getRenewalPeriodMonths() : null)
+                    .workPostId(certification.getWorkPost() != null ? certification.getWorkPost().getId() : null)
+                    .workPostName(certification.getWorkPost() != null ? certification.getWorkPost().getName() : null)
+                    .certificationNumber(certification.getCertificationNumber())
+                    .issueDate(certification.getIssueDate())
+                    .expirationDate(certification.getExpirationDate())
+                    .status(certification.getStatus())
+                    .documentUrl(certification.getDocumentUrl())
+                    .build();
+        } catch (Exception e) {
+            // Log do erro e retornar null será filtrado no controller
+            throw new RuntimeException("Erro ao converter EmployeeCertification para DTO: " + e.getMessage(), e);
+        }
     }
 }
 

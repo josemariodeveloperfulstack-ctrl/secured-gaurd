@@ -32,6 +32,7 @@ export interface ContaAReceber {
   comprovante?: File;
   categoria?: string | undefined;
   centroCusto?: string | undefined;
+  paymentMethod?: string; // PaymentMethod enum: PIX, BOLETO, TRANSFER, CASH, CARD
   createdAt?: Date;
 }
 
@@ -70,8 +71,9 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     baixa: false,
     dataPagamento: undefined,
     observacoes: '',
-    categoria: undefined,
-    centroCusto: undefined
+    categoria: 'INVOICE', // Valor padrão - enum ReceivableCategory
+    centroCusto: undefined,
+    paymentMethod: 'PIX' // Valor padrão - enum PaymentMethod
   });
 
   const [categories, setCategories] = useState<string[]>([]);
@@ -111,24 +113,8 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           ]);
         });
 
-      // Carregar categorias
-      contasAReceberService.getCategories()
-        .then(data => {
-          const categoriasArray = Array.isArray(data) ? data : [];
-          setCategories(categoriasArray);
-        })
-        .catch(error => {
-          console.error('Erro ao carregar categorias:', error);
-          setCategories([
-            'Serviços de Segurança',
-            'Consultoria',
-            'Manutenção',
-            'Equipamentos',
-            'Treinamento',
-            'Auditoria',
-            'Outros'
-          ]);
-        });
+      // Não precisamos mais carregar categorias via API, usando valores fixos do enum
+      // setCategories(['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER']);
 
       // Carregar centros de custo
       contasAReceberService.getCostCenters()
@@ -165,6 +151,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           dataPagamento: initialData.dataPagamento || undefined,
           observacoes: initialData.observacoes || '',
           categoria: initialData.categoria || '',
+          paymentMethod: initialData.paymentMethod || 'PIX', // Garantir paymentMethod padrão
           centroCusto: initialData.centroCusto || ''
         });
       } else {
@@ -512,6 +499,40 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                 </Select>
               </div>
 
+              {/* Forma de Pagamento */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <DollarSign size={14} />
+                  Forma de Pagamento *
+                </label>
+                <Select
+                  value={formData.paymentMethod || 'PIX'}
+                  onValueChange={(value) => handleInputChange('paymentMethod', value)}
+                  required
+                >
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione a forma de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      PIX
+                    </SelectItem>
+                    <SelectItem value="BOLETO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Boleto
+                    </SelectItem>
+                    <SelectItem value="TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Transferência
+                    </SelectItem>
+                    <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Dinheiro
+                    </SelectItem>
+                    <SelectItem value="CARD" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      Cartão
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Centro de Custo */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
@@ -526,15 +547,15 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <SelectValue placeholder="Selecione um centro de custo" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem 
+                    <SelectItem
                       value="NENHUM"
                       className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                     >
                       Nenhum centro de custo
                     </SelectItem>
                     {costCenters.map((center) => (
-                      <SelectItem 
-                        key={center} 
+                      <SelectItem
+                        key={center}
                         value={center}
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >

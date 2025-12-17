@@ -469,7 +469,9 @@ function App() {
                     } />
                     <Route path="/financeiro/centro-custos" element={
                       <ProtectedRoute requiredPermissions={['FINANCIAL_MANAGE']}>
-                        <CentrosDeCusto />
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <CentrosDeCusto />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/medicao" element={

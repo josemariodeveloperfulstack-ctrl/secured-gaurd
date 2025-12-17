@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import CentroCustosTab from '@/components/financeiro/CentroCustosTab';
 
 const CentrosDeCusto: React.FC = () => {
+  useEffect(() => {
+    console.log('✅ CentrosDeCusto component mounted');
+  }, []);
+
   return (
-    <StandardLayout>
-      <div className="container mx-auto p-6">
-        <CentroCustosTab />
-      </div>
+    <StandardLayout title="Centros de Custos">
+      <CentroCustosTab />
     </StandardLayout>
   );
 };

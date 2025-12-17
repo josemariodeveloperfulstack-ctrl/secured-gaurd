@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogPortal, DialogOverlay } from '@/components/ui/dialog';
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -17,7 +18,8 @@ import {
   User,
   Hash,
   Calendar,
-  Tag
+  Tag,
+  X
 } from 'lucide-react';
 
 interface SupplierFormModalProps {
@@ -137,7 +139,11 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-seguranca-graphite/95 to-seguranca-black/95 border-gray-600/50 shadow-2xl backdrop-blur-sm">
+      <DialogPortal>
+        <DialogOverlay className="z-[10010]" />
+        <DialogPrimitive.Content
+          className="fixed left-[50%] top-[50%] z-[10011] grid w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-gradient-to-br from-seguranca-graphite/95 to-seguranca-black/95 border-gray-600/50 shadow-2xl backdrop-blur-sm p-6 rounded-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+        >
         <DialogHeader className="space-y-3 sm:space-y-4">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-seguranca-red/20 to-seguranca-red/10 border border-seguranca-red/30 shadow-lg shadow-seguranca-red/10">
@@ -343,7 +349,12 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
             </Button>
           </div>
         </form>
-      </DialogContent>
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4 text-white" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 };

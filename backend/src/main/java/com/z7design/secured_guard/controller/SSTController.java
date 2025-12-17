@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -123,6 +124,26 @@ public class SSTController {
         summary.setAccidentsThisMonth(0L);
         
         return ResponseEntity.ok(summary);
+    }
+
+    // ========== RELATÓRIOS SST ==========
+    
+    @GetMapping("/reports")
+    @Operation(summary = "Listar relatórios SST", description = "Retorna todos os relatórios SST disponíveis")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<Map<String, Object>>> getReports() {
+        // TODO: Implementar quando a funcionalidade de relatórios SST for desenvolvida
+        // Por enquanto, retorna lista vazia para evitar erros 500
+        return ResponseEntity.ok(List.of());
+    }
+
+    @GetMapping("/reports/executions")
+    @Operation(summary = "Listar execuções de relatórios SST", description = "Retorna todas as execuções de relatórios SST")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<Map<String, Object>>> getReportExecutions() {
+        // TODO: Implementar quando a funcionalidade de execuções de relatórios SST for desenvolvida
+        // Por enquanto, retorna lista vazia para evitar erros 500
+        return ResponseEntity.ok(List.of());
     }
 
     // ========== CLASSE AUXILIAR PARA DASHBOARD ==========

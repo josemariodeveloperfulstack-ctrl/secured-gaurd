@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -240,6 +240,9 @@ const Frota: React.FC = () => {
     queryFn: () => fleetService.getFines(),
     retry: 2,
     retryDelay: 1000,
+    staleTime: 0, // Sempre considerar dados stale para forçar refetch
+    refetchOnWindowFocus: true, // Refetch quando a janela recebe foco
+    refetchOnMount: 'always', // Sempre refetch ao montar o componente
     onSuccess: (data) => {
       console.log('✅ React Query: Multas carregadas com sucesso:', data);
       console.log('📊 React Query: Total de multas:', data?.length || 0);
@@ -451,20 +454,36 @@ const Frota: React.FC = () => {
     setIsAbastecimentoModalOpen(false);
   };
 
-  const handleMultaSuccess = () => {
+  const handleMultaSuccess = async () => {
     console.log('✅ Multa salva com sucesso! Atualizando lista...');
     
-    // Invalidar queries para forçar atualização
-    queryClient.invalidateQueries({ queryKey: ['fines'] });
-    
-    // Refetch explícito
-    refetchFines();
-    
-    // Fechar modal
-    setIsMultaModalOpen(false);
-    setSelectedMulta(null);
-    
-    console.log('🔄 Lista de multas atualizada!');
+    try {
+      // Pequeno delay para garantir que o backend processou a operação
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Invalidar queries para forçar atualização
+      await queryClient.invalidateQueries({ queryKey: ['fines'], exact: true });
+      
+      // Refetch explícito e aguardar conclusão
+      const result = await refetchFines();
+      console.log('🔄 Refetch concluído. Novos dados:', result.data);
+      console.log('📊 Total de multas após atualização:', result.data?.length || 0);
+      
+      // Fechar modal após atualizar os dados
+      setIsMultaModalOpen(false);
+      setSelectedMulta(null);
+      
+      // Mostrar toast de sucesso
+      toast({
+        title: 'Sucesso!',
+        description: 'Multa salva e lista atualizada com sucesso.',
+      });
+    } catch (error) {
+      console.error('❌ Erro ao atualizar lista de multas:', error);
+      // Fechar modal mesmo em caso de erro
+      setIsMultaModalOpen(false);
+      setSelectedMulta(null);
+    }
   };
 
   const handleViewMulta = (multa: MultaComponent) => {
@@ -651,9 +670,10 @@ const Frota: React.FC = () => {
       pdf.save(filename);
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao gerar PDF:', error);
-      throw error;
+      console.error('❌ Stack trace:', error.stack);
+      throw new Error(`Erro ao gerar PDF: ${error.message || 'Erro desconhecido'}`);
     }
   };
 
@@ -673,8 +693,11 @@ const Frota: React.FC = () => {
       }
 
       if (format === 'pdf') {
+        console.log('📄 Gerando PDF para multa:', multa);
         await generatePDFReport(multa);
+        console.log('✅ PDF gerado com sucesso');
       } else {
+        console.log('📊 Gerando Excel para multa:', multaId);
         // Para Excel, usar o serviço original
         const response = await fleetService.generateFineReportExcel({ selectedIds: [multaId] });
         
@@ -691,6 +714,7 @@ const Frota: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
+        console.log('✅ Excel gerado com sucesso');
       }
       
       toast({

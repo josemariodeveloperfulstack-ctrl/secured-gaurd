@@ -38,10 +38,12 @@ public class InvoiceService {
     private final ContractRepository contractRepository;
     private final UnitRepository unitRepository;
     
+    @Transactional(readOnly = true)
     public List<Invoice> findAll() {
         return invoiceRepository.findAll();
     }
     
+    @Transactional(readOnly = true)
     public Page<Invoice> findAll(Pageable pageable) {
         return invoiceRepository.findAll(pageable);
     }

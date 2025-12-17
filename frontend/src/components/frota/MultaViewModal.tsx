@@ -331,19 +331,39 @@ const MultaViewModal: React.FC<MultaViewModalProps> = ({
           </Card>
         </div>
 
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-4 mt-6 pt-4 border-t border-gray-700">
           {/* Botões de Relatórios */}
           {onGenerateReport && (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               <Button
-                onClick={() => onGenerateReport(multa.id, 'pdf')}
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔘 Botão PDF clicado para multa:', multa.id);
+                  try {
+                    await onGenerateReport(multa.id, 'pdf');
+                  } catch (error) {
+                    console.error('❌ Erro ao chamar onGenerateReport para PDF:', error);
+                  }
+                }}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Relatório PDF
               </Button>
               <Button
-                onClick={() => onGenerateReport(multa.id, 'excel')}
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔘 Botão Excel clicado para multa:', multa.id);
+                  try {
+                    await onGenerateReport(multa.id, 'excel');
+                  } catch (error) {
+                    console.error('❌ Erro ao chamar onGenerateReport para Excel:', error);
+                  }
+                }}
                 variant="outline"
                 className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
               >
@@ -355,9 +375,14 @@ const MultaViewModal: React.FC<MultaViewModalProps> = ({
           
           {/* Botão Fechar */}
           <Button
+            type="button"
             variant="outline"
-            onClick={onClose}
-            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black ml-auto"
           >
             <X className="h-4 w-4 mr-2" />
             Fechar

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +29,7 @@ import StockAlertsPanel from '@/components/stock/StockAlertsPanel';
 import StockItemModal from '@/components/stock/StockItemModal';
 import StockMovementModal from '@/components/stock/StockMovementModal';
 import QrCodeScanner from '@/components/stock/QrCodeScanner';
+import StockReportsContent from '@/components/stock/StockReportsContent';
 
 const EstoqueSimplificado: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -389,17 +390,7 @@ const EstoqueSimplificado: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="reports" className="mt-6">
-            <Card className="bg-seguranca-graphite border-gray-600 p-6">
-              <div className="text-center">
-                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">
-                  Relatórios em Desenvolvimento
-                </h3>
-                <p className="text-gray-400">
-                  Relatórios detalhados de estoque, movimentações e entregas por funcionário em breve.
-                </p>
-              </div>
-            </Card>
+            <StockReportsContent />
           </TabsContent>
         </Tabs>
 
