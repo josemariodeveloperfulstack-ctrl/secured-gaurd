@@ -79,12 +79,12 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     if (!user) return;
     setIsLoading(true);
     try {
-      // Enviar roles como array para o backend
+      // Enviar roles como array de strings para o backend
       const updateData = {
         name: formData.name,
         email: formData.email,
         username: formData.username,
-        roles: [{ name: formData.role }],
+        roles: formData.role ? [formData.role] : [],
         active: formData.active,
         whatsapp: formData.whatsapp,
       };

@@ -52,5 +52,27 @@ public class UpdateUserRequest {
     private Boolean active;
     
     private String status;
+    
+    // Campos de informações adicionais (opcionais)
+    @Size(max = 500, message = "Avatar deve ter no máximo 500 caracteres")
+    private String avatar;
+    
+    @Size(max = 100, message = "Departamento deve ter no máximo 100 caracteres")
+    private String department;
+    
+    @Size(max = 100, message = "Posição deve ter no máximo 100 caracteres")
+    private String position;
+    
+    @Size(max = 50, message = "Código do funcionário deve ter no máximo 50 caracteres")
+    private String employeeCode;
+    
+    @Pattern(
+        regexp = "^\\d{9,20}$|^$", 
+        message = "Telefone deve conter apenas dígitos (9-20 caracteres)"
+    )
+    private String phone;
+    
+    @Size(max = 500, message = "Endereço deve ter no máximo 500 caracteres")
+    private String address;
 }
 

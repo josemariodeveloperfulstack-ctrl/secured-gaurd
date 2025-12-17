@@ -164,6 +164,26 @@ public class User implements UserDetails {
     @Builder.Default
     private Boolean firstAccessCompleted = false;
     
+    // ===== CAMPOS DE INFORMAÇÕES ADICIONAIS =====
+    
+    @Column(length = 500)
+    private String avatar;
+    
+    @Column(length = 100)
+    private String department;
+    
+    @Column(length = 100)
+    private String position;
+    
+    @Column(name = "employee_code", length = 50)
+    private String employeeCode;
+    
+    @Column(length = 20)
+    private String phone;
+    
+    @Column(length = 500)
+    private String address;
+    
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

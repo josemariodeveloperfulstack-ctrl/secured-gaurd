@@ -39,16 +39,10 @@ public class UserController {
     @Operation(summary = "Listar usuários", description = "Retorna uma lista de todos os usuários")
     public ResponseEntity<List<UserListResponseDTO>> getAllUsers() {
         List<User> users = userService.findAll();
-        List<UserListResponseDTO> dtos = users.stream().map(user -> {
-            UserListResponseDTO dto = new UserListResponseDTO();
-            dto.setId(user.getId().toString());
-            dto.setName(user.getName());
-            dto.setUsername(user.getUsername());
-            dto.setEmail(user.getEmail());
-            dto.setActive(user.isActive());
-            dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-            return dto;
-        }).collect(java.util.stream.Collectors.toList());
+        List<UserListResponseDTO> dtos = users.stream()
+            .map(this::convertToDTO)
+            .filter(dto -> dto != null)
+            .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
     
@@ -99,15 +93,7 @@ public class UserController {
                     .body(Map.of("error", "Acesso negado"));
             }
             
-            UserListResponseDTO dto = new UserListResponseDTO();
-            dto.setId(user.getId().toString());
-            dto.setName(user.getName());
-            dto.setUsername(user.getUsername());
-            dto.setEmail(user.getEmail());
-            dto.setActive(user.isActive());
-            dto.setRoles(user.getRoles().stream()
-                .map(role -> role.getName())
-                .collect(java.util.stream.Collectors.toList()));
+            UserListResponseDTO dto = convertToDTO(user);
             
             return ResponseEntity.ok(dto);
         } catch (Exception e) {
@@ -133,15 +119,7 @@ public class UserController {
         User user = userService.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         
-        UserListResponseDTO dto = new UserListResponseDTO();
-        dto.setId(user.getId().toString());
-        dto.setName(user.getName());
-        dto.setUsername(user.getUsername());
-        dto.setEmail(user.getEmail());
-        dto.setActive(user.isActive());
-        dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-        
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(convertToDTO(user));
     }
     
     @GetMapping("/email/{email}")
@@ -151,15 +129,7 @@ public class UserController {
         User user = userService.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         
-        UserListResponseDTO dto = new UserListResponseDTO();
-        dto.setId(user.getId().toString());
-        dto.setName(user.getName());
-        dto.setUsername(user.getUsername());
-        dto.setEmail(user.getEmail());
-        dto.setActive(user.isActive());
-        dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-        
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(convertToDTO(user));
     }
 
     @GetMapping("/search")
@@ -174,16 +144,10 @@ public class UserController {
             users = userService.searchUsers(query.trim());
         }
         
-        List<UserListResponseDTO> dtos = users.stream().map(user -> {
-            UserListResponseDTO dto = new UserListResponseDTO();
-            dto.setId(user.getId().toString());
-            dto.setName(user.getName());
-            dto.setUsername(user.getUsername());
-            dto.setEmail(user.getEmail());
-            dto.setActive(user.isActive());
-            dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-            return dto;
-        }).collect(java.util.stream.Collectors.toList());
+        List<UserListResponseDTO> dtos = users.stream()
+            .map(this::convertToDTO)
+            .filter(dto -> dto != null)
+            .collect(java.util.stream.Collectors.toList());
         
         return ResponseEntity.ok(dtos);
     }
@@ -200,15 +164,7 @@ public class UserController {
         User user = userService.findByEmployeeCpf(cpf)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o CPF informado"));
         
-        UserListResponseDTO dto = new UserListResponseDTO();
-        dto.setId(user.getId().toString());
-        dto.setName(user.getName());
-        dto.setUsername(user.getUsername());
-        dto.setEmail(user.getEmail());
-        dto.setActive(user.isActive());
-        dto.setRoles(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-        
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(convertToDTO(user));
     }
     
     @PostMapping
@@ -229,15 +185,7 @@ public class UserController {
             User createdUser = userService.createFromRequest(request);
             System.out.println("✅ Usuário criado: " + createdUser.getId());
             
-            UserListResponseDTO dto = new UserListResponseDTO();
-            dto.setId(createdUser.getId().toString());
-            dto.setName(createdUser.getName());
-            dto.setUsername(createdUser.getUsername());
-            dto.setEmail(createdUser.getEmail());
-            dto.setActive(createdUser.isActive());
-            dto.setRoles(createdUser.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toList()));
-            
-            return ResponseEntity.status(201).body(dto);
+            return ResponseEntity.status(201).body(convertToDTO(createdUser));
         } catch (Exception e) {
             System.err.println("❌ Erro ao criar usuário: " + e.getMessage());
             e.printStackTrace();
@@ -304,23 +252,7 @@ public class UserController {
                     .body(Map.of("error", "Usuário não encontrado"));
             }
             
-            UserListResponseDTO dto = new UserListResponseDTO();
-            dto.setId(updatedUser.getId().toString());
-            dto.setName(updatedUser.getName());
-            dto.setUsername(updatedUser.getUsername());
-            dto.setEmail(updatedUser.getEmail());
-            dto.setActive(updatedUser.isActive());
-            
-            // Tratar roles null
-            if (updatedUser.getRoles() != null && !updatedUser.getRoles().isEmpty()) {
-                dto.setRoles(updatedUser.getRoles().stream()
-                    .map(role -> role.getName())
-                    .collect(java.util.stream.Collectors.toList()));
-            } else {
-                dto.setRoles(java.util.Collections.emptyList());
-            }
-            
-            return ResponseEntity.ok(dto);
+            return ResponseEntity.ok(convertToDTO(updatedUser));
         } catch (IllegalArgumentException e) {
             log.warn("Erro de validação ao atualizar usuário {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -340,6 +272,59 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Erro ao atualizar usuário: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido")));
         }
+    }
+    
+    /**
+     * Método helper para converter User para UserListResponseDTO
+     */
+    private UserListResponseDTO convertToDTO(User user) {
+        if (user == null) {
+            return null;
+        }
+        
+        UserListResponseDTO dto = new UserListResponseDTO();
+        dto.setId(user.getId().toString());
+        dto.setName(user.getName());
+        dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
+        dto.setActive(user.isActive());
+        dto.setStatus(user.getStatus());
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setUpdatedAt(user.getUpdatedAt());
+        
+        // Tratar roles de forma segura
+        try {
+            if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+                List<String> roleNames = user.getRoles().stream()
+                    .filter(role -> role != null)
+                    .map(role -> {
+                        try {
+                            return role.getName();
+                        } catch (Exception e) {
+                            log.warn("Erro ao obter nome da role: {}", e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(name -> name != null)
+                    .collect(java.util.stream.Collectors.toList());
+                dto.setRoles(roleNames);
+            } else {
+                dto.setRoles(java.util.Collections.emptyList());
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar roles, usando lista vazia: {}", e.getMessage());
+            dto.setRoles(java.util.Collections.emptyList());
+        }
+        
+        // Campos de informações adicionais
+        dto.setAvatar(user.getAvatar());
+        dto.setDepartment(user.getDepartment());
+        dto.setPosition(user.getPosition());
+        dto.setEmployeeCode(user.getEmployeeCode());
+        dto.setPhone(user.getPhone());
+        dto.setAddress(user.getAddress());
+        
+        return dto;
     }
     
     @DeleteMapping("/{id}")

@@ -18,11 +18,13 @@ import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
@@ -218,11 +220,22 @@ public class UserService {
     }
 
     public User updateFromRequest(UUID id, com.z7design.secured_guard.dto.UpdateUserRequest request) {
+        log.info("Atualizando usuário {} com dados: name={}, email={}, username={}, roles={}", 
+                id, request.getName(), request.getEmail(), request.getUsername(), request.getRoles());
+        
         User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
         if (!StringUtils.hasText(request.getName())) {
             throw new IllegalArgumentException("Nome não pode ser vazio");
+        }
+        
+        if (!StringUtils.hasText(request.getEmail())) {
+            throw new IllegalArgumentException("Email não pode ser vazio");
+        }
+        
+        if (!StringUtils.hasText(request.getUsername())) {
+            throw new IllegalArgumentException("Username não pode ser vazio");
         }
 
         // Validar username único (se estiver sendo alterado)
@@ -281,10 +294,58 @@ public class UserService {
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
             var roleNames = request.getRoles(); // Já é uma lista de strings
             var rolesFromDb = roleRepository.findByNames(roleNames);
+            
+            // Validar se pelo menos um role foi encontrado
+            if (rolesFromDb.isEmpty()) {
+                throw new IllegalArgumentException("Nenhum role válido encontrado. Roles fornecidos: " + roleNames);
+            }
+            
+            // Verificar se todos os roles solicitados foram encontrados
+            if (rolesFromDb.size() < roleNames.size()) {
+                var foundRoleNames = rolesFromDb.stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toSet());
+                var missingRoles = roleNames.stream().filter(name -> !foundRoleNames.contains(name)).collect(java.util.stream.Collectors.toList());
+                log.warn("Alguns roles não foram encontrados: {}", missingRoles);
+            }
+            
             existingUser.setRoles(new java.util.HashSet<>(rolesFromDb));
+            log.info("Roles atualizadas para usuário {}: {}", id, rolesFromDb.stream().map(r -> r.getName()).collect(java.util.stream.Collectors.toList()));
+        } else {
+            log.info("Roles não fornecidas no request, mantendo roles existentes para usuário {}", id);
+        }
+        
+        // Atualizar campos de informações adicionais (opcionais - só atualiza se fornecidos)
+        if (request.getAvatar() != null) {
+            existingUser.setAvatar(request.getAvatar().trim().isEmpty() ? null : request.getAvatar());
+        }
+        
+        if (request.getDepartment() != null) {
+            existingUser.setDepartment(request.getDepartment().trim().isEmpty() ? null : request.getDepartment());
+        }
+        
+        if (request.getPosition() != null) {
+            existingUser.setPosition(request.getPosition().trim().isEmpty() ? null : request.getPosition());
+        }
+        
+        if (request.getEmployeeCode() != null) {
+            existingUser.setEmployeeCode(request.getEmployeeCode().trim().isEmpty() ? null : request.getEmployeeCode());
+        }
+        
+        if (request.getPhone() != null) {
+            existingUser.setPhone(request.getPhone().trim().isEmpty() ? null : request.getPhone());
+        }
+        
+        if (request.getAddress() != null) {
+            existingUser.setAddress(request.getAddress().trim().isEmpty() ? null : request.getAddress());
         }
 
-        return userRepository.save(existingUser);
+        try {
+            User savedUser = userRepository.save(existingUser);
+            log.info("Usuário {} atualizado com sucesso", id);
+            return savedUser;
+        } catch (Exception e) {
+            log.error("Erro ao salvar usuário {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Erro ao salvar usuário: " + e.getMessage(), e);
+        }
     }
 
     public void delete(UUID id) {
