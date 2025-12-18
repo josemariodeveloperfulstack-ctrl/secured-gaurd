@@ -158,11 +158,22 @@ public class GlobalExceptionHandler {
         log.error("Erro interno do servidor: {}", ex.getMessage(), ex);
         
         // Log específico para debugging
-        if (request.getDescription(false).contains("/auth/login")) {
+        String requestPath = request.getDescription(false);
+        if (requestPath.contains("/auth/login")) {
             log.error("ERRO NO LOGIN - Classe da exceção: {}", ex.getClass().getName());
             log.error("ERRO NO LOGIN - Stack trace completo: ", ex);
             if (ex.getCause() != null) {
                 log.error("ERRO NO LOGIN - Causa raiz: {}", ex.getCause().getMessage());
+            }
+        } else if (requestPath.contains("/work-posts/all")) {
+            log.error("ERRO NO WORK-POSTS/ALL - Classe da exceção: {}", ex.getClass().getName());
+            log.error("ERRO NO WORK-POSTS/ALL - Mensagem: {}", ex.getMessage());
+            log.error("ERRO NO WORK-POSTS/ALL - Stack trace completo: ", ex);
+            if (ex.getCause() != null) {
+                log.error("ERRO NO WORK-POSTS/ALL - Causa raiz: {}", ex.getCause().getMessage());
+                if (ex.getCause().getCause() != null) {
+                    log.error("ERRO NO WORK-POSTS/ALL - Causa da causa: {}", ex.getCause().getCause().getMessage());
+                }
             }
         }
         

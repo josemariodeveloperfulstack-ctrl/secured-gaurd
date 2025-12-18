@@ -16,6 +16,7 @@ import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,27 +43,56 @@ public class WorkPostService {
     // Métodos básicos CRUD
     @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
+        log.info("🔍 WorkPostService.findAll() - Iniciando busca de postos");
         try {
-            log.info("🔍 Buscando postos com relacionamentos carregados via EntityGraph");
+            log.info("🔍 Tentando buscar postos com relacionamentos carregados via EntityGraph");
             // Usar método com @EntityGraph para carregar relacionamentos e evitar lazy loading
             List<WorkPost> workPosts = workPostRepository.findAllWithRelationships();
-            log.info("✅ Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
-            return workPosts != null ? workPosts : List.of();
-        } catch (Exception e) {
-            log.error("❌ Erro ao buscar postos: {}", e.getMessage(), e);
-            log.error("❌ Stack trace completo: ", e);
-            // Se falhar com EntityGraph, tentar findAll simples como fallback
-            try {
-                log.warn("⚠️ Tentando findAll simples como fallback");
-                List<WorkPost> workPosts = workPostRepository.findAll();
-                log.info("✅ Fallback: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
-                return workPosts != null ? workPosts : List.of();
-            } catch (Exception fallbackException) {
-                log.error("❌ Erro também no fallback: {}", fallbackException.getMessage(), fallbackException);
-                // Retornar lista vazia em vez de lançar exceção para evitar 500
-                log.warn("⚠️ Retornando lista vazia devido a erro na busca");
+            log.info("✅ EntityGraph: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
+            
+            if (workPosts == null) {
+                log.warn("⚠️ EntityGraph retornou null, usando lista vazia");
                 return List.of();
             }
+            
+            return workPosts;
+            
+        } catch (DataAccessException e) {
+            log.warn("⚠️ Erro de acesso a dados ao usar EntityGraph: {} - Tipo: {}", e.getMessage(), e.getClass().getSimpleName());
+            log.warn("⚠️ Tentando findAll simples como fallback");
+            return findAllFallback();
+        } catch (Exception e) {
+            String exceptionType = e.getClass().getName();
+            // Detectar problemas relacionados a lazy loading ou transações
+            if (exceptionType.contains("LazyInitialization") || 
+                exceptionType.contains("Transaction") ||
+                exceptionType.contains("Session")) {
+                log.warn("⚠️ Problema detectado ({}) ao usar EntityGraph: {}", exceptionType, e.getMessage());
+                log.warn("⚠️ Tentando findAll simples como fallback");
+                return findAllFallback();
+            }
+            log.error("❌ Erro inesperado ao buscar postos: {} - Tipo: {}", e.getMessage(), exceptionType);
+            log.error("❌ Stack trace completo: ", e);
+            log.warn("⚠️ Tentando findAll simples como fallback");
+            return findAllFallback();
+        }
+    }
+    
+    /**
+     * Fallback para buscar postos sem EntityGraph (mais seguro em ambientes com problemas de transação)
+     */
+    private List<WorkPost> findAllFallback() {
+        try {
+            log.info("🔍 Fallback: Buscando postos com findAll() simples");
+            List<WorkPost> workPosts = workPostRepository.findAll();
+            log.info("✅ Fallback: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
+            return workPosts != null ? workPosts : List.of();
+        } catch (Exception fallbackException) {
+            log.error("❌ Erro também no fallback: {} - Tipo: {}", fallbackException.getMessage(), fallbackException.getClass().getName());
+            log.error("❌ Stack trace do fallback: ", fallbackException);
+            // Retornar lista vazia em vez de lançar exceção para evitar 500
+            log.warn("⚠️ Retornando lista vazia devido a erro na busca");
+            return List.of();
         }
     }
     
