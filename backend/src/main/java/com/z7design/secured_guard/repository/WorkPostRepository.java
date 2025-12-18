@@ -101,6 +101,9 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     boolean existsByPostCode(String postCode);
     
     // Buscar todos os postos com relacionamentos carregados (para evitar lazy loading)
+    // Precisamos de uma @Query explícita, pois o Spring Data não consegue
+    // derivar automaticamente um método chamado "findAllWithRelationships"
     @EntityGraph(attributePaths = {"client", "contract", "responsible"})
+    @Query("SELECT wp FROM WorkPost wp")
     List<WorkPost> findAllWithRelationships();
 }
