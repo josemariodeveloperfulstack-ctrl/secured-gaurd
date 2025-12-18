@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.ArrayList;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.*;
@@ -60,6 +61,7 @@ public class Training {
     
     @OneToMany(mappedBy = "training")
     @JsonIgnoreProperties("training")
+    @JsonIgnore // Ignorar na serialização JSON para evitar LazyInitializationException
     @Builder.Default
     private List<EmployeeCertification> certifications = new ArrayList<>();
     
