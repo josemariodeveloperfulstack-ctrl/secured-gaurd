@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.JobVacancyDTO;
 import com.z7design.secured_guard.model.enums.VacancyStatus;
 import com.z7design.secured_guard.service.JobVacancyService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
+@Slf4j
 public class JobVacancyController {
     
     @Autowired
@@ -52,9 +54,21 @@ public class JobVacancyController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String position,
             @RequestParam(required = false) String location) {
-        
-        List<JobVacancyDTO> vacancies = jobVacancyService.getJobVacanciesWithFilters(status, position, location);
-        return ResponseEntity.ok(vacancies);
+        try {
+            log.info("GET /api/hr/vacancies - Buscando vagas com filtros: status={}, position={}, location={}", 
+                    status, position, location);
+            List<JobVacancyDTO> vacancies = jobVacancyService.getJobVacanciesWithFilters(status, position, location);
+            log.info("✅ Vagas retornadas: {} registros", vacancies.size());
+            return ResponseEntity.ok(vacancies);
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar vagas", e);
+            log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+            log.error("❌ Mensagem: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("❌ Causa: {}", e.getCause().getMessage());
+            }
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
     
     // Buscar vaga por ID (admin)

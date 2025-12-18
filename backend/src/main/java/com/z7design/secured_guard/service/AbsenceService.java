@@ -28,42 +28,21 @@ public class AbsenceService {
     public List<Absence> getAllAbsences() {
         try {
             log.info("Buscando todas as faltas com relacionamentos");
-            // Primeiro tentar com JPQL
-            try {
-                List<Absence> absences = absenceRepository.findAllWithRelationships();
-                log.info("✅ Faltas encontradas com JPQL: {} registros", absences.size());
-                return absences;
-            } catch (Exception e1) {
-                log.warn("⚠️ Erro com JPQL, tentando método padrão: {}", e1.getMessage());
-                // Se falhar, usar findAll() padrão e carregar relações manualmente
-                List<Absence> absences = absenceRepository.findAll();
-                log.info("✅ Faltas encontradas (método padrão): {} registros", absences.size());
-                // Forçar inicialização das relações dentro da transação
-                for (Absence absence : absences) {
-                    try {
-                        if (absence.getEmployee() != null) {
-                            absence.getEmployee().getName(); // Forçar inicialização
-                        }
-                        if (absence.getCoverageEmployee() != null) {
-                            absence.getCoverageEmployee().getName(); // Forçar inicialização
-                        }
-                        if (absence.getApprovedBy() != null) {
-                            absence.getApprovedBy().getName(); // Forçar inicialização
-                        }
-                    } catch (Exception e2) {
-                        log.warn("⚠️ Erro ao inicializar relações da falta {}: {}", absence.getId(), e2.getMessage());
-                    }
-                }
-                return absences;
-            }
+            List<Absence> absences = absenceRepository.findAllWithRelationships();
+            log.info("✅ Faltas encontradas: {} registros", absences.size());
+            return absences;
         } catch (Exception e) {
-            log.error("❌ Erro ao buscar faltas", e);
+            log.error("❌ Erro ao buscar faltas com relacionamentos", e);
             log.error("❌ Tipo de exceção: {}", e.getClass().getName());
             log.error("❌ Mensagem: {}", e.getMessage());
             if (e.getCause() != null) {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
                 log.error("❌ Tipo da causa: {}", e.getCause().getClass().getName());
+                if (e.getCause().getCause() != null) {
+                    log.error("❌ Causa da causa: {}", e.getCause().getCause().getMessage());
+                }
             }
+            log.error("❌ Stack trace completo:", e);
             throw new RuntimeException("Erro ao buscar faltas: " + e.getMessage(), e);
         }
     }
