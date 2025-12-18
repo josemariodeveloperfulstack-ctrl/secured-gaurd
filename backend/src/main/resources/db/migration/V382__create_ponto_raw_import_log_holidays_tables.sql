@@ -187,3 +187,4 @@ INSERT INTO permissions (id, name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 
+

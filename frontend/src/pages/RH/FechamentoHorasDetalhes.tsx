@@ -368,3 +368,4 @@ const FechamentoHorasDetalhes: React.FC = () => {
 export default FechamentoHorasDetalhes;
 
 
+

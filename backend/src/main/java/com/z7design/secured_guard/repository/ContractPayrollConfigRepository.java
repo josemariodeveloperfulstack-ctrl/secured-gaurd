@@ -16,3 +16,4 @@ public interface ContractPayrollConfigRepository extends JpaRepository<ContractP
 }
 
 
+
