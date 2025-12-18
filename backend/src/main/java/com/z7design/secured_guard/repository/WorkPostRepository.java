@@ -98,4 +98,11 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     
     // Verificar se código do posto já existe
     boolean existsByPostCode(String postCode);
+    
+    // Buscar todos os postos com relacionamentos carregados (para evitar lazy loading)
+    @Query("SELECT DISTINCT wp FROM WorkPost wp " +
+           "LEFT JOIN FETCH wp.client " +
+           "LEFT JOIN FETCH wp.contract " +
+           "LEFT JOIN FETCH wp.responsible")
+    List<WorkPost> findAllWithRelationships();
 }

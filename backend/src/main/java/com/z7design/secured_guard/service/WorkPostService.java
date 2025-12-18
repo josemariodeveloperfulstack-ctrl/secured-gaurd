@@ -43,17 +43,26 @@ public class WorkPostService {
     @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
         try {
-            log.info("🔍 Buscando postos usando findAll simples");
-            // Usar findAll simples primeiro para garantir que funcione
-            List<WorkPost> workPosts = workPostRepository.findAll();
+            log.info("🔍 Buscando postos com relacionamentos carregados");
+            // Usar query com JOIN FETCH para carregar relacionamentos e evitar lazy loading
+            List<WorkPost> workPosts = workPostRepository.findAllWithRelationships();
             log.info("✅ Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
             return workPosts != null ? workPosts : List.of();
         } catch (Exception e) {
             log.error("❌ Erro ao buscar postos: {}", e.getMessage(), e);
             log.error("❌ Stack trace: ", e);
-            // Retornar lista vazia em vez de lançar exceção para evitar 500
-            log.warn("⚠️ Retornando lista vazia devido a erro na busca");
-            return List.of();
+            // Se falhar com JOIN FETCH, tentar findAll simples
+            try {
+                log.warn("⚠️ Tentando findAll simples como fallback");
+                List<WorkPost> workPosts = workPostRepository.findAll();
+                log.info("✅ Fallback: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
+                return workPosts != null ? workPosts : List.of();
+            } catch (Exception fallbackException) {
+                log.error("❌ Erro também no fallback: {}", fallbackException.getMessage(), fallbackException);
+                // Retornar lista vazia em vez de lançar exceção para evitar 500
+                log.warn("⚠️ Retornando lista vazia devido a erro na busca");
+                return List.of();
+            }
         }
     }
     
