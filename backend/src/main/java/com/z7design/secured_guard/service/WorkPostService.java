@@ -43,15 +43,15 @@ public class WorkPostService {
     @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
         try {
-            log.info("🔍 Buscando postos com relacionamentos carregados");
-            // Usar query com JOIN FETCH para carregar relacionamentos e evitar lazy loading
+            log.info("🔍 Buscando postos com relacionamentos carregados via EntityGraph");
+            // Usar método com @EntityGraph para carregar relacionamentos e evitar lazy loading
             List<WorkPost> workPosts = workPostRepository.findAllWithRelationships();
             log.info("✅ Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
             return workPosts != null ? workPosts : List.of();
         } catch (Exception e) {
             log.error("❌ Erro ao buscar postos: {}", e.getMessage(), e);
-            log.error("❌ Stack trace: ", e);
-            // Se falhar com JOIN FETCH, tentar findAll simples
+            log.error("❌ Stack trace completo: ", e);
+            // Se falhar com EntityGraph, tentar findAll simples como fallback
             try {
                 log.warn("⚠️ Tentando findAll simples como fallback");
                 List<WorkPost> workPosts = workPostRepository.findAll();

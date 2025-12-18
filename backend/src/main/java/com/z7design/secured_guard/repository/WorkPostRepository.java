@@ -5,6 +5,7 @@ import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -100,9 +101,6 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     boolean existsByPostCode(String postCode);
     
     // Buscar todos os postos com relacionamentos carregados (para evitar lazy loading)
-    @Query("SELECT DISTINCT wp FROM WorkPost wp " +
-           "LEFT JOIN FETCH wp.client " +
-           "LEFT JOIN FETCH wp.contract " +
-           "LEFT JOIN FETCH wp.responsible")
+    @EntityGraph(attributePaths = {"client", "contract", "responsible"})
     List<WorkPost> findAllWithRelationships();
 }
