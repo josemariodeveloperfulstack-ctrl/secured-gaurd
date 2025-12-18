@@ -64,7 +64,7 @@ public class WorkPostDTO {
     
     // Relacionamentos
     @Schema(description = "ID do cliente", example = "1")
-    @NotNull(message = "ID do cliente é obrigatório")
+    // Removido @NotNull porque client pode ser null na entidade WorkPost
     private java.util.UUID clientId;
     
     @Schema(description = "ID do contrato", example = "1")

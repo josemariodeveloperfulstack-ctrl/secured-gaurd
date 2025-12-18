@@ -43,23 +43,17 @@ public class WorkPostService {
     @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
         try {
-            log.debug("Buscando postos com relacionamentos usando findAllWithRelations");
-            List<WorkPost> workPosts = workPostRepository.findAllWithRelations();
-            log.debug("Encontrados {} postos com relacionamentos", workPosts.size());
-            return workPosts;
+            log.info("🔍 Buscando postos usando findAll simples");
+            // Usar findAll simples primeiro para garantir que funcione
+            List<WorkPost> workPosts = workPostRepository.findAll();
+            log.info("✅ Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
+            return workPosts != null ? workPosts : List.of();
         } catch (Exception e) {
-            log.error("Erro ao buscar postos com relacionamentos, tentando busca simples: {}", e.getMessage(), e);
-            // Fallback para busca simples se houver erro com JOIN FETCH
-            try {
-                List<WorkPost> workPosts = workPostRepository.findAll();
-                log.debug("Fallback: Encontrados {} postos sem relacionamentos", workPosts.size());
-                return workPosts;
-            } catch (Exception fallbackError) {
-                log.error("Erro também no fallback findAll: {}", fallbackError.getMessage(), fallbackError);
-                // Retornar lista vazia em vez de lançar exceção para evitar 500
-                log.warn("Retornando lista vazia devido a erro na busca");
-                return List.of();
-            }
+            log.error("❌ Erro ao buscar postos: {}", e.getMessage(), e);
+            log.error("❌ Stack trace: ", e);
+            // Retornar lista vazia em vez de lançar exceção para evitar 500
+            log.warn("⚠️ Retornando lista vazia devido a erro na busca");
+            return List.of();
         }
     }
     
@@ -270,6 +264,7 @@ public class WorkPostService {
     }
     
     // Métodos para conversão DTO
+    @Transactional(readOnly = true)
     public WorkPostDTO convertToDTO(WorkPost workPost) {
         if (workPost == null) {
             return null;
@@ -290,7 +285,7 @@ public class WorkPostService {
             dto.setStatus(workPost.getStatus());
         }
         
-        // Tratar relacionamentos de forma segura
+        // Tratar relacionamentos de forma segura - capturar LazyInitializationException
         try {
             if (workPost.getClient() != null) {
                 try {
@@ -298,18 +293,28 @@ public class WorkPostService {
                     dto.setClientName(workPost.getClient().getName());
                     dto.setClientCnpj(workPost.getClient().getCnpj() != null ? workPost.getClient().getCnpj() : "N/A");
                 } catch (Exception e) {
-                    log.warn("Erro ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
-                    dto.setClientName("Cliente não encontrado");
-                    dto.setClientCnpj("N/A");
+                    // Captura qualquer exceção (incluindo LazyInitializationException)
+                    String exceptionType = e.getClass().getSimpleName();
+                    if (exceptionType.contains("LazyInitialization")) {
+                        log.warn("LazyInitializationException ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                        dto.setClientName("Cliente não disponível");
+                        dto.setClientCnpj("N/A");
+                    } else {
+                        log.warn("Erro ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                        dto.setClientName("Cliente não encontrado");
+                        dto.setClientCnpj("N/A");
+                    }
                 }
             } else {
                 // Cliente não encontrado - definir valores padrão
+                dto.setClientId(null);
                 dto.setClientName("Cliente não encontrado");
                 dto.setClientCnpj("N/A");
             }
         } catch (Exception e) {
             log.warn("Erro ao processar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
             // Em caso de erro ao acessar o cliente, definir valores padrão
+            dto.setClientId(null);
             dto.setClientName("Cliente não encontrado");
             dto.setClientCnpj("N/A");
         }
@@ -350,23 +355,27 @@ public class WorkPostService {
         return workPosts.map(this::convertToDTO);
     }
     
+    @Transactional(readOnly = true)
     public List<WorkPostDTO> convertToDTOList(List<WorkPost> workPosts) {
-        if (workPosts == null) {
+        if (workPosts == null || workPosts.isEmpty()) {
             return List.of();
         }
-        
-        return workPosts.stream()
-                .map(workPost -> {
-                    try {
-                        return convertToDTO(workPost);
-                    } catch (Exception e) {
-                        log.error("Erro ao converter WorkPost {} para DTO: {}", 
-                                workPost != null ? workPost.getId() : "null", e.getMessage(), e);
-                        return null;
-                    }
-                })
-                .filter(dto -> dto != null) // Filtrar DTOs nulos
-                .toList();
+
+        List<WorkPostDTO> dtos = new java.util.ArrayList<>();
+        for (WorkPost workPost : workPosts) {
+            try {
+                WorkPostDTO dto = convertToDTO(workPost);
+                if (dto != null) {
+                    // Adicionar DTO mesmo se clientId for null (é permitido agora)
+                    dtos.add(dto);
+                }
+            } catch (Exception e) {
+                log.error("Erro ao converter WorkPost {} para DTO: {}",
+                        workPost != null ? workPost.getId() : "null", e.getMessage(), e);
+                // Continuar processando os outros
+            }
+        }
+        return dtos;
     }
     
     private void updateWorkPostFromDTO(WorkPost workPost, WorkPostDTO dto) {

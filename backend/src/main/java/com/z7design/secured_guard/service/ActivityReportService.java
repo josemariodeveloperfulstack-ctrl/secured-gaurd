@@ -12,9 +12,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -352,11 +361,205 @@ public class ActivityReportService {
         return ActivityReportDTO.fromEntity(rejectedReport);
     }
 
-    // TODO: Implement generatePDFReport logic (e.g., using a reporting library)
     public byte[] generatePDFReport(UUID employeeId, UUID clientId, LocalDate startDate, LocalDate endDate) {
-        log.warn("PDF report generation is not yet implemented.");
-        // For now, return a dummy byte array
-        String dummyContent = "Activity Report PDF - Not Implemented Yet!";
-        return dummyContent.getBytes();
+        log.info("Gerando relatório PDF de atividades - EmployeeId: {}, ClientId: {}, StartDate: {}, EndDate: {}",
+                employeeId, clientId, startDate, endDate);
+
+        // Buscar relatórios com os filtros
+        ActivityReportStatus status = null; // Buscar todos os status
+        UUID workPostId = null;
+        UUID supervisorId = null;
+        
+        List<ActivityReportDTO> reports = getActivityReports(employeeId, clientId, workPostId, startDate, endDate, status, supervisorId);
+        log.info("Total de relatórios encontrados para o PDF: {}", reports.size());
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE ATIVIDADES")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+
+            // Filtros aplicados
+            if (employeeId != null || clientId != null || startDate != null || endDate != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+
+                if (startDate != null && endDate != null) {
+                    document.add(new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                            " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                } else if (startDate != null) {
+                    document.add(new Paragraph("Data inicial: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                } else if (endDate != null) {
+                    document.add(new Paragraph("Data final: " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+
+            // Estatísticas
+            long totalReports = reports.size();
+            long presentCount = reports.stream()
+                    .filter(r -> r.getAbsenceStatus() != null && r.getAbsenceStatus().name().equals("PRESENT"))
+                    .count();
+            long absentCount = reports.stream()
+                    .filter(r -> r.getAbsenceStatus() != null && r.getAbsenceStatus().name().equals("ABSENT"))
+                    .count();
+
+            Paragraph stats = new Paragraph(String.format(
+                    "Total de relatórios: %d | Presentes: %d | Ausentes: %d",
+                    totalReports, presentCount, absentCount))
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(stats);
+
+            // Tabela de relatórios
+            if (reports.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhum relatório encontrado com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Funcionário"));
+                table.addHeaderCell(createHeaderCell("Cliente"));
+                table.addHeaderCell(createHeaderCell("Posto"));
+                table.addHeaderCell(createHeaderCell("Horário"));
+                table.addHeaderCell(createHeaderCell("Presença"));
+                table.addHeaderCell(createHeaderCell("Status"));
+
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (ActivityReportDTO report : reports) {
+                    table.addCell(createCell(report.getDate() != null ? report.getDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(report.getEmployeeName() != null ? report.getEmployeeName() : ""));
+                    table.addCell(createCell(report.getClientName() != null ? report.getClientName() : ""));
+                    table.addCell(createCell(report.getWorkPostName() != null ? report.getWorkPostName() : ""));
+                    
+                    String timeRange = "";
+                    if (report.getStartTime() != null && report.getEndTime() != null) {
+                        timeRange = report.getStartTime() + " - " + report.getEndTime();
+                    } else if (report.getStartTime() != null) {
+                        timeRange = report.getStartTime();
+                    }
+                    table.addCell(createCell(timeRange));
+                    
+                    String absenceStatus = report.getAbsenceStatus() != null ? 
+                            getAbsenceStatusLabel(report.getAbsenceStatus().name()) : "";
+                    table.addCell(createCell(absenceStatus));
+                    
+                    String statusLabel = report.getStatus() != null ? 
+                            getStatusLabel(report.getStatus().name()) : "";
+                    table.addCell(createCell(statusLabel));
+                }
+
+                document.add(table);
+            }
+
+            document.close();
+            pdfDoc.close();
+            writer.close();
+
+            byte[] pdfBytes = baos.toByteArray();
+            log.info("PDF gerado com sucesso. Tamanho: {} bytes", pdfBytes.length);
+            return pdfBytes;
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de relatórios de atividade: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
+        } finally {
+            try {
+                if (document != null && !document.isClosed()) {
+                    document.close();
+                }
+                if (pdfDoc != null && !pdfDoc.isClosed()) {
+                    pdfDoc.close();
+                }
+                if (writer != null) {
+                    writer.close();
+                }
+            } catch (Exception e) {
+                log.error("Erro ao fechar recursos do PDF: {}", e.getMessage());
+            }
+        }
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(51, 51, 51))
+                .setFontColor(com.itextpdf.kernel.colors.ColorConstants.WHITE)
+                .setPadding(8);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setPadding(6);
+    }
+
+    private String getStatusLabel(String status) {
+        if (status == null) return "";
+        switch (status) {
+            case "DRAFT": return "Rascunho";
+            case "SUBMITTED": return "Enviado";
+            case "APPROVED": return "Aprovado";
+            case "REJECTED": return "Rejeitado";
+            default: return status;
+        }
+    }
+
+    private String getAbsenceStatusLabel(String status) {
+        if (status == null) return "";
+        switch (status) {
+            case "PRESENT": return "Presente";
+            case "ABSENT": return "Ausente";
+            case "LATE": return "Atraso";
+            case "MEDICAL_LEAVE": return "Atestado";
+            case "JUSTIFIED": return "Justificado";
+            default: return status;
+        }
     }
 }

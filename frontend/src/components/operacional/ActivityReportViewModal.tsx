@@ -88,14 +88,22 @@ const ActivityReportViewModal: React.FC<ActivityReportViewModalProps> = ({
       }
       
       const blob = response.data;
+      
+      // Verificar se o blob é realmente um PDF válido
+      if (blob.type && !blob.type.includes('pdf') && !blob.type.includes('application/octet-stream')) {
+        console.warn('⚠️ Tipo MIME inesperado:', blob.type);
+        // Mesmo assim, tentar processar como PDF
+      }
+      
       setPdfBlob(blob);
       
+      // Criar URL do blob para visualização
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
 
       toast({
         title: 'Sucesso',
-        description: 'PDF gerado com sucesso!',
+        description: `PDF gerado com sucesso! (${Math.round(blob.size / 1024)} KB)`,
       });
     } catch (error: any) {
       console.error('❌ Erro ao gerar PDF:', error);
@@ -128,7 +136,24 @@ const ActivityReportViewModal: React.FC<ActivityReportViewModalProps> = ({
   };
 
   const handleOpenPDF = () => {
-    if (pdfUrl) {
+    if (pdfBlob) {
+      // Criar uma nova URL do blob para abrir em nova aba
+      const url = URL.createObjectURL(pdfBlob);
+      const newWindow = window.open(url, '_blank');
+      if (newWindow) {
+        // Revogar a URL após um tempo para liberar memória
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 100);
+      } else {
+        toast({
+          title: 'Aviso',
+          description: 'Por favor, permita pop-ups para abrir o PDF.',
+          variant: 'default',
+        });
+      }
+    } else if (pdfUrl) {
+      // Fallback para usar a URL existente
       window.open(pdfUrl, '_blank');
     }
   };

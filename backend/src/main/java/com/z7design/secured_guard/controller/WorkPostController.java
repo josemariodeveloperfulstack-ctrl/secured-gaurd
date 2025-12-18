@@ -62,39 +62,41 @@ public class WorkPostController {
         @ApiResponse(responseCode = "403", description = "Acesso negado"),
         @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<List<WorkPostDTO>> getAllWorkPostsNoPagination() {
+    public ResponseEntity<?> getAllWorkPostsNoPagination() {
         log.info("🔍 Buscando todos os postos de trabalho");
         try {
-            List<WorkPost> workPosts = workPostService.findAll();
-            log.info("✅ Encontrados {} postos de trabalho", workPosts != null ? workPosts.size() : 0);
-            
-            if (workPosts == null || workPosts.isEmpty()) {
-                log.warn("⚠️ Nenhum posto de trabalho encontrado");
+            // Buscar postos primeiro
+            List<WorkPost> workPosts;
+            try {
+                workPosts = workPostService.findAll();
+                log.info("✅ Encontrados {} postos de trabalho", workPosts != null ? workPosts.size() : 0);
+            } catch (Exception e) {
+                log.error("❌ Erro ao buscar postos de trabalho no banco: {}", e.getMessage(), e);
                 return ResponseEntity.ok(List.of());
             }
             
-            // Tentar converter cada item individualmente para identificar qual está causando problema
-            List<WorkPostDTO> workPostDTOs = new java.util.ArrayList<>();
-            for (int i = 0; i < workPosts.size(); i++) {
-                WorkPost wp = workPosts.get(i);
-                try {
-                    WorkPostDTO dto = workPostService.convertToDTO(wp);
-                    if (dto != null) {
-                        workPostDTOs.add(dto);
-                    }
-                } catch (Exception e) {
-                    log.error("❌ Erro ao converter WorkPost[{}] (ID: {}): {}", i, wp != null ? wp.getId() : "null", e.getMessage(), e);
-                    // Continuar processando os outros
-                }
+            // Converter para DTO
+            List<WorkPostDTO> workPostDTOs;
+            try {
+                workPostDTOs = workPostService.convertToDTOList(workPosts);
+                log.info("✅ Convertidos {} DTOs de postos de trabalho", workPostDTOs != null ? workPostDTOs.size() : 0);
+            } catch (Exception e) {
+                log.error("❌ Erro ao converter postos para DTO: {}", e.getMessage(), e);
+                return ResponseEntity.ok(List.of());
             }
             
-            log.info("✅ Convertidos {} DTOs de postos de trabalho (de {} originais)", workPostDTOs.size(), workPosts.size());
-            return ResponseEntity.ok(workPostDTOs);
+            return ResponseEntity.ok(workPostDTOs != null ? workPostDTOs : List.of());
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            log.error("❌ Acesso negado ao buscar postos de trabalho: {}", e.getMessage());
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
-            log.error("❌ Erro ao buscar postos de trabalho: {}", e.getMessage(), e);
+            log.error("❌ Erro geral ao buscar postos de trabalho: {}", e.getMessage(), e);
             log.error("❌ Tipo da exceção: {}", e.getClass().getName());
             if (e.getCause() != null) {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
+                if (e.getCause().getCause() != null) {
+                    log.error("❌ Causa da causa: {}", e.getCause().getCause().getMessage());
+                }
             }
             // Retornar lista vazia em vez de lançar exceção para evitar 500
             log.warn("⚠️ Retornando lista vazia devido a erro");
