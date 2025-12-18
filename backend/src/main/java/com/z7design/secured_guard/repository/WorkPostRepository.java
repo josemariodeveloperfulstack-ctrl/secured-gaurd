@@ -99,8 +99,4 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     
     // Verificar se código do posto já existe
     boolean existsByPostCode(String postCode);
-    
-    // Buscar todos os postos com relacionamentos carregados (para evitar lazy loading)
-    @EntityGraph(attributePaths = {"client", "contract", "responsible"})
-    List<WorkPost> findAllWithRelationships();
 }

@@ -15,6 +15,7 @@ import com.z7design.secured_guard.repository.ContractRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,26 +44,16 @@ public class WorkPostService {
     @Transactional(readOnly = true)
     public List<WorkPost> findAll() {
         try {
-            log.info("🔍 Buscando postos com relacionamentos carregados via EntityGraph");
-            // Usar método com @EntityGraph para carregar relacionamentos e evitar lazy loading
-            List<WorkPost> workPosts = workPostRepository.findAllWithRelationships();
+            log.info("🔍 Buscando postos de trabalho");
+            List<WorkPost> workPosts = workPostRepository.findAll();
             log.info("✅ Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
             return workPosts != null ? workPosts : List.of();
         } catch (Exception e) {
             log.error("❌ Erro ao buscar postos: {}", e.getMessage(), e);
-            log.error("❌ Stack trace completo: ", e);
-            // Se falhar com EntityGraph, tentar findAll simples como fallback
-            try {
-                log.warn("⚠️ Tentando findAll simples como fallback");
-                List<WorkPost> workPosts = workPostRepository.findAll();
-                log.info("✅ Fallback: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
-                return workPosts != null ? workPosts : List.of();
-            } catch (Exception fallbackException) {
-                log.error("❌ Erro também no fallback: {}", fallbackException.getMessage(), fallbackException);
-                // Retornar lista vazia em vez de lançar exceção para evitar 500
-                log.warn("⚠️ Retornando lista vazia devido a erro na busca");
-                return List.of();
-            }
+            log.error("❌ Stack trace: ", e);
+            // Retornar lista vazia em vez de lançar exceção para evitar 500
+            log.warn("⚠️ Retornando lista vazia devido a erro na busca");
+            return List.of();
         }
     }
     
@@ -294,67 +285,56 @@ public class WorkPostService {
             dto.setStatus(workPost.getStatus());
         }
         
-        // Tratar relacionamentos de forma segura - capturar LazyInitializationException
+        // Inicializar relacionamentos lazy dentro da transação usando Hibernate.initialize()
         try {
+            Hibernate.initialize(workPost.getClient());
             if (workPost.getClient() != null) {
                 try {
                     dto.setClientId(workPost.getClient().getId());
                     dto.setClientName(workPost.getClient().getName());
                     dto.setClientCnpj(workPost.getClient().getCnpj() != null ? workPost.getClient().getCnpj() : "N/A");
                 } catch (Exception e) {
-                    // Captura qualquer exceção (incluindo LazyInitializationException)
-                    String exceptionType = e.getClass().getSimpleName();
-                    if (exceptionType.contains("LazyInitialization")) {
-                        log.warn("LazyInitializationException ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
-                        dto.setClientName("Cliente não disponível");
-                        dto.setClientCnpj("N/A");
-                    } else {
-                        log.warn("Erro ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
-                        dto.setClientName("Cliente não encontrado");
-                        dto.setClientCnpj("N/A");
-                    }
+                    log.warn("Erro ao acessar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                    dto.setClientName("Cliente não encontrado");
+                    dto.setClientCnpj("N/A");
                 }
             } else {
-                // Cliente não encontrado - definir valores padrão
                 dto.setClientId(null);
                 dto.setClientName("Cliente não encontrado");
                 dto.setClientCnpj("N/A");
             }
         } catch (Exception e) {
             log.warn("Erro ao processar cliente do WorkPost {}: {}", workPost.getId(), e.getMessage());
-            // Em caso de erro ao acessar o cliente, definir valores padrão
             dto.setClientId(null);
             dto.setClientName("Cliente não encontrado");
             dto.setClientCnpj("N/A");
         }
         
         try {
+            Hibernate.initialize(workPost.getContract());
             if (workPost.getContract() != null) {
                 try {
                     dto.setContractId(workPost.getContract().getId());
                 } catch (Exception e) {
                     log.warn("Erro ao acessar contrato do WorkPost {}: {}", workPost.getId(), e.getMessage());
-                    // Não definir contractId em caso de erro
                 }
             }
         } catch (Exception e) {
             log.warn("Erro ao processar contrato do WorkPost {}: {}", workPost.getId(), e.getMessage());
-            // Contrato não encontrado - não definir contractId
         }
         
         try {
+            Hibernate.initialize(workPost.getResponsible());
             if (workPost.getResponsible() != null) {
                 try {
                     dto.setResponsibleId(workPost.getResponsible().getId());
                     dto.setResponsibleName(workPost.getResponsible().getName());
                 } catch (Exception e) {
                     log.warn("Erro ao acessar responsável do WorkPost {}: {}", workPost.getId(), e.getMessage());
-                    // Não definir responsibleId em caso de erro
                 }
             }
         } catch (Exception e) {
             log.warn("Erro ao processar responsável do WorkPost {}: {}", workPost.getId(), e.getMessage());
-            // Responsável não encontrado - não definir responsibleId
         }
         
         return dto;
