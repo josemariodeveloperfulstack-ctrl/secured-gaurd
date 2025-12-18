@@ -92,6 +92,41 @@ export interface ContasAReceberReport {
   }>;
 }
 
+// Função auxiliar para mapear tipo/categoria do backend para tipo do frontend
+function mapBackendTypeToFrontend(backendTypeOrCategory: string | undefined): 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO' {
+  if (!backendTypeOrCategory) return 'FATURA';
+  
+  const upper = backendTypeOrCategory.toUpperCase();
+  
+  // Se for uma categoria (ReceivableCategory enum)
+  switch (upper) {
+    case 'INVOICE':
+    case 'NOTE':
+    case 'ADVANCE':
+      return 'FATURA';
+    case 'SERVICE':
+      return 'SERVICO';
+    case 'PRODUCT':
+      return 'PRODUTO';
+    case 'OTHER':
+      return 'FATURA';
+  }
+  
+  // Se for um tipo antigo (para compatibilidade)
+  switch (upper) {
+    case 'FATURA':
+      return 'FATURA';
+    case 'MEDICAO':
+      return 'MEDICAO';
+    case 'SERVICO':
+      return 'SERVICO';
+    case 'PRODUTO':
+      return 'PRODUTO';
+    default:
+      return 'FATURA';
+  }
+}
+
 export const contasAReceberService = {
   // ===== CONTAS A RECEBER =====
   
@@ -125,12 +160,12 @@ export const contasAReceberService = {
       numeroFatura: account.invoiceNumber,
       dataEmissao: parseDateFromBackend(account.issueDate),
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
-      cliente: account.clientName || 'Não informado',
-      clienteId: account.clientId,
+      cliente: account.clientName || account.client?.name || 'Não informado',
+      clienteId: account.clientId || account.client?.id,
       empresa: account.unitSigla || account.unitName || 'Não informado',
       empresaId: account.unitId,
       descricao: account.description,
-      tipo: mapBackendTypeToFrontend(account.type),
+      tipo: mapBackendTypeToFrontend(account.type || account.category),
       valor: parseFloat(account.amount),
       codigoBarras: account.barcode,
       status: mapBackendStatusToFrontend(account.status),
@@ -153,12 +188,12 @@ export const contasAReceberService = {
       numeroFatura: account.invoiceNumber,
       dataEmissao: parseDateFromBackend(account.issueDate),
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
-      cliente: account.clientName || 'Não informado',
-      clienteId: account.clientId,
+      cliente: account.clientName || account.client?.name || 'Não informado',
+      clienteId: account.clientId || account.client?.id,
       empresa: account.unitSigla || account.unitName || 'Não informado',
       empresaId: account.unitId,
       descricao: account.description,
-      tipo: mapBackendTypeToFrontend(account.type),
+      tipo: mapBackendTypeToFrontend(account.type || account.category),
       valor: parseFloat(account.amount),
       codigoBarras: account.barcode,
       status: mapBackendStatusToFrontend(account.status),
@@ -449,12 +484,12 @@ export const contasAReceberService = {
       numeroFatura: account.invoiceNumber,
       dataEmissao: parseDateFromBackend(account.issueDate),
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
-      cliente: account.clientName || 'Não informado',
-      clienteId: account.clientId,
+      cliente: account.clientName || account.client?.name || 'Não informado',
+      clienteId: account.clientId || account.client?.id,
       empresa: account.unitSigla || account.unitName || 'Não informado',
       empresaId: account.unitId,
       descricao: account.description,
-      tipo: mapBackendTypeToFrontend(account.type),
+      tipo: mapBackendTypeToFrontend(account.type || account.category),
       valor: parseFloat(account.amount),
       codigoBarras: account.barcode,
       status: mapBackendStatusToFrontend(account.status),
@@ -489,22 +524,9 @@ function mapFrontendTypeToBackend(frontendType: 'FATURA' | 'MEDICAO' | 'SERVICO'
   return mapTypeToCategory(frontendType);
 }
 
-// Função auxiliar para mapear categoria do backend para tipo do frontend
+// Função auxiliar para mapear categoria do backend para tipo do frontend (mantida para compatibilidade)
 function mapCategoryToFrontendType(category: string | undefined): 'FATURA' | 'MEDICAO' | 'SERVICO' | 'PRODUTO' {
-  if (!category) return 'FATURA';
-  switch (category.toUpperCase()) {
-    case 'INVOICE':
-    case 'NOTE':
-    case 'ADVANCE':
-      return 'FATURA';
-    case 'SERVICE':
-      return 'SERVICO';
-    case 'PRODUCT':
-      return 'PRODUTO';
-    case 'OTHER':
-    default:
-      return 'FATURA';
-  }
+  return mapBackendTypeToFrontend(category);
 }
 
 // Função auxiliar para mapear status do frontend para backend

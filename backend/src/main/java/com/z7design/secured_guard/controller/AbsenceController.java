@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/absences")
 @CrossOrigin(origins = "*")
+@Slf4j
 public class AbsenceController {
 
     @Autowired
@@ -29,11 +31,23 @@ public class AbsenceController {
 
     @GetMapping
     public ResponseEntity<List<AbsenceResponse>> getAllAbsences() {
-        List<Absence> absences = absenceService.getAllAbsences();
-        List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
-        return ResponseEntity.ok(absenceResponses);
+        try {
+            log.info("GET /api/absences - Buscando todas as faltas");
+            List<Absence> absences = absenceService.getAllAbsences();
+            List<AbsenceResponse> absenceResponses = absences.stream()
+                .map(AbsenceResponse::fromEntity)
+                .toList();
+            log.info("✅ Faltas retornadas: {} registros", absenceResponses.size());
+            return ResponseEntity.ok(absenceResponses);
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar faltas", e);
+            log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+            log.error("❌ Mensagem: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("❌ Causa: {}", e.getCause().getMessage());
+            }
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/{id}")

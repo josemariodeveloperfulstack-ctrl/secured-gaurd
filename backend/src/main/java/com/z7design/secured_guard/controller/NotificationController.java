@@ -191,4 +191,22 @@ public class NotificationController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
         return ResponseEntity.ok(notificationService.findByCreatedAtBetween(startDate, endDate));
     }
+    
+    @Operation(summary = "Retorna todas as notificações",
+               description = "Retorna uma lista de todas as notificações cadastradas. Requer o papel de ADMIN ou GESTOR.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de todas as notificações",
+                    content = @Content(mediaType = "application/json", schema = @Schema(type = "array", implementation = com.z7design.secured_guard.model.Notification.class))),
+            @ApiResponse(responseCode = "403", description = "Acesso negado (papel insuficiente)",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @GetMapping
+    public ResponseEntity<List<com.z7design.secured_guard.model.Notification>> findAll() {
+        try {
+            return ResponseEntity.ok(notificationService.findAll());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 } 

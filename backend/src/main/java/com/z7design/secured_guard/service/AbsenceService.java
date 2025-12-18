@@ -7,6 +7,7 @@ import com.z7design.secured_guard.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 @Service
 @Transactional
+@Slf4j
 public class AbsenceService {
 
     @Autowired
@@ -24,7 +26,46 @@ public class AbsenceService {
     private EmployeeRepository employeeRepository;
 
     public List<Absence> getAllAbsences() {
-        return absenceRepository.findAll();
+        try {
+            log.info("Buscando todas as faltas com relacionamentos");
+            // Primeiro tentar com JPQL
+            try {
+                List<Absence> absences = absenceRepository.findAllWithRelationships();
+                log.info("✅ Faltas encontradas com JPQL: {} registros", absences.size());
+                return absences;
+            } catch (Exception e1) {
+                log.warn("⚠️ Erro com JPQL, tentando método padrão: {}", e1.getMessage());
+                // Se falhar, usar findAll() padrão e carregar relações manualmente
+                List<Absence> absences = absenceRepository.findAll();
+                log.info("✅ Faltas encontradas (método padrão): {} registros", absences.size());
+                // Forçar inicialização das relações dentro da transação
+                for (Absence absence : absences) {
+                    try {
+                        if (absence.getEmployee() != null) {
+                            absence.getEmployee().getName(); // Forçar inicialização
+                        }
+                        if (absence.getCoverageEmployee() != null) {
+                            absence.getCoverageEmployee().getName(); // Forçar inicialização
+                        }
+                        if (absence.getApprovedBy() != null) {
+                            absence.getApprovedBy().getName(); // Forçar inicialização
+                        }
+                    } catch (Exception e2) {
+                        log.warn("⚠️ Erro ao inicializar relações da falta {}: {}", absence.getId(), e2.getMessage());
+                    }
+                }
+                return absences;
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar faltas", e);
+            log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+            log.error("❌ Mensagem: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("❌ Causa: {}", e.getCause().getMessage());
+                log.error("❌ Tipo da causa: {}", e.getCause().getClass().getName());
+            }
+            throw new RuntimeException("Erro ao buscar faltas: " + e.getMessage(), e);
+        }
     }
 
     public Optional<Absence> getAbsenceById(UUID id) {

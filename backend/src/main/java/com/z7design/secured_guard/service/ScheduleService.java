@@ -264,12 +264,27 @@ public class ScheduleService {
 
     public List<Schedule> findAll() {
         try {
+            log.info("Buscando todas as escalas com relacionamentos");
             // Tentar usar o método com JOIN FETCH para carregar relacionamentos eager
-            return scheduleRepository.findAllWithRelations();
+            List<Schedule> schedules = scheduleRepository.findAllWithRelations();
+            log.info("✅ Escalas encontradas: {} registros", schedules.size());
+            return schedules;
         } catch (Exception e) {
+            log.error("❌ Erro ao buscar escalas com relacionamentos", e);
+            log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+            log.error("❌ Mensagem: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("❌ Causa: {}", e.getCause().getMessage());
+                log.error("❌ Tipo da causa: {}", e.getCause().getClass().getName());
+            }
             // Se falhar, usar o método padrão
-            System.err.println("Erro ao buscar escalas com relacionamentos: " + e.getMessage());
-            return scheduleRepository.findAll();
+            try {
+                log.info("Tentando buscar escalas com método padrão");
+                return scheduleRepository.findAll();
+            } catch (Exception e2) {
+                log.error("❌ Erro também no método padrão", e2);
+                throw new RuntimeException("Erro ao buscar escalas: " + e2.getMessage(), e2);
+            }
         }
     }
 

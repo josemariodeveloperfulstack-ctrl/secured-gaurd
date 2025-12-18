@@ -265,10 +265,22 @@ public class OccurrenceController {
     })
     @GetMapping
     public ResponseEntity<List<OccurrenceResponseDTO>> findAll() {
-        var occurrences = operationalOccurrenceService.getAllOccurrences();
-        var responseDTOs = occurrences.stream()
-            .map(operationalOccurrenceService::convertToResponseDTO)
-            .toList();
-        return ResponseEntity.ok(responseDTOs);
+        log.info("GET /api/occurrences - Buscando todas as ocorrências");
+        try {
+            var occurrences = operationalOccurrenceService.getAllOccurrences();
+            var responseDTOs = occurrences.stream()
+                .map(operationalOccurrenceService::convertToResponseDTO)
+                .toList();
+            log.info("✅ Ocorrências retornadas: {} registros", responseDTOs.size());
+            return ResponseEntity.ok(responseDTOs);
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar ocorrências", e);
+            log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+            log.error("❌ Mensagem: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("❌ Causa: {}", e.getCause().getMessage());
+            }
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 } 

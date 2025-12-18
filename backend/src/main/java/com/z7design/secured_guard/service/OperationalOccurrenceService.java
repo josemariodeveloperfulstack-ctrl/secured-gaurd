@@ -203,7 +203,14 @@ public class OperationalOccurrenceService {
      */
     @Transactional(readOnly = true)
     public List<OperationalOccurrence> getAllOccurrences() {
-        return occurrenceRepository.findAll();
+        try {
+            return occurrenceRepository.findAllWithRelationships();
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar todas as ocorrências", e);
+            // Fallback para findAll() sem relações se houver erro
+            log.warn("⚠️ Tentando buscar ocorrências sem relações carregadas");
+            return occurrenceRepository.findAll();
+        }
     }
     
     /**
@@ -374,22 +381,44 @@ public class OperationalOccurrenceService {
      * Converter OperationalOccurrence para OccurrenceResponseDTO
      */
     public com.z7design.secured_guard.dto.OccurrenceResponseDTO convertToResponseDTO(OperationalOccurrence occurrence) {
-        return com.z7design.secured_guard.dto.OccurrenceResponseDTO.builder()
-            .id(occurrence.getId())
-            .type(occurrence.getType() != null ? occurrence.getType().name() : null)
-            .title(occurrence.getTitle())
-            .description(occurrence.getDescription())
-            .employeeId(occurrence.getEmployee() != null ? occurrence.getEmployee().getId().toString() : null)
-            .employeeName(occurrence.getEmployee() != null ? occurrence.getEmployee().getName() : null)
-            .location(occurrence.getLocation())
-            .status(occurrence.getStatus() != null ? occurrence.getStatus().name() : null)
-            .priority(occurrence.getPriority() != null ? occurrence.getPriority().name() : null)
-            .date(occurrence.getDate())
-            .responsible(occurrence.getResponsible())
-            .warningNumber(occurrence.getWarningNumber())
-            .createdAt(occurrence.getCreatedAt())
-            .updatedAt(occurrence.getUpdatedAt())
-            .build();
+        try {
+            if (occurrence == null) {
+                log.error("❌ Tentativa de converter OperationalOccurrence nula para DTO");
+                throw new IllegalArgumentException("OperationalOccurrence não pode ser nula");
+            }
+            
+            // Acessar employee de forma segura
+            String employeeId = null;
+            String employeeName = null;
+            try {
+                if (occurrence.getEmployee() != null) {
+                    employeeId = occurrence.getEmployee().getId().toString();
+                    employeeName = occurrence.getEmployee().getName();
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao acessar employee da ocorrência {}: {}", occurrence.getId(), e.getMessage());
+            }
+            
+            return com.z7design.secured_guard.dto.OccurrenceResponseDTO.builder()
+                .id(occurrence.getId())
+                .type(occurrence.getType() != null ? occurrence.getType().name() : null)
+                .title(occurrence.getTitle())
+                .description(occurrence.getDescription())
+                .employeeId(employeeId)
+                .employeeName(employeeName)
+                .location(occurrence.getLocation())
+                .status(occurrence.getStatus() != null ? occurrence.getStatus().name() : null)
+                .priority(occurrence.getPriority() != null ? occurrence.getPriority().name() : null)
+                .date(occurrence.getDate())
+                .responsible(occurrence.getResponsible())
+                .warningNumber(occurrence.getWarningNumber())
+                .createdAt(occurrence.getCreatedAt())
+                .updatedAt(occurrence.getUpdatedAt())
+                .build();
+        } catch (Exception e) {
+            log.error("❌ Erro ao converter OperationalOccurrence para DTO - ID: {}", occurrence != null ? occurrence.getId() : "null", e);
+            throw new RuntimeException("Erro ao converter OperationalOccurrence para DTO: " + e.getMessage(), e);
+        }
     }
 
     /**

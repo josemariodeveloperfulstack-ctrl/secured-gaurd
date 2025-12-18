@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.Absence;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,23 +14,35 @@ import java.util.UUID;
 @Repository
 public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
     
-    List<Absence> findByEmployeeId(UUID employeeId);
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a")
+    List<Absence> findAllWithRelationships();
     
-    List<Absence> findByAbsenceDate(LocalDate absenceDate);
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.employee.id = :employeeId")
+    List<Absence> findByEmployeeId(@Param("employeeId") UUID employeeId);
     
-    List<Absence> findByStatus(Absence.AbsenceStatus status);
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.absenceDate = :absenceDate")
+    List<Absence> findByAbsenceDate(@Param("absenceDate") LocalDate absenceDate);
     
-    List<Absence> findByAbsenceType(Absence.AbsenceType absenceType);
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.status = :status")
+    List<Absence> findByStatus(@Param("status") Absence.AbsenceStatus status);
     
-    @Query("SELECT a FROM Absence a WHERE " +
-           "a.employee.id = :employeeId AND " +
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.absenceType = :absenceType")
+    List<Absence> findByAbsenceType(@Param("absenceType") Absence.AbsenceType absenceType);
+    
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.employee.id = :employeeId AND " +
            "a.absenceDate BETWEEN :startDate AND :endDate")
     List<Absence> findByEmployeeAndDateRange(@Param("employeeId") UUID employeeId,
                                             @Param("startDate") LocalDate startDate,
                                             @Param("endDate") LocalDate endDate);
     
-    @Query("SELECT a FROM Absence a WHERE " +
-           "a.absenceDate BETWEEN :startDate AND :endDate")
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.absenceDate BETWEEN :startDate AND :endDate")
     List<Absence> findByDateRange(@Param("startDate") LocalDate startDate,
                                  @Param("endDate") LocalDate endDate);
     

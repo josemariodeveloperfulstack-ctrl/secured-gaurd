@@ -4,6 +4,7 @@ import com.z7design.secured_guard.model.Invoice;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.ExpenseStatus;
 import com.z7design.secured_guard.repository.InvoiceRepository;
+import com.z7design.secured_guard.repository.NotificationRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,11 +26,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class NotificationService {
     
     private final JavaMailSender mailSender;
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
 
     @Value("${app.notification.email.from:noreply@secureguard.com}")
     private String fromEmail;
@@ -202,46 +206,118 @@ public class NotificationService {
     }
     
     // Métodos para NotificationController
-    public void create(com.z7design.secured_guard.model.Notification notification) {
-        // Implementação básica - salvar no repositório se existir
+    @Transactional
+    public com.z7design.secured_guard.model.Notification create(com.z7design.secured_guard.model.Notification notification) {
         log.info("Criando notificação: {}", notification);
+        try {
+            return notificationRepository.save(notification);
+        } catch (Exception e) {
+            log.error("Erro ao criar notificação", e);
+            throw new RuntimeException("Erro ao criar notificação: " + e.getMessage(), e);
+        }
     }
     
+    @Transactional
     public void markAsRead(UUID id) {
         log.info("Marcando notificação como lida: {}", id);
+        try {
+            com.z7design.secured_guard.model.Notification notification = notificationRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Notificação não encontrada"));
+            notification.setStatus(com.z7design.secured_guard.model.enums.NotificationStatus.READ);
+            notificationRepository.save(notification);
+        } catch (Exception e) {
+            log.error("Erro ao marcar notificação como lida", e);
+            throw new RuntimeException("Erro ao marcar notificação como lida: " + e.getMessage(), e);
+        }
     }
     
+    @Transactional
     public void markAsUnread(UUID id) {
         log.info("Marcando notificação como não lida: {}", id);
+        try {
+            com.z7design.secured_guard.model.Notification notification = notificationRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Notificação não encontrada"));
+            notification.setStatus(com.z7design.secured_guard.model.enums.NotificationStatus.UNREAD);
+            notificationRepository.save(notification);
+        } catch (Exception e) {
+            log.error("Erro ao marcar notificação como não lida", e);
+            throw new RuntimeException("Erro ao marcar notificação como não lida: " + e.getMessage(), e);
+        }
     }
     
+    @Transactional
     public void delete(UUID id) {
         log.info("Excluindo notificação: {}", id);
+        try {
+            if (!notificationRepository.existsById(id)) {
+                throw new RuntimeException("Notificação não encontrada");
+            }
+            notificationRepository.deleteById(id);
+        } catch (Exception e) {
+            log.error("Erro ao excluir notificação", e);
+            throw new RuntimeException("Erro ao excluir notificação: " + e.getMessage(), e);
+        }
     }
     
     public com.z7design.secured_guard.model.Notification findById(UUID id) {
         log.info("Buscando notificação por ID: {}", id);
-        return null; // Implementar quando tiver o repositório
+        try {
+            return notificationRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Notificação não encontrada"));
+        } catch (Exception e) {
+            log.error("Erro ao buscar notificação por ID", e);
+            throw new RuntimeException("Erro ao buscar notificação: " + e.getMessage(), e);
+        }
     }
     
     public List<com.z7design.secured_guard.model.Notification> findByUserId(UUID userId) {
         log.info("Buscando notificações por usuário: {}", userId);
-        return List.of(); // Implementar quando tiver o repositório
+        try {
+            return notificationRepository.findByUserId(userId);
+        } catch (Exception e) {
+            log.error("Erro ao buscar notificações por usuário", e);
+            throw new RuntimeException("Erro ao buscar notificações: " + e.getMessage(), e);
+        }
     }
     
     public List<com.z7design.secured_guard.model.Notification> findByUserIdAndStatus(UUID userId, com.z7design.secured_guard.model.enums.NotificationStatus status) {
         log.info("Buscando notificações por usuário e status: {} - {}", userId, status);
-        return List.of(); // Implementar quando tiver o repositório
+        try {
+            return notificationRepository.findByUserIdAndStatus(userId, status);
+        } catch (Exception e) {
+            log.error("Erro ao buscar notificações por usuário e status", e);
+            throw new RuntimeException("Erro ao buscar notificações: " + e.getMessage(), e);
+        }
     }
     
     public List<com.z7design.secured_guard.model.Notification> findByUserIdAndType(UUID userId, com.z7design.secured_guard.model.enums.NotificationType type) {
         log.info("Buscando notificações por usuário e tipo: {} - {}", userId, type);
-        return List.of(); // Implementar quando tiver o repositório
+        try {
+            return notificationRepository.findByUserIdAndType(userId, type);
+        } catch (Exception e) {
+            log.error("Erro ao buscar notificações por usuário e tipo", e);
+            throw new RuntimeException("Erro ao buscar notificações: " + e.getMessage(), e);
+        }
     }
     
     public List<com.z7design.secured_guard.model.Notification> findByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end) {
         log.info("Buscando notificações por período: {} - {}", start, end);
-        return List.of(); // Implementar quando tiver o repositório
+        try {
+            return notificationRepository.findByCreatedAtBetween(start, end);
+        } catch (Exception e) {
+            log.error("Erro ao buscar notificações por período", e);
+            throw new RuntimeException("Erro ao buscar notificações: " + e.getMessage(), e);
+        }
+    }
+    
+    public List<com.z7design.secured_guard.model.Notification> findAll() {
+        log.info("Buscando todas as notificações");
+        try {
+            return notificationRepository.findAllWithRelationships();
+        } catch (Exception e) {
+            log.error("Erro ao buscar todas as notificações", e);
+            throw new RuntimeException("Erro ao buscar notificações: " + e.getMessage(), e);
+        }
     }
     
     public void sendNotification(com.z7design.secured_guard.model.Message message) {

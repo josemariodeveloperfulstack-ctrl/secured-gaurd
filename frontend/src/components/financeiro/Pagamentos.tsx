@@ -157,8 +157,10 @@ export const Pagamentos: React.FC = () => {
 
   // Filtrar pagamentos
   const filteredPagamentos = pagamentos.filter(pagamento => {
-    const matchesSearch = pagamento.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pagamento.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+    const clienteNome = pagamento.clienteNome || '';
+    const descricao = pagamento.descricao || '';
+    const matchesSearch = clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         descricao.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || pagamento.status === filterStatus;
     const matchesCategoria = filterCategoria === 'all' || pagamento.categoria === filterCategoria;
     const matchesFormaPagamento = filterFormaPagamento === 'all' || pagamento.formaPagamento === filterFormaPagamento;

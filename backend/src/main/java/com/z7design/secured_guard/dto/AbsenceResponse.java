@@ -51,36 +51,80 @@ public class AbsenceResponse {
     }
 
     public static AbsenceResponse fromEntity(Absence absence) {
-        return AbsenceResponse.builder()
-                .id(absence.getId())
-                .employee(absence.getEmployee() != null ? SimpleEmployee.builder()
-                        .id(absence.getEmployee().getId())
-                        .name(absence.getEmployee().getName())
-                        .registrationNumber(absence.getEmployee().getRegistrationNumber())
-                        .build() : null)
-                .absenceDate(absence.getAbsenceDate())
-                .absenceType(absence.getAbsenceType())
-                .reason(absence.getReason())
-                .medicalCertificateDays(absence.getMedicalCertificateDays())
-                .documentUrl(absence.getDocumentUrl())
-                .status(absence.getStatus())
-                .isJustified(absence.getIsJustified())
-                .approvedBy(absence.getApprovedBy() != null ? SimpleUser.builder()
-                        .id(absence.getApprovedBy().getId())
-                        .name(absence.getApprovedBy().getName())
-                        .build() : null)
-                .approvalDate(absence.getApprovalDate())
-                .coverageEmployee(absence.getCoverageEmployee() != null ? SimpleEmployee.builder()
-                        .id(absence.getCoverageEmployee().getId())
-                        .name(absence.getCoverageEmployee().getName())
-                        .registrationNumber(absence.getCoverageEmployee().getRegistrationNumber())
-                        .build() : null)
-                .coverageNotes(absence.getCoverageNotes())
-                .createdAt(absence.getCreatedAt())
-                .updatedAt(absence.getUpdatedAt())
-                .build();
+        if (absence == null) {
+            return null;
+        }
+        
+        try {
+            // Acessar employee de forma segura
+            SimpleEmployee employee = null;
+            try {
+                if (absence.getEmployee() != null) {
+                    employee = SimpleEmployee.builder()
+                            .id(absence.getEmployee().getId())
+                            .name(absence.getEmployee().getName())
+                            .registrationNumber(absence.getEmployee().getRegistrationNumber())
+                            .build();
+                }
+            } catch (Exception e) {
+                // Log warning mas continua
+                System.err.println("⚠️ Erro ao acessar employee da falta " + absence.getId() + ": " + e.getMessage());
+            }
+            
+            // Acessar approvedBy de forma segura
+            SimpleUser approvedBy = null;
+            try {
+                if (absence.getApprovedBy() != null) {
+                    approvedBy = SimpleUser.builder()
+                            .id(absence.getApprovedBy().getId())
+                            .name(absence.getApprovedBy().getName())
+                            .build();
+                }
+            } catch (Exception e) {
+                // Log warning mas continua
+                System.err.println("⚠️ Erro ao acessar approvedBy da falta " + absence.getId() + ": " + e.getMessage());
+            }
+            
+            // Acessar coverageEmployee de forma segura
+            SimpleEmployee coverageEmployee = null;
+            try {
+                if (absence.getCoverageEmployee() != null) {
+                    coverageEmployee = SimpleEmployee.builder()
+                            .id(absence.getCoverageEmployee().getId())
+                            .name(absence.getCoverageEmployee().getName())
+                            .registrationNumber(absence.getCoverageEmployee().getRegistrationNumber())
+                            .build();
+                }
+            } catch (Exception e) {
+                // Log warning mas continua
+                System.err.println("⚠️ Erro ao acessar coverageEmployee da falta " + absence.getId() + ": " + e.getMessage());
+            }
+            
+            return AbsenceResponse.builder()
+                    .id(absence.getId())
+                    .employee(employee)
+                    .absenceDate(absence.getAbsenceDate())
+                    .absenceType(absence.getAbsenceType())
+                    .reason(absence.getReason())
+                    .medicalCertificateDays(absence.getMedicalCertificateDays())
+                    .documentUrl(absence.getDocumentUrl())
+                    .status(absence.getStatus())
+                    .isJustified(absence.getIsJustified())
+                    .approvedBy(approvedBy)
+                    .approvalDate(absence.getApprovalDate())
+                    .coverageEmployee(coverageEmployee)
+                    .coverageNotes(absence.getCoverageNotes())
+                    .createdAt(absence.getCreatedAt())
+                    .updatedAt(absence.getUpdatedAt())
+                    .build();
+        } catch (Exception e) {
+            System.err.println("❌ Erro ao converter Absence para AbsenceResponse - ID: " + absence.getId());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao converter Absence para AbsenceResponse: " + e.getMessage(), e);
+        }
     }
 }
+
 
 
 

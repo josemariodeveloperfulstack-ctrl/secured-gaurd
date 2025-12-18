@@ -13,37 +13,50 @@ import java.util.UUID;
 @Repository
 public interface OperationalOccurrenceRepository extends JpaRepository<OperationalOccurrence, UUID> {
     
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee")
+    List<OperationalOccurrence> findAllWithRelationships();
+    
     // Buscar ocorrências por funcionário
-    List<OperationalOccurrence> findByEmployeeIdOrderByDateDesc(UUID employeeId);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.employee.id = :employeeId ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByEmployeeIdOrderByDateDesc(@Param("employeeId") UUID employeeId);
     
     // Buscar ocorrências por tipo
-    List<OperationalOccurrence> findByTypeOrderByDateDesc(OperationalOccurrence.OccurrenceType type);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.type = :type ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByTypeOrderByDateDesc(@Param("type") OperationalOccurrence.OccurrenceType type);
     
     // Buscar ocorrências por status
-    List<OperationalOccurrence> findByStatusOrderByDateDesc(OperationalOccurrence.OccurrenceStatus status);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.status = :status ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByStatusOrderByDateDesc(@Param("status") OperationalOccurrence.OccurrenceStatus status);
     
     // Buscar ocorrências por prioridade
-    List<OperationalOccurrence> findByPriorityOrderByDateDesc(OperationalOccurrence.OccurrencePriority priority);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.priority = :priority ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByPriorityOrderByDateDesc(@Param("priority") OperationalOccurrence.OccurrencePriority priority);
     
     // Buscar ocorrências por período
-    List<OperationalOccurrence> findByDateBetweenOrderByDateDesc(LocalDateTime startDate, LocalDateTime endDate);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.date BETWEEN :startDate AND :endDate ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByDateBetweenOrderByDateDesc(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
     // Buscar ocorrências por funcionário e período
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.employee.id = :employeeId AND o.date BETWEEN :startDate AND :endDate ORDER BY o.date DESC")
     List<OperationalOccurrence> findByEmployeeIdAndDateBetweenOrderByDateDesc(
-        UUID employeeId, LocalDateTime startDate, LocalDateTime endDate);
+        @Param("employeeId") UUID employeeId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
     // Buscar ocorrências por tipo e período
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.type = :type AND o.date BETWEEN :startDate AND :endDate ORDER BY o.date DESC")
     List<OperationalOccurrence> findByTypeAndDateBetweenOrderByDateDesc(
-        OperationalOccurrence.OccurrenceType type, LocalDateTime startDate, LocalDateTime endDate);
+        @Param("type") OperationalOccurrence.OccurrenceType type, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
     // Buscar ocorrências pendentes
-    List<OperationalOccurrence> findByStatusOrderByPriorityDescDateAsc(OperationalOccurrence.OccurrenceStatus status);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.status = :status ORDER BY o.priority DESC, o.date ASC")
+    List<OperationalOccurrence> findByStatusOrderByPriorityDescDateAsc(@Param("status") OperationalOccurrence.OccurrenceStatus status);
     
     // Buscar ocorrências por responsável
-    List<OperationalOccurrence> findByResponsibleOrderByDateDesc(String responsible);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE o.responsible = :responsible ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByResponsibleOrderByDateDesc(@Param("responsible") String responsible);
     
     // Buscar ocorrências por local
-    List<OperationalOccurrence> findByLocationContainingIgnoreCaseOrderByDateDesc(String location);
+    @Query("SELECT DISTINCT o FROM OperationalOccurrence o LEFT JOIN FETCH o.employee WHERE LOWER(o.location) LIKE LOWER(CONCAT('%', :location, '%')) ORDER BY o.date DESC")
+    List<OperationalOccurrence> findByLocationContainingIgnoreCaseOrderByDateDesc(@Param("location") String location);
     
     // Contar ocorrências por funcionário e período
     @Query("SELECT COUNT(o) FROM OperationalOccurrence o WHERE o.employee.id = :employeeId AND o.date BETWEEN :startDate AND :endDate")

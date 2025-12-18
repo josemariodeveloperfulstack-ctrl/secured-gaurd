@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -277,8 +277,9 @@ const PagamentosTab: React.FC = () => {
 
   // Filtrar contas pendentes
   const contasFiltradas = contasPendentes.filter(conta => {
+    const descricao = conta.descricao || '';
     const matchesSearch = 
-      conta.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.fornecedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.cliente?.toLowerCase().includes(searchTerm.toLowerCase());
     

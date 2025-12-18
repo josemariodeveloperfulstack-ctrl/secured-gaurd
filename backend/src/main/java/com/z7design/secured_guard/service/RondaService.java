@@ -9,6 +9,7 @@ import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +18,9 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +36,7 @@ public class RondaService {
     public Page<RondaDTO> findAll(Pageable pageable) {
         log.info("Buscando todas as rondas com paginação");
         try {
-            Page<Ronda> rondas = rondaRepository.findAll(pageable);
+            Page<Ronda> rondas = rondaRepository.findAllWithRelationships(pageable);
             log.info("✅ Rondas encontradas: {} registros", rondas.getTotalElements());
             return rondas.map(this::convertToDTO);
         } catch (Exception e) {
@@ -42,6 +45,7 @@ public class RondaService {
             log.error("❌ Mensagem: {}", e.getMessage());
             if (e.getCause() != null) {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
+                log.error("❌ Stack trace completo:", e);
             }
             throw e;
         }
@@ -77,43 +81,48 @@ public class RondaService {
             
             Page<Ronda> rondas;
             if (!hasFilters) {
-                log.info("Sem filtros, usando findAll");
-                rondas = rondaRepository.findAll(pageable);
+                log.info("Sem filtros, usando findAllWithRelationships");
+                rondas = rondaRepository.findAllWithRelationships(pageable);
             } else {
                 // Converter enums para String para a query nativa
                 String statusStr = status != null ? status.name() : null;
                 String tipoStr = tipo != null ? tipo.name() : null;
                 String prioridadeStr = prioridade != null ? prioridade.name() : null;
                 
-                rondas = rondaRepository.search(
+                // Primeiro buscar os IDs com a query nativa
+                Page<Ronda> rondasPage = rondaRepository.search(
                         statusStr, tipoStr, prioridadeStr, responsavelId, localId,
                         dataInicio, dataFim, normalizedSearchTerm, pageable);
+                
+                // Buscar as rondas com relações carregadas
+                List<UUID> ids = rondasPage.getContent().stream()
+                        .map(Ronda::getId)
+                        .toList();
+                
+                List<Ronda> rondasWithRelations = ids.isEmpty() 
+                        ? new ArrayList<>() 
+                        : rondaRepository.findAllByIdsWithRelationships(ids);
+                
+                // Criar um mapa para acesso rápido
+                Map<UUID, Ronda> rondaMap = rondasWithRelations.stream()
+                        .collect(Collectors.toMap(Ronda::getId, r -> r));
+                
+                // Substituir as rondas na página com as que têm relações carregadas
+                List<Ronda> contentWithRelations = rondasPage.getContent().stream()
+                        .map(r -> rondaMap.getOrDefault(r.getId(), r))
+                        .toList();
+                
+                // Criar nova página com as relações carregadas
+                rondas = new PageImpl<>(
+                        contentWithRelations, 
+                        rondasPage.getPageable(), 
+                        rondasPage.getTotalElements());
             }
             
             log.info("✅ Rondas encontradas no repository: {} registros", rondas.getTotalElements());
             
-            // Converter para DTO, garantindo que as relações sejam acessadas dentro da transação
-            return rondas.map(ronda -> {
-                try {
-                    // Forçar o carregamento das relações lazy antes de converter
-                    if (ronda.getResponsavel() != null) {
-                        ronda.getResponsavel().getName(); // Força o carregamento
-                    }
-                    if (ronda.getSupervisor() != null) {
-                        ronda.getSupervisor().getName(); // Força o carregamento
-                    }
-                    if (ronda.getLocal() != null) {
-                        ronda.getLocal().getName(); // Força o carregamento
-                    }
-                    if (ronda.getCreatedBy() != null) {
-                        ronda.getCreatedBy().getName(); // Força o carregamento
-                    }
-                    return convertToDTO(ronda);
-                } catch (Exception e) {
-                    log.error("❌ Erro ao converter ronda {} para DTO", ronda.getId(), e);
-                    throw new RuntimeException("Erro ao converter ronda para DTO", e);
-                }
-            });
+            // Converter para DTO
+            return rondas.map(this::convertToDTO);
         } catch (Exception e) {
             log.error("❌ Erro ao buscar rondas no repository", e);
             log.error("❌ Tipo de exceção: {}", e.getClass().getName());
@@ -360,15 +369,57 @@ public class RondaService {
     
     private RondaDTO convertToDTO(Ronda ronda) {
         try {
-            // Acessar as relações dentro da transação para evitar LazyInitializationException
-            Employee responsavel = ronda.getResponsavel();
-            Employee supervisor = ronda.getSupervisor();
-            WorkPost local = ronda.getLocal();
-            User createdBy = ronda.getCreatedBy();
+            if (ronda == null) {
+                log.error("❌ Tentativa de converter Ronda nula para DTO");
+                throw new IllegalArgumentException("Ronda não pode ser nula");
+            }
+            
+            // Acessar as relações de forma segura
+            Employee responsavel = null;
+            Employee supervisor = null;
+            WorkPost local = null;
+            User createdBy = null;
+            
+            try {
+                responsavel = ronda.getResponsavel();
+                if (responsavel != null) {
+                    // Forçar inicialização se necessário
+                    responsavel.getName();
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao acessar responsável da ronda {}: {}", ronda.getId(), e.getMessage());
+            }
+            
+            try {
+                supervisor = ronda.getSupervisor();
+                if (supervisor != null) {
+                    supervisor.getName();
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao acessar supervisor da ronda {}: {}", ronda.getId(), e.getMessage());
+            }
+            
+            try {
+                local = ronda.getLocal();
+                if (local != null) {
+                    local.getName();
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao acessar local da ronda {}: {}", ronda.getId(), e.getMessage());
+            }
+            
+            try {
+                createdBy = ronda.getCreatedBy();
+                if (createdBy != null) {
+                    createdBy.getName();
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao acessar createdBy da ronda {}: {}", ronda.getId(), e.getMessage());
+            }
             
             return RondaDTO.builder()
                     .id(ronda.getId())
-                    .nome(ronda.getNome())
+                    .nome(ronda.getNome() != null ? ronda.getNome() : "")
                     .descricao(ronda.getDescricao())
                     .tipo(ronda.getTipo())
                     .prioridade(ronda.getPrioridade())
@@ -392,7 +443,8 @@ public class RondaService {
                     .createdBy(createdBy != null ? createdBy.getName() : null)
                     .build();
         } catch (Exception e) {
-            log.error("❌ Erro ao converter Ronda para DTO - ID: {}", ronda.getId(), e);
+            log.error("❌ Erro ao converter Ronda para DTO - ID: {}", ronda != null ? ronda.getId() : "null", e);
+            log.error("❌ Stack trace completo:", e);
             throw new RuntimeException("Erro ao converter Ronda para DTO: " + e.getMessage(), e);
         }
     }
