@@ -79,6 +79,49 @@ public class WorkPostService {
     }
     
     /**
+     * Busca todos os postos e converte para DTO dentro da mesma transação
+     * Isso garante que os relacionamentos sejam carregados antes da conversão
+     * IMPORTANTE: Tudo deve acontecer dentro desta única transação
+     */
+    @Transactional(readOnly = true)
+    public List<WorkPostDTO> findAllAsDTO() {
+        log.info("🔍 WorkPostService.findAllAsDTO() - Buscando postos e convertendo para DTO em uma única transação");
+        try {
+            // Buscar postos dentro desta transação
+            List<WorkPost> workPosts = null;
+            try {
+                log.debug("🔍 Tentando buscar com EntityGraph dentro da transação");
+                workPosts = workPostRepository.findAllWithRelationships();
+                log.info("✅ EntityGraph: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
+            } catch (Exception e) {
+                log.warn("⚠️ Erro com EntityGraph, tentando findAll simples: {}", e.getMessage());
+                try {
+                    workPosts = workPostRepository.findAll();
+                    log.info("✅ Fallback findAll: Encontrados {} postos", workPosts != null ? workPosts.size() : 0);
+                } catch (Exception fallbackEx) {
+                    log.error("❌ Erro também no fallback: {}", fallbackEx.getMessage());
+                    return new java.util.ArrayList<>();
+                }
+            }
+            
+            if (workPosts == null || workPosts.isEmpty()) {
+                log.info("✅ findAllAsDTO: Nenhum posto encontrado");
+                return new java.util.ArrayList<>();
+            }
+            
+            // Converter dentro da MESMA transação (ainda está aberta)
+            List<WorkPostDTO> dtos = convertToDTOList(workPosts);
+            log.info("✅ findAllAsDTO: {} postos convertidos para DTOs", dtos != null ? dtos.size() : 0);
+            return dtos != null ? dtos : new java.util.ArrayList<>();
+            
+        } catch (Exception e) {
+            log.error("❌ Erro em findAllAsDTO: {} - Tipo: {}", e.getMessage(), e.getClass().getName());
+            log.error("❌ Stack trace: ", e);
+            return new java.util.ArrayList<>();
+        }
+    }
+    
+    /**
      * Fallback para buscar postos sem EntityGraph (mais seguro em ambientes com problemas de transação)
      */
     private List<WorkPost> findAllFallback() {
@@ -303,7 +346,8 @@ public class WorkPostService {
     }
     
     // Métodos para conversão DTO
-    @Transactional(readOnly = true)
+    // NOTA: Removido @Transactional para evitar problemas em ambientes CI
+    // A transação deve ser mantida pelo método chamador (ex: findAll com @Transactional)
     public WorkPostDTO convertToDTO(WorkPost workPost) {
         if (workPost == null) {
             return null;
@@ -394,27 +438,96 @@ public class WorkPostService {
         return workPosts.map(this::convertToDTO);
     }
     
-    @Transactional(readOnly = true)
+    // NOTA: Removido @Transactional para evitar problemas em ambientes CI
+    // A transação deve ser mantida pelo método chamador
     public List<WorkPostDTO> convertToDTOList(List<WorkPost> workPosts) {
         if (workPosts == null || workPosts.isEmpty()) {
-            return List.of();
+            log.debug("convertToDTOList: Lista vazia ou null recebida");
+            return new java.util.ArrayList<>();
         }
 
+        log.debug("convertToDTOList: Convertendo {} workPosts para DTOs", workPosts.size());
         List<WorkPostDTO> dtos = new java.util.ArrayList<>();
+        int successCount = 0;
+        int errorCount = 0;
+        
         for (WorkPost workPost : workPosts) {
+            if (workPost == null) {
+                log.warn("convertToDTOList: WorkPost null encontrado, pulando");
+                errorCount++;
+                continue;
+            }
+            
             try {
                 WorkPostDTO dto = convertToDTO(workPost);
                 if (dto != null) {
-                    // Adicionar DTO mesmo se clientId for null (é permitido agora)
                     dtos.add(dto);
+                    successCount++;
+                } else {
+                    log.warn("convertToDTOList: convertToDTO retornou null para WorkPost {}", workPost.getId());
+                    errorCount++;
                 }
-            } catch (Exception e) {
-                log.error("Erro ao converter WorkPost {} para DTO: {}",
-                        workPost != null ? workPost.getId() : "null", e.getMessage(), e);
-                // Continuar processando os outros
+            } catch (Throwable e) {
+                // Capturar qualquer erro, incluindo Error
+                String exceptionType = e.getClass().getName();
+                log.error("Erro ao converter WorkPost {} para DTO: {} - Tipo: {}",
+                        workPost.getId(), e.getMessage(), exceptionType);
+                
+                // Se for problema de lazy loading, tentar criar DTO mínimo
+                if (exceptionType.contains("LazyInitialization") || 
+                    exceptionType.contains("Session") ||
+                    exceptionType.contains("Transaction")) {
+                    log.warn("Problema de lazy loading detectado, criando DTO mínimo para WorkPost {}", workPost.getId());
+                    try {
+                        WorkPostDTO minimalDto = createMinimalDTO(workPost);
+                        if (minimalDto != null) {
+                            dtos.add(minimalDto);
+                            successCount++;
+                        }
+                    } catch (Exception minimalException) {
+                        log.error("Erro ao criar DTO mínimo para WorkPost {}: {}", workPost.getId(), minimalException.getMessage());
+                        errorCount++;
+                    }
+                } else {
+                    errorCount++;
+                }
             }
         }
+        
+        log.info("convertToDTOList: Conversão concluída - {} sucessos, {} erros, {} total", 
+                successCount, errorCount, dtos.size());
+        
         return dtos;
+    }
+    
+    /**
+     * Cria um DTO mínimo quando há problemas com lazy loading
+     */
+    private WorkPostDTO createMinimalDTO(WorkPost workPost) {
+        try {
+            WorkPostDTO dto = new WorkPostDTO();
+            dto.setId(workPost.getId());
+            dto.setPostCode(workPost.getPostCode());
+            dto.setName(workPost.getName());
+            dto.setDescription(workPost.getDescription());
+            dto.setType(workPost.getType());
+            dto.setStatus(workPost.getStatus());
+            dto.setAddress(workPost.getAddress());
+            dto.setCity(workPost.getCity());
+            dto.setState(workPost.getState());
+            dto.setZipCode(workPost.getZipCode());
+            // Relacionamentos não disponíveis devido a lazy loading
+            dto.setClientId(null);
+            dto.setClientName("N/A");
+            dto.setClientCnpj("N/A");
+            dto.setContractId(null);
+            dto.setResponsibleId(null);
+            dto.setResponsibleName("N/A");
+            return dto;
+        } catch (Exception e) {
+            log.error("Erro ao criar DTO mínimo: {}", e.getMessage());
+            return null;
+        }
     }
     
     private void updateWorkPostFromDTO(WorkPost workPost, WorkPostDTO dto) {

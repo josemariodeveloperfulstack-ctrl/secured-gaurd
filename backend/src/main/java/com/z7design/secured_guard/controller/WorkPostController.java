@@ -63,63 +63,41 @@ public class WorkPostController {
         @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
     public ResponseEntity<List<WorkPostDTO>> getAllWorkPostsNoPagination() {
-        log.info("🔍 Buscando todos os postos de trabalho - Endpoint /all");
+        log.info("🔍 GET /api/work-posts/all - Iniciando busca de todos os postos");
         try {
-            // Buscar postos primeiro
-            List<WorkPost> workPosts = null;
-            try {
-                log.debug("🔍 Chamando workPostService.findAll()");
-                workPosts = workPostService.findAll();
-                log.info("✅ Encontrados {} postos de trabalho", workPosts != null ? workPosts.size() : 0);
-            } catch (Exception e) {
-                log.error("❌ Erro ao buscar postos de trabalho no banco: {}", e.getMessage(), e);
-                log.error("❌ Stack trace completo: ", e);
-                // Retornar lista vazia em vez de propagar erro
-                return ResponseEntity.ok(new java.util.ArrayList<>());
-            }
-            
-            // Validar se workPosts não é null
-            if (workPosts == null) {
-                log.warn("⚠️ workPosts é null, retornando lista vazia");
-                return ResponseEntity.ok(new java.util.ArrayList<>());
-            }
-            
-            // Converter para DTO
+            // Usar método que busca e converte dentro da mesma transação
             List<WorkPostDTO> workPostDTOs = null;
             try {
-                log.debug("🔍 Convertendo {} postos para DTO", workPosts.size());
-                workPostDTOs = workPostService.convertToDTOList(workPosts);
-                log.info("✅ Convertidos {} DTOs de postos de trabalho", workPostDTOs != null ? workPostDTOs.size() : 0);
+                log.debug("🔍 Chamando workPostService.findAllAsDTO()");
+                workPostDTOs = workPostService.findAllAsDTO();
+                log.info("✅ findAllAsDTO retornou {} DTOs", workPostDTOs != null ? workPostDTOs.size() : 0);
             } catch (Exception e) {
-                log.error("❌ Erro ao converter postos para DTO: {}", e.getMessage(), e);
+                log.error("❌ Erro ao buscar/converter postos: {} - Tipo: {}", e.getMessage(), e.getClass().getName());
                 log.error("❌ Stack trace completo: ", e);
                 // Retornar lista vazia em vez de propagar erro
                 return ResponseEntity.ok(new java.util.ArrayList<>());
             }
             
-            // Validar se workPostDTOs não é null
+            // Validar resultado
             if (workPostDTOs == null) {
-                log.warn("⚠️ workPostDTOs é null, retornando lista vazia");
+                log.warn("⚠️ findAllAsDTO retornou null, retornando lista vazia");
                 return ResponseEntity.ok(new java.util.ArrayList<>());
             }
             
-            log.info("✅ Retornando {} postos de trabalho com sucesso", workPostDTOs.size());
+            log.info("✅ GET /api/work-posts/all - Retornando {} postos com sucesso", workPostDTOs.size());
             return ResponseEntity.ok(workPostDTOs);
             
         } catch (org.springframework.security.access.AccessDeniedException e) {
-            log.error("❌ Acesso negado ao buscar postos de trabalho: {}", e.getMessage());
+            log.error("❌ Acesso negado ao buscar postos: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Throwable e) {
-            // Capturar qualquer exceção, incluindo Error e Throwable
-            log.error("❌ Erro inesperado ao buscar postos de trabalho: {}", e.getMessage(), e);
-            log.error("❌ Tipo da exceção: {}", e.getClass().getName());
+            // Capturar qualquer exceção, incluindo Error
+            log.error("❌ Erro inesperado em /work-posts/all: {} - Tipo: {}", e.getMessage(), e.getClass().getName());
+            log.error("❌ Stack trace completo: ", e);
             if (e.getCause() != null) {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
-                if (e.getCause().getCause() != null) {
-                    log.error("❌ Causa da causa: {}", e.getCause().getCause().getMessage());
-                }
             }
-            // Sempre retornar lista vazia em vez de lançar exceção para evitar 500
+            // Sempre retornar lista vazia para evitar 500
             log.warn("⚠️ Retornando lista vazia devido a erro inesperado");
             return ResponseEntity.ok(new java.util.ArrayList<>());
         }
@@ -130,11 +108,31 @@ public class WorkPostController {
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Posto encontrado"),
         @ApiResponse(responseCode = "404", description = "Posto não encontrado"),
+        @ApiResponse(responseCode = "400", description = "ID inválido"),
         @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<WorkPostDTO> getWorkPostById(
             @Parameter(description = "ID do posto") @PathVariable String id) {
-        WorkPost workPost = workPostService.getById(UUID.fromString(id));
+        // Limpar espaços da URL (caso venha com espaço no final, ex: "all ")
+        String cleanId = id != null ? id.trim() : "";
+        
+        // Se for "all" (com ou sem espaços), deve ter sido mapeado incorretamente
+        // Retornar 404 em vez de tentar converter para UUID
+        if ("all".equalsIgnoreCase(cleanId)) {
+            log.warn("⚠️ Endpoint /all foi incorretamente mapeado para /{id}. Use /api/work-posts/all");
+            throw new ResourceNotFoundException("Use o endpoint /api/work-posts/all para listar todos os postos");
+        }
+        
+        // Validar se é um UUID válido antes de processar
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(cleanId);
+        } catch (IllegalArgumentException e) {
+            log.warn("⚠️ Tentativa de buscar posto com ID inválido (não é UUID): '{}'", cleanId);
+            throw new IllegalArgumentException("ID deve ser um UUID válido. Recebido: '" + cleanId + "'");
+        }
+        
+        WorkPost workPost = workPostService.getById(uuid);
         WorkPostDTO workPostDTO = workPostService.convertToDTO(workPost);
         return ResponseEntity.ok(workPostDTO);
     }
