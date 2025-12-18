@@ -480,9 +480,9 @@ public class ActivityReportService {
                     
                     String timeRange = "";
                     if (report.getStartTime() != null && report.getEndTime() != null) {
-                        timeRange = report.getStartTime() + " - " + report.getEndTime();
+                        timeRange = report.getStartTime().toString() + " - " + report.getEndTime().toString();
                     } else if (report.getStartTime() != null) {
-                        timeRange = report.getStartTime();
+                        timeRange = report.getStartTime().toString();
                     }
                     table.addCell(createCell(timeRange));
                     
@@ -511,10 +511,10 @@ public class ActivityReportService {
             throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
         } finally {
             try {
-                if (document != null && !document.isClosed()) {
+                if (document != null) {
                     document.close();
                 }
-                if (pdfDoc != null && !pdfDoc.isClosed()) {
+                if (pdfDoc != null) {
                     pdfDoc.close();
                 }
                 if (writer != null) {
