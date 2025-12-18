@@ -357,6 +357,42 @@ public class WorkPostService {
         
         try {
             BeanUtils.copyProperties(workPost, dto);
+            
+            // CRÍTICO: Copiar coleções @ElementCollection como novas listas para evitar lazy loading
+            // Isso deve ser feito DENTRO da transação, antes que a sessão seja fechada
+            try {
+                if (workPost.getNrs() != null) {
+                    dto.setNrs(new java.util.ArrayList<>(workPost.getNrs()));
+                } else {
+                    dto.setNrs(new java.util.ArrayList<>());
+                }
+            } catch (Exception e) {
+                log.warn("Erro ao copiar nrs do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                dto.setNrs(new java.util.ArrayList<>());
+            }
+            
+            try {
+                if (workPost.getEpis() != null) {
+                    dto.setEpis(new java.util.ArrayList<>(workPost.getEpis()));
+                } else {
+                    dto.setEpis(new java.util.ArrayList<>());
+                }
+            } catch (Exception e) {
+                log.warn("Erro ao copiar epis do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                dto.setEpis(new java.util.ArrayList<>());
+            }
+            
+            try {
+                if (workPost.getTrainings() != null) {
+                    dto.setTrainings(new java.util.ArrayList<>(workPost.getTrainings()));
+                } else {
+                    dto.setTrainings(new java.util.ArrayList<>());
+                }
+            } catch (Exception e) {
+                log.warn("Erro ao copiar trainings do WorkPost {}: {}", workPost.getId(), e.getMessage());
+                dto.setTrainings(new java.util.ArrayList<>());
+            }
+            
         } catch (Exception e) {
             log.warn("Erro ao copiar propriedades do WorkPost {}: {}", workPost.getId(), e.getMessage());
             // Continuar mesmo com erro na cópia, preenchendo manualmente os campos essenciais
@@ -366,6 +402,10 @@ public class WorkPostService {
             dto.setDescription(workPost.getDescription());
             dto.setType(workPost.getType());
             dto.setStatus(workPost.getStatus());
+            // Definir coleções vazias em caso de erro
+            dto.setNrs(new java.util.ArrayList<>());
+            dto.setEpis(new java.util.ArrayList<>());
+            dto.setTrainings(new java.util.ArrayList<>());
         }
         
         // Tratar relacionamentos de forma segura - capturar LazyInitializationException

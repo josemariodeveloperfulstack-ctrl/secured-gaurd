@@ -62,44 +62,38 @@ public class WorkPostController {
         @ApiResponse(responseCode = "403", description = "Acesso negado"),
         @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<List<WorkPostDTO>> getAllWorkPostsNoPagination() {
-        log.info("🔍 GET /api/work-posts/all - Iniciando busca de todos os postos");
+    public ResponseEntity<?> getAllWorkPostsNoPagination() {
+        log.info("🔍 GET /api/work-posts/all - INÍCIO");
+        java.util.ArrayList<WorkPostDTO> emptyList = new java.util.ArrayList<>();
+        
         try {
-            // Usar método que busca e converte dentro da mesma transação
-            List<WorkPostDTO> workPostDTOs = null;
-            try {
-                log.debug("🔍 Chamando workPostService.findAllAsDTO()");
-                workPostDTOs = workPostService.findAllAsDTO();
-                log.info("✅ findAllAsDTO retornou {} DTOs", workPostDTOs != null ? workPostDTOs.size() : 0);
-            } catch (Exception e) {
-                log.error("❌ Erro ao buscar/converter postos: {} - Tipo: {}", e.getMessage(), e.getClass().getName());
-                log.error("❌ Stack trace completo: ", e);
-                // Retornar lista vazia em vez de propagar erro
-                return ResponseEntity.ok(new java.util.ArrayList<>());
-            }
+            log.info("🔍 Tentando buscar postos via findAllAsDTO");
+            List<WorkPostDTO> workPostDTOs = workPostService.findAllAsDTO();
+            log.info("✅ findAllAsDTO retornou: {} (null={})", workPostDTOs != null ? workPostDTOs.size() : "null", workPostDTOs == null);
             
-            // Validar resultado
             if (workPostDTOs == null) {
-                log.warn("⚠️ findAllAsDTO retornou null, retornando lista vazia");
-                return ResponseEntity.ok(new java.util.ArrayList<>());
+                log.warn("⚠️ findAllAsDTO retornou null");
+                return ResponseEntity.ok(emptyList);
             }
             
-            log.info("✅ GET /api/work-posts/all - Retornando {} postos com sucesso", workPostDTOs.size());
+            log.info("✅ Retornando {} postos", workPostDTOs.size());
             return ResponseEntity.ok(workPostDTOs);
             
         } catch (org.springframework.security.access.AccessDeniedException e) {
-            log.error("❌ Acesso negado ao buscar postos: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            log.error("❌ AccessDeniedException: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(emptyList);
         } catch (Throwable e) {
-            // Capturar qualquer exceção, incluindo Error
-            log.error("❌ Erro inesperado em /work-posts/all: {} - Tipo: {}", e.getMessage(), e.getClass().getName());
+            log.error("❌ ERRO CRÍTICO em /work-posts/all - Tipo: {} - Mensagem: {}", 
+                    e.getClass().getName(), e.getMessage());
             log.error("❌ Stack trace completo: ", e);
             if (e.getCause() != null) {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
+                if (e.getCause().getCause() != null) {
+                    log.error("❌ Causa da causa: {}", e.getCause().getCause().getMessage());
+                }
             }
-            // Sempre retornar lista vazia para evitar 500
-            log.warn("⚠️ Retornando lista vazia devido a erro inesperado");
-            return ResponseEntity.ok(new java.util.ArrayList<>());
+            // Retornar lista vazia em qualquer caso
+            return ResponseEntity.ok(emptyList);
         }
     }
     
