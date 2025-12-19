@@ -17,7 +17,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -228,6 +239,387 @@ public class AdmissionRequestService {
     
     public long countByType(AdmissionRequestType type) {
         return admissionRequestRepository.countByType(type);
+    }
+    
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(String employeeName, AdmissionRequestType type, 
+                                     LocalDate startDate, LocalDate endDate, 
+                                     AdmissionRequestStatus status) throws IOException {
+        log.info("Gerando relatório PDF de solicitações - EmployeeName: {}, Type: {}, StartDate: {}, EndDate: {}, Status: {}",
+                employeeName, type, startDate, endDate, status);
+        
+        // Buscar solicitações com filtros
+        List<AdmissionRequest> allRequests = admissionRequestRepository.findAll();
+        
+        // Aplicar filtros
+        List<AdmissionRequest> filteredRequests = allRequests.stream()
+                .filter(r -> employeeName == null || employeeName.isEmpty() || 
+                        (r.getEmployeeName() != null && r.getEmployeeName().toLowerCase().contains(employeeName.toLowerCase())))
+                .filter(r -> type == null || r.getType() == type)
+                .filter(r -> status == null || r.getStatus() == status)
+                .filter(r -> startDate == null || (r.getRequestDate() != null && !r.getRequestDate().isBefore(startDate)))
+                .filter(r -> endDate == null || (r.getRequestDate() != null && !r.getRequestDate().isAfter(endDate)))
+                .collect(Collectors.toList());
+        
+        log.info("Total de solicitações encontradas para o relatório: {}", filteredRequests.size());
+        
+        List<AdmissionRequestDTO> dtos = filteredRequests.stream()
+                .map(AdmissionRequestDTO::fromEntity)
+                .collect(Collectors.toList());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+        
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+            
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+            
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+            
+            // Título
+            Paragraph title = new Paragraph("RELATÓRIO DE SOLICITAÇÕES DE ADMISSÃO/DEMISSÃO")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+            
+            // Filtros aplicados
+            if (employeeName != null || type != null || status != null || startDate != null || endDate != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(12)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+                
+                if (employeeName != null && !employeeName.isEmpty()) {
+                    document.add(new Paragraph("Funcionário: " + employeeName).setFontSize(10).setMarginBottom(2));
+                }
+                if (type != null) {
+                    document.add(new Paragraph("Tipo: " + (type == AdmissionRequestType.ADMISSION ? "Admissão" : "Demissão")).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null) {
+                    String statusText = switch (status) {
+                        case PENDING -> "Pendente";
+                        case APPROVED -> "Aprovado";
+                        case REJECTED -> "Rejeitado";
+                        case COMPLETED -> "Completado";
+                        case CANCELLED -> "Cancelado";
+                        default -> status.toString();
+                    };
+                    document.add(new Paragraph("Status: " + statusText).setFontSize(10).setMarginBottom(2));
+                }
+                if (startDate != null && endDate != null) {
+                    document.add(new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                            " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                } else if (startDate != null) {
+                    document.add(new Paragraph("Data inicial: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                } else if (endDate != null) {
+                    document.add(new Paragraph("Data final: " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10).setMarginBottom(2));
+                }
+                
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+            
+            // Estatísticas
+            long totalRequests = dtos.size();
+            long admissionCount = dtos.stream().filter(d -> d.getType() == AdmissionRequestType.ADMISSION).count();
+            long dismissalCount = dtos.stream().filter(d -> d.getType() == AdmissionRequestType.DISMISSAL).count();
+            long pendingCount = dtos.stream().filter(d -> d.getStatus() == AdmissionRequestStatus.PENDING).count();
+            long approvedCount = dtos.stream().filter(d -> d.getStatus() == AdmissionRequestStatus.APPROVED).count();
+            
+            Paragraph stats = new Paragraph(String.format(
+                    "Total de solicitações: %d | Admissões: %d | Demissões: %d | Pendentes: %d | Aprovadas: %d",
+                    totalRequests, admissionCount, dismissalCount, pendingCount, approvedCount))
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(stats);
+            
+            // Tabela com solicitações
+            if (!dtos.isEmpty()) {
+                Table table = new Table(UnitValue.createPercentArray(new float[]{12f, 15f, 12f, 10f, 10f, 12f, 12f, 17f}))
+                        .useAllAvailableWidth()
+                        .setMarginBottom(20);
+                
+                // Cabeçalho da tabela
+                table.addHeaderCell(createHeaderCell("Número"));
+                table.addHeaderCell(createHeaderCell("Funcionário"));
+                table.addHeaderCell(createHeaderCell("Tipo"));
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Cargo"));
+                table.addHeaderCell(createHeaderCell("Unidade"));
+                table.addHeaderCell(createHeaderCell("Solicitante"));
+                
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (AdmissionRequestDTO dto : dtos) {
+                    table.addCell(createCell(dto.getRequestNumber() != null ? dto.getRequestNumber() : ""));
+                    table.addCell(createCell(dto.getEmployeeName() != null ? dto.getEmployeeName() : ""));
+                    table.addCell(createCell(dto.getType() == AdmissionRequestType.ADMISSION ? "Admissão" : "Demissão"));
+                    table.addCell(createCell(dto.getRequestDate() != null ? dto.getRequestDate().format(dateFormatter) : ""));
+                    
+                    String statusText = "";
+                    if (dto.getStatus() != null) {
+                        statusText = switch (dto.getStatus()) {
+                            case PENDING -> "Pendente";
+                            case APPROVED -> "Aprovado";
+                            case REJECTED -> "Rejeitado";
+                            case COMPLETED -> "Completado";
+                            case CANCELLED -> "Cancelado";
+                            default -> dto.getStatus().toString();
+                        };
+                    }
+                    table.addCell(createCell(statusText));
+                    table.addCell(createCell(dto.getPosition() != null ? dto.getPosition() : ""));
+                    table.addCell(createCell(dto.getUnitName() != null ? dto.getUnitName() : ""));
+                    table.addCell(createCell(dto.getRequesterName() != null ? dto.getRequesterName() : ""));
+                }
+                
+                document.add(table);
+            } else {
+                Paragraph noData = new Paragraph("Nenhuma solicitação encontrada com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            }
+            
+            document.close();
+            pdfDoc.close();
+            writer.close();
+            
+            byte[] pdfBytes = baos.toByteArray();
+            log.info("Relatório PDF gerado com sucesso. Tamanho: {} bytes", pdfBytes.length);
+            return pdfBytes;
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF: {}", e.getMessage(), e);
+            if (document != null) document.close();
+            if (pdfDoc != null) pdfDoc.close();
+            if (writer != null) writer.close();
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        }
+    }
+    
+    @Transactional(readOnly = true)
+    public byte[] generatePDF(UUID id) throws IOException {
+        log.info("Gerando PDF para solicitação de admissão/demissão: {}", id);
+        
+        AdmissionRequest request = admissionRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada com ID: " + id));
+        
+        AdmissionRequestDTO dto = AdmissionRequestDTO.fromEntity(request);
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = null;
+        PdfDocument pdfDoc = null;
+        Document document = null;
+        
+        try {
+            writer = new PdfWriter(baos);
+            pdfDoc = new PdfDocument(writer);
+            document = new Document(pdfDoc);
+            document.setMargins(50, 50, 50, 50);
+            
+            // Cabeçalho da empresa
+            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(16)
+                    .setBold()
+                    .setMarginBottom(5);
+            document.add(companyHeader);
+            
+            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(companyInfo);
+            
+            // Título
+            String titleText = dto.getType() == AdmissionRequestType.ADMISSION 
+                    ? "SOLICITAÇÃO DE ADMISSÃO" 
+                    : "SOLICITAÇÃO DE DEMISSÃO";
+            Paragraph title = new Paragraph(titleText)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(18)
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(20);
+            document.add(title);
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(reportInfo);
+            
+            // Tabela com informações da solicitação
+            Table table = new Table(UnitValue.createPercentArray(new float[]{35f, 65f}))
+                    .useAllAvailableWidth()
+                    .setMarginBottom(20);
+            
+            // Adicionar linhas da tabela
+            table.addCell(createHeaderCell("Número da Solicitação"));
+            table.addCell(createCell(dto.getRequestNumber() != null ? dto.getRequestNumber() : "N/A"));
+            
+            table.addCell(createHeaderCell("Tipo"));
+            String typeText = dto.getType() != null 
+                    ? (dto.getType() == AdmissionRequestType.ADMISSION ? "Admissão" : "Demissão")
+                    : "N/A";
+            table.addCell(createCell(typeText));
+            
+            table.addCell(createHeaderCell("Status"));
+            String statusText = "N/A";
+            if (dto.getStatus() != null) {
+                statusText = switch (dto.getStatus()) {
+                    case PENDING -> "Pendente";
+                    case APPROVED -> "Aprovado";
+                    case REJECTED -> "Rejeitado";
+                    case COMPLETED -> "Completado";
+                    case CANCELLED -> "Cancelado";
+                    default -> dto.getStatus().toString();
+                };
+            }
+            table.addCell(createCell(statusText));
+            
+            table.addCell(createHeaderCell("Funcionário"));
+            table.addCell(createCell(dto.getEmployeeName() != null ? dto.getEmployeeName() : "N/A"));
+            
+            if (dto.getEmployeeCpf() != null && !dto.getEmployeeCpf().isEmpty()) {
+                table.addCell(createHeaderCell("CPF"));
+                table.addCell(createCell(dto.getEmployeeCpf()));
+            }
+            
+            if (dto.getEmployeeRg() != null && !dto.getEmployeeRg().isEmpty()) {
+                table.addCell(createHeaderCell("RG"));
+                table.addCell(createCell(dto.getEmployeeRg()));
+            }
+            
+            if (dto.getPosition() != null && !dto.getPosition().isEmpty()) {
+                table.addCell(createHeaderCell("Cargo"));
+                table.addCell(createCell(dto.getPosition()));
+            }
+            
+            if (dto.getDepartment() != null && !dto.getDepartment().isEmpty()) {
+                table.addCell(createHeaderCell("Departamento"));
+                table.addCell(createCell(dto.getDepartment()));
+            }
+            
+            if (dto.getUnitName() != null && !dto.getUnitName().isEmpty()) {
+                table.addCell(createHeaderCell("Unidade"));
+                table.addCell(createCell(dto.getUnitName()));
+            }
+            
+            if (dto.getRequestDate() != null) {
+                table.addCell(createHeaderCell("Data da Solicitação"));
+                table.addCell(createCell(dto.getRequestDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            } else {
+                table.addCell(createHeaderCell("Data da Solicitação"));
+                table.addCell(createCell("N/A"));
+            }
+            
+            if (dto.getStartDate() != null) {
+                table.addCell(createHeaderCell("Data de Início"));
+                table.addCell(createCell(dto.getStartDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            }
+            
+            if (dto.getEndDate() != null) {
+                table.addCell(createHeaderCell("Data de Fim"));
+                table.addCell(createCell(dto.getEndDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            }
+            
+            if (dto.getReason() != null && !dto.getReason().isEmpty()) {
+                table.addCell(createHeaderCell("Motivo"));
+                table.addCell(createCell(dto.getReason()));
+            }
+            
+            if (dto.getJustification() != null && !dto.getJustification().isEmpty()) {
+                table.addCell(createHeaderCell("Justificativa"));
+                table.addCell(createCell(dto.getJustification()));
+            }
+            
+            if (dto.getNotes() != null && !dto.getNotes().isEmpty()) {
+                table.addCell(createHeaderCell("Observações"));
+                table.addCell(createCell(dto.getNotes()));
+            }
+            
+            if (dto.getRequesterName() != null && !dto.getRequesterName().isEmpty()) {
+                table.addCell(createHeaderCell("Solicitante"));
+                table.addCell(createCell(dto.getRequesterName()));
+            }
+            
+            if (dto.getApprovedByName() != null && !dto.getApprovedByName().isEmpty()) {
+                table.addCell(createHeaderCell("Aprovador"));
+                table.addCell(createCell(dto.getApprovedByName()));
+            }
+            
+            if (dto.getApprovalDate() != null) {
+                table.addCell(createHeaderCell("Data de Aprovação"));
+                table.addCell(createCell(dto.getApprovalDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            }
+            
+            if (dto.getApprovalNotes() != null && !dto.getApprovalNotes().isEmpty()) {
+                table.addCell(createHeaderCell("Notas de Aprovação"));
+                table.addCell(createCell(dto.getApprovalNotes()));
+            }
+            
+            document.add(table);
+            
+            document.close();
+            pdfDoc.close();
+            writer.close();
+            
+            byte[] pdfBytes = baos.toByteArray();
+            log.info("PDF gerado com sucesso. Tamanho: {} bytes", pdfBytes.length);
+            return pdfBytes;
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF da solicitação: {}", e.getMessage(), e);
+            if (document != null) document.close();
+            if (pdfDoc != null) pdfDoc.close();
+            if (writer != null) writer.close();
+            throw new IOException("Erro ao gerar PDF: " + e.getMessage(), e);
+        }
+    }
+    
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "N/A"))
+                .setPadding(8);
+    }
+    
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "N/A"))
+                .setPadding(8)
+                .setBold()
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
     }
 }
 

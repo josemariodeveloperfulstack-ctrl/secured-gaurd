@@ -235,6 +235,13 @@ class AdmissionRequestService {
     return response.data;
   }
 
+  async generatePDF(id: string): Promise<Blob> {
+    const response = await api.get(`/api/admission-requests/${id}/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // Método para dados de exemplo durante desenvolvimento
   private getMockData(): AdmissionRequest[] {
     return [
@@ -342,4 +349,6 @@ export const admissionRequestService = {
   searchRequests: serviceInstance.searchRequests.bind(serviceInstance),
   getRequestsCountByStatus: serviceInstance.getRequestsCountByStatus.bind(serviceInstance),
   getRequestsCountByType: serviceInstance.getRequestsCountByType.bind(serviceInstance),
+  generatePDF: serviceInstance.generatePDF.bind(serviceInstance),
+  generatePDFReport: serviceInstance.generatePDFReport.bind(serviceInstance),
 };

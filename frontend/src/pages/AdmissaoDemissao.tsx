@@ -194,10 +194,48 @@ const AdmissaoDemissao: React.FC = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
+                  onClick={async () => {
+                    try {
+                      toast({
+                        title: 'Gerando relatório...',
+                        description: 'Por favor, aguarde enquanto o relatório é gerado.',
+                      });
+                      
+                      const blob = await admissionRequestService.generatePDFReport({
+                        employeeName: filters.funcionario || undefined,
+                        type: filters.tipo && filters.tipo !== '' ? filters.tipo.toUpperCase() : undefined,
+                        startDate: filters.dataInicio || undefined,
+                        endDate: filters.dataFim || undefined,
+                        status: undefined, // Pode ser adicionado se houver filtro de status
+                      });
+                      
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `relatorio-solicitacoes-${new Date().toISOString().split('T')[0]}.pdf`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                      
+                      toast({
+                        title: 'Relatório gerado!',
+                        description: 'O PDF foi baixado com sucesso.',
+                      });
+                    } catch (error: any) {
+                      console.error('Erro ao gerar relatório:', error);
+                      toast({
+                        title: 'Erro ao gerar relatório',
+                        description: error.message || 'Não foi possível gerar o relatório.',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
                   className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Exportar</span>
+                  <span className="hidden sm:inline">Gerar Relatório</span>
+                  <span className="sm:hidden">Relatório</span>
                 </Button>
                 <Button 
                   onClick={handleCreate} 
@@ -597,7 +635,43 @@ const AdmissaoDemissao: React.FC = () => {
               </div>
             )}
             
-            <DialogFooter>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (!selectedRecord) return;
+                  try {
+                    toast({
+                      title: 'Gerando PDF...',
+                      description: 'Por favor, aguarde enquanto o PDF é gerado.',
+                    });
+                    const blob = await admissionRequestService.generatePDF(selectedRecord.id);
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `solicitacao-${selectedRecord.requestNumber || selectedRecord.id}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    toast({
+                      title: 'PDF gerado!',
+                      description: 'O PDF foi baixado com sucesso.',
+                    });
+                  } catch (error: any) {
+                    console.error('Erro ao gerar PDF:', error);
+                    toast({
+                      title: 'Erro ao gerar PDF',
+                      description: error.message || 'Não foi possível gerar o PDF.',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+                className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Baixar PDF
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowViewModal(false)}

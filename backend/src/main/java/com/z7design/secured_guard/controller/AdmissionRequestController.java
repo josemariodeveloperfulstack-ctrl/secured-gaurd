@@ -10,11 +10,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -212,6 +215,72 @@ public class AdmissionRequestController {
         AdmissionRequestType requestType = AdmissionRequestType.valueOf(type.toUpperCase());
         long count = admissionRequestService.countByType(requestType);
         return ResponseEntity.ok(count);
+    }
+    
+    @GetMapping("/{id}/pdf")
+    @Operation(summary = "Gerar PDF da solicitação", description = "Gera e retorna o PDF da solicitação de admissão/demissão")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    public ResponseEntity<byte[]> generatePDF(@PathVariable String id) {
+        try {
+            UUID requestId = parseUUID(id);
+            byte[] pdfBytes = admissionRequestService.generatePDF(requestId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "solicitacao-" + id + ".pdf");
+            headers.setContentLength(pdfBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    @GetMapping("/report/pdf")
+    @Operation(summary = "Gerar relatório PDF com filtros", description = "Gera relatório PDF de solicitações com filtros opcionais")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) String employeeName,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status) {
+        try {
+            AdmissionRequestType requestType = null;
+            if (type != null && !type.isEmpty()) {
+                try {
+                    requestType = AdmissionRequestType.valueOf(type.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    // Tipo inválido, ignorar
+                }
+            }
+            
+            AdmissionRequestStatus requestStatus = null;
+            if (status != null && !status.isEmpty()) {
+                try {
+                    requestStatus = AdmissionRequestStatus.valueOf(status.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    // Status inválido, ignorar
+                }
+            }
+            
+            byte[] pdfBytes = admissionRequestService.generatePDFReport(
+                    employeeName, requestType, startDate, endDate, requestStatus);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            String fileName = "relatorio-solicitacoes-" + LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
+            headers.setContentDispositionFormData("attachment", fileName);
+            headers.setContentLength(pdfBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }
 

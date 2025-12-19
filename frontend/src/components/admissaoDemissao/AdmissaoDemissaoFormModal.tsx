@@ -14,7 +14,8 @@ import { workPostService, WorkPost } from '@/services/workPostService';
 import { Company } from '@/types/company';
 import { Unit } from '@/types/unit';
 import { Position } from '@/services/positionService';
-import { admissionRequestService } from '@/services/admissionRequestService';
+import { admissionRequestService, AdmissionRequest } from '@/services/admissionRequestService';
+import { useToast } from '@/hooks/use-toast';
 
 interface AdmissaoDemissaoFormModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ interface AdmissaoDemissaoFormModalProps {
 // Removido mocks - agora usando dados reais da API
 
 const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ isOpen, onClose, onSuccess, request }) => {
+  const { toast } = useToast();
   const [form, setForm] = useState({
     tipo: 'admissao',
     funcionario: '',
@@ -306,12 +308,42 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     setShowPreview(true);
   };
 
-  const handleGeneratePDF = () => {
-    if (!validate()) return;
-    // Aqui seria implementada a geração do PDF
-    console.log('Gerando PDF da solicitação:', form);
-    // Por enquanto, apenas simula a geração
-    alert('PDF gerado com sucesso!');
+  const handleGeneratePDF = async () => {
+    // Se estiver editando e houver um request salvo, gerar PDF do request
+    if (request && request.id) {
+      try {
+        setLoading(true);
+        const blob = await admissionRequestService.generatePDF(request.id);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `solicitacao-${request.requestNumber || request.id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast({
+          title: 'PDF gerado!',
+          description: 'O PDF foi baixado com sucesso.',
+        });
+      } catch (error: any) {
+        console.error('Erro ao gerar PDF:', error);
+        toast({
+          title: 'Erro ao gerar PDF',
+          description: error.message || 'Não foi possível gerar o PDF.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Se não houver request salvo, mostrar mensagem
+      toast({
+        title: 'Aviso',
+        description: 'Salve a solicitação primeiro para gerar o PDF.',
+        variant: 'default',
+      });
+    }
   };
 
   const handleSendEmail = () => {
