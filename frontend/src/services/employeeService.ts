@@ -110,6 +110,33 @@ export const employeeService = {
   },
 
   /**
+   * Buscar funcionários por status
+   */
+  async getEmployeesByStatus(status: string): Promise<Employee[]> {
+    try {
+      console.log(`[EmployeeService] Buscando funcionários com status: ${status}`);
+      const response = await api.get(`/api/employees/status/${status.toUpperCase()}`);
+      console.log(`[EmployeeService] Resposta recebida:`, response.data);
+      
+      if (!response.data) {
+        console.warn('[EmployeeService] Resposta vazia do backend');
+        return [];
+      }
+      
+      // Garantir que seja um array
+      const employees = Array.isArray(response.data) ? response.data : [];
+      console.log(`[EmployeeService] ${employees.length} funcionários encontrados`);
+      
+      return employees;
+    } catch (error: any) {
+      console.error('[EmployeeService] Erro ao buscar funcionários por status:', error);
+      console.error('[EmployeeService] Status do erro:', error.response?.status);
+      console.error('[EmployeeService] Mensagem do erro:', error.response?.data);
+      return [];
+    }
+  },
+
+  /**
    * Buscar funcionário por CPF exato (normalizado)
    */
   async searchEmployeeByCpf(cpf: string): Promise<Employee | null> {

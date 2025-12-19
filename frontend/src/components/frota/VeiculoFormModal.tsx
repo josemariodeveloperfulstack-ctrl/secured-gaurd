@@ -73,10 +73,17 @@ const VeiculoFormModal: React.FC<VeiculoFormModalProps> = ({ isOpen, onClose, on
 
   // Buscar funcionários ativos
   const { data: employees, isLoading: employeesLoading, error: employeesError } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeService.getEmployeesByStatus('ACTIVE'),
+    queryKey: ['employees', 'ACTIVE'],
+    queryFn: async () => {
+      console.log('🔍 VeiculoFormModal - Buscando funcionários ativos...');
+      const result = await employeeService.getEmployeesByStatus('ACTIVE');
+      console.log('✅ VeiculoFormModal - Funcionários encontrados:', result?.length || 0);
+      console.log('📋 VeiculoFormModal - Primeiros funcionários:', result?.slice(0, 3));
+      return result;
+    },
     retry: 2,
-    retryDelay: 1000
+    retryDelay: 1000,
+    enabled: isOpen // Só buscar quando o modal estiver aberto
   });
 
   // Buscar empresas

@@ -6,7 +6,6 @@ import com.z7design.secured_guard.repository.VehicleRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -137,15 +136,79 @@ public class FrotaController {
     @PostMapping("/vehicles")
     public ResponseEntity<VehicleDTO> createVehicle(@Valid @RequestBody Vehicle vehicle) {
         try {
-            if (vehicleRepository.existsByPlate(vehicle.getPlate())) {
+            // Validar campos obrigatórios
+            if (vehicle.getPlate() == null || vehicle.getPlate().trim().isEmpty()) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Placa é obrigatória");
                 return ResponseEntity.badRequest().build();
             }
+            
+            if (vehicle.getModel() == null || vehicle.getModel().trim().isEmpty()) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Modelo é obrigatório");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (vehicle.getBrand() == null || vehicle.getBrand().trim().isEmpty()) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Marca é obrigatória");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (vehicle.getYear() == null) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Ano é obrigatório");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (vehicle.getStatus() == null) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Status é obrigatório");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (vehicle.getFuelType() == null) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Tipo de combustível é obrigatório");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (vehicle.getCapacity() == null) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Capacidade é obrigatória");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (vehicle.getCurrentMileage() == null) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Quilometragem atual é obrigatória");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Verificar se a placa já existe
+            if (vehicleRepository.existsByPlate(vehicle.getPlate())) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Placa já existe: " + vehicle.getPlate());
+                return ResponseEntity.badRequest().build();
+            }
+            
+            System.out.println("[DEBUG] FrotaController.createVehicle() - Dados recebidos:");
+            System.out.println("  - Placa: " + vehicle.getPlate());
+            System.out.println("  - Modelo: " + vehicle.getModel());
+            System.out.println("  - Marca: " + vehicle.getBrand());
+            System.out.println("  - Ano: " + vehicle.getYear());
+            System.out.println("  - Status: " + vehicle.getStatus());
+            System.out.println("  - Combustível: " + vehicle.getFuelType());
+            System.out.println("  - Capacidade: " + vehicle.getCapacity());
+            System.out.println("  - Quilometragem: " + vehicle.getCurrentMileage());
+            
             Vehicle savedVehicle = vehicleRepository.save(vehicle);
+            System.out.println("[DEBUG] FrotaController.createVehicle() - Veículo salvo com sucesso: " + savedVehicle.getId());
             return ResponseEntity.ok(VehicleDTO.fromEntity(savedVehicle));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            System.err.println("[DEBUG] FrotaController.createVehicle() - Erro de integridade: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
+        } catch (jakarta.validation.ConstraintViolationException e) {
+            System.err.println("[DEBUG] FrotaController.createVehicle() - Erro de validação: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             System.err.println("[DEBUG] FrotaController.createVehicle() - Erro: " + e.getMessage());
+            System.err.println("[DEBUG] FrotaController.createVehicle() - Tipo: " + e.getClass().getSimpleName());
             e.printStackTrace();
-            throw e;
+            return ResponseEntity.status(500).build();
         }
     }
     

@@ -182,16 +182,22 @@ export const messageService = {
   async getUnreadSystemCount(): Promise<number> {
     try {
       const response = await api.get('/api/v1/messages/unread/count', {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        validateStatus: (status) => status < 500 // Não lançar erro para 401/403, apenas para 500+
       });
       return response.data || 0;
-    } catch (error) {
-      if ((error as any)?.response?.status === 403) {
-        console.warn('[MessageService] Usuário sem permissão para ler contagem de mensagens, retornando zero');
+    } catch (error: any) {
+      // Evitar loops de redirecionamento - retornar 0 silenciosamente
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        console.warn('[MessageService] Usuário sem permissão ou não autenticado, retornando zero');
         return 0;
       }
-      console.warn('[MessageService] Backend indisponível, usando contagem de demonstração');
-      return 2; // Corresponde às mensagens de demo
+      if (error?.code === 'ERR_TOO_MANY_REDIRECTS') {
+        console.warn('[MessageService] Loop de redirecionamento detectado, retornando zero');
+        return 0;
+      }
+      console.warn('[MessageService] Erro ao buscar contagem de mensagens:', error?.message || error);
+      return 0; // Sempre retornar 0 em caso de erro para evitar quebrar o frontend
     }
   },
 
