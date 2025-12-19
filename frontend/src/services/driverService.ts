@@ -1,6 +1,8 @@
 import api from '@/lib/axios';
 import { Driver } from '@/types/driver';
 
+export type { Driver };
+
 export interface CreateDriverDTO {
   name: string;
   licenseNumber?: string;

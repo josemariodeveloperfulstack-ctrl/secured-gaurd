@@ -134,56 +134,263 @@ public class FrotaController {
     }
     
     @PostMapping("/vehicles")
-    public ResponseEntity<VehicleDTO> createVehicle(@Valid @RequestBody Vehicle vehicle) {
+    public ResponseEntity<?> createVehicle(@RequestBody Map<String, Object> vehicleData) {
         try {
+            System.out.println("[DEBUG] FrotaController.createVehicle() - Dados recebidos (raw): " + vehicleData);
+            
             // Validar campos obrigatórios
-            if (vehicle.getPlate() == null || vehicle.getPlate().trim().isEmpty()) {
+            String plate = (String) vehicleData.get("plate");
+            if (plate == null || plate.trim().isEmpty()) {
                 System.err.println("[DEBUG] FrotaController.createVehicle() - Placa é obrigatória");
-                return ResponseEntity.badRequest().build();
+                return ResponseEntity.badRequest().body(Map.of("error", "Placa é obrigatória"));
             }
             
-            if (vehicle.getModel() == null || vehicle.getModel().trim().isEmpty()) {
+            String model = (String) vehicleData.get("model");
+            if (model == null || model.trim().isEmpty()) {
                 System.err.println("[DEBUG] FrotaController.createVehicle() - Modelo é obrigatório");
-                return ResponseEntity.badRequest().build();
+                return ResponseEntity.badRequest().body(Map.of("error", "Modelo é obrigatório"));
             }
             
-            if (vehicle.getBrand() == null || vehicle.getBrand().trim().isEmpty()) {
+            String brand = (String) vehicleData.get("brand");
+            if (brand == null || brand.trim().isEmpty()) {
                 System.err.println("[DEBUG] FrotaController.createVehicle() - Marca é obrigatória");
-                return ResponseEntity.badRequest().build();
+                return ResponseEntity.badRequest().body(Map.of("error", "Marca é obrigatória"));
             }
             
-            if (vehicle.getYear() == null) {
+            Object yearObj = vehicleData.get("year");
+            Integer year = null;
+            if (yearObj != null) {
+                if (yearObj instanceof Integer) {
+                    year = (Integer) yearObj;
+                } else if (yearObj instanceof Number) {
+                    year = ((Number) yearObj).intValue();
+                } else if (yearObj instanceof String) {
+                    try {
+                        year = Integer.parseInt((String) yearObj);
+                    } catch (NumberFormatException e) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Ano inválido"));
+                    }
+                }
+            }
+            if (year == null) {
                 System.err.println("[DEBUG] FrotaController.createVehicle() - Ano é obrigatório");
-                return ResponseEntity.badRequest().build();
-            }
-            
-            if (vehicle.getStatus() == null) {
-                System.err.println("[DEBUG] FrotaController.createVehicle() - Status é obrigatório");
-                return ResponseEntity.badRequest().build();
-            }
-            
-            if (vehicle.getFuelType() == null) {
-                System.err.println("[DEBUG] FrotaController.createVehicle() - Tipo de combustível é obrigatório");
-                return ResponseEntity.badRequest().build();
-            }
-            
-            if (vehicle.getCapacity() == null) {
-                System.err.println("[DEBUG] FrotaController.createVehicle() - Capacidade é obrigatória");
-                return ResponseEntity.badRequest().build();
-            }
-            
-            if (vehicle.getCurrentMileage() == null) {
-                System.err.println("[DEBUG] FrotaController.createVehicle() - Quilometragem atual é obrigatória");
-                return ResponseEntity.badRequest().build();
+                return ResponseEntity.badRequest().body(Map.of("error", "Ano é obrigatório"));
             }
             
             // Verificar se a placa já existe
-            if (vehicleRepository.existsByPlate(vehicle.getPlate())) {
-                System.err.println("[DEBUG] FrotaController.createVehicle() - Placa já existe: " + vehicle.getPlate());
-                return ResponseEntity.badRequest().build();
+            if (vehicleRepository.existsByPlate(plate)) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Placa já existe: " + plate);
+                return ResponseEntity.badRequest().body(Map.of("error", "Placa já cadastrada"));
             }
             
-            System.out.println("[DEBUG] FrotaController.createVehicle() - Dados recebidos:");
+            // Criar objeto Vehicle
+            Vehicle vehicle = new Vehicle();
+            vehicle.setPlate(plate.toUpperCase().trim());
+            vehicle.setModel(model.trim());
+            vehicle.setBrand(brand.trim());
+            vehicle.setYear(year);
+            
+            // Campos opcionais
+            if (vehicleData.get("color") != null) {
+                vehicle.setColor(((String) vehicleData.get("color")).trim());
+            }
+            
+            // Status
+            Object statusObj = vehicleData.get("status");
+            if (statusObj != null) {
+                try {
+                    String statusStr = statusObj.toString().toUpperCase();
+                    vehicle.setStatus(Vehicle.VehicleStatus.valueOf(statusStr));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[DEBUG] Status inválido: " + statusObj);
+                    vehicle.setStatus(Vehicle.VehicleStatus.ACTIVE); // Default
+                }
+            } else {
+                vehicle.setStatus(Vehicle.VehicleStatus.ACTIVE);
+            }
+            
+            // FuelType
+            Object fuelTypeObj = vehicleData.get("fuelType");
+            if (fuelTypeObj != null) {
+                try {
+                    String fuelTypeStr = fuelTypeObj.toString().toUpperCase();
+                    vehicle.setFuelType(Vehicle.FuelType.valueOf(fuelTypeStr));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[DEBUG] Tipo de combustível inválido: " + fuelTypeObj);
+                    vehicle.setFuelType(Vehicle.FuelType.FLEX); // Default
+                }
+            } else {
+                vehicle.setFuelType(Vehicle.FuelType.FLEX);
+            }
+            
+            // Capacity
+            Object capacityObj = vehicleData.get("capacity");
+            if (capacityObj != null) {
+                if (capacityObj instanceof Integer) {
+                    vehicle.setCapacity((Integer) capacityObj);
+                } else if (capacityObj instanceof Number) {
+                    vehicle.setCapacity(((Number) capacityObj).intValue());
+                } else if (capacityObj instanceof String) {
+                    try {
+                        vehicle.setCapacity(Integer.parseInt((String) capacityObj));
+                    } catch (NumberFormatException e) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Capacidade inválida"));
+                    }
+                }
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "Capacidade é obrigatória"));
+            }
+            
+            // CurrentMileage
+            Object mileageObj = vehicleData.get("currentMileage");
+            if (mileageObj != null) {
+                if (mileageObj instanceof Integer) {
+                    vehicle.setCurrentMileage((Integer) mileageObj);
+                } else if (mileageObj instanceof Number) {
+                    vehicle.setCurrentMileage(((Number) mileageObj).intValue());
+                } else if (mileageObj instanceof String) {
+                    try {
+                        vehicle.setCurrentMileage(Integer.parseInt((String) mileageObj));
+                    } catch (NumberFormatException e) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Quilometragem inválida"));
+                    }
+                }
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "Quilometragem atual é obrigatória"));
+            }
+            
+            // Campos opcionais UUID
+            if (vehicleData.get("responsibleEmployeeId") != null) {
+                try {
+                    String empIdStr = vehicleData.get("responsibleEmployeeId").toString();
+                    if (!empIdStr.isEmpty()) {
+                        vehicle.setResponsibleEmployeeId(UUID.fromString(empIdStr));
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[DEBUG] UUID de funcionário responsável inválido: " + vehicleData.get("responsibleEmployeeId"));
+                }
+            }
+            
+            if (vehicleData.get("departmentId") != null) {
+                try {
+                    String deptIdStr = vehicleData.get("departmentId").toString();
+                    if (!deptIdStr.isEmpty()) {
+                        vehicle.setDepartmentId(UUID.fromString(deptIdStr));
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[DEBUG] UUID de departamento inválido: " + vehicleData.get("departmentId"));
+                }
+            }
+            
+            if (vehicleData.get("companyId") != null) {
+                try {
+                    String compIdStr = vehicleData.get("companyId").toString();
+                    if (!compIdStr.isEmpty()) {
+                        vehicle.setCompanyId(UUID.fromString(compIdStr));
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[DEBUG] UUID de empresa inválido: " + vehicleData.get("companyId"));
+                }
+            }
+            
+            if (vehicleData.get("workPostId") != null) {
+                try {
+                    String wpIdStr = vehicleData.get("workPostId").toString();
+                    if (!wpIdStr.isEmpty()) {
+                        vehicle.setWorkPostId(UUID.fromString(wpIdStr));
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[DEBUG] UUID de posto de trabalho inválido: " + vehicleData.get("workPostId"));
+                }
+            }
+            
+            // Campos opcionais String
+            if (vehicleData.get("department") != null) {
+                vehicle.setDepartment(vehicleData.get("department").toString());
+            }
+            
+            if (vehicleData.get("notes") != null) {
+                vehicle.setNotes(vehicleData.get("notes").toString());
+            }
+            
+            if (vehicleData.get("photos") != null) {
+                vehicle.setPhotos(vehicleData.get("photos").toString());
+            }
+            
+            // Campos de data (opcionais)
+            if (vehicleData.get("lastMaintenanceDate") != null) {
+                try {
+                    String dateStr = vehicleData.get("lastMaintenanceDate").toString();
+                    if (!dateStr.isEmpty()) {
+                        vehicle.setLastMaintenanceDate(java.time.LocalDate.parse(dateStr));
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DEBUG] Data de última manutenção inválida: " + vehicleData.get("lastMaintenanceDate"));
+                }
+            }
+            
+            if (vehicleData.get("nextMaintenanceDate") != null) {
+                try {
+                    String dateStr = vehicleData.get("nextMaintenanceDate").toString();
+                    if (!dateStr.isEmpty()) {
+                        vehicle.setNextMaintenanceDate(java.time.LocalDate.parse(dateStr));
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DEBUG] Data de próxima manutenção inválida: " + vehicleData.get("nextMaintenanceDate"));
+                }
+            }
+            
+            if (vehicleData.get("insuranceExpiryDate") != null) {
+                try {
+                    String dateStr = vehicleData.get("insuranceExpiryDate").toString();
+                    if (!dateStr.isEmpty()) {
+                        vehicle.setInsuranceExpiryDate(java.time.LocalDate.parse(dateStr));
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DEBUG] Data de vencimento do seguro inválida: " + vehicleData.get("insuranceExpiryDate"));
+                }
+            }
+            
+            if (vehicleData.get("documentationExpiryDate") != null) {
+                try {
+                    String dateStr = vehicleData.get("documentationExpiryDate").toString();
+                    if (!dateStr.isEmpty()) {
+                        vehicle.setDocumentationExpiryDate(java.time.LocalDate.parse(dateStr));
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DEBUG] Data de vencimento da documentação inválida: " + vehicleData.get("documentationExpiryDate"));
+                }
+            }
+            
+            if (vehicleData.get("acquisitionDate") != null) {
+                try {
+                    String dateStr = vehicleData.get("acquisitionDate").toString();
+                    if (!dateStr.isEmpty()) {
+                        vehicle.setAcquisitionDate(java.time.LocalDate.parse(dateStr));
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DEBUG] Data de aquisição inválida: " + vehicleData.get("acquisitionDate"));
+                }
+            }
+            
+            // AcquisitionValue
+            if (vehicleData.get("acquisitionValue") != null) {
+                try {
+                    Object valueObj = vehicleData.get("acquisitionValue");
+                    if (valueObj instanceof Number) {
+                        vehicle.setAcquisitionValue(java.math.BigDecimal.valueOf(((Number) valueObj).doubleValue()));
+                    } else if (valueObj instanceof String) {
+                        String valueStr = ((String) valueObj).replace(",", ".").replace("R$", "").trim();
+                        if (!valueStr.isEmpty()) {
+                            vehicle.setAcquisitionValue(new java.math.BigDecimal(valueStr));
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DEBUG] Valor de aquisição inválido: " + vehicleData.get("acquisitionValue"));
+                }
+            }
+            
+            System.out.println("[DEBUG] FrotaController.createVehicle() - Dados processados:");
             System.out.println("  - Placa: " + vehicle.getPlate());
             System.out.println("  - Modelo: " + vehicle.getModel());
             System.out.println("  - Marca: " + vehicle.getBrand());
@@ -193,22 +400,87 @@ public class FrotaController {
             System.out.println("  - Capacidade: " + vehicle.getCapacity());
             System.out.println("  - Quilometragem: " + vehicle.getCurrentMileage());
             
-            Vehicle savedVehicle = vehicleRepository.save(vehicle);
-            System.out.println("[DEBUG] FrotaController.createVehicle() - Veículo salvo com sucesso: " + savedVehicle.getId());
-            return ResponseEntity.ok(VehicleDTO.fromEntity(savedVehicle));
+            // Validar campos obrigatórios antes de salvar
+            if (vehicle.getStatus() == null) {
+                System.err.println("[DEBUG] Status é null, definindo como ACTIVE");
+                vehicle.setStatus(Vehicle.VehicleStatus.ACTIVE);
+            }
+            if (vehicle.getFuelType() == null) {
+                System.err.println("[DEBUG] FuelType é null, definindo como FLEX");
+                vehicle.setFuelType(Vehicle.FuelType.FLEX);
+            }
+            if (vehicle.getCapacity() == null) {
+                System.err.println("[DEBUG] Capacity é null, retornando erro");
+                return ResponseEntity.badRequest().body(Map.of("error", "Capacidade é obrigatória"));
+            }
+            if (vehicle.getCurrentMileage() == null) {
+                System.err.println("[DEBUG] CurrentMileage é null, retornando erro");
+                return ResponseEntity.badRequest().body(Map.of("error", "Quilometragem atual é obrigatória"));
+            }
+            
+            try {
+                Vehicle savedVehicle = vehicleRepository.save(vehicle);
+                System.out.println("[DEBUG] FrotaController.createVehicle() - Veículo salvo com sucesso: " + savedVehicle.getId());
+                
+                try {
+                    VehicleDTO dto = VehicleDTO.fromEntity(savedVehicle);
+                    System.out.println("[DEBUG] FrotaController.createVehicle() - DTO criado com sucesso");
+                    return ResponseEntity.ok(dto);
+                } catch (Exception dtoException) {
+                    System.err.println("[DEBUG] FrotaController.createVehicle() - Erro ao criar DTO: " + dtoException.getMessage());
+                    dtoException.printStackTrace();
+                    // Retornar o veículo salvo mesmo sem DTO
+                    return ResponseEntity.status(500).body(Map.of(
+                        "error", "Erro ao converter veículo para DTO: " + dtoException.getMessage(),
+                        "vehicleId", savedVehicle.getId().toString()
+                    ));
+                }
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Erro de integridade ao salvar: " + e.getMessage());
+                e.printStackTrace();
+                String errorMessage = "Erro de integridade";
+                if (e.getMessage() != null && e.getMessage().contains("plate")) {
+                    errorMessage = "Placa já cadastrada";
+                } else if (e.getMessage() != null) {
+                    errorMessage = "Erro de integridade: " + e.getMessage();
+                }
+                return ResponseEntity.badRequest().body(Map.of("error", errorMessage));
+            } catch (jakarta.validation.ConstraintViolationException e) {
+                System.err.println("[DEBUG] FrotaController.createVehicle() - Erro de validação ao salvar: " + e.getMessage());
+                e.printStackTrace();
+                return ResponseEntity.badRequest().body(Map.of("error", "Erro de validação: " + e.getMessage()));
+            }
+            
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             System.err.println("[DEBUG] FrotaController.createVehicle() - Erro de integridade: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("error", "Erro de integridade: " + e.getMessage()));
         } catch (jakarta.validation.ConstraintViolationException e) {
             System.err.println("[DEBUG] FrotaController.createVehicle() - Erro de validação: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("error", "Erro de validação: " + e.getMessage()));
         } catch (Exception e) {
             System.err.println("[DEBUG] FrotaController.createVehicle() - Erro: " + e.getMessage());
             System.err.println("[DEBUG] FrotaController.createVehicle() - Tipo: " + e.getClass().getSimpleName());
+            System.err.println("[DEBUG] FrotaController.createVehicle() - Stack trace completo:");
             e.printStackTrace();
-            return ResponseEntity.status(500).build();
+            
+            // Mensagem de erro mais amigável
+            String errorMessage = "Erro ao criar veículo";
+            if (e.getMessage() != null) {
+                if (e.getMessage().contains("NullPointerException")) {
+                    errorMessage = "Erro: algum campo obrigatório não foi preenchido corretamente";
+                } else if (e.getMessage().contains("ConstraintViolation")) {
+                    errorMessage = "Erro de validação: verifique os dados informados";
+                } else {
+                    errorMessage = "Erro ao criar veículo: " + e.getMessage();
+                }
+            }
+            
+            return ResponseEntity.status(500).body(Map.of(
+                "error", errorMessage,
+                "details", e.getClass().getSimpleName() + ": " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido")
+            ));
         }
     }
     

@@ -14,6 +14,8 @@ import { KmControl, Vehicle } from '@/types/fleet';
 import { Calendar, Clock, MapPin, Fuel, DollarSign, Calculator, AlertCircle } from 'lucide-react';
 import kmControlService from '@/services/kmControlService';
 import { useToast } from '@/components/ui/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { workPostService, WorkPost } from '@/services/workPostService';
 
 interface KmControlFormModalProps {
   isOpen: boolean;
@@ -92,6 +94,15 @@ const KmControlFormModal: React.FC<KmControlFormModalProps> = ({
   const [supervisors, setSupervisors] = useState<string[]>([]);
   const [isLoadingSupervisors, setIsLoadingSupervisors] = useState(false);
   const { toast } = useToast();
+
+  // Buscar postos de trabalho do banco de dados
+  const { data: workPosts, isLoading: workPostsLoading, error: workPostsError } = useQuery({
+    queryKey: ['workPosts', 'kmControl'],
+    queryFn: () => workPostService.getWorkPosts(),
+    retry: 2,
+    retryDelay: 1000,
+    enabled: isOpen // Só buscar quando o modal estiver aberto
+  });
 
   // Buscar supervisores ao abrir o modal
   useEffect(() => {
@@ -620,15 +631,47 @@ const KmControlFormModal: React.FC<KmControlFormModalProps> = ({
                 <MapPin className="inline h-4 w-4 mr-2 text-seguranca-yellow" />
                 Posto de Trabalho
               </Label>
-              <Input
-                id="workPost"
+              <Select
                 value={formData.workPost}
-                onChange={(e) => handleInputChange('workPost', e.target.value)}
-                placeholder="Nome do posto"
-                className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11 ${
+                onValueChange={(value) => handleInputChange('workPost', value)}
+                disabled={workPostsLoading || !!workPostsError}
+              >
+                <SelectTrigger className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11 ${
                   errors.workPost ? 'border-red-500' : ''
-                }`}
-              />
+                }`}>
+                  <SelectValue placeholder={workPostsLoading ? "Carregando postos..." : "Selecione um posto de trabalho"} />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600">
+                  {workPostsLoading ? (
+                    <SelectItem value="loading" disabled className="text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                        Carregando postos...
+                      </div>
+                    </SelectItem>
+                  ) : workPostsError ? (
+                    <SelectItem value="error" disabled className="text-red-400">
+                      ❌ Erro ao carregar postos
+                    </SelectItem>
+                  ) : workPosts && workPosts.length > 0 ? (
+                    workPosts.map((workPost) => (
+                      <SelectItem key={workPost.id} value={workPost.name} className="text-seguranca-lightgray hover:bg-gray-700">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-3 w-3 text-seguranca-yellow" />
+                          {workPost.name}
+                          {workPost.postCode && (
+                            <span className="text-xs text-gray-400">({workPost.postCode})</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-data" disabled className="text-gray-400">
+                      📭 Nenhum posto encontrado
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
               {errors.workPost && <p className="text-red-500 text-sm">{errors.workPost}</p>}
             </div>
           </div>

@@ -347,14 +347,13 @@ const Frota: React.FC = () => {
       placa: fine.vehiclePlate || '',
       marca: vehicle?.brand || '',
       modelo: vehicle?.model || '',
-      // TESTE: Adicionar dados de motorista para teste
-      motorista_id: fine.driverId || 'TESTE-001',
-      motorista_nome: fine.driverName || 'João Silva (Teste)',
-      motorista_cnh: fine.driverLicenseNumber || '12345678901',
+      motorista_id: fine.driverId || undefined,
+      motorista_nome: fine.driverName || undefined,
+      motorista_cnh: fine.driverLicenseNumber || undefined,
       data_infracao: fine.date,
       data_vencimento: fine.dueDate || fine.date,
       valor: fine.amount,
-      pontos: 0, // Não temos essa informação na API
+      pontos: fine.points || 0,
       tipo_infracao: fine.description,
       local_infracao: fine.location,
       status: fine.status === 'PAID' ? 'paga' : fine.status === 'PENDING' ? 'pendente' : 'vencida',

@@ -386,7 +386,7 @@ const MultasTable: React.FC<MultasTableProps> = ({
         </div>
       </div>
 
-      <div className="rounded-md border border-gray-600">
+      <div className="rounded-md border border-gray-600 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-gray-600">
@@ -399,19 +399,24 @@ const MultasTable: React.FC<MultasTableProps> = ({
                   />
                 </TableHead>
               )}
-              <TableHead className="text-seguranca-lightgray">Veículo</TableHead>
-              <TableHead className="text-seguranca-lightgray">Motorista</TableHead>
-              <TableHead className="text-seguranca-lightgray">Infração</TableHead>
-              <TableHead className="text-seguranca-lightgray">Data Infração</TableHead>
-              <TableHead className="text-seguranca-lightgray">Vencimento</TableHead>
-              <TableHead className="text-seguranca-lightgray">Valor</TableHead>
-              <TableHead className="text-seguranca-lightgray">Pontos</TableHead>
-              <TableHead className="text-seguranca-lightgray">Status</TableHead>
-              <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Veículo</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Motorista</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Infração</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Data Infração</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Vencimento</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Valor</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap min-w-[100px] w-[100px]" style={{ display: 'table-cell' }}>Pontos</TableHead>
+              <TableHead className="text-seguranca-lightgray whitespace-nowrap">Status</TableHead>
+              <TableHead className="text-seguranca-lightgray text-right whitespace-nowrap">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {multas.map((multa) => (
+            {multas.map((multa) => {
+              // Debug: verificar se pontos está presente
+              if (process.env.NODE_ENV === 'development') {
+                console.log('🔍 Multa:', multa.placa, 'Pontos:', multa.pontos);
+              }
+              return (
               <TableRow key={multa.id} className="border-gray-600 hover:bg-seguranca-black">
                 {showSelection && (
                   <TableCell>
@@ -476,9 +481,9 @@ const MultasTable: React.FC<MultasTableProps> = ({
                     </span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="border-gray-600 text-seguranca-lightgray">
-                    {multa.pontos} pts
+                <TableCell className="whitespace-nowrap min-w-[100px] w-[100px]" style={{ display: 'table-cell' }}>
+                  <Badge variant="outline" className="border-gray-600 text-seguranca-lightgray bg-gray-800/50">
+                    {multa.pontos || 0} pts
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -518,7 +523,8 @@ const MultasTable: React.FC<MultasTableProps> = ({
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>

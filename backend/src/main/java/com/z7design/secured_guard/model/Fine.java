@@ -50,6 +50,9 @@ public class Fine {
     @Column
     private LocalDate paymentDate;
     
+    @Column
+    private Integer points; // Pontos na CNH
+    
     @Column(nullable = false)
     private LocalDateTime createdAt;
     

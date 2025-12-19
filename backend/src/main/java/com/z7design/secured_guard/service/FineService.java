@@ -139,6 +139,9 @@ public class FineService {
         fine.setStatus(fineDTO.getStatus());
         fine.setDueDate(fineDTO.getDueDate());
         fine.setPaymentDate(fineDTO.getPaymentDate());
+        if (fineDTO.getPoints() != null) {
+            fine.setPoints(fineDTO.getPoints());
+        }
         
         Fine savedFine = fineRepository.save(fine);
         log.info("Multa atualizada com sucesso: {}", savedFine.getId());

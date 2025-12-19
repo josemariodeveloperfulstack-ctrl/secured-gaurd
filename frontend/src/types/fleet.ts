@@ -62,6 +62,7 @@ export interface Fine {
   status: 'PENDING' | 'PAID' | 'CANCELLED';
   dueDate?: string;
   paymentDate?: string;
+  points?: number; // Pontos na CNH
   createdAt: string;
 }
 

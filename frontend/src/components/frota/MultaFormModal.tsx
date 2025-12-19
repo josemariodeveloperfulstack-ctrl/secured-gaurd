@@ -25,7 +25,7 @@ import {
   FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { employeeService, Employee } from '@/services/employeeService';
+import driverService, { Driver } from '@/services/driverService';
 import fleetService from '@/services/fleetService';
 
 interface Veiculo {
@@ -83,7 +83,7 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
     status: 'pendente',
     observacoes: '',
   });
-  const [motoristas, setMotoristas] = useState<Employee[]>([]);
+  const [motoristas, setMotoristas] = useState<Driver[]>([]);
   const [selectedMotorista, setSelectedMotorista] = useState<string>('');
 
   useEffect(() => {
@@ -121,36 +121,48 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       console.log('🔄 Carregando lista de motoristas...');
-      employeeService.getAllEmployees()
-        .then(employees => {
-          // Filtrar apenas funcionários ativos
-          const ativos = employees.filter(emp => emp.status === 'ATIVO' || emp.status === 'ACTIVE');
+      driverService.getDrivers()
+        .then(drivers => {
+          // Filtrar apenas motoristas ativos
+          const ativos = drivers.filter(driver => driver.status === 'ATIVO' || driver.status === 'ACTIVE');
           setMotoristas(ativos);
           console.log('✅ Motoristas carregados:', ativos.length);
-          
-          // Se estiver editando, preencher motorista APÓS carregar a lista
-          if (multa) {
-            const driverId = (multa as any).driverId || multa.motorista_id;
-            console.log('👤 Preenchendo motorista da multa:', driverId);
-            
-            if (driverId) {
-              // Verificar se o motorista existe na lista
-              const motoristaExiste = ativos.find(m => m.id === driverId);
-              if (motoristaExiste) {
-                setSelectedMotorista(driverId);
-                console.log('✅ Motorista selecionado:', motoristaExiste.name);
-              } else {
-                console.warn('⚠️ Motorista não encontrado na lista:', driverId);
-              }
-            }
-          }
+          console.log('✅ Lista de motoristas:', ativos.map(d => ({ id: d.id, name: d.name })));
         })
         .catch(error => {
           console.error('Erro ao carregar motoristas:', error);
           setMotoristas([]);
         });
     }
-  }, [isOpen, multa]);
+  }, [isOpen]);
+
+  // Preencher motorista quando multa ou motoristas mudarem
+  useEffect(() => {
+    if (multa && motoristas.length > 0) {
+      // Tentar múltiplas formas de obter o ID do motorista
+      const driverId = (multa as any).driverId || 
+                      (multa as any).driver?.id || 
+                      multa.motorista_id ||
+                      (multa as any).motoristaId;
+      console.log('👤 Preenchendo motorista da multa:', driverId);
+      console.log('👤 Dados completos da multa:', multa);
+      console.log('👤 Motoristas disponíveis:', motoristas.length);
+      
+      if (driverId) {
+        // Verificar se o motorista existe na lista
+        const motoristaExiste = motoristas.find(m => m.id === driverId);
+        if (motoristaExiste) {
+          setSelectedMotorista(driverId);
+          console.log('✅ Motorista selecionado:', motoristaExiste.name);
+        } else {
+          console.warn('⚠️ Motorista não encontrado na lista:', driverId);
+          console.warn('⚠️ IDs disponíveis na lista:', motoristas.map(m => m.id).slice(0, 5));
+        }
+      } else {
+        console.warn('⚠️ Nenhum ID de motorista encontrado na multa');
+      }
+    }
+  }, [multa, motoristas]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -215,20 +227,22 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
       return;
     }
 
-    if (!selectedMotorista) {
-      toast({
-        title: 'Erro!',
-        description: 'Selecione o motorista responsável.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    // Motorista é opcional - não validar
+    // if (!selectedMotorista) {
+    //   toast({
+    //     title: 'Erro!',
+    //     description: 'Selecione o motorista responsável.',
+    //     variant: 'destructive',
+    //   });
+    //   return;
+    // }
 
     setIsLoading(true);
     try {
       // Preparar dados da multa para a API
       const multaPayload = {
         vehicleId: formData.veiculo_id,
+        driverId: selectedMotorista || undefined,
         date: formData.data_infracao,
         dueDate: formData.data_vencimento,
         amount: formData.valor,
@@ -236,7 +250,10 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
         location: formData.local_infracao,
         status: formData.status === 'paga' ? 'PAID' : formData.status === 'pendente' ? 'PENDING' : 'CANCELLED',
         paymentDate: formData.status === 'paga' ? formData.data_vencimento : undefined,
+        points: formData.pontos || 0,
       };
+      
+      console.log('🚀 MultaFormModal - Payload enviado:', multaPayload);
 
       if (multa) {
         // Atualizar multa existente
@@ -362,7 +379,7 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
             <CardContent>
               <div className="space-y-2">
                 <Label htmlFor="motorista" className="text-seguranca-lightgray">
-                  Motorista Responsável *
+                  Motorista Responsável
                 </Label>
                 <Select
                   value={selectedMotorista}
@@ -372,11 +389,20 @@ const MultaFormModal: React.FC<MultaFormModalProps> = ({
                     <SelectValue placeholder="Selecione o motorista" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    {motoristas.map((motorista) => (
-                      <SelectItem key={motorista.id} value={motorista.id}>
-                        {motorista.name}
+                    {motoristas.length === 0 ? (
+                      <SelectItem value="loading" disabled className="text-gray-400">
+                        Carregando motoristas...
                       </SelectItem>
-                    ))}
+                    ) : (
+                      motoristas.map((motorista) => (
+                        <SelectItem key={motorista.id} value={motorista.id}>
+                          {motorista.name}
+                          {motorista.licenseNumber && (
+                            <span className="text-xs text-gray-400 ml-2">(CNH: {motorista.licenseNumber})</span>
+                          )}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

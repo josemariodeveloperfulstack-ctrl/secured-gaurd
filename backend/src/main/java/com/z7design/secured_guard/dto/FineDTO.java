@@ -28,6 +28,7 @@ public class FineDTO {
     private Fine.FineStatus status;
     private LocalDate dueDate;
     private LocalDate paymentDate;
+    private Integer points; // Pontos na CNH
     private LocalDateTime createdAt;
     
     public static FineDTO fromEntity(Fine fine) {
@@ -59,6 +60,7 @@ public class FineDTO {
         dto.setStatus(fine.getStatus());
         dto.setDueDate(fine.getDueDate());
         dto.setPaymentDate(fine.getPaymentDate());
+        dto.setPoints(fine.getPoints());
         dto.setCreatedAt(fine.getCreatedAt());
         return dto;
     }
