@@ -66,22 +66,26 @@ const DayVisitsModal: React.FC<DayVisitsModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] bg-seguranca-graphite border-gray-700">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Visitas do dia - {formatDate(date)}
+      <DialogContent className="w-[95vw] sm:max-w-[800px] max-h-[90vh] sm:max-h-[80vh] bg-seguranca-graphite border-gray-700 p-4 sm:p-6">
+        <DialogHeader className="pb-3 sm:pb-4">
+          <DialogTitle className="text-white flex flex-col sm:flex-row items-start sm:items-center gap-2 text-base sm:text-lg">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Visitas do dia - </span>
+              <span className="sm:hidden">Visitas - </span>
+            </div>
+            <span className="text-sm sm:text-base">{formatDate(date)}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[calc(90vh-180px)] sm:max-h-[60vh] overflow-y-auto -mx-4 sm:-mx-6 px-4 sm:px-6">
           {visits.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
-              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhuma visita agendada para este dia</p>
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-sm sm:text-base">Nenhuma visita agendada para este dia</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {visits.map((visit) => (
                 <Card
                   key={visit.id}
@@ -91,48 +95,53 @@ const DayVisitsModal: React.FC<DayVisitsModalProps> = ({
                     onOpenChange(false);
                   }}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-white font-semibold text-lg">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <h3 className="text-white font-semibold text-sm sm:text-lg truncate">
                             {visit.workPostName || visit.location || 'Visita sem local'}
                           </h3>
-                          {getStatusBadge(visit.status)}
+                          <div className="flex-shrink-0">
+                            {getStatusBadge(visit.status)}
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                           {visit.visitTime && (
                             <div className="flex items-center gap-2 text-gray-300">
-                              <Clock className="w-4 h-4 text-seguranca-yellow" />
-                              <span className="font-medium">{formatTime(visit.visitTime)}</span>
+                              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-seguranca-yellow flex-shrink-0" />
+                              <span className="font-medium truncate">{formatTime(visit.visitTime)}</span>
                             </div>
                           )}
 
                           {visit.location && (
                             <div className="flex items-center gap-2 text-gray-300">
-                              <MapPin className="w-4 h-4 text-blue-400" />
-                              <span>{visit.location}</span>
+                              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400 flex-shrink-0" />
+                              <span className="truncate">{visit.location}</span>
                             </div>
                           )}
 
                           {visit.clientName && (
                             <div className="flex items-center gap-2 text-gray-300">
-                              <Building className="w-4 h-4 text-green-400" />
-                              <span>{visit.clientName}</span>
+                              <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-400 flex-shrink-0" />
+                              <span className="truncate">{visit.clientName}</span>
                             </div>
                           )}
 
                           {visit.supervisorName && (
                             <div className="flex items-center gap-2 text-gray-300">
-                              <User className="w-4 h-4 text-purple-400" />
-                              <span>Supervisor: {visit.supervisorName}</span>
+                              <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 flex-shrink-0" />
+                              <span className="truncate">
+                                <span className="hidden sm:inline">Supervisor: </span>
+                                {visit.supervisorName}
+                              </span>
                             </div>
                           )}
                         </div>
 
                         {visit.observations && (
-                          <p className="text-sm text-gray-400 mt-2 line-clamp-2">
+                          <p className="text-xs sm:text-sm text-gray-400 mt-2 line-clamp-2">
                             {visit.observations}
                           </p>
                         )}
@@ -141,7 +150,7 @@ const DayVisitsModal: React.FC<DayVisitsModalProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-seguranca-yellow hover:text-seguranca-yellow/80 hover:bg-gray-800"
+                        className="text-seguranca-yellow hover:text-seguranca-yellow/80 hover:bg-gray-800 w-full sm:w-auto self-stretch sm:self-auto"
                         onClick={(e) => {
                           e.stopPropagation();
                           onVisitClick(visit);
@@ -149,7 +158,7 @@ const DayVisitsModal: React.FC<DayVisitsModalProps> = ({
                         }}
                       >
                         <Eye className="w-4 h-4 mr-1" />
-                        Ver Detalhes
+                        <span className="text-xs sm:text-sm">Ver Detalhes</span>
                       </Button>
                     </div>
                   </CardContent>
@@ -159,10 +168,10 @@ const DayVisitsModal: React.FC<DayVisitsModalProps> = ({
           )}
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-gray-700">
+        <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-700 mt-4">
           <Button
             onClick={() => onOpenChange(false)}
-            className="bg-seguranca-graphite border-gray-600 text-gray-300 hover:bg-gray-700"
+            className="bg-seguranca-graphite border-gray-600 text-gray-300 hover:bg-gray-700 w-full sm:w-auto"
           >
             Fechar
           </Button>

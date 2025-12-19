@@ -117,8 +117,15 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   const safeEscalas = Array.isArray(escalas) ? escalas : [];
   
   console.log('📊 EscalaTrabalhoTable - escalas recebidas:', escalas);
+  console.log('📊 EscalaTrabalhoTable - tipo:', typeof escalas);
+  console.log('📊 EscalaTrabalhoTable - é array?', Array.isArray(escalas));
   console.log('📊 EscalaTrabalhoTable - safeEscalas:', safeEscalas);
   console.log('📊 EscalaTrabalhoTable - quantidade:', safeEscalas.length);
+  console.log('📊 EscalaTrabalhoTable - isLoading:', isLoading);
+  
+  if (safeEscalas.length > 0) {
+    console.log('📊 EscalaTrabalhoTable - Primeira escala:', safeEscalas[0]);
+  }
   
   const filteredEscalas = safeEscalas.filter(escala => {
     const matchesSearch = 
@@ -157,7 +164,8 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
       );
   }
 
-  if (safeEscalas.length === 0 && !isLoading) {
+  // Renderizar estado vazio apenas se realmente não houver escalas E não estiver carregando
+  if (!isLoading && safeEscalas.length === 0) {
     return (
       <Card className="bg-seguranca-graphite border-gray-700">
         <CardContent className="p-6">
@@ -166,16 +174,26 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
             <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">
               Nenhuma escala encontrada
             </h3>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-400 mb-4">
               Ainda não há escalas de trabalho para exibir.
             </p>
-            <Button 
-              onClick={onCreate}
-              className="mt-6 bg-seguranca-red hover:bg-seguranca-darkred"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Nova Escala
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                onClick={onRefresh}
+                variant="outline"
+                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Atualizar
+              </Button>
+              <Button 
+                onClick={onCreate}
+                className="bg-seguranca-red hover:bg-seguranca-darkred"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Nova Escala
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

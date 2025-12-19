@@ -66,15 +66,25 @@ export const scheduleService = {
    */
   async findAll(): Promise<Schedule[]> {
     try {
+      console.log('🔍 ScheduleService.findAll - Fazendo requisição para /api/schedules');
       const response = await api.get('/api/schedules');
       const data = response.data;
       
-      console.log('🔍 ScheduleService - Dados recebidos:', typeof data, data);
+      console.log('🔍 ScheduleService.findAll - Response status:', response.status);
+      console.log('🔍 ScheduleService.findAll - Response headers:', response.headers);
+      console.log('🔍 ScheduleService.findAll - Dados recebidos:', typeof data, data);
+      console.log('🔍 ScheduleService.findAll - É array?', Array.isArray(data));
+      console.log('🔍 ScheduleService.findAll - Quantidade:', Array.isArray(data) ? data.length : 'N/A');
       
       // Garantir que sempre retornamos um array
       if (Array.isArray(data)) {
+        console.log('✅ ScheduleService.findAll - Retornando array com', data.length, 'escalas');
+        if (data.length > 0) {
+          console.log('📋 ScheduleService.findAll - Primeira escala:', data[0]);
+        }
         return data;
       } else if (data && Array.isArray(data.content)) {
+        console.log('✅ ScheduleService.findAll - Retornando data.content com', data.content.length, 'escalas');
         return data.content;
       } else if (data && typeof data === 'number') {
         // Se o backend retornou apenas um número (count), retornar array vazio
@@ -82,13 +92,16 @@ export const scheduleService = {
         return [];
       } else {
         console.warn('⚠️ API retornou dados em formato inesperado:', data);
+        console.warn('⚠️ Tipo dos dados:', typeof data);
+        console.warn('⚠️ Estrutura dos dados:', JSON.stringify(data, null, 2));
         return [];
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro detalhado ao buscar escalas de trabalho:', error);
       console.error('❌ Status:', error.response?.status);
       console.error('❌ Data:', error.response?.data);
       console.error('❌ Headers:', error.response?.headers);
+      console.error('❌ Mensagem:', error.message);
       // Em caso de erro, lançar exceção para que o componente possa tratar
       throw error;
     }

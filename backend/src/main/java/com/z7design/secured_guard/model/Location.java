@@ -24,6 +24,8 @@ import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 @Data
 @Entity
@@ -54,6 +56,7 @@ public class Location {
     @NotNull(message = "Unit is required")
     @ManyToOne
     @JoinColumn(name = "unit_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JsonIgnoreProperties("locations")
     private Unit unit;
     

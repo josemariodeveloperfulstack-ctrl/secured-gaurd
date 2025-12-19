@@ -24,6 +24,7 @@ import com.z7design.secured_guard.model.Unit;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +72,11 @@ public class ScheduleService {
     @Transactional
     public Schedule createFromDTO(CreateScheduleDTO dto) {
         try {
+            // Validar que pelo menos locationId ou workPostId foi fornecido
+            if (dto.getLocationId() == null && dto.getWorkPostId() == null) {
+                throw new IllegalArgumentException("Location ID ou WorkPost ID é obrigatório");
+            }
+            
             // Buscar Employee
             Employee employee = employeeRepository.findById(dto.getEmployeeId())
                     .orElseThrow(() -> new EntityNotFoundException("Employee not found with ID: " + dto.getEmployeeId()));
@@ -250,7 +256,40 @@ public class ScheduleService {
 
     @Transactional
     public void delete(UUID id) {
-        scheduleRepository.deleteById(id);
+        try {
+            // Excluir EmployeeSchedules relacionados primeiro (para evitar constraint violation)
+            List<EmployeeSchedule> employeeSchedules = employeeScheduleRepository.findByScheduleId(id);
+            if (!employeeSchedules.isEmpty()) {
+                log.info("🗑️ Excluindo {} EmployeeSchedule(s) relacionados à escala {}", employeeSchedules.size(), id);
+                employeeScheduleRepository.deleteAll(employeeSchedules);
+            }
+            
+            // Tentar deletar usando deleteById primeiro
+            scheduleRepository.deleteById(id);
+            log.info("✅ Escala excluída com sucesso: {}", id);
+        } catch (org.hibernate.FetchNotFoundException | org.springframework.orm.jpa.JpaObjectRetrievalFailureException e) {
+            // Tratar caso onde Unit não existe mais (orphan record)
+            // Isso acontece quando Location referencia uma Unit que foi deletada
+            log.warn("⚠️ Location referencia Unit inexistente ao excluir escala {}. Tentando exclusão forçada com query nativa...", id);
+            try {
+                // Usar query nativa para deletar diretamente sem carregar relacionamentos
+                scheduleRepository.deleteByIdNative(id);
+                log.info("✅ Escala excluída com sucesso (forçada via query nativa): {}", id);
+            } catch (Exception e2) {
+                log.error("❌ Erro ao excluir escala {} mesmo com exclusão forçada: {}", id, e2.getMessage());
+                throw new RuntimeException("Erro ao excluir escala: " + e2.getMessage(), e2);
+            }
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            log.warn("⚠️ Tentativa de excluir escala inexistente: {}", id);
+            throw new EntityNotFoundException("Schedule not found with ID: " + id);
+        } catch (DataIntegrityViolationException e) {
+            log.error("❌ Erro de integridade ao excluir escala {}: {}", id, e.getMessage());
+            throw new RuntimeException("Não é possível excluir esta escala pois ela possui relacionamentos que impedem a exclusão. " + 
+                    "Remova os relacionamentos antes de tentar novamente.", e);
+        } catch (Exception e) {
+            log.error("❌ Erro ao excluir escala {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Erro ao excluir escala: " + e.getMessage(), e);
+        }
     }
 
     public Schedule findById(UUID id) {
@@ -268,33 +307,23 @@ public class ScheduleService {
 
     public List<Schedule> findAll() {
         try {
-            log.info("Buscando todas as escalas com relacionamentos");
+            log.info("🔍 Buscando todas as escalas com relacionamentos");
             // Tentar usar o método com JOIN FETCH para carregar relacionamentos eager
             List<Schedule> schedules = scheduleRepository.findAllWithRelations();
             
-            // Filtrar escalas com Location inválida (null devido a @NotFound)
-            List<Schedule> validSchedules = schedules.stream()
-                .filter(schedule -> {
-                    try {
-                        // Tentar acessar a location para verificar se está válida
-                        if (schedule.getLocation() == null) {
-                            log.warn("⚠️ Escala {} tem Location inválida (null), será filtrada", schedule.getId());
-                            return false;
-                        }
-                        return true;
-                    } catch (Exception e) {
-                        log.warn("⚠️ Erro ao verificar Location da escala {}: {}", schedule.getId(), e.getMessage());
-                        return false;
-                    }
-                })
-                .toList();
+            log.info("✅ Escalas encontradas (findAllWithRelations): {} registros", schedules.size());
             
-            if (validSchedules.size() < schedules.size()) {
-                log.warn("⚠️ {} escalas foram filtradas devido a Locations inválidas", schedules.size() - validSchedules.size());
+            // Se retornou vazio, tentar método padrão como fallback
+            if (schedules == null || schedules.isEmpty()) {
+                log.warn("⚠️ findAllWithRelations retornou vazio, tentando método padrão");
+                List<Schedule> allSchedules = scheduleRepository.findAll();
+                log.info("✅ Escalas encontradas (método padrão): {} registros", allSchedules != null ? allSchedules.size() : 0);
+                return allSchedules != null ? allSchedules : new java.util.ArrayList<>();
             }
             
-            log.info("✅ Escalas encontradas: {} registros válidos (de {} total)", validSchedules.size(), schedules.size());
-            return validSchedules;
+            // Retornar todas as escalas, mesmo com Location null
+            // O @NotFound(action = NotFoundAction.IGNORE) já trata isso no modelo
+            return schedules;
         } catch (Exception e) {
             log.error("❌ Erro ao buscar escalas com relacionamentos", e);
             log.error("❌ Tipo de exceção: {}", e.getClass().getName());
@@ -303,27 +332,19 @@ public class ScheduleService {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
                 log.error("❌ Tipo da causa: {}", e.getCause().getClass().getName());
             }
-            // Se falhar, usar o método padrão e filtrar
+            // Se falhar, usar o método padrão
             try {
-                log.info("Tentando buscar escalas com método padrão");
+                log.info("🔄 Tentando buscar escalas com método padrão (fallback)");
                 List<Schedule> allSchedules = scheduleRepository.findAll();
                 
-                // Filtrar escalas com Location inválida
-                List<Schedule> validSchedules = allSchedules.stream()
-                    .filter(schedule -> {
-                        try {
-                            if (schedule.getLocation() == null) {
-                                return false;
-                            }
-                            return true;
-                        } catch (Exception ex) {
-                            return false;
-                        }
-                    })
-                    .toList();
-                
-                log.info("✅ Escalas encontradas (método padrão): {} registros válidos", validSchedules.size());
-                return validSchedules;
+                log.info("✅ Escalas encontradas (método padrão): {} registros", allSchedules.size());
+                if (allSchedules.size() > 0) {
+                    log.info("📋 Primeira escala (método padrão): ID={}, Employee={}, Date={}", 
+                        allSchedules.get(0).getId(), 
+                        allSchedules.get(0).getEmployee() != null ? allSchedules.get(0).getEmployee().getName() : "null",
+                        allSchedules.get(0).getScheduleDate());
+                }
+                return allSchedules;
             } catch (Exception e2) {
                 log.error("❌ Erro também no método padrão", e2);
                 throw new RuntimeException("Erro ao buscar escalas: " + e2.getMessage(), e2);

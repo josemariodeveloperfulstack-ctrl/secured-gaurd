@@ -125,6 +125,13 @@ public class ActivityReportService {
         activityReport.setStartTime(createDTO.getStartTime());
         activityReport.setEndTime(createDTO.getEndTime());
         activityReport.setDescription(createDTO.getDescription());
+        // Garantir que as listas sejam inicializadas
+        if (activityReport.getPhotos() == null) {
+            activityReport.setPhotos(new java.util.ArrayList<>());
+        }
+        if (activityReport.getDocuments() == null) {
+            activityReport.setDocuments(new java.util.ArrayList<>());
+        }
         // Handle embedded objects and collections
         if (createDTO.getBallisticPlate() != null) {
             BallisticPlate bp = new BallisticPlate();

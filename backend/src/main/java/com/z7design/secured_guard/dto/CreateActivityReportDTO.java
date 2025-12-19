@@ -11,16 +11,13 @@ import java.util.UUID;
 public class CreateActivityReportDTO {
     @NotNull(message = "Employee ID is required")
     private UUID employeeId;
-    @NotBlank(message = "Employee name is required")
-    private String employeeName;
+    private String employeeName; // Opcional, será preenchido pelo service
     @NotNull(message = "Client ID is required")
     private UUID clientId;
-    @NotBlank(message = "Client name is required")
-    private String clientName;
+    private String clientName; // Opcional, será preenchido pelo service
     @NotNull(message = "Work Post ID is required")
     private UUID workPostId;
-    @NotBlank(message = "Work Post name is required")
-    private String workPostName;
+    private String workPostName; // Opcional, será preenchido pelo service
     @NotNull(message = "Date is required")
     private LocalDate date;
     @NotNull(message = "Start time is required")

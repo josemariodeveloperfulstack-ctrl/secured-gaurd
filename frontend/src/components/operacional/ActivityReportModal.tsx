@@ -119,19 +119,73 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
     loadWorkPostsForClient();
   }, [formData.clientId]);
 
+  // Preservar workPostId quando os postos são carregados e há um report sendo editado
+  useEffect(() => {
+    if (report && filteredWorkPosts.length > 0) {
+      const reportWorkPostId = report.workPostId?.toString() || report.workPostId || '';
+      
+      console.log('🔍 Verificando preservação de workPostId:', {
+        reportWorkPostId,
+        formDataWorkPostId: formData.workPostId,
+        filteredWorkPostsCount: filteredWorkPosts.length,
+        availableWorkPostIds: filteredWorkPosts.map(wp => ({ id: wp.id, name: wp.name }))
+      });
+      
+      if (reportWorkPostId) {
+        // Verificar se o workPostId do report existe na lista de postos carregados
+        // Comparar tanto como string quanto como UUID
+        const workPostExists = filteredWorkPosts.some(wp => {
+          const wpId = wp.id?.toString() || wp.id || '';
+          return wpId === reportWorkPostId;
+        });
+        
+        if (workPostExists) {
+          if (formData.workPostId !== reportWorkPostId) {
+            console.log('✅ Atualizando workPostId do report:', reportWorkPostId);
+            setFormData(prev => ({ ...prev, workPostId: reportWorkPostId }));
+          } else {
+            console.log('✅ workPostId já está correto:', formData.workPostId);
+          }
+        } else {
+          console.warn('⚠️ WorkPostId do report não encontrado na lista de postos:', reportWorkPostId);
+          console.warn('⚠️ Postos disponíveis:', filteredWorkPosts.map(wp => ({ id: wp.id, name: wp.name })));
+          // Tentar encontrar por nome como fallback
+          if (report.workPostName) {
+            const foundByName = filteredWorkPosts.find(wp => wp.name === report.workPostName);
+            if (foundByName) {
+              const foundId = foundByName.id?.toString() || foundByName.id || '';
+              console.log('✅ Encontrado posto por nome, atualizando workPostId:', foundId);
+              setFormData(prev => ({ ...prev, workPostId: foundId }));
+            } else {
+              console.warn('⚠️ Posto não encontrado nem por ID nem por nome. Nome procurado:', report.workPostName);
+            }
+          }
+        }
+      } else {
+        console.warn('⚠️ report.workPostId está vazio ou undefined');
+      }
+    }
+  }, [report, filteredWorkPosts]);
+
   useEffect(() => {
     if (report) {
-      setFormData({
+      console.log('📋 Inicializando formData com dados do report:', {
         employeeId: report.employeeId,
         clientId: report.clientId,
         workPostId: report.workPostId,
-        date: report.date,
-        startTime: report.startTime,
-        endTime: report.endTime,
-        description: report.description,
+        workPostName: report.workPostName
+      });
+      setFormData({
+        employeeId: report.employeeId || '',
+        clientId: report.clientId || '',
+        workPostId: report.workPostId || '',
+        date: report.date || '',
+        startTime: report.startTime || '',
+        endTime: report.endTime || '',
+        description: report.description || '',
         ballisticPlate: report.ballisticPlate,
         weaponRegistry: report.weaponRegistry,
-        absenceStatus: report.absenceStatus,
+        absenceStatus: report.absenceStatus || 'PRESENT',
         divergences: report.divergences,
         medicalConsultation: report.medicalConsultation
       });
@@ -164,10 +218,12 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
       [field]: value
     }));
     
-    // Limpar posto selecionado quando cliente mudar
-    // A filtragem será feita pelo useEffect
+    // Limpar posto selecionado quando cliente mudar (exceto se estiver editando e o cliente não mudou)
     if (field === 'clientId') {
-      setFormData(prev => ({ ...prev, workPostId: '' }));
+      // Só limpar se o cliente realmente mudou e não estamos preservando o workPostId do report
+      if (!report || report.clientId !== value) {
+        setFormData(prev => ({ ...prev, workPostId: '' }));
+      }
     }
   };
 
@@ -440,7 +496,7 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
               <div className="space-y-2">
                 <Label htmlFor="workPostId" className="text-sm font-medium">Posto de Trabalho *</Label>
                 <Select 
-                  value={formData.workPostId} 
+                  value={formData.workPostId || ''} 
                   onValueChange={(value) => handleInputChange('workPostId', value)}
                   disabled={!formData.clientId || loadingWorkPosts}
                 >
@@ -454,11 +510,17 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
                     } />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredWorkPosts.map((workPost) => (
-                      <SelectItem key={workPost.id} value={workPost.id}>
-                        {workPost.name}
-                      </SelectItem>
-                    ))}
+                    {loadingWorkPosts ? (
+                      <SelectItem value="loading" disabled>Carregando postos...</SelectItem>
+                    ) : filteredWorkPosts.length === 0 ? (
+                      <SelectItem value="no-posts" disabled>Nenhum posto encontrado</SelectItem>
+                    ) : (
+                      filteredWorkPosts.map((workPost) => (
+                        <SelectItem key={workPost.id} value={workPost.id}>
+                          {workPost.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 {formData.clientId && filteredWorkPosts.length === 0 && !loadingWorkPosts && (

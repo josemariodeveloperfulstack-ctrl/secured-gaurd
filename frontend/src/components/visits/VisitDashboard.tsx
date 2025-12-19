@@ -1,8 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, User, Building, Camera, Upload, QrCode, Map, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, MapPin, Clock, User, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -221,20 +220,23 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* Header - Responsivo */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Controle de Visitas</h1>
-          <p className="text-gray-400">Gerencie visitas de supervisão</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Controle de Visitas</h1>
+          <p className="text-sm sm:text-base text-gray-400">Gerencie visitas de supervisão</p>
         </div>
-        <Button onClick={handleCreateVisit} className="bg-seguranca-yellow hover:bg-seguranca-yellow/90">
+        <Button 
+          onClick={handleCreateVisit} 
+          className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 w-full sm:w-auto"
+        >
           <Calendar className="w-4 h-4 mr-2" />
           Nova Visita
         </Button>
       </div>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Estatísticas - Responsivo */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card className="bg-seguranca-graphite border-gray-700">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -284,13 +286,13 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
         </Card>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros - Responsivo */}
       <Card className="bg-seguranca-graphite border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white">Filtros</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-white text-base sm:text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div>
               <Label className="text-gray-300">Data Início</Label>
               <Input
@@ -327,10 +329,10 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end sm:col-span-2 md:col-span-1">
               <Button
                 onClick={loadVisits}
-                className="bg-seguranca-yellow hover:bg-seguranca-yellow/90"
+                className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 w-full sm:w-auto"
               >
                 Aplicar Filtros
               </Button>
@@ -339,37 +341,42 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
+      {/* Tabs - Responsivo */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-seguranca-graphite border-gray-700">
-          <TabsTrigger value="calendar" className="text-gray-300 data-[state='active']:text-white">
-            <Calendar className="w-4 h-4 mr-2" />
-            Calendário
+        <TabsList className="bg-seguranca-graphite border-gray-700 w-full sm:w-auto grid grid-cols-3 sm:flex">
+          <TabsTrigger value="calendar" className="text-gray-300 data-[state='active']:text-white text-xs sm:text-sm">
+            <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Calendário</span>
+            <span className="sm:hidden">Cal.</span>
           </TabsTrigger>
-          <TabsTrigger value="list" className="text-gray-300 data-[state='active']:text-white">
-            <User className="w-4 h-4 mr-2" />
-            Lista
+          <TabsTrigger value="list" className="text-gray-300 data-[state='active']:text-white text-xs sm:text-sm">
+            <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Lista</span>
+            <span className="sm:hidden">List.</span>
           </TabsTrigger>
-          <TabsTrigger value="reports" className="text-gray-300 data-[state='active']:text-white">
-            <FileText className="w-4 h-4 mr-2" />
-            Relatórios
+          <TabsTrigger value="reports" className="text-gray-300 data-[state='active']:text-white text-xs sm:text-sm">
+            <FileText className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Relatórios</span>
+            <span className="sm:hidden">Rel.</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="calendar" className="space-y-4">
-          <Card className="bg-seguranca-graphite border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white">Calendário de Visitas</CardTitle>
+        <TabsContent value="calendar" className="space-y-4 mt-4 sm:mt-6">
+          <Card className="bg-seguranca-graphite border-gray-700 overflow-hidden w-full max-w-full">
+            <CardHeader className="pb-2 sm:pb-3 md:pb-4 px-2 sm:px-3 md:px-4 lg:px-6">
+              <CardTitle className="text-white text-sm sm:text-base md:text-lg lg:text-xl">Calendário de Visitas</CardTitle>
             </CardHeader>
-            <CardContent>
-              <VisitCalendar
-                events={calendarEvents}
-                selectedDate={selectedDate}
-                onDateChange={handleDateChange}
-                onEventClick={handleViewVisit}
-                onDayClick={handleDayClick}
-                loading={loading}
-              />
+            <CardContent className="p-1 sm:p-2 md:p-3 lg:p-4 xl:p-6 overflow-hidden w-full max-w-full">
+              <div className="w-full max-w-full overflow-hidden">
+                <VisitCalendar
+                  events={calendarEvents}
+                  selectedDate={selectedDate}
+                  onDateChange={handleDateChange}
+                  onEventClick={handleViewVisit}
+                  onDayClick={handleDayClick}
+                  loading={loading}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

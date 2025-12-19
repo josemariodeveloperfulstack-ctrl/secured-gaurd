@@ -37,11 +37,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.Parameter;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/schedules")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Escalas de Trabalho", description = "Endpoints para gestão de escalas de trabalho dos funcionários.")
 @SecurityRequirement(name = "bearerAuth")
 public class ScheduleController {
@@ -131,7 +133,14 @@ public class ScheduleController {
         })
         @GetMapping
         public ResponseEntity<List<Schedule>> findAll() {
-                return ResponseEntity.ok(scheduleService.findAll());
+                try {
+                        List<Schedule> schedules = scheduleService.findAll();
+                        log.info("📤 Retornando {} escalas para o frontend", schedules.size());
+                        return ResponseEntity.ok(schedules);
+                } catch (Exception e) {
+                        log.error("❌ Erro ao buscar escalas no controller", e);
+                        throw e;
+                }
         }
 
         @Operation(summary = "Gerar relatório PDF de escalas", description = "Gera relatório PDF de escalas com filtros opcionais")

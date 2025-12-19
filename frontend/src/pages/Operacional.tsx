@@ -46,16 +46,18 @@ import EscalaFormModal from '@/components/EscalaFormModal';
 import TransportGuideTab from '@/components/operacional/TransportGuideTab';
 import VisitWidget from '@/components/operacional/VisitWidget';
 
-import { scheduleService, Schedule, CreateScheduleDTO, UpdateScheduleDTO } from '@/services/scheduleService';
+import { scheduleService, Schedule, CreateScheduleDTO, UpdateScheduleDTO, ScheduleStatus } from '@/services/scheduleService';
 
 // Interface para o formulário de escala
 interface EscalaFormData {
   employeeId: string;
   locationId: string;
+  workPostId: string;
   scheduleDate: Date;
   shift: string;
   startTime: string;
   endTime: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
   observations: string;
 }
 import { notificationService, NotificationData } from '@/services/notificationService';
@@ -141,19 +143,34 @@ const Operacional: React.FC = () => {
     try {
       console.log('🔍 Tentando carregar escalas do backend...');
       const data = await scheduleService.findAll();
-      setEscalas(data);
-      console.log('✅ Escalas carregadas do backend:', data.length);
-      toast({
-        title: 'Sucesso',
-        description: `${data.length} escalas carregadas do servidor.`,
-        variant: 'default',
-      });
-    } catch (error) {
+      console.log('📦 Dados recebidos do backend:', data);
+      console.log('📦 Tipo dos dados:', typeof data);
+      console.log('📦 É array?', Array.isArray(data));
+      console.log('📦 Quantidade:', Array.isArray(data) ? data.length : 'N/A');
+      
+      if (Array.isArray(data) && data.length > 0) {
+        console.log('📦 Primeira escala:', data[0]);
+      }
+      
+      setEscalas(Array.isArray(data) ? data : []);
+      console.log('✅ Escalas carregadas do backend:', Array.isArray(data) ? data.length : 0);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        toast({
+          title: 'Sucesso',
+          description: `${data.length} escala${data.length > 1 ? 's' : ''} carregada${data.length > 1 ? 's' : ''} do servidor.`,
+          variant: 'default',
+        });
+      } else {
+        console.warn('⚠️ Nenhuma escala retornada do backend');
+      }
+    } catch (error: any) {
       console.error('❌ Erro detalhado ao carregar escalas:', error);
+      console.error('❌ Erro completo:', JSON.stringify(error, null, 2));
       setEscalas([]);
       toast({
         title: 'Erro de Integração',
-        description: `Falha ao conectar com o backend: ${error.message || 'Erro desconhecido'}`,
+        description: `Falha ao conectar com o backend: ${error?.message || 'Erro desconhecido'}`,
         variant: 'destructive',
       });
     } finally {
@@ -339,11 +356,8 @@ const Operacional: React.FC = () => {
   };
 
   const handleViewActivityReport = (report: ActivityReport) => {
-    toast({
-      title: 'Visualizar Relatório',
-      description: `Visualizando relatório de ${report.employeeName}`,
-    });
-    // TODO: Implementar modal de visualização detalhada
+    setSelectedActivityReport(report);
+    setShowActivityReportViewModal(true);
   };
 
   const handleDeleteActivityReport = async (report: ActivityReport) => {
@@ -612,10 +626,11 @@ const Operacional: React.FC = () => {
       // Converter dados do formulário para o formato da API
       const scheduleData: CreateScheduleDTO = {
         employeeId: escalaData.employeeId,
-        locationId: escalaData.locationId,
+        locationId: escalaData.locationId || escalaData.workPostId, // Usar workPostId como fallback
+        workPostId: escalaData.workPostId, // Incluir workPostId para o backend criar Location automaticamente
         scheduleDate: escalaData.scheduleDate.toISOString().split('T')[0], // Converter Date para string YYYY-MM-DD
         shift: escalaData.shift as 'DAY' | 'NIGHT' | 'MIXED', // Converter string para Shift
-        status: 'PENDING', // Status padrão para novas escalas
+        status: (escalaData.status || 'PENDING') as ScheduleStatus, // Usar status do formulário ou padrão
         observations: escalaData.observations
       };
 
@@ -1188,7 +1203,7 @@ const Operacional: React.FC = () => {
           onConfirm={confirmDeleteEscala}
           title="Excluir Escala"
           description="Tem certeza que deseja excluir esta escala? Esta ação não pode ser desfeita."
-          itemName={escalaToDelete ? `${escalaToDelete.employee.name} - ${new Date(escalaToDelete.scheduleDate).toLocaleDateString('pt-BR')}` : ''}
+          itemName={escalaToDelete ? `${escalaToDelete.employee?.name || 'Funcionário'} - ${new Date(escalaToDelete.scheduleDate).toLocaleDateString('pt-BR')}` : ''}
         />
 
         {/* Modal de Relatório de Atividade */}

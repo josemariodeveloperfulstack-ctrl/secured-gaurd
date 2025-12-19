@@ -2,7 +2,9 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.*;
 import com.z7design.secured_guard.model.enums.ActivityReportStatus;
+import com.z7design.secured_guard.model.enums.AbsenceStatus;
 import com.z7design.secured_guard.service.ActivityReportService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
@@ -19,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,9 +32,11 @@ public class ActivityReportController {
     private static final Logger log = LoggerFactory.getLogger(ActivityReportController.class);
 
     private final ActivityReportService activityReportService;
+    private final ObjectMapper objectMapper;
 
-    public ActivityReportController(ActivityReportService activityReportService) {
+    public ActivityReportController(ActivityReportService activityReportService, ObjectMapper objectMapper) {
         this.activityReportService = activityReportService;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping
@@ -84,14 +89,112 @@ public class ActivityReportController {
         return ResponseEntity.ok(report);
     }
 
-    @PostMapping
-    @Operation(summary = "Criar novo relatório de atividade", description = "Cria um novo relatório de atividade.")
-    public ResponseEntity<ActivityReportDTO> createActivityReport(
-            @Parameter(description = "Dados do relatório de atividade a ser criado") @Valid @RequestBody CreateActivityReportDTO createDTO) {
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Criar novo relatório de atividade (JSON)", description = "Cria um novo relatório de atividade usando application/json.")
+    public ResponseEntity<ActivityReportDTO> createActivityReportJson(
+            @Parameter(description = "Dados do relatório de atividade a ser criado") 
+            @Valid @RequestBody CreateActivityReportDTO createDTO) {
         
-        log.info("POST /api/activity-reports - Criando novo relatório de atividade");
-        ActivityReportDTO createdReport = activityReportService.createActivityReport(createDTO);
-        return new ResponseEntity<>(createdReport, HttpStatus.CREATED);
+        log.info("POST /api/activity-reports (JSON) - Criando novo relatório de atividade");
+        log.info("📋 Dados recebidos - employeeId: {}, clientId: {}, workPostId: {}, date: {}", 
+            createDTO.getEmployeeId(), createDTO.getClientId(), createDTO.getWorkPostId(), createDTO.getDate());
+        
+        try {
+            ActivityReportDTO createdReport = activityReportService.createActivityReport(createDTO);
+            return new ResponseEntity<>(createdReport, HttpStatus.CREATED);
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar relatório de atividade: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Criar novo relatório de atividade (Multipart)", description = "Cria um novo relatório de atividade usando multipart/form-data.")
+    public ResponseEntity<ActivityReportDTO> createActivityReportMultipart(
+            @Parameter(description = "ID do funcionário") @RequestParam String employeeId,
+            @Parameter(description = "ID do cliente") @RequestParam String clientId,
+            @Parameter(description = "ID do posto de trabalho") @RequestParam String workPostId,
+            @Parameter(description = "Data do relatório (YYYY-MM-DD)") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "Hora de início (HH:mm)") @RequestParam String startTime,
+            @Parameter(description = "Hora de fim (HH:mm)") @RequestParam String endTime,
+            @Parameter(description = "Descrição") @RequestParam(required = false) String description,
+            @Parameter(description = "Status de ausência") @RequestParam(required = false) String absenceStatus,
+            @Parameter(description = "Placa balística (JSON string)") @RequestParam(required = false) String ballisticPlate,
+            @Parameter(description = "Registro de arma (JSON string)") @RequestParam(required = false) String weaponRegistry,
+            @Parameter(description = "Divergências") @RequestParam(required = false) String divergences,
+            @Parameter(description = "Consulta médica (JSON string)") @RequestParam(required = false) String medicalConsultation) {
+        
+        log.info("POST /api/activity-reports (Multipart) - Criando novo relatório de atividade");
+        log.info("📋 Dados recebidos - employeeId: {}, clientId: {}, workPostId: {}, date: {}", 
+            employeeId, clientId, workPostId, date);
+        
+        try {
+            CreateActivityReportDTO createDTO = new CreateActivityReportDTO();
+            
+            // Campos obrigatórios
+            createDTO.setEmployeeId(UUID.fromString(employeeId));
+            createDTO.setClientId(UUID.fromString(clientId));
+            createDTO.setWorkPostId(UUID.fromString(workPostId));
+            createDTO.setDate(date);
+            createDTO.setStartTime(LocalTime.parse(startTime));
+            createDTO.setEndTime(LocalTime.parse(endTime));
+            
+            if (description != null) {
+                createDTO.setDescription(description);
+            }
+            
+            if (absenceStatus != null && !absenceStatus.isEmpty()) {
+                try {
+                    createDTO.setAbsenceStatus(AbsenceStatus.valueOf(absenceStatus));
+                } catch (IllegalArgumentException e) {
+                    log.warn("⚠️ Status de ausência inválido: {}, usando PRESENT como padrão", absenceStatus);
+                    createDTO.setAbsenceStatus(AbsenceStatus.PRESENT);
+                }
+            } else {
+                createDTO.setAbsenceStatus(AbsenceStatus.PRESENT);
+            }
+            
+            if (divergences != null) {
+                createDTO.setDivergences(divergences);
+            }
+            
+            // Parse de objetos JSON enviados como strings
+            if (ballisticPlate != null && !ballisticPlate.isEmpty()) {
+                try {
+                    BallisticPlateDTO bp = objectMapper.readValue(ballisticPlate, BallisticPlateDTO.class);
+                    createDTO.setBallisticPlate(bp);
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao fazer parse de ballisticPlate: {}", e.getMessage());
+                }
+            }
+            
+            if (weaponRegistry != null && !weaponRegistry.isEmpty()) {
+                try {
+                    WeaponRegistryDTO wr = objectMapper.readValue(weaponRegistry, WeaponRegistryDTO.class);
+                    createDTO.setWeaponRegistry(wr);
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao fazer parse de weaponRegistry: {}", e.getMessage());
+                }
+            }
+            
+            if (medicalConsultation != null && !medicalConsultation.isEmpty()) {
+                try {
+                    MedicalConsultationDTO mc = objectMapper.readValue(medicalConsultation, MedicalConsultationDTO.class);
+                    createDTO.setMedicalConsultation(mc);
+                } catch (Exception e) {
+                    log.warn("⚠️ Erro ao fazer parse de medicalConsultation: {}", e.getMessage());
+                }
+            }
+            
+            log.info("📋 DTO construído - employeeId: {}, clientId: {}, workPostId: {}, date: {}", 
+                createDTO.getEmployeeId(), createDTO.getClientId(), createDTO.getWorkPostId(), createDTO.getDate());
+            
+            ActivityReportDTO createdReport = activityReportService.createActivityReport(createDTO);
+            return new ResponseEntity<>(createdReport, HttpStatus.CREATED);
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar relatório de atividade: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     @PutMapping("/{id}")

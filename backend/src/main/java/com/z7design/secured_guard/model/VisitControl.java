@@ -24,6 +24,9 @@ public class VisitControl {
     @GeneratedValue
     private UUID id;
 
+    @Column(length = 255)
+    private String title; // Título da visita
+
     @Column(nullable = false)
     private String location;
 

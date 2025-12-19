@@ -2,7 +2,9 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.Schedule;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -22,4 +24,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
            "LEFT JOIN FETCH s.route " +
            "LEFT JOIN FETCH s.patrol")
     List<Schedule> findAllWithRelations();
+    
+    @Modifying
+    @Query(value = "DELETE FROM schedules WHERE id = :id", nativeQuery = true)
+    void deleteByIdNative(@Param("id") UUID id);
 } 

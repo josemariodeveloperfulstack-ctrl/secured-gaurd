@@ -19,6 +19,8 @@ public class VisitControlDTO {
 
     private UUID id;
 
+    private String title; // Título da visita
+
     @NotBlank(message = "Local é obrigatório")
     private String location;
 

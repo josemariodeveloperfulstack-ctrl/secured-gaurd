@@ -85,6 +85,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     shift: '',
     startTime: '',
     endTime: '',
+    status: 'PENDING',
     observations: ''
   });
 
@@ -457,6 +458,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           endTime = typeof end === 'string' && end.length >= 5 ? end.substring(0, 5) : String(end);
         }
 
+        // Extrair status - verificar se existe no initialData ou usar padrão
+        const status = (initialData as any).status || getProperty(initialData, 'status') || 'PENDING';
+        const validStatus: ScheduleStatus = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(status) 
+          ? status as ScheduleStatus 
+          : 'PENDING';
+
         // Garantir que todos os valores sejam sempre strings válidas
         const newFormData = {
           employeeId,
@@ -466,6 +473,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           shift,
           startTime,
           endTime,
+          status: validStatus,
           observations: String(initialData.observations || '')
         };
         console.log('📝 Atualizando formData com dados processados:', newFormData);
@@ -517,6 +525,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           shift: '',
           startTime: '',
           endTime: '',
+          status: 'PENDING',
           observations: ''
         });
         setSelectedClientId('');
@@ -678,6 +687,27 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                     <span className="text-seguranca-lightgray font-medium text-right">{duration || '—'}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className="w-4 h-4 text-seguranca-yellow" />
+                <h3 className="text-base font-semibold text-seguranca-lightgray">Status</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className={
+                  formData.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
+                  formData.status === 'CONFIRMED' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                  formData.status === 'COMPLETED' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                  'bg-red-500/20 text-red-300 border-red-500/30'
+                }>
+                  {formData.status === 'PENDING' && 'Pendente'}
+                  {formData.status === 'CONFIRMED' && 'Confirmada'}
+                  {formData.status === 'COMPLETED' && 'Concluída'}
+                  {formData.status === 'CANCELLED' && 'Cancelada'}
+                </Badge>
               </div>
             </div>
 
@@ -1096,6 +1126,60 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             )}
           </div>
 
+          {/* Status */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-seguranca-yellow" />
+              <Label htmlFor="status" className="text-sm font-medium">
+                Status <span className="text-red-400">*</span>
+              </Label>
+            </div>
+            <Select
+              value={formData.status || 'PENDING'}
+              onValueChange={(value) => {
+                handleInputChange('status', value as ScheduleStatus);
+              }}
+              disabled={mode === 'view'}
+            >
+              <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${
+                mode === 'view' ? 'opacity-50 cursor-not-allowed' : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
+              }`}>
+                <SelectValue placeholder="Selecione o status">
+                  {formData.status === 'PENDING' && 'Pendente'}
+                  {formData.status === 'CONFIRMED' && 'Confirmada'}
+                  {formData.status === 'CANCELLED' && 'Cancelada'}
+                  {formData.status === 'COMPLETED' && 'Concluída'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
+                <SelectItem value="PENDING" className="hover:bg-seguranca-black/50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    Pendente
+                  </div>
+                </SelectItem>
+                <SelectItem value="CONFIRMED" className="hover:bg-seguranca-black/50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    Confirmada
+                  </div>
+                </SelectItem>
+                <SelectItem value="COMPLETED" className="hover:bg-seguranca-black/50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    Concluída
+                  </div>
+                </SelectItem>
+                <SelectItem value="CANCELLED" className="hover:bg-seguranca-black/50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    Cancelada
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Observações */}
           <div className="space-y-3">
             <Label htmlFor="observations" className="text-sm font-medium">
@@ -1145,18 +1229,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             </div>
           </DialogFooter>
         </form>
-
-        {/* Debug Info Helper */}
-        <div className="mt-4 p-4 bg-black/50 rounded text-xs font-mono text-gray-400 overflow-auto max-h-40 border border-gray-700">
-          <p className="font-bold text-gray-200">DEBUG INFO:</p>
-          <p>Mode: {mode}</p>
-          <p>Employees Loaded: {usuarios.length}</p>
-          <p>Clients Loaded: {clientes.length}</p>
-          <p>Postos Loaded: {postosTrabalho.length}</p>
-          <p>Current EmployeeId: {formData.employeeId}</p>
-          <p>Current ClientId: {selectedClientId}</p>
-          <p>Current WorkPostId: {formData.workPostId}</p>
-        </div>
       </DialogContent>
     </Dialog>
   );

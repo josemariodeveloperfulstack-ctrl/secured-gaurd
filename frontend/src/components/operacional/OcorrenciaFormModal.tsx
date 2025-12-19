@@ -131,6 +131,12 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
         return typeLower;
       };
       
+      // Extrair locationId se a ocorrência tiver (pode vir como locationId ou location pode ser um ID)
+      let locationId = '';
+      if ((ocorrencia as any).locationId) {
+        locationId = (ocorrencia as any).locationId;
+      }
+      
       setFormData({
         ...ocorrencia,
         type: normalizeType(ocorrencia.type),
@@ -144,8 +150,15 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
         reason: ocorrencia.reason || '',
         warningNumber: ocorrencia.warningNumber || undefined,
         employeeId: ocorrencia.employeeId || '',
-        locationId: ocorrencia.locationId || '',
+        locationId: locationId || '',
         responsibleId: ''
+      });
+      
+      console.log('📋 FormData inicializado para edição:', {
+        employeeId: ocorrencia.employeeId,
+        location: ocorrencia.location,
+        locationId: locationId,
+        responsible: ocorrencia.responsible
       });
     } else {
       setFormData({
@@ -171,40 +184,67 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
     setErrors({});
   }, [ocorrencia, open]);
 
-  // Atualizar responsibleId quando employees são carregados e há um responsible definido
+  // Atualizar employeeId e responsibleId quando employees são carregados
   useEffect(() => {
-    if (ocorrencia && (formData.responsible || formData.responsibleId) && employees.length > 0 && !formData.responsibleId) {
-      const foundEmployee = employees.find(emp => 
-        emp.name === formData.responsible || 
-        emp.id === formData.responsibleId ||
-        emp.id === formData.responsible ||
-        emp.name === ocorrencia.responsible
-      );
-      if (foundEmployee) {
-        setFormData(prev => ({ 
-          ...prev, 
-          responsibleId: foundEmployee.id,
-          responsible: foundEmployee.name 
-        }));
+    if (ocorrencia && employees.length > 0) {
+      // Atualizar employeeId se houver employeeId ou employeeName na ocorrência
+      if (ocorrencia.employeeId) {
+        const foundEmployee = employees.find(emp => 
+          emp.id === ocorrencia.employeeId ||
+          emp.id === formData.employeeId ||
+          emp.name === ocorrencia.employeeName
+        );
+        if (foundEmployee && formData.employeeId !== foundEmployee.id) {
+          console.log('🔍 Atualizando employeeId:', foundEmployee.id, 'para funcionário:', foundEmployee.name);
+          setFormData(prev => ({ 
+            ...prev, 
+            employeeId: foundEmployee.id
+          }));
+        }
+      }
+      
+      // Atualizar responsibleId se houver responsible definido
+      if (formData.responsible || ocorrencia.responsible) {
+        const foundEmployee = employees.find(emp => 
+          emp.name === formData.responsible || 
+          emp.name === ocorrencia.responsible ||
+          (formData.responsibleId && emp.id === formData.responsibleId)
+        );
+        if (foundEmployee && formData.responsibleId !== foundEmployee.id) {
+          console.log('🔍 Atualizando responsibleId:', foundEmployee.id, 'para responsável:', foundEmployee.name);
+          setFormData(prev => ({ 
+            ...prev, 
+            responsibleId: foundEmployee.id,
+            responsible: foundEmployee.name 
+          }));
+        }
       }
     }
-  }, [ocorrencia, employees, formData.responsible, formData.responsibleId]);
+  }, [ocorrencia, employees, formData.responsible, formData.responsibleId, formData.employeeId]);
 
   // Atualizar locationId quando workPosts são carregados e há um location definido
   useEffect(() => {
-    if (ocorrencia && (formData.location || formData.locationId) && workPosts.length > 0 && !formData.locationId) {
+    if (ocorrencia && workPosts.length > 0 && formData.location) {
+      // Buscar locationId pelo nome do location (backend retorna apenas o nome, não o ID)
       const foundPost = workPosts.find(post => 
-        post.name === formData.location || 
-        post.id === formData.locationId ||
-        post.id === formData.location ||
-        post.name === ocorrencia.location
+        post.name === formData.location ||
+        post.name === ocorrencia.location ||
+        (formData.locationId && post.id === formData.locationId) ||
+        ((ocorrencia as any).locationId && post.id === (ocorrencia as any).locationId)
       );
+      
       if (foundPost) {
-        setFormData(prev => ({ 
-          ...prev, 
-          locationId: foundPost.id,
-          location: foundPost.name 
-        }));
+        // Só atualizar se o locationId ainda não estiver definido ou for diferente
+        if (!formData.locationId || formData.locationId !== foundPost.id) {
+          console.log('🔍 Atualizando locationId:', foundPost.id, 'para location:', foundPost.name);
+          setFormData(prev => ({ 
+            ...prev, 
+            locationId: foundPost.id,
+            location: foundPost.name 
+          }));
+        }
+      } else {
+        console.warn('⚠️ Posto de trabalho não encontrado para location:', formData.location || ocorrencia.location);
       }
     }
   }, [ocorrencia, workPosts, formData.location, formData.locationId]);
@@ -548,22 +588,33 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                 </Label>
                 <Select
                   value={formData.employeeId || ''}
-                  onValueChange={(value) => handleInputChange('employeeId', value)}
+                  onValueChange={(value) => {
+                    console.log('👤 Funcionário selecionado:', value);
+                    handleInputChange('employeeId', value);
+                  }}
                   disabled={loadingEmployees}
                 >
                   <SelectTrigger className={`bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11 ${errors.employeeId ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder={loadingEmployees ? 'Carregando...' : 'Selecione um funcionário'}>
-                      {formData.employeeId && !loadingEmployees && (
-                        employees.find(emp => emp.id === formData.employeeId)?.name || ''
+                      {formData.employeeId && !loadingEmployees && employees.length > 0 && (
+                        employees.find(emp => emp.id === formData.employeeId)?.name || 
+                        ocorrencia?.employeeName || 
+                        ''
                       )}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                    {employees.map((employee, index) => (
-                      <SelectItem key={employee.id || `employee-${index}`} value={employee.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {employee.name}
-                      </SelectItem>
-                    ))}
+                    {loadingEmployees ? (
+                      <SelectItem value="loading" disabled>Carregando funcionários...</SelectItem>
+                    ) : employees.length === 0 ? (
+                      <SelectItem value="empty" disabled>Nenhum funcionário encontrado</SelectItem>
+                    ) : (
+                      employees.map((employee, index) => (
+                        <SelectItem key={employee.id || `employee-${index}`} value={employee.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                          {employee.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 {errors.employeeId && <p className="text-red-500 text-sm">{errors.employeeId}</p>}
@@ -574,36 +625,44 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                   Setor/Posto de Trabalho <span className="text-seguranca-red">*</span>
                 </Label>
                 <Select
-                  value={formData.locationId || formData.location}
+                  value={formData.locationId || ''}
                   onValueChange={(value) => {
-                    const selectedPost = workPosts.find(post => post.id === value || post.name === value);
+                    console.log('📍 Posto de trabalho selecionado:', value);
+                    const selectedPost = workPosts.find(post => post.id === value);
                     if (selectedPost) {
                       handleInputChange('location', selectedPost.name);
                       setFormData(prev => ({ ...prev, locationId: selectedPost.id }));
-                    } else {
-                      handleInputChange('location', value);
                     }
                   }}
                   disabled={loadingWorkPosts}
                 >
                   <SelectTrigger className={`bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11 ${errors.location ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder={loadingWorkPosts ? 'Carregando...' : 'Selecione o posto de trabalho'}>
-                      {((formData.locationId || formData.location) && !loadingWorkPosts) && (
-                        workPosts.find(post => post.id === formData.locationId || post.name === formData.location)?.name || formData.location || ''
+                      {formData.locationId && !loadingWorkPosts && workPosts.length > 0 && (
+                        workPosts.find(post => post.id === formData.locationId)?.name || 
+                        formData.location || 
+                        ocorrencia?.location || 
+                        ''
                       )}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
-                    {workPosts.map((post, index) => (
-                      <SelectItem key={post.id || `post-${index}`} value={post.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{post.name}</span>
-                          {post.client && (
-                            <span className="text-xs text-gray-400">Cliente: {post.client}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {loadingWorkPosts ? (
+                      <SelectItem value="loading" disabled>Carregando postos de trabalho...</SelectItem>
+                    ) : workPosts.length === 0 ? (
+                      <SelectItem value="empty" disabled>Nenhum posto de trabalho encontrado</SelectItem>
+                    ) : (
+                      workPosts.map((post, index) => (
+                        <SelectItem key={post.id || `post-${index}`} value={post.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{post.name}</span>
+                            {post.client && (
+                              <span className="text-xs text-gray-400">Cliente: {post.client}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 {errors.location && <p className="text-red-500 text-sm">{errors.location}</p>}

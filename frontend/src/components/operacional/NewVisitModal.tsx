@@ -106,9 +106,34 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
     setLoading(true);
 
     try {
-      console.log('🔗 Criando nova visita:', formData);
+      // Mapear dados do formulário para o formato esperado pela API
+      const scheduledDateTime = new Date(formData.scheduledAt);
+      const visitDate = scheduledDateTime.toISOString().split('T')[0]; // yyyy-MM-dd
+      const scheduledTime = scheduledDateTime.toTimeString().split(' ')[0].substring(0, 5); // HH:mm
       
-      const response = await api.post('/api/visit-controls', formData);
+      // Buscar nome do funcionário responsável
+      const assignedEmployee = employees.find(emp => emp.id === formData.assignedToId);
+      const assignedTo = assignedEmployee ? assignedEmployee.name : '';
+      
+      // Buscar nome do posto de trabalho para usar como location se necessário
+      const workPost = workPosts.find(wp => wp.id === formData.workPostId);
+      const location = workPost ? workPost.name : '';
+      
+      const visitData = {
+        title: formData.title || undefined,
+        workPostId: formData.workPostId || undefined,
+        supervisorId: formData.supervisorId || undefined,
+        assignedTo: assignedTo,
+        location: location,
+        visitDate: visitDate,
+        scheduledAt: scheduledTime,
+        observations: formData.description || undefined,
+        status: 'SCHEDULED' // Status padrão
+      };
+      
+      console.log('🔗 Criando nova visita:', visitData);
+      
+      const response = await api.post('/api/visit-controls', visitData);
       
       console.log('✅ Visita criada com sucesso:', response.data);
       
@@ -181,9 +206,9 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <Label htmlFor="workPostId" className="text-gray-300">Setor / Posto de Trabalho *</Label>
+                  <Label htmlFor="workPostId" className="text-gray-300 text-sm sm:text-base">Setor / Posto de Trabalho *</Label>
                   <Select 
                     value={formData.workPostId} 
                     onValueChange={(value) => setFormData({ ...formData, workPostId: value })}
@@ -231,9 +256,9 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <Label htmlFor="assignedToId" className="text-gray-300">Funcionário Responsável *</Label>
+                  <Label htmlFor="assignedToId" className="text-gray-300 text-sm sm:text-base">Funcionário Responsável *</Label>
                   <Select 
                     value={formData.assignedToId} 
                     onValueChange={(value) => setFormData({ ...formData, assignedToId: value })}
@@ -280,9 +305,9 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <Label htmlFor="priority" className="text-gray-300">Prioridade</Label>
+                  <Label htmlFor="priority" className="text-gray-300 text-sm sm:text-base">Prioridade</Label>
                   <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
                     <SelectTrigger className="bg-gray-700 border-gray-600 text-white mt-1">
                       <SelectValue />
@@ -307,7 +332,7 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                 </div>
               </div>
               <div>
-                <Label htmlFor="description" className="text-gray-300">Descrição / Observações</Label>
+                <Label htmlFor="description" className="text-gray-300 text-sm sm:text-base">Descrição / Observações</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
@@ -318,12 +343,12 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-gray-600">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 pt-3 sm:pt-4 border-t border-gray-600">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setOpen(false)}
-                  className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+                  className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 w-full sm:w-auto order-2 sm:order-1"
                   disabled={loading}
                 >
                   Cancelar
@@ -331,7 +356,7 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
                 <Button
                   type="submit"
                   disabled={loading || loadingData}
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto order-1 sm:order-2"
                 >
                   {loading ? (
                     <>

@@ -13,10 +13,10 @@ public class CreateScheduleDTO {
     @NotNull(message = "Employee ID is required")
     private UUID employeeId;
     
-    @NotNull(message = "Location ID is required")
+    // LocationId é opcional se workPostId for fornecido (o backend criará a Location automaticamente)
     private UUID locationId;
     
-    private UUID workPostId; // Posto de trabalho (opcional)
+    private UUID workPostId; // Posto de trabalho (opcional, mas recomendado)
     
     @NotNull(message = "Schedule date is required")
     private LocalDate scheduleDate;

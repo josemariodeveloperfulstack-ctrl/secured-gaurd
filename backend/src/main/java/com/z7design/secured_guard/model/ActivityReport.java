@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -66,10 +67,10 @@ public class ActivityReport {
     private MedicalConsultation medicalConsultation;
 
     @OneToMany(mappedBy = "activityReport", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ActivityReportPhoto> photos;
+    private List<ActivityReportPhoto> photos = new ArrayList<>();
 
     @OneToMany(mappedBy = "activityReport", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ActivityReportDocument> documents;
+    private List<ActivityReportDocument> documents = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supervisor_id")
@@ -228,6 +229,9 @@ public class ActivityReport {
     }
 
     public List<ActivityReportDocument> getDocuments() {
+        if (documents == null) {
+            documents = new ArrayList<>();
+        }
         return documents;
     }
 

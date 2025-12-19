@@ -72,7 +72,7 @@ public class ActivityReportDTO {
             mcDto.setResult(entity.getMedicalConsultation().getResult());
             dto.setMedicalConsultation(mcDto);
         }
-        if (entity.getPhotos() != null) {
+        if (entity.getPhotos() != null && !entity.getPhotos().isEmpty()) {
             dto.setPhotos(entity.getPhotos().stream().map(photo -> {
                 ActivityReportPhotoDTO photoDto = new ActivityReportPhotoDTO();
                 photoDto.setId(photo.getId());
@@ -81,8 +81,10 @@ public class ActivityReportDTO {
                 photoDto.setTimestamp(photo.getTimestamp());
                 return photoDto;
             }).collect(Collectors.toList()));
+        } else {
+            dto.setPhotos(java.util.Collections.emptyList());
         }
-        if (entity.getDocuments() != null) {
+        if (entity.getDocuments() != null && !entity.getDocuments().isEmpty()) {
             dto.setDocuments(entity.getDocuments().stream().map(doc -> {
                 ActivityReportDocumentDTO docDto = new ActivityReportDocumentDTO();
                 docDto.setId(doc.getId());
@@ -93,6 +95,8 @@ public class ActivityReportDTO {
                 docDto.setUploadedAt(doc.getUploadedAt());
                 return docDto;
             }).collect(Collectors.toList()));
+        } else {
+            dto.setDocuments(java.util.Collections.emptyList());
         }
         if (entity.getSupervisor() != null) {
             dto.setSupervisorId(entity.getSupervisor().getId());

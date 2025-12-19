@@ -222,6 +222,7 @@ public class VisitControlService {
     private VisitControlDTO convertToDTO(VisitControl entity) {
         VisitControlDTO dto = new VisitControlDTO();
         dto.setId(entity.getId());
+        dto.setTitle(entity.getTitle());
         dto.setLocation(entity.getLocation());
         dto.setAssignedTo(entity.getAssignedTo());
         dto.setVisitDate(entity.getVisitDate());
