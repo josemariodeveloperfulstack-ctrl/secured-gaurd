@@ -287,7 +287,31 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!veiculo) return;
+    if (!veiculo) {
+      toast({
+        title: "Erro",
+        description: "Nenhum veículo selecionado para edição.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validar ID do veículo
+    const invalidIds = [
+      'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      '00000000-0000-0000-0000-000000000000',
+      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'
+    ];
+    
+    if (!veiculo.id || invalidIds.includes(veiculo.id)) {
+      console.error('❌ ID do veículo inválido:', veiculo.id);
+      toast({
+        title: "Erro",
+        description: "ID do veículo inválido. Por favor, recarregue a página e tente novamente.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsLoading(true);
 
