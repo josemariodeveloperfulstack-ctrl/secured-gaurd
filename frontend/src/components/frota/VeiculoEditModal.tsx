@@ -33,6 +33,16 @@ interface VeiculoComponent {
   valor_aquisicao?: number;
   photos?: string; // URLs das fotos separadas por vírgula
   observacoes?: string; // Adicionado campo observações
+  // Campos adicionais para edição
+  workPostId?: string;
+  companyId?: string;
+  departmentId?: string;
+  department?: string;
+  responsibleEmployeeId?: string;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
+  insuranceExpiryDate?: string;
+  documentationExpiryDate?: string;
 }
 
 interface VeiculoEditModalProps {
@@ -188,21 +198,32 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
         quilometragem: veiculo.quilometragem || 0,
         status: veiculo.status?.toUpperCase() || 'ACTIVE',
         capacidade: veiculo.capacidade || 5,
-        postoDeTrabalho: '', // Campo não existe no VeiculoComponent
-        departamento: '', // Campo não existe no VeiculoComponent
-        departmentId: '',
-        empresa: '',
-        empresaId: '',
-        dataManutencao: '', // Será preenchido pela função fetchLastMaintenanceDate
-        proximaManutencao: '', // Campo não existe no VeiculoComponent
-        vencimentoSeguro: '', // Campo não existe no VeiculoComponent
-        vencimentoDocumentacao: '', // Campo não existe no VeiculoComponent
-        data_aquisicao: veiculo.data_aquisicao || '',
+        postoDeTrabalho: veiculo.workPostId || '',
+        departamento: veiculo.department || '',
+        departmentId: veiculo.departmentId || '',
+        empresa: '', // Será preenchido no useEffect quando companies for carregado
+        empresaId: veiculo.companyId || '',
+        dataManutencao: veiculo.lastMaintenanceDate ? (veiculo.lastMaintenanceDate.includes('T') ? veiculo.lastMaintenanceDate.split('T')[0] : veiculo.lastMaintenanceDate) : '', // Será sobrescrito pela função fetchLastMaintenanceDate se necessário
+        proximaManutencao: veiculo.nextMaintenanceDate ? (veiculo.nextMaintenanceDate.includes('T') ? veiculo.nextMaintenanceDate.split('T')[0] : veiculo.nextMaintenanceDate) : '',
+        vencimentoSeguro: veiculo.insuranceExpiryDate ? (veiculo.insuranceExpiryDate.includes('T') ? veiculo.insuranceExpiryDate.split('T')[0] : veiculo.insuranceExpiryDate) : '',
+        vencimentoDocumentacao: veiculo.documentationExpiryDate ? (veiculo.documentationExpiryDate.includes('T') ? veiculo.documentationExpiryDate.split('T')[0] : veiculo.documentationExpiryDate) : '',
+        data_aquisicao: veiculo.data_aquisicao ? (veiculo.data_aquisicao.includes('T') ? veiculo.data_aquisicao.split('T')[0] : veiculo.data_aquisicao) : '',
         valor_aquisicao: veiculo.valor_aquisicao || 0,
-        observacoes: veiculo.observacoes || '', // Corrigido: usar o valor do veículo
-        responsavel: '', // Campo não existe no VeiculoComponent
+        observacoes: veiculo.observacoes || '',
+        responsavel: veiculo.responsibleEmployeeId || '',
         fotos: null
       };
+      
+      console.log('📝 Campos adicionais do veículo:');
+      console.log('  - workPostId:', veiculo.workPostId);
+      console.log('  - companyId:', veiculo.companyId);
+      console.log('  - departmentId:', veiculo.departmentId);
+      console.log('  - department:', veiculo.department);
+      console.log('  - responsibleEmployeeId:', veiculo.responsibleEmployeeId);
+      console.log('  - lastMaintenanceDate:', veiculo.lastMaintenanceDate);
+      console.log('  - nextMaintenanceDate:', veiculo.nextMaintenanceDate);
+      console.log('  - insuranceExpiryDate:', veiculo.insuranceExpiryDate);
+      console.log('  - documentationExpiryDate:', veiculo.documentationExpiryDate);
       
       console.log('📝 DADOS DO FORMULÁRIO A SEREM DEFINIDOS:');
       console.log('  - placa:', formDataToSet.placa);
@@ -235,6 +256,124 @@ const VeiculoEditModal: React.FC<VeiculoEditModalProps> = ({
       console.log('📝 Formulário preenchido com dados do veículo:', formData);
     }
   }, [veiculo]);
+
+  // Atualizar campos quando as listas forem carregadas (para garantir que os selects sejam preenchidos)
+  useEffect(() => {
+    if (veiculo && !workPostsLoading && !companiesLoading && !departmentsLoading && !employeesLoading) {
+      console.log('🔄 Atualizando campos após carregamento das listas...');
+      console.log('🔄 Veículo:', veiculo);
+      console.log('🔄 Listas carregadas - WorkPosts:', workPosts?.length, 'Companies:', companies?.length, 'Departments:', departments?.length, 'Employees:', employees?.length);
+      
+      setFormData(prev => {
+        const updated = { ...prev };
+        let hasChanges = false;
+        
+        // Atualizar posto de trabalho se o veículo tiver workPostId
+        if (veiculo.workPostId && prev.postoDeTrabalho !== veiculo.workPostId) {
+          updated.postoDeTrabalho = veiculo.workPostId;
+          hasChanges = true;
+          console.log('✅ Posto de trabalho atualizado:', veiculo.workPostId);
+        }
+        
+        // Atualizar empresa se o veículo tiver companyId
+        if (veiculo.companyId && prev.empresaId !== veiculo.companyId) {
+          updated.empresaId = veiculo.companyId;
+          // Buscar o nome da empresa
+          const selectedCompany = companies?.find(c => c.id === veiculo.companyId);
+          if (selectedCompany) {
+            updated.empresa = selectedCompany.name;
+            hasChanges = true;
+            console.log('✅ Empresa atualizada:', veiculo.companyId, selectedCompany.name);
+          } else {
+            console.warn('⚠️ Empresa não encontrada na lista para ID:', veiculo.companyId);
+          }
+        }
+        
+        // Atualizar departamento se o veículo tiver departmentId
+        if (veiculo.departmentId && prev.departmentId !== veiculo.departmentId) {
+          updated.departmentId = veiculo.departmentId;
+          // Buscar o nome do departamento se não estiver disponível
+          if (!veiculo.department) {
+            const selectedDepartment = departments?.find(d => d.id === veiculo.departmentId);
+            if (selectedDepartment) {
+              updated.departamento = selectedDepartment.name;
+            }
+          } else {
+            updated.departamento = veiculo.department;
+          }
+          hasChanges = true;
+          console.log('✅ Departamento atualizado:', veiculo.departmentId, updated.departamento);
+        }
+        
+        // Atualizar responsável se o veículo tiver responsibleEmployeeId
+        if (veiculo.responsibleEmployeeId && prev.responsavel !== veiculo.responsibleEmployeeId) {
+          updated.responsavel = veiculo.responsibleEmployeeId;
+          hasChanges = true;
+          console.log('✅ Responsável atualizado:', veiculo.responsibleEmployeeId);
+        }
+        
+        // Atualizar datas se ainda não estiverem preenchidas (formatar para yyyy-MM-dd)
+        const formatDate = (dateStr: string | undefined): string => {
+          if (!dateStr) return '';
+          if (dateStr.includes('T')) {
+            return dateStr.split('T')[0];
+          }
+          return dateStr;
+        };
+        
+        if (veiculo.lastMaintenanceDate) {
+          const formatted = formatDate(veiculo.lastMaintenanceDate);
+          if (prev.dataManutencao !== formatted) {
+            updated.dataManutencao = formatted;
+            hasChanges = true;
+            console.log('✅ Data de manutenção atualizada:', formatted);
+          }
+        }
+        
+        if (veiculo.nextMaintenanceDate) {
+          const formatted = formatDate(veiculo.nextMaintenanceDate);
+          if (prev.proximaManutencao !== formatted) {
+            updated.proximaManutencao = formatted;
+            hasChanges = true;
+            console.log('✅ Próxima manutenção atualizada:', formatted);
+          }
+        }
+        
+        if (veiculo.insuranceExpiryDate) {
+          const formatted = formatDate(veiculo.insuranceExpiryDate);
+          if (prev.vencimentoSeguro !== formatted) {
+            updated.vencimentoSeguro = formatted;
+            hasChanges = true;
+            console.log('✅ Vencimento do seguro atualizado:', formatted);
+          }
+        }
+        
+        if (veiculo.documentationExpiryDate) {
+          const formatted = formatDate(veiculo.documentationExpiryDate);
+          if (prev.vencimentoDocumentacao !== formatted) {
+            updated.vencimentoDocumentacao = formatted;
+            hasChanges = true;
+            console.log('✅ Vencimento da documentação atualizado:', formatted);
+          }
+        }
+        
+        if (veiculo.data_aquisicao) {
+          const formatted = formatDate(veiculo.data_aquisicao);
+          if (prev.data_aquisicao !== formatted) {
+            updated.data_aquisicao = formatted;
+            hasChanges = true;
+            console.log('✅ Data de aquisição atualizada:', formatted);
+          }
+        }
+        
+        if (hasChanges) {
+          console.log('📝 Formulário atualizado com campos adicionais');
+        }
+        
+        return updated;
+      });
+    }
+  }, [veiculo, workPostsLoading, companiesLoading, departmentsLoading, employeesLoading, workPosts, companies, departments, employees]);
 
   // Funções para gerenciar fotos
   const handleDeleteExistingPhoto = (photoName: string) => {

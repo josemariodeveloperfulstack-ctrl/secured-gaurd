@@ -22,6 +22,9 @@ export interface Vehicle {
   insuranceExpiryDate?: string;
   documentationExpiryDate?: string;
   responsibleEmployeeId?: string;
+  workPostId?: string;
+  companyId?: string;
+  departmentId?: string;
   photos?: FileList | null;
 }
 

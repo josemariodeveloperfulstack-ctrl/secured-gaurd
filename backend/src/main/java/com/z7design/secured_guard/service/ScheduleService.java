@@ -23,8 +23,12 @@ import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.model.Unit;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
@@ -267,8 +271,30 @@ public class ScheduleService {
             log.info("Buscando todas as escalas com relacionamentos");
             // Tentar usar o método com JOIN FETCH para carregar relacionamentos eager
             List<Schedule> schedules = scheduleRepository.findAllWithRelations();
-            log.info("✅ Escalas encontradas: {} registros", schedules.size());
-            return schedules;
+            
+            // Filtrar escalas com Location inválida (null devido a @NotFound)
+            List<Schedule> validSchedules = schedules.stream()
+                .filter(schedule -> {
+                    try {
+                        // Tentar acessar a location para verificar se está válida
+                        if (schedule.getLocation() == null) {
+                            log.warn("⚠️ Escala {} tem Location inválida (null), será filtrada", schedule.getId());
+                            return false;
+                        }
+                        return true;
+                    } catch (Exception e) {
+                        log.warn("⚠️ Erro ao verificar Location da escala {}: {}", schedule.getId(), e.getMessage());
+                        return false;
+                    }
+                })
+                .toList();
+            
+            if (validSchedules.size() < schedules.size()) {
+                log.warn("⚠️ {} escalas foram filtradas devido a Locations inválidas", schedules.size() - validSchedules.size());
+            }
+            
+            log.info("✅ Escalas encontradas: {} registros válidos (de {} total)", validSchedules.size(), schedules.size());
+            return validSchedules;
         } catch (Exception e) {
             log.error("❌ Erro ao buscar escalas com relacionamentos", e);
             log.error("❌ Tipo de exceção: {}", e.getClass().getName());
@@ -277,10 +303,27 @@ public class ScheduleService {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
                 log.error("❌ Tipo da causa: {}", e.getCause().getClass().getName());
             }
-            // Se falhar, usar o método padrão
+            // Se falhar, usar o método padrão e filtrar
             try {
                 log.info("Tentando buscar escalas com método padrão");
-                return scheduleRepository.findAll();
+                List<Schedule> allSchedules = scheduleRepository.findAll();
+                
+                // Filtrar escalas com Location inválida
+                List<Schedule> validSchedules = allSchedules.stream()
+                    .filter(schedule -> {
+                        try {
+                            if (schedule.getLocation() == null) {
+                                return false;
+                            }
+                            return true;
+                        } catch (Exception ex) {
+                            return false;
+                        }
+                    })
+                    .toList();
+                
+                log.info("✅ Escalas encontradas (método padrão): {} registros válidos", validSchedules.size());
+                return validSchedules;
             } catch (Exception e2) {
                 log.error("❌ Erro também no método padrão", e2);
                 throw new RuntimeException("Erro ao buscar escalas: " + e2.getMessage(), e2);
@@ -352,13 +395,13 @@ public class ScheduleService {
         if (employeeId != null) {
             schedules = schedules.stream()
                     .filter(s -> s.getEmployee() != null && s.getEmployee().getId().equals(employeeId))
-                    .collect(java.util.stream.Collectors.toList());
+                    .toList();
         }
         
         if (workPostId != null) {
             schedules = schedules.stream()
                     .filter(s -> s.getWorkPost() != null && s.getWorkPost().getId().equals(workPostId))
-                    .collect(java.util.stream.Collectors.toList());
+                    .toList();
         }
         
         if (status != null && !status.isEmpty()) {
@@ -367,7 +410,7 @@ public class ScheduleService {
                         com.z7design.secured_guard.model.enums.ScheduleStatus.valueOf(status);
                 schedules = schedules.stream()
                         .filter(s -> s.getStatus() == statusEnum)
-                        .collect(java.util.stream.Collectors.toList());
+                        .toList();
             } catch (IllegalArgumentException e) {
                 log.warn("Status inválido: {}", status);
             }

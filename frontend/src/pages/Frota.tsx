@@ -59,6 +59,16 @@ interface VeiculoComponent {
   photos?: string; // URLs das fotos separadas por vírgula
   capacidade?: number;
   observacoes?: string;
+  // Campos adicionais para edição
+  workPostId?: string;
+  companyId?: string;
+  departmentId?: string;
+  department?: string;
+  responsibleEmployeeId?: string;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
+  insuranceExpiryDate?: string;
+  documentationExpiryDate?: string;
 }
 
 interface AbastecimentoComponent {
@@ -117,7 +127,17 @@ const mapVehicleToComponent = (vehicle: Vehicle): VeiculoComponent => {
     valor_aquisicao: vehicle.acquisitionValue ? Number(vehicle.acquisitionValue) : undefined,
     photos: vehicle.photos ? Array.from(vehicle.photos).map(file => file.name).join(',') : undefined,
     capacidade: vehicle.capacity,
-    observacoes: vehicle.notes
+    observacoes: vehicle.notes,
+    // Campos adicionais para edição
+    workPostId: vehicle.workPostId,
+    companyId: vehicle.companyId,
+    departmentId: vehicle.departmentId,
+    department: vehicle.department,
+    responsibleEmployeeId: vehicle.responsibleEmployeeId,
+    lastMaintenanceDate: vehicle.lastMaintenanceDate,
+    nextMaintenanceDate: vehicle.nextMaintenanceDate,
+    insuranceExpiryDate: vehicle.insuranceExpiryDate,
+    documentationExpiryDate: vehicle.documentationExpiryDate
   };
 };
 
@@ -439,8 +459,9 @@ const Frota: React.FC = () => {
   };
 
   const handleDeleteVeiculo = (veiculo: VeiculoComponent) => {
-    setSelectedVeiculo(veiculo);
-    // Aqui você pode implementar a lógica de exclusão
+    // O VeiculosTable já tem seu próprio modal de exclusão
+    // Esta função é chamada mas o modal é gerenciado internamente pelo VeiculosTable
+    console.log('🗑️ Exclusão de veículo solicitada:', veiculo.placa);
   };
 
   const handleViewVeiculo = (veiculo: VeiculoComponent) => {

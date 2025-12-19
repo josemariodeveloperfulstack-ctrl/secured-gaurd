@@ -265,7 +265,8 @@ const VeiculosTable: React.FC<VeiculosTableProps> = ({ veiculos, searchTerm, mai
   };
 
   const handleDelete = (veiculo: Veiculo) => {
-    onDelete(veiculo);
+    setSelectedVeiculo(veiculo);
+    setIsDeleteDialogOpen(true);
   };
 
   const handleEdit = (veiculo: Veiculo) => {
