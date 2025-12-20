@@ -37,12 +37,79 @@ public class OpportunityService {
     @Autowired
     private UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public List<Opportunity> findAll() {
-        return opportunityRepository.findAll();
+        try {
+            List<Opportunity> opportunities = opportunityRepository.findAllWithRelationships();
+            // Inicializar objetos necessários dentro da transação para evitar LazyInitializationException
+            for (Opportunity opportunity : opportunities) {
+                if (opportunity.getLead() != null) {
+                    // Forçar inicialização de campos básicos do Lead dentro da transação
+                    opportunity.getLead().getId();
+                    opportunity.getLead().getName();
+                    opportunity.getLead().getCompany();
+                    opportunity.getLead().getEmail();
+                    opportunity.getLead().getPhone();
+                    opportunity.getLead().getStatus();
+                    opportunity.getLead().getSource();
+                    opportunity.getLead().getCreatedAt();
+                }
+                if (opportunity.getStatus() != null) {
+                    opportunity.getStatus().getId();
+                    opportunity.getStatus().getName();
+                }
+                if (opportunity.getAssignedTo() != null) {
+                    opportunity.getAssignedTo().getId();
+                    opportunity.getAssignedTo().getName();
+                }
+                if (opportunity.getClient() != null) {
+                    opportunity.getClient().getId();
+                    opportunity.getClient().getName();
+                }
+            }
+            return opportunities;
+        } catch (Exception e) {
+            // Fallback para método padrão
+            return opportunityRepository.findAll();
+        }
     }
 
+    @Transactional(readOnly = true)
     public Optional<Opportunity> findById(UUID id) {
-        return opportunityRepository.findById(id);
+        try {
+            // Buscar oportunidade e tentar inicializar relacionamentos
+            Optional<Opportunity> opportunityOpt = opportunityRepository.findById(id);
+            if (opportunityOpt.isPresent()) {
+                Opportunity opportunity = opportunityOpt.get();
+                // Inicializar objetos necessários dentro da transação
+                if (opportunity.getLead() != null) {
+                    opportunity.getLead().getId();
+                    opportunity.getLead().getName();
+                    opportunity.getLead().getCompany();
+                    opportunity.getLead().getEmail();
+                    opportunity.getLead().getPhone();
+                    opportunity.getLead().getStatus();
+                    opportunity.getLead().getSource();
+                    opportunity.getLead().getCreatedAt();
+                }
+                if (opportunity.getStatus() != null) {
+                    opportunity.getStatus().getId();
+                    opportunity.getStatus().getName();
+                }
+                if (opportunity.getAssignedTo() != null) {
+                    opportunity.getAssignedTo().getId();
+                    opportunity.getAssignedTo().getName();
+                }
+                if (opportunity.getClient() != null) {
+                    opportunity.getClient().getId();
+                    opportunity.getClient().getName();
+                }
+            }
+            return opportunityOpt;
+        } catch (Exception e) {
+            // Fallback para método padrão
+            return opportunityRepository.findById(id);
+        }
     }
 
     public Opportunity save(Opportunity opportunity) {

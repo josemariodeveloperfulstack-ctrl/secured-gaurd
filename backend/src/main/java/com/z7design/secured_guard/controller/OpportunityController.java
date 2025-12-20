@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.OpportunityDTO;
+import com.z7design.secured_guard.dto.OpportunityResponse;
 import com.z7design.secured_guard.model.Opportunity;
 import com.z7design.secured_guard.service.OpportunityService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -23,7 +24,7 @@ public class OpportunityController {
     @Autowired
     private OpportunityService opportunityService;
 
-    // Converter Opportunity para OpportunityDTO (simplificado)
+    // Converter Opportunity para OpportunityDTO (simplificado) - usado para criação/atualização
     private OpportunityDTO toDTO(Opportunity o) {
         OpportunityDTO dto = new OpportunityDTO();
         dto.setId(o.getId());
@@ -52,14 +53,16 @@ public class OpportunityController {
     }
 
     @GetMapping
-    public List<OpportunityDTO> getAll() {
-        return opportunityService.findAll().stream().map(this::toDTO).collect(Collectors.toList());
+    public List<OpportunityResponse> getAll() {
+        return opportunityService.findAll().stream()
+                .map(OpportunityResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OpportunityDTO> getById(@PathVariable String id) {
+    public ResponseEntity<OpportunityResponse> getById(@PathVariable String id) {
         Optional<Opportunity> opportunity = opportunityService.findById(UUID.fromString(id));
-        return opportunity.map(this::toDTO)
+        return opportunity.map(OpportunityResponse::fromEntity)
             .map(ResponseEntity::ok)
             .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada"));
     }

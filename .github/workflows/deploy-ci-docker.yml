@@ -135,26 +135,81 @@ jobs:
         run: |
           echo "📤 Transferindo arquivos para VPS..."
           
-          # Criar diretório de deploy na VPS
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            mkdir -p /var/www/secured_guard/ci
-            mkdir -p /var/www/secured_guard/ci/uploads
-            mkdir -p /var/www/secured_guard/ci/logs
-            mkdir -p /var/www/secured_guard/ci/nginx
-            mkdir -p /var/www/secured_guard/ci/postgres_data
-            mkdir -p /var/www/secured_guard/ci/redis_data
-            mkdir -p /var/www/secured_guard/ci/evolution_instances
-            mkdir -p /var/www/secured_guard/ci/holerites
-            mkdir -p /var/www/secured_guard/ci/whatsapp_sessions
-          EOF
+          # Configurar opções SSH para conexões mais robustas
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o BatchMode=no"
           
-          # Transferir docker-compose.ci.yml
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp docker-compose.ci.yml \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/
+          # Criar diretório de deploy na VPS (com retry)
+          echo "📁 Criando diretórios na VPS..."
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            if sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+              mkdir -p /var/www/secured_guard/ci
+              mkdir -p /var/www/secured_guard/ci/uploads
+              mkdir -p /var/www/secured_guard/ci/logs
+              mkdir -p /var/www/secured_guard/ci/nginx
+              mkdir -p /var/www/secured_guard/ci/postgres_data
+              mkdir -p /var/www/secured_guard/ci/redis_data
+              mkdir -p /var/www/secured_guard/ci/evolution_instances
+              mkdir -p /var/www/secured_guard/ci/holerites
+              mkdir -p /var/www/secured_guard/ci/whatsapp_sessions
+            EOF
+            then
+              echo "✅ Diretórios criados com sucesso!"
+              break
+            else
+              echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
+              sleep 5
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
           
-          # Transferir configuração do nginx
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp nginx/ci.conf \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/nginx/
+          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+            echo "❌ Falha ao criar diretórios após $MAX_ATTEMPTS tentativas"
+            exit 1
+          fi
+          
+          # Transferir docker-compose.ci.yml (com retry)
+          echo "📤 Transferindo docker-compose.ci.yml..."
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            if sshpass -p "${{ secrets.VPS_PASSWORD }}" scp $SSH_OPTS docker-compose.ci.yml \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/
+            then
+              echo "✅ docker-compose.ci.yml transferido!"
+              break
+            else
+              echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
+              sleep 5
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+          
+          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+            echo "❌ Falha ao transferir docker-compose.ci.yml após $MAX_ATTEMPTS tentativas"
+            exit 1
+          fi
+          
+          # Transferir configuração do nginx (com retry)
+          echo "📤 Transferindo nginx/ci.conf..."
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            if sshpass -p "${{ secrets.VPS_PASSWORD }}" scp $SSH_OPTS nginx/ci.conf \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/nginx/
+            then
+              echo "✅ nginx/ci.conf transferido!"
+              break
+            else
+              echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
+              sleep 5
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+          
+          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+            echo "❌ Falha ao transferir nginx/ci.conf após $MAX_ATTEMPTS tentativas"
+            exit 1
+          fi
           
           echo "✅ Arquivos transferidos com sucesso!"
 

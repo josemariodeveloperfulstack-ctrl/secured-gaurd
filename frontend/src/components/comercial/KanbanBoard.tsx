@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
@@ -284,6 +287,27 @@ export default function KanbanBoard() {
     }
   }, [opportunities]);
 
+  // Função helper para normalizar o source do Lead (pode vir como string, enum object ou null/undefined)
+  function normalizeLeadSource(source: any): string {
+    if (!source) return 'Não informado';
+    if (typeof source === 'string') {
+      return source;
+    }
+    if (typeof source === 'object') {
+      if (source.name) return source.name;
+      if (source.value) return source.value;
+      if (source.displayName) return source.displayName;
+      // Tentar pegar a primeira chave válida que não seja uma propriedade padrão
+      const keys = Object.keys(source);
+      const validKeys = keys.filter(k => k !== 'name' && k !== 'value' && k !== 'displayName');
+      if (validKeys.length > 0) {
+        return validKeys[0];
+      }
+      return source.toString();
+    }
+    return 'Não informado';
+  }
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -382,15 +406,14 @@ export default function KanbanBoard() {
       
       // Mapear oportunidades do backend
       const mappedOpportunities = opportunitiesData.map((opp: any) => {
-        // Buscar nome do responsável usando o ID
-        let assignedToName = 'Não atribuído';
-        if (opp.assignedToId) {
-          const userName = usersMap.get(opp.assignedToId);
-          if (userName) {
-            assignedToName = userName;
-          } else if (opp.assignedTo) {
-            // Se vier o nome diretamente do backend (fallback)
-            assignedToName = opp.assignedTo;
+        // Buscar nome do responsável usando o ID ou o nome que vem do backend
+        let assignedToName = opp.assignedToName || 'Não atribuído';
+        if (!assignedToName || assignedToName === 'Não atribuído') {
+          if (opp.assignedToId) {
+            const userName = usersMap.get(opp.assignedToId);
+            if (userName) {
+              assignedToName = userName;
+            }
           }
         }
         
@@ -399,7 +422,7 @@ export default function KanbanBoard() {
           title: opp.title,
           description: opp.description || '',
           statusId: opp.statusId,
-          leadId: opp.leadId,
+          leadId: opp.lead?.id || opp.leadId || null,
           value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
           estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
           expectedCloseDate: opp.closeDate || '',
@@ -410,19 +433,19 @@ export default function KanbanBoard() {
           priority: 'MEDIUM' as const,
           lastContact: opp.updatedAt || opp.createdAt || '',
           tags: [],
-          // Incluir lead se vier do backend, caso contrário criar objeto vazio
+          // Incluir lead se vier do backend (agora vem no formato OpportunityResponse com lead completo)
           lead: opp.lead ? {
-            id: opp.lead.id || opp.leadId || 0,
+            id: opp.lead.id || null,
             name: opp.lead.name || 'Sem nome',
-            company: opp.lead.company || opp.lead.companyName || '',
+            company: opp.lead.company || '',
             email: opp.lead.email || '',
             phone: opp.lead.phone || '',
             status: opp.lead.status || 'NEW' as const,
-            source: opp.lead.source || 'Não informado',
-            value: opp.lead.value || opp.estimatedValue || 0,
+            source: normalizeLeadSource(opp.lead.source),
+            value: opp.lead.value ? Number(opp.lead.value) : (opp.estimatedValue ? Number(opp.estimatedValue) : 0),
             createdAt: opp.lead.createdAt || opp.createdAt || ''
           } : {
-            id: opp.leadId || 0,
+            id: opp.leadId || null,
             name: 'Lead não encontrado',
             company: '',
             email: '',
@@ -488,12 +511,14 @@ export default function KanbanBoard() {
               const usersMap = new Map(users.map(u => [u.id, u.name]));
               
               const mappedOpportunities = opportunitiesData.map((opp: any) => {
-                // Buscar nome do responsável
-                let assignedToName = 'Não atribuído';
-                if (opp.assignedToId) {
-                  const userName = usersMap.get(opp.assignedToId);
-                  if (userName) {
-                    assignedToName = userName;
+                // Buscar nome do responsável usando o ID ou o nome que vem do backend
+                let assignedToName = opp.assignedToName || 'Não atribuído';
+                if (!assignedToName || assignedToName === 'Não atribuído') {
+                  if (opp.assignedToId) {
+                    const userName = usersMap.get(opp.assignedToId);
+                    if (userName) {
+                      assignedToName = userName;
+                    }
                   }
                 }
                 
@@ -502,7 +527,7 @@ export default function KanbanBoard() {
                   title: opp.title,
                   description: opp.description || '',
                   statusId: opp.statusId,
-                  leadId: opp.leadId,
+                  leadId: opp.lead?.id || opp.leadId || null,
                   value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
                   estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
                   expectedCloseDate: opp.closeDate || '',
@@ -660,14 +685,7 @@ export default function KanbanBoard() {
     
     // Buscar fonte do lead se disponível
     if ((opp.lead as any)?.source) {
-      const source = (opp.lead as any).source;
-      // Se for string, usar diretamente; se for objeto enum, usar toString ou pegar valor
-      if (typeof source === 'string') {
-        leadSourceValue = source;
-      } else if (source && typeof source === 'object') {
-        // Se for objeto enum, tentar pegar o valor
-        leadSourceValue = source.toString();
-      }
+      leadSourceValue = normalizeLeadSource((opp.lead as any).source);
     }
     
     // Formatar valor estimado - pode estar em opp.value ou opp.estimatedValue
@@ -1018,175 +1036,197 @@ export default function KanbanBoard() {
       </div>
 
       {/* Modal de Oportunidade */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-seguranca-graphite border-gray-600">
-            <CardHeader>
-              <CardTitle className="text-seguranca-lightgray">
-                {editing ? 'Editar Oportunidade' : 'Nova Oportunidade'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={(e) => { e.preventDefault(); handleSaveOpportunity(); }} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Título</label>
-                  <Input
-                    required
-                    placeholder="Título da oportunidade"
-                    value={form.title}
-                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Descrição</label>
-                  <textarea
-                    required
-                    placeholder="Descrição da oportunidade"
-                    value={form.description}
-                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                    className="w-full p-3 bg-seguranca-black border border-gray-600 rounded-md text-seguranca-lightgray resize-none"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Status <span className="text-red-500">*</span></label>
-                  <Select value={form.statusId || ''} onValueChange={(value) => setForm(f => ({ ...f, statusId: value }))} required>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statuses.map(status => (
-                        <SelectItem key={String(status.id)} value={String(status.id)}>
-                          {status.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto w-[98vw] sm:w-[95vw] md:w-[90vw] lg:w-full p-0 sm:p-6 bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="px-4 sm:px-0 pt-4 sm:pt-0 pb-2">
+            <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-semibold text-seguranca-lightgray">
+              {editing ? 'Editar Oportunidade' : 'Nova Oportunidade'}
+            </DialogTitle>
+          </DialogHeader>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Data de Fechamento</label>
-                    <Input
-                      type="date"
-                      value={form.closeDate}
-                      onChange={e => setForm(f => ({ ...f, closeDate: e.target.value }))}
-                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    />
-                  </div>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveOpportunity(); }} className="space-y-4 sm:space-y-6 px-4 sm:px-0">
+            <div className="space-y-2">
+              <Label htmlFor="title" className="text-sm font-medium text-seguranca-lightgray">
+                Título <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="title"
+                required
+                placeholder="Título da oportunidade"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10"
+              />
+            </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Valor Estimado (R$)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={form.estimatedValue}
-                      onChange={e => setForm(f => ({ ...f, estimatedValue: e.target.value }))}
-                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    />
-                  </div>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-sm font-medium text-seguranca-lightgray">
+                Descrição <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="description"
+                required
+                placeholder="Descrição da oportunidade"
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray resize-none"
+                rows={3}
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Responsável</label>
-                  <Select 
-                    value={form.assignedToId ? form.assignedToId : undefined} 
-                    onValueChange={(value) => setForm(f => ({ ...f, assignedToId: value }))}
-                  >
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione o responsável (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map(user => (
-                        <SelectItem key={String(user.id)} value={String(user.id)}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-sm font-medium text-seguranca-lightgray">
+                Status <span className="text-red-500">*</span>
+              </Label>
+              <Select value={form.statusId || ''} onValueChange={(value) => setForm(f => ({ ...f, statusId: value }))} required>
+                <SelectTrigger id="status" className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10">
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  {statuses.map(status => (
+                    <SelectItem key={String(status.id)} value={String(status.id)} className="text-seguranca-lightgray hover:bg-seguranca-black">
+                      {status.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Lead</label>
-                  <Select 
-                    value={form.leadId ? form.leadId : undefined} 
-                    onValueChange={(value) => {
-                      const selectedLead = leads.find(l => String(l.id) === value);
-                      // Buscar source do lead - pode estar como objeto (enum) ou string
-                      let sourceValue = '';
-                      if (selectedLead) {
-                        if (typeof selectedLead.source === 'string') {
-                          sourceValue = selectedLead.source;
-                        } else if (selectedLead.source && typeof selectedLead.source === 'object') {
-                          // Se for um objeto enum, pegar a chave
-                          sourceValue = Object.keys(selectedLead.source)[0] || selectedLead.source.toString();
-                        }
-                      }
-                      setForm(f => ({ 
-                        ...f, 
-                        leadId: value,
-                        leadSource: sourceValue
-                      }));
-                    }}
-                  >
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione o lead (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {leads.map(lead => (
-                        <SelectItem key={String(lead.id)} value={String(lead.id)}>
-                          {lead.name || lead.company || `Lead #${lead.id}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="closeDate" className="text-sm font-medium text-seguranca-lightgray">
+                  Data de Fechamento
+                </Label>
+                <Input
+                  id="closeDate"
+                  type="date"
+                  value={form.closeDate}
+                  onChange={e => setForm(f => ({ ...f, closeDate: e.target.value }))}
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10"
+                />
+              </div>
 
-                {form.leadId && (
-                  <div>
-                    <label className="block text-sm font-medium text-seguranca-lightgray mb-2">Fonte do Lead</label>
-                    <Select 
-                      value={form.leadSource || undefined} 
-                      onValueChange={(value) => setForm(f => ({ ...f, leadSource: value }))}
-                    >
-                      <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                        <SelectValue placeholder="Selecione a fonte do lead" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="WEBSITE">Website</SelectItem>
-                        <SelectItem value="REFERRAL">Indicação</SelectItem>
-                        <SelectItem value="COLD_CALL">Ligação a Frio</SelectItem>
-                        <SelectItem value="EMAIL_MARKETING">Email Marketing</SelectItem>
-                        <SelectItem value="SOCIAL_MEDIA">Redes Sociais</SelectItem>
-                        <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
-                        <SelectItem value="EVENT">Evento</SelectItem>
-                        <SelectItem value="PARTNER">Parceiro</SelectItem>
-                        <SelectItem value="OTHER">Outro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="estimatedValue" className="text-sm font-medium text-seguranca-lightgray">
+                  Valor Estimado (R$)
+                </Label>
+                <Input
+                  id="estimatedValue"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.estimatedValue}
+                  onChange={e => setForm(f => ({ ...f, estimatedValue: e.target.value }))}
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10"
+                />
+              </div>
+            </div>
 
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex-1 bg-seguranca-yellow text-black hover:bg-yellow-500">
-                    {editing ? 'Atualizar' : 'Criar'}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setShowModal(false)}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            <div className="space-y-2">
+              <Label htmlFor="assignedTo" className="text-sm font-medium text-seguranca-lightgray">
+                Responsável
+              </Label>
+              <Select 
+                value={form.assignedToId ? form.assignedToId : undefined} 
+                onValueChange={(value) => setForm(f => ({ ...f, assignedToId: value }))}
+              >
+                <SelectTrigger id="assignedTo" className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10">
+                  <SelectValue placeholder="Selecione o responsável (opcional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  {users.map(user => (
+                    <SelectItem key={String(user.id)} value={String(user.id)} className="text-seguranca-lightgray hover:bg-seguranca-black">
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="leadId" className="text-sm font-medium text-seguranca-lightgray">
+                Lead
+              </Label>
+              <Select 
+                value={form.leadId ? form.leadId : undefined} 
+                onValueChange={(value) => {
+                  const selectedLead = leads.find(l => String(l.id) === value);
+                  // Buscar source do lead - pode estar como objeto (enum) ou string
+                  let sourceValue = '';
+                  if (selectedLead) {
+                    if (typeof selectedLead.source === 'string') {
+                      sourceValue = selectedLead.source;
+                    } else if (selectedLead.source && typeof selectedLead.source === 'object') {
+                      // Se for um objeto enum, pegar a chave
+                      sourceValue = Object.keys(selectedLead.source)[0] || selectedLead.source.toString();
+                    }
+                  }
+                  setForm(f => ({ 
+                    ...f, 
+                    leadId: value,
+                    leadSource: sourceValue
+                  }));
+                }}
+              >
+                <SelectTrigger id="leadId" className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10">
+                  <SelectValue placeholder="Selecione o lead (opcional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  {leads.map(lead => (
+                    <SelectItem key={String(lead.id)} value={String(lead.id)} className="text-seguranca-lightgray hover:bg-seguranca-black">
+                      {lead.name || lead.company || `Lead #${lead.id}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {form.leadId && (
+              <div className="space-y-2">
+                <Label htmlFor="leadSource" className="text-sm font-medium text-seguranca-lightgray">
+                  Fonte do Lead
+                </Label>
+                <Select 
+                  value={form.leadSource || undefined} 
+                  onValueChange={(value) => setForm(f => ({ ...f, leadSource: value }))}
+                >
+                  <SelectTrigger id="leadSource" className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10">
+                    <SelectValue placeholder="Selecione a fonte do lead" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="WEBSITE" className="text-seguranca-lightgray hover:bg-seguranca-black">Website</SelectItem>
+                    <SelectItem value="REFERRAL" className="text-seguranca-lightgray hover:bg-seguranca-black">Indicação</SelectItem>
+                    <SelectItem value="COLD_CALL" className="text-seguranca-lightgray hover:bg-seguranca-black">Ligação a Frio</SelectItem>
+                    <SelectItem value="EMAIL_MARKETING" className="text-seguranca-lightgray hover:bg-seguranca-black">Email Marketing</SelectItem>
+                    <SelectItem value="SOCIAL_MEDIA" className="text-seguranca-lightgray hover:bg-seguranca-black">Redes Sociais</SelectItem>
+                    <SelectItem value="GOOGLE_ADS" className="text-seguranca-lightgray hover:bg-seguranca-black">Google Ads</SelectItem>
+                    <SelectItem value="EVENT" className="text-seguranca-lightgray hover:bg-seguranca-black">Evento</SelectItem>
+                    <SelectItem value="PARTNER" className="text-seguranca-lightgray hover:bg-seguranca-black">Parceiro</SelectItem>
+                    <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-black">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 sm:pt-4">
+              <Button 
+                type="submit" 
+                className="flex-1 sm:flex-none sm:order-2 bg-seguranca-yellow text-black hover:bg-yellow-500 h-10"
+              >
+                {editing ? 'Atualizar' : 'Criar'}
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowModal(false)}
+                className="flex-1 sm:flex-none sm:order-1 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-10"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
