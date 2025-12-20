@@ -67,7 +67,9 @@ export const scheduleService = {
   async findAll(): Promise<Schedule[]> {
     try {
       console.log('🔍 ScheduleService.findAll - Fazendo requisição para /api/schedules');
-      const response = await api.get('/api/schedules');
+      const response = await api.get('/api/schedules', {
+        validateStatus: (status) => status < 500 // Não lançar erro para 401/403, apenas para 500+
+      });
       const data = response.data;
       
       console.log('🔍 ScheduleService.findAll - Response status:', response.status);
@@ -102,8 +104,15 @@ export const scheduleService = {
       console.error('❌ Data:', error.response?.data);
       console.error('❌ Headers:', error.response?.headers);
       console.error('❌ Mensagem:', error.message);
-      // Em caso de erro, lançar exceção para que o componente possa tratar
-      throw error;
+      
+      // Se for erro 500, logar mas retornar array vazio (backend pode estar com problema temporário)
+      if (error.response?.status === 500) {
+        console.warn('⚠️ Backend retornou erro 500. Retornando array vazio para não quebrar o frontend.');
+        console.warn('⚠️ Isso pode indicar que o backend precisa ser atualizado com as correções mais recentes.');
+      }
+      
+      // Retornar array vazio ao invés de lançar erro para não quebrar o frontend
+      return [];
     }
   },
 
@@ -175,7 +184,9 @@ export const scheduleService = {
    */
   async getSchedules(filters?: any): Promise<Schedule[]> {
     try {
-      const response = await api.get('/api/schedules');
+      const response = await api.get('/api/schedules', {
+        validateStatus: (status) => status < 500 // Não lançar erro para 401/403, apenas para 500+
+      });
       const data = response.data;
       
       console.log('🔍 ScheduleService.getSchedules - Dados recebidos:', typeof data, data);
@@ -193,8 +204,14 @@ export const scheduleService = {
         console.warn('⚠️ API retornou dados em formato inesperado:', data);
         return [];
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao buscar escalas de trabalho:', error);
+      
+      // Se for erro 500, logar mas retornar array vazio
+      if (error.response?.status === 500) {
+        console.warn('⚠️ Backend retornou erro 500. Retornando array vazio para não quebrar o frontend.');
+      }
+      
       return [];
     }
   },

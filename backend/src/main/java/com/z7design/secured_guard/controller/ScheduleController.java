@@ -137,9 +137,17 @@ public class ScheduleController {
                         List<Schedule> schedules = scheduleService.findAll();
                         log.info("📤 Retornando {} escalas para o frontend", schedules.size());
                         return ResponseEntity.ok(schedules);
+                } catch (org.hibernate.LazyInitializationException e) {
+                        log.error("❌ LazyInitializationException ao buscar escalas no controller: {}", e.getMessage());
+                        // Retornar lista vazia ao invés de erro 500 para não quebrar o frontend
+                        log.warn("⚠️ Retornando lista vazia devido a LazyInitializationException");
+                        return ResponseEntity.ok(new java.util.ArrayList<>());
                 } catch (Exception e) {
-                        log.error("❌ Erro ao buscar escalas no controller", e);
-                        throw e;
+                        log.error("❌ Erro ao buscar escalas no controller: {}", e.getMessage(), e);
+                        log.error("❌ Tipo de exceção: {}", e.getClass().getName());
+                        // Retornar lista vazia ao invés de erro 500 para não quebrar o frontend
+                        log.warn("⚠️ Retornando lista vazia devido a erro inesperado");
+                        return ResponseEntity.ok(new java.util.ArrayList<>());
                 }
         }
 

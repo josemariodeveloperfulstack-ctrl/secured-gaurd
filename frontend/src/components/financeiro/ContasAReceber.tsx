@@ -445,7 +445,7 @@ export const ContasAReceber: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-seguranca-lightgray">Total a Receber</p>
                         <p className="text-2xl font-bold text-seguranca-yellow">
-                          R$ {contas.reduce((sum, c) => sum + c.amount, 0).toLocaleString('pt-BR')}
+                          R$ {(contas.reduce((sum, c) => sum + (c?.amount || 0), 0) || 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-seguranca-yellow/20 rounded-lg flex items-center justify-center">
@@ -477,7 +477,7 @@ export const ContasAReceber: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-seguranca-lightgray">Valor Vencido</p>
                         <p className="text-2xl font-bold text-seguranca-red">
-                          R$ {contas.filter(c => c.status === 'OVERDUE').reduce((sum, c) => sum + c.amount, 0).toLocaleString('pt-BR')}
+                          R$ {(contas.filter(c => c?.status === 'OVERDUE').reduce((sum, c) => sum + (c?.amount || 0), 0) || 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-seguranca-red/20 rounded-lg flex items-center justify-center">
@@ -640,7 +640,7 @@ export const ContasAReceber: React.FC = () => {
                             </div>
                             <div className="text-right">
                               <p className="font-semibold text-seguranca-yellow">
-                                R$ {conta.amount.toLocaleString('pt-BR')}
+                                R$ {((conta?.amount || 0) as number).toLocaleString('pt-BR')}
                               </p>
                               <Badge 
                                 variant="outline" 
@@ -751,16 +751,16 @@ export const ContasAReceber: React.FC = () => {
                           <td className="px-4 py-4">
                             <div>
                               <div className="font-medium text-seguranca-yellow">
-                                R$ {conta.amount.toLocaleString('pt-BR')}
+                                R$ {((conta?.amount || 0) as number).toLocaleString('pt-BR')}
                               </div>
-                              {conta.amountPaid > 0 && (
+                              {(conta?.amountPaid || 0) > 0 && (
                                 <div className="text-sm text-seguranca-yellow">
-                                  Pago: R$ {conta.amountPaid.toLocaleString('pt-BR')}
+                                  Pago: R$ {((conta?.amountPaid || 0) as number).toLocaleString('pt-BR')}
                                 </div>
                               )}
-                              {conta.pendingAmount > 0 && (
+                              {(conta?.pendingAmount || 0) > 0 && (
                                 <div className="text-sm text-seguranca-red">
-                                  Pendente: R$ {conta.pendingAmount.toLocaleString('pt-BR')}
+                                  Pendente: R$ {((conta?.pendingAmount || 0) as number).toLocaleString('pt-BR')}
                                 </div>
                               )}
                             </div>
