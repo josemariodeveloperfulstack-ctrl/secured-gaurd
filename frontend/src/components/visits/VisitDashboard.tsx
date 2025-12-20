@@ -183,20 +183,75 @@ const VisitDashboard: React.FC<VisitDashboardProps> = ({ supervisorId }) => {
     });
   };
 
-  const handleDayClick = async (date: Date, dayEvents: any[]) => {
+  const handleDayClick = async (date: Date, dayEvents: VisitCalendarEvent[]) => {
     try {
-      // Buscar todas as visitas do dia selecionado
-      const dateString = date.toISOString().split('T')[0];
-      const dayVisits = visits.filter(visit => {
-        const visitDate = new Date(visit.visitDate);
-        return visitDate.toISOString().split('T')[0] === dateString;
-      });
+      // Normalizar a data para evitar problemas de timezone
+      // Criar uma data no início do dia no timezone local
+      const normalizedDate = new Date(date);
+      normalizedDate.setHours(0, 0, 0, 0);
+      
+      console.log('📅 Data clicada (raw):', date);
+      console.log('📅 Data normalizada:', normalizedDate);
+      console.log('📅 Data como string (YYYY-MM-DD):', normalizedDate.toISOString().split('T')[0]);
+      console.log('📊 Eventos recebidos do calendário:', dayEvents?.length || 0);
+      console.log('📊 IDs dos eventos:', dayEvents?.map(e => e.id) || []);
+      
+      // IMPORTANTE: Usar os eventos que já foram corretamente filtrados pelo calendário
+      // Isso evita problemas de timezone e garante que só mostramos visitas do dia correto
+      let dayVisits: Visit[] = [];
+      
+      if (dayEvents && dayEvents.length > 0) {
+        // Buscar visitas pelos IDs dos eventos que foram corretamente associados ao dia
+        const eventIds = dayEvents.map(event => event.id).filter(id => id);
+        console.log('🔍 Buscando visitas pelos IDs dos eventos do calendário:', eventIds);
+        
+        dayVisits = visits.filter(visit => eventIds.includes(visit.id));
+        console.log('✅ Visitas encontradas pelos IDs:', dayVisits.length);
+        console.log('✅ Detalhes das visitas:', dayVisits.map(v => ({ 
+          id: v.id, 
+          date: v.visitDate, 
+          workPost: v.workPostName 
+        })));
+      } else {
+        // Se não há eventos passados, significa que não há visitas neste dia
+        // Fazer uma verificação final para garantir (mas os eventos já são a fonte da verdade)
+        console.log('⚠️ Nenhum evento recebido do calendário - dia vazio confirmado');
+        dayVisits = [];
+        
+        // Verificação adicional apenas para debug (não usar para exibir)
+        const year = normalizedDate.getFullYear();
+        const month = normalizedDate.getMonth();
+        const day = normalizedDate.getDate();
+        
+        const debugVisits = visits.filter(visit => {
+          if (!visit.visitDate) return false;
+          
+          // Usar apenas a parte da data (YYYY-MM-DD) para comparação
+          const visitDateStr = visit.visitDate.split('T')[0];
+          const visitDateParts = visitDateStr.split('-');
+          if (visitDateParts.length !== 3) return false;
+          
+          const visitYear = parseInt(visitDateParts[0], 10);
+          const visitMonth = parseInt(visitDateParts[1], 10) - 1; // Mês é 0-indexed
+          const visitDay = parseInt(visitDateParts[2], 10);
+          
+          return visitYear === year && visitMonth === month && visitDay === day;
+        });
+        
+        console.log('🔍 Verificação adicional (apenas debug):', debugVisits.length, 'visitas encontradas');
+        if (debugVisits.length > 0) {
+          console.warn('⚠️ ATENÇÃO: Encontradas visitas na verificação adicional que não estavam nos eventos!', 
+            debugVisits.map(v => ({ id: v.id, date: v.visitDate })));
+        }
+      }
 
-      setSelectedDayDate(date);
-      setSelectedDayVisits(dayVisits);
+      console.log('📋 Total final de visitas para o modal:', dayVisits.length);
+
+      setSelectedDayDate(normalizedDate);
+      setSelectedDayVisits(dayVisits); // Passar array vazio se não houver eventos
       setShowDayVisitsModal(true);
     } catch (error) {
-      console.error('Erro ao carregar visitas do dia:', error);
+      console.error('❌ Erro ao carregar visitas do dia:', error);
       toast({
         title: 'Erro',
         description: 'Falha ao carregar visitas do dia',

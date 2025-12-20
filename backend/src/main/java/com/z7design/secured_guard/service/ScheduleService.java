@@ -305,6 +305,7 @@ public class ScheduleService {
         return scheduleRepository.findByScheduleDate(date);
     }
 
+    @Transactional(readOnly = true)
     public List<Schedule> findAll() {
         try {
             log.info("🔍 Buscando todas as escalas com relacionamentos");

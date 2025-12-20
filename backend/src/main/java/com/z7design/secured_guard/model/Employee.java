@@ -28,7 +28,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Table(name = "employees")
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "documents", "benefits", "dependents", "timeRecords", "payrolls", "epis", "occurrences"})
 public class Employee {
     
     @Id
@@ -143,43 +143,43 @@ public class Employee {
     // private String currentScale;
 
     // Documentos
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Document> documents = new ArrayList<>();
 
     // Benefícios
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Benefit> benefits = new ArrayList<>();
 
     // Histórico de Escalas
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Schedule> schedules = new ArrayList<>();
 
     // Ocorrências
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Occurrence> occurrences = new ArrayList<>();
 
     // Holerites
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference("employee-payrolls")
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Payroll> payrolls = new ArrayList<>();
 
     // EPIs
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<EPI> epis = new ArrayList<>();
 
     // Time Records
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference("employee-time-records")
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<TimeRecord> timeRecords = new ArrayList<>();
 
     // Dependentes
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
-    @JsonManagedReference("employee-dependents")
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Dependent> dependents = new ArrayList<>();
 
     // @Column(name = "caminho_pdf")

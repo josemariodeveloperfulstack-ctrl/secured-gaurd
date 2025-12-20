@@ -82,13 +82,40 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
     // Adicionar dias do mês atual
     const today = new Date();
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayDate = new Date(year, month, day);
+      const dayDate = new Date(year, month, day, 0, 0, 0, 0);
       const dayEvents = events.filter(event => {
+        if (!event.date) return false;
+        
         const eventDate = parseLocalDate(event.date);
-        return eventDate.getFullYear() === dayDate.getFullYear() &&
-               eventDate.getMonth() === dayDate.getMonth() &&
-               eventDate.getDate() === dayDate.getDate();
+        // Normalizar ambas as datas para comparação (meia-noite do dia)
+        eventDate.setHours(0, 0, 0, 0);
+        
+        const matches = eventDate.getFullYear() === dayDate.getFullYear() &&
+                        eventDate.getMonth() === dayDate.getMonth() &&
+                        eventDate.getDate() === dayDate.getDate();
+        
+        // Log apenas para o dia 11 e 12 para debug
+        if (day === 11 || day === 12) {
+          console.log(`🔍 Dia ${day} - Comparando evento:`, {
+            eventId: event.id,
+            eventDateStr: event.date,
+            eventDateParsed: eventDate.toISOString().split('T')[0],
+            dayDate: dayDate.toISOString().split('T')[0],
+            matches
+          });
+        }
+        
+        return matches;
       });
+
+      // Log apenas para o dia 11 e 12 para debug
+      if (day === 11 || day === 12) {
+        console.log(`📅 Dia ${day} do mês ${month + 1}/${year}:`, {
+          dayDate: dayDate.toISOString().split('T')[0],
+          eventsCount: dayEvents.length,
+          eventIds: dayEvents.map(e => e.id)
+        });
+      }
 
       days.push({
         date: day,
@@ -130,16 +157,33 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
 
   const handleDayClick = (day: any) => {
     if (day.isCurrentMonth) {
-      const newDate = new Date(currentMonth);
-      newDate.setDate(day.date);
+      // Criar data no timezone local para evitar problemas de timezone
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const dayOfMonth = day.date;
+      const newDate = new Date(year, month, dayOfMonth, 0, 0, 0, 0);
+      
+      console.log('📅 VisitCalendar - Dia clicado:', {
+        dayOfMonth,
+        year,
+        month: month + 1,
+        eventsCount: day.events?.length || 0,
+        events: day.events?.map((e: any) => ({ id: e.id, date: e.date })) || [],
+        newDate: newDate.toISOString().split('T')[0]
+      });
+      
       onDateChange(newDate);
       
-      // Se houver callback onDayClick e o dia tiver eventos, chamá-lo
-      if (onDayClick && day.events && day.events.length > 0) {
-        onDayClick(newDate, day.events);
-      } else if (onDayClick) {
-        // Chamar mesmo sem eventos para mostrar que não há visitas
-        onDayClick(newDate, []);
+      // Sempre chamar o callback com os eventos do dia correto
+      // IMPORTANTE: Passar exatamente os eventos que foram associados a este dia específico
+      if (onDayClick) {
+        const eventsForDay = day.events || [];
+        console.log('📤 VisitCalendar - Passando eventos para handleDayClick:', {
+          date: newDate.toISOString().split('T')[0],
+          eventsCount: eventsForDay.length,
+          eventIds: eventsForDay.map((e: any) => e.id)
+        });
+        onDayClick(newDate, eventsForDay);
       }
     }
   };
@@ -319,8 +363,11 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
                         if (day.events.length === 1) {
                           onEventClick(day.events[0]);
                         } else if (onDayClick) {
-                          const newDate = new Date(currentMonth);
-                          newDate.setDate(day.date);
+                          // Criar data no timezone local para evitar problemas de timezone
+                          const year = currentMonth.getFullYear();
+                          const month = currentMonth.getMonth();
+                          const dayOfMonth = day.date;
+                          const newDate = new Date(year, month, dayOfMonth, 0, 0, 0, 0);
                           onDayClick(newDate, day.events);
                         }
                       }
@@ -375,8 +422,11 @@ export const VisitCalendar: React.FC<VisitCalendarProps> = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onDayClick) {
-                          const newDate = new Date(currentMonth);
-                          newDate.setDate(day.date);
+                          // Criar data no timezone local para evitar problemas de timezone
+                          const year = currentMonth.getFullYear();
+                          const month = currentMonth.getMonth();
+                          const dayOfMonth = day.date;
+                          const newDate = new Date(year, month, dayOfMonth, 0, 0, 0, 0);
                           onDayClick(newDate, day.events);
                         }
                       }}

@@ -468,7 +468,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/centro-custos" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_MANAGE']}>
+                      <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <CentrosDeCusto />
                         </Suspense>
@@ -1068,7 +1068,7 @@ function App() {
                     } />
                     {/* Centros de Custo */}
                     <Route path="/centros-de-custo" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_MANAGE']}>
+                      <ProtectedRoute>
                         <CentrosDeCusto />
                       </ProtectedRoute>
                     } />
