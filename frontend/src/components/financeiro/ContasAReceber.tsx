@@ -384,11 +384,13 @@ export const ContasAReceber: React.FC = () => {
                       </SelectTrigger>
                       <SelectContent className="bg-seguranca-black border-gray-600">
                         <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todos os Clientes</SelectItem>
-                        {clientes.map(cliente => (
-                          <SelectItem key={cliente.id} value={cliente.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                            {cliente.name}
-                          </SelectItem>
-                        ))}
+                        {clientes && Array.isArray(clientes) ? clientes
+                          .filter(cliente => cliente && cliente.id && cliente.name)
+                          .map(cliente => (
+                            <SelectItem key={cliente.id} value={cliente.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                              {cliente.name}
+                            </SelectItem>
+                          )) : null}
                       </SelectContent>
                     </Select>
                   </div>

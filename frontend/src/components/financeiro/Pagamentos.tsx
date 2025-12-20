@@ -843,11 +843,11 @@ export const Pagamentos: React.FC = () => {
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-2">
                                 <User className="w-4 h-4 text-gray-400" />
-                                <span className="font-medium">{pagamento.clienteNome}</span>
+                                <span className="font-medium">{pagamento.clienteNome || '-'}</span>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                              {pagamento.descricao}
+                              {pagamento.descricao || '-'}
                             </td>
                             <td className="px-4 py-3">
                               <span className="font-medium text-red-600">
@@ -868,7 +868,15 @@ export const Pagamentos: React.FC = () => {
                                   isVencimentoProximo() ? 'text-yellow-600 font-medium' :
                                   'text-muted-foreground'
                                 }`}>
-                                  {format(new Date(pagamento.dataVencimento), 'dd/MM/yyyy', { locale: ptBR })}
+                                  {pagamento.dataVencimento ? (() => {
+                                    try {
+                                      const date = new Date(pagamento.dataVencimento);
+                                      if (isNaN(date.getTime())) return '-';
+                                      return format(date, 'dd/MM/yyyy', { locale: ptBR });
+                                    } catch {
+                                      return '-';
+                                    }
+                                  })() : '-'}
                                 </span>
                                 {(isVencido() || isVencimentoProximo()) && (
                                   <AlertTriangle className="w-4 h-4 text-yellow-500" />
@@ -1092,9 +1100,23 @@ export const Pagamentos: React.FC = () => {
                                       </span>
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                      Início: {format(new Date(etapa.dataInicio), 'dd/MM/yyyy', { locale: ptBR })}
+                                      Início: {etapa.dataInicio ? (() => {
+                                        try {
+                                          const date = new Date(etapa.dataInicio);
+                                          return isNaN(date.getTime()) ? '-' : format(date, 'dd/MM/yyyy', { locale: ptBR });
+                                        } catch {
+                                          return '-';
+                                        }
+                                      })() : '-'}
                                       {etapa.dataConclusao && (
-                                        <> • Conclusão: {format(new Date(etapa.dataConclusao), 'dd/MM/yyyy', { locale: ptBR })}</>
+                                        <> • Conclusão: {(() => {
+                                          try {
+                                            const date = new Date(etapa.dataConclusao);
+                                            return isNaN(date.getTime()) ? '-' : format(date, 'dd/MM/yyyy', { locale: ptBR });
+                                          } catch {
+                                            return '-';
+                                          }
+                                        })()}</>
                                       )}
                                     </div>
                                   </div>

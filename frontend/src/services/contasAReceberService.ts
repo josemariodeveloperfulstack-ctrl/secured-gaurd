@@ -155,27 +155,29 @@ export const contasAReceberService = {
     
     console.log('🔍 DEBUG: Accounts processados:', accounts);
     
-    return accounts.map((account: any): ContaAReceber => ({
-      id: account.id,
-      numeroFatura: account.invoiceNumber,
-      dataEmissao: parseDateFromBackend(account.issueDate),
-      vencimento: parseDateFromBackend(account.dueDate) || new Date(),
-      cliente: account.clientName || account.client?.name || 'Não informado',
-      clienteId: account.clientId || account.client?.id,
-      empresa: account.unitSigla || account.unitName || 'Não informado',
-      empresaId: account.unitId,
-      descricao: account.description,
-      tipo: mapBackendTypeToFrontend(account.type || account.category),
-      valor: parseFloat(account.amount),
-      codigoBarras: account.barcode,
-      status: mapBackendStatusToFrontend(account.status),
-      baixa: account.baixa || false,
-      dataPagamento: parseDateFromBackend(account.paymentDate),
-      observacoes: account.notes,
-      categoria: account.category,
-      centroCusto: account.centroCusto,
-      paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
-    }));
+    return accounts
+      .filter((account: any) => account && account.id) // Filtrar itens inválidos
+      .map((account: any): ContaAReceber => ({
+        id: account.id,
+        numeroFatura: account.invoiceNumber,
+        dataEmissao: parseDateFromBackend(account.issueDate),
+        vencimento: parseDateFromBackend(account.dueDate) || new Date(),
+        cliente: account.clientName || account.client?.name || 'Não informado',
+        clienteId: account.clientId || account.client?.id,
+        empresa: account.unitSigla || account.unitName || 'Não informado',
+        empresaId: account.unitId,
+        descricao: account.description || '',
+        tipo: mapBackendTypeToFrontend(account.type || account.category),
+        valor: parseFloat(account.amount || 0),
+        codigoBarras: account.barcode,
+        status: mapBackendStatusToFrontend(account.status),
+        baixa: account.baixa || false,
+        dataPagamento: parseDateFromBackend(account.paymentDate),
+        observacoes: account.notes,
+        categoria: account.category,
+        centroCusto: account.centroCusto,
+        paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
+      }));
   },
 
   // Buscar conta por ID
@@ -392,7 +394,15 @@ export const contasAReceberService = {
     const response = await api.get('/api/clients/all');
     console.log('🔍 DEBUG: Resposta da API /api/clients/all:', response.data);
     const data = response.data;
-    return Array.isArray(data) ? data : [];
+    const clientes = Array.isArray(data) ? data : [];
+    // Filtrar clientes inválidos e garantir que têm nome
+    return clientes
+      .filter((c: any) => c && c.id && (c.name || c.nome))
+      .map((c: any) => ({
+        ...c,
+        name: c.name || c.nome || '-',
+        id: c.id
+      }));
   },
 
   // Buscar todas as empresas

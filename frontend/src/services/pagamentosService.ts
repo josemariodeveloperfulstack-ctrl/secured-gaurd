@@ -104,8 +104,18 @@ class PagamentosService {
       const response = await axios.get(`${API_BASE_URL}/accounts-receivable/all`, {
         headers: this.getAuthHeaders()
       });
-      // Garantir que sempre retornamos um array
-      return Array.isArray(response.data) ? response.data : this.getMockPagamentos();
+      // Garantir que sempre retornamos um array válido
+      const pagamentos = Array.isArray(response.data) ? response.data : [];
+      // Filtrar e validar cada pagamento
+      return pagamentos
+        .filter((p: any) => p && p.id) // Remover itens inválidos
+        .map((p: any) => ({
+          ...p,
+          dataVencimento: p.dataVencimento || p.dueDate || '',
+          clienteNome: p.clienteNome || p.clientName || '-',
+          descricao: p.descricao || p.description || '-',
+          valor: p.valor || p.amount || 0
+        }));
     } catch (error: any) {
       if (isConnectionError(error)) {
         console.warn('⚠️ Backend não está disponível. Usando dados mockados para pagamentos.');
@@ -355,8 +365,16 @@ class PagamentosService {
       const response = await axios.get(`${API_BASE_URL}/clients/all`, {
         headers: this.getAuthHeaders()
       });
-      // Garantir que sempre retornamos um array
-      return Array.isArray(response.data) ? response.data : [];
+      // Garantir que sempre retornamos um array válido
+      const clientes = Array.isArray(response.data) ? response.data : [];
+      // Filtrar clientes inválidos e garantir que têm nome
+      return clientes
+        .filter((c: any) => c && c.id && (c.name || c.nome))
+        .map((c: any) => ({
+          ...c,
+          nome: c.nome || c.name || '-',
+          id: c.id
+        }));
     } catch (error: any) {
       if (isConnectionError(error)) {
         console.warn('⚠️ Backend não está disponível. Usando dados mockados para clientes.');
