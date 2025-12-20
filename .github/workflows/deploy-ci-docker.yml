@@ -143,17 +143,8 @@ jobs:
           MAX_ATTEMPTS=3
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-              mkdir -p /var/www/secured_guard/ci
-              mkdir -p /var/www/secured_guard/ci/uploads
-              mkdir -p /var/www/secured_guard/ci/logs
-              mkdir -p /var/www/secured_guard/ci/nginx
-              mkdir -p /var/www/secured_guard/ci/postgres_data
-              mkdir -p /var/www/secured_guard/ci/redis_data
-              mkdir -p /var/www/secured_guard/ci/evolution_instances
-              mkdir -p /var/www/secured_guard/ci/holerites
-              mkdir -p /var/www/secured_guard/ci/whatsapp_sessions
-            EOF
+            if sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "mkdir -p /var/www/secured_guard/ci /var/www/secured_guard/ci/uploads /var/www/secured_guard/ci/logs /var/www/secured_guard/ci/nginx /var/www/secured_guard/ci/postgres_data /var/www/secured_guard/ci/redis_data /var/www/secured_guard/ci/evolution_instances /var/www/secured_guard/ci/holerites /var/www/secured_guard/ci/whatsapp_sessions" 2>&1
             then
               echo "✅ Diretórios criados com sucesso!"
               break
