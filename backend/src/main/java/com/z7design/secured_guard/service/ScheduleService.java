@@ -314,11 +314,47 @@ public class ScheduleService {
             
             log.info("✅ Escalas encontradas (findAllWithRelations): {} registros", schedules.size());
             
+            // Inicializar objetos necessários dentro da transação para evitar LazyInitializationException
+            for (Schedule schedule : schedules) {
+                if (schedule.getEmployee() != null) {
+                    // Forçar inicialização de campos básicos do Employee dentro da transação
+                    schedule.getEmployee().getName();
+                    schedule.getEmployee().getId();
+                }
+                if (schedule.getLocation() != null) {
+                    schedule.getLocation().getName();
+                    schedule.getLocation().getId();
+                }
+                if (schedule.getWorkPost() != null) {
+                    schedule.getWorkPost().getName();
+                    schedule.getWorkPost().getId();
+                }
+            }
+            
             // Se retornou vazio, tentar método padrão como fallback
             if (schedules == null || schedules.isEmpty()) {
                 log.warn("⚠️ findAllWithRelations retornou vazio, tentando método padrão");
                 List<Schedule> allSchedules = scheduleRepository.findAll();
                 log.info("✅ Escalas encontradas (método padrão): {} registros", allSchedules != null ? allSchedules.size() : 0);
+                
+                // Inicializar também no método padrão
+                if (allSchedules != null) {
+                    for (Schedule schedule : allSchedules) {
+                        if (schedule.getEmployee() != null) {
+                            schedule.getEmployee().getName();
+                            schedule.getEmployee().getId();
+                        }
+                        if (schedule.getLocation() != null) {
+                            schedule.getLocation().getName();
+                            schedule.getLocation().getId();
+                        }
+                        if (schedule.getWorkPost() != null) {
+                            schedule.getWorkPost().getName();
+                            schedule.getWorkPost().getId();
+                        }
+                    }
+                }
+                
                 return allSchedules != null ? allSchedules : new java.util.ArrayList<>();
             }
             
@@ -345,6 +381,35 @@ public class ScheduleService {
                         allSchedules.get(0).getEmployee() != null ? allSchedules.get(0).getEmployee().getName() : "null",
                         allSchedules.get(0).getScheduleDate());
                 }
+                
+                // Inicializar objetos dentro da transação
+                for (Schedule schedule : allSchedules) {
+                    if (schedule.getEmployee() != null) {
+                        try {
+                            schedule.getEmployee().getName();
+                            schedule.getEmployee().getId();
+                        } catch (Exception ignored) {
+                            // Ignorar erros de lazy initialization
+                        }
+                    }
+                    if (schedule.getLocation() != null) {
+                        try {
+                            schedule.getLocation().getName();
+                            schedule.getLocation().getId();
+                        } catch (Exception ignored) {
+                            // Ignorar erros de lazy initialization
+                        }
+                    }
+                    if (schedule.getWorkPost() != null) {
+                        try {
+                            schedule.getWorkPost().getName();
+                            schedule.getWorkPost().getId();
+                        } catch (Exception ignored) {
+                            // Ignorar erros de lazy initialization
+                        }
+                    }
+                }
+                
                 return allSchedules;
             } catch (Exception e2) {
                 log.error("❌ Erro também no método padrão", e2);

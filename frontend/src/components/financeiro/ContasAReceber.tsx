@@ -125,7 +125,7 @@ export const ContasAReceber: React.FC = () => {
 
       toast({
         title: 'Cobrança Enviada',
-        description: `Cobrança enviada via ${tipo} para ${conta.client.name}`
+        description: `Cobrança enviada via ${tipo} para ${conta.client?.name || 'cliente'}`
       });
     } catch (error) {
       toast({
@@ -161,7 +161,7 @@ export const ContasAReceber: React.FC = () => {
 
       toast({
         title: 'Cobrança Enviada',
-        description: `Cobrança personalizada enviada para ${selectedConta.client.name}`
+        description: `Cobrança personalizada enviada para ${selectedConta.client?.name || 'cliente'}`
       });
     } catch (error) {
       toast({
@@ -258,18 +258,25 @@ export const ContasAReceber: React.FC = () => {
 
   // Filtros aplicados
   const filteredContas = contas.filter(conta => {
-    const matchesSearch = conta.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conta.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conta.description.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!conta) return false;
+    
+    const matchesSearch = (conta.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+                         (conta.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+                         (conta.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     const matchesStatus = filterStatus === 'all' || conta.status === filterStatus;
     const matchesCategoria = filterCategoria === 'all' || conta.categoria === filterCategoria;
-    const matchesCliente = filterCliente === 'all' || conta.client.id === filterCliente;
+    const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
     
     // Filtro por data
     let matchesDate = true;
     if (dateRange?.from && dateRange?.to) {
-      const contaDate = new Date(conta.dueDate);
-      matchesDate = contaDate >= dateRange.from && contaDate <= dateRange.to;
+      try {
+        const contaDate = new Date(conta.dueDate);
+        if (isNaN(contaDate.getTime())) return false;
+        matchesDate = contaDate >= dateRange.from && contaDate <= dateRange.to;
+      } catch {
+        matchesDate = false;
+      }
     }
     
     return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesDate;
@@ -627,8 +634,8 @@ export const ContasAReceber: React.FC = () => {
                                 <span className="text-sm font-bold text-seguranca-yellow">{index + 1}</span>
                               </div>
                               <div>
-                                <p className="font-medium text-seguranca-lightgray">{conta.client.name}</p>
-                                <p className="text-xs text-gray-400">{conta.invoiceNumber}</p>
+                                <p className="font-medium text-seguranca-lightgray">{conta.client?.name || '-'}</p>
+                                <p className="text-xs text-gray-400">{conta.invoiceNumber || '-'}</p>
                               </div>
                             </div>
                             <div className="text-right">
@@ -670,8 +677,8 @@ export const ContasAReceber: React.FC = () => {
                         .map((conta) => (
                           <div key={conta.id} className="flex items-center justify-between p-3 bg-seguranca-red/10 border border-seguranca-red/20 rounded-lg">
                             <div>
-                              <p className="font-medium text-seguranca-lightgray">{conta.client.name}</p>
-                              <p className="text-xs text-gray-400">{conta.invoiceNumber}</p>
+                              <p className="font-medium text-seguranca-lightgray">{conta.client?.name || '-'}</p>
+                              <p className="text-xs text-gray-400">{conta.invoiceNumber || '-'}</p>
                             </div>
                             <div className="text-right">
                               <p className="font-semibold text-seguranca-red">
@@ -729,11 +736,11 @@ export const ContasAReceber: React.FC = () => {
                         <tr key={conta.id} className="hover:bg-seguranca-graphite/50">
                           <td className="px-4 py-4">
                             <div>
-                              <div className="font-medium text-seguranca-lightgray">{conta.client.name}</div>
+                              <div className="font-medium text-seguranca-lightgray">{conta.client?.name || '-'}</div>
                               <div className="text-sm text-gray-400">
-                                Fatura: {conta.invoiceNumber}
+                                Fatura: {conta.invoiceNumber || '-'}
                               </div>
-                              <div className="text-sm text-gray-400">{conta.description}</div>
+                              <div className="text-sm text-gray-400">{conta.description || '-'}</div>
                             </div>
                           </td>
                           <td className="px-4 py-4">

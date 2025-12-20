@@ -52,7 +52,7 @@ public class Schedule {
         "schedules", "hibernateLazyInitializer", "handler", 
         "documents", "benefits", "dependents", "timeRecords", 
         "bankHours", "payrollItems", "payrolls", "epis", 
-        "occurrences", "user", "position"
+        "occurrences", "user", "position", "unit", "company"
     })
     private Employee employee;
     
@@ -67,10 +67,10 @@ public class Schedule {
     private Shift shift;
     
     @NotNull(message = "Location is required")
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "location_id", nullable = false)
     @NotFound(action = NotFoundAction.IGNORE)
-    @JsonIgnoreProperties({"schedules", "hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({"schedules", "hibernateLazyInitializer", "handler", "unit", "employees", "routes", "client"})
     private Location location;
     
     @ManyToOne
