@@ -25,11 +25,31 @@ public class AbsenceService {
     @Autowired
     private EmployeeRepository employeeRepository;
 
+    @Transactional(readOnly = true)
     public List<Absence> getAllAbsences() {
         try {
-            log.info("Buscando todas as faltas com relacionamentos");
+            log.info("🔍 Buscando todas as faltas com relacionamentos");
             List<Absence> absences = absenceRepository.findAllWithRelationships();
             log.info("✅ Faltas encontradas: {} registros", absences.size());
+            
+            // Inicializar objetos necessários dentro da transação para evitar LazyInitializationException
+            for (Absence absence : absences) {
+                if (absence.getEmployee() != null) {
+                    // Forçar inicialização de campos básicos do Employee dentro da transação
+                    absence.getEmployee().getName();
+                    absence.getEmployee().getId();
+                    absence.getEmployee().getRegistrationNumber();
+                }
+                if (absence.getCoverageEmployee() != null) {
+                    absence.getCoverageEmployee().getName();
+                    absence.getCoverageEmployee().getId();
+                }
+                if (absence.getApprovedBy() != null) {
+                    absence.getApprovedBy().getName();
+                    absence.getApprovedBy().getId();
+                }
+            }
+            
             return absences;
         } catch (Exception e) {
             log.error("❌ Erro ao buscar faltas com relacionamentos", e);
@@ -47,8 +67,33 @@ public class AbsenceService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Optional<Absence> getAbsenceById(UUID id) {
-        return absenceRepository.findById(id);
+        try {
+            Optional<Absence> absenceOpt = absenceRepository.findByIdWithRelationships(id);
+            if (absenceOpt.isPresent()) {
+                Absence absence = absenceOpt.get();
+                // Inicializar objetos necessários dentro da transação
+                if (absence.getEmployee() != null) {
+                    absence.getEmployee().getName();
+                    absence.getEmployee().getId();
+                    absence.getEmployee().getRegistrationNumber();
+                }
+                if (absence.getCoverageEmployee() != null) {
+                    absence.getCoverageEmployee().getName();
+                    absence.getCoverageEmployee().getId();
+                }
+                if (absence.getApprovedBy() != null) {
+                    absence.getApprovedBy().getName();
+                    absence.getApprovedBy().getId();
+                }
+            }
+            return absenceOpt;
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar falta por ID: {}", id, e);
+            // Fallback para método padrão
+            return absenceRepository.findById(id);
+        }
     }
 
     public List<Absence> getAbsencesByEmployee(UUID employeeId) {

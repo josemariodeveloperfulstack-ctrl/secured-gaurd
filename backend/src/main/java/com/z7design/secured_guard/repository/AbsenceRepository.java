@@ -19,6 +19,10 @@ public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
     List<Absence> findAllWithRelationships();
     
     @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
+    @Query("SELECT a FROM Absence a WHERE a.id = :id")
+    java.util.Optional<Absence> findByIdWithRelationships(@Param("id") UUID id);
+    
+    @EntityGraph(attributePaths = {"employee", "coverageEmployee", "approvedBy"})
     @Query("SELECT a FROM Absence a WHERE a.employee.id = :employeeId")
     List<Absence> findByEmployeeId(@Param("employeeId") UUID employeeId);
     

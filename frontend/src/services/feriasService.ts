@@ -103,8 +103,8 @@ export const feriasService = {
     // Converter dados do backend para o formato esperado pelo frontend
     return response.data.map((absence: any) => ({
       id: absence.id,
-      employeeId: absence.employeeId,
-      employeeName: absence.employeeName || 'Funcionário não encontrado',
+      employeeId: absence.employee?.id || absence.employeeId || null,
+      employeeName: absence.employee?.name || absence.employeeName || 'Funcionário não encontrado',
       tipo: tipoMapInverso[absence.absenceType] || 'OUTROS',
       dataInicio: absence.absenceDate, // Usar absenceDate em vez de startDate
       dataFim: absence.absenceDate, // Para afastamentos, usar a mesma data
