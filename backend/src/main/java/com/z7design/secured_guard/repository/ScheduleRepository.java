@@ -20,7 +20,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     @Query("SELECT DISTINCT s FROM Schedule s " +
            "LEFT JOIN FETCH s.employee " +
            "LEFT JOIN FETCH s.location " +
-           "LEFT JOIN FETCH s.workPost " +
+           "LEFT JOIN FETCH s.workPost wp " +
+           "LEFT JOIN FETCH wp.client " +
            "LEFT JOIN FETCH s.route " +
            "LEFT JOIN FETCH s.patrol")
     List<Schedule> findAllWithRelations();

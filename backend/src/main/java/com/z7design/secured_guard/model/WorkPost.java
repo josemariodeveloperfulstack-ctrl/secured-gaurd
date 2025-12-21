@@ -2,6 +2,7 @@ package com.z7design.secured_guard.model;
 
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,6 +22,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "client", "contract", "responsible"})
 public class WorkPost {
     
     @Id
