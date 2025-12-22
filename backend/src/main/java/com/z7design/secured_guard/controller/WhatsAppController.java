@@ -87,13 +87,13 @@ public class WhatsAppController {
             // Verificar se o serviço está disponível antes de tentar inicializar
             boolean serviceAvailable = false;
             try {
-                serviceAvailable = baileysRestService.checkConnection();
+                serviceAvailable = baileysRestService.isServiceAvailable();
             } catch (Exception e) {
-                log.warn("⚠️ Não foi possível verificar conexão com Baileys REST: {}", e.getMessage());
+                log.warn("⚠️ Não foi possível verificar disponibilidade do Baileys REST: {}", e.getMessage());
             }
             
             if (!serviceAvailable) {
-                log.error("❌ Baileys REST não disponível");
+                log.error("❌ Baileys REST não disponível - serviço não está rodando");
                 // Retornar 200 OK com erro na resposta para não quebrar o frontend
                 return ResponseEntity.ok(Map.of(
                     "success", false,

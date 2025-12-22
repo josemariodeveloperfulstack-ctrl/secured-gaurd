@@ -178,6 +178,52 @@ public class BaileysRestService {
     }
     
     /**
+     * Verifica se o serviço Baileys REST está disponível (health check)
+     * Retorna true se o serviço está rodando, independente do estado da conexão WhatsApp
+     */
+    public boolean isServiceAvailable() {
+        try {
+            // Se Baileys não estiver habilitado, retornar false
+            if (!baileysEnabled) {
+                logger.debug("Baileys não está habilitado. Serviço não disponível.");
+                return false;
+            }
+            
+            // Tentar primeiro o endpoint /health
+            try {
+                String healthUrl = baileysRestUrl + "/health";
+                ResponseEntity<String> healthResponse = restTemplate.getForEntity(healthUrl, String.class);
+                if (healthResponse.getStatusCode() == HttpStatus.OK) {
+                    logger.debug("✅ Serviço Baileys REST está disponível (health check OK)");
+                    return true;
+                }
+            } catch (Exception e) {
+                logger.debug("⚠️ Endpoint /health não disponível, tentando endpoint alternativo: {}", e.getMessage());
+            }
+            
+            // Se /health falhar, tentar um endpoint básico que sempre existe
+            String url = baileysRestUrl + "/instance/connectionState?key=" + instanceKey;
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK) {
+                logger.debug("✅ Serviço Baileys REST está disponível (connectionState OK)");
+                return true;
+            }
+            
+            return false;
+            
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Serviço não disponível - não está rodando ou não é acessível
+            logger.debug("⚠️ Serviço Baileys REST não disponível: {}", e.getMessage());
+            return false;
+        } catch (Exception e) {
+            // Outros erros - logar mas não crashar
+            logger.debug("⚠️ Erro ao verificar disponibilidade do serviço Baileys REST: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
      * Verifica se a instância está conectada
      */
     public boolean checkConnection() {
