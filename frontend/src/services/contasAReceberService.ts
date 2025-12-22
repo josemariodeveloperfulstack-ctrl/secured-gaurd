@@ -1,13 +1,29 @@
 import api from '@/lib/axios';
-import { ContaAReceber } from '@/components/financeiro/ContasAReceberFormModal';
+import { ContaAReceber as ContaAReceberForm } from '@/components/financeiro/ContasAReceberFormModal';
 import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
+
+// Interface estendida para Contas a Receber com campos adicionais do backend
+export type ContaAReceber = ContaAReceberForm & {
+  amount?: number; // Valor total (alias para valor)
+  amountPaid?: number; // Valor já pago
+  pendingAmount?: number; // Valor pendente
+  overdueDays?: number; // Dias em atraso
+  invoiceNumber?: string; // Número da fatura
+  measurementNumber?: string; // Número da medição
+  dueDate?: Date; // Data de vencimento
+  client?: {
+    id: string;
+    name: string;
+  };
+};
 
 export interface CreateContaAReceberRequest {
   invoiceNumber?: string;
   description: string;
   clientId: string | null;
-  // unitId removido - AccountsReceivableDTO não possui esse campo
+  unitId?: string; // ID da unidade/empresa
   amount: number;
+  amountPaid?: number; // Valor pago (opcional, padrão 0)
   dueDate: string;
   issueDate: string;
   paymentDate?: string;
@@ -18,7 +34,10 @@ export interface CreateContaAReceberRequest {
   notes?: string;
   measurementNumber?: string;
   measurementId?: string;
-  // centroCusto removido - AccountsReceivableDTO não possui esse campo
+  overdueDays?: number; // Dias em atraso
+  lateFee?: number; // Taxa de atraso
+  latePenalty?: number; // Multa de atraso
+  centroCusto?: string; // Centro de custo
 }
 
 export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberRequest> {
@@ -169,6 +188,10 @@ export const contasAReceberService = {
         descricao: account.description || '',
         tipo: mapBackendTypeToFrontend(account.type || account.category),
         valor: parseFloat(account.amount || 0),
+        amount: parseFloat(account.amount || 0), // Campo adicional para compatibilidade
+        amountPaid: parseFloat(account.amountPaid || 0), // Valor pago
+        pendingAmount: parseFloat(account.pendingAmount || (parseFloat(account.amount || 0) - parseFloat(account.amountPaid || 0)) || 0), // Valor pendente
+        overdueDays: account.overdueDays || 0, // Dias em atraso
         codigoBarras: account.barcode,
         status: mapBackendStatusToFrontend(account.status),
         baixa: account.baixa || false,
@@ -176,7 +199,14 @@ export const contasAReceberService = {
         observacoes: account.notes,
         categoria: account.category,
         centroCusto: account.centroCusto,
-        paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
+        paymentMethod: account.paymentMethod || 'PIX', // Incluir paymentMethod do backend
+        invoiceNumber: account.invoiceNumber, // Número da fatura
+        measurementNumber: account.measurementNumber, // Número da medição
+        dueDate: parseDateFromBackend(account.dueDate) || new Date(), // Data de vencimento
+        client: account.client ? {
+          id: account.client.id,
+          name: account.client.name || account.clientName || 'Não informado'
+        } : undefined
       }));
   },
 
@@ -185,6 +215,12 @@ export const contasAReceberService = {
     const response = await api.get(`/api/accounts-receivable/${id}`);
     const account = response.data;
     
+    console.log('📋 Dados recebidos do backend para conta:', id, account);
+    
+    // Nota: O backend não retorna unitId, unitSigla, unitName nem centroCusto
+    // porque esses campos não existem no modelo AccountsReceivable
+    // Eles são apenas campos do frontend e não são persistidos no backend
+    
     return {
       id: account.id,
       numeroFatura: account.invoiceNumber,
@@ -192,8 +228,8 @@ export const contasAReceberService = {
       vencimento: parseDateFromBackend(account.dueDate) || new Date(),
       cliente: account.clientName || account.client?.name || 'Não informado',
       clienteId: account.clientId || account.client?.id,
-      empresa: account.unitSigla || account.unitName || 'Não informado',
-      empresaId: account.unitId,
+      empresa: account.unit?.sigla || account.unit?.name || account.unitSigla || account.unitName || account.companySigla || undefined,
+      empresaId: account.unitId || account.unit?.id || account.companyId || undefined,
       descricao: account.description,
       tipo: mapBackendTypeToFrontend(account.type || account.category),
       valor: parseFloat(account.amount),
@@ -203,7 +239,7 @@ export const contasAReceberService = {
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
       categoria: account.category || 'INVOICE', // Garantir categoria
-      centroCusto: account.centroCusto,
+      centroCusto: account.centroCusto || undefined,
       paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
     };
   },
@@ -230,6 +266,7 @@ export const contasAReceberService = {
     const requestData: CreateContaAReceberRequest = {
       description: conta.descricao,
       clientId: conta.clienteId || null,
+      unitId: conta.empresaId || undefined,
       amount: Number(conta.valor) || 0,
       dueDate: formatDateForBackend(conta.vencimento) || '',
       issueDate: formatDateForBackend(conta.dataEmissao) || '',
@@ -238,7 +275,8 @@ export const contasAReceberService = {
       category: category,
       paymentMethod: paymentMethod,
       status: mapFrontendStatusToBackend(conta.status) || 'PENDING',
-      notes: conta.observacoes
+      notes: conta.observacoes,
+      centroCusto: conta.centroCusto || undefined
     };
 
     // Adicionar invoiceNumber apenas se fornecido
@@ -261,49 +299,168 @@ export const contasAReceberService = {
 
   // Atualizar conta
   async updateContaAReceber(id: string, conta: Partial<ContaAReceber>): Promise<ContaAReceber> {
-    const requestData: Partial<CreateContaAReceberRequest> = {};
+    // Primeiro, buscar a conta existente para obter os valores atuais
+    const contaExistente = await this.getContaAReceberById(id);
     
-    if (conta.descricao) requestData.description = conta.descricao;
-    if (conta.clienteId) requestData.clientId = conta.clienteId;
-    if (conta.valor !== undefined) requestData.amount = conta.valor;
-    if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) || 'PENDING';
-    if (conta.dataEmissao) requestData.issueDate = formatDateForBackend(conta.dataEmissao);
-    if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
-    if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
-    if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
-    if (conta.observacoes) requestData.notes = conta.observacoes;
+    // Construir requestData com todos os campos obrigatórios
+    // Usar valores do formulário se fornecidos, senão usar valores existentes
+    const requestData: CreateContaAReceberRequest = {
+      description: (conta.descricao || contaExistente.descricao || '').trim(),
+      clientId: conta.clienteId || contaExistente.clienteId || null,
+      unitId: conta.empresaId || contaExistente.empresaId || undefined,
+      amount: Number(conta.valor !== undefined ? conta.valor : (contaExistente.valor || contaExistente.amount || 0)),
+      amountPaid: Number(contaExistente.amountPaid !== undefined ? contaExistente.amountPaid : 0),
+      dueDate: conta.vencimento ? formatDateForBackend(conta.vencimento) : formatDateForBackend(contaExistente.dueDate || contaExistente.vencimento),
+      issueDate: conta.dataEmissao ? formatDateForBackend(conta.dataEmissao) : formatDateForBackend(contaExistente.dataEmissao || new Date()),
+      paymentDate: conta.dataPagamento ? formatDateForBackend(conta.dataPagamento) : (contaExistente.dataPagamento ? formatDateForBackend(contaExistente.dataPagamento) : undefined),
+      barcode: conta.codigoBarras !== undefined ? conta.codigoBarras : contaExistente.codigoBarras,
+      notes: conta.observacoes !== undefined ? conta.observacoes : contaExistente.observacoes,
+      centroCusto: conta.centroCusto !== undefined ? conta.centroCusto : contaExistente.centroCusto,
+      overdueDays: Number(contaExistente.overdueDays || 0),
+      lateFee: Number(contaExistente.lateFee || 0),
+      latePenalty: Number(contaExistente.latePenalty || 0)
+    };
     
-    // Mapear categoria - já deve vir como enum válido do formulário
-    if (conta.categoria && conta.categoria !== 'NENHUMA') {
+    // Número da fatura (obrigatório - @NotBlank)
+    if (conta.numeroFatura || conta.invoiceNumber) {
+      requestData.invoiceNumber = (conta.numeroFatura || conta.invoiceNumber || '').trim();
+    } else if (contaExistente.numeroFatura || contaExistente.invoiceNumber) {
+      requestData.invoiceNumber = (contaExistente.numeroFatura || contaExistente.invoiceNumber || '').trim();
+    } else {
+      // Se não houver número da fatura, gerar um temporário baseado no ID
+      requestData.invoiceNumber = `FAT-${id.substring(0, 8).toUpperCase()}`;
+    }
+    
+    // Mapear categoria (obrigatória - @NotNull)
+    if (conta.categoria && conta.categoria !== 'NENHUMA' && conta.categoria !== '' && conta.categoria !== undefined) {
       const validCategories = ['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'];
       const catUpper = conta.categoria.toUpperCase();
       requestData.category = validCategories.includes(catUpper) ? catUpper : 'INVOICE';
+    } else if (contaExistente.categoria && contaExistente.categoria !== 'NENHUMA' && contaExistente.categoria !== '' && contaExistente.categoria !== undefined) {
+      const validCategories = ['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'];
+      const catUpper = String(contaExistente.categoria).toUpperCase();
+      requestData.category = validCategories.includes(catUpper) ? catUpper : 'INVOICE';
     } else if (conta.tipo) {
       requestData.category = mapTypeToCategory(conta.tipo);
+    } else if (contaExistente.tipo) {
+      requestData.category = mapTypeToCategory(contaExistente.tipo);
     } else {
       requestData.category = 'INVOICE'; // Valor padrão
     }
     
-    // Garantir paymentMethod se não fornecido
-    if (!requestData.paymentMethod && conta.paymentMethod) {
+    // Forma de pagamento (obrigatória - @NotNull)
+    if (conta.paymentMethod) {
       requestData.paymentMethod = conta.paymentMethod;
-    } else if (!requestData.paymentMethod) {
+    } else if (contaExistente.paymentMethod) {
+      requestData.paymentMethod = contaExistente.paymentMethod;
+    } else {
       requestData.paymentMethod = 'PIX'; // Valor padrão
     }
     
-    // Removido type, unitId e centroCusto pois AccountsReceivableDTO não possui esses campos
+    // Status (obrigatório - usar o existente se não fornecido)
+    if (conta.status) {
+      requestData.status = mapFrontendStatusToBackend(conta.status) || 'PENDING';
+    } else if (contaExistente.status) {
+      requestData.status = mapFrontendStatusToBackend(contaExistente.status) || 'PENDING';
+    } else {
+      requestData.status = 'PENDING'; // Valor padrão
+    }
 
-    console.log('Dados da requisição de atualização:', requestData);
-    console.log('ID da conta:', id);
+    // Validar campos obrigatórios antes de enviar
+    if (!requestData.description || requestData.description.trim() === '') {
+      throw new Error('Descrição é obrigatória');
+    }
+    if (!requestData.clientId) {
+      throw new Error('Cliente é obrigatório');
+    }
+    if (!requestData.invoiceNumber || requestData.invoiceNumber.trim() === '') {
+      throw new Error('Número da fatura é obrigatório');
+    }
+    if (!requestData.amount || requestData.amount <= 0) {
+      throw new Error('Valor deve ser maior que zero');
+    }
+    if (!requestData.issueDate) {
+      throw new Error('Data de emissão é obrigatória');
+    }
+    if (!requestData.dueDate) {
+      throw new Error('Data de vencimento é obrigatória');
+    }
+
+    // Garantir que category e paymentMethod sejam strings válidas (enums)
+    if (!requestData.category || requestData.category === 'NENHUMA') {
+      requestData.category = 'INVOICE';
+    }
+    if (!requestData.paymentMethod) {
+      requestData.paymentMethod = 'PIX';
+    }
+    
+    // Validar clientId antes de enviar
+    if (!requestData.clientId) {
+      throw new Error('Cliente é obrigatório. Por favor, selecione um cliente.');
+    }
+    
+    // Remover campos undefined para evitar problemas de serialização
+    const cleanRequestData: any = {
+      description: String(requestData.description || '').trim(),
+      clientId: String(requestData.clientId), // Garantir que seja string (UUID)
+      invoiceNumber: String(requestData.invoiceNumber || '').trim(),
+      amount: Number(requestData.amount), // Garantir que seja número
+      issueDate: String(requestData.issueDate), // Data no formato YYYY-MM-DD
+      dueDate: String(requestData.dueDate), // Data no formato YYYY-MM-DD
+      category: String(requestData.category).toUpperCase(), // Enum em maiúsculas
+      paymentMethod: String(requestData.paymentMethod).toUpperCase(), // Enum em maiúsculas
+      status: String(requestData.status || 'PENDING').toUpperCase() // Enum em maiúsculas
+    };
+    
+    // Adicionar campos opcionais apenas se existirem e forem válidos
+    if (requestData.unitId) {
+      cleanRequestData.unitId = String(requestData.unitId);
+    }
+    if (requestData.paymentDate) {
+      cleanRequestData.paymentDate = String(requestData.paymentDate);
+    }
+    if (requestData.amountPaid !== undefined && requestData.amountPaid !== null) {
+      cleanRequestData.amountPaid = Number(requestData.amountPaid);
+    }
+    if (requestData.centroCusto && String(requestData.centroCusto).trim()) {
+      cleanRequestData.centroCusto = String(requestData.centroCusto).trim();
+    }
+    if (requestData.barcode && String(requestData.barcode).trim()) {
+      cleanRequestData.barcode = String(requestData.barcode).trim();
+    }
+    if (requestData.notes && String(requestData.notes).trim()) {
+      cleanRequestData.notes = String(requestData.notes).trim();
+    }
+    if (requestData.measurementNumber && String(requestData.measurementNumber).trim()) {
+      cleanRequestData.measurementNumber = String(requestData.measurementNumber).trim();
+    }
+    if (requestData.overdueDays !== undefined && requestData.overdueDays !== null) {
+      cleanRequestData.overdueDays = Number(requestData.overdueDays);
+    }
+    if (requestData.lateFee !== undefined && requestData.lateFee !== null) {
+      cleanRequestData.lateFee = Number(requestData.lateFee);
+    }
+    if (requestData.latePenalty !== undefined && requestData.latePenalty !== null) {
+      cleanRequestData.latePenalty = Number(requestData.latePenalty);
+    }
+
+    console.log('📤 Dados da requisição de atualização (limpos):', JSON.stringify(cleanRequestData, null, 2));
+    console.log('📋 ID da conta:', id);
+    console.log('📋 Conta existente:', contaExistente);
 
     try {
-      const response = await api.put(`/api/accounts-receivable/${id}`, requestData);
+      const response = await api.put(`/api/accounts-receivable/${id}`, cleanRequestData);
+      console.log('✅ Resposta do servidor:', response.data);
       return this.getContaAReceberById(response.data.id);
     } catch (error: any) {
-      console.error('Erro detalhado ao atualizar conta a receber:', error);
-      console.error('Response data:', error.response?.data);
-      console.error('Response status:', error.response?.status);
-      console.error('Request data enviado:', requestData);
+      console.error('❌ Erro detalhado ao atualizar conta a receber:', error);
+      console.error('❌ Response data:', error.response?.data);
+      console.error('❌ Response status:', error.response?.status);
+      console.error('❌ Response headers:', error.response?.headers);
+      console.error('❌ Request data enviado:', JSON.stringify(cleanRequestData, null, 2));
+      if (error.response?.data?.message) {
+        console.error('❌ Mensagem de erro do servidor:', error.response.data.message);
+      }
       throw error;
     }
   },
@@ -407,10 +564,20 @@ export const contasAReceberService = {
 
   // Buscar todas as empresas
   async getEmpresas(): Promise<any[]> {
-    const response = await api.get('/api/companies');
-    console.log('🔍 DEBUG: Resposta da API /api/companies:', response.data);
-    const data = response.data;
-    return Array.isArray(data) ? data : [];
+    try {
+      const response = await api.get('/api/companies');
+      console.log('🔍 DEBUG: Resposta da API /api/companies:', response.data);
+      const data = Array.isArray(response.data) ? response.data : (response.data?.content ?? []);
+      // Normalizar para sempre conter id, name e sigla
+      return data.map((c: any) => ({ 
+        id: c.id, 
+        name: c.name || c.nome || '', 
+        sigla: c.sigla || c.acronym || c.abbreviation || c.name?.substring(0, 3).toUpperCase() || ''
+      }));
+    } catch (error) {
+      console.error('❌ Erro ao carregar empresas:', error);
+      return [];
+    }
   },
 
   // Criar cliente

@@ -156,18 +156,26 @@ public class UserGroupService {
     public void addUserToGroup(UUID userId, UUID groupId) {
         System.out.println("➕ [BACKEND] Iniciando adição: userId=" + userId + ", groupId=" + groupId);
         
-        UserGroupEntity group = userGroupRepository.findById(groupId)
-                .orElseThrow(() -> new RuntimeException("Grupo não encontrado"));
+        // Verificar se o grupo existe
+        if (!userGroupRepository.existsById(groupId)) {
+            throw new RuntimeException("Grupo não encontrado");
+        }
         
-        com.z7design.secured_guard.model.User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        // Verificar se o usuário existe
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Usuário não encontrado");
+        }
         
-        // Verificar se o usuário já está no grupo consultando diretamente no banco
-        List<UserGroupEntity> userGroups = userGroupRepository.findByUserId(userId);
-        boolean userAlreadyInGroup = userGroups.stream()
-                .anyMatch(g -> g.getId().equals(groupId));
+        // Verificar se o usuário já está no grupo consultando diretamente na tabela de junção
+        String checkQuery = "SELECT COUNT(*) FROM user_group_membership WHERE user_id = :userId AND group_id = :groupId";
+        Long count = ((Number) entityManager.createNativeQuery(checkQuery)
+                .setParameter("userId", userId)
+                .setParameter("groupId", groupId)
+                .getSingleResult()).longValue();
         
-        System.out.println("🔍 [BACKEND] Usuário já está no grupo: " + userAlreadyInGroup);
+        boolean userAlreadyInGroup = count > 0;
+        
+        System.out.println("🔍 [BACKEND] Verificação na tabela de junção - Count: " + count + ", Já está no grupo: " + userAlreadyInGroup);
         
         if (userAlreadyInGroup) {
             throw new RuntimeException("Usuário já está no grupo");

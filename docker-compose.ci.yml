@@ -70,6 +70,7 @@ services:
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
       BAILEYS_REST_URL: http://whatsapp-service-ci:3333
+      BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
     ports:
       - "8081:8080"
     volumes:
@@ -80,6 +81,8 @@ services:
         condition: service_healthy
       redis-ci:
         condition: service_healthy
+      whatsapp-service-ci:
+        condition: service_started
     networks:
       - secured-guard-ci-network
       - z7network
@@ -112,8 +115,6 @@ services:
       - whatsapp_sessions_ci:/app/sessions
       - uploads_ci:/app/uploads
     depends_on:
-      backend-ci:
-        condition: service_started
       postgres-ci:
         condition: service_healthy
       redis-ci:
@@ -122,10 +123,10 @@ services:
       - secured-guard-ci-network
       - z7network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3333/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3333/health || curl -f http://localhost:3333/instance/connectionState?key=securedguard_ci || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
     restart: unless-stopped
     # Memória compartilhada para Chromium/Puppeteer

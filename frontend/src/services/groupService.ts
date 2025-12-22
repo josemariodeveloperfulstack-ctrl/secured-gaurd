@@ -59,6 +59,18 @@ export const groupService = {
     await api.delete(`/api/groups/${groupId}/users/${userId}`);
   },
 
+  // Buscar usuários de um grupo
+  async getUsersByGroup(groupId: string): Promise<any[]> {
+    const response = await api.get(`/api/groups/${groupId}/users`);
+    return response.data;
+  },
+
+  // Buscar usuários disponíveis para adicionar ao grupo
+  async getAvailableUsersForGroup(groupId: string): Promise<any[]> {
+    const response = await api.get(`/api/groups/${groupId}/available-users`);
+    return response.data;
+  },
+
   // Adicionar permissão ao grupo
   async addPermissionToGroup(groupId: string, permission: string): Promise<void> {
     await api.post(`/api/groups/${groupId}/permissions`, { permission });

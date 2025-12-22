@@ -27,6 +27,15 @@ public class AccountsReceivable {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Client client;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Unit unit;
+    
+    @Size(max = 100, message = "Centro de custo deve ter no máximo 100 caracteres")
+    @Column(name = "centro_custo", length = 100)
+    private String centroCusto;
+    
     @NotBlank(message = "Número da fatura é obrigatório")
     @Size(max = 100, message = "Número da fatura deve ter no máximo 100 caracteres")
     @Column(name = "invoice_number", nullable = false)
@@ -123,6 +132,22 @@ public class AccountsReceivable {
     
     public void setClient(Client client) {
         this.client = client;
+    }
+    
+    public Unit getUnit() {
+        return unit;
+    }
+    
+    public void setUnit(Unit unit) {
+        this.unit = unit;
+    }
+    
+    public String getCentroCusto() {
+        return centroCusto;
+    }
+    
+    public void setCentroCusto(String centroCusto) {
+        this.centroCusto = centroCusto;
     }
     
     public String getInvoiceNumber() {

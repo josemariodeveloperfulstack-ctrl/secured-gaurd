@@ -54,11 +54,11 @@ export const GroupUsersModal: React.FC<GroupUsersModalProps> = ({
       console.log('🔄 Carregando usuários do grupo:', group.id);
       
       // Buscar usuários que já estão no grupo
-      const usersInGroup = await userService.getUsersByGroup(group.id);
+      const usersInGroup = await groupService.getUsersByGroup(group.id);
       console.log('👥 Usuários no grupo:', usersInGroup.length, usersInGroup);
       
       // Buscar usuários disponíveis para adicionar
-      const available = await userService.getAvailableUsersForGroup(group.id);
+      const available = await groupService.getAvailableUsersForGroup(group.id);
       console.log('✅ Usuários disponíveis:', available.length, available);
       
       setGroupUsers(usersInGroup);
