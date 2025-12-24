@@ -23,7 +23,8 @@ import {
   Building2,
   AlertCircle,
   CheckCircle,
-  Info
+  Info,
+  Reply
 } from 'lucide-react';
 import { SystemMessage } from '@/stores/messageStore';
 
@@ -34,6 +35,7 @@ interface ViewMessageModalProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onMarkAsRead?: () => void;
+  onReply?: () => void;
 }
 
 export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
@@ -42,7 +44,8 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
   message,
   onEdit,
   onDelete,
-  onMarkAsRead
+  onMarkAsRead,
+  onReply
 }) => {
   if (!message) return null;
 
@@ -250,6 +253,19 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Marcar como Lida
+            </Button>
+          )}
+          
+          {onReply && (
+            <Button
+              onClick={() => {
+                onReply();
+                onClose();
+              }}
+              className="bg-cyan-600 hover:bg-cyan-700"
+            >
+              <Reply className="h-4 w-4 mr-2" />
+              Responder
             </Button>
           )}
           

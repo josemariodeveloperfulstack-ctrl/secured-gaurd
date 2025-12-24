@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -114,9 +115,27 @@ public class MessageService {
         message.setSendNotification(request.getSendNotification());
         message.setScheduledAt(request.getScheduledAt());
         
-        // Definir destinatários baseado no tipo
-        Set<User> recipients = getRecipients(request);
-        message.setRecipients(recipients);
+        // Se for uma resposta, definir a mensagem original
+        if (request.getReplyToId() != null) {
+            Message replyToMessage = messageRepository.findById(request.getReplyToId())
+                .orElseThrow(() -> new BusinessException("Mensagem original não encontrada"));
+            message.setReplyTo(replyToMessage);
+            
+            // Se não foram especificados destinatários, usar o remetente da mensagem original
+            if (request.getRecipientIds() == null || request.getRecipientIds().isEmpty()) {
+                Set<User> replyRecipients = new HashSet<>();
+                replyRecipients.add(replyToMessage.getSender());
+                message.setRecipients(replyRecipients);
+                message.setType(MessageType.INDIVIDUAL);
+            } else {
+                Set<User> recipients = getRecipients(request);
+                message.setRecipients(recipients);
+            }
+        } else {
+            // Definir destinatários baseado no tipo
+            Set<User> recipients = getRecipients(request);
+            message.setRecipients(recipients);
+        }
         
         // Definir departamentos se aplicável
         if (request.getDepartmentIds() != null && !request.getDepartmentIds().isEmpty()) {
@@ -458,6 +477,13 @@ public class MessageService {
         dto.setReadAt(message.getReadAt());
         dto.setCreatedAt(message.getCreatedAt());
         dto.setUpdatedAt(message.getUpdatedAt());
+        
+        // Converter replyTo
+        if (message.getReplyTo() != null) {
+            dto.setReplyToId(message.getReplyTo().getId());
+            // Evitar recursão infinita - não incluir o replyTo completo por padrão
+            // Se necessário, pode ser carregado separadamente
+        }
         
         // Converter sender
         if (message.getSender() != null) {

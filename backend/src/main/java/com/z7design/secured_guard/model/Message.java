@@ -85,6 +85,10 @@ public class Message {
     @Column(name = "read_at")
     private LocalDateTime readAt;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_id")
+    private Message replyTo;
+    
     @Column(name = "created_at", nullable = false)
     @NotNull(message = "Data de criação é obrigatória")
     private LocalDateTime createdAt;

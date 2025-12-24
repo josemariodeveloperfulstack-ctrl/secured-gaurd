@@ -357,6 +357,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
         <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
@@ -953,15 +954,16 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
             </Button>
           </div>
         </form>
-
-        {/* Modal de Fornecedor */}
-        <SupplierFormModal
-          isOpen={isSupplierModalOpen}
-          onClose={() => setIsSupplierModalOpen(false)}
-          supplier={null}
-          onSave={handleSaveSupplier}
-        />
       </DialogContent>
+
+      {/* Modal de Fornecedor - Renderizado fora do Dialog principal para evitar conflitos de z-index */}
+      <SupplierFormModal
+        isOpen={isSupplierModalOpen}
+        onClose={() => setIsSupplierModalOpen(false)}
+        supplier={null}
+        onSave={handleSaveSupplier}
+      />
     </Dialog>
+    </>
   );
 }

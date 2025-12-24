@@ -215,6 +215,33 @@ export function getEnvironmentInfo() {
   };
 }
 
+/**
+ * Obtém a URL completa para arquivos de chat
+ */
+export function getChatFileUrl(filePath: string): string {
+  const config = getCurrentEnvironmentConfig();
+  const baseUrl = config.apiUrl.replace('/api', ''); // Remove /api para obter base URL
+  
+  // Se o filePath já for uma URL completa, retorna como está
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath;
+  }
+  
+  // Constrói a URL completa para arquivos de chat
+  // Ex: http://localhost:8083/uploads/chat/images/filename.jpg
+  // ou http://localhost:8083/api/uploads/chat/images/filename.jpg
+  if (filePath.startsWith('/uploads/')) {
+    return `${baseUrl}${filePath}`;
+  }
+  
+  if (filePath.startsWith('/api/uploads/')) {
+    return `${baseUrl}${filePath.replace('/api', '')}`;
+  }
+  
+  // Se não começar com /, adiciona o caminho completo
+  return `${baseUrl}/uploads/chat/${filePath}`;
+}
+
 // Log inicial do ambiente (apenas em desenvolvimento)
 if (typeof window !== 'undefined' && isDebugMode()) {
   console.group('🌍 Environment Detection');

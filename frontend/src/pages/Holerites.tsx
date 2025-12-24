@@ -68,6 +68,29 @@ const Holerites: React.FC = () => {
   const { user } = useAuth();
   const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '').toUpperCase();
   const isCollaborator = normalizedRole === 'COLABORADOR' && !!user;
+  
+  // Detecção de tamanho de tela para responsividade (padrão SST)
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    height: typeof window !== 'undefined' ? window.innerHeight : 768
+  });
+
+  const isMobile = windowSize.width < 768;
+  const isTablet = windowSize.width >= 768 && windowSize.width < 1024;
+  const isDesktop = windowSize.width >= 1024;
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -5412,48 +5435,50 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       <div className="space-y-6">
         {/* Header - PADRÃO SST */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
-              <FileText className="h-8 w-8 text-seguranca-yellow" />
+          <div className="flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
+              <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-seguranca-yellow" />
               Gestão de Holerites
                   </h1>
-            <p className="text-gray-400 mt-1">Sistema de gerenciamento de documentos financeiros</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1">Sistema de gerenciamento de documentos financeiros</p>
                 </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
             <Button 
               variant="outline"
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+              className="group relative overflow-hidden border-2 border-gray-500/50 bg-gradient-to-br from-gray-800/50 to-gray-900/50 text-seguranca-lightgray hover:border-gray-400/70 hover:bg-gradient-to-br hover:from-gray-700/60 hover:to-gray-800/60 text-xs sm:text-sm font-medium w-full sm:w-auto px-4 sm:px-5 py-2.5 sm:py-3 transition-all duration-300 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-gray-900/30 active:scale-[0.98]"
             >
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 relative z-10 group-hover:rotate-180 transition-transform duration-300" />
+              <span className="relative z-10">Filtros</span>
             </Button>
             <Button 
               onClick={() => setShowUploadModal(true)}
-              className="bg-seguranca-red hover:bg-seguranca-darkred"
+              className="group relative overflow-hidden bg-gradient-to-r from-seguranca-red via-red-600 to-seguranca-red hover:from-red-600 hover:via-red-700 hover:to-red-600 text-white text-xs sm:text-sm font-semibold w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 transition-all duration-300 shadow-lg shadow-red-900/40 hover:shadow-xl hover:shadow-red-900/50 active:scale-[0.98] border-0"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Importar
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+              <span className="relative z-10">Importar</span>
             </Button>
           </div>
         </div>
 
         {/* Tabs - COPIADO DO PADRÃO SST (que funciona bem!) */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="processados" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+          <TabsList className={`grid w-full ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-6'} bg-seguranca-graphite border-gray-600 gap-1 sm:gap-0`}>
+            <TabsTrigger value="processados" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-[10px] sm:text-xs md:text-sm px-2 sm:px-4">
               Holerites
             </TabsTrigger>
-            <TabsTrigger value="recibos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            <TabsTrigger value="recibos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-[10px] sm:text-xs md:text-sm px-2 sm:px-4">
               Comprovantes
             </TabsTrigger>
-            <TabsTrigger value="empresas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            <TabsTrigger value="empresas" className={`text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 ${isMobile ? 'hidden' : ''}`}>
               Empresas
             </TabsTrigger>
-            <TabsTrigger value="logs-envio" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            <TabsTrigger value="logs-envio" className={`text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 ${isMobile ? 'hidden' : ''}`}>
               Logs
             </TabsTrigger>
-            <TabsTrigger value="unificacao-individual" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+            <TabsTrigger value="unificacao-individual" className={`text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 ${isMobile ? 'hidden' : ''}`}>
               Unificação
             </TabsTrigger>
             <TabsTrigger value="unificados-por-setor" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
@@ -5462,67 +5487,67 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           </TabsList>
             
           <TabsContent value="processados" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-              <div className="group relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-br from-seguranca-yellow/20 via-yellow-500/5 to-transparent p-5 shadow-[0_20px_45px_-35px_rgba(251,191,36,0.75)] transition-all duration-300 hover:border-yellow-400/60 hover:shadow-[0_25px_60px_-30px_rgba(251,191,36,0.65)]">
+            <div className={`grid ${isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'} gap-3 sm:gap-4 lg:gap-6`}>
+              <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl border border-yellow-500/30 bg-gradient-to-br from-seguranca-yellow/20 via-yellow-500/5 to-transparent p-4 sm:p-5 shadow-[0_20px_45px_-35px_rgba(251,191,36,0.75)] transition-all duration-300 hover:border-yellow-400/60 hover:shadow-[0_25px_60px_-30px_rgba(251,191,36,0.65)]">
                 <div className="absolute inset-0 bg-gradient-to-br from-seguranca-yellow/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-yellow-200/80">Total de Holerites</p>
-                    <p className="mt-2 text-3xl font-bold text-white">{holerites.length}</p>
-                    <p className="text-xs text-gray-300 mt-1">Documentos processados</p>
+                <div className="relative flex items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-yellow-200/80">Total de Holerites</p>
+                    <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-white">{holerites.length}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-300 mt-0.5 sm:mt-1">Documentos processados</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-500/20 text-seguranca-yellow">
-                    <FileText className="h-6 w-6" />
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl bg-yellow-500/20 text-seguranca-yellow flex-shrink-0">
+                    <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
                 </div>
               </div>
 
-              <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent p-5 shadow-[0_20px_45px_-35px_rgba(16,185,129,0.55)] transition-all duration-300 hover:border-emerald-400/60 hover:shadow-[0_25px_60px_-30px_rgba(16,185,129,0.5)]">
+              <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent p-4 sm:p-5 shadow-[0_20px_45px_-35px_rgba(16,185,129,0.55)] transition-all duration-300 hover:border-emerald-400/60 hover:shadow-[0_25px_60px_-30px_rgba(16,185,129,0.5)]">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200/80">Comprovantes</p>
-                    <p className="mt-2 text-3xl font-bold text-white">{Array.isArray(receipts) ? receipts.length : 0}</p>
-                    <p className="text-xs text-gray-300 mt-1">Recibos de pagamento vinculados</p>
+                <div className="relative flex items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-emerald-200/80">Comprovantes</p>
+                    <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-white">{Array.isArray(receipts) ? receipts.length : 0}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-300 mt-0.5 sm:mt-1">Recibos de pagamento vinculados</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
-                    <Receipt className="h-6 w-6" />
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-500/20 text-emerald-300 flex-shrink-0">
+                    <Receipt className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
                 </div>
               </div>
 
-              <div className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/20 via-blue-500/5 to-transparent p-5 shadow-[0_20px_45px_-35px_rgba(59,130,246,0.55)] transition-all duration-300 hover:border-blue-400/60 hover:shadow-[0_25px_60px_-30px_rgba(59,130,246,0.5)]">
+              <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/20 via-blue-500/5 to-transparent p-4 sm:p-5 shadow-[0_20px_45px_-35px_rgba(59,130,246,0.55)] transition-all duration-300 hover:border-blue-400/60 hover:shadow-[0_25px_60px_-30px_rgba(59,130,246,0.5)]">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-200/80">Processados Hoje</p>
-                    <p className="mt-2 text-3xl font-bold text-white">{getHoleritesProcessedToday()}</p>
-                    <p className="text-xs text-gray-300 mt-1">Holerites organizados nas últimas horas</p>
+                <div className="relative flex items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-blue-200/80">Processados Hoje</p>
+                    <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-white">{getHoleritesProcessedToday()}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-300 mt-0.5 sm:mt-1">Holerites organizados nas últimas horas</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
-                    <CheckCircle className="h-6 w-6" />
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl bg-blue-500/20 text-blue-300 flex-shrink-0">
+                    <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-seguranca-red/15 via-red-500/10 to-transparent border border-red-600/40 rounded-3xl p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-[0_25px_60px_-45px_rgba(220,38,38,0.75)]">
-              <div className="flex items-start gap-3">
-                <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/20 text-seguranca-red">
-                  <Upload className="h-6 w-6" />
+            <div className="bg-gradient-to-r from-seguranca-red/15 via-red-500/10 to-transparent border border-red-600/40 rounded-2xl sm:rounded-3xl p-3 sm:p-4 lg:p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 shadow-[0_25px_60px_-45px_rgba(220,38,38,0.75)]">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-red-500/20 text-seguranca-red flex-shrink-0">
+                  <Upload className="h-5 w-5 sm:h-6 sm:w-6" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-semibold text-white">Importar novos holerites</h3>
-                  <p className="text-sm text-red-100/80 max-w-xl">
+                <div className="space-y-0.5 sm:space-y-1 flex-1 min-w-0">
+                  <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-white">Importar novos holerites</h3>
+                  <p className="text-xs sm:text-sm text-red-100/80 max-w-xl">
                     Faça upload de arquivos em lote e mantenha a base sempre atualizada para todos os setores.
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
                 <Button
                   onClick={() => setShowUploadModal(true)}
                   disabled={loading}
-                  className="w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred shadow-lg shadow-red-900/40"
+                  className="w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred shadow-lg shadow-red-900/40 text-xs sm:text-sm touch-manipulation"
                 >
                   {loading ? (
                     <>
@@ -5540,17 +5565,18 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   variant="outline"
                   onClick={refreshHolerites}
                   disabled={refreshing}
-                  className="w-full sm:w-auto border-red-500/40 text-red-200 hover:bg-red-500/10"
+                  className="group relative overflow-hidden w-full sm:w-auto border-2 border-red-500/40 bg-gradient-to-br from-red-900/20 to-red-950/20 text-red-200 hover:border-red-400/60 hover:bg-gradient-to-br hover:from-red-800/30 hover:to-red-900/30 text-xs sm:text-sm font-medium px-4 sm:px-5 py-2.5 sm:py-3 transition-all duration-300 shadow-lg shadow-red-900/20 hover:shadow-xl hover:shadow-red-900/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   {refreshing ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Atualizando...
+                      <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 animate-spin relative z-10" />
+                      <span className="relative z-10">Atualizando...</span>
                     </>
                   ) : (
                     <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Atualizar lista
+                      <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 relative z-10 group-hover:rotate-180 transition-transform duration-500" />
+                      <span className="relative z-10">Atualizar lista</span>
                     </>
                   )}
                 </Button>

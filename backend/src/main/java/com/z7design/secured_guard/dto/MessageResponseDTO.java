@@ -41,6 +41,10 @@ public class MessageResponseDTO {
     
     private LocalDateTime readAt;
     
+    private UUID replyToId;
+    
+    private MessageResponseDTO replyTo;
+    
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;

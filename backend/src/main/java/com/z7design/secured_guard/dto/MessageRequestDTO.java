@@ -36,4 +36,6 @@ public class MessageRequestDTO {
     private Boolean sendNotification = true;
     
     private LocalDateTime scheduledAt;
+    
+    private UUID replyToId;
 } 

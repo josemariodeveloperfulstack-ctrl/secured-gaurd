@@ -10,7 +10,7 @@ import com.z7design.secured_guard.model.enums.ChatMessageType;
 @Data
 public class ChatMessageRequestDTO {
     
-    @NotBlank(message = "Conteúdo da mensagem é obrigatório")
+    // Conteúdo é opcional quando há arquivo
     private String content;
     
     private UUID recipientId;
@@ -22,4 +22,10 @@ public class ChatMessageRequestDTO {
     private ChatMessageType type = ChatMessageType.TEXT;
     
     private UUID replyToId;
+    
+    // Informações do arquivo (preenchidas após upload)
+    private String fileUrl;
+    private String fileName;
+    private Long fileSize;
+    private String fileContentType;
 } 

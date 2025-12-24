@@ -5,14 +5,15 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.z7design.secured_guard.dto.ChatMessageRequestDTO;
 import com.z7design.secured_guard.dto.ChatMessageResponseDTO;
+import com.z7design.secured_guard.dto.ReactionSummaryDTO;
 // import com.z7design.secured_guard.dto.ChatUserDTO;
 import com.z7design.secured_guard.service.ChatService;
+import com.z7design.secured_guard.service.MessageReactionService;
 import com.z7design.secured_guard.service.NotificationService;
 import com.z7design.secured_guard.service.UserService;
 import com.z7design.secured_guard.model.User;
@@ -20,6 +21,12 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+
+import com.z7design.secured_guard.service.ChatFileService;
+import com.z7design.secured_guard.service.ChatFileService.ChatFileInfo;
+import com.z7design.secured_guard.exception.BusinessException;
 
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -41,8 +48,17 @@ public class ChatController {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
     
+    @Autowired
+    private MessageReactionService reactionService;
+    
+    @Autowired
+    private ChatFileService chatFileService;
+    
+    @Autowired
+    private com.z7design.secured_guard.service.ChatMessageActionService actionService;
+    
     /**
-     * Envia mensagem de chat
+     * Envia mensagem de chat (texto)
      */
     @PostMapping("/send")
     public ResponseEntity<ChatMessageResponseDTO> sendMessage(
@@ -55,6 +71,89 @@ public class ChatController {
         ChatMessageResponseDTO response = chatService.sendChatMessage(request, username);
         
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Envia mensagem de chat com arquivo (imagem, áudio, vídeo, documento)
+     */
+    @PostMapping(value = "/send-with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatMessageResponseDTO> sendMessageWithFile(
+            @RequestParam(value = "content", required = false) String content,
+            @RequestParam(value = "recipientId", required = false) UUID recipientId,
+            @RequestParam(value = "groupId", required = false) UUID groupId,
+            @RequestParam(value = "departmentId", required = false) UUID departmentId,
+            @RequestParam(value = "type", required = false, defaultValue = "TEXT") String typeStr,
+            @RequestParam(value = "replyToId", required = false) UUID replyToId,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        
+        String username = authentication.getName();
+        log.info("Enviando mensagem de chat com arquivo para usuário: {}", username);
+        
+        try {
+            // Validar que pelo menos um destinatário foi especificado
+            if (recipientId == null && groupId == null && departmentId == null) {
+                log.error("Nenhum destinatário especificado para mensagem com arquivo");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Validar arquivo
+            if (file == null || file.isEmpty()) {
+                log.error("Arquivo não fornecido ou vazio");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Determinar tipo de mensagem baseado no arquivo
+            com.z7design.secured_guard.model.enums.ChatMessageType messageType = 
+                determineMessageTypeFromFile(file);
+            
+            // Salvar arquivo
+            ChatFileInfo fileInfo = chatFileService.saveChatFile(file, messageType);
+            
+            // Criar DTO da requisição
+            ChatMessageRequestDTO request = new ChatMessageRequestDTO();
+            request.setContent(content != null && !content.trim().isEmpty() ? content : "");
+            request.setRecipientId(recipientId);
+            request.setGroupId(groupId);
+            request.setDepartmentId(departmentId);
+            request.setType(messageType);
+            request.setReplyToId(replyToId);
+            request.setFileUrl(fileInfo.getUrl());
+            request.setFileName(fileInfo.getOriginalName());
+            request.setFileSize(fileInfo.getSize());
+            request.setFileContentType(fileInfo.getContentType());
+            
+            ChatMessageResponseDTO response = chatService.sendChatMessage(request, username);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (BusinessException e) {
+            log.error("Erro de negócio ao enviar mensagem com arquivo: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Erro ao enviar mensagem com arquivo: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    /**
+     * Determina o tipo de mensagem baseado no arquivo
+     */
+    private com.z7design.secured_guard.model.enums.ChatMessageType determineMessageTypeFromFile(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType == null) {
+            return com.z7design.secured_guard.model.enums.ChatMessageType.FILE;
+        }
+        
+        if (contentType.startsWith("image/")) {
+            return com.z7design.secured_guard.model.enums.ChatMessageType.IMAGE;
+        } else if (contentType.startsWith("audio/")) {
+            return com.z7design.secured_guard.model.enums.ChatMessageType.AUDIO;
+        } else if (contentType.startsWith("video/")) {
+            return com.z7design.secured_guard.model.enums.ChatMessageType.VIDEO;
+        } else {
+            return com.z7design.secured_guard.model.enums.ChatMessageType.FILE;
+        }
     }
     
     /**
@@ -223,7 +322,217 @@ public class ChatController {
             return ResponseEntity.internalServerError().build();
         }
     }
+    
+    /**
+     * Adiciona ou remove reação de uma mensagem
+     */
+    @PostMapping("/{messageId}/reaction")
+    public ResponseEntity<ReactionSummaryDTO> toggleReaction(
+            @PathVariable UUID messageId,
+            @RequestParam String emoji,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            ReactionSummaryDTO reaction = reactionService.toggleReaction(messageId, userId, emoji);
+            
+            // Publicar atualização via WebSocket
+            messagingTemplate.convertAndSend("/topic/chat/message/" + messageId + "/reactions", reaction);
+            
+            return ResponseEntity.ok(reaction);
+        } catch (Exception e) {
+            log.error("Erro ao alternar reação: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Busca todas as reações de uma mensagem
+     */
+    @GetMapping("/{messageId}/reactions")
+    public ResponseEntity<List<ReactionSummaryDTO>> getMessageReactions(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            List<ReactionSummaryDTO> reactions = reactionService.getAllReactionsForMessage(messageId, userId);
+            return ResponseEntity.ok(reactions);
+        } catch (Exception e) {
+            log.error("Erro ao buscar reações: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
+    /**
+     * Fixa ou desfixa uma mensagem
+     */
+    @PostMapping("/{messageId}/pin")
+    public ResponseEntity<Boolean> togglePin(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            boolean isPinned = actionService.togglePin(messageId, userId);
+            return ResponseEntity.ok(isPinned);
+        } catch (Exception e) {
+            log.error("Erro ao alternar fixação: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Verifica se uma mensagem está fixada
+     */
+    @GetMapping("/{messageId}/pin")
+    public ResponseEntity<Boolean> isPinned(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            boolean isPinned = actionService.isPinned(messageId, userId);
+            return ResponseEntity.ok(isPinned);
+        } catch (Exception e) {
+            log.error("Erro ao verificar fixação: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Adiciona ou remove uma mensagem dos favoritos
+     */
+    @PostMapping("/{messageId}/favorite")
+    public ResponseEntity<Boolean> toggleFavorite(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            boolean isFavorite = actionService.toggleFavorite(messageId, userId);
+            return ResponseEntity.ok(isFavorite);
+        } catch (Exception e) {
+            log.error("Erro ao alternar favorito: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Verifica se uma mensagem está nos favoritos
+     */
+    @GetMapping("/{messageId}/favorite")
+    public ResponseEntity<Boolean> isFavorite(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            boolean isFavorite = actionService.isFavorite(messageId, userId);
+            return ResponseEntity.ok(isFavorite);
+        } catch (Exception e) {
+            log.error("Erro ao verificar favorito: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Denuncia uma mensagem
+     */
+    @PostMapping("/{messageId}/report")
+    public ResponseEntity<Void> reportMessage(
+            @PathVariable UUID messageId,
+            @RequestParam String reason,
+            @RequestParam(required = false) String description,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            actionService.reportMessage(messageId, userId, reason, description);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Erro ao denunciar mensagem: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Encaminha uma mensagem para novos destinatários
+     */
+    @PostMapping("/{messageId}/forward")
+    public ResponseEntity<Void> forwardMessage(
+            @PathVariable UUID messageId,
+            @RequestParam(required = false) UUID[] recipientIds,
+            @RequestParam(required = false) UUID[] groupIds,
+            @RequestParam(required = false) UUID[] departmentIds,
+            Authentication authentication) {
+        
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            actionService.forwardMessage(messageId, userId, recipientIds, groupIds, departmentIds);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Erro ao encaminhar mensagem: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
     /**
      * Recebe evento de digitação via WebSocket e propaga para os destinatários
      */

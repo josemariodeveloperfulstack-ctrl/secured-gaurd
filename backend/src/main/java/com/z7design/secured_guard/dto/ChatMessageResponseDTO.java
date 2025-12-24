@@ -32,6 +32,14 @@ public class ChatMessageResponseDTO {
     
     private UUID replyToId;
     
+    private java.util.List<ReactionSummaryDTO> reactions;
+    
+    // Informações do arquivo
+    private String fileUrl;
+    private String fileName;
+    private Long fileSize;
+    private String fileContentType;
+    
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;

@@ -55,10 +55,31 @@ public class ChatService {
             .orElseThrow(() -> new BusinessException("Usuário remetente não encontrado: " + senderUsername));
         
         ChatMessage chatMessage = new ChatMessage();
-        chatMessage.setContent(request.getContent());
+        
+        // Se há arquivo, permitir conteúdo vazio; caso contrário, conteúdo é obrigatório
+        String content = request.getContent();
+        if (content == null || content.trim().isEmpty()) {
+            if (request.getFileUrl() != null) {
+                // Se há arquivo, permitir conteúdo vazio
+                content = "";
+            } else {
+                // Se não há arquivo, conteúdo é obrigatório
+                throw new BusinessException("Conteúdo da mensagem é obrigatório quando não há arquivo");
+            }
+        }
+        chatMessage.setContent(content);
         chatMessage.setSender(sender);
         chatMessage.setType(request.getType());
         chatMessage.setReplyToId(request.getReplyToId());
+        
+        // Informações do arquivo (se houver)
+        if (request.getFileUrl() != null) {
+            chatMessage.setFileUrl(request.getFileUrl());
+            chatMessage.setFileName(request.getFileName());
+            chatMessage.setFileSize(request.getFileSize());
+            chatMessage.setFileContentType(request.getFileContentType());
+        }
+        
         chatMessage.setCreatedAt(LocalDateTime.now());
         
         // Definir destinatário
@@ -87,6 +108,15 @@ public class ChatService {
         // Converter para DTO antes de enviar via WebSocket
         ChatMessageResponseDTO messageDTO = convertToDTO(chatMessage);
         
+        // Log detalhado para mensagens com arquivo
+        if (messageDTO.getFileUrl() != null) {
+            log.info("📎 Mensagem com arquivo - URL: {}, Nome: {}, Tamanho: {}, Tipo: {}", 
+                messageDTO.getFileUrl(), 
+                messageDTO.getFileName(), 
+                messageDTO.getFileSize(), 
+                messageDTO.getFileContentType());
+        }
+        
         // Publicar mensagem via WebSocket
         try {
             if (chatMessage.getRecipient() != null) {
@@ -94,12 +124,14 @@ public class ChatService {
                 String recipientUsername = chatMessage.getRecipient().getUsername();
                 String destination = "/user/" + recipientUsername + "/queue/messages";
                 messagingTemplate.convertAndSend(destination, messageDTO);
-                log.info("Mensagem publicada via WebSocket para usuário: {} (destino: {})", recipientUsername, destination);
+                log.info("✅ Mensagem publicada via WebSocket para usuário: {} (destino: {}) - Tipo: {}, Tem arquivo: {}", 
+                    recipientUsername, destination, messageDTO.getType(), messageDTO.getFileUrl() != null);
                 
                 // Também enviar para o remetente para atualização em tempo real
                 String senderDestination = "/user/" + senderUsername + "/queue/messages";
                 messagingTemplate.convertAndSend(senderDestination, messageDTO);
-                log.info("Mensagem publicada via WebSocket para remetente: {} (destino: {})", senderUsername, senderDestination);
+                log.info("✅ Mensagem publicada via WebSocket para remetente: {} (destino: {}) - Tipo: {}, Tem arquivo: {}", 
+                    senderUsername, senderDestination, messageDTO.getType(), messageDTO.getFileUrl() != null);
             } else if (chatMessage.getGroup() != null) {
                 // Mensagem de grupo: enviar para todos os membros do grupo
                 String destination = "/topic/chat/group/" + chatMessage.getGroup().getId();
@@ -259,6 +291,13 @@ public class ChatService {
         dto.setReadAt(message.getReadAt());
         dto.setEditedAt(message.getEditedAt());
         dto.setReplyToId(message.getReplyToId());
+        
+        // Informações do arquivo
+        dto.setFileUrl(message.getFileUrl());
+        dto.setFileName(message.getFileName());
+        dto.setFileSize(message.getFileSize());
+        dto.setFileContentType(message.getFileContentType());
+        
         dto.setCreatedAt(message.getCreatedAt());
         dto.setUpdatedAt(message.getUpdatedAt());
         
@@ -296,6 +335,9 @@ public class ChatService {
             deptDTO.setDescription(message.getDepartment().getDescription());
             dto.setDepartment(deptDTO);
         }
+        
+        // Reações serão carregadas via endpoint específico quando necessário
+        // Não carregar aqui para evitar dependência circular e melhorar performance
         
         return dto;
     }

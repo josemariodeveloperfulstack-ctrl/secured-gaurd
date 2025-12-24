@@ -104,6 +104,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/document-processing/**").authenticated()
                 // Arquivos públicos (imagens e uploads)
                 .requestMatchers("/uploads/**").permitAll()
+                .requestMatchers("/api/uploads/**").authenticated() // Arquivos do chat requerem autenticação
                 .requestMatchers("/files/**").permitAll()
                 // Endpoints HR - requerem permissões específicas
                 .requestMatchers("/api/hr/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR", "ROLE_RH")
@@ -208,6 +209,8 @@ public class SecurityConfig {
                 )
                 // Endpoints de suporte e atendimento - requerem permissões específicas
                 .requestMatchers("/api/v1/support/**").hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE", "SUPPORT_DELETE", "SUPPORT_MANAGE", "ATTENDANCE_READ", "ATTENDANCE_WRITE", "ATTENDANCE_MANAGE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_FINANCEIRO", "ROLE_COMERCIAL", "ROLE_SUPERVISOR")
+                // Endpoints de chatbot - mesmas permissões de suporte
+                .requestMatchers("/api/v1/support/chatbot/**").hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE", "SUPPORT_DELETE", "SUPPORT_MANAGE", "ATTENDANCE_READ", "ATTENDANCE_WRITE", "ATTENDANCE_MANAGE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_FINANCEIRO", "ROLE_COMERCIAL", "ROLE_SUPERVISOR")
                 // Endpoints de funcionários - temporariamente públicos para debug
                 .requestMatchers("/api/employees/**").permitAll()
                 // Endpoints de unidades - temporariamente públicos para debug

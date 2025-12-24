@@ -3,6 +3,10 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.model.UserActivityLog;
 import com.z7design.secured_guard.service.UserActivityLogService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,14 +28,24 @@ public class UserActivityLogController {
     private UserActivityLogService activityLogService;
 
     @GetMapping
-    public ResponseEntity<List<UserActivityLog>> getActivityLogs(
+    public ResponseEntity<?> getActivityLogs(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String module,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "50") int size) {
         
+        // Se page e size forem fornecidos, retornar paginado
+        if (page >= 0 && size > 0) {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Page<UserActivityLog> logsPage = activityLogService.getActivityLogs(username, action, module, status, startDate, endDate, pageable);
+            return ResponseEntity.ok(logsPage);
+        }
+        
+        // Caso contrário, retornar lista completa (compatibilidade com código antigo)
         List<UserActivityLog> logs = activityLogService.getActivityLogsList(username, action, module, status, startDate, endDate);
         return ResponseEntity.ok(logs);
     }

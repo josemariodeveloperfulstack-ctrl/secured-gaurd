@@ -47,7 +47,16 @@ import {
   Heart,
   ThumbsUp,
   Smile,
-  Plus
+  Plus,
+  Paperclip,
+  Image as ImageIcon,
+  File,
+  Mic,
+  Play,
+  Download,
+  Camera,
+  Square,
+  Menu
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -58,6 +67,7 @@ import { messageService, MessageServiceError } from '@/services/messageService';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { groupService } from '@/services/groupService';
 import api from '@/lib/axios';
+import { getApiUrl, getChatFileUrl } from '@/config/environment';
 
 const ChatInterno: React.FC = () => {
   // Estado local para UI
@@ -79,6 +89,26 @@ const ChatInterno: React.FC = () => {
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
   const [favoriteMessages, setFavoriteMessages] = useState<Set<string>>(new Set());
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [messageToForward, setMessageToForward] = useState<ChatMessage | null>(null);
+  const [forwardRecipients, setForwardRecipients] = useState<string[]>([]);
+  const [forwardGroups, setForwardGroups] = useState<string[]>([]);
+  const [forwardDepartments, setForwardDepartments] = useState<string[]>([]);
+  const [forwardShowOnlyOnline, setForwardShowOnlyOnline] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [messageToReport, setMessageToReport] = useState<ChatMessage | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -329,6 +359,29 @@ const ChatInterno: React.FC = () => {
       const messages = await messageService.getConversationMessages(conversationId);
       setChatMessages(messages);
       console.log('✅ [CHAT] Mensagens carregadas:', messages.length);
+      
+      // Carregar estados de fixar e favoritar para todas as mensagens
+      const pinnedSet = new Set<string>();
+      const favoriteSet = new Set<string>();
+      
+      await Promise.all(
+        messages.map(async (msg) => {
+          try {
+            const [isPinned, isFavorite] = await Promise.all([
+              messageService.isPinned(msg.id),
+              messageService.isFavorite(msg.id)
+            ]);
+            if (isPinned) pinnedSet.add(msg.id);
+            if (isFavorite) favoriteSet.add(msg.id);
+          } catch (error) {
+            // Ignorar erros individuais
+            console.warn(`Erro ao carregar estado de mensagem ${msg.id}:`, error);
+          }
+        })
+      );
+      
+      setPinnedMessages(pinnedSet);
+      setFavoriteMessages(favoriteSet);
     } catch (error) {
       console.error('❌ [CHAT] Erro ao carregar conversa:', error);
       if (error instanceof MessageServiceError) {
@@ -345,23 +398,55 @@ const ChatInterno: React.FC = () => {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+    if ((!newMessage.trim() && !selectedFile) || !selectedConversation) return;
 
-    console.log('📤 [CHAT] Enviando mensagem:', newMessage);
+    console.log('📤 [CHAT] Enviando mensagem:', newMessage, selectedFile ? 'com arquivo' : '');
 
     try {
-      const messageData = {
-        content: newMessage,
-        recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
-        groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
-        departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
-        type: 'TEXT' as const,
-        replyToId: replyToMessage?.id
-      };
+      setLoading(true);
 
-      const sentMessage = await messageService.sendChatMessage(messageData);
+      let sentMessage: ChatMessage;
+
+      if (selectedFile) {
+        // Enviar mensagem com arquivo
+        const messageData = {
+          content: newMessage || undefined,
+          recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
+          groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
+          departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
+          replyToId: replyToMessage?.id
+        };
+
+        sentMessage = await messageService.sendChatMessageWithFile(selectedFile, messageData);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } else {
+        // Enviar mensagem de texto
+        const messageData = {
+          content: newMessage,
+          recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
+          groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
+          departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
+          type: 'TEXT' as const,
+          replyToId: replyToMessage?.id
+        };
+
+        sentMessage = await messageService.sendChatMessage(messageData);
+      }
       
       // Adicionar mensagem localmente (otimistic update)
+      // Garantir que todas as informações do arquivo estejam presentes
+      console.log('📤 [CHAT] Mensagem enviada:', {
+        id: sentMessage.id,
+        type: sentMessage.type,
+        fileUrl: sentMessage.fileUrl,
+        fileName: sentMessage.fileName,
+        fileSize: sentMessage.fileSize,
+        fileContentType: sentMessage.fileContentType
+      });
+      
       addChatMessage(sentMessage);
       
       // Limpar campos
@@ -385,6 +470,163 @@ const ChatInterno: React.FC = () => {
           variant: "destructive"
         });
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tamanho (50MB máximo)
+      const maxSize = 50 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Erro",
+          description: "Arquivo muito grande. Máximo permitido: 50MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageButtonClick = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tamanho (10MB máximo para imagens)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: "Erro",
+          description: "Imagem muito grande. Máximo permitido: 10MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  // Funções para gravação de áudio
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+        setSelectedFile(audioFile);
+        
+        // Parar todos os tracks do stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      // Atualizar tempo de gravação
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Erro ao iniciar gravação:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível acessar o microfone. Verifique as permissões.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      setRecordingTime(0);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      setRecordingTime(0);
+      audioChunksRef.current = [];
+      
+      // Parar todos os tracks
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  };
+
+  // Limpar ao desmontar
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getFileIcon = (contentType?: string) => {
+    if (!contentType) return <File className="w-4 h-4" />;
+    if (contentType.startsWith('image/')) return <ImageIcon className="w-4 h-4" />;
+    if (contentType.startsWith('audio/')) return <Mic className="w-4 h-4" />;
+    if (contentType.startsWith('video/')) return <Play className="w-4 h-4" />;
+    return <File className="w-4 h-4" />;
+  };
+
+  const getFileUrl = (fileUrl?: string) => {
+    if (!fileUrl) return '';
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      return fileUrl;
+    }
+    // Usar getChatFileUrl para arquivos de chat
+    try {
+      return getChatFileUrl(fileUrl);
+    } catch (error) {
+      // Fallback para construção manual
+      const apiUrl = getApiUrl();
+      const baseUrl = apiUrl.replace('/api', '');
+      return `${baseUrl}${fileUrl.startsWith('/') ? fileUrl : '/' + fileUrl}`;
     }
   };
 
@@ -472,56 +714,95 @@ const ChatInterno: React.FC = () => {
   };
 
   const handleForwardMessage = (message: ChatMessage) => {
-    // TODO: Implementar encaminhamento de mensagem
-    toast({
-      title: "Em desenvolvimento",
-      description: "Funcionalidade de encaminhar mensagem será implementada em breve",
-      variant: "default"
-    });
+    setMessageToForward(message);
+    setShowForwardModal(true);
   };
 
-  const handlePinMessage = (messageId: string) => {
-    setPinnedMessages(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(messageId)) {
-        newSet.delete(messageId);
-        toast({
-          title: "Desfixado",
-          description: "Mensagem desfixada",
-          variant: "default"
-        });
-      } else {
-        newSet.add(messageId);
-        toast({
-          title: "Fixado",
-          description: "Mensagem fixada",
-          variant: "default"
-        });
-      }
-      return newSet;
-    });
+  const confirmForward = async () => {
+    if (!messageToForward) return;
+
+    try {
+      await messageService.forwardMessage(
+        messageToForward.id,
+        forwardRecipients.length > 0 ? forwardRecipients : undefined,
+        forwardGroups.length > 0 ? forwardGroups : undefined,
+        forwardDepartments.length > 0 ? forwardDepartments : undefined
+      );
+
+      toast({
+        title: "Sucesso",
+        description: "Mensagem encaminhada com sucesso",
+        variant: "default"
+      });
+
+      setShowForwardModal(false);
+      setMessageToForward(null);
+      setForwardRecipients([]);
+      setForwardGroups([]);
+      setForwardDepartments([]);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao encaminhar mensagem",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleFavoriteMessage = (messageId: string) => {
-    setFavoriteMessages(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(messageId)) {
-        newSet.delete(messageId);
-        toast({
-          title: "Removido dos favoritos",
-          description: "Mensagem removida dos favoritos",
-          variant: "default"
-        });
-      } else {
-        newSet.add(messageId);
-        toast({
-          title: "Adicionado aos favoritos",
-          description: "Mensagem adicionada aos favoritos",
-          variant: "default"
-        });
-      }
-      return newSet;
-    });
+  const handlePinMessage = async (messageId: string) => {
+    try {
+      const isPinned = await messageService.togglePin(messageId);
+      
+      setPinnedMessages(prev => {
+        const newSet = new Set(prev);
+        if (isPinned) {
+          newSet.add(messageId);
+        } else {
+          newSet.delete(messageId);
+        }
+        return newSet;
+      });
+
+      toast({
+        title: isPinned ? "Fixado" : "Desfixado",
+        description: isPinned ? "Mensagem fixada" : "Mensagem desfixada",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar fixação",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFavoriteMessage = async (messageId: string) => {
+    try {
+      const isFavorite = await messageService.toggleFavorite(messageId);
+      
+      setFavoriteMessages(prev => {
+        const newSet = new Set(prev);
+        if (isFavorite) {
+          newSet.add(messageId);
+        } else {
+          newSet.delete(messageId);
+        }
+        return newSet;
+      });
+
+      toast({
+        title: isFavorite ? "Adicionado aos favoritos" : "Removido dos favoritos",
+        description: isFavorite ? "Mensagem adicionada aos favoritos" : "Mensagem removida dos favoritos",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar favorito",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleSelectMessage = (messageId: string) => {
@@ -537,12 +818,44 @@ const ChatInterno: React.FC = () => {
   };
 
   const handleReportMessage = (message: ChatMessage) => {
-    // TODO: Implementar denúncia de mensagem
-    toast({
-      title: "Em desenvolvimento",
-      description: "Funcionalidade de denunciar mensagem será implementada em breve",
-      variant: "default"
-    });
+    setMessageToReport(message);
+    setShowReportModal(true);
+  };
+
+  const confirmReport = async () => {
+    if (!messageToReport || !reportReason.trim()) {
+      toast({
+        title: "Erro",
+        description: "Por favor, informe o motivo da denúncia",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await messageService.reportMessage(
+        messageToReport.id,
+        reportReason,
+        reportDescription || undefined
+      );
+
+      toast({
+        title: "Sucesso",
+        description: "Mensagem denunciada. Nossa equipe irá analisar.",
+        variant: "default"
+      });
+
+      setShowReportModal(false);
+      setMessageToReport(null);
+      setReportReason('');
+      setReportDescription('');
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao denunciar mensagem",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -565,13 +878,31 @@ const ChatInterno: React.FC = () => {
     }
   };
 
-  const handleReaction = (messageId: string, reaction: string) => {
-    // TODO: Implementar reações (emoji) nas mensagens
-    toast({
-      title: "Reação",
-      description: `Reação ${reaction} adicionada`,
-      variant: "default"
-    });
+  const handleReaction = async (messageId: string, emoji: string) => {
+    try {
+      // Chamar API para adicionar/remover reação
+      const reactionSummary = await messageService.toggleReaction(messageId, emoji);
+      
+      // Atualizar a mensagem no store com as novas reações
+      const message = safeChatMessages.find(m => m.id === messageId);
+      if (message) {
+        // Buscar todas as reações atualizadas
+        const allReactions = await messageService.getMessageReactions(messageId);
+        
+        // Atualizar mensagem no store
+        updateChatMessage(messageId, {
+          ...message,
+          reactions: allReactions
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao adicionar reação:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao adicionar reação",
+        variant: "destructive"
+      });
+    }
   };
 
   const startNewConversation = () => {
@@ -614,15 +945,54 @@ const ChatInterno: React.FC = () => {
     loadConversation(newConversation.id);
   };
 
+  // Detectar tamanho da tela para responsividade (padrão SST)
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    height: typeof window !== 'undefined' ? window.innerHeight : 768
+  });
+
+  const isMobile = windowSize.width < 768;
+  const isTablet = windowSize.width >= 768 && windowSize.width < 1024;
+  const isDesktop = windowSize.width >= 1024;
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Estado para controlar visibilidade da sidebar no mobile
+  const [showSidebar, setShowSidebar] = useState(!isMobile);
+
+  useEffect(() => {
+    setShowSidebar(!isMobile);
+  }, [isMobile]);
+
   return (
     <MainLayout title="Chat Interno" subtitle="Converse em tempo real com colaboradores, grupos e departamentos">
-      <div className="flex h-full gap-6">
+      <div className={`flex h-full gap-2 sm:gap-4 lg:gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
         {/* Sidebar - Lista de Conversas */}
-        <Card className="w-80 flex flex-col">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+        <Card className={`${isMobile ? (showSidebar ? 'w-full h-1/2' : 'hidden') : 'w-64 sm:w-72 lg:w-80'} flex flex-col transition-all duration-300`}>
+          <CardHeader className="pb-3 sm:pb-4">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <CardTitle className="text-lg">Conversas</CardTitle>
+                {isMobile && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSidebar(false)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+                <CardTitle className="text-base sm:text-lg">Conversas</CardTitle>
                 {wsConnected ? (
                   <Wifi className="w-4 h-4 text-green-500" title="Conectado" />
                 ) : (
@@ -632,9 +1002,10 @@ const ChatInterno: React.FC = () => {
               
               <Dialog open={showNewChatModal} onOpenChange={setShowNewChatModal}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Nova Conversa
+                  <Button size="sm" variant="outline" className="text-xs sm:text-sm">
+                    <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Nova Conversa</span>
+                    <span className="sm:hidden">Nova</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent 
@@ -922,18 +1293,28 @@ const ChatInterno: React.FC = () => {
         </Card>
 
         {/* Área Principal do Chat */}
-        <Card className="flex-1 flex flex-col">
+        <Card className={`flex-1 flex flex-col ${isMobile && !showSidebar ? 'w-full' : ''}`}>
           {selectedConversation && selectedConversation.id ? (
             <>
               {/* Header da Conversa */}
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
+              <CardHeader className="pb-3 sm:pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    {isMobile && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSidebar(true)}
+                        className="h-8 w-8 p-0 flex-shrink-0"
+                      >
+                        <Menu className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
+                      <AvatarFallback className="text-xs sm:text-sm">{getInitials(selectedConversation.name)}</AvatarFallback>
                     </Avatar>
-                    <div>
-                      <CardTitle className="text-lg">{selectedConversation.name || 'Conversa sem nome'}</CardTitle>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-sm sm:text-base lg:text-lg truncate">{selectedConversation.name || 'Conversa sem nome'}</CardTitle>
                       <div className="flex items-center gap-2">
                         {selectedConversation.isOnline && (
                           <Badge variant="secondary" className="text-xs">Online</Badge>
@@ -1005,10 +1386,10 @@ const ChatInterno: React.FC = () => {
                 </div>
               </CardHeader>
 
-              {/* Área de Mensagens */}
+                {/* Área de Mensagens */}
               <CardContent className="flex-1 p-0 flex flex-col">
-                <div className="flex-1 px-4 overflow-y-auto">
-                  <div className="space-y-4 py-4">
+                <div className="flex-1 px-2 sm:px-4 overflow-y-auto">
+                  <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
                     {loading ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-6 h-6 animate-spin" />
@@ -1029,7 +1410,7 @@ const ChatInterno: React.FC = () => {
                             key={message.id}
                             className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                           >
-                            <div className={`max-w-xs lg:max-w-md ${isCurrentUser ? 'order-2' : 'order-1'}`}>
+                            <div className={`max-w-[85%] sm:max-w-xs lg:max-w-md ${isCurrentUser ? 'order-2' : 'order-1'}`}>
                               {!isCurrentUser && (
                                 <div className="flex items-center gap-2 mb-1">
                                   <Avatar className="w-6 h-6">
@@ -1073,8 +1454,72 @@ const ChatInterno: React.FC = () => {
                                       </div>
                                     ) : (
                                       <div>
+                                        {/* Exibir arquivo se houver */}
+                                        {message.fileUrl && (
+                                          <div className="mb-2">
+                                            {message.type === 'IMAGE' ? (
+                                              <div className="rounded-lg overflow-hidden max-w-xs">
+                                                <img 
+                                                  src={getFileUrl(message.fileUrl)}
+                                                  alt={message.fileName || 'Imagem'}
+                                                  className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                                  onClick={() => window.open(getFileUrl(message.fileUrl), '_blank')}
+                                                />
+                                              </div>
+                                            ) : message.type === 'AUDIO' ? (
+                                              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg min-w-[200px]">
+                                                <Mic className="w-5 h-5 flex-shrink-0 text-primary" />
+                                                <audio 
+                                                  controls 
+                                                  src={getFileUrl(message.fileUrl)}
+                                                  className="flex-1 h-8"
+                                                  preload="metadata"
+                                                  onError={(e) => {
+                                                    console.error('Erro ao carregar áudio:', e);
+                                                    toast({
+                                                      title: "Erro",
+                                                      description: "Não foi possível reproduzir o áudio",
+                                                      variant: "destructive"
+                                                    });
+                                                  }}
+                                                >
+                                                  Seu navegador não suporta o elemento de áudio.
+                                                </audio>
+                                              </div>
+                                            ) : message.type === 'VIDEO' ? (
+                                              <div className="rounded-lg overflow-hidden max-w-xs">
+                                                <video 
+                                                  controls 
+                                                  src={getFileUrl(message.fileUrl)}
+                                                  className="max-w-full h-auto"
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                                                {getFileIcon(message.fileContentType)}
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="text-sm font-medium truncate">{message.fileName || 'Arquivo'}</p>
+                                                  {message.fileSize && (
+                                                    <p className="text-xs text-muted-foreground">{formatFileSize(message.fileSize)}</p>
+                                                  )}
+                                                </div>
+                                                <a
+                                                  href={getFileUrl(message.fileUrl)}
+                                                  download
+                                                  className="p-1 hover:bg-muted rounded transition-colors"
+                                                  title="Baixar arquivo"
+                                                >
+                                                  <Download className="w-4 h-4" />
+                                                </a>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                        
                                         <div className="flex items-start justify-between gap-2">
-                                          <p className="text-sm flex-1">{message.content}</p>
+                                          {message.content && (
+                                            <p className="text-sm flex-1">{message.content}</p>
+                                          )}
                                           {pinnedMessages.has(message.id) && (
                                             <Pin className="w-3 h-3 opacity-70 flex-shrink-0" />
                                           )}
@@ -1082,6 +1527,36 @@ const ChatInterno: React.FC = () => {
                                             <Star className="w-3 h-3 opacity-70 flex-shrink-0 fill-yellow-400 text-yellow-400" />
                                           )}
                                         </div>
+                                        
+                                        {/* Exibir reações (estilo WhatsApp) */}
+                                        {message.reactions && message.reactions.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-2 mb-1">
+                                            {message.reactions.map((reaction, index) => {
+                                              const hasUserReaction = reaction.currentUserReacted || false;
+                                              return (
+                                                <button
+                                                  key={index}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleReaction(message.id, reaction.emoji);
+                                                  }}
+                                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all ${
+                                                    hasUserReaction
+                                                      ? 'bg-blue-500/30 border border-blue-500/50'
+                                                      : 'bg-gray-600/30 border border-gray-500/30 hover:bg-gray-500/40'
+                                                  }`}
+                                                  title={`${reaction.count} ${reaction.count === 1 ? 'reação' : 'reações'}`}
+                                                >
+                                                  <span className="text-sm">{reaction.emoji}</span>
+                                                  {reaction.count > 1 && (
+                                                    <span className="text-[10px] opacity-80">{reaction.count}</span>
+                                                  )}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                        
                                         <div className="flex items-center justify-between mt-2">
                                           <span className="text-xs opacity-70">
                                             {format(new Date(message.createdAt), 'HH:mm', { locale: ptBR })}
@@ -1232,7 +1707,7 @@ const ChatInterno: React.FC = () => {
                 </div>
 
                 {/* Área de Input */}
-                <div className="p-4 border-t">
+                <div className="p-2 sm:p-4 border-t">
                   {replyToMessage && (
                     <div className="bg-muted/50 p-2 rounded-lg mb-2 flex items-center justify-between">
                       <div>
@@ -1249,29 +1724,172 @@ const ChatInterno: React.FC = () => {
                     </div>
                   )}
                   
-                  <div className="flex gap-2">
+                  {selectedFile && (
+                    <div className="mb-2 p-2 bg-muted/50 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {getFileIcon(selectedFile.type)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Input estilo WhatsApp com ícones dentro */}
+                  <div className="relative flex items-end gap-1 sm:gap-2 bg-muted/30 rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1.5 sm:py-2 border border-border/50">
+                    {/* Ícones à esquerda */}
+                    <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+                      {/* Emoji */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted touch-manipulation"
+                        title="Emoji"
+                      >
+                        <Smile className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      </Button>
+                      
+                      {/* Anexo/Arquivo */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleFileButtonClick}
+                        className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted touch-manipulation"
+                        title="Anexar arquivo"
+                      >
+                        <Paperclip className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      </Button>
+                      
+                      {/* Câmera */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleImageButtonClick}
+                        className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted touch-manipulation"
+                        title="Tirar foto"
+                      >
+                        <Camera className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      </Button>
+                    </div>
+
+                    {/* Input de texto */}
                     <Textarea
-                      placeholder="Digite sua mensagem..."
+                      placeholder="Mensagem"
                       value={newMessage}
                       onChange={(e) => {
                         setNewMessage(e.target.value);
                         handleTyping();
                       }}
                       onKeyPress={handleKeyPress}
-                      className="min-h-[60px] resize-none"
-                      disabled={loading}
+                      className="flex-1 min-h-[36px] sm:min-h-[40px] max-h-[100px] sm:max-h-[120px] resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-1.5 sm:px-2 py-1.5 sm:py-2 text-sm sm:text-base"
+                      disabled={loading || isRecording}
+                      rows={1}
                     />
-                    <Button 
-                      onClick={sendMessage} 
-                      disabled={!newMessage.trim() || loading}
-                      className="self-end"
-                    >
-                      {loading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+
+                    {/* Botão de gravação ou envio */}
+                    <div className="flex items-center">
+                      {isRecording ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 text-red-500">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                            <span className="text-xs font-medium">
+                              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelRecording}
+                            className="h-8 w-8 p-0 hover:bg-red-500/20"
+                            title="Cancelar gravação"
+                          >
+                            <X className="w-4 h-4 text-red-500" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={stopRecording}
+                            className="h-8 w-8 p-0 bg-green-500 hover:bg-green-600 rounded-full"
+                            title="Parar e enviar"
+                          >
+                            <Square className="w-4 h-4 text-white" />
+                          </Button>
+                        </div>
+                      ) : newMessage.trim() || selectedFile ? (
+                        <Button 
+                          onClick={sendMessage} 
+                          disabled={loading}
+                          className="h-8 w-8 p-0 bg-primary hover:bg-primary/90 rounded-full"
+                          title="Enviar"
+                        >
+                          {loading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          ) : (
+                            <Send className="w-4 h-4 text-white" />
+                          )}
+                        </Button>
                       ) : (
-                        <Send className="w-4 h-4" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            startRecording();
+                          }}
+                          onMouseUp={(e) => {
+                            e.preventDefault();
+                            if (isRecording) {
+                              stopRecording();
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            if (isRecording) {
+                              cancelRecording();
+                            }
+                          }}
+                          className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+                          title="Gravar áudio (segure)"
+                        >
+                          <Mic className="w-5 h-5 text-muted-foreground" />
+                        </Button>
                       )}
-                    </Button>
+                    </div>
+
+                    {/* Inputs de arquivo ocultos */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept="audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt,.csv"
+                    />
+                    <input
+                      type="file"
+                      ref={imageInputRef}
+                      onChange={handleImageSelect}
+                      className="hidden"
+                      accept="image/*"
+                      capture="environment"
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -1287,6 +1905,243 @@ const ChatInterno: React.FC = () => {
           )}
         </Card>
       </div>
+
+      {/* Modal de Encaminhar Mensagem */}
+      <Dialog open={showForwardModal} onOpenChange={setShowForwardModal}>
+        <DialogContent className="bg-seguranca-darkgray border-seguranca-gray/30 max-w-md w-[90vw] sm:w-full overflow-visible" style={{ zIndex: 10050 }}>
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray">Encaminhar Mensagem</DialogTitle>
+            <DialogDescription className="text-seguranca-gray">
+              Selecione os destinatários para encaminhar esta mensagem
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-seguranca-lightgray">Usuários</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="forwardShowOnlyOnline"
+                    checked={forwardShowOnlyOnline}
+                    onChange={(e) => setForwardShowOnlyOnline(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="forwardShowOnlyOnline" className="text-xs text-seguranca-gray cursor-pointer">
+                    Apenas online
+                  </label>
+                </div>
+              </div>
+              <Select
+                onValueChange={(value) => {
+                  if (!forwardRecipients.includes(value)) {
+                    setForwardRecipients([...forwardRecipients, value]);
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
+                  <SelectValue placeholder="Selecione usuários" />
+                </SelectTrigger>
+                <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50" style={{ backgroundColor: '#1f2937', opacity: 1, zIndex: 10070 }}>
+                  {safeAvailableUsers
+                    .filter(user => user.id !== currentUser?.id)
+                    .filter(user => !forwardShowOnlyOnline || user.isOnline)
+                    .sort((a, b) => {
+                      // Ordenar: online primeiro, depois offline
+                      if (a.isOnline && !b.isOnline) return -1;
+                      if (!a.isOnline && b.isOnline) return 1;
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map(user => (
+                      <SelectItem key={user.id} value={user.id} className="text-seguranca-lightgray">
+                        <div className="flex items-center gap-2 w-full">
+                          <span className="flex-1">{user.name}</span>
+                          {user.isOnline && (
+                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {forwardRecipients.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {forwardRecipients.map(recipientId => {
+                    const user = safeAvailableUsers.find(u => u.id === recipientId);
+                    return user ? (
+                      <Badge key={recipientId} variant="secondary" className="flex items-center gap-1">
+                        {user.name}
+                        <X
+                          className="w-3 h-3 cursor-pointer"
+                          onClick={() => setForwardRecipients(forwardRecipients.filter(id => id !== recipientId))}
+                        />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Grupos</label>
+              <Select
+                onValueChange={(value) => {
+                  if (!forwardGroups.includes(value)) {
+                    setForwardGroups([...forwardGroups, value]);
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
+                  <SelectValue placeholder="Selecione grupos" />
+                </SelectTrigger>
+                <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50" style={{ backgroundColor: '#1f2937', opacity: 1, zIndex: 10070 }}>
+                  {groups.map(group => (
+                    <SelectItem key={group.id} value={group.id} className="text-seguranca-lightgray">
+                      {group.name || group.groupName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {forwardGroups.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {forwardGroups.map(groupId => {
+                    const group = groups.find(g => g.id === groupId);
+                    return group ? (
+                      <Badge key={groupId} variant="secondary" className="flex items-center gap-1">
+                        {group.name || group.groupName}
+                        <X
+                          className="w-3 h-3 cursor-pointer"
+                          onClick={() => setForwardGroups(forwardGroups.filter(id => id !== groupId))}
+                        />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Departamentos</label>
+              <Select
+                onValueChange={(value) => {
+                  if (!forwardDepartments.includes(value)) {
+                    setForwardDepartments([...forwardDepartments, value]);
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
+                  <SelectValue placeholder="Selecione departamentos" />
+                </SelectTrigger>
+                <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50" style={{ backgroundColor: '#1f2937', opacity: 1, zIndex: 10070 }}>
+                  {departments.map(dept => (
+                    <SelectItem key={dept.id} value={dept.id} className="text-seguranca-lightgray">
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {forwardDepartments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {forwardDepartments.map(deptId => {
+                    const dept = departments.find(d => d.id === deptId);
+                    return dept ? (
+                      <Badge key={deptId} variant="secondary" className="flex items-center gap-1">
+                        {dept.name}
+                        <X
+                          className="w-3 h-3 cursor-pointer"
+                          onClick={() => setForwardDepartments(forwardDepartments.filter(id => id !== deptId))}
+                        />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2 pt-4 border-t border-seguranca-gray/20">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowForwardModal(false);
+                setMessageToForward(null);
+                setForwardRecipients([]);
+                setForwardGroups([]);
+                setForwardDepartments([]);
+                setForwardShowOnlyOnline(false);
+              }}
+              className="border-seguranca-gray/30 text-seguranca-lightgray"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmForward}
+              disabled={forwardRecipients.length === 0 && forwardGroups.length === 0 && forwardDepartments.length === 0}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Encaminhar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Denunciar Mensagem */}
+      <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
+        <DialogContent className="bg-seguranca-darkgray border-seguranca-gray/30 max-w-md w-[90vw] sm:w-full overflow-visible" style={{ zIndex: 10050 }}>
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray">Denunciar Mensagem</DialogTitle>
+            <DialogDescription className="text-seguranca-gray">
+              Informe o motivo da denúncia. Nossa equipe irá analisar o caso.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Motivo *</label>
+              <Select onValueChange={setReportReason} value={reportReason}>
+                <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50" style={{ backgroundColor: '#1f2937', opacity: 1, zIndex: 10070 }}>
+                  <SelectItem value="SPAM" className="text-seguranca-lightgray">Spam</SelectItem>
+                  <SelectItem value="INAPPROPRIATE" className="text-seguranca-lightgray">Conteúdo Inadequado</SelectItem>
+                  <SelectItem value="HARASSMENT" className="text-seguranca-lightgray">Assédio</SelectItem>
+                  <SelectItem value="FAKE_NEWS" className="text-seguranca-lightgray">Informação Falsa</SelectItem>
+                  <SelectItem value="OTHER" className="text-seguranca-lightgray">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Descrição (opcional)</label>
+              <Textarea
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                placeholder="Forneça mais detalhes sobre a denúncia..."
+                className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray min-h-[100px]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2 pt-4 border-t border-seguranca-gray/20">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReportModal(false);
+                setMessageToReport(null);
+                setReportReason('');
+                setReportDescription('');
+              }}
+              className="border-seguranca-gray/30 text-seguranca-lightgray"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmReport}
+              disabled={!reportReason.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Denunciar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 };

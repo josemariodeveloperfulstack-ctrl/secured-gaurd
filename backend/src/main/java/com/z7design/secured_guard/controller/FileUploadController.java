@@ -224,6 +224,37 @@ public class FileUploadController {
                 .body(Map.of("error", "Erro ao excluir arquivo: " + e.getMessage()));
         }
     }
+    
+    /**
+     * Download de arquivo do chat
+     */
+    @GetMapping("/chat/{subDir}/{filename}")
+    public ResponseEntity<Resource> downloadChatFile(
+            @PathVariable String subDir,
+            @PathVariable String filename) {
+        
+        try {
+            Path filePath = Paths.get(uploadDir, "chat", subDir).resolve(filename);
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                String contentType = Files.probeContentType(filePath);
+                if (contentType == null) {
+                    contentType = "application/octet-stream";
+                }
+
+                return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                    .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
     // Métodos auxiliares
     private boolean isValidFileType(String contentType) {

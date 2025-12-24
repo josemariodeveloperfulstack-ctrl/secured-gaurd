@@ -74,8 +74,29 @@ export const useWebSocket = (config: WebSocketConfig) => {
         // Subscrever aos tópicos de mensagens individuais
         client.subscribe(`/user/${config.username}/queue/messages`, (message) => {
           try {
-            const chatMessage: ChatMessage = JSON.parse(message.body);
+            const rawMessage = JSON.parse(message.body);
+            // Garantir que todas as informações do arquivo sejam preservadas
+            const chatMessage: ChatMessage = {
+              ...rawMessage,
+              fileUrl: rawMessage.fileUrl,
+              fileName: rawMessage.fileName,
+              fileSize: rawMessage.fileSize,
+              fileContentType: rawMessage.fileContentType
+            };
             console.log('[WebSocket] Nova mensagem recebida (individual):', chatMessage);
+            
+            // Log detalhado para mensagens com arquivo
+            if (chatMessage.fileUrl) {
+              console.log('📎 Mensagem com arquivo recebida (individual):', {
+                id: chatMessage.id,
+                type: chatMessage.type,
+                fileUrl: chatMessage.fileUrl,
+                fileName: chatMessage.fileName,
+                fileSize: chatMessage.fileSize,
+                fileContentType: chatMessage.fileContentType
+              });
+            }
+            
             addChatMessage(chatMessage);
             config.onMessage?.(chatMessage);
           } catch (error) {
@@ -86,8 +107,29 @@ export const useWebSocket = (config: WebSocketConfig) => {
         // Subscrever a tópicos de grupos (se o usuário estiver em grupos)
         client.subscribe('/topic/chat/group/*', (message) => {
           try {
-            const chatMessage: ChatMessage = JSON.parse(message.body);
+            const rawMessage = JSON.parse(message.body);
+            // Garantir que todas as informações do arquivo sejam preservadas
+            const chatMessage: ChatMessage = {
+              ...rawMessage,
+              fileUrl: rawMessage.fileUrl,
+              fileName: rawMessage.fileName,
+              fileSize: rawMessage.fileSize,
+              fileContentType: rawMessage.fileContentType
+            };
             console.log('[WebSocket] Nova mensagem recebida (grupo):', chatMessage);
+            
+            // Log detalhado para mensagens com arquivo
+            if (chatMessage.fileUrl) {
+              console.log('📎 Mensagem com arquivo recebida (grupo):', {
+                id: chatMessage.id,
+                type: chatMessage.type,
+                fileUrl: chatMessage.fileUrl,
+                fileName: chatMessage.fileName,
+                fileSize: chatMessage.fileSize,
+                fileContentType: chatMessage.fileContentType
+              });
+            }
+            
             addChatMessage(chatMessage);
             config.onMessage?.(chatMessage);
           } catch (error) {
@@ -98,8 +140,29 @@ export const useWebSocket = (config: WebSocketConfig) => {
         // Subscrever a tópicos de departamentos (se o usuário estiver em departamentos)
         client.subscribe('/topic/chat/department/*', (message) => {
           try {
-            const chatMessage: ChatMessage = JSON.parse(message.body);
+            const rawMessage = JSON.parse(message.body);
+            // Garantir que todas as informações do arquivo sejam preservadas
+            const chatMessage: ChatMessage = {
+              ...rawMessage,
+              fileUrl: rawMessage.fileUrl,
+              fileName: rawMessage.fileName,
+              fileSize: rawMessage.fileSize,
+              fileContentType: rawMessage.fileContentType
+            };
             console.log('[WebSocket] Nova mensagem recebida (departamento):', chatMessage);
+            
+            // Log detalhado para mensagens com arquivo
+            if (chatMessage.fileUrl) {
+              console.log('📎 Mensagem com arquivo recebida (departamento):', {
+                id: chatMessage.id,
+                type: chatMessage.type,
+                fileUrl: chatMessage.fileUrl,
+                fileName: chatMessage.fileName,
+                fileSize: chatMessage.fileSize,
+                fileContentType: chatMessage.fileContentType
+              });
+            }
+            
             addChatMessage(chatMessage);
             config.onMessage?.(chatMessage);
           } catch (error) {

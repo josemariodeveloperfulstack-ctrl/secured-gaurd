@@ -202,6 +202,7 @@ const comunicacaoInternaMenuItems = [
 // ===== NOVO: MÓDULO DE ATENDIMENTO =====
 const atendimentoMenuItems = [
   { icon: Phone, text: 'Dashboard de Atendimento', to: '/gestao-atendimento/dashboard', id: 'gestao-atendimento-dashboard' },
+  { icon: MessageCircle, text: 'Tickets', to: '/gestao-atendimento/tickets', id: 'gestao-atendimento-tickets' },
   { icon: Clock, text: 'Histórico de Conversas', to: '/gestao-atendimento/historico', id: 'gestao-atendimento-historico' },
   { icon: UserCog, text: 'Gerenciar Agentes', to: '/gestao-atendimento/agentes', id: 'gestao-atendimento-agentes' },
   { icon: BarChart3, text: 'Métricas', to: '/gestao-atendimento/metricas', id: 'gestao-atendimento-metricas' },

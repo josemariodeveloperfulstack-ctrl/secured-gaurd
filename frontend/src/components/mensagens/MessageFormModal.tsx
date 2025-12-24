@@ -30,7 +30,8 @@ interface MessageFormModalProps {
   onClose: () => void;
   onSuccess: () => void;
   message?: any | null;
-  mode: 'create' | 'edit';
+  mode: 'create' | 'edit' | 'reply';
+  replyTo?: any | null;
 }
 
 export const MessageFormModal: React.FC<MessageFormModalProps> = ({
@@ -38,7 +39,8 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
   onClose,
   onSuccess,
   message,
-  mode
+  mode,
+  replyTo
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,8 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
     departmentIds: [] as string[],
     sendEmail: false,
     sendNotification: true,
-    scheduledAt: ''
+    scheduledAt: '',
+    replyToId: undefined as string | undefined
   });
 
   useEffect(() => {
@@ -70,10 +73,43 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
         departmentIds: message.departments?.map((d: any) => d.id) || [],
         sendEmail: message.sendEmail || false,
         sendNotification: message.sendNotification !== false,
-        scheduledAt: message.scheduledAt || ''
+        scheduledAt: message.scheduledAt || '',
+        replyToId: undefined
+      });
+    } else if (mode === 'reply' && replyTo) {
+      // Pré-preencher dados para resposta
+      const replyTitle = replyTo.title?.startsWith('Re: ') 
+        ? replyTo.title 
+        : `Re: ${replyTo.title || ''}`;
+      
+      setFormData({
+        title: replyTitle,
+        content: '',
+        type: 'INDIVIDUAL',
+        priority: replyTo.priority || 'NORMAL',
+        recipientIds: replyTo.sender?.id ? [replyTo.sender.id] : [],
+        departmentIds: [],
+        sendEmail: false,
+        sendNotification: true,
+        scheduledAt: '',
+        replyToId: replyTo.id
+      });
+    } else if (mode === 'create') {
+      // Resetar formulário para nova mensagem
+      setFormData({
+        title: '',
+        content: '',
+        type: 'INDIVIDUAL',
+        priority: 'NORMAL',
+        recipientIds: [],
+        departmentIds: [],
+        sendEmail: false,
+        sendNotification: true,
+        scheduledAt: '',
+        replyToId: undefined
       });
     }
-  }, [mode, message]);
+  }, [mode, message, replyTo]);
 
   useEffect(() => {
     if (isOpen) {
@@ -132,11 +168,15 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
     try {
       setLoading(true);
 
-      if (mode === 'create') {
-        await messageService.sendSystemMessage(formData);
+      if (mode === 'create' || mode === 'reply') {
+        const messageData = {
+          ...formData,
+          replyToId: mode === 'reply' ? formData.replyToId : undefined
+        };
+        await messageService.sendSystemMessage(messageData);
         toast({
           title: "Sucesso",
-          description: "Mensagem enviada com sucesso"
+          description: mode === 'reply' ? "Resposta enviada com sucesso" : "Mensagem enviada com sucesso"
         });
       } else {
         // TODO: Implementar edição
@@ -203,11 +243,13 @@ export const MessageFormModal: React.FC<MessageFormModalProps> = ({
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-gray-600">
           <DialogTitle className="text-lg sm:text-2xl font-bold text-seguranca-yellow flex items-center gap-2">
             <Send className="h-5 w-5 sm:h-6 sm:w-6" />
-            {mode === 'create' ? 'Nova Mensagem' : 'Editar Mensagem'}
+            {mode === 'create' ? 'Nova Mensagem' : mode === 'reply' ? 'Responder Mensagem' : 'Editar Mensagem'}
           </DialogTitle>
           <DialogDescription className="text-gray-300 text-sm mt-2">
             {mode === 'create' 
               ? 'Preencha os dados para enviar uma nova mensagem'
+              : mode === 'reply'
+              ? 'Responda à mensagem selecionada'
               : 'Atualize as informações da mensagem'
             }
           </DialogDescription>

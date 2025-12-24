@@ -36,6 +36,7 @@ import supportService, {
   TicketCategory
 } from '@/services/supportService';
 import employeeService, { SimpleEmployee } from '@/services/employeeService'; // Mudança: usar employeeService
+import chatbotService, { ChatbotConfig, CreateChatbotConfigRequest, UpdateChatbotConfigRequest } from '@/services/chatbotService';
 
 const GestaoAtendimento: React.FC = () => {
   const location = useLocation();
@@ -53,6 +54,27 @@ const GestaoAtendimento: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [users, setUsers] = useState<SimpleEmployee[]>([]); // Mudança: usar SimpleEmployee
   const [protocol, setProtocol] = useState<string>(''); // Novo: campo protocolo
+  const [chatbotConfigs, setChatbotConfigs] = useState<ChatbotConfig[]>([]);
+  const [selectedConfig, setSelectedConfig] = useState<ChatbotConfig | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configFormData, setConfigFormData] = useState<CreateChatbotConfigRequest>({
+    name: '',
+    welcomeMessage: 'Olá! Bem-vindo ao nosso atendimento. Como posso ajudá-lo hoje?',
+    defaultResponse: 'Desculpe, não entendi sua mensagem. Poderia reformular?',
+    isActive: true,
+    autoRespond: true,
+    transferToHumanEnabled: true,
+    workingHoursEnabled: false,
+    workingHoursStart: '08:00',
+    workingHoursEnd: '18:00',
+    offlineMessage: 'No momento estamos fora do horário de atendimento. Nossa equipe retornará em breve.',
+    maxWaitTimeMinutes: 30,
+    autoEscalateEnabled: false,
+    autoEscalateAfterMinutes: 15,
+    knowledgeBaseEnabled: false,
+    sentimentAnalysisEnabled: false,
+    language: 'pt-BR'
+  });
   
   const { toast } = useToast();
 
@@ -70,7 +92,21 @@ const GestaoAtendimento: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadChatbotConfigs();
   }, []);
+
+  const loadChatbotConfigs = async () => {
+    try {
+      const configs = await chatbotService.getAllConfigs();
+      setChatbotConfigs(configs);
+      const activeConfig = configs.find(c => c.isActive);
+      if (activeConfig) {
+        setSelectedConfig(activeConfig);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações do chatbot:', error);
+    }
+  };
 
   // Redirecionar para dashboard se estiver na rota raiz
   useEffect(() => {
@@ -101,18 +137,25 @@ const GestaoAtendimento: React.FC = () => {
       ]);
       
       if (agentsData.status === 'fulfilled') {
-        setAgents(agentsData.value);
-        console.log('✅ Agentes carregados:', agentsData.value.length);
+        const agentsList = Array.isArray(agentsData.value) ? agentsData.value : [];
+        setAgents(agentsList);
+        console.log('✅ Agentes carregados:', agentsList.length);
+        console.log('📊 Status dos agentes:', agentsList.map(a => ({ name: a.name, status: a.status })));
+        const onlineAgents = agentsList.filter(a => a.status === 'ONLINE');
+        console.log('🟢 Agentes online:', onlineAgents.length);
       } else {
         console.error('❌ Erro ao carregar agentes:', agentsData.reason);
         setAgents([]);
       }
       
       if (ticketsData.status === 'fulfilled') {
-        setTickets(ticketsData.value.content);
-        console.log('✅ Tickets carregados:', ticketsData.value.content.length);
+        const ticketsList = ticketsData.value?.content || (Array.isArray(ticketsData.value) ? ticketsData.value : []);
+        setTickets(ticketsList);
+        console.log('✅ Tickets carregados:', ticketsList.length);
+        console.log('📊 Estrutura do primeiro ticket:', ticketsList.length > 0 ? ticketsList[0] : 'Nenhum ticket');
       } else {
         console.error('❌ Erro ao carregar tickets:', ticketsData.reason);
+        console.error('❌ Detalhes do erro:', ticketsData.reason?.response?.data || ticketsData.reason?.message);
         setTickets([]);
       }
       
@@ -272,10 +315,21 @@ const GestaoAtendimento: React.FC = () => {
             <h1 className="text-2xl font-bold">Gestão de Atendimento</h1>
             <p className="text-muted-foreground">Gerencie tickets, agentes e métricas de atendimento</p>
           </div>
-          <Button onClick={() => navigateToPage('tickets')}>
-            <MessageCircle className="w-4 h-4 mr-2" />
-            Novo Ticket
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={loadData}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+            <Button onClick={() => navigateToPage('tickets')}>
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Novo Ticket
+            </Button>
+          </div>
         </div>
 
         {/* Navegação entre páginas */}
@@ -380,18 +434,35 @@ const GestaoAtendimento: React.FC = () => {
 
             {/* Agentes online */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Agentes Online</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={loadData}
+                  disabled={loading}
+                  className="h-8"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
               </CardHeader>
               <CardContent>
-                {agents.filter(agent => agent.status === 'ONLINE').length > 0 ? (
+                {(() => {
+                  const onlineAgents = agents.filter(agent => agent && agent.status === 'ONLINE');
+                  console.log('🔍 Verificando agentes online:', { 
+                    total: agents.length, 
+                    online: onlineAgents.length, 
+                    agents: agents.map(a => ({ name: a?.name, status: a?.status, id: a?.id })) 
+                  });
+                  return onlineAgents.length > 0;
+                })() ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {agents.filter(agent => agent.status === 'ONLINE').map((agent) => (
+                    {agents.filter(agent => agent && agent.status === 'ONLINE').map((agent) => (
                       <div key={agent.id} className="flex items-center space-x-3 p-3 border rounded-lg">
                         <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                           <Users className="w-5 h-5 text-green-600" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium">{agent.name}</p>
                           <p className="text-sm text-muted-foreground">{agent.department || 'Sem departamento'}</p>
                         </div>
@@ -402,18 +473,45 @@ const GestaoAtendimento: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-4">Nenhum agente online no momento</p>
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+                    <p className="text-muted-foreground">Nenhum agente online no momento</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Total de agentes: {agents.length}
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
 
             {/* Tickets recentes */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Tickets Recentes</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={loadData}
+                  disabled={loading}
+                  className="h-8"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
               </CardHeader>
               <CardContent>
-                {tickets.length > 0 ? (
+                {(() => {
+                  console.log('🔍 Verificando tickets:', { 
+                    total: tickets.length, 
+                    tickets: tickets.slice(0, 3).map(t => ({ 
+                      id: t?.id, 
+                      title: t?.title, 
+                      customer: t?.customer,
+                      customerName: t?.customerName,
+                      status: t?.status
+                    })) 
+                  });
+                  return tickets.length > 0;
+                })() ? (
                   <div className="space-y-3">
                     {tickets.slice(0, 5).map((ticket) => (
                       <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
@@ -421,28 +519,39 @@ const GestaoAtendimento: React.FC = () => {
                              setSelectedTicket(ticket);
                              setShowTicketModal(true);
                            }}>
-                        <div>
-                          <p className="font-medium">{ticket.title}</p>
+                        <div className="flex-1">
+                          <p className="font-medium">{ticket.title || 'Sem título'}</p>
                           <p className="text-sm text-muted-foreground">
-                            {ticket.customer.name} • {supportService.getCategoryLabel(ticket.category)}
+                            {ticket.customer?.name || ticket.customerName || 'Cliente não informado'} • {supportService.getCategoryLabel(ticket.category)}
                           </p>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 flex-shrink-0">
                           <Badge className={getPriorityColor(ticket.priority)}>
                             {supportService.getPriorityLabel(ticket.priority)}
                           </Badge>
                           <Badge className={getTicketStatusColor(ticket.status)}>
                             {supportService.getStatusLabel(ticket.status)}
                           </Badge>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(ticket.createdAt), 'dd/MM HH:mm', { locale: ptBR })}
+                          <p className="text-xs text-muted-foreground whitespace-nowrap">
+                            {ticket.createdAt ? format(new Date(ticket.createdAt), 'dd/MM HH:mm', { locale: ptBR }) : 'Data não disponível'}
                           </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-4">Nenhum ticket encontrado</p>
+                  <div className="text-center py-8">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+                    <p className="text-muted-foreground">Nenhum ticket encontrado</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => navigateToPage('tickets')}
+                      className="mt-4"
+                    >
+                      Criar Primeiro Ticket
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -628,10 +737,10 @@ const GestaoAtendimento: React.FC = () => {
                              setSelectedTicket(ticket);
                              setShowTicketModal(true);
                            }}>
-                        <div>
-                          <p className="font-medium">{ticket.title}</p>
+                        <div className="flex-1">
+                          <p className="font-medium">{ticket.title || 'Sem título'}</p>
                           <p className="text-sm text-muted-foreground">
-                            {ticket.customer.name} • {supportService.getCategoryLabel(ticket.category)}
+                            {ticket.customer?.name || ticket.customerName || 'Cliente não informado'} • {supportService.getCategoryLabel(ticket.category)}
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -758,18 +867,373 @@ const GestaoAtendimento: React.FC = () => {
         {/* Página de Chatbot */}
         {currentPage === 'chatbot' && (
           <div className="space-y-4">
+            {/* Lista de Configurações */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Configurações do Chatbot</CardTitle>
+                <Button onClick={() => {
+                  setConfigFormData({
+                    name: '',
+                    welcomeMessage: 'Olá! Bem-vindo ao nosso atendimento. Como posso ajudá-lo hoje?',
+                    defaultResponse: 'Desculpe, não entendi sua mensagem. Poderia reformular?',
+                    isActive: true,
+                    autoRespond: true,
+                    transferToHumanEnabled: true,
+                    workingHoursEnabled: false,
+                    workingHoursStart: '08:00',
+                    workingHoursEnd: '18:00',
+                    offlineMessage: 'No momento estamos fora do horário de atendimento. Nossa equipe retornará em breve.',
+                    maxWaitTimeMinutes: 30,
+                    autoEscalateEnabled: false,
+                    autoEscalateAfterMinutes: 15,
+                    knowledgeBaseEnabled: false,
+                    sentimentAnalysisEnabled: false,
+                    language: 'pt-BR'
+                  });
+                  setSelectedConfig(null);
+                  setShowConfigModal(true);
+                }}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Nova Configuração
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Settings className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
-                  <p>Funcionalidade em desenvolvimento</p>
-                  <p className="text-sm">Em breve você poderá configurar o chatbot</p>
-                </div>
+                {chatbotConfigs.length > 0 ? (
+                  <div className="space-y-3">
+                    {chatbotConfigs.map((config) => (
+                      <div 
+                        key={config.id} 
+                        className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-colors ${
+                          selectedConfig?.id === config.id 
+                            ? 'bg-blue-50 border-blue-500' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => {
+                          setSelectedConfig(config);
+                          setConfigFormData({
+                            name: config.name,
+                            welcomeMessage: config.welcomeMessage || '',
+                            defaultResponse: config.defaultResponse || '',
+                            isActive: config.isActive,
+                            autoRespond: config.autoRespond,
+                            transferToHumanEnabled: config.transferToHumanEnabled,
+                            workingHoursEnabled: config.workingHoursEnabled,
+                            workingHoursStart: config.workingHoursStart || '08:00',
+                            workingHoursEnd: config.workingHoursEnd || '18:00',
+                            offlineMessage: config.offlineMessage || '',
+                            maxWaitTimeMinutes: config.maxWaitTimeMinutes,
+                            autoEscalateEnabled: config.autoEscalateEnabled,
+                            autoEscalateAfterMinutes: config.autoEscalateAfterMinutes,
+                            knowledgeBaseEnabled: config.knowledgeBaseEnabled,
+                            sentimentAnalysisEnabled: config.sentimentAnalysisEnabled,
+                            language: config.language
+                          });
+                          setShowConfigModal(true);
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${config.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          <div>
+                            <p className="font-medium">{config.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {config.isActive ? 'Ativo' : 'Inativo'} • 
+                              {config.autoRespond ? ' Resposta Automática' : ' Manual'} • 
+                              Idioma: {config.language}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={config.isActive ? 'default' : 'secondary'}>
+                          {config.isActive ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Settings className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+                    <p>Nenhuma configuração encontrada</p>
+                    <p className="text-sm">Clique em "Nova Configuração" para criar uma</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Modal de Configuração */}
+            <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedConfig ? 'Editar Configuração do Chatbot' : 'Nova Configuração do Chatbot'}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="config-name">Nome da Configuração *</Label>
+                    <Input
+                      id="config-name"
+                      value={configFormData.name}
+                      onChange={(e) => setConfigFormData({...configFormData, name: e.target.value})}
+                      placeholder="Ex: Chatbot Principal"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="welcome-message">Mensagem de Boas-vindas</Label>
+                    <Textarea
+                      id="welcome-message"
+                      value={configFormData.welcomeMessage || ''}
+                      onChange={(e) => setConfigFormData({...configFormData, welcomeMessage: e.target.value})}
+                      placeholder="Mensagem exibida quando o cliente inicia uma conversa"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="default-response">Resposta Padrão</Label>
+                    <Textarea
+                      id="default-response"
+                      value={configFormData.defaultResponse || ''}
+                      onChange={(e) => setConfigFormData({...configFormData, defaultResponse: e.target.value})}
+                      placeholder="Mensagem quando o chatbot não entende a pergunta"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is-active"
+                        checked={configFormData.isActive || false}
+                        onChange={(e) => setConfigFormData({...configFormData, isActive: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="is-active" className="cursor-pointer">Configuração Ativa</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="auto-respond"
+                        checked={configFormData.autoRespond || false}
+                        onChange={(e) => setConfigFormData({...configFormData, autoRespond: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="auto-respond" className="cursor-pointer">Resposta Automática</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="transfer-human"
+                        checked={configFormData.transferToHumanEnabled || false}
+                        onChange={(e) => setConfigFormData({...configFormData, transferToHumanEnabled: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="transfer-human" className="cursor-pointer">Permitir Transferência para Humano</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="working-hours"
+                        checked={configFormData.workingHoursEnabled || false}
+                        onChange={(e) => setConfigFormData({...configFormData, workingHoursEnabled: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="working-hours" className="cursor-pointer">Respeitar Horário de Funcionamento</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="auto-escalate"
+                        checked={configFormData.autoEscalateEnabled || false}
+                        onChange={(e) => setConfigFormData({...configFormData, autoEscalateEnabled: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="auto-escalate" className="cursor-pointer">Escalação Automática</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="knowledge-base"
+                        checked={configFormData.knowledgeBaseEnabled || false}
+                        onChange={(e) => setConfigFormData({...configFormData, knowledgeBaseEnabled: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="knowledge-base" className="cursor-pointer">Base de Conhecimento</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="sentiment-analysis"
+                        checked={configFormData.sentimentAnalysisEnabled || false}
+                        onChange={(e) => setConfigFormData({...configFormData, sentimentAnalysisEnabled: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="sentiment-analysis" className="cursor-pointer">Análise de Sentimento</Label>
+                    </div>
+                  </div>
+
+                  {configFormData.workingHoursEnabled && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="hours-start">Horário de Início</Label>
+                        <Input
+                          id="hours-start"
+                          type="time"
+                          value={configFormData.workingHoursStart || '08:00'}
+                          onChange={(e) => setConfigFormData({...configFormData, workingHoursStart: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="hours-end">Horário de Fim</Label>
+                        <Input
+                          id="hours-end"
+                          type="time"
+                          value={configFormData.workingHoursEnd || '18:00'}
+                          onChange={(e) => setConfigFormData({...configFormData, workingHoursEnd: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {configFormData.workingHoursEnabled && (
+                    <div>
+                      <Label htmlFor="offline-message">Mensagem Fora do Horário</Label>
+                      <Textarea
+                        id="offline-message"
+                        value={configFormData.offlineMessage || ''}
+                        onChange={(e) => setConfigFormData({...configFormData, offlineMessage: e.target.value})}
+                        placeholder="Mensagem exibida quando está fora do horário de funcionamento"
+                        rows={2}
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="max-wait">Tempo Máximo de Espera (minutos)</Label>
+                      <Input
+                        id="max-wait"
+                        type="number"
+                        value={configFormData.maxWaitTimeMinutes || 30}
+                        onChange={(e) => setConfigFormData({...configFormData, maxWaitTimeMinutes: parseInt(e.target.value) || 30})}
+                        min="1"
+                      />
+                    </div>
+
+                    {configFormData.autoEscalateEnabled && (
+                      <div>
+                        <Label htmlFor="escalate-after">Escalar Após (minutos)</Label>
+                        <Input
+                          id="escalate-after"
+                          type="number"
+                          value={configFormData.autoEscalateAfterMinutes || 15}
+                          onChange={(e) => setConfigFormData({...configFormData, autoEscalateAfterMinutes: parseInt(e.target.value) || 15})}
+                          min="1"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <Label htmlFor="language">Idioma</Label>
+                      <Select 
+                        value={configFormData.language || 'pt-BR'} 
+                        onValueChange={(value) => setConfigFormData({...configFormData, language: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+                          <SelectItem value="en-US">English (US)</SelectItem>
+                          <SelectItem value="es-ES">Español</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => {
+                      setShowConfigModal(false);
+                      setSelectedConfig(null);
+                    }}>
+                      Cancelar
+                    </Button>
+                    {selectedConfig && (
+                      <Button 
+                        variant="destructive" 
+                        onClick={async () => {
+                          try {
+                            await chatbotService.deleteConfig(selectedConfig.id);
+                            toast({
+                              title: "Sucesso",
+                              description: "Configuração deletada com sucesso.",
+                            });
+                            await loadChatbotConfigs();
+                            setShowConfigModal(false);
+                            setSelectedConfig(null);
+                          } catch (error) {
+                            toast({
+                              title: "Erro",
+                              description: "Não foi possível deletar a configuração.",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                      >
+                        Deletar
+                      </Button>
+                    )}
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          if (!configFormData.name) {
+                            toast({
+                              title: "Erro",
+                              description: "Nome da configuração é obrigatório.",
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+
+                          if (selectedConfig) {
+                            await chatbotService.updateConfig(selectedConfig.id, configFormData as UpdateChatbotConfigRequest);
+                            toast({
+                              title: "Sucesso",
+                              description: "Configuração atualizada com sucesso.",
+                            });
+                          } else {
+                            await chatbotService.createConfig(configFormData);
+                            toast({
+                              title: "Sucesso",
+                              description: "Configuração criada com sucesso.",
+                            });
+                          }
+                          await loadChatbotConfigs();
+                          setShowConfigModal(false);
+                          setSelectedConfig(null);
+                        } catch (error: any) {
+                          toast({
+                            title: "Erro",
+                            description: error.response?.data?.message || "Não foi possível salvar a configuração.",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      {selectedConfig ? 'Atualizar' : 'Criar'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
@@ -809,9 +1273,9 @@ const GestaoAtendimento: React.FC = () => {
 
                 <div>
                   <Label className="text-sm font-medium">Cliente</Label>
-                  <p>{selectedTicket.customer.name} ({selectedTicket.customer.email})</p>
-                  {selectedTicket.customer.phone && (
-                    <p className="text-sm text-muted-foreground">{selectedTicket.customer.phone}</p>
+                  <p>{selectedTicket.customer?.name || selectedTicket.customerName || 'Cliente não informado'} ({selectedTicket.customer?.email || selectedTicket.customerEmail || 'Email não informado'})</p>
+                  {(selectedTicket.customer?.phone || selectedTicket.customerPhone) && (
+                    <p className="text-sm text-muted-foreground">{selectedTicket.customer?.phone || selectedTicket.customerPhone}</p>
                   )}
                 </div>
 

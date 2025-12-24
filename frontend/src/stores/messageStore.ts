@@ -19,6 +19,13 @@ export interface User {
     isOnline?: boolean;
 }
 
+export interface ReactionSummary {
+    emoji: string;
+    count: number;
+    userIds: string[];
+    currentUserReacted?: boolean;
+}
+
 export interface ChatMessage {
     id: string;
     content: string;
@@ -32,6 +39,12 @@ export interface ChatMessage {
     editedAt?: string;
     replyToId?: string;
     replyToMessage?: ChatMessage;
+    reactions?: ReactionSummary[];
+    // Informações do arquivo
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+    fileContentType?: string;
     createdAt: string;
     updatedAt?: string;
 }
@@ -60,6 +73,8 @@ export interface SystemMessage {
     readAt?: string;
     scheduledAt?: string;
     sentAt?: string;
+    replyToId?: string;
+    replyTo?: SystemMessage;
 }
 
 interface MessageState {

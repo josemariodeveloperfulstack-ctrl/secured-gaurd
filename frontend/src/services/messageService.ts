@@ -134,6 +134,7 @@ export const messageService = {
     sendEmail?: boolean;
     sendNotification?: boolean;
     scheduledAt?: string;
+    replyToId?: string;
   }): Promise<SystemMessage> {
     try {
       // Transformar os dados para o formato esperado pelo backend
@@ -266,23 +267,11 @@ export const messageService = {
       const response = await api.get(`/v1/chat/conversation/${conversationId}`, {
         headers: getAuthHeaders()
       });
-
-      return (response.data || []).map((msg: {
-        id: string;
-        content: string;
-        sender: { id: string; name: string; email: string };
-        recipient?: { id: string; name: string; email: string };
-        group?: { id: string; name: string };
-        department?: { id: string; name: string };
-        type: string;
-        isRead?: boolean;
-        readAt?: string;
-        editedAt?: string;
-        replyToId?: string;
-        createdAt: string;
-      }) => ({
+      
+      // Mapear corretamente as mensagens, garantindo que informações de arquivo sejam preservadas
+      return (response.data || []).map((msg: any) => ({
         id: msg.id,
-        content: msg.content,
+        content: msg.content || '',
         sender: {
           id: msg.sender.id,
           name: msg.sender.name,
@@ -300,7 +289,14 @@ export const messageService = {
         readAt: msg.readAt,
         editedAt: msg.editedAt,
         replyToId: msg.replyToId,
-        createdAt: msg.createdAt
+        reactions: msg.reactions || [],
+        // Informações do arquivo - CRÍTICO para mensagens com arquivo
+        fileUrl: msg.fileUrl,
+        fileName: msg.fileName,
+        fileSize: msg.fileSize,
+        fileContentType: msg.fileContentType,
+        createdAt: msg.createdAt,
+        updatedAt: msg.updatedAt
       }));
     } catch (error) {
       console.warn('[MessageService] Erro ao buscar mensagens da conversa:', error);
@@ -333,10 +329,66 @@ export const messageService = {
         isRead: response.data.isRead || false,
         readAt: response.data.readAt,
         createdAt: response.data.createdAt,
-        replyToId: response.data.replyToId
+        replyToId: response.data.replyToId,
+        reactions: response.data.reactions || [],
+        fileUrl: response.data.fileUrl,
+        fileName: response.data.fileName,
+        fileSize: response.data.fileSize,
+        fileContentType: response.data.fileContentType
       };
     } catch (error) {
       handleApiError(error, 'sendChatMessage');
+    }
+  },
+
+  async sendChatMessageWithFile(
+    file: File,
+    messageData: {
+      content?: string;
+      recipientId?: string;
+      groupId?: string;
+      departmentId?: string;
+      replyToId?: string;
+    }
+  ): Promise<ChatMessage> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (messageData.content) formData.append('content', messageData.content);
+      if (messageData.recipientId) formData.append('recipientId', messageData.recipientId);
+      if (messageData.groupId) formData.append('groupId', messageData.groupId);
+      if (messageData.departmentId) formData.append('departmentId', messageData.departmentId);
+      if (messageData.replyToId) formData.append('replyToId', messageData.replyToId);
+
+      const response = await api.post('/v1/chat/send-with-file', formData, {
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      return {
+        id: response.data.id,
+        content: response.data.content || '',
+        sender: {
+          id: response.data.sender.id,
+          name: response.data.sender.name,
+          email: response.data.sender.email
+        },
+        type: response.data.type,
+        isRead: response.data.isRead || false,
+        readAt: response.data.readAt,
+        createdAt: response.data.createdAt,
+        replyToId: response.data.replyToId,
+        reactions: response.data.reactions || [],
+        fileUrl: response.data.fileUrl,
+        fileName: response.data.fileName,
+        fileSize: response.data.fileSize,
+        fileContentType: response.data.fileContentType
+      };
+    } catch (error) {
+      handleApiError(error, 'sendChatMessageWithFile');
+      throw error;
     }
   },
 
@@ -375,6 +427,33 @@ export const messageService = {
     }
   },
 
+  // ===== REAÇÕES =====
+
+  async toggleReaction(messageId: string, emoji: string): Promise<any> {
+    try {
+      const response = await api.post(`/v1/chat/${messageId}/reaction`, null, {
+        headers: getAuthHeaders(),
+        params: { emoji }
+      });
+      return response.data;
+    } catch (error) {
+      handleApiError(error, 'toggleReaction');
+      throw error;
+    }
+  },
+
+  async getMessageReactions(messageId: string): Promise<any[]> {
+    try {
+      const response = await api.get(`/v1/chat/${messageId}/reactions`, {
+        headers: getAuthHeaders()
+      });
+      return response.data || [];
+    } catch (error) {
+      console.warn('[MessageService] Erro ao buscar reações:', error);
+      return [];
+    }
+  },
+
   async deleteSystemMessage(messageId: string, reason: string): Promise<void> {
     try {
       await api.delete(`/api/v1/messages/${messageId}`, {
@@ -404,6 +483,92 @@ export const messageService = {
     } catch (error) {
       console.warn('[MessageService] Erro na busca:', error);
       return [];
+    }
+  },
+
+  // ===== AÇÕES DE MENSAGEM =====
+
+  async togglePin(messageId: string): Promise<boolean> {
+    try {
+      const response = await api.post(`/v1/chat/${messageId}/pin`, null, {
+        headers: getAuthHeaders()
+      });
+      return response.data;
+    } catch (error) {
+      handleApiError(error, 'togglePin');
+    }
+  },
+
+  async isPinned(messageId: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/v1/chat/${messageId}/pin`, {
+        headers: getAuthHeaders()
+      });
+      return response.data || false;
+    } catch (error) {
+      console.warn('[MessageService] Erro ao verificar fixação:', error);
+      return false;
+    }
+  },
+
+  async toggleFavorite(messageId: string): Promise<boolean> {
+    try {
+      const response = await api.post(`/v1/chat/${messageId}/favorite`, null, {
+        headers: getAuthHeaders()
+      });
+      return response.data;
+    } catch (error) {
+      handleApiError(error, 'toggleFavorite');
+    }
+  },
+
+  async isFavorite(messageId: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/v1/chat/${messageId}/favorite`, {
+        headers: getAuthHeaders()
+      });
+      return response.data || false;
+    } catch (error) {
+      console.warn('[MessageService] Erro ao verificar favorito:', error);
+      return false;
+    }
+  },
+
+  async reportMessage(messageId: string, reason: string, description?: string): Promise<void> {
+    try {
+      await api.post(`/v1/chat/${messageId}/report`, null, {
+        headers: getAuthHeaders(),
+        params: { reason, description }
+      });
+    } catch (error) {
+      handleApiError(error, 'reportMessage');
+    }
+  },
+
+  async forwardMessage(
+    messageId: string,
+    recipientIds?: string[],
+    groupIds?: string[],
+    departmentIds?: string[]
+  ): Promise<void> {
+    try {
+      const params: any = {};
+      if (recipientIds && recipientIds.length > 0) {
+        params.recipientIds = recipientIds;
+      }
+      if (groupIds && groupIds.length > 0) {
+        params.groupIds = groupIds;
+      }
+      if (departmentIds && departmentIds.length > 0) {
+        params.departmentIds = departmentIds;
+      }
+
+      await api.post(`/v1/chat/${messageId}/forward`, null, {
+        headers: getAuthHeaders(),
+        params
+      });
+    } catch (error) {
+      handleApiError(error, 'forwardMessage');
     }
   }
 }; 

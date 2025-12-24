@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,12 @@ import java.util.Map;
 public class EmailTestController {
 
     private final EmailService emailService;
+    
+    @Value("${spring.mail.host:mail.z7design.com.br}")
+    private String mailHost;
+    
+    @Value("${spring.mail.port:587}")
+    private String mailPort;
 
     @RequestMapping(value = "/test", method = {RequestMethod.GET, RequestMethod.POST})
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
@@ -35,41 +42,72 @@ public class EmailTestController {
                 ));
             }
             
-            log.info("📧 Testando envio de email para: {}", toEmail);
+            String email = toEmail.trim();
+            log.info("📧 Testando envio de email para: {}", email);
+            log.info("📧 Configuração SMTP - Host: {}, Port: {}", mailHost, mailPort);
             
             boolean success = emailService.sendEmailWithAttachment(
-                toEmail.trim(),
-                "🧪 Teste de Email - Secured Guard CI",
+                email,
+                "🧪 Teste de Email - Secured Guard",
                 createTestEmailBody(),
                 null, // Sem anexo
                 null
             );
             
             if (success) {
-                log.info("✅ Email de teste enviado com sucesso para: {}", toEmail);
+                log.info("✅ Email de teste enviado com sucesso para: {}", email);
                 return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Email enviado com sucesso para " + toEmail,
+                    "message", "Email enviado com sucesso para " + email,
                     "from", "securedguard@z7design.com.br",
-                    "to", toEmail
+                    "to", email
                 ));
             } else {
-                log.error("❌ Falha ao enviar email de teste para: {}", toEmail);
+                log.error("❌ Falha ao enviar email de teste para: {}", email);
                 return ResponseEntity.status(500).body(Map.of(
                     "success", false,
-                    "message", "Falha ao enviar email. Verifique os logs do backend.",
-                    "to", toEmail,
-                    "error", "EMAIL_SEND_FAILED"
+                    "message", "Falha ao enviar email. Verifique os logs do backend para mais detalhes.",
+                    "to", email,
+                    "error", "EMAIL_SEND_FAILED",
+                    "hint", "Verifique se o servidor SMTP está acessível e as credenciais estão corretas"
                 ));
             }
             
-        } catch (Exception e) {
-            log.error("💥 Erro ao testar envio de email: {}", e.getMessage(), e);
+        } catch (org.springframework.mail.MailException e) {
+            log.error("💥 Erro de email ao testar envio: {}", e.getMessage(), e);
+            Throwable cause = e.getCause();
+            String errorMessage = e.getMessage();
+            String errorType = "MAIL_EXCEPTION";
+            
+            if (cause != null) {
+                if (cause instanceof jakarta.mail.AuthenticationFailedException) {
+                    errorType = "AUTHENTICATION_FAILED";
+                    errorMessage = "Falha na autenticação SMTP. Verifique usuário e senha.";
+                } else if (cause instanceof jakarta.mail.MessagingException) {
+                    errorType = "MESSAGING_EXCEPTION";
+                    if (cause.getMessage() != null && cause.getMessage().contains("Could not connect")) {
+                        errorMessage = "Não foi possível conectar ao servidor SMTP. Verifique host, porta e firewall.";
+                    } else if (cause.getMessage() != null && cause.getMessage().contains("timeout")) {
+                        errorMessage = "Timeout ao conectar ao servidor SMTP. Tente usar porta 587 com STARTTLS.";
+                    }
+                }
+            }
+            
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
-                "message", "Erro ao enviar email: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"),
+                "message", errorMessage,
                 "to", toEmail != null ? toEmail : "N/A",
-                "error", e.getClass().getSimpleName()
+                "error", errorType,
+                "details", cause != null ? cause.getMessage() : e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("💥 Erro inesperado ao testar envio de email: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Erro inesperado: " + (e.getMessage() != null ? e.getMessage() : "Erro desconhecido"),
+                "to", toEmail != null ? toEmail : "N/A",
+                "error", e.getClass().getSimpleName(),
+                "details", e.toString()
             ));
         }
     }

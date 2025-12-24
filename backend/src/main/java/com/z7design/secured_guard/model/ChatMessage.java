@@ -23,7 +23,7 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     
-    @NotBlank(message = "Conteúdo da mensagem é obrigatório")
+    // Conteúdo pode ser vazio quando há arquivo
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
     
@@ -60,6 +60,18 @@ public class ChatMessage {
     
     @Column(name = "reply_to_id")
     private UUID replyToId;
+    
+    @Column(name = "file_url")
+    private String fileUrl;
+    
+    @Column(name = "file_name")
+    private String fileName;
+    
+    @Column(name = "file_size")
+    private Long fileSize;
+    
+    @Column(name = "file_content_type")
+    private String fileContentType;
     
     @Column(name = "created_at", nullable = false)
     @NotNull(message = "Data de criação é obrigatória")

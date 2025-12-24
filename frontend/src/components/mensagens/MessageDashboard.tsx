@@ -25,7 +25,8 @@ import {
   Bell,
   Users,
   Filter,
-  SendHorizontal
+  SendHorizontal,
+  Reply
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import { useMessageStore, SystemMessage } from '../../stores/messageStore';
@@ -44,9 +45,10 @@ const MessageDashboard: React.FC = () => {
   const [selectedMessage, setSelectedMessage] = useState<SystemMessage | null>(null);
   const [messageToEdit, setMessageToEdit] = useState<SystemMessage | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<SystemMessage | null>(null);
+  const [messageToReply, setMessageToReply] = useState<SystemMessage | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reply'>('create');
 
   const { toast } = useToast();
 
@@ -229,7 +231,15 @@ const MessageDashboard: React.FC = () => {
 
   const handleNewMessage = () => {
     setMessageToEdit(null);
+    setMessageToReply(null);
     setModalMode('create');
+    setShowMessageForm(true);
+  };
+
+  const handleReplyClick = (message: SystemMessage) => {
+    setMessageToReply(message);
+    setMessageToEdit(null);
+    setModalMode('reply');
     setShowMessageForm(true);
   };
 
@@ -465,6 +475,7 @@ const MessageDashboard: React.FC = () => {
                 onDelete={handleDeleteClick}
                 onEdit={handleEditClick}
                 onView={handleView}
+                onReply={handleReplyClick}
                 loading={loading}
                 activeTab={activeTab}
               />
@@ -496,10 +507,14 @@ const MessageDashboard: React.FC = () => {
       {/* Modais */}
       <MessageFormModal
         isOpen={showMessageForm}
-        onClose={() => setShowMessageForm(false)}
+        onClose={() => {
+          setShowMessageForm(false);
+          setMessageToReply(null);
+        }}
         onSuccess={handleFormSuccess}
-        message={messageToEdit}
+        message={messageToEdit || messageToReply}
         mode={modalMode}
+        replyTo={messageToReply}
       />
 
       <ViewMessageModal
@@ -509,6 +524,7 @@ const MessageDashboard: React.FC = () => {
         onEdit={() => selectedMessage && handleEditClick(selectedMessage)}
         onDelete={() => selectedMessage && handleDeleteClick(selectedMessage)}
         onMarkAsRead={() => selectedMessage && handleMarkAsRead(selectedMessage.id)}
+        onReply={() => selectedMessage && handleReplyClick(selectedMessage)}
       />
 
       <DeleteMessageModal
@@ -528,6 +544,7 @@ interface MessageListProps {
   onDelete: (message: SystemMessage) => void;
   onEdit: (message: SystemMessage) => void;
   onView: (message: SystemMessage) => void;
+  onReply: (message: SystemMessage) => void;
   loading: boolean;
   activeTab: string;
 }
@@ -538,6 +555,7 @@ const MessageList: React.FC<MessageListProps> = ({
   onDelete,
   onEdit,
   onView,
+  onReply,
   loading,
   activeTab
 }) => {
@@ -671,6 +689,18 @@ const MessageList: React.FC<MessageListProps> = ({
                   <span className="hidden md:inline">Marcar</span>
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReply(message);
+                }}
+                className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+              >
+                <Reply className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Responder</span>
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
