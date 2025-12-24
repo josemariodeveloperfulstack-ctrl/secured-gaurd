@@ -26,25 +26,25 @@ BEGIN
                 CONSTRAINT fk_message_reactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT uk_message_reactions_user_emoji UNIQUE (message_id, user_id, emoji)
             );
+            
+            -- Criar índices para melhor performance
+            CREATE INDEX idx_message_reactions_message_id ON message_reactions(message_id);
+            CREATE INDEX idx_message_reactions_user_id ON message_reactions(user_id);
+            CREATE INDEX idx_message_reactions_emoji ON message_reactions(emoji);
+            
+            -- Comentários
+            COMMENT ON TABLE message_reactions IS 'Tabela para armazenar reações (emoji) de mensagens de chat';
+            COMMENT ON COLUMN message_reactions.id IS 'ID único da reação';
+            COMMENT ON COLUMN message_reactions.message_id IS 'ID da mensagem reagida';
+            COMMENT ON COLUMN message_reactions.user_id IS 'ID do usuário que reagiu';
+            COMMENT ON COLUMN message_reactions.emoji IS 'Emoji da reação';
+            COMMENT ON COLUMN message_reactions.created_at IS 'Data e hora da reação';
+        ELSE
+            -- Se a tabela já existe, apenas criar índices que ainda não existem
+            CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON message_reactions(message_id);
+            CREATE INDEX IF NOT EXISTS idx_message_reactions_user_id ON message_reactions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_message_reactions_emoji ON message_reactions(emoji);
         END IF;
-    END IF;
-END $$;
-
--- Criar índices para melhor performance
-CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON message_reactions(message_id);
-CREATE INDEX IF NOT EXISTS idx_message_reactions_user_id ON message_reactions(user_id);
-CREATE INDEX IF NOT EXISTS idx_message_reactions_emoji ON message_reactions(emoji);
-
--- Comentários
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'message_reactions') THEN
-        COMMENT ON TABLE message_reactions IS 'Tabela para armazenar reações (emoji) de mensagens de chat';
-        COMMENT ON COLUMN message_reactions.id IS 'ID único da reação';
-        COMMENT ON COLUMN message_reactions.message_id IS 'ID da mensagem reagida';
-        COMMENT ON COLUMN message_reactions.user_id IS 'ID do usuário que reagiu';
-        COMMENT ON COLUMN message_reactions.emoji IS 'Emoji da reação';
-        COMMENT ON COLUMN message_reactions.created_at IS 'Data e hora da reação';
     END IF;
 END $$;
 

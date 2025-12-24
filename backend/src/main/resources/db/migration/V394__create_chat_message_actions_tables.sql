@@ -23,6 +23,13 @@ BEGIN
                 CONSTRAINT fk_pin_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT uk_pin_message_user UNIQUE (message_id, user_id)
             );
+            -- Criar índices
+            CREATE INDEX idx_pin_message ON chat_message_pins(message_id);
+            CREATE INDEX idx_pin_user ON chat_message_pins(user_id);
+        ELSE
+            -- Se a tabela já existe, apenas criar índices que ainda não existem
+            CREATE INDEX IF NOT EXISTS idx_pin_message ON chat_message_pins(message_id);
+            CREATE INDEX IF NOT EXISTS idx_pin_user ON chat_message_pins(user_id);
         END IF;
 
         -- Tabela para mensagens favoritas
@@ -36,6 +43,13 @@ BEGIN
                 CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT uk_favorite_message_user UNIQUE (message_id, user_id)
             );
+            -- Criar índices
+            CREATE INDEX idx_favorite_message ON chat_message_favorites(message_id);
+            CREATE INDEX idx_favorite_user ON chat_message_favorites(user_id);
+        ELSE
+            -- Se a tabela já existe, apenas criar índices que ainda não existem
+            CREATE INDEX IF NOT EXISTS idx_favorite_message ON chat_message_favorites(message_id);
+            CREATE INDEX IF NOT EXISTS idx_favorite_user ON chat_message_favorites(user_id);
         END IF;
 
         -- Tabela para denúncias de mensagens
@@ -54,18 +68,16 @@ BEGIN
                 CONSTRAINT fk_report_reporter FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT fk_report_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
             );
+            -- Criar índices
+            CREATE INDEX idx_report_message ON chat_message_reports(message_id);
+            CREATE INDEX idx_report_reporter ON chat_message_reports(reporter_id);
+            CREATE INDEX idx_report_status ON chat_message_reports(status);
+        ELSE
+            -- Se a tabela já existe, apenas criar índices que ainda não existem
+            CREATE INDEX IF NOT EXISTS idx_report_message ON chat_message_reports(message_id);
+            CREATE INDEX IF NOT EXISTS idx_report_reporter ON chat_message_reports(reporter_id);
+            CREATE INDEX IF NOT EXISTS idx_report_status ON chat_message_reports(status);
         END IF;
     END IF;
 END $$;
-
--- Criar índices para melhor performance
-CREATE INDEX IF NOT EXISTS idx_pin_message ON chat_message_pins(message_id);
-CREATE INDEX IF NOT EXISTS idx_pin_user ON chat_message_pins(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_favorite_message ON chat_message_favorites(message_id);
-CREATE INDEX IF NOT EXISTS idx_favorite_user ON chat_message_favorites(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_report_message ON chat_message_reports(message_id);
-CREATE INDEX IF NOT EXISTS idx_report_reporter ON chat_message_reports(reporter_id);
-CREATE INDEX IF NOT EXISTS idx_report_status ON chat_message_reports(status);
 
