@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollPreservation } from '@/hooks/useScrollPreservation';
@@ -193,7 +193,8 @@ const estoqueMenuItems = [
 const comunicacaoInternaMenuItems = [
   // Chat e Mensagens Básicas
   { icon: MessageCircle, text: 'Chat Interno', to: '/chat-interno', id: 'chat-interno' },
-  { icon: Send, text: 'Enviar Mensagens', to: '/gestao-mensagens/enviar', id: 'gestao-mensagens-enviar' },
+  // Para usuários comuns, vamos usar /mensagens (caixa de entrada / envio básico)
+  { icon: Send, text: 'Enviar Mensagens', to: '/mensagens', id: 'mensagens' },
   { icon: Users, text: 'Grupos de Mensagens', to: '/gestao-mensagens/grupos', id: 'gestao-mensagens-grupos' },
   { icon: Bell, text: 'Notificações', to: '/gestao-mensagens/notificacoes', id: 'gestao-mensagens-notificacoes' },
 ];
@@ -252,6 +253,87 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
   ]),
+  // RH e Departamento Pessoal NÃO veem módulo Operacional
+  RH: new Set([
+    'dashboard',
+    'holerites',
+    'filiais',
+    'configuracoes',
+    'rh',
+    'rh-funcionarios',
+    'rh-postos',
+    'rh-vagas',
+    'rh-beneficios',
+    'rh-treinamentos',
+    'rh-relatorios',
+    'rh-sst',
+    'rh-sst-exames',
+    'rh-sst-epis',
+    'rh-sst-acidentes',
+    'rh-sst-treinamentos',
+    'rh-sst-cipa',
+    'rh-sst-relatorios',
+    'dp-funcionarios',
+    'dp-funcionarios-importar-bancarios',
+    'dp-admissao-demissao',
+    'dp-remanejamentos',
+    'dp-ferias',
+    'dp-ponto-eletronico',
+    'rh-fechamento-horas',
+    'dp-ocorrencias',
+    'dp-beneficios',
+    'dp-funcoes',
+    'dp-cargos',
+    'dp-postos',
+    'dp-epis',
+    'dp-documentos',
+    'dp-ordens-servico',
+    'dp-vagas',
+    'chat-interno',
+    'mensagens',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+  ]),
+  DEPARTAMENTO_PESSOAL: new Set([
+    'dashboard',
+    'holerites',
+    'filiais',
+    'configuracoes',
+    'rh',
+    'rh-funcionarios',
+    'rh-postos',
+    'rh-vagas',
+    'rh-beneficios',
+    'rh-treinamentos',
+    'rh-relatorios',
+    'rh-sst',
+    'rh-sst-exames',
+    'rh-sst-epis',
+    'rh-sst-acidentes',
+    'rh-sst-treinamentos',
+    'rh-sst-cipa',
+    'rh-sst-relatorios',
+    'dp-funcionarios',
+    'dp-funcionarios-importar-bancarios',
+    'dp-admissao-demissao',
+    'dp-remanejamentos',
+    'dp-ferias',
+    'dp-ponto-eletronico',
+    'rh-fechamento-horas',
+    'dp-ocorrencias',
+    'dp-beneficios',
+    'dp-funcoes',
+    'dp-cargos',
+    'dp-postos',
+    'dp-epis',
+    'dp-documentos',
+    'dp-ordens-servico',
+    'dp-vagas',
+    'chat-interno',
+    'mensagens',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+  ]),
 };
 
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
@@ -269,6 +351,10 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     [user?.role]
   );
   const allowedItemIds = useMemo(() => ROLE_ALLOWED_ITEM_IDS[normalizedRole], [normalizedRole]);
+
+  // Referências para controlar o scroll da própria sidebar
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const activeItemRef = useRef<HTMLAnchorElement | null>(null);
 
   const filterItemsForRole = useCallback(<T extends { id: string }>(items: T[]): T[] => {
     if (!allowedItemIds) {
@@ -330,9 +416,31 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   const filteredComercialItems = useMemo(() => filterItemsForRole(comercialMenuItems), [filterItemsForRole]);
   const filteredEstoqueItems = useMemo(() => filterItemsForRole(estoqueMenuItems), [filterItemsForRole]);
   const filteredComprasItems = useMemo(() => filterItemsForRole(comprasMenuItems), [filterItemsForRole]);
-  const filteredComunicacaoInternaItems = useMemo(() => filterItemsForRole(comunicacaoInternaMenuItems), [filterItemsForRole]);
+  const filteredComunicacaoInternaItems = useMemo(
+    () => filterItemsForRole(comunicacaoInternaMenuItems).filter(item => {
+      // Regras por permissão para cada item de comunicação interna
+      if (item.id === 'mensagens' || item.id === 'chat-interno') {
+        return hasPermission('MESSAGES_READ');
+      }
+      if (item.id === 'gestao-mensagens-grupos' || item.id === 'gestao-mensagens-notificacoes') {
+        return hasPermission('MESSAGES_MANAGE');
+      }
+      return true;
+    }),
+    [filterItemsForRole, hasPermission]
+  );
   const filteredAtendimentoItems = useMemo(() => filterItemsForRole(atendimentoMenuItems), [filterItemsForRole]);
   const filteredSistemaItems = useMemo(() => filterItemsForRole(sistemaMenuItems), [filterItemsForRole]);
+
+  // Sempre que a rota mudar, garantir que o item ativo fique visível na sidebar
+  useEffect(() => {
+    if (activeItemRef.current && scrollContainerRef.current) {
+      activeItemRef.current.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+    }
+  }, [location.pathname, location.search]);
 
   const getActiveId = () => {
     const path = location.pathname;
@@ -433,7 +541,10 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         </div>
 
         {/* Conteúdo da navegação */}
-        <div className="flex-1 overflow-y-auto py-4">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto py-4"
+        >
           {/* Menu Principal */}
           <div className="mb-6">
             {!collapsed && (
@@ -447,6 +558,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                  ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -481,6 +593,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -516,6 +629,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -551,6 +665,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -586,6 +701,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -621,6 +737,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -643,7 +760,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Comercial */}
-          {filteredComercialItems.length > 0 && (
+          {shouldShowModule('LEADS_READ') && filteredComercialItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -656,6 +773,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -678,7 +796,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Estoque Simplificado */}
-          {filteredEstoqueItems.length > 0 && (
+          {shouldShowModule('STOCK_READ') && filteredEstoqueItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -691,6 +809,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -713,7 +832,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Grupo Compras */}
-          {filteredComprasItems.length > 0 && (
+          {shouldShowModule('STOCK_MANAGE') && filteredComprasItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -726,6 +845,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -796,6 +916,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -831,6 +952,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 
@@ -866,6 +988,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     key={item.id}
                     to={item.to}
                     preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id) 

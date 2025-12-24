@@ -88,7 +88,7 @@ public class EmployeeCertificationController {
 
     @Operation(summary = "Cria certificação")
     @PostMapping
-    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<EmployeeCertificationResponse> create(@Valid @RequestBody CreateEmployeeCertificationRequest request) {
         EmployeeCertification created = certificationService.create(request);
         EmployeeCertification loaded = certificationService.findById(created.getId());
@@ -97,7 +97,7 @@ public class EmployeeCertificationController {
 
     @Operation(summary = "Atualiza certificação")
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<EmployeeCertificationResponse> update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeCertificationRequest request) {
         EmployeeCertification updated = certificationService.update(id, request);
         EmployeeCertification loaded = certificationService.findById(updated.getId());
@@ -106,7 +106,7 @@ public class EmployeeCertificationController {
 
     @Operation(summary = "Renova certificação")
     @PutMapping("/{id}/renew")
-    @PreAuthorize("hasAuthority('HR_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<EmployeeCertificationResponse> renew(@PathVariable UUID id,
             @RequestParam("expirationDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate newExpirationDate) {
         EmployeeCertification renewed = certificationService.renew(id, newExpirationDate);
@@ -116,7 +116,7 @@ public class EmployeeCertificationController {
 
     @Operation(summary = "Cancela certificação")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('HR_DELETE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_DELETE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<Void> cancel(@PathVariable UUID id) {
         certificationService.cancel(id);
         return ResponseEntity.noContent().build();

@@ -29,14 +29,14 @@ public class CreateTicketRequest {
     @NotNull(message = "Categoria é obrigatória")
     private TicketCategory category;
     
-    @NotBlank(message = "Nome do cliente é obrigatório")
-    private String customerName;
+    private String customerName; // Opcional se customerUserId for fornecido
     
-    @NotBlank(message = "Email do cliente é obrigatório")
     @Email(message = "Email inválido")
-    private String customerEmail;
+    private String customerEmail; // Opcional se customerUserId for fornecido
     
     private String customerPhone;
+    
+    private UUID customerUserId; // ID do usuário/funcionário (opcional)
     
     private UUID assignedToAgentId;
     

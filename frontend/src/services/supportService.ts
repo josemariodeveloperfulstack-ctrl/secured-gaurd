@@ -130,7 +130,7 @@ export const supportService = {
    * Listar todos os agentes
    */
   async getAllAgents(): Promise<Agent[]> {
-    const response = await api.get('/support/agents');
+    const response = await api.get('/v1/support/agents');
     return response.data;
   },
 
@@ -138,7 +138,7 @@ export const supportService = {
    * Listar agentes ativos
    */
   async getActiveAgents(): Promise<Agent[]> {
-    const response = await api.get('/support/agents/active');
+    const response = await api.get('/v1/support/agents/active');
     return response.data;
   },
 
@@ -146,7 +146,7 @@ export const supportService = {
    * Buscar agente por ID
    */
   async getAgentById(id: string): Promise<Agent> {
-    const response = await api.get(`/support/agents/${id}`);
+    const response = await api.get(`/v1/support/agents/${id}`);
     return response.data;
   },
 
@@ -154,7 +154,7 @@ export const supportService = {
    * Buscar agente por ID do usuário
    */
   async getAgentByUserId(userId: string): Promise<Agent> {
-    const response = await api.get(`/support/agents/user/${userId}`);
+    const response = await api.get(`/v1/support/agents/user/${userId}`);
     return response.data;
   },
 
@@ -162,7 +162,7 @@ export const supportService = {
    * Buscar agentes por status
    */
   async getAgentsByStatus(status: AgentStatus): Promise<Agent[]> {
-    const response = await api.get(`/support/agents/status/${status}`);
+    const response = await api.get(`/v1/support/agents/status/${status}`);
     return response.data;
   },
 
@@ -170,7 +170,7 @@ export const supportService = {
    * Buscar agente disponível
    */
   async getAvailableAgent(): Promise<Agent> {
-    const response = await api.get('/support/agents/available');
+    const response = await api.get('/v1/support/agents/available');
     return response.data;
   },
 
@@ -178,7 +178,7 @@ export const supportService = {
    * Criar novo agente
    */
   async createAgent(request: CreateAgentRequest): Promise<Agent> {
-    const response = await api.post('/support/agents', request);
+    const response = await api.post('/v1/support/agents', request);
     return response.data;
   },
 
@@ -186,7 +186,7 @@ export const supportService = {
    * Atualizar status do agente
    */
   async updateAgentStatus(id: string, status: AgentStatus): Promise<Agent> {
-    const response = await api.put(`/support/agents/${id}/status`, null, {
+    const response = await api.put(`/v1/support/agents/${id}/status`, null, {
       params: { status }
     });
     return response.data;
@@ -196,7 +196,7 @@ export const supportService = {
    * Atualizar departamento do agente
    */
   async updateAgentDepartment(id: string, department: string): Promise<Agent> {
-    const response = await api.put(`/support/agents/${id}/department`, null, {
+    const response = await api.put(`/v1/support/agents/${id}/department`, null, {
       params: { department }
     });
     return response.data;
@@ -206,7 +206,7 @@ export const supportService = {
    * Ativar/desativar agente
    */
   async toggleAgentActive(id: string): Promise<Agent> {
-    const response = await api.put(`/support/agents/${id}/toggle-active`);
+    const response = await api.put(`/v1/support/agents/${id}/toggle-active`);
     return response.data;
   },
 
@@ -214,7 +214,7 @@ export const supportService = {
    * Deletar agente
    */
   async deleteAgent(id: string): Promise<void> {
-    await api.delete(`/support/agents/${id}`);
+    await api.delete(`/v1/support/agents/${id}`);
   },
 
   // ===== TICKETS =====
@@ -228,7 +228,7 @@ export const supportService = {
     sortBy = 'createdAt',
     direction: 'ASC' | 'DESC' = 'DESC'
   ): Promise<PaginatedResponse<Ticket>> {
-    const response = await api.get('/support/tickets', {
+    const response = await api.get('/v1/support/tickets', {
       params: { page, size, sortBy, direction }
     });
     return response.data;
@@ -238,7 +238,7 @@ export const supportService = {
    * Buscar ticket por ID
    */
   async getTicketById(id: string): Promise<Ticket> {
-    const response = await api.get(`/support/tickets/${id}`);
+    const response = await api.get(`/v1/support/tickets/${id}`);
     return response.data;
   },
 
@@ -250,7 +250,7 @@ export const supportService = {
     page = 0,
     size = 10
   ): Promise<PaginatedResponse<Ticket>> {
-    const response = await api.get(`/support/tickets/status/${status}`, {
+    const response = await api.get(`/v1/support/tickets/status/${status}`, {
       params: { page, size }
     });
     return response.data;
@@ -264,7 +264,7 @@ export const supportService = {
     page = 0,
     size = 10
   ): Promise<PaginatedResponse<Ticket>> {
-    const response = await api.get(`/support/tickets/agent/${agentId}`, {
+    const response = await api.get(`/v1/support/tickets/agent/${agentId}`, {
       params: { page, size }
     });
     return response.data;
@@ -283,7 +283,7 @@ export const supportService = {
     page = 0,
     size = 10
   ): Promise<PaginatedResponse<Ticket>> {
-    const response = await api.get('/support/tickets/filter', {
+    const response = await api.get('/v1/support/tickets/filter', {
       params: { ...filters, page, size }
     });
     return response.data;
@@ -297,7 +297,7 @@ export const supportService = {
     page = 0,
     size = 10
   ): Promise<PaginatedResponse<Ticket>> {
-    const response = await api.get('/support/tickets/search', {
+    const response = await api.get('/v1/support/tickets/search', {
       params: { q: searchTerm, page, size }
     });
     return response.data;
@@ -307,7 +307,7 @@ export const supportService = {
    * Criar novo ticket
    */
   async createTicket(request: CreateTicketRequest): Promise<Ticket> {
-    const response = await api.post('/support/tickets', request);
+    const response = await api.post('/v1/support/tickets', request);
     return response.data;
   },
 
@@ -315,7 +315,7 @@ export const supportService = {
    * Atualizar ticket
    */
   async updateTicket(id: string, request: UpdateTicketRequest): Promise<Ticket> {
-    const response = await api.put(`/support/tickets/${id}`, request);
+    const response = await api.put(`/v1/support/tickets/${id}`, request);
     return response.data;
   },
 
@@ -323,7 +323,7 @@ export const supportService = {
    * Atribuir ticket a um agente
    */
   async assignTicketToAgent(ticketId: string, agentId: string): Promise<Ticket> {
-    const response = await api.put(`/support/tickets/${ticketId}/assign/${agentId}`);
+    const response = await api.put(`/v1/support/tickets/${ticketId}/assign/${agentId}`);
     return response.data;
   },
 
@@ -334,7 +334,7 @@ export const supportService = {
     ticketId: string,
     request: AddTicketMessageRequest
   ): Promise<TicketMessage> {
-    const response = await api.post(`/support/tickets/${ticketId}/messages`, request);
+    const response = await api.post(`/v1/support/tickets/${ticketId}/messages`, request);
     return response.data;
   },
 
@@ -342,7 +342,7 @@ export const supportService = {
    * Buscar mensagens de um ticket
    */
   async getTicketMessages(ticketId: string): Promise<TicketMessage[]> {
-    const response = await api.get(`/support/tickets/${ticketId}/messages`);
+    const response = await api.get(`/v1/support/tickets/${ticketId}/messages`);
     return response.data;
   },
 
@@ -350,14 +350,14 @@ export const supportService = {
    * Deletar ticket
    */
   async deleteTicket(id: string): Promise<void> {
-    await api.delete(`/support/tickets/${id}`);
+    await api.delete(`/v1/support/tickets/${id}`);
   },
 
   /**
    * Obter métricas de atendimento
    */
   async getTicketMetrics(): Promise<TicketMetrics> {
-    const response = await api.get('/support/tickets/metrics');
+    const response = await api.get('/v1/support/tickets/metrics');
     return response.data;
   },
 

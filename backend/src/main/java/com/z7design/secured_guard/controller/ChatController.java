@@ -19,6 +19,7 @@ import com.z7design.secured_guard.model.User;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,9 @@ public class ChatController {
     
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     
     /**
      * Envia mensagem de chat
@@ -231,12 +235,24 @@ public class ChatController {
             notificationService.sendChatTypingNotification(typingEvent.getRecipientId(), typingEvent);
         }
         if (typingEvent.getGroupId() != null) {
-            // Enviar para todos do grupo (exemplo simplificado)
-            // notificationService.sendChatTypingNotificationToGroup(typingEvent.getGroupId(), typingEvent);
+            // Enviar para todos do grupo via tópico
+            try {
+                String destination = "/topic/chat/group/" + typingEvent.getGroupId() + "/typing";
+                messagingTemplate.convertAndSend(destination, typingEvent);
+                log.info("Evento de digitação publicado para grupo: {} (destino: {})", typingEvent.getGroupId(), destination);
+            } catch (Exception e) {
+                log.error("Erro ao publicar evento de digitação para grupo: {}", e.getMessage(), e);
+            }
         }
         if (typingEvent.getDepartmentId() != null) {
-            // Enviar para todos do departamento (exemplo simplificado)
-            // notificationService.sendChatTypingNotificationToDepartment(typingEvent.getDepartmentId(), typingEvent);
+            // Enviar para todos do departamento via tópico
+            try {
+                String destination = "/topic/chat/department/" + typingEvent.getDepartmentId() + "/typing";
+                messagingTemplate.convertAndSend(destination, typingEvent);
+                log.info("Evento de digitação publicado para departamento: {} (destino: {})", typingEvent.getDepartmentId(), destination);
+            } catch (Exception e) {
+                log.error("Erro ao publicar evento de digitação para departamento: {}", e.getMessage(), e);
+            }
         }
     }
     

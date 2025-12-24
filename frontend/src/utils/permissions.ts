@@ -316,6 +316,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         // Permissões de Equipamentos/Frota
         EQUIPMENTS_READ: true,
         EQUIPMENTS_WRITE: true,
+
+        // Permissões de Atendimento (Supervisão acompanha atendimentos)
+        ATTENDANCE_READ: true,
       };
 
     case 'RH':
@@ -331,15 +334,6 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         PAYSLIPS_PUBLISH: true,
         REPORTS_READ: true,
         REPORTS_GENERATE: true,
-        LEADS_READ: true,
-        LEADS_WRITE: true,
-        LEADS_CREATE: true,
-        PROPOSALS_READ: true,
-        PROPOSALS_WRITE: true,
-        PROPOSALS_CREATE: true,
-        QUOTES_READ: true,
-        QUOTES_WRITE: true,
-        QUOTES_CREATE: true,
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
@@ -362,6 +356,10 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         
         // Permissões de Suporte
         SUPPORT_READ: true,
+
+        // Permissões de Atendimento
+        ATTENDANCE_READ: true,
+        ATTENDANCE_MANAGE: true,
       };
 
     case 'FINANCEIRO':
@@ -396,6 +394,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         
         // Permissões de Suporte
         SUPPORT_READ: true,
+
+        // Permissões de Atendimento
+        ATTENDANCE_READ: true,
       };
 
     case 'TI_SUPORTE':
@@ -500,6 +501,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         
         // Permissões de Suporte
         SUPPORT_READ: true,
+
+        // Permissões de Atendimento
+        ATTENDANCE_READ: true,
       };
 
     case 'ASSISTENCIA_RH':
@@ -850,6 +854,35 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     'ATTENDANCE_WRITE': 'ATTENDANCE_WRITE',
     'ATTENDANCE_MANAGE': 'ATTENDANCE_MANAGE',
     'ALL_PERMISSIONS': 'ALL_PERMISSIONS',
+
+    // ---- Mapeamento de permissões legadas de grupos (VIEW_*/MANAGE_*/EDIT_*) para o modelo novo ----
+    // Pagamentos / holerites / comprovantes
+    'VIEW_PAYSLIP': 'PAYSLIPS_READ',
+    'DOWNLOAD_PAYSLIP': 'PAYSLIPS_READ',
+    // Perfil do usuário
+    'EDIT_PROFILE': 'PROFILE_WRITE',
+    // Funcionários
+    'VIEW_EMPLOYEES': 'EMPLOYEES_READ',
+    'MANAGE_EMPLOYEES': 'EMPLOYEES_WRITE',
+    // Relatórios
+    'VIEW_REPORTS': 'REPORTS_READ',
+    // Sistema / administração
+    'MANAGE_SYSTEM': 'SYSTEM_CONFIG',
+    // Clientes
+    'VIEW_CLIENTS': 'CLIENTS_READ',
+    'MANAGE_CLIENTS': 'CLIENTS_WRITE',
+    // Contratos
+    'VIEW_CONTRACTS': 'CONTRACTS_READ',
+    'MANAGE_CONTRACTS': 'CONTRACTS_WRITE',
+    // Financeiro
+    'VIEW_FINANCIAL': 'FINANCIAL_READ',
+    'MANAGE_FINANCIAL': 'FINANCIAL_WRITE',
+    // Frota / equipamentos
+    'VIEW_FLEET': 'EQUIPMENTS_READ',
+    'MANAGE_FLEET': 'EQUIPMENTS_WRITE',
+    // Documentos (usa permissões de holerites/documentos)
+    'VIEW_DOCUMENTS': 'PAYSLIPS_READ',
+    'MANAGE_DOCUMENTS': 'PAYSLIPS_WRITE',
   };
 
   // Aplicar permissões de todos os grupos

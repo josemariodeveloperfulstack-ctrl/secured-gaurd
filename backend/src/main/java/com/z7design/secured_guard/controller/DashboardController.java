@@ -107,7 +107,7 @@ public class DashboardController {
         summary = "Obter alertas do sistema", 
         description = "Retorna alertas e notificações importantes do sistema"
     )
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','DEPARTAMENTO_PESSOAL','FINANCEIRO','OPERACIONAL','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_DEPARTAMENTO_PESSOAL','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR')")
     public ResponseEntity<Object> getAlerts() {
         try {
             log.info("Solicitando alertas do dashboard");
@@ -137,7 +137,7 @@ public class DashboardController {
         summary = "Obter atividades recentes", 
         description = "Retorna atividades recentes do sistema"
     )
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','DEPARTAMENTO_PESSOAL','FINANCEIRO','OPERACIONAL','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_DEPARTAMENTO_PESSOAL','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR')")
     public ResponseEntity<Object> getActivities() {
         try {
             log.info("Solicitando atividades recentes do dashboard");

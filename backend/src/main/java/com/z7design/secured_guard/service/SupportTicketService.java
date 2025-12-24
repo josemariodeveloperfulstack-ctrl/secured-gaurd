@@ -24,10 +24,12 @@ import com.z7design.secured_guard.model.TicketMessage;
 import com.z7design.secured_guard.model.enums.TicketCategory;
 import com.z7design.secured_guard.model.enums.TicketPriority;
 import com.z7design.secured_guard.model.enums.TicketStatus;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.SupportAgentRepository;
 import com.z7design.secured_guard.repository.SupportTicketRepository;
 import com.z7design.secured_guard.repository.TicketMessageRepository;
+import com.z7design.secured_guard.repository.UserRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -51,6 +53,9 @@ public class SupportTicketService {
     @Autowired
     private SupportAgentService agentService;
     
+    @Autowired
+    private UserRepository userRepository;
+    
     /**
      * Criar novo ticket
      */
@@ -63,9 +68,26 @@ public class SupportTicketService {
         ticket.setPriority(request.getPriority());
         ticket.setCategory(request.getCategory());
         ticket.setStatus(TicketStatus.OPEN);
-        ticket.setCustomerName(request.getCustomerName());
-        ticket.setCustomerEmail(request.getCustomerEmail());
-        ticket.setCustomerPhone(request.getCustomerPhone());
+        
+        // Se customerUserId for fornecido, buscar dados do usuário
+        if (request.getCustomerUserId() != null) {
+            User customer = userRepository.findById(request.getCustomerUserId())
+                .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+            ticket.setCustomerName(customer.getName());
+            ticket.setCustomerEmail(customer.getEmail());
+            ticket.setCustomerPhone(customer.getPhone() != null ? customer.getPhone() : request.getCustomerPhone());
+        } else {
+            // Se não fornecido, usar dados fornecidos diretamente
+            if (request.getCustomerName() == null || request.getCustomerName().trim().isEmpty()) {
+                throw new BusinessException("Nome do cliente é obrigatório quando não é fornecido customerUserId");
+            }
+            if (request.getCustomerEmail() == null || request.getCustomerEmail().trim().isEmpty()) {
+                throw new BusinessException("Email do cliente é obrigatório quando não é fornecido customerUserId");
+            }
+            ticket.setCustomerName(request.getCustomerName());
+            ticket.setCustomerEmail(request.getCustomerEmail());
+            ticket.setCustomerPhone(request.getCustomerPhone());
+        }
         
         // Atribuir empresa, se fornecida
         if (request.getCompanyId() != null) {
@@ -90,8 +112,8 @@ public class SupportTicketService {
         TicketMessage initialMessage = new TicketMessage();
         initialMessage.setTicket(ticket);
         initialMessage.setContent(request.getDescription());
-        initialMessage.setSenderName(request.getCustomerName());
-        initialMessage.setSenderEmail(request.getCustomerEmail());
+        initialMessage.setSenderName(ticket.getCustomerName());
+        initialMessage.setSenderEmail(ticket.getCustomerEmail());
         initialMessage.setIsSupport(false);
         messageRepository.save(initialMessage);
         
@@ -105,8 +127,13 @@ public class SupportTicketService {
      */
     public Page<SupportTicketDTO> getAllTickets(Pageable pageable) {
         log.info("Buscando todos os tickets");
-        return ticketRepository.findAll(pageable)
-            .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
+        try {
+            return ticketRepository.findAll(pageable)
+                .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
+        } catch (Exception e) {
+            log.error("Erro ao buscar todos os tickets: {}", e.getMessage(), e);
+            throw new BusinessException("Erro ao buscar tickets: " + e.getMessage());
+        }
     }
     
     /**
@@ -307,24 +334,49 @@ public class SupportTicketService {
     public TicketMetrics getTicketMetrics() {
         log.info("Calculando métricas de atendimento");
         
-        Long totalTickets = ticketRepository.count();
-        Long openTickets = ticketRepository.countByStatus(TicketStatus.OPEN);
-        Long inProgressTickets = ticketRepository.countByStatus(TicketStatus.IN_PROGRESS);
-        Long resolvedTickets = ticketRepository.countByStatus(TicketStatus.RESOLVED);
-        Long closedTickets = ticketRepository.countByStatus(TicketStatus.CLOSED);
-        
-        Double averageResolutionTime = ticketRepository.getAverageResolutionTime();
-        Double resolutionRate = ticketRepository.getResolutionRate(LocalDateTime.now().minusDays(30));
-        
-        return new TicketMetrics(
-            totalTickets,
-            openTickets,
-            inProgressTickets,
-            resolvedTickets,
-            closedTickets,
-            averageResolutionTime != null ? averageResolutionTime : 0.0,
-            resolutionRate != null ? resolutionRate : 0.0
-        );
+        try {
+            Long totalTickets = ticketRepository.count();
+            Long openTickets = ticketRepository.countByStatus(TicketStatus.OPEN);
+            Long inProgressTickets = ticketRepository.countByStatus(TicketStatus.IN_PROGRESS);
+            Long resolvedTickets = ticketRepository.countByStatus(TicketStatus.RESOLVED);
+            Long closedTickets = ticketRepository.countByStatus(TicketStatus.CLOSED);
+            
+            // Tratar possíveis valores null
+            totalTickets = totalTickets != null ? totalTickets : 0L;
+            openTickets = openTickets != null ? openTickets : 0L;
+            inProgressTickets = inProgressTickets != null ? inProgressTickets : 0L;
+            resolvedTickets = resolvedTickets != null ? resolvedTickets : 0L;
+            closedTickets = closedTickets != null ? closedTickets : 0L;
+            
+            Double averageResolutionTime = null;
+            Double resolutionRate = null;
+            
+            try {
+                averageResolutionTime = ticketRepository.getAverageResolutionTime();
+            } catch (Exception e) {
+                log.warn("Erro ao calcular tempo médio de resolução: {}", e.getMessage());
+            }
+            
+            try {
+                resolutionRate = ticketRepository.getResolutionRate(LocalDateTime.now().minusDays(30));
+            } catch (Exception e) {
+                log.warn("Erro ao calcular taxa de resolução: {}", e.getMessage());
+            }
+            
+            return new TicketMetrics(
+                totalTickets,
+                openTickets,
+                inProgressTickets,
+                resolvedTickets,
+                closedTickets,
+                averageResolutionTime != null ? averageResolutionTime : 0.0,
+                resolutionRate != null ? resolutionRate : 0.0
+            );
+        } catch (Exception e) {
+            log.error("Erro ao calcular métricas de atendimento: {}", e.getMessage(), e);
+            // Retornar métricas zeradas em caso de erro
+            return new TicketMetrics(0L, 0L, 0L, 0L, 0L, 0.0, 0.0);
+        }
     }
     
     /**

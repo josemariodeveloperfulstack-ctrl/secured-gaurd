@@ -211,46 +211,41 @@ export const messageService = {
 
   async getAvailableUsers(): Promise<User[]> {
     try {
-      // Primeiro tenta a API principal de usuários
-      const response = await api.get('/users', {
+      // Tenta a API principal de usuários
+      const response = await api.get('/api/users', {
         headers: getAuthHeaders()
       });
 
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log('[MessageService] Resposta da API /api/users:', response.data);
 
-      return response.data
-        .filter((u: { active: boolean; username: string }) => u.active && u.username !== currentUser?.username)
-        .map((u: { id: string; name?: string; username: string; email: string }) => ({
-          id: u.id,
-          name: u.name || u.username,
-          email: u.email,
-          username: u.username,
-          isOnline: false // TODO: implementar status online
-        }));
-    } catch (error) {
-      console.warn('[MessageService] API principal falhou, tentando fallback...');
-
-      try {
-        // Fallback para API de teste
-        const response = await api.get('/test/users', {
-          headers: getAuthHeaders()
-        });
-
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-
-        return response.data
-          .filter((u: { active: boolean; username: string }) => u.active && u.username !== currentUser?.username)
-          .map((u: { username: string; email: string }) => ({
-            id: u.username, // Usar username como ID temporariamente
-            name: u.username,
-            email: u.email,
-            username: u.username,
-            isOnline: false
-          }));
-      } catch (fallbackError) {
-        console.error('[MessageService] Ambas APIs falharam:', fallbackError);
+      // Garantir que response.data é um array
+      if (!Array.isArray(response.data)) {
+        console.warn('[MessageService] Resposta não é um array:', response.data);
         return [];
       }
+
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+      const users = response.data
+        .filter((u: { active?: boolean; username: string }) => {
+          // Incluir usuários ativos ou sem campo active (assumir ativo)
+          const isActive = u.active !== false;
+          const isNotCurrentUser = u.username !== currentUser?.username;
+          return isActive && isNotCurrentUser;
+        })
+        .map((u: { id: string; name?: string; username: string; email: string; isOnline?: boolean }) => ({
+          id: u.id,
+          name: u.name || u.username || 'Usuário sem nome',
+          email: u.email || '',
+          username: u.username || '',
+          isOnline: u.isOnline || false
+        }));
+
+      console.log('[MessageService] Usuários disponíveis processados:', users.length);
+      return users;
+    } catch (error) {
+      console.error('[MessageService] Erro ao buscar usuários disponíveis:', error);
+      return [];
     }
   },
 

@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,9 @@ public class ChatService {
     
     @Autowired
     private DepartmentRepository departmentRepository;
+    
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     
     /**
      * Envia mensagem de chat
@@ -80,8 +84,40 @@ public class ChatService {
         
         chatMessage = chatMessageRepository.save(chatMessage);
         
+        // Converter para DTO antes de enviar via WebSocket
+        ChatMessageResponseDTO messageDTO = convertToDTO(chatMessage);
+        
+        // Publicar mensagem via WebSocket
+        try {
+            if (chatMessage.getRecipient() != null) {
+                // Mensagem individual: enviar para o destinatário
+                String recipientUsername = chatMessage.getRecipient().getUsername();
+                String destination = "/user/" + recipientUsername + "/queue/messages";
+                messagingTemplate.convertAndSend(destination, messageDTO);
+                log.info("Mensagem publicada via WebSocket para usuário: {} (destino: {})", recipientUsername, destination);
+                
+                // Também enviar para o remetente para atualização em tempo real
+                String senderDestination = "/user/" + senderUsername + "/queue/messages";
+                messagingTemplate.convertAndSend(senderDestination, messageDTO);
+                log.info("Mensagem publicada via WebSocket para remetente: {} (destino: {})", senderUsername, senderDestination);
+            } else if (chatMessage.getGroup() != null) {
+                // Mensagem de grupo: enviar para todos os membros do grupo
+                String destination = "/topic/chat/group/" + chatMessage.getGroup().getId();
+                messagingTemplate.convertAndSend(destination, messageDTO);
+                log.info("Mensagem publicada via WebSocket para grupo: {} (destino: {})", chatMessage.getGroup().getId(), destination);
+            } else if (chatMessage.getDepartment() != null) {
+                // Mensagem de departamento: enviar para todos os membros do departamento
+                String destination = "/topic/chat/department/" + chatMessage.getDepartment().getId();
+                messagingTemplate.convertAndSend(destination, messageDTO);
+                log.info("Mensagem publicada via WebSocket para departamento: {} (destino: {})", chatMessage.getDepartment().getId(), destination);
+            }
+        } catch (Exception e) {
+            log.error("Erro ao publicar mensagem via WebSocket: {}", e.getMessage(), e);
+            // Não lançar exceção para não quebrar o fluxo, apenas logar o erro
+        }
+        
         log.info("Mensagem de chat enviada: {}", chatMessage.getId());
-        return convertToDTO(chatMessage);
+        return messageDTO;
     }
     
     /**

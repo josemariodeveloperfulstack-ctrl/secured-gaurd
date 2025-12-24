@@ -308,14 +308,14 @@ function App() {
 
                     {/* Módulo de Gestão de Atendimento com rotas aninhadas */}
                     <Route path="/gestao-atendimento" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredPermissions={['ATTENDANCE_READ']}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <GestaoAtendimento />
                         </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/gestao-atendimento/:page" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredPermissions={['ATTENDANCE_READ']}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <GestaoAtendimento />
                         </Suspense>

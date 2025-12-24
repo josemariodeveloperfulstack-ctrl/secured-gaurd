@@ -23,7 +23,7 @@ public class BankHoursController {
     private final BankHoursService bankHoursService;
 
     @GetMapping("/employee/{employeeId}")
-    @PreAuthorize("hasAnyAuthority('BANK_HOURS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('BANK_HOURS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<?> getBankHours(
             @PathVariable UUID employeeId,
             @RequestParam(required = false) UUID contractId) {
@@ -139,7 +139,7 @@ public class BankHoursController {
     }
 
     @GetMapping("/employee/{employeeId}/transactions")
-    @PreAuthorize("hasAnyAuthority('BANK_HOURS_TRANSACTION_READ', 'BANK_HOURS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('BANK_HOURS_TRANSACTION_READ', 'BANK_HOURS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<?> getTransactionHistory(@PathVariable UUID employeeId) {
         try {
             List<BankHoursTransaction> transactions = bankHoursService.getTransactionHistory(employeeId);
@@ -157,7 +157,7 @@ public class BankHoursController {
     }
 
     @GetMapping("/expiring")
-    @PreAuthorize("hasAnyAuthority('BANK_HOURS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('BANK_HOURS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<?> getExpiringBalances(@RequestParam(defaultValue = "30") int daysAhead) {
         try {
             List<BankHours> expiring = bankHoursService.findExpiringBalances(daysAhead);

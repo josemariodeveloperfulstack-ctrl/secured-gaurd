@@ -24,8 +24,15 @@ export interface UpdateUserRequest {
   username?: string;
   email?: string;
   whatsapp?: string;
+  password?: string;
   active?: boolean;
   roles?: string[]; // Backend DTO espera List<String>
+  avatar?: string;
+  department?: string;
+  position?: string;
+  employeeCode?: string;
+  phone?: string;
+  address?: string;
 }
 
 export const userService = {

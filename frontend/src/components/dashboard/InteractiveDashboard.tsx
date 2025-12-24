@@ -344,74 +344,159 @@ const InteractiveDashboard: React.FC = () => {
   );
 
   // Renderizar resumo geral
-  const renderOverview = () => (
-    <div className="space-y-6">
-      {/* Estatísticas em tempo real */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Total de Usuários</p>
-                <p className="text-2xl font-bold text-seguranca-lightgray">124</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-500" />
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
-              <span className="text-green-400 text-sm">+8% este mês</span>
-            </div>
-          </CardContent>
-        </Card>
+  const renderOverview = () => {
+    // Normalizar role (remover prefixo ROLE_ se vier do backend assim)
+    const rawRole = user?.role || 'COLABORADOR';
+    const role = (rawRole as string).replace(/^ROLE_/, '').toUpperCase();
+    const isRH = role === 'RH' || role === 'ASSISTENCIA_RH';
+    const isDP = role === 'DEPARTAMENTO_PESSOAL' || role === 'AUX_DEP';
 
-        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Contratos Ativos</p>
-                <p className="text-2xl font-bold text-seguranca-lightgray">48</p>
-              </div>
-              <FileText className="h-8 w-8 text-green-500" />
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
-              <span className="text-green-400 text-sm">+5% este mês</span>
-            </div>
-          </CardContent>
-        </Card>
+    const isRhOrDp = isRH || isDP;
 
-        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Receita Mensal</p>
-                <p className="text-2xl font-bold text-seguranca-yellow">R$ 485.320</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-yellow-500" />
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
-              <span className="text-green-400 text-sm">+15% este mês</span>
-            </div>
-          </CardContent>
-        </Card>
+    return (
+      <div className="space-y-6">
+        {/* Estatísticas em tempo real / DP-RH */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {isRhOrDp ? (
+            <>
+              {/* Funcionários ativos */}
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Funcionários Ativos</p>
+                      <p className="text-2xl font-bold text-seguranca-lightgray">156</p>
+                    </div>
+                    <Users className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
+                    <span className="text-green-400 text-sm">+12 novos este mês</span>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Equipamentos</p>
-                <p className="text-2xl font-bold text-seguranca-lightgray">245</p>
-              </div>
-              <Package className="h-8 w-8 text-orange-500" />
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
-              <span className="text-green-400 text-sm">+8% este mês</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              {/* Férias pendentes */}
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Férias Pendentes</p>
+                      <p className="text-2xl font-bold text-seguranca-lightgray">8</p>
+                    </div>
+                    <Calendar className="h-8 w-8 text-yellow-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-orange-400 mr-1" />
+                    <span className="text-orange-400 text-sm">Priorizar programação</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Holerites do mês */}
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Holerites do Mês</p>
+                      <p className="text-2xl font-bold text-seguranca-yellow">95</p>
+                    </div>
+                    <FileText className="h-8 w-8 text-seguranca-yellow" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
+                    <span className="text-green-400 text-sm">Disponíveis para envio</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Admissões / Demissões */}
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Movimentações (30 dias)</p>
+                      <p className="text-2xl font-bold text-seguranca-lightgray">
+                        5<span className="text-sm text-gray-400 ml-1">adm. /</span> 2<span className="text-sm text-gray-400 ml-1">dem.</span>
+                      </p>
+                    </div>
+                    <Activity className="h-8 w-8 text-purple-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-blue-400 mr-1" />
+                    <span className="text-blue-400 text-sm">Resumo de movimentações</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Total de Usuários</p>
+                      <p className="text-2xl font-bold text-seguranca-lightgray">124</p>
+                    </div>
+                    <Users className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
+                    <span className="text-green-400 text-sm">+8% este mês</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Contratos Ativos</p>
+                      <p className="text-2xl font-bold text-seguranca-lightgray">48</p>
+                    </div>
+                    <FileText className="h-8 w-8 text-green-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
+                    <span className="text-green-400 text-sm">+5% este mês</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Receita Mensal</p>
+                      <p className="text-2xl font-bold text-seguranca-yellow">R$ 485.320</p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-yellow-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
+                    <span className="text-green-400 text-sm">+15% este mês</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/60 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Equipamentos</p>
+                      <p className="text-2xl font-bold text-seguranca-lightgray">245</p>
+                    </div>
+                    <Package className="h-8 w-8 text-orange-500" />
+                  </div>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
+                    <span className="text-green-400 text-sm">+8% este mês</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
@@ -486,7 +571,8 @@ const InteractiveDashboard: React.FC = () => {
         </Card>
       </div>
     </div>
-  );
+    );
+  };
 
   if (!user) {
     return (

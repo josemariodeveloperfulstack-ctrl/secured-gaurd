@@ -5,7 +5,6 @@ import com.z7design.secured_guard.dto.UserResponseDTO;
 import com.z7design.secured_guard.service.UserGroupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +31,7 @@ public class UserGroupController {
     }
     
     @GetMapping("/user/{userId}")
+    // Permissão já gerenciada pelo SecurityConfig - permite acesso autenticado
     public ResponseEntity<List<UserGroupDTO>> getGroupsByUserId(@PathVariable String userId) {
         try {
             UUID uuid = UUID.fromString(userId);
@@ -50,6 +50,7 @@ public class UserGroupController {
     }
     
     @GetMapping("/user/{userId}/permissions")
+    // Permissão já gerenciada pelo SecurityConfig - permite acesso autenticado
     public ResponseEntity<Set<String>> getUserPermissions(@PathVariable String userId) {
         try {
             UUID uuid = UUID.fromString(userId);

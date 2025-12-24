@@ -96,14 +96,14 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
     /**
      * Calcula tempo médio de resolução (em horas)
      */
-    @Query("SELECT AVG(TIMESTAMPDIFF(HOUR, st.createdAt, st.resolvedAt)) FROM SupportTicket st WHERE st.resolvedAt IS NOT NULL")
+    @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600.0) FROM support_tickets WHERE resolved_at IS NOT NULL", nativeQuery = true)
     Double getAverageResolutionTime();
     
     /**
      * Taxa de resolução (tickets resolvidos / total)
      */
-    @Query("SELECT (COUNT(CASE WHEN st.status = 'RESOLVED' THEN 1 END) * 100.0 / COUNT(*)) " +
-           "FROM SupportTicket st WHERE st.createdAt >= :since")
+    @Query(value = "SELECT (COUNT(CASE WHEN status = 'RESOLVED' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) " +
+           "FROM support_tickets WHERE created_at >= :since", nativeQuery = true)
     Double getResolutionRate(@Param("since") LocalDateTime since);
 }
 

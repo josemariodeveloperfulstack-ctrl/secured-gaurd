@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import api from '@/lib/axios';
-import { User, AuthContextType } from '@/types/user';
+import { User, AuthContextType, UserGroupData, UserRole } from '@/types/user';
 import { generatePermissions, generatePermissionsFromGroups, combinePermissions } from '@/utils/permissions';
 import { groupService } from '@/services/groupService';
 import { getApiUrl } from '@/config/environment';
@@ -28,6 +28,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Determina a "função efetiva" do usuário com base em roles e grupos
+  const determineEffectiveRole = (currentRole: UserRole | undefined, groups: UserGroupData[] | undefined): UserRole => {
+    // Se já for um papel forte (não colaborador), mantém
+    if (currentRole && currentRole !== 'COLABORADOR') {
+      return currentRole;
+    }
+
+    if (!groups || groups.length === 0) {
+      return currentRole || 'COLABORADOR';
+    }
+
+    const groupNames = groups.map((g) => g.groupName);
+
+    // Prioridades por grupo
+    if (groupNames.includes('GRUPO_DPE')) {
+      return 'DEPARTAMENTO_PESSOAL';
+    }
+    if (groupNames.includes('GRUPO_RH')) {
+      return 'RH';
+    }
+    if (groupNames.includes('GRUPO_GESTOR')) {
+      return 'GESTOR';
+    }
+
+    // Se cair aqui, mantém como colaborador
+    return currentRole || 'COLABORADOR';
+  };
 
   // Limpar localStorage corrompido se houver
   useEffect(() => {
@@ -102,8 +130,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const rolePermissions = generatePermissions(userData.role);
         const groupPermissions = generatePermissionsFromGroups(groups);
         const combinedPermissions = combinePermissions(rolePermissions, groupPermissions);
-        
-        const userWithPermissions = { ...updatedUser, permissions: combinedPermissions };
+
+        // Ajustar função exibida de acordo com os grupos (ex.: GRUPO_DPE -> Departamento Pessoal)
+        const effectiveRole = determineEffectiveRole(updatedUser.role as UserRole, groups);
+        const userWithPermissions = { ...updatedUser, role: effectiveRole, permissions: combinedPermissions };
         
         setUser(userWithPermissions);
         localStorage.setItem('user', JSON.stringify(userWithPermissions));
@@ -158,7 +188,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       // Definir o role principal por prioridade
-      const rolePriority = ['SUPER_ADMIN', 'ADMIN', 'RH', 'SUPERVISOR', 'FINANCEIRO', 'TI_SUPORTE', 'AUDITOR', 'COLABORADOR'];
+      const rolePriority: UserRole[] = [
+        'SUPER_ADMIN',
+        'ADMIN',
+        'RH',
+        'DEPARTAMENTO_PESSOAL',
+        'GESTOR',
+        'SUPERVISOR',
+        'FINANCEIRO',
+        'OPERACIONAL',
+        'TI_SUPORTE',
+        'AUDITOR',
+        'VIGILANTE',
+        'AUXI_ADMINISTRATIVO',
+        'AUX_DEP',
+        'COLABORADOR',
+      ];
       let userRole: User['role'] = 'COLABORADOR';
       for (const role of rolePriority) {
         if (userRoles.includes(role)) {

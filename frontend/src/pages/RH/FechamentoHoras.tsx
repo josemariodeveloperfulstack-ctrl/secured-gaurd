@@ -27,6 +27,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/axios';
+import { timeSheetService } from '@/services/timeSheetService';
 
 const FechamentoHoras: React.FC = () => {
   const navigate = useNavigate();
@@ -45,9 +47,43 @@ const FechamentoHoras: React.FC = () => {
   const [newPeriodEndDate, setNewPeriodEndDate] = useState('');
   const [newPeriodDescription, setNewPeriodDescription] = useState('');
 
+  const [bankHoursSummary, setBankHoursSummary] = useState<{
+    totalEmployees: number;
+    totalBalance: number;
+    positiveBalance: number;
+    negativeBalance: number;
+  } | null>(null);
+  const [bankHoursLoading, setBankHoursLoading] = useState(false);
+
   useEffect(() => {
     loadData();
+    loadBankHours();
   }, [selectedYear, selectedMonth]);
+
+  const loadBankHours = async () => {
+    try {
+      setBankHoursLoading(true);
+      const response = await api.get('/api/bank-hours/expiring?daysAhead=30');
+      const items: any[] = response.data?.data || [];
+
+      const totalEmployees = items.length;
+      const totalBalance = items.reduce((sum, item) => sum + (item.balanceHours || 0), 0);
+      const positiveBalance = items.filter(i => (i.balanceHours || 0) > 0).length;
+      const negativeBalance = items.filter(i => (i.balanceHours || 0) < 0).length;
+
+      setBankHoursSummary({
+        totalEmployees,
+        totalBalance,
+        positiveBalance,
+        negativeBalance,
+      });
+    } catch (error) {
+      console.error('Erro ao carregar banco de horas:', error);
+      setBankHoursSummary(null);
+    } finally {
+      setBankHoursLoading(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -111,6 +147,28 @@ const FechamentoHoras: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadTimeSheet = async (employeeId: string) => {
+    try {
+      const blob = await timeSheetService.downloadTimeSheet(employeeId, selectedYear, selectedMonth);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const monthLabel = months.find(m => m.value === selectedMonth)?.label || selectedMonth.toString();
+      link.download = `folha-ponto-${employeeId}-${monthLabel}-${selectedYear}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error('Erro ao baixar folha de ponto:', error);
+      toast({
+        title: 'Erro',
+        description: error?.response?.data?.message || 'Erro ao gerar/baixar folha de ponto',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -364,6 +422,14 @@ const FechamentoHoras: React.FC = () => {
                             >
                               <FileText className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadTimeSheet(closure.employeeId)}
+                              title="Baixar folha de ponto (Excel)"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
                             {closure.status === 'DRAFT' && (
                               <Button
                                 variant="outline"
@@ -481,15 +547,79 @@ const FechamentoHoras: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="bank-hours">
+        <TabsContent value="bank-hours" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Banco de Horas</CardTitle>
-              <CardDescription>Visualize saldos e transações de banco de horas</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Banco de Horas</CardTitle>
+                <CardDescription>Visão geral dos saldos de banco de horas (próximos 30 dias)</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={loadBankHours} disabled={bankHoursLoading}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${bankHoursLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
             </CardHeader>
             <CardContent>
-              {/* Conteúdo de banco de horas será implementado */}
-              <p className="text-muted-foreground">Funcionalidade em desenvolvimento...</p>
+              {bankHoursLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Carregando banco de horas...</div>
+              ) : !bankHoursSummary ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Não foi possível carregar os dados de banco de horas ou não há registros próximos ao vencimento.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="bg-seguranca-black border-gray-700">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-gray-300">Funcionários com Banco de Horas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-seguranca-lightgray">
+                        {bankHoursSummary.totalEmployees}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Com lançamentos recentes</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-seguranca-black border-gray-700">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-gray-300">Saldo Total (h)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-seguranca-lightgray">
+                        {bankHoursSummary.totalBalance.toFixed(2).replace('.', ',')}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Soma de todos os saldos</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-seguranca-black border-gray-700">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-gray-300">Saldos Positivos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-400">
+                        {bankHoursSummary.positiveBalance}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Funcionários com horas a compensar</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-seguranca-black border-gray-700">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-gray-300">Saldos Negativos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-red-400">
+                        {bankHoursSummary.negativeBalance}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Funcionários devendo horas</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

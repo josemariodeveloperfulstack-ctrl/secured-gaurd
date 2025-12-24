@@ -1,13 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, MessageSquare, Check, RefreshCw, Settings, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Removido Popover do Radix UI devido a problemas com PopperAnchor
+// Usando componente customizado simples
 import { Separator } from '@/components/ui/separator';
 import { useNotificationBell } from '@/hooks/useNotificationBell';
 import MessageItem from '@/components/MessageItem';
@@ -16,6 +12,7 @@ import '@/styles/notifications.css';
 export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   const {
     systemMessages,
@@ -28,12 +25,17 @@ export const NotificationBell: React.FC = () => {
     getPriorityConfig
   } = useNotificationBell();
 
-  // Carregar mensagens quando abrir o dropdown
+  // Carregar mensagens quando abrir o dropdown (apenas uma vez)
   useEffect(() => {
-    if (isOpen && systemMessages.length === 0) {
+    if (isOpen && systemMessages.length === 0 && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       loadMessages();
     }
-  }, [isOpen, systemMessages.length, loadMessages]);
+    if (!isOpen) {
+      hasLoadedRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, systemMessages.length]); // Removido loadMessages das dependências para evitar loop infinito
 
   // Animação do sino quando há notificações não lidas
   useEffect(() => {
@@ -48,33 +50,51 @@ export const NotificationBell: React.FC = () => {
     await loadMessages();
   };
 
-  return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`relative h-10 w-10 p-0 hover:bg-seguranca-graphite/50 text-seguranca-lightgray transition-all duration-200 ${
-            isAnimating ? 'animate-pulse' : ''
-          }`}
-        >
-          <Bell className={`h-5 w-5 transition-transform duration-200 ${isAnimating ? 'animate-bounce' : ''}`} />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-red-500 to-red-600 shadow-lg animate-pulse"
-            >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
+  // Handler para abrir/fechar o popover
+  const handleToggle = useCallback(() => {
+    setIsOpen(prev => !prev);
+  }, []);
 
-      <DropdownMenuContent
-        align="end"
-        className="notification-dropdown w-[400px] sm:w-[450px] max-h-[600px] bg-gradient-to-br from-seguranca-graphite to-seguranca-black border border-gray-600 text-seguranca-lightgray shadow-2xl backdrop-blur-sm animate-bounce-in"
-        sideOffset={8}
+  // Handler para fechar quando clicar fora
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.notification-popover-container')) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="relative notification-popover-container">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleToggle}
+        className={`relative h-10 w-10 p-0 hover:bg-seguranca-graphite/50 text-seguranca-lightgray transition-all duration-200 ${
+          isAnimating ? 'animate-pulse' : ''
+        }`}
       >
+        <Bell className={`h-5 w-5 transition-transform duration-200 ${isAnimating ? 'animate-bounce' : ''}`} />
+        {unreadCount > 0 && (
+          <Badge
+            variant="destructive"
+            className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-red-500 to-red-600 shadow-lg animate-pulse"
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Badge>
+        )}
+      </Button>
+
+      {isOpen && (
+        <div
+          className="absolute right-0 top-full mt-2 z-[10050] w-[400px] sm:w-[450px] max-h-[600px] bg-gradient-to-br from-seguranca-graphite to-seguranca-black border border-gray-600 text-seguranca-lightgray shadow-2xl backdrop-blur-sm rounded-lg overflow-hidden"
+        >
         {/* Header com gradiente */}
         <div className="relative p-4 border-b border-gray-600 bg-gradient-to-r from-seguranca-graphite to-seguranca-black">
           <div className="flex items-center justify-between">
@@ -131,7 +151,7 @@ export const NotificationBell: React.FC = () => {
         </div>
 
         {/* Lista de Mensagens */}
-        <ScrollArea className="max-h-[400px]">
+        <div className="max-h-[400px] overflow-y-auto">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center p-12">
               <div className="relative">
@@ -175,7 +195,7 @@ export const NotificationBell: React.FC = () => {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* Footer com gradiente */}
         {systemMessages.length > 0 && (
@@ -195,8 +215,9 @@ export const NotificationBell: React.FC = () => {
             </Button>
           </div>
         )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </div>
+      )}
+    </div>
   );
 };
 

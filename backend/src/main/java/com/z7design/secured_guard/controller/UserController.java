@@ -1,12 +1,14 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.UserListResponseDTO;
+import com.z7design.secured_guard.dto.UserGroupDTO;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.ProfileResponse;
 import com.z7design.secured_guard.dto.UpdateUserRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.UserService;
+import com.z7design.secured_guard.service.UserOnlineStatusService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -24,6 +26,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/users")
@@ -33,10 +36,11 @@ import java.util.UUID;
 public class UserController {
     
     private final UserService userService;
+    private final UserOnlineStatusService userOnlineStatusService;
     
     @GetMapping
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    @Operation(summary = "Listar usuários", description = "Retorna uma lista de todos os usuários")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar usuários", description = "Retorna uma lista de todos os usuários. Permite acesso para usuários autenticados (necessário para chat)")
     public ResponseEntity<List<UserListResponseDTO>> getAllUsers() {
         List<User> users = userService.findAll();
         List<UserListResponseDTO> dtos = users.stream()
@@ -47,8 +51,8 @@ public class UserController {
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    @Operation(summary = "Buscar usuário por ID", description = "Retorna um usuário específico pelo ID")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Buscar usuário por ID", description = "Retorna um usuário específico pelo ID. Permite acesso para usuários autenticados (necessário para chat)")
     public ResponseEntity<?> getUserById(@PathVariable String id) {
         try {
             // Validar ID
@@ -323,6 +327,41 @@ public class UserController {
         dto.setEmployeeCode(user.getEmployeeCode());
         dto.setPhone(user.getPhone());
         dto.setAddress(user.getAddress());
+
+        // Status online/offline
+        try {
+            UUID userId = UUID.fromString(dto.getId());
+            dto.setIsOnline(userOnlineStatusService.isUserOnline(userId));
+        } catch (Exception e) {
+            log.warn("Erro ao verificar status online do usuário {}: {}", user.getId(), e.getMessage());
+            dto.setIsOnline(false);
+        }
+
+        // Grupos do usuário
+        try {
+            if (user.getGroups() != null && !user.getGroups().isEmpty()) {
+                List<UserGroupDTO> groupDTOs = user.getGroups().stream()
+                        .filter(Objects::nonNull)
+                        .map(group -> {
+                            UserGroupDTO g = new UserGroupDTO();
+                            g.setId(group.getId());
+                            g.setName(group.getGroupName() != null ? group.getGroupName().name() : null);
+                            g.setGroupName(group.getGroupName() != null ? group.getGroupName().name() : null);
+                            g.setDisplayName(group.getDisplayName());
+                            g.setDescription(group.getDescription());
+                            g.setPermissions(group.getPermissions());
+                            // userCount pode ser preenchido em endpoints específicos de grupos
+                            return g;
+                        })
+                        .collect(java.util.stream.Collectors.toList());
+                dto.setGroups(groupDTOs);
+            } else {
+                dto.setGroups(java.util.Collections.emptyList());
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar grupos do usuário {}, usando lista vazia: {}", user.getId(), e.getMessage());
+            dto.setGroups(java.util.Collections.emptyList());
+        }
         
         return dto;
     }

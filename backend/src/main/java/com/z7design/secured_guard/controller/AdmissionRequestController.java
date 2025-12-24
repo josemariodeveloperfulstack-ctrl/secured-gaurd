@@ -46,7 +46,7 @@ public class AdmissionRequestController {
     
     @GetMapping
     @Operation(summary = "Listar solicitações", description = "Lista todas as solicitações de admissão/demissão")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> list() {
         List<AdmissionRequestDTO> requests = admissionRequestService.findAll();
         return ResponseEntity.ok(requests);
@@ -54,7 +54,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/{id}")
     @Operation(summary = "Buscar solicitação por ID", description = "Retorna uma solicitação específica")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AdmissionRequestDTO> findById(@PathVariable String id) {
         AdmissionRequestDTO request = admissionRequestService.findById(parseUUID(id));
         return ResponseEntity.ok(request);
@@ -62,7 +62,7 @@ public class AdmissionRequestController {
     
     @PostMapping
     @Operation(summary = "Criar solicitação", description = "Cria uma nova solicitação de admissão ou demissão")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AdmissionRequestDTO> create(@Valid @RequestBody CreateAdmissionRequestDTO dto) {
         AdmissionRequestDTO createdRequest = admissionRequestService.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRequest);
@@ -70,7 +70,7 @@ public class AdmissionRequestController {
     
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar solicitação", description = "Atualiza uma solicitação existente")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AdmissionRequestDTO> update(
             @PathVariable String id,
             @Valid @RequestBody CreateAdmissionRequestDTO dto) {
@@ -80,7 +80,7 @@ public class AdmissionRequestController {
     
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir solicitação", description = "Exclui uma solicitação")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         admissionRequestService.delete(parseUUID(id));
         return ResponseEntity.noContent().build();
@@ -88,7 +88,7 @@ public class AdmissionRequestController {
     
     @PostMapping("/{id}/approve")
     @Operation(summary = "Aprovar solicitação", description = "Aprova uma solicitação pendente")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AdmissionRequestDTO> approve(
             @PathVariable String id,
             @RequestParam(required = false) String approverName,
@@ -103,7 +103,7 @@ public class AdmissionRequestController {
     
     @PostMapping("/{id}/reject")
     @Operation(summary = "Rejeitar solicitação", description = "Rejeita uma solicitação pendente")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AdmissionRequestDTO> reject(
             @PathVariable String id,
             @RequestParam String rejectorName,
@@ -118,7 +118,7 @@ public class AdmissionRequestController {
     
     @PostMapping("/{id}/complete")
     @Operation(summary = "Completar solicitação", description = "Marca uma solicitação aprovada como completada")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AdmissionRequestDTO> complete(@PathVariable String id) {
         AdmissionRequestDTO completedRequest = admissionRequestService.complete(parseUUID(id));
         return ResponseEntity.ok(completedRequest);
@@ -126,7 +126,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/status/{status}")
     @Operation(summary = "Buscar por status", description = "Lista solicitações por status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findByStatus(@PathVariable String status) {
         AdmissionRequestStatus requestStatus = AdmissionRequestStatus.valueOf(status.toUpperCase());
         List<AdmissionRequestDTO> requests = admissionRequestService.findByStatus(requestStatus);
@@ -135,7 +135,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/type/{type}")
     @Operation(summary = "Buscar por tipo", description = "Lista solicitações por tipo (ADMISSION ou DISMISSAL)")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findByType(@PathVariable String type) {
         AdmissionRequestType requestType = AdmissionRequestType.valueOf(type.toUpperCase());
         List<AdmissionRequestDTO> requests = admissionRequestService.findByType(requestType);
@@ -144,7 +144,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/priority/{priority}")
     @Operation(summary = "Buscar por prioridade", description = "Lista solicitações por prioridade")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findByPriority(@PathVariable String priority) {
         // Implementar se necessário
         return ResponseEntity.ok(List.of());
@@ -152,7 +152,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/requester/{requesterId}")
     @Operation(summary = "Buscar por solicitante", description = "Lista solicitações de um solicitante específico")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findByRequester(@PathVariable String requesterId) {
         // Implementar se necessário
         return ResponseEntity.ok(List.of());
@@ -160,7 +160,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/approver/{approverId}")
     @Operation(summary = "Buscar por aprovador", description = "Lista solicitações de um aprovador específico")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findByApprover(@PathVariable String approverId) {
         // Implementar se necessário
         return ResponseEntity.ok(List.of());
@@ -168,7 +168,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/unit/{unitId}")
     @Operation(summary = "Buscar por unidade", description = "Lista solicitações de uma unidade específica")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findByUnit(@PathVariable String unitId) {
         // Implementar se necessário
         return ResponseEntity.ok(List.of());
@@ -176,7 +176,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/pending-approval")
     @Operation(summary = "Buscar pendentes de aprovação", description = "Lista solicitações pendentes de aprovação")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> findPendingApproval() {
         List<AdmissionRequestDTO> requests = admissionRequestService.findPendingApprovalRequests();
         return ResponseEntity.ok(requests);
@@ -184,7 +184,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/search")
     @Operation(summary = "Buscar com filtros", description = "Busca solicitações com filtros opcionais")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AdmissionRequestDTO>> search(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String searchTerm,
@@ -201,7 +201,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/stats/count/{status}")
     @Operation(summary = "Contar por status", description = "Retorna a quantidade de solicitações por status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<Long> countByStatus(@PathVariable String status) {
         AdmissionRequestStatus requestStatus = AdmissionRequestStatus.valueOf(status.toUpperCase());
         long count = admissionRequestService.countByStatus(requestStatus);
@@ -210,7 +210,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/stats/type-count/{type}")
     @Operation(summary = "Contar por tipo", description = "Retorna a quantidade de solicitações por tipo")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<Long> countByType(@PathVariable String type) {
         AdmissionRequestType requestType = AdmissionRequestType.valueOf(type.toUpperCase());
         long count = admissionRequestService.countByType(requestType);
@@ -219,7 +219,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/{id}/pdf")
     @Operation(summary = "Gerar PDF da solicitação", description = "Gera e retorna o PDF da solicitação de admissão/demissão")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<byte[]> generatePDF(@PathVariable String id) {
         try {
             UUID requestId = parseUUID(id);
@@ -240,7 +240,7 @@ public class AdmissionRequestController {
     
     @GetMapping("/report/pdf")
     @Operation(summary = "Gerar relatório PDF com filtros", description = "Gera relatório PDF de solicitações com filtros opcionais")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<byte[]> generatePDFReport(
             @RequestParam(required = false) String employeeName,
             @RequestParam(required = false) String type,

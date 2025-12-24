@@ -161,20 +161,45 @@ public class MessageService {
     public void markAsRead(UUID messageId, UUID userId) {
         log.info("Marcando mensagem {} como lida pelo usuário {}", messageId, userId);
         
-        Message message = messageRepository.findById(messageId)
-            .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
-        
-        // Verificar se o usuário é destinatário
-        boolean isRecipient = message.getRecipients().stream()
-            .anyMatch(user -> user.getId().equals(userId));
-        
-        if (!isRecipient) {
-            throw new BusinessException("Usuário não é destinatário desta mensagem");
+        try {
+            Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
+            
+            // Verificar se o usuário é o remetente
+            boolean isSender = message.getSender() != null && message.getSender().getId().equals(userId);
+            
+            // Verificar se o usuário é destinatário
+            boolean isRecipient = false;
+            if (message.getRecipients() != null && !message.getRecipients().isEmpty()) {
+                isRecipient = message.getRecipients().stream()
+                    .anyMatch(user -> user.getId().equals(userId));
+            }
+            
+            // Verificar tipo de mensagem
+            boolean isGlobalOrDepartment = message.getType() == MessageType.GLOBAL || 
+                                          message.getType() == MessageType.DEPARTMENT;
+            
+            // Permitir marcar como lida se:
+            // 1. O usuário é o remetente, OU
+            // 2. O usuário é destinatário, OU
+            // 3. É mensagem GLOBAL ou DEPARTMENT (qualquer usuário autenticado pode marcar)
+            if (!isSender && !isRecipient && !isGlobalOrDepartment) {
+                log.warn("Usuário {} não tem permissão para marcar mensagem {} como lida (não é remetente, destinatário, nem mensagem global/departamento)", userId, messageId);
+                throw new BusinessException("Usuário não tem permissão para marcar esta mensagem como lida");
+            }
+            
+            message.setReadAt(LocalDateTime.now());
+            message.setStatus(MessageStatus.READ);
+            messageRepository.save(message);
+            log.info("Mensagem {} marcada como lida com sucesso pelo usuário {} (remetente: {}, destinatário: {}, tipo: {})", 
+                    messageId, userId, isSender, isRecipient, message.getType());
+        } catch (BusinessException e) {
+            log.error("Erro de negócio ao marcar mensagem como lida: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Erro inesperado ao marcar mensagem {} como lida: {}", messageId, e.getMessage(), e);
+            throw new BusinessException("Erro ao marcar mensagem como lida: " + e.getMessage());
         }
-        
-        message.setReadAt(LocalDateTime.now());
-        message.setStatus(MessageStatus.READ);
-        messageRepository.save(message);
     }
     
     /**

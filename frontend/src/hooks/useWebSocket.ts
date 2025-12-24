@@ -71,15 +71,39 @@ export const useWebSocket = (config: WebSocketConfig) => {
         setError(null);
         config.onConnect?.();
 
-        // Subscrever aos tópicos de mensagens
+        // Subscrever aos tópicos de mensagens individuais
         client.subscribe(`/user/${config.username}/queue/messages`, (message) => {
           try {
             const chatMessage: ChatMessage = JSON.parse(message.body);
-            console.log('[WebSocket] Nova mensagem recebida:', chatMessage);
+            console.log('[WebSocket] Nova mensagem recebida (individual):', chatMessage);
             addChatMessage(chatMessage);
             config.onMessage?.(chatMessage);
           } catch (error) {
             console.error('[WebSocket] Erro ao processar mensagem:', error);
+          }
+        });
+
+        // Subscrever a tópicos de grupos (se o usuário estiver em grupos)
+        client.subscribe('/topic/chat/group/*', (message) => {
+          try {
+            const chatMessage: ChatMessage = JSON.parse(message.body);
+            console.log('[WebSocket] Nova mensagem recebida (grupo):', chatMessage);
+            addChatMessage(chatMessage);
+            config.onMessage?.(chatMessage);
+          } catch (error) {
+            console.error('[WebSocket] Erro ao processar mensagem de grupo:', error);
+          }
+        });
+
+        // Subscrever a tópicos de departamentos (se o usuário estiver em departamentos)
+        client.subscribe('/topic/chat/department/*', (message) => {
+          try {
+            const chatMessage: ChatMessage = JSON.parse(message.body);
+            console.log('[WebSocket] Nova mensagem recebida (departamento):', chatMessage);
+            addChatMessage(chatMessage);
+            config.onMessage?.(chatMessage);
+          } catch (error) {
+            console.error('[WebSocket] Erro ao processar mensagem de departamento:', error);
           }
         });
 
@@ -111,6 +135,36 @@ export const useWebSocket = (config: WebSocketConfig) => {
             // TODO: Implementar notificações do sistema
           } catch (error) {
             console.error('[WebSocket] Erro ao processar notificação:', error);
+          }
+        });
+
+        // Subscrever a eventos de status de usuário (online/offline)
+        client.subscribe(`/user/${config.username}/queue/user-status`, (message) => {
+          try {
+            const userStatusEvent = JSON.parse(message.body);
+            console.log('[WebSocket] Evento de status de usuário:', userStatusEvent);
+            // Atualizar o status online/offline no store
+            const { updateUserStatus } = useMessageStore.getState();
+            if (updateUserStatus && userStatusEvent.userId) {
+              updateUserStatus(userStatusEvent.userId, userStatusEvent.isOnline);
+            }
+          } catch (error) {
+            console.error('[WebSocket] Erro ao processar evento de status de usuário:', error);
+          }
+        });
+
+        // Subscrever a tópico público de status de usuários (broadcast)
+        client.subscribe('/topic/user-status', (message) => {
+          try {
+            const userStatusEvent = JSON.parse(message.body);
+            console.log('[WebSocket] Broadcast de status de usuário:', userStatusEvent);
+            // Atualizar o status online/offline no store
+            const { updateUserStatus } = useMessageStore.getState();
+            if (updateUserStatus && userStatusEvent.userId) {
+              updateUserStatus(userStatusEvent.userId, userStatusEvent.isOnline);
+            }
+          } catch (error) {
+            console.error('[WebSocket] Erro ao processar broadcast de status:', error);
           }
         });
       };

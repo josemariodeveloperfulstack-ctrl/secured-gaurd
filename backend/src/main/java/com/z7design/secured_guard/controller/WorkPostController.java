@@ -55,7 +55,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Listar todos os postos de trabalho (sem paginação)", description = "Retorna uma lista completa de todos os postos de trabalho")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),

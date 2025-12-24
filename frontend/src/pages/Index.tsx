@@ -58,10 +58,16 @@ const Index: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
+  // Normalizar role para decidir comportamento de dashboard
+  const rawRole = user?.role || 'COLABORADOR';
+  const normalizedRole = (rawRole as string).replace(/^ROLE_/, '').toUpperCase();
+  const isRhOrDp = ['RH', 'ASSISTENCIA_RH', 'DEPARTAMENTO_PESSOAL', 'AUX_DEP'].includes(normalizedRole);
+
   // Staged fetching: quick stats first, then full summary
   const quickStatsQuery = useQuery({
     queryKey: ['dashboard', 'quick'],
     queryFn: () => dashboardService.getQuickStats() as unknown as Promise<DashboardStats>,
+    enabled: !!user && !isRhOrDp, // Para RH/DP usamos métricas fixas, sem chamar backend
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -69,13 +75,32 @@ const Index: React.FC = () => {
   const summaryQuery = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: () => dashboardService.getDashboardSummary() as unknown as Promise<DashboardStats>,
+    enabled: !!user && !isRhOrDp,
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
   });
 
   // Reagir aos dados das queries e definir estado de exibição
   useEffect(() => {
-    // Preferir resumo completo; senão, usar quick stats
+    if (isRhOrDp) {
+      // Métricas fixas específicas para RH / Departamento Pessoal
+      const fixedStats: DashboardStats = {
+        totalUsers: 156,            // Funcionários ativos
+        activeUsers: 0,
+        activeContracts: 0,
+        monthlyRevenue: 0,
+        totalEquipment: 0,
+        pendingTasks: 8,            // Férias pendentes (exemplo)
+        totalAlerts: 95,            // Holerites do mês (exemplo)
+        unreadAlerts: 0,
+        lastUpdate: new Date().toISOString(),
+      };
+      setStats(fixedStats);
+      setLoading(false);
+      return;
+    }
+
+    // Para outros perfis, preferir resumo completo; senão, usar quick stats
     const data = (summaryQuery.data as DashboardStats) || (quickStatsQuery.data as DashboardStats) || null;
     if (data) {
       setStats(data);
@@ -83,7 +108,7 @@ const Index: React.FC = () => {
     } else if (quickStatsQuery.isLoading && summaryQuery.isLoading) {
       setLoading(true);
     }
-  }, [quickStatsQuery.data, quickStatsQuery.isLoading, summaryQuery.data, summaryQuery.isLoading]);
+  }, [isRhOrDp, quickStatsQuery.data, quickStatsQuery.isLoading, summaryQuery.data, summaryQuery.isLoading]);
 
   // Atualização manual (botão Atualizar)
   const loadDashboardData = async (showToast = false) => {
@@ -104,14 +129,19 @@ const Index: React.FC = () => {
     }
   };
 
-  // Redirecionar colaboradores e vigilantes para dashboards exclusivos
+  // Redirecionar para dashboards específicos por função
   useEffect(() => {
-    if (user?.role === 'COLABORADOR') {
+    if (!user) return;
+
+    if (normalizedRole === 'COLABORADOR') {
       navigate('/dashboard-colaborador', { replace: true });
-    } else if (user?.role === 'VIGILANTE') {
+    } else if (normalizedRole === 'VIGILANTE') {
       navigate('/dashboard-vigilante', { replace: true });
+    } else if (['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP'].includes(normalizedRole)) {
+      // RH e Departamento Pessoal devem usar o mesmo dashboard de RH
+      navigate('/rh', { replace: true });
     }
-  }, [user, navigate]);
+  }, [normalizedRole, navigate, user]);
 
   // Carregar dados iniciais (queries já disparam automaticamente)
   useEffect(() => {

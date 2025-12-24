@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class NotificationService {
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${app.notification.email.from:noreply@secureguard.com}")
     private String fromEmail;
@@ -322,9 +324,40 @@ public class NotificationService {
     
     public void sendNotification(com.z7design.secured_guard.model.Message message) {
         log.info("Enviando notificação para mensagem: {}", message);
+        
+        try {
+            // Publicar notificação via WebSocket para todos os destinatários
+            if (message.getRecipients() != null && !message.getRecipients().isEmpty()) {
+                for (User recipient : message.getRecipients()) {
+                    if (recipient.getUsername() != null) {
+                        String destination = "/user/" + recipient.getUsername() + "/queue/notifications";
+                        messagingTemplate.convertAndSend(destination, message);
+                        log.info("Notificação publicada via WebSocket para usuário: {} (destino: {})", recipient.getUsername(), destination);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Erro ao publicar notificação via WebSocket: {}", e.getMessage(), e);
+            // Não lançar exceção para não quebrar o fluxo
+        }
     }
     
-    public void sendChatTypingNotification(String channel, Object event) {
-        log.info("Enviando notificação de digitação: {} - {}", channel, event);
+    public void sendChatTypingNotification(String recipientId, Object event) {
+        log.info("Enviando notificação de digitação: {} - {}", recipientId, event);
+        
+        try {
+            // Publicar evento de digitação via WebSocket
+            if (recipientId != null) {
+                User recipient = userRepository.findById(UUID.fromString(recipientId)).orElse(null);
+                if (recipient != null && recipient.getUsername() != null) {
+                    String destination = "/user/" + recipient.getUsername() + "/queue/typing";
+                    messagingTemplate.convertAndSend(destination, event);
+                    log.debug("Evento de digitação publicado via WebSocket para usuário: {} (destino: {})", recipient.getUsername(), destination);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Erro ao publicar evento de digitação via WebSocket: {}", e.getMessage(), e);
+            // Não lançar exceção para não quebrar o fluxo
+        }
     }
 } 

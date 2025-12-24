@@ -702,6 +702,31 @@ export function DynamicSidebar() {
         return false;
       }
 
+      // Regras extras por função para esconder módulos específicos
+      // Departamento Pessoal e RH NÃO veem módulo Operacional/Supervisão
+      if (['DEPARTAMENTO_PESSOAL', 'RH'].includes(normalizedRole)) {
+        const forbiddenOperationalIds = new Set([
+          'operacional',
+          'controle-visitas',
+          'controle-visitas-avancado',
+          'guia-transporte',
+          'servicos',
+          'rota-semanal-supervisao',
+          'equipamentos',
+          'troca-plantao',
+          'supervisao',
+          'facial-login',
+          'supervisao-visitas',
+          'supervisao-rotas',
+          'supervisao-relatorios',
+          'supervisao-biometria',
+        ]);
+        if (forbiddenOperationalIds.has(item.id)) {
+          console.log(`🚫 ${normalizedRole} - escondendo item operacional: ${item.id}`);
+          return false;
+        }
+      }
+
       // Se tem role específico, verificar se o usuário tem esse role
       if (item.role && item.role !== user.role) {
         console.log(`🔍 Item ${item.text} - Role não confere: ${item.role} !== ${user.role}`);

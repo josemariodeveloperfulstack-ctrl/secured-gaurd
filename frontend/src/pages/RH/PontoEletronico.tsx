@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -39,6 +41,15 @@ const PontoEletronico: React.FC = () => {
   const [qrCodeData, setQrCodeData] = useState<string>('');
   const [geolocation, setGeolocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+  // Modais de ações rápidas
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [showJustificationDialog, setShowJustificationDialog] = useState(false);
+  const [justificationText, setJustificationText] = useState('');
+  const [historyRecords, setHistoryRecords] = useState<TimeRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
 
   // Buscar geolocalização ao montar
   useEffect(() => {
@@ -269,6 +280,109 @@ const PontoEletronico: React.FC = () => {
     const minutos = Math.floor((totalTrabalhado % (1000 * 60 * 60)) / (1000 * 60));
 
     return `${horas}h ${minutos}min`;
+  };
+
+  const openHistoryDialog = async () => {
+    if (!user?.employeeId) return;
+    try {
+      setHistoryLoading(true);
+      setShowHistoryDialog(true);
+      const response = await timeRecordService.getEmployeeRecords(user.employeeId, 0, 50);
+      if (response.success) {
+        setHistoryRecords(response.data);
+      } else {
+        toast({
+          title: 'Erro ao carregar histórico',
+          description: response.error || 'Tente novamente mais tarde',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar histórico:', error);
+      toast({
+        title: 'Erro ao carregar histórico',
+        description: error.response?.data?.error || error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!user?.employeeId) return;
+    if (!reportStartDate || !reportEndDate) {
+      toast({
+        title: 'Período obrigatório',
+        description: 'Informe data inicial e final para o relatório.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const response = await timeRecordService.getRecordsByPeriod(
+        user.employeeId,
+        reportStartDate,
+        reportEndDate
+      );
+
+      if (response.success && Array.isArray(response.data)) {
+        // Exporta um CSV simples no frontend
+        const rows = [
+          ['Data', 'Hora', 'Tipo', 'Localização'],
+          ...response.data.map((r: TimeRecord) => [
+            new Date(r.recordedAt).toLocaleDateString('pt-BR'),
+            new Date(r.recordedAt).toLocaleTimeString('pt-BR'),
+            getTipoLabel(r.recordType),
+            r.location || '',
+          ]),
+        ];
+        const csvContent = rows.map((cols) => cols.join(';')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `relatorio-ponto-${reportStartDate}-a-${reportEndDate}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast({
+          title: 'Relatório gerado',
+          description: 'Arquivo CSV baixado com sucesso.',
+        });
+      } else {
+        throw new Error(response.error || 'Erro ao gerar relatório');
+      }
+    } catch (error: any) {
+      console.error('Erro ao gerar relatório:', error);
+      toast({
+        title: 'Erro ao gerar relatório',
+        description: error.response?.data?.error || error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSaveJustification = () => {
+    if (!justificationText.trim()) {
+      toast({
+        title: 'Justificativa vazia',
+        description: 'Digite uma justificativa antes de salvar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Por enquanto apenas exibe um feedback; integração com backend pode ser adicionada depois
+    toast({
+      title: 'Justificativa registrada',
+      description: 'Sua justificativa foi registrada localmente. Integração completa será adicionada em breve.',
+    });
+    setJustificationText('');
+    setShowJustificationDialog(false);
   };
 
   const getProximoRegistroButton = () => {
@@ -517,7 +631,7 @@ const PontoEletronico: React.FC = () => {
               <Button
                 variant="outline"
                 className="h-20 flex flex-col items-center justify-center border-seguranca-gray/30 hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10"
-                onClick={() => toast({ title: "🕐 Histórico em desenvolvimento" })}
+                onClick={openHistoryDialog}
               >
                 <History className="h-6 w-6 mb-2" />
                 <span className="text-sm">Histórico</span>
@@ -525,7 +639,7 @@ const PontoEletronico: React.FC = () => {
               <Button
                 variant="outline"
                 className="h-20 flex flex-col items-center justify-center border-seguranca-gray/30 hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10"
-                onClick={() => toast({ title: "📊 Relatório em desenvolvimento" })}
+                onClick={handleGenerateReport}
               >
                 <CheckCircle className="h-6 w-6 mb-2" />
                 <span className="text-sm">Relatório</span>
@@ -533,7 +647,7 @@ const PontoEletronico: React.FC = () => {
               <Button
                 variant="outline"
                 className="h-20 flex flex-col items-center justify-center border-seguranca-gray/30 hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10"
-                onClick={() => toast({ title: "⚙️ Configurações em desenvolvimento" })}
+                onClick={() => setShowJustificationDialog(true)}
               >
                 <AlertCircle className="h-6 w-6 mb-2" />
                 <span className="text-sm">Justificativas</span>
@@ -541,7 +655,41 @@ const PontoEletronico: React.FC = () => {
               <Button
                 variant="outline"
                 className="h-20 flex flex-col items-center justify-center border-seguranca-gray/30 hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10"
-                onClick={() => toast({ title: "📅 Espelho em desenvolvimento" })}
+                onClick={() => {
+                  if (!user?.employeeId) {
+                    toast({
+                      title: 'Erro',
+                      description: 'Funcionário não identificado',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+                  // Usa o mês/ano atuais para gerar o espelho (folha de ponto)
+                  const year = currentTime.getFullYear();
+                  const month = currentTime.getMonth() + 1;
+                  import('@/services/timeSheetService').then(({ timeSheetService }) => {
+                    timeSheetService
+                      .downloadTimeSheet(user.employeeId!, year, month)
+                      .then((blob) => {
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `espelho-ponto-${year}-${String(month).padStart(2, '0')}.xlsx`;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        window.URL.revokeObjectURL(url);
+                      })
+                      .catch((error: any) => {
+                        console.error('Erro ao gerar espelho de ponto:', error);
+                        toast({
+                          title: 'Erro ao gerar espelho',
+                          description: error?.response?.data?.message || 'Não foi possível gerar o espelho de ponto.',
+                          variant: 'destructive',
+                        });
+                      });
+                  });
+                }}
               >
                 <Calendar className="h-6 w-6 mb-2" />
                 <span className="text-sm">Espelho</span>
@@ -567,6 +715,96 @@ const PontoEletronico: React.FC = () => {
           </Card>
         )}
       </div>
+
+      {/* Modal de Histórico */}
+      <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+        <DialogContent className="sm:max-w-2xl bg-seguranca-darkgray border-seguranca-gray/20">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray flex items-center">
+              <History className="mr-2 h-5 w-5 text-seguranca-yellow" />
+              Histórico de Registros
+            </DialogTitle>
+            <DialogDescription className="text-seguranca-gray">
+              Últimos registros de ponto realizados por você.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto space-y-3">
+            {historyLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-seguranca-yellow" />
+                <p className="text-seguranca-gray mt-2">Carregando histórico...</p>
+              </div>
+            ) : historyRecords.length === 0 ? (
+              <p className="text-seguranca-gray text-center py-4">
+                Nenhum registro encontrado.
+              </p>
+            ) : (
+              historyRecords.map((registro) => {
+                const Icon = getTipoIcon(registro.recordType);
+                return (
+                  <div
+                    key={registro.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${getTipoColor(registro.recordType)}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-current/10">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">
+                          {getTipoLabel(registro.recordType)}
+                        </div>
+                        <div className="text-xs opacity-75">
+                          {new Date(registro.recordedAt).toLocaleDateString('pt-BR')} •{' '}
+                          {new Date(registro.recordedAt).toLocaleTimeString('pt-BR')}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs opacity-75 text-right max-w-[180px] truncate">
+                      {registro.location || 'Sem localização'}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Justificativas */}
+      <Dialog open={showJustificationDialog} onOpenChange={setShowJustificationDialog}>
+        <DialogContent className="sm:max-w-md bg-seguranca-darkgray border-seguranca-gray/20">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray flex items-center">
+              <AlertCircle className="mr-2 h-5 w-5 text-seguranca-yellow" />
+              Justificativa de Ponto
+            </DialogTitle>
+            <DialogDescription className="text-seguranca-gray">
+              Descreva o motivo para ajuste ou ausência de registro.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Textarea
+              value={justificationText}
+              onChange={(e) => setJustificationText(e.target.value)}
+              placeholder="Ex: Esqueci de registrar a saída no dia 10/05 às 18h..."
+              className="min-h-[120px] bg-seguranca-darkgray border-seguranca-gray/40 text-seguranca-lightgray"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="border-seguranca-gray/40"
+                onClick={() => setShowJustificationDialog(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveJustification}>
+                Salvar Justificativa
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Scanner de QR Code */}
       <Dialog open={showQRScanner} onOpenChange={closeQRScanner}>

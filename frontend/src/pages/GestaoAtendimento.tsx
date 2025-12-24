@@ -81,47 +81,63 @@ const GestaoAtendimento: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    
+    // Carregar funcionários independentemente (prioridade)
     try {
-      // Carregar dados reais do backend
-      const [agentsData, ticketsData, metricsData, employeesData] = await Promise.all([
+      const employeesData = await employeeService.getSimpleEmployees();
+      setUsers(employeesData);
+      console.log('✅ Funcionários carregados:', employeesData.length);
+    } catch (error) {
+      console.error('❌ Erro ao carregar funcionários:', error);
+      setUsers([]);
+    }
+    
+    // Carregar outros dados em paralelo
+    try {
+      const [agentsData, ticketsData, metricsData] = await Promise.allSettled([
         supportService.getAllAgents(),
         supportService.getAllTickets(0, 50),
-        supportService.getTicketMetrics(),
-        employeeService.getSimpleEmployees() // Mudança: usar employeeService
+        supportService.getTicketMetrics()
       ]);
       
-      setAgents(agentsData);
-      setTickets(ticketsData.content);
-      setMetrics(metricsData);
-      setUsers(employeesData); // Mudança: usar employeesData
+      if (agentsData.status === 'fulfilled') {
+        setAgents(agentsData.value);
+        console.log('✅ Agentes carregados:', agentsData.value.length);
+      } else {
+        console.error('❌ Erro ao carregar agentes:', agentsData.reason);
+        setAgents([]);
+      }
       
-      console.log('✅ Dados carregados do backend:', {
-        agents: agentsData.length,
-        tickets: ticketsData.content.length,
-        metrics: metricsData,
-        employees: employeesData.length // Mudança: usar employees
-      });
+      if (ticketsData.status === 'fulfilled') {
+        setTickets(ticketsData.value.content);
+        console.log('✅ Tickets carregados:', ticketsData.value.content.length);
+      } else {
+        console.error('❌ Erro ao carregar tickets:', ticketsData.reason);
+        setTickets([]);
+      }
+      
+      if (metricsData.status === 'fulfilled') {
+        setMetrics(metricsData.value);
+        console.log('✅ Métricas carregadas');
+      } else {
+        console.error('❌ Erro ao carregar métricas:', metricsData.reason);
+        setMetrics({
+          totalTickets: 0,
+          openTickets: 0,
+          inProgressTickets: 0,
+          resolvedTickets: 0,
+          closedTickets: 0,
+          averageResolutionTimeHours: 0,
+          resolutionRatePercentage: 0
+        });
+      }
       
     } catch (error) {
-      console.error('❌ Erro ao carregar dados:', error);
+      console.error('❌ Erro ao carregar dados de atendimento:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados de atendimento. Usando dados de demonstração.",
-        variant: "destructive"
-      });
-      
-      // Fallback para dados de demonstração se o backend não estiver disponível
-      setAgents([]);
-      setTickets([]);
-      setUsers([]); // Clear employees on error
-      setMetrics({
-        totalTickets: 0,
-        openTickets: 0,
-        inProgressTickets: 0,
-        resolvedTickets: 0,
-        closedTickets: 0,
-        averageResolutionTimeHours: 0,
-        resolutionRatePercentage: 0
+        title: "Aviso",
+        description: "Alguns dados de atendimento não puderam ser carregados.",
+        variant: "default"
       });
     } finally {
       setLoading(false);

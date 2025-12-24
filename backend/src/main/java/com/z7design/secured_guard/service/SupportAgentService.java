@@ -65,9 +65,14 @@ public class SupportAgentService {
      */
     public List<SupportAgentDTO> getAllAgents() {
         log.info("Buscando todos os agentes");
-        return agentRepository.findAll().stream()
-            .map(SupportAgentDTO::fromEntity)
-            .collect(Collectors.toList());
+        try {
+            return agentRepository.findAll().stream()
+                .map(SupportAgentDTO::fromEntity)
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao buscar todos os agentes: {}", e.getMessage(), e);
+            throw new BusinessException("Erro ao buscar agentes: " + e.getMessage());
+        }
     }
     
     /**
