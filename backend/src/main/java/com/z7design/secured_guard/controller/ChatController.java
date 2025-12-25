@@ -395,10 +395,21 @@ public class ChatController {
                 return ResponseEntity.badRequest().build();
             }
             
+            log.debug("Tentando alternar fixação da mensagem {} para usuário {}", messageId, userId);
             boolean isPinned = actionService.togglePin(messageId, userId);
+            log.debug("Fixação alternada com sucesso: {}", isPinned);
             return ResponseEntity.ok(isPinned);
+        } catch (org.springframework.dao.DataAccessException e) {
+            log.error("Erro de acesso ao banco de dados ao alternar fixação: {}", e.getMessage(), e);
+            if (e.getCause() != null) {
+                log.error("Causa: {}", e.getCause().getMessage());
+            }
+            return ResponseEntity.internalServerError().build();
+        } catch (com.z7design.secured_guard.exception.BusinessException e) {
+            log.error("Erro de negócio ao alternar fixação: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            log.error("Erro ao alternar fixação: {}", e.getMessage(), e);
+            log.error("Erro inesperado ao alternar fixação: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -445,10 +456,21 @@ public class ChatController {
                 return ResponseEntity.badRequest().build();
             }
             
+            log.debug("Tentando alternar favorito da mensagem {} para usuário {}", messageId, userId);
             boolean isFavorite = actionService.toggleFavorite(messageId, userId);
+            log.debug("Favorito alternado com sucesso: {}", isFavorite);
             return ResponseEntity.ok(isFavorite);
+        } catch (org.springframework.dao.DataAccessException e) {
+            log.error("Erro de acesso ao banco de dados ao alternar favorito: {}", e.getMessage(), e);
+            if (e.getCause() != null) {
+                log.error("Causa: {}", e.getCause().getMessage());
+            }
+            return ResponseEntity.internalServerError().build();
+        } catch (com.z7design.secured_guard.exception.BusinessException e) {
+            log.error("Erro de negócio ao alternar favorito: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            log.error("Erro ao alternar favorito: {}", e.getMessage(), e);
+            log.error("Erro inesperado ao alternar favorito: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

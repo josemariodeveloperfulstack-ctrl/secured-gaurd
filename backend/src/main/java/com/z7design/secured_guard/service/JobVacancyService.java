@@ -172,7 +172,16 @@ public class JobVacancyService {
     }
     
     // Conversão de Entity para DTO
+    @Transactional(readOnly = true)
     private JobVacancyDTO convertToDTO(JobVacancy vacancy) {
+        // Inicializar coleções lazy dentro da transação
+        if (vacancy.getRequirements() != null) {
+            vacancy.getRequirements().size(); // Força inicialização
+        }
+        if (vacancy.getBenefits() != null) {
+            vacancy.getBenefits().size(); // Força inicialização
+        }
+        
         return new JobVacancyDTO(
                 vacancy.getId(),
                 vacancy.getTitle(),

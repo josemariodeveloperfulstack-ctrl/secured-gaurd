@@ -27,12 +27,34 @@ public class LeadService {
     @Autowired
     private UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public List<Lead> findAll() {
-        return leadRepository.findAll();
+        List<Lead> leads = leadRepository.findAll();
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Lead lead : leads) {
+            if (lead.getCreatedBy() != null) {
+                lead.getCreatedBy().getUsername(); // Força inicialização
+            }
+            if (lead.getAssignedTo() != null) {
+                lead.getAssignedTo().getUsername(); // Força inicialização
+            }
+        }
+        return leads;
     }
 
+    @Transactional(readOnly = true)
     public Page<Lead> findAll(Pageable pageable) {
-        return leadRepository.findAll(pageable);
+        Page<Lead> leads = leadRepository.findAll(pageable);
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Lead lead : leads.getContent()) {
+            if (lead.getCreatedBy() != null) {
+                lead.getCreatedBy().getUsername(); // Força inicialização
+            }
+            if (lead.getAssignedTo() != null) {
+                lead.getAssignedTo().getUsername(); // Força inicialização
+            }
+        }
+        return leads;
     }
 
     public Lead findById(UUID id) {
