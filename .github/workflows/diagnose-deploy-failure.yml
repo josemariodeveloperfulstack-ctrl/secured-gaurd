@@ -111,43 +111,25 @@ jobs:
         id: check-secrets
         continue-on-error: true
         run: |
-          echo "🔐 Verificando secrets necessários..."
+          echo "🔐 Informações sobre secrets necessários..."
           echo "ℹ️ Nota: Secrets não são necessários para o diagnóstico de build"
           echo "ℹ️ Eles são necessários apenas para o deploy"
-          
-          REQUIRED_SECRETS=(
-            "DOCKER_USERNAME"
-            "DOCKER_PASSWORD"
-            "VPS_HOST"
-            "VPS_USER"
-            "VPS_PASSWORD"
-            "POSTGRES_PASSWORD_CI"
-            "REDIS_PASSWORD"
-          )
-          
-          MISSING_SECRETS=()
-          PRESENT_SECRETS=()
-          
-          for secret in "${REQUIRED_SECRETS[@]}"; do
-            if [ -z "${!secret:-}" ]; then
-              MISSING_SECRETS+=("$secret")
-              echo "⚠️ Secret '$secret' não está definido (necessário apenas para deploy)"
-            else
-              PRESENT_SECRETS+=("$secret")
-              echo "✅ Secret '$secret' está definido"
-            fi
-          done
-          
-          if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
-            echo "⚠️ Secrets faltando para deploy: ${MISSING_SECRETS[*]}"
-            echo "ℹ️ Isso não impede o diagnóstico de build, apenas o deploy"
-            echo "secrets_status=warning" >> $GITHUB_OUTPUT
-          else
-            echo "✅ Todos os secrets estão definidos"
-            echo "secrets_status=success" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "📊 Resumo: ${#PRESENT_SECRETS[@]} secrets configurados, ${#MISSING_SECRETS[@]} faltando"
+          echo ""
+          echo "📋 Secrets necessários para deploy:"
+          echo "  - DOCKER_USERNAME (para fazer push das imagens)"
+          echo "  - DOCKER_PASSWORD (para fazer push das imagens)"
+          echo "  - VPS_HOST (endereço do servidor VPS)"
+          echo "  - VPS_USER (usuário SSH do servidor)"
+          echo "  - VPS_PASSWORD (senha SSH do servidor)"
+          echo "  - POSTGRES_PASSWORD_CI (senha do banco de dados PostgreSQL)"
+          echo "  - REDIS_PASSWORD (senha do Redis)"
+          echo "  - JWT_SECRET (opcional, tem valor padrão se não definido)"
+          echo ""
+          echo "ℹ️ Não é possível verificar se os secrets estão configurados sem expô-los"
+          echo "ℹ️ Se o deploy falhar com erro de autenticação, verifique se os secrets estão configurados em:"
+          echo "   Settings → Secrets and variables → Actions"
+          echo ""
+          echo "secrets_status=info" >> $GITHUB_OUTPUT
 
       - name: 📊 Resumo do Diagnóstico
         run: |
@@ -186,11 +168,11 @@ jobs:
             exit 1
           fi
           
-          # Verificar secrets (apenas aviso)
-          if [ "${{ steps.check-secrets.outputs.secrets_status }}" = "warning" ]; then
+          # Informação sobre secrets
+          if [ "${{ steps.check-secrets.outputs.secrets_status }}" = "info" ]; then
             echo ""
-            echo "⚠️ AVISO: Alguns secrets não estão configurados"
-            echo "💡 Isso não impede o diagnóstico, mas será necessário para o deploy"
+            echo "ℹ️ INFORMAÇÃO: Secrets são necessários para o deploy"
+            echo "💡 Se o deploy falhar, verifique se todos os secrets estão configurados"
             echo "💡 Configure os secrets em: Settings → Secrets and variables → Actions"
           fi
           
