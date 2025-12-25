@@ -1448,6 +1448,73 @@ jobs:
           EOF
 
       # ============================================
+      # 2️⃣2️⃣5️⃣ CORRIGIR 404 NO TRAEFIK
+      # ============================================
+      - name: 🔧 Fix 404 Traefik
+        run: |
+          echo "🔧 Corrigindo problema de 404 no Traefik..."
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            cd /var/www/secured_guard/ci
+            
+            # Verificar se script existe, se não, criar inline
+            if [ -f "scripts/fix-404-traefik.sh" ]; then
+              chmod +x scripts/fix-404-traefik.sh
+              ./scripts/fix-404-traefik.sh
+            else
+              echo "⚠️ Script não encontrado, executando correção inline..."
+              
+              # 1. Verificar configuração dinâmica
+              if [ ! -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
+                echo "❌ Arquivo de configuração dinâmica não encontrado!"
+                echo "   Criando diretório..."
+                mkdir -p /var/www/secured_guard/traefik/dynamic
+                echo "   ⚠️ Arquivo ci.yml não existe. Verifique se foi transferido."
+              else
+                echo "✅ Arquivo de configuração dinâmica encontrado"
+              fi
+              
+              # 2. Conectar Nginx à rede z7network
+              if docker ps | grep -q "secured-guard-nginx-ci"; then
+                if ! docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
+                  echo "🔗 Conectando Nginx à rede z7network..."
+                  docker network connect z7network secured-guard-nginx-ci 2>/dev/null || echo "⚠️ Pode já estar conectado"
+                  sleep 2
+                else
+                  echo "✅ Nginx já está na rede z7network"
+                fi
+              fi
+              
+              # 3. Reiniciar Traefik
+              if docker ps | grep -q "traefik"; then
+                echo "🔄 Reiniciando Traefik para carregar configuração dinâmica..."
+                docker restart traefik
+                sleep 15
+                
+                # Verificar se router foi carregado
+                ROUTERS=$(docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null || echo "[]")
+                if echo "$ROUTERS" | grep -q "ci-backend"; then
+                  echo "✅ Router ci-backend encontrado no Traefik"
+                else
+                  echo "❌ Router ci-backend NÃO encontrado no Traefik!"
+                  echo "📋 Routers disponíveis:"
+                  echo "$ROUTERS" | jq -r '.[].name' 2>/dev/null || echo "$ROUTERS"
+                  echo ""
+                  echo "📋 Verificando logs do Traefik:"
+                  docker logs traefik --tail 30 | grep -i "error\|dynamic\|ci" || echo "Nenhum erro encontrado"
+                fi
+              fi
+              
+              # 4. Testar acesso
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: ci.z7botsolutions.com.br" http://localhost/api/health 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Acesso via Traefik funcionando! (HTTP $HTTP_CODE)"
+              else
+                echo "⚠️ Ainda retornando HTTP $HTTP_CODE"
+              fi
+            fi
+          EOF
+
+      # ============================================
       # 2️⃣3️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
       # ============================================
       - name: 🏥 Health check

@@ -3,6 +3,9 @@
 
 set -e
 
+# Permitir execução mesmo se algum comando falhar (para diagnóstico)
+set +e
+
 echo "🔧 Corrigindo problema de 404 no Traefik..."
 echo ""
 
@@ -145,10 +148,23 @@ if [ "$HTTP_CODE" = "200" ]; then
   echo "✅ Acesso via Traefik funcionando! (HTTP $HTTP_CODE)"
 elif [ "$HTTP_CODE" = "404" ]; then
   echo "❌ Ainda retornando 404"
+  echo ""
+  echo "🔍 Diagnóstico adicional:"
+  echo ""
+  echo "📋 Verificando se Traefik consegue resolver o nome do Nginx:"
+  docker exec traefik nslookup secured-guard-nginx-ci 2>/dev/null || echo "⚠️ Não foi possível resolver nome"
+  echo ""
+  echo "📋 Verificando se Traefik consegue acessar o Nginx diretamente:"
+  docker exec traefik wget -qO- --timeout=5 http://secured-guard-nginx-ci:80/health 2>&1 | head -5 || echo "❌ Falha ao acessar Nginx"
+  echo ""
+  echo "📋 Verificando conteúdo do arquivo de configuração dinâmica:"
+  cat /var/www/secured_guard/traefik/dynamic/ci.yml | head -30
+  echo ""
   echo "💡 Verifique:"
   echo "   1. Se o router ci-backend está configurado corretamente"
-  echo "   2. Se o serviço ci-backend-service aponta para o Nginx correto"
+  echo "   2. Se o serviço ci-backend-service aponta para o Nginx correto (secured-guard-nginx-ci:80)"
   echo "   3. Se o Nginx está respondendo corretamente"
+  echo "   4. Se ambos estão na mesma rede (z7network)"
 else
   echo "⚠️ Resposta HTTP: $HTTP_CODE"
 fi
