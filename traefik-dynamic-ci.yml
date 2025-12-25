@@ -73,8 +73,9 @@ http:
         # Timeouts aumentados para uploads grandes (5 minutos)
         responseForwarding:
           flushInterval: 100ms
-      # Health check
-      healthCheck:
-        path: /health
-        interval: 30s
-        timeout: 10s
+        # Health check (dentro do loadBalancer no Traefik 3.0)
+        healthCheck:
+          path: /health
+          interval: "30s"
+          timeout: "10s"
+          scheme: http
