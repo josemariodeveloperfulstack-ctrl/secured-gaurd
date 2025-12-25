@@ -229,6 +229,28 @@ jobs:
                   ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/traefik/dynamic/ci.yml
               then
                 echo "✅ traefik-dynamic-ci.yml transferido!"
+                
+                # Verificar se o arquivo foi transferido corretamente
+                sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY_EOF'
+                  if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
+                    echo "✅ Arquivo existe no servidor"
+                    # Verificar se não tem healthCheck ou path solto
+                    if grep -q "healthCheck" /var/www/secured_guard/traefik/dynamic/ci.yml || grep -q "^[[:space:]]*path:" /var/www/secured_guard/traefik/dynamic/ci.yml; then
+                      echo "⚠️ Arquivo ainda contém healthCheck ou path solto. Corrigindo..."
+                      sed -i '/healthCheck/d' /var/www/secured_guard/traefik/dynamic/ci.yml
+                      sed -i '/^[[:space:]]*path:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
+                      sed -i '/^[[:space:]]*interval:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
+                      sed -i '/^[[:space:]]*timeout:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
+                      sed -i '/^[[:space:]]*scheme:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
+                      echo "✅ Arquivo corrigido"
+                    else
+                      echo "✅ Arquivo está correto (sem healthCheck ou path solto)"
+                    fi
+                  else
+                    echo "❌ Arquivo não foi transferido!"
+                  fi
+                VERIFY_EOF
+                
                 break
               else
                 echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
