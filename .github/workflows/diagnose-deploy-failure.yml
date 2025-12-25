@@ -112,6 +112,8 @@ jobs:
         continue-on-error: true
         run: |
           echo "🔐 Verificando secrets necessários..."
+          echo "ℹ️ Nota: Secrets não são necessários para o diagnóstico de build"
+          echo "ℹ️ Eles são necessários apenas para o deploy"
           
           REQUIRED_SECRETS=(
             "DOCKER_USERNAME"
@@ -124,24 +126,28 @@ jobs:
           )
           
           MISSING_SECRETS=()
+          PRESENT_SECRETS=()
           
           for secret in "${REQUIRED_SECRETS[@]}"; do
             if [ -z "${!secret:-}" ]; then
               MISSING_SECRETS+=("$secret")
-              echo "❌ Secret '$secret' não está definido"
+              echo "⚠️ Secret '$secret' não está definido (necessário apenas para deploy)"
             else
+              PRESENT_SECRETS+=("$secret")
               echo "✅ Secret '$secret' está definido"
             fi
           done
           
           if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
-            echo "❌ Secrets faltando: ${MISSING_SECRETS[*]}"
-            echo "secrets_status=failed" >> $GITHUB_OUTPUT
-            exit 1
+            echo "⚠️ Secrets faltando para deploy: ${MISSING_SECRETS[*]}"
+            echo "ℹ️ Isso não impede o diagnóstico de build, apenas o deploy"
+            echo "secrets_status=warning" >> $GITHUB_OUTPUT
           else
             echo "✅ Todos os secrets estão definidos"
             echo "secrets_status=success" >> $GITHUB_OUTPUT
           fi
+          
+          echo "📊 Resumo: ${#PRESENT_SECRETS[@]} secrets configurados, ${#MISSING_SECRETS[@]} faltando"
 
       - name: 📊 Resumo do Diagnóstico
         run: |
@@ -155,13 +161,41 @@ jobs:
           echo "Secrets: ${{ steps.check-secrets.outputs.secrets_status || 'not_run' }}"
           echo ""
           
-          if [ "${{ steps.build-backend.outputs.build_status }}" = "failed" ] || \
-             [ "${{ steps.build-frontend.outputs.build_status }}" = "failed" ] || \
-             [ "${{ steps.docker-build.outputs.build_status }}" = "failed" ] || \
-             [ "${{ steps.check-secrets.outputs.secrets_status }}" = "failed" ]; then
-            echo "❌ DIAGNÓSTICO: Problemas encontrados!"
-            exit 1
-          else
-            echo "✅ DIAGNÓSTICO: Tudo OK! O problema pode estar no deploy ou health check."
+          # Verificar apenas builds (secrets são apenas aviso)
+          BUILD_FAILED=false
+          
+          if [ "${{ steps.build-backend.outputs.build_status }}" = "failed" ]; then
+            echo "❌ Backend Build falhou!"
+            BUILD_FAILED=true
           fi
+          
+          if [ "${{ steps.build-frontend.outputs.build_status }}" = "failed" ]; then
+            echo "❌ Frontend Build falhou!"
+            BUILD_FAILED=true
+          fi
+          
+          if [ "${{ steps.docker-build.outputs.build_status }}" = "failed" ]; then
+            echo "❌ Docker Build falhou!"
+            BUILD_FAILED=true
+          fi
+          
+          if [ "$BUILD_FAILED" = "true" ]; then
+            echo ""
+            echo "❌ DIAGNÓSTICO: Problemas encontrados nos builds!"
+            echo "💡 Corrija os problemas de build antes de tentar deploy."
+            exit 1
+          fi
+          
+          # Verificar secrets (apenas aviso)
+          if [ "${{ steps.check-secrets.outputs.secrets_status }}" = "warning" ]; then
+            echo ""
+            echo "⚠️ AVISO: Alguns secrets não estão configurados"
+            echo "💡 Isso não impede o diagnóstico, mas será necessário para o deploy"
+            echo "💡 Configure os secrets em: Settings → Secrets and variables → Actions"
+          fi
+          
+          echo ""
+          echo "✅ DIAGNÓSTICO: Todos os builds passaram!"
+          echo "💡 Se o deploy ainda falhar, o problema está no deploy ou health check."
+          echo "💡 Verifique os logs do workflow de deploy para mais detalhes."
 
