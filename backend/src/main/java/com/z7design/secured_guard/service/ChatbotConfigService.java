@@ -55,6 +55,10 @@ public class ChatbotConfigService {
         config.setCreatedBy(user);
         
         config = chatbotConfigRepository.save(config);
+        // Inicializar relacionamentos lazy antes de converter
+        if (config.getCreatedBy() != null) {
+            config.getCreatedBy().getName(); // Força inicialização
+        }
         return convertToDTO(config);
     }
     
@@ -120,23 +124,57 @@ public class ChatbotConfigService {
         
         config.setUpdatedBy(user);
         config = chatbotConfigRepository.save(config);
+        // Inicializar relacionamentos lazy antes de converter
+        if (config.getCreatedBy() != null) {
+            config.getCreatedBy().getName(); // Força inicialização
+        }
+        if (config.getUpdatedBy() != null) {
+            config.getUpdatedBy().getName(); // Força inicialização
+        }
         return convertToDTO(config);
     }
     
+    @Transactional(readOnly = true)
     public ChatbotConfigDTO getConfig(UUID id) {
         ChatbotConfig config = chatbotConfigRepository.findById(id)
             .orElseThrow(() -> new BusinessException("Configuração do chatbot não encontrada"));
+        // Inicializar relacionamentos lazy dentro da transação
+        if (config.getCreatedBy() != null) {
+            config.getCreatedBy().getName(); // Força inicialização
+        }
+        if (config.getUpdatedBy() != null) {
+            config.getUpdatedBy().getName(); // Força inicialização
+        }
         return convertToDTO(config);
     }
     
+    @Transactional(readOnly = true)
     public ChatbotConfigDTO getActiveConfig() {
         ChatbotConfig config = chatbotConfigRepository.findFirstByIsActiveTrue()
             .orElseThrow(() -> new BusinessException("Nenhuma configuração ativa encontrada"));
+        // Inicializar relacionamentos lazy dentro da transação
+        if (config.getCreatedBy() != null) {
+            config.getCreatedBy().getName(); // Força inicialização
+        }
+        if (config.getUpdatedBy() != null) {
+            config.getUpdatedBy().getName(); // Força inicialização
+        }
         return convertToDTO(config);
     }
     
+    @Transactional(readOnly = true)
     public List<ChatbotConfigDTO> getAllConfigs() {
-        return chatbotConfigRepository.findAll().stream()
+        List<ChatbotConfig> configs = chatbotConfigRepository.findAll();
+        // Inicializar relacionamentos lazy dentro da transação
+        for (ChatbotConfig config : configs) {
+            if (config.getCreatedBy() != null) {
+                config.getCreatedBy().getName(); // Força inicialização
+            }
+            if (config.getUpdatedBy() != null) {
+                config.getUpdatedBy().getName(); // Força inicialização
+            }
+        }
+        return configs.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
@@ -148,6 +186,7 @@ public class ChatbotConfigService {
         chatbotConfigRepository.deleteById(id);
     }
     
+    @Transactional(readOnly = true)
     private ChatbotConfigDTO convertToDTO(ChatbotConfig config) {
         ChatbotConfigDTO dto = new ChatbotConfigDTO();
         dto.setId(config.getId());

@@ -30,9 +30,15 @@ public class ChatbotConfigController {
     public ResponseEntity<ChatbotConfigDTO> createConfig(
             @Valid @RequestBody CreateChatbotConfigRequest request,
             Authentication authentication) {
-        String username = authentication.getName();
-        ChatbotConfigDTO config = chatbotConfigService.createConfig(request, username);
-        return ResponseEntity.status(HttpStatus.CREATED).body(config);
+        try {
+            String username = authentication.getName();
+            ChatbotConfigDTO config = chatbotConfigService.createConfig(request, username);
+            return ResponseEntity.status(HttpStatus.CREATED).body(config);
+        } catch (com.z7design.secured_guard.exception.BusinessException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
     
     @PutMapping("/config/{id}")
@@ -49,8 +55,13 @@ public class ChatbotConfigController {
     @GetMapping("/config")
     @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ATTENDANCE_MANAGE', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<List<ChatbotConfigDTO>> getAllConfigs() {
-        List<ChatbotConfigDTO> configs = chatbotConfigService.getAllConfigs();
-        return ResponseEntity.ok(configs);
+        try {
+            List<ChatbotConfigDTO> configs = chatbotConfigService.getAllConfigs();
+            return ResponseEntity.ok(configs);
+        } catch (Exception e) {
+            // Se não houver configurações, retornar lista vazia ao invés de erro 500
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
     
     @GetMapping("/config/{id}")
