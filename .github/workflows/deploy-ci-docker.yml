@@ -741,6 +741,12 @@ jobs:
             echo "📋 Redes Docker disponíveis:"
             $DOCKER_CMD network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
             
+            # Parar containers existentes antes de recriar
+            echo ""
+            echo "🛑 Parando containers existentes..."
+            $COMPOSE_CMD -f docker-compose.ci.yml down 2>&1 || true
+            sleep 5
+            
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
             echo "🚀 Iniciando TODOS os containers..."
@@ -753,8 +759,24 @@ jobs:
               exit 1
             fi
             
-            echo "⏳ Aguardando containers iniciarem (30s)..."
-            sleep 30
+            echo "⏳ Aguardando containers iniciarem (60s)..."
+            sleep 60
+            
+            # Verificar containers que saíram imediatamente
+            echo ""
+            echo "🔍 Verificando containers que podem ter saído..."
+            EXITED_CONTAINERS=$($DOCKER_CMD ps -a --filter "status=exited" --format "{{.Names}}" | grep "secured-guard" || true)
+            if [ -n "$EXITED_CONTAINERS" ]; then
+              echo "⚠️ Containers que saíram:"
+              echo "$EXITED_CONTAINERS"
+              echo ""
+              echo "📋 Logs dos containers que saíram:"
+              for container in $EXITED_CONTAINERS; do
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo "📋 Logs de $container:"
+                $DOCKER_CMD logs --tail 50 "$container" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
+              done
+            fi
             
             # Verificar se PostgreSQL e Redis estão rodando
             echo ""
@@ -840,7 +862,7 @@ jobs:
             # Verificar e tentar iniciar containers que não estão rodando
             echo ""
             echo "🔍 Verificando e corrigindo containers que não estão rodando..."
-            REQUIRED_CONTAINERS=("secured-guard-db-ci" "secured-guard-redis-ci" "secured-guard-backend-ci" "secured-guard-whatsapp-ci" "secured-guard-frontend-ci" "secured-guard-nginx-ci")
+            REQUIRED_SERVICES=("postgres-ci" "redis-ci" "backend-ci" "whatsapp-service-ci" "frontend-ci" "nginx-ci")
             MAX_RETRIES=3
             RETRY=0
             
@@ -850,24 +872,27 @@ jobs:
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               echo "Verificação $RETRY de $MAX_RETRIES..."
               
-              STOPPED_CONTAINERS=()
+              STOPPED_SERVICES=()
               
-              for container in "${REQUIRED_CONTAINERS[@]}"; do
-                if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
-                  if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                    STATUS=$($DOCKER_CMD ps --format "{{.Names}} {{.Status}}" | grep "^${container} ")
-                    echo "  ✅ $STATUS"
-                  else
-                    echo "  ⚠️ $container está parado!"
-                    STOPPED_CONTAINERS+=("$container")
-                  fi
+              # Usar docker-compose ps para verificar status real
+              for service in "${REQUIRED_SERVICES[@]}"; do
+                SERVICE_STATUS=$($COMPOSE_CMD -f docker-compose.ci.yml ps "$service" 2>&1 | tail -1 || echo "")
+                if echo "$SERVICE_STATUS" | grep -q "Up"; then
+                  echo "  ✅ $service está rodando"
+                elif echo "$SERVICE_STATUS" | grep -q "Exit"; then
+                  echo "  ⚠️ $service saiu (Exit)"
+                  STOPPED_SERVICES+=("$service")
+                  
+                  # Mostrar logs do serviço que saiu
+                  echo "  📋 Logs de $service:"
+                  $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 30 "$service" 2>&1 | tail -20 || echo "  ⚠️ Não foi possível obter logs"
                 else
-                  echo "  ❌ $container NÃO foi criado!"
-                  STOPPED_CONTAINERS+=("$container")
+                  echo "  ❌ $service não está rodando"
+                  STOPPED_SERVICES+=("$service")
                 fi
               done
               
-              if [ ${#STOPPED_CONTAINERS[@]} -eq 0 ]; then
+              if [ ${#STOPPED_SERVICES[@]} -eq 0 ]; then
                 echo ""
                 echo "✅ Todos os containers estão rodando!"
                 break
@@ -875,68 +900,53 @@ jobs:
               
               if [ $RETRY -lt $MAX_RETRIES ]; then
                 echo ""
-                echo "🔄 Tentando iniciar containers parados..."
+                echo "🔄 Tentando reiniciar serviços parados..."
                 
-                for container in "${STOPPED_CONTAINERS[@]}"; do
-                  echo "  🔄 Iniciando $container..."
+                for service in "${STOPPED_SERVICES[@]}"; do
+                  echo "  🔄 Reiniciando $service..."
                   
-                  # Tentar iniciar o container
-                  $DOCKER_CMD start "$container" 2>&1 || {
-                    echo "  ⚠️ Erro ao iniciar $container. Verificando logs..."
-                    $DOCKER_CMD logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
-                    
-                    # Tentar recriar qualquer container que não iniciou
-                    echo "  🔄 Tentando recriar $container..."
-                    if [[ "$container" == *"db"* ]] || [[ "$container" == *"postgres"* ]]; then
-                      SERVICE_NAME="postgres-ci"
-                    elif [[ "$container" == *"redis"* ]]; then
-                      SERVICE_NAME="redis-ci"
-                    elif [[ "$container" == *"backend"* ]]; then
-                      SERVICE_NAME="backend-ci"
-                    elif [[ "$container" == *"whatsapp"* ]]; then
-                      SERVICE_NAME="whatsapp-service-ci"
-                    elif [[ "$container" == *"frontend"* ]]; then
-                      SERVICE_NAME="frontend-ci"
-                    elif [[ "$container" == *"nginx"* ]]; then
-                      SERVICE_NAME="nginx-ci"
-                    else
-                      SERVICE_NAME=$(echo "$container" | sed 's/secured-guard-//' | sed 's/-ci$//')
-                    fi
-                    $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME" 2>&1 || echo "  ⚠️ Erro ao recriar $container"
+                  # Tentar reiniciar o serviço
+                  $COMPOSE_CMD -f docker-compose.ci.yml restart "$service" 2>&1 || {
+                    echo "  ⚠️ Erro ao reiniciar $service. Tentando recriar..."
+                    $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate "$service" 2>&1 || echo "  ⚠️ Erro ao recriar $service"
                   }
                 done
                 
-                echo "⏳ Aguardando containers iniciarem (20s)..."
-                sleep 20
+                echo "⏳ Aguardando serviços iniciarem (30s)..."
+                sleep 30
               fi
             done
             
-            # Verificação final
+            # Verificação final usando docker-compose ps
             echo ""
             echo "🔍 Verificação final dos containers..."
             FINAL_STOPPED=()
             
-            for container in "${REQUIRED_CONTAINERS[@]}"; do
-              if ! $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                echo "  ❌ $container NÃO está rodando!"
-                FINAL_STOPPED+=("$container")
+            for service in "${REQUIRED_SERVICES[@]}"; do
+              SERVICE_STATUS=$($COMPOSE_CMD -f docker-compose.ci.yml ps "$service" 2>&1 | tail -1 || echo "")
+              if ! echo "$SERVICE_STATUS" | grep -q "Up"; then
+                echo "  ❌ $service NÃO está rodando!"
+                FINAL_STOPPED+=("$service")
                 
-                # Mostrar logs do container que não está rodando
-                echo "  📋 Logs de $container:"
-                $DOCKER_CMD logs --tail 50 "$container" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
+                # Mostrar logs do serviço que não está rodando
+                echo "  📋 Logs de $service:"
+                $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 "$service" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
               fi
             done
             
             if [ ${#FINAL_STOPPED[@]} -gt 0 ]; then
               echo ""
-              echo "❌ ERRO: Os seguintes containers não estão rodando após $MAX_RETRIES tentativas:"
+              echo "❌ ERRO: Os seguintes serviços não estão rodando após $MAX_RETRIES tentativas:"
               printf '  - %s\n' "${FINAL_STOPPED[@]}"
               echo ""
-              echo "📋 Logs do docker-compose:"
+              echo "📋 Logs do docker-compose (últimos 100 linhas):"
               $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 100 2>&1 | tail -100
               echo ""
               echo "📋 Status detalhado:"
               $COMPOSE_CMD -f docker-compose.ci.yml ps -a
+              echo ""
+              echo "📋 Containers que saíram:"
+              $DOCKER_CMD ps -a --filter "status=exited" --format "table {{.Names}}\t{{.Status}}\t{{.ExitCode}}" | grep "secured-guard" || echo "Nenhum container exited encontrado"
               exit 1
             fi
             
