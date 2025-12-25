@@ -218,6 +218,32 @@ jobs:
             exit 1
           fi
           
+          # Transferir configuração dinâmica do Traefik (se existir)
+          if [ -f "traefik-dynamic-ci.yml" ]; then
+            echo "📤 Transferindo traefik-dynamic-ci.yml..."
+            ATTEMPT=1
+            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+              if sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+                "mkdir -p /var/www/secured_guard/traefik/dynamic" && \
+                sshpass -p "${{ secrets.VPS_PASSWORD }}" scp $SSH_OPTS traefik-dynamic-ci.yml \
+                  ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/traefik/dynamic/ci.yml
+              then
+                echo "✅ traefik-dynamic-ci.yml transferido!"
+                break
+              else
+                echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
+                sleep 5
+                ATTEMPT=$((ATTEMPT + 1))
+              fi
+            done
+            
+            if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+              echo "⚠️ Falha ao transferir traefik-dynamic-ci.yml (não crítico, continuando...)"
+            fi
+          else
+            echo "⚠️ Arquivo traefik-dynamic-ci.yml não encontrado, pulando..."
+          fi
+          
           echo "✅ Arquivos transferidos com sucesso!"
 
       # ============================================
@@ -1266,6 +1292,23 @@ jobs:
             if docker ps | grep -q "traefik"; then
               echo "✅ Traefik já está rodando"
               docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+              
+              # Verificar e recarregar configuração dinâmica se existir
+              if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
+                echo "✅ Configuração dinâmica encontrada: /var/www/secured_guard/traefik/dynamic/ci.yml"
+                echo "🔄 Recarregando configuração dinâmica do Traefik..."
+                docker exec traefik kill -HUP 1 2>/dev/null || echo "⚠️ Não foi possível recarregar Traefik (pode ser normal)"
+                sleep 5
+                
+                # Verificar se o router foi carregado
+                echo "🔍 Verificando routers do Traefik..."
+                docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null | grep -q "ci-backend" && \
+                  echo "✅ Router ci-backend encontrado no Traefik" || \
+                  echo "⚠️ Router ci-backend não encontrado no Traefik"
+              else
+                echo "⚠️ Configuração dinâmica não encontrada em /var/www/secured_guard/traefik/dynamic/ci.yml"
+                echo "💡 Isso pode causar erro 404. Verifique se o arquivo foi transferido corretamente."
+              fi
             else
               echo "⚠️ Traefik não está rodando! Iniciando..."
               
