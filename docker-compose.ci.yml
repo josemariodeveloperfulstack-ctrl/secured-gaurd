@@ -167,13 +167,25 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Router HTTPS (usar configuração dinâmica ao invés de labels para evitar conflito)
-      - "traefik.http.routers.nginx-ci.rule=Host(`ci.z7botsolutions.com.br`)"
-      - "traefik.http.routers.nginx-ci.entrypoints=websecure"
-      - "traefik.http.routers.nginx-ci.tls.certresolver=letsencryptresolver"
-      - "traefik.http.services.nginx-ci.loadbalancer.server.port=80"
-      # Prioridade máxima para sobrescrever configuração dinâmica se necessário
-      - "traefik.http.routers.nginx-ci.priority=2000"
+      # Router HTTPS - usando labels como fallback se configuração dinâmica não funcionar
+      - "traefik.http.routers.nginx-ci-https.rule=Host(`ci.z7botsolutions.com.br`)"
+      - "traefik.http.routers.nginx-ci-https.entrypoints=websecure"
+      - "traefik.http.routers.nginx-ci-https.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.nginx-ci-https.service=nginx-ci-service"
+      - "traefik.http.routers.nginx-ci-https.priority=2000"
+      # Router HTTP (redireciona para HTTPS)
+      - "traefik.http.routers.nginx-ci-http.rule=Host(`ci.z7botsolutions.com.br`)"
+      - "traefik.http.routers.nginx-ci-http.entrypoints=web"
+      - "traefik.http.routers.nginx-ci-http.middlewares=redirect-https@docker"
+      - "traefik.http.routers.nginx-ci-http.priority=2000"
+      # Serviço
+      - "traefik.http.services.nginx-ci-service.loadbalancer.server.port=80"
+      # Middlewares CORS
+      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.routers.nginx-ci-https.middlewares=nginx-ci-cors@docker"
 
   # ========================================
   # FRONTEND CI
