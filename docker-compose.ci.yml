@@ -167,7 +167,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Router HTTPS - usando labels como fallback se configuração dinâmica não funcionar
+      # Router HTTPS - usando labels diretas
       - "traefik.http.routers.nginx-ci-https.rule=Host(`ci.z7botsolutions.com.br`)"
       - "traefik.http.routers.nginx-ci-https.entrypoints=websecure"
       - "traefik.http.routers.nginx-ci-https.tls.certresolver=letsencryptresolver"
@@ -186,6 +186,8 @@ services:
       - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowheaders=*"
       - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowcredentials=true"
       - "traefik.http.routers.nginx-ci-https.middlewares=nginx-ci-cors@docker"
+      # Forçar detecção na rede correta
+      - "traefik.docker.network=z7network"
 
   # ========================================
   # FRONTEND CI
