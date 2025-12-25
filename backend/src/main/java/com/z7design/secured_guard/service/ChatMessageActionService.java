@@ -44,27 +44,44 @@ public class ChatMessageActionService {
      * Fixa ou desfixa uma mensagem
      */
     public boolean togglePin(UUID messageId, UUID userId) {
-        log.info("Alternando fixação da mensagem {} para usuário {}", messageId, userId);
-        
-        ChatMessage message = chatMessageRepository.findById(messageId)
-            .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
-        
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
-        
-        boolean isPinned = pinRepository.existsByMessageIdAndUserId(messageId, userId);
-        
-        if (isPinned) {
-            pinRepository.deleteByMessageIdAndUserId(messageId, userId);
-            log.info("Mensagem {} desfixada para usuário {}", messageId, userId);
-            return false;
-        } else {
-            ChatMessagePin pin = new ChatMessagePin();
-            pin.setMessage(message);
-            pin.setUser(user);
-            pinRepository.save(pin);
-            log.info("Mensagem {} fixada para usuário {}", messageId, userId);
-            return true;
+        try {
+            log.info("Alternando fixação da mensagem {} para usuário {}", messageId, userId);
+            
+            if (messageId == null) {
+                throw new BusinessException("ID da mensagem é obrigatório");
+            }
+            
+            if (userId == null) {
+                throw new BusinessException("ID do usuário é obrigatório");
+            }
+            
+            ChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
+            
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+            
+            boolean isPinned = pinRepository.existsByMessageIdAndUserId(messageId, userId);
+            
+            if (isPinned) {
+                pinRepository.deleteByMessageIdAndUserId(messageId, userId);
+                log.info("Mensagem {} desfixada para usuário {}", messageId, userId);
+                return false;
+            } else {
+                ChatMessagePin pin = new ChatMessagePin();
+                pin.setMessage(message);
+                pin.setUser(user);
+                pinRepository.save(pin);
+                log.info("Mensagem {} fixada para usuário {}", messageId, userId);
+                return true;
+            }
+        } catch (BusinessException e) {
+            log.error("Erro de negócio ao alternar fixação: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Erro inesperado ao alternar fixação da mensagem {} para usuário {}: {}", 
+                messageId, userId, e.getMessage(), e);
+            throw new BusinessException("Erro ao processar fixação: " + e.getMessage());
         }
     }
     
@@ -79,27 +96,44 @@ public class ChatMessageActionService {
      * Adiciona ou remove uma mensagem dos favoritos
      */
     public boolean toggleFavorite(UUID messageId, UUID userId) {
-        log.info("Alternando favorito da mensagem {} para usuário {}", messageId, userId);
-        
-        ChatMessage message = chatMessageRepository.findById(messageId)
-            .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
-        
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
-        
-        boolean isFavorite = favoriteRepository.existsByMessageIdAndUserId(messageId, userId);
-        
-        if (isFavorite) {
-            favoriteRepository.deleteByMessageIdAndUserId(messageId, userId);
-            log.info("Mensagem {} removida dos favoritos para usuário {}", messageId, userId);
-            return false;
-        } else {
-            ChatMessageFavorite favorite = new ChatMessageFavorite();
-            favorite.setMessage(message);
-            favorite.setUser(user);
-            favoriteRepository.save(favorite);
-            log.info("Mensagem {} adicionada aos favoritos para usuário {}", messageId, userId);
-            return true;
+        try {
+            log.info("Alternando favorito da mensagem {} para usuário {}", messageId, userId);
+            
+            if (messageId == null) {
+                throw new BusinessException("ID da mensagem é obrigatório");
+            }
+            
+            if (userId == null) {
+                throw new BusinessException("ID do usuário é obrigatório");
+            }
+            
+            ChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
+            
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+            
+            boolean isFavorite = favoriteRepository.existsByMessageIdAndUserId(messageId, userId);
+            
+            if (isFavorite) {
+                favoriteRepository.deleteByMessageIdAndUserId(messageId, userId);
+                log.info("Mensagem {} removida dos favoritos para usuário {}", messageId, userId);
+                return false;
+            } else {
+                ChatMessageFavorite favorite = new ChatMessageFavorite();
+                favorite.setMessage(message);
+                favorite.setUser(user);
+                favoriteRepository.save(favorite);
+                log.info("Mensagem {} adicionada aos favoritos para usuário {}", messageId, userId);
+                return true;
+            }
+        } catch (BusinessException e) {
+            log.error("Erro de negócio ao alternar favorito: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Erro inesperado ao alternar favorito da mensagem {} para usuário {}: {}", 
+                messageId, userId, e.getMessage(), e);
+            throw new BusinessException("Erro ao processar favorito: " + e.getMessage());
         }
     }
     
