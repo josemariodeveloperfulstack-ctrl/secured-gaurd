@@ -1335,18 +1335,53 @@ jobs:
               # Verificar e recarregar configuração dinâmica se existir
               if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
                 echo "✅ Configuração dinâmica encontrada: /var/www/secured_guard/traefik/dynamic/ci.yml"
-                echo "🔄 Recarregando configuração dinâmica do Traefik..."
-                docker exec traefik kill -HUP 1 2>/dev/null || echo "⚠️ Não foi possível recarregar Traefik (pode ser normal)"
-                sleep 5
+                
+                # Reiniciar Traefik para garantir que a configuração seja carregada
+                echo "🔄 Reiniciando Traefik para carregar configuração dinâmica..."
+                docker restart traefik
+                sleep 15
+                
+                # Verificar se Traefik reiniciou
+                if docker ps | grep -q "traefik"; then
+                  echo "✅ Traefik reiniciado com sucesso"
+                else
+                  echo "❌ Traefik não reiniciou!"
+                  exit 1
+                fi
                 
                 # Verificar se o router foi carregado
                 echo "🔍 Verificando routers do Traefik..."
-                docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null | grep -q "ci-backend" && \
-                  echo "✅ Router ci-backend encontrado no Traefik" || \
+                ROUTERS=$(docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null || echo "[]")
+                if echo "$ROUTERS" | grep -q "ci-backend"; then
+                  echo "✅ Router ci-backend encontrado no Traefik"
+                else
                   echo "⚠️ Router ci-backend não encontrado no Traefik"
+                  echo "📋 Routers disponíveis:"
+                  echo "$ROUTERS" | jq -r '.[].name' 2>/dev/null || echo "$ROUTERS"
+                fi
               else
                 echo "⚠️ Configuração dinâmica não encontrada em /var/www/secured_guard/traefik/dynamic/ci.yml"
                 echo "💡 Isso pode causar erro 404. Verifique se o arquivo foi transferido corretamente."
+              fi
+              
+              # Garantir que Nginx está na rede z7network
+              echo ""
+              echo "🔗 Verificando se Nginx está na rede z7network..."
+              if docker ps | grep -q "secured-guard-nginx-ci"; then
+                if docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
+                  echo "✅ Nginx já está na rede z7network"
+                else
+                  echo "⚠️ Nginx não está na rede z7network. Conectando..."
+                  docker network connect z7network secured-guard-nginx-ci 2>/dev/null || echo "⚠️ Pode já estar conectado"
+                  sleep 2
+                  if docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
+                    echo "✅ Nginx conectado à rede z7network"
+                  else
+                    echo "❌ Falha ao conectar Nginx à rede z7network"
+                  fi
+                fi
+              else
+                echo "⚠️ Nginx não está rodando"
               fi
             else
               echo "⚠️ Traefik não está rodando! Iniciando..."
