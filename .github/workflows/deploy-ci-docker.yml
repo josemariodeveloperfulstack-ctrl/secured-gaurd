@@ -50,28 +50,44 @@ jobs:
       # ============================================
       - name: 🔨 Build Backend (Maven)
         working-directory: ./backend
+        continue-on-error: false
         run: |
           echo "🔨 Compilando backend para ambiente CI..."
-          chmod +x mvnw
+          chmod +x mvnw || echo "⚠️ mvnw já tem permissão"
           # pular totalmente compilação/execução de testes no CI (-Dmaven.test.skip=true)
-          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci
+          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci || {
+            echo "❌ Erro ao compilar backend"
+            echo "📋 Verificando logs do Maven..."
+            cat target/surefire-reports/*.txt 2>/dev/null || echo "Nenhum relatório de teste encontrado"
+            exit 1
+          }
           echo "✅ Backend compilado com sucesso!"
-          ls -lh target/*.jar
+          ls -lh target/*.jar || echo "⚠️ Nenhum JAR encontrado"
 
       # ============================================
       # 5️⃣ BUILD FRONTEND (Vite)
       # ============================================
       - name: 🎨 Build Frontend (Vite)
         working-directory: ./frontend
+        continue-on-error: false
         env:
           VITE_API_URL: https://ci.z7botsolutions.com.br/api
           VITE_ENVIRONMENT: ci
         run: |
           echo "🎨 Compilando frontend para ambiente CI..."
-          npm ci
-          npm run build
+          npm ci || {
+            echo "❌ Erro ao executar npm ci"
+            echo "📋 Verificando package-lock.json..."
+            ls -lh package-lock.json || echo "⚠️ package-lock.json não encontrado"
+            exit 1
+          }
+          npm run build || {
+            echo "❌ Erro ao executar npm run build"
+            echo "📋 Verificando logs do Vite..."
+            exit 1
+          }
           echo "✅ Frontend compilado com sucesso!"
-          ls -lh dist/
+          ls -lh dist/ || echo "⚠️ Diretório dist/ não encontrado"
 
       # ============================================
       # 6️⃣ BUILD DOCKER IMAGES
