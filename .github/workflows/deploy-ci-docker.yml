@@ -767,11 +767,12 @@ jobs:
             echo "📋 Redes Docker disponíveis:"
             $DOCKER_CMD network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
             
-            # Parar containers existentes antes de recriar
-            echo ""
-            echo "🛑 Parando containers existentes..."
-            $COMPOSE_CMD -f docker-compose.ci.yml down 2>&1 || true
-            sleep 5
+    # Parar containers existentes antes de recriar (sem remover redes compartilhadas)
+    echo ""
+    echo "🛑 Parando containers existentes..."
+    $COMPOSE_CMD -f docker-compose.ci.yml stop 2>&1 || true
+    $COMPOSE_CMD -f docker-compose.ci.yml rm -f 2>&1 || true
+    sleep 5
             
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
@@ -804,73 +805,111 @@ jobs:
               done
             fi
             
-            # Verificar se PostgreSQL e Redis estão rodando
-            echo ""
-            echo "🔍 Verificando PostgreSQL e Redis..."
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-db-ci"; then
-              echo "⚠️ PostgreSQL não está rodando! Tentando iniciar..."
-              $DOCKER_CMD start secured-guard-db-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
-              sleep 10
-            fi
-            
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-redis-ci"; then
-              echo "⚠️ Redis não está rodando! Tentando iniciar..."
-              $DOCKER_CMD start secured-guard-redis-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
-              sleep 10
-            fi
+    # Verificar se PostgreSQL e Redis estão rodando
+    echo ""
+    echo "🔍 Verificando PostgreSQL e Redis..."
+    
+    # Verificar usando docker-compose ps (mais confiável)
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps postgres-ci 2>&1 | grep -q "Up"; then
+      echo "⚠️ PostgreSQL não está rodando! Tentando iniciar..."
+      # Verificar se container existe antes de tentar iniciar
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-db-ci$"; then
+        $DOCKER_CMD start secured-guard-db-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
+      else
+        $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
+      fi
+      sleep 10
+    fi
+    
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps redis-ci 2>&1 | grep -q "Up"; then
+      echo "⚠️ Redis não está rodando! Tentando iniciar..."
+      # Verificar se container existe antes de tentar iniciar
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-redis-ci$"; then
+        $DOCKER_CMD start secured-guard-redis-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
+      else
+        $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
+      fi
+      sleep 10
+    fi
             
             # Aguardar PostgreSQL e Redis ficarem saudáveis
             echo "⏳ Aguardando PostgreSQL e Redis ficarem saudáveis (20s)..."
             sleep 20
             
-            # Verificar novamente se estão rodando
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-db-ci"; then
-              echo "❌ ERRO: PostgreSQL ainda não está rodando!"
-              echo "📋 Logs do PostgreSQL:"
-              $DOCKER_CMD logs --tail 50 secured-guard-db-ci 2>&1 | tail -30 || echo "Container não encontrado"
-              exit 1
-            fi
-            
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-redis-ci"; then
-              echo "❌ ERRO: Redis ainda não está rodando!"
-              echo "📋 Logs do Redis:"
-              $DOCKER_CMD logs --tail 50 secured-guard-redis-ci 2>&1 | tail -30 || echo "Container não encontrado"
-              exit 1
-            fi
+    # Verificar novamente se estão rodando usando docker-compose ps
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps postgres-ci 2>&1 | grep -q "Up"; then
+      echo "❌ ERRO: PostgreSQL ainda não está rodando!"
+      echo "📋 Logs do PostgreSQL:"
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-db-ci$"; then
+        $DOCKER_CMD logs --tail 50 secured-guard-db-ci 2>&1 | tail -30
+      else
+        echo "Container não foi criado"
+        $COMPOSE_CMD -f docker-compose.ci.yml logs postgres-ci 2>&1 | tail -30
+      fi
+      exit 1
+    fi
+    
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps redis-ci 2>&1 | grep -q "Up"; then
+      echo "❌ ERRO: Redis ainda não está rodando!"
+      echo "📋 Logs do Redis:"
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-redis-ci$"; then
+        $DOCKER_CMD logs --tail 50 secured-guard-redis-ci 2>&1 | tail -30
+      else
+        echo "Container não foi criado"
+        $COMPOSE_CMD -f docker-compose.ci.yml logs redis-ci 2>&1 | tail -30
+      fi
+      exit 1
+    fi
             
             echo "✅ PostgreSQL e Redis estão rodando!"
             
-            # Verificar se Frontend e Nginx estão rodando
-            echo ""
-            echo "🔍 Verificando Frontend e Nginx..."
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-frontend-ci"; then
-              echo "⚠️ Frontend não está rodando! Tentando iniciar..."
-              $DOCKER_CMD start secured-guard-frontend-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
-              sleep 10
-            fi
-            
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-nginx-ci"; then
-              echo "⚠️ Nginx não está rodando! Tentando iniciar..."
-              $DOCKER_CMD start secured-guard-nginx-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
-              sleep 10
-            fi
-            
-            # Verificar novamente
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-frontend-ci"; then
-              echo "❌ ERRO: Frontend ainda não está rodando!"
-              echo "📋 Logs do Frontend:"
-              $DOCKER_CMD logs --tail 50 secured-guard-frontend-ci 2>&1 | tail -30 || echo "Container não encontrado"
-            else
-              echo "✅ Frontend está rodando!"
-            fi
-            
-            if ! $DOCKER_CMD ps | grep -q "secured-guard-nginx-ci"; then
-              echo "❌ ERRO: Nginx ainda não está rodando!"
-              echo "📋 Logs do Nginx:"
-              $DOCKER_CMD logs --tail 50 secured-guard-nginx-ci 2>&1 | tail -30 || echo "Container não encontrado"
-            else
-              echo "✅ Nginx está rodando!"
-            fi
+    # Verificar se Frontend e Nginx estão rodando
+    echo ""
+    echo "🔍 Verificando Frontend e Nginx..."
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps frontend-ci 2>&1 | grep -q "Up"; then
+      echo "⚠️ Frontend não está rodando! Tentando iniciar..."
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+        $DOCKER_CMD start secured-guard-frontend-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
+      else
+        $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
+      fi
+      sleep 10
+    fi
+    
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps nginx-ci 2>&1 | grep -q "Up"; then
+      echo "⚠️ Nginx não está rodando! Tentando iniciar..."
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-nginx-ci$"; then
+        $DOCKER_CMD start secured-guard-nginx-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
+      else
+        $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
+      fi
+      sleep 10
+    fi
+    
+    # Verificar novamente usando docker-compose ps
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps frontend-ci 2>&1 | grep -q "Up"; then
+      echo "❌ ERRO: Frontend ainda não está rodando!"
+      echo "📋 Logs do Frontend:"
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+        $DOCKER_CMD logs --tail 50 secured-guard-frontend-ci 2>&1 | tail -30
+      else
+        $COMPOSE_CMD -f docker-compose.ci.yml logs frontend-ci 2>&1 | tail -30
+      fi
+    else
+      echo "✅ Frontend está rodando!"
+    fi
+    
+    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps nginx-ci 2>&1 | grep -q "Up"; then
+      echo "❌ ERRO: Nginx ainda não está rodando!"
+      echo "📋 Logs do Nginx:"
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-nginx-ci$"; then
+        $DOCKER_CMD logs --tail 50 secured-guard-nginx-ci 2>&1 | tail -30
+      else
+        $COMPOSE_CMD -f docker-compose.ci.yml logs nginx-ci 2>&1 | tail -30
+      fi
+    else
+      echo "✅ Nginx está rodando!"
+    fi
             
             echo "⏳ Aguardando containers iniciarem (30s)..."
             sleep 30
