@@ -42,17 +42,77 @@ public class QuoteService {
     @Autowired
     private UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public List<Quote> findAll() {
-        return quoteRepository.findAll();
+        List<Quote> quotes = quoteRepository.findAll();
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public Page<Quote> findAll(Pageable pageable) {
-        return quoteRepository.findAll(pageable);
+        Page<Quote> quotes = quoteRepository.findAll(pageable);
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Quote quote : quotes.getContent()) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
+    }
+    
+    /**
+     * Inicializa relacionamentos lazy de um Quote, tratando casos onde entidades foram deletadas
+     */
+    private void initializeQuoteRelationships(Quote quote) {
+        // Inicializar Client
+        if (quote.getClient() != null) {
+            try {
+                quote.getClient().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // Client foi deletado ou não pode ser inicializado, definir como null
+                quote.setClient(null);
+            }
+        }
+        
+        // Inicializar Lead
+        if (quote.getLead() != null) {
+            try {
+                quote.getLead().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // Lead foi deletado ou não pode ser inicializado, definir como null
+                quote.setLead(null);
+            }
+        }
+        
+        // Inicializar CreatedBy
+        if (quote.getCreatedBy() != null) {
+            try {
+                quote.getCreatedBy().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // User foi deletado ou não pode ser inicializado, definir como null
+                quote.setCreatedBy(null);
+            }
+        }
+        
+        // Inicializar AssignedTo
+        if (quote.getAssignedTo() != null) {
+            try {
+                quote.getAssignedTo().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // User foi deletado ou não pode ser inicializado, definir como null
+                quote.setAssignedTo(null);
+            }
+        }
     }
 
+    @Transactional(readOnly = true)
     public Quote findById(UUID id) {
-        return quoteRepository.findById(id)
+        Quote quote = quoteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Orçamento não encontrado com ID: " + id));
+        initializeQuoteRelationships(quote);
+        return quote;
     }
 
     public Quote create(QuoteDTO quoteDTO, UUID createdById) {
@@ -141,33 +201,68 @@ public class QuoteService {
         quoteRepository.delete(quote);
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findByStatus(QuoteStatus status) {
-        return quoteRepository.findByStatus(status);
+        List<Quote> quotes = quoteRepository.findByStatus(status);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findByClient(UUID clientId) {
-        return quoteRepository.findByClientId(clientId);
+        List<Quote> quotes = quoteRepository.findByClientId(clientId);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findByLead(UUID leadId) {
-        return quoteRepository.findByLeadId(leadId);
+        List<Quote> quotes = quoteRepository.findByLeadId(leadId);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findByAssignedTo(UUID userId) {
-        return quoteRepository.findByAssignedToId(userId);
+        List<Quote> quotes = quoteRepository.findByAssignedToId(userId);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findByCreatedBy(UUID userId) {
-        return quoteRepository.findByCreatedById(userId);
+        List<Quote> quotes = quoteRepository.findByCreatedById(userId);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findExpiredQuotes() {
-        return quoteRepository.findByValidUntilBefore(LocalDate.now());
+        List<Quote> quotes = quoteRepository.findByValidUntilBefore(LocalDate.now());
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> findQuotesExpiringSoon(int days) {
         LocalDate expiryDate = LocalDate.now().plusDays(days);
-        return quoteRepository.findByValidUntilBefore(expiryDate);
+        List<Quote> quotes = quoteRepository.findByValidUntilBefore(expiryDate);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
     public long countByStatus(QuoteStatus status) {
@@ -179,8 +274,13 @@ public class QuoteService {
         return value != null ? value : BigDecimal.ZERO;
     }
 
+    @Transactional(readOnly = true)
     public List<Quote> searchQuotes(String searchTerm) {
-        return quoteRepository.searchQuotes(searchTerm);
+        List<Quote> quotes = quoteRepository.searchQuotes(searchTerm);
+        for (Quote quote : quotes) {
+            initializeQuoteRelationships(quote);
+        }
+        return quotes;
     }
 
     private String generateQuoteNumber() {
