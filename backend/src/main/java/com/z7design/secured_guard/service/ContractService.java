@@ -177,14 +177,24 @@ public class ContractService {
     }
     
     // Métodos para conversão DTO
+    @Transactional(readOnly = true)
     public ContractDTO convertToDTO(Contract contract) {
         ContractDTO dto = new ContractDTO();
         BeanUtils.copyProperties(contract, dto);
         
+        // Inicializar relacionamento lazy do Client dentro da transação
         if (contract.getClient() != null) {
-            dto.setClientId(contract.getClient().getId());
-            dto.setClientName(contract.getClient().getName());
-            dto.setClientCnpj(contract.getClient().getCnpj());
+            try {
+                // Forçar inicialização do proxy lazy
+                contract.getClient().getName();
+                dto.setClientId(contract.getClient().getId());
+                dto.setClientName(contract.getClient().getName());
+                dto.setClientCnpj(contract.getClient().getCnpj());
+            } catch (org.hibernate.LazyInitializationException e) {
+                // Se o Client não puder ser inicializado, definir apenas o ID
+                dto.setClientId(contract.getClient().getId());
+                log.warn("Não foi possível inicializar o Client para o contrato {}", contract.getId());
+            }
         }
         
         return dto;

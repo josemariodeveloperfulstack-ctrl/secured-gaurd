@@ -7,6 +7,7 @@ import com.z7design.secured_guard.model.enums.LeadSource;
 import com.z7design.secured_guard.repository.LeadRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,17 +28,37 @@ public class LeadService {
     @Autowired
     private UserRepository userRepository;
 
+    /**
+     * Inicializa relacionamentos lazy de um Lead, tratando casos onde o User foi deletado
+     */
+    private void initializeLeadRelationships(Lead lead) {
+        // Inicializar createdBy
+        if (lead.getCreatedBy() != null) {
+            try {
+                lead.getCreatedBy().getUsername(); // Força inicialização
+            } catch (EntityNotFoundException e) {
+                // User foi deletado, definir como null
+                lead.setCreatedBy(null);
+            }
+        }
+        
+        // Inicializar assignedTo
+        if (lead.getAssignedTo() != null) {
+            try {
+                lead.getAssignedTo().getUsername(); // Força inicialização
+            } catch (EntityNotFoundException e) {
+                // User foi deletado, definir como null
+                lead.setAssignedTo(null);
+            }
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<Lead> findAll() {
         List<Lead> leads = leadRepository.findAll();
         // Inicializar relacionamentos lazy dentro da transação
         for (Lead lead : leads) {
-            if (lead.getCreatedBy() != null) {
-                lead.getCreatedBy().getUsername(); // Força inicialização
-            }
-            if (lead.getAssignedTo() != null) {
-                lead.getAssignedTo().getUsername(); // Força inicialização
-            }
+            initializeLeadRelationships(lead);
         }
         return leads;
     }
@@ -47,12 +68,7 @@ public class LeadService {
         Page<Lead> leads = leadRepository.findAll(pageable);
         // Inicializar relacionamentos lazy dentro da transação
         for (Lead lead : leads.getContent()) {
-            if (lead.getCreatedBy() != null) {
-                lead.getCreatedBy().getUsername(); // Força inicialização
-            }
-            if (lead.getAssignedTo() != null) {
-                lead.getAssignedTo().getUsername(); // Força inicialização
-            }
+            initializeLeadRelationships(lead);
         }
         return leads;
     }
@@ -129,29 +145,59 @@ public class LeadService {
         leadRepository.delete(lead);
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> findByStatus(LeadStatus status) {
-        return leadRepository.findByStatus(status);
+        List<Lead> leads = leadRepository.findByStatus(status);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> findBySource(LeadSource source) {
-        return leadRepository.findBySource(source);
+        List<Lead> leads = leadRepository.findBySource(source);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> findByAssignedTo(UUID userId) {
-        return leadRepository.findByAssignedToId(userId);
+        List<Lead> leads = leadRepository.findByAssignedToId(userId);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> findByCreatedBy(UUID userId) {
-        return leadRepository.findByCreatedById(userId);
+        List<Lead> leads = leadRepository.findByCreatedById(userId);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> findByCompany(String company) {
-        return leadRepository.findByCompanyContainingIgnoreCase(company);
+        List<Lead> leads = leadRepository.findByCompanyContainingIgnoreCase(company);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> findRecentLeads(int days) {
         LocalDateTime since = LocalDateTime.now().minusDays(days);
-        return leadRepository.findByCreatedAtAfter(since);
+        List<Lead> leads = leadRepository.findByCreatedAtAfter(since);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 
     public long countByStatus(LeadStatus status) {
@@ -162,7 +208,12 @@ public class LeadService {
         return leadRepository.countBySource(source);
     }
 
+    @Transactional(readOnly = true)
     public List<Lead> searchLeads(String searchTerm) {
-        return leadRepository.searchLeads(searchTerm);
+        List<Lead> leads = leadRepository.searchLeads(searchTerm);
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+        }
+        return leads;
     }
 } 
