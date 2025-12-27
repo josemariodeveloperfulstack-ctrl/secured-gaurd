@@ -15,6 +15,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -91,12 +92,18 @@ public class MeasurementReportService {
     /**
      * Gera PDF de um boletim específico com informações completas
      */
+    @Transactional(readOnly = true)
     public byte[] generateBulletinPDF(UUID bulletinId) throws IOException {
         log.info("Gerando PDF para boletim: {} com informações completas", bulletinId);
         
         // Buscar o boletim no banco de dados
         MeasurementBulletin bulletin = bulletinRepository.findById(bulletinId)
                 .orElseThrow(() -> new RuntimeException("Boletim não encontrado: " + bulletinId));
+        
+        // Inicializar relacionamentos lazy dentro da transação
+        if (bulletin.getItems() != null) {
+            bulletin.getItems().size(); // Força inicialização da coleção lazy
+        }
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = null;
@@ -268,12 +275,18 @@ public class MeasurementReportService {
     /**
      * Gera Excel de um boletim específico com informações completas
      */
+    @Transactional(readOnly = true)
     public byte[] generateBulletinExcel(UUID bulletinId) throws IOException {
         log.info("Gerando Excel para boletim: {} com informações completas", bulletinId);
         
         // Buscar o boletim no banco de dados
         MeasurementBulletin bulletin = bulletinRepository.findById(bulletinId)
                 .orElseThrow(() -> new RuntimeException("Boletim não encontrado: " + bulletinId));
+        
+        // Inicializar relacionamentos lazy dentro da transação
+        if (bulletin.getItems() != null) {
+            bulletin.getItems().size(); // Força inicialização da coleção lazy
+        }
         
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Boletim de Medição");
