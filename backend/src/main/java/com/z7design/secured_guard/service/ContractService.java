@@ -50,12 +50,38 @@ public class ContractService {
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
     
+    @Transactional(readOnly = true)
     public List<Contract> findAll() {
-        return contractRepository.findAll();
+        List<Contract> contracts = contractRepository.findAll();
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Contract contract : contracts) {
+            if (contract.getClient() != null) {
+                try {
+                    contract.getClient().getName(); // Força inicialização
+                } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                    // Client foi deletado ou não pode ser inicializado
+                    contract.setClient(null);
+                }
+            }
+        }
+        return contracts;
     }
     
+    @Transactional(readOnly = true)
     public Page<Contract> findAll(Pageable pageable) {
-        return contractRepository.findAll(pageable);
+        Page<Contract> contracts = contractRepository.findAll(pageable);
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Contract contract : contracts.getContent()) {
+            if (contract.getClient() != null) {
+                try {
+                    contract.getClient().getName(); // Força inicialização
+                } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                    // Client foi deletado ou não pode ser inicializado
+                    contract.setClient(null);
+                }
+            }
+        }
+        return contracts;
     }
     
     public Optional<Contract> findById(UUID id) {

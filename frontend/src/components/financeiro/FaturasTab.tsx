@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
+  XCircle,
   Building,
   CreditCard,
   Receipt
@@ -154,7 +155,7 @@ const FaturasTab: React.FC = () => {
       case 'PENDENTE': return <Clock className="h-4 w-4" />;
       case 'PAGA': return <CheckCircle className="h-4 w-4" />;
       case 'VENCIDA': return <AlertTriangle className="h-4 w-4" />;
-      case 'CANCELADA': return <X className="h-4 w-4" />;
+      case 'CANCELADA': return <XCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };

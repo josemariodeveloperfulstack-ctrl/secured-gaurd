@@ -13,7 +13,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import com.z7design.secured_guard.model.User;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -52,8 +55,14 @@ public class ProposalController {
     @PostMapping
     @Operation(summary = "Criar nova proposta", description = "Cria uma nova proposta no sistema")
     public ResponseEntity<Proposal> createProposal(@RequestBody ProposalDTO proposalDTO) {
-        // TODO: Obter ID do usuário logado do contexto de segurança
-        UUID currentUserId = UUID.randomUUID(); // Temporário
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        User currentUser = (User) authentication.getPrincipal();
+        UUID currentUserId = currentUser.getId();
+        
         Proposal createdProposal = proposalService.create(proposalDTO, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProposal);
     }

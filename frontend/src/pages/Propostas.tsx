@@ -50,6 +50,7 @@ import { clientService, Client } from '@/services/clientService';
 import leadService from '@/services/leadService';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import PropostaAcordo from '@/components/comercial/PropostaAcordo';
+import { AgreementProposalsList } from '@/components/comercial/AgreementProposalsList';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Plus as PlusIcon, Link as LinkIcon } from 'lucide-react';
 
@@ -74,7 +75,7 @@ const Propostas = () => {
   const [loadingLeads, setLoadingLeads] = useState(false);
 
   // Form state
-  const [formData, setFormData] = useState<CreateProposalRequest>({
+  const [formData, setFormData] = useState<CreateProposalRequest & { clientId?: number | string; leadId?: number | string }>({
     title: '',
     clientId: undefined,
     leadId: undefined,
@@ -123,27 +124,36 @@ const Propostas = () => {
     loadProposals();
   }, []);
 
-  // Load clients and leads when create modal opens
+  // Load clients and leads when create or edit modal opens
   useEffect(() => {
-    if (isCreateModalOpen) {
+    if (isCreateModalOpen || isEditModalOpen) {
       loadClients();
       loadLeads();
     }
-  }, [isCreateModalOpen]);
+  }, [isCreateModalOpen, isEditModalOpen]);
 
   // Load clients function
   const loadClients = async () => {
     try {
       setLoadingClients(true);
       const data = await clientService.getAllClients();
-      setClients(data);
+      console.log('📋 Clientes carregados:', data);
+      // Garantir que os dados estão no formato correto
+      const normalizedClients = Array.isArray(data) ? data.map((client: any) => ({
+        id: client.id || client.uuid || String(client.id),
+        name: client.name || client.nome || '',
+        cnpj: client.cnpj || ''
+      })) : [];
+      setClients(normalizedClients);
+      console.log('✅ Clientes normalizados:', normalizedClients);
     } catch (error: any) {
-      console.error('Erro ao carregar clientes:', error);
+      console.error('❌ Erro ao carregar clientes:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os clientes.",
+        description: error.response?.data?.message || "Não foi possível carregar os clientes.",
         variant: "destructive"
       });
+      setClients([]);
     } finally {
       setLoadingClients(false);
     }
@@ -154,10 +164,19 @@ const Propostas = () => {
     try {
       setLoadingLeads(true);
       const data = await leadService.getAllLeads();
-      setLeads(data);
+      console.log('📋 Leads carregados:', data);
+      // Garantir que os dados estão no formato correto
+      const normalizedLeads = Array.isArray(data) ? data.map((lead: any) => ({
+        id: lead.id || lead.uuid || String(lead.id),
+        name: lead.name || lead.nome || '',
+        company: lead.company || lead.empresa || ''
+      })) : [];
+      setLeads(normalizedLeads);
+      console.log('✅ Leads normalizados:', normalizedLeads);
     } catch (error: any) {
-      console.error('Erro ao carregar leads:', error);
+      console.error('❌ Erro ao carregar leads:', error);
       // Não mostrar toast para leads, pois é opcional
+      setLeads([]);
     } finally {
       setLoadingLeads(false);
     }
@@ -170,7 +189,7 @@ const Propostas = () => {
     
     // Se um cliente foi criado, selecioná-lo automaticamente
     if (createdClient && createdClient.id) {
-      setFormData({ ...formData, clientId: Number(createdClient.id) });
+      setFormData({ ...formData, clientId: isNaN(Number(createdClient.id)) ? createdClient.id : Number(createdClient.id) });
       toast({
         title: "Sucesso",
         description: `Cliente "${createdClient.name}" criado e selecionado com sucesso!`,
@@ -209,7 +228,14 @@ const Propostas = () => {
   const handleCreateProposal = async () => {
     try {
       setIsSubmitting(true);
-      await proposalService.createProposal(formData);
+      // Converter IDs para o formato esperado pela API (pode ser string UUID ou number)
+      const proposalData: CreateProposalRequest = {
+        ...formData,
+        clientId: formData.clientId ? (typeof formData.clientId === 'string' ? Number(formData.clientId) || formData.clientId : formData.clientId) : undefined,
+        leadId: formData.leadId ? (typeof formData.leadId === 'string' ? Number(formData.leadId) || formData.leadId : formData.leadId) : undefined,
+      };
+      console.log('📤 Enviando proposta:', proposalData);
+      await proposalService.createProposal(proposalData);
       toast({
         title: "Sucesso",
         description: "Proposta criada com sucesso!",
@@ -218,7 +244,7 @@ const Propostas = () => {
       resetForm();
       await loadProposals();
     } catch (error: any) {
-      console.error('Erro ao criar proposta:', error);
+      console.error('❌ Erro ao criar proposta:', error);
       toast({
         title: "Erro",
         description: error.response?.data?.message || "Não foi possível criar a proposta.",
@@ -231,14 +257,43 @@ const Propostas = () => {
 
   // Handle update proposal
   const handleUpdateProposal = async () => {
-    if (!selectedProposal) return;
+    if (!selectedProposal || !selectedProposal.id) {
+      toast({
+        title: "Erro",
+        description: "Proposta não selecionada ou ID inválido.",
+        variant: "destructive"
+      });
+      return;
+    }
     try {
       setIsSubmitting(true);
+      
+      // Converter clientId e leadId para string (UUID) se necessário
+      const clientId = formData.clientId 
+        ? (typeof formData.clientId === 'string' ? formData.clientId : String(formData.clientId))
+        : undefined;
+      
+      const leadId = formData.leadId
+        ? (typeof formData.leadId === 'string' ? formData.leadId : String(formData.leadId))
+        : undefined;
+      
       const updateData: UpdateProposalRequest = {
-        ...formData,
+        title: formData.title,
+        clientId: clientId,
+        leadId: leadId,
+        totalValue: formData.totalValue,
+        validUntil: formData.validUntil,
+        description: formData.description,
         status: formData.status || selectedProposal.status
       };
-      await proposalService.updateProposal(Number(selectedProposal.id), updateData);
+      
+      // Converter ID para string (pode ser UUID ou number)
+      const proposalId = typeof selectedProposal.id === 'string' 
+        ? selectedProposal.id 
+        : String(selectedProposal.id);
+      
+      console.log('📤 Atualizando proposta:', { id: proposalId, data: updateData });
+      await proposalService.updateProposal(proposalId, updateData);
       toast({
         title: "Sucesso",
         description: "Proposta atualizada com sucesso!",
@@ -259,10 +314,12 @@ const Propostas = () => {
   };
 
   // Handle delete proposal
-  const handleDeleteProposal = async (proposalId: number) => {
+  const handleDeleteProposal = async (proposalId: number | string) => {
     if (!confirm('Tem certeza que deseja excluir esta proposta?')) return;
     try {
-      await proposalService.deleteProposal(proposalId);
+      // Converter ID para string se necessário
+      const id = typeof proposalId === 'string' ? proposalId : String(proposalId);
+      await proposalService.deleteProposal(id);
       toast({
         title: "Sucesso",
         description: "Proposta excluída com sucesso!",
@@ -293,13 +350,63 @@ const Propostas = () => {
   };
 
   // Open edit modal
-  const handleEdit = (proposal: Proposal) => {
+  const handleEdit = async (proposal: Proposal) => {
     setSelectedProposal(proposal);
-    setFormData({
-      title: proposal.title || '',
-      totalValue: proposal.totalValue || 0,
-      description: proposal.description || ''
-    });
+    
+    // Carregar clientes e leads se ainda não foram carregados
+    if (clients.length === 0) {
+      await loadClients();
+    }
+    if (leads.length === 0) {
+      await loadLeads();
+    }
+    
+    // Buscar a proposta completa do backend para ter todos os dados
+    try {
+      // Converter ID para string se necessário
+      const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
+      const fullProposal = await proposalService.getProposalById(proposalId);
+      
+      // Extrair clientId e leadId (pode estar em client.id ou clientId direto)
+      const clientId = (fullProposal as any).clientId 
+        ? String((fullProposal as any).clientId)
+        : (fullProposal.client?.id ? String(fullProposal.client.id) : undefined);
+      
+      const leadId = (fullProposal as any).leadId
+        ? String((fullProposal as any).leadId)
+        : (fullProposal.lead?.id ? String(fullProposal.lead.id) : undefined);
+      
+      setFormData({
+        title: fullProposal.title || proposal.title || '',
+        clientId: clientId || undefined,
+        leadId: leadId || undefined,
+        totalValue: fullProposal.totalValue ? Number(fullProposal.totalValue) : proposal.totalValue || 0,
+        validUntil: fullProposal.validUntil ? new Date(fullProposal.validUntil).toISOString().split('T')[0] : proposal.validUntil || undefined,
+        description: fullProposal.description || proposal.description || '',
+        status: fullProposal.status || proposal.status || 'DRAFT'
+      });
+    } catch (error) {
+      // Se falhar, usar os dados que temos
+      console.error('Erro ao carregar proposta completa:', error);
+      const clientId = (proposal as any).clientId 
+        ? String((proposal as any).clientId)
+        : (proposal.client?.id ? String(proposal.client.id) : undefined);
+      
+      const leadId = (proposal as any).leadId
+        ? String((proposal as any).leadId)
+        : (proposal.lead?.id ? String(proposal.lead.id) : undefined);
+      
+      setFormData({
+        title: proposal.title || '',
+        clientId: clientId || undefined,
+        leadId: leadId || undefined,
+        totalValue: proposal.totalValue || 0,
+        validUntil: proposal.validUntil || undefined,
+        description: proposal.description || '',
+        status: proposal.status || 'DRAFT'
+      });
+    }
+    
     setIsEditModalOpen(true);
   };
 
@@ -579,7 +686,7 @@ const Propostas = () => {
                                   variant="outline"
                                   size="sm"
                                   className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
-                                  onClick={() => handleDeleteProposal(Number(proposal.id))}
+                                  onClick={() => handleDeleteProposal(proposal.id)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -667,7 +774,15 @@ const Propostas = () => {
                       >
                         Fechar
                       </Button>
-                      <Button className="bg-seguranca-red hover:bg-seguranca-darkred">
+                      <Button 
+                        className="bg-seguranca-red hover:bg-seguranca-darkred"
+                        onClick={() => {
+                          if (selectedProposal) {
+                            setIsViewModalOpen(false);
+                            handleEdit(selectedProposal);
+                          }
+                        }}
+                      >
                         Editar Proposta
                       </Button>
                     </div>
@@ -702,9 +817,10 @@ const Propostas = () => {
                       <div className="flex gap-2">
                         <div className="flex-1 relative">
                           <Select
-                            value={formData.clientId?.toString() || ''}
+                            value={formData.clientId ? String(formData.clientId) : ''}
                             onValueChange={(value) => {
-                              setFormData({ ...formData, clientId: Number(value) });
+                              console.log('🔵 Cliente selecionado:', value);
+                              setFormData({ ...formData, clientId: value ? (isNaN(Number(value)) ? value : Number(value)) : undefined });
                             }}
                             disabled={loadingClients}
                           >
@@ -715,7 +831,7 @@ const Propostas = () => {
                                 placeholder={loadingClients ? "Carregando clientes..." : clients.length === 0 ? "Nenhum cliente cadastrado" : "Selecione o cliente"}
                               />
                             </SelectTrigger>
-                            <SelectContent className="bg-seguranca-graphite border-gray-600">
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
                               {loadingClients ? (
                                 <SelectItem value="loading" disabled className="text-gray-400">
                                   Carregando clientes...
@@ -728,8 +844,8 @@ const Propostas = () => {
                                 clients.map((client) => (
                                   <SelectItem 
                                     key={client.id} 
-                                    value={client.id.toString()}
-                                    className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                                    value={String(client.id)}
+                                    className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray"
                                   >
                                     {client.name} {client.cnpj ? `- ${client.cnpj}` : ''}
                                   </SelectItem>
@@ -737,23 +853,6 @@ const Propostas = () => {
                               )}
                             </SelectContent>
                           </Select>
-                          {/* Exibição customizada do nome do cliente selecionado - fallback se Radix UI não renderizar */}
-                          {formData.clientId && clients.length > 0 && (() => {
-                            const selectedClient = clients.find(c => c.id === formData.clientId);
-                            if (selectedClient) {
-                              return (
-                                <div 
-                                  className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10 pr-8"
-                                  style={{ color: '#ffffff' }}
-                                >
-                                  <span className="text-sm font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis block max-w-full">
-                                    {selectedClient.name} {selectedClient.cnpj ? `- ${selectedClient.cnpj}` : ''}
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
                         </div>
                         <Button
                           type="button"
@@ -781,16 +880,23 @@ const Propostas = () => {
                     <div>
                       <Label htmlFor="lead" className="text-seguranca-lightgray">Lead</Label>
                       <Select
-                        value={formData.leadId?.toString() || '__NONE__'}
-                        onValueChange={(value) => setFormData({ ...formData, leadId: value === '__NONE__' ? undefined : Number(value) })}
+                        value={formData.leadId ? String(formData.leadId) : '__NONE__'}
+                        onValueChange={(value) => {
+                          console.log('🔵 Lead selecionado:', value);
+                          setFormData({ ...formData, leadId: value === '__NONE__' ? undefined : (isNaN(Number(value)) ? value : Number(value)) });
+                        }}
                         disabled={loadingLeads}
                       >
                         <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:text-seguranca-lightgray">
                           <SelectValue placeholder={loadingLeads ? "Carregando leads..." : "Selecione o lead (opcional)"} />
                         </SelectTrigger>
-                        <SelectContent className="bg-seguranca-graphite border-gray-600">
-                          <SelectItem value="__NONE__" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Nenhum</SelectItem>
-                          {leads.length === 0 ? (
+                        <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                          <SelectItem value="__NONE__" className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray">Nenhum</SelectItem>
+                          {loadingLeads ? (
+                            <SelectItem value="loading" disabled className="text-gray-400">
+                              Carregando leads...
+                            </SelectItem>
+                          ) : leads.length === 0 ? (
                             <SelectItem value="no-leads" disabled className="text-gray-400">
                               Nenhum lead encontrado
                             </SelectItem>
@@ -798,8 +904,8 @@ const Propostas = () => {
                             leads.map((lead) => (
                               <SelectItem 
                                 key={lead.id} 
-                                value={lead.id.toString()}
-                                className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                                value={String(lead.id)}
+                                className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray"
                               >
                                 {lead.name} {lead.company ? `- ${lead.company}` : ''}
                               </SelectItem>
@@ -890,6 +996,138 @@ const Propostas = () => {
               </DialogContent>
             </Dialog>
 
+            {/* Modal de Edição */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+              <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-seguranca-lightgray">Editar Proposta</DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    Atualize os dados da proposta comercial
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-title" className="text-seguranca-lightgray">Título *</Label>
+                      <Input
+                        id="edit-title"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                        placeholder="Título da proposta"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-client" className="text-seguranca-lightgray">Cliente</Label>
+                      <Select
+                        value={formData.clientId ? String(formData.clientId) : ''}
+                        onValueChange={(value) => {
+                          setFormData({ ...formData, clientId: value ? (isNaN(Number(value)) ? value : Number(value)) : undefined });
+                        }}
+                        disabled={loadingClients}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                          <SelectValue placeholder={loadingClients ? "Carregando..." : "Selecione o cliente"} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                          {clients.map((client) => (
+                            <SelectItem 
+                              key={client.id} 
+                              value={String(client.id)}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
+                            >
+                              {client.name} {client.cnpj ? `- ${client.cnpj}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-totalValue" className="text-seguranca-lightgray">Valor Total *</Label>
+                      <Input
+                        id="edit-totalValue"
+                        type="number"
+                        step="0.01"
+                        value={formData.totalValue || ''}
+                        onChange={(e) => setFormData({ ...formData, totalValue: parseFloat(e.target.value) || 0 })}
+                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-validUntil" className="text-seguranca-lightgray">Válida Até</Label>
+                      <Input
+                        id="edit-validUntil"
+                        type="date"
+                        value={formData.validUntil || ''}
+                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
+                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-status" className="text-seguranca-lightgray">Status</Label>
+                      <Select
+                        value={formData.status || selectedProposal?.status || 'DRAFT'}
+                        onValueChange={(value) => setFormData({ ...formData, status: value as any })}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="DRAFT" className="text-seguranca-lightgray">Rascunho</SelectItem>
+                          <SelectItem value="SENT" className="text-seguranca-lightgray">Enviada</SelectItem>
+                          <SelectItem value="UNDER_REVIEW" className="text-seguranca-lightgray">Em Análise</SelectItem>
+                          <SelectItem value="APPROVED" className="text-seguranca-lightgray">Aprovada</SelectItem>
+                          <SelectItem value="REJECTED" className="text-seguranca-lightgray">Rejeitada</SelectItem>
+                          <SelectItem value="EXPIRED" className="text-seguranca-lightgray">Expirada</SelectItem>
+                          <SelectItem value="CONVERTED" className="text-seguranca-lightgray">Convertida</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit-description" className="text-seguranca-lightgray">Descrição</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={formData.description || ''}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      placeholder="Descrição detalhada da proposta..."
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      onClick={() => {
+                        setIsEditModalOpen(false);
+                        resetForm();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      className="bg-seguranca-red hover:bg-seguranca-darkred"
+                      onClick={handleUpdateProposal}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Atualizando...
+                        </>
+                      ) : (
+                        'Atualizar Proposta'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {/* Modal de Criação de Cliente */}
             <ClientFormModal
               isOpen={isClientModalOpen}
@@ -899,7 +1137,57 @@ const Propostas = () => {
           </div>
         </TabsContent>
         <TabsContent value="acordo">
-          <PropostaAcordo />
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-seguranca-lightgray">Propostas de Acordo</h1>
+                <p className="text-gray-400 mt-1">Simulação e gestão de propostas de acordo comercial</p>
+              </div>
+            </div>
+
+            {/* Tabs internas para Simulação e Lista */}
+            <Tabs defaultValue="simulacao" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="simulacao">Simulação</TabsTrigger>
+                <TabsTrigger value="lista">Lista de Propostas de Acordo</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="simulacao">
+                <PropostaAcordo 
+                  onSaveProposal={async (proposalData: any) => {
+                    try {
+                      // Salvar como proposta no backend
+                      const savedProposal = await proposalService.createProposal({
+                        title: `Proposta de Acordo - ${new Date().toLocaleDateString('pt-BR')}`,
+                        description: proposalData.descricaoServico || 'Proposta de Acordo Comercial',
+                        totalValue: proposalData.resultado.valorMensal,
+                        validUntil: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                        status: 'DRAFT',
+                        items: []
+                      });
+                      toast({
+                        title: "Sucesso",
+                        description: "Proposta de acordo salva com sucesso!",
+                      });
+                      // Recarregar lista de propostas
+                      await loadProposals();
+                    } catch (error: any) {
+                      console.error('Erro ao salvar proposta de acordo:', error);
+                      toast({
+                        title: "Erro",
+                        description: error.response?.data?.message || "Não foi possível salvar a proposta de acordo.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                />
+              </TabsContent>
+              
+              <TabsContent value="lista">
+                <AgreementProposalsList />
+              </TabsContent>
+            </Tabs>
+          </div>
         </TabsContent>
       </Tabs>
     </StandardLayout>

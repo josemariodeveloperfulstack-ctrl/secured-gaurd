@@ -9,15 +9,15 @@ export interface ProposalItem {
 }
 
 export interface Proposal {
-  id: number;
+  id: number | string; // Pode ser UUID (string) ou number
   title: string;
   proposalNumber: string;
   client?: {
-    id: number;
+    id: number | string;
     name: string;
   };
   lead?: {
-    id: number;
+    id: number | string;
     name: string;
   };
   status: string;
@@ -25,11 +25,11 @@ export interface Proposal {
   validUntil: string;
   description: string;
   assignedTo?: {
-    id: number;
+    id: number | string;
     name: string;
   };
   createdBy: {
-    id: number;
+    id: number | string;
     name: string;
   };
   createdAt: string;
@@ -39,12 +39,12 @@ export interface Proposal {
 
 export interface CreateProposalRequest {
   title: string;
-  clientId?: number;
-  leadId?: number;
+  clientId?: number | string; // Pode ser UUID (string) ou number
+  leadId?: number | string; // Pode ser UUID (string) ou number
   totalValue: number;
   validUntil?: string;
   description?: string;
-  assignedToId?: number;
+  assignedToId?: number | string; // Pode ser UUID (string) ou number
   items?: {
     description: string;
     quantity: number;

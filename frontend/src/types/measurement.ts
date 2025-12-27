@@ -17,7 +17,14 @@ export interface MeasurementBulletin {
   items: MeasurementItem[];
   calculationMemory?: CalculationMemory;
   subtotal: number;
-  client?: { id: number; name: string };
+  // IDs diretos do DTO
+  clientId?: string;
+  clientName?: string;
+  contractId?: string;
+  unitId?: string;
+  unitName?: string;
+  // Objetos completos (para compatibilidade)
+  client?: { id: number | string; name: string };
   contract?: { id: string; contractNumber: string; description: string };
   unit?: { id: string; name: string };
   notes?: string;

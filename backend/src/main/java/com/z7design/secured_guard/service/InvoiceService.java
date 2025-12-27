@@ -182,6 +182,10 @@ public class InvoiceService {
                             updateInvoiceFromDTO(invoice, invoiceDTO);
                             log.info("Dados atualizados, salvando fatura...");
                             Invoice saved = invoiceRepository.save(invoice);
+                            
+                            // Inicializar relacionamentos lazy dentro da transação
+                            initializeInvoiceRelationships(saved);
+                            
                             log.info("Fatura salva com sucesso: {}", saved.getId());
                             return saved;
                         } catch (Exception e) {
@@ -196,6 +200,51 @@ public class InvoiceService {
         } catch (Exception e) {
             log.error("Erro geral ao atualizar fatura {}: {}", id, e.getMessage(), e);
             throw e;
+        }
+    }
+    
+    /**
+     * Inicializa relacionamentos lazy de uma Invoice, tratando casos onde entidades foram deletadas
+     */
+    private void initializeInvoiceRelationships(Invoice invoice) {
+        // Inicializar Supplier
+        if (invoice.getSupplier() != null) {
+            try {
+                invoice.getSupplier().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // Supplier foi deletado ou não pode ser inicializado, definir como null
+                invoice.setSupplier(null);
+            }
+        }
+        
+        // Inicializar Client
+        if (invoice.getClient() != null) {
+            try {
+                invoice.getClient().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // Client foi deletado ou não pode ser inicializado, definir como null
+                invoice.setClient(null);
+            }
+        }
+        
+        // Inicializar Contract
+        if (invoice.getContract() != null) {
+            try {
+                invoice.getContract().getContractNumber(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // Contract foi deletado ou não pode ser inicializado, definir como null
+                invoice.setContract(null);
+            }
+        }
+        
+        // Inicializar Unit
+        if (invoice.getUnit() != null) {
+            try {
+                invoice.getUnit().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                // Unit foi deletado ou não pode ser inicializado, definir como null
+                invoice.setUnit(null);
+            }
         }
     }
     

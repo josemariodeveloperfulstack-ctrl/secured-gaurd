@@ -84,6 +84,29 @@ const OcorrenciasPage: React.FC = () => {
     handleCloseModal();
   };
 
+  const handleDeleteOccurrence = async (occurrence: ServiceOccurrence) => {
+    if (!window.confirm(`Tem certeza que deseja excluir a ocorrência "${occurrence.title || occurrence.description}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      await occurrenceService.deleteOccurrence(occurrence.id);
+      queryClient.invalidateQueries({ queryKey: ['occurrences'] });
+      toast({
+        title: "Sucesso",
+        description: "Ocorrência excluída com sucesso",
+      });
+      refetch();
+    } catch (error: any) {
+      console.error('Erro ao excluir ocorrência:', error);
+      toast({
+        title: "Erro",
+        description: error?.response?.data?.message || "Não foi possível excluir a ocorrência. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleRefresh = () => {
     refetch();
     toast({
@@ -448,6 +471,7 @@ const OcorrenciasPage: React.FC = () => {
                                 size="sm"
                                 variant="outline"
                                 className="text-red-400 border-red-400 hover:bg-red-400 hover:text-seguranca-black"
+                                onClick={() => handleDeleteOccurrence(occurrence)}
                               >
                                 <Trash2 size={16} className="mr-1" />
                                 Excluir

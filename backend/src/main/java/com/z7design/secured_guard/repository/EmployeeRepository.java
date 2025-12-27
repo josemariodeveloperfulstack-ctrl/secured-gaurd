@@ -47,7 +47,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     List<UUID> findAllIds();
     
     // Buscar dados básicos COM relacionamentos de cargo e unidade
-    @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name FROM employees e LEFT JOIN positions p ON e.position_id = p.id LEFT JOIN units u ON e.unit_id = u.id", nativeQuery = true)
+    @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, e.user_id FROM employees e LEFT JOIN positions p ON e.position_id = p.id LEFT JOIN units u ON e.unit_id = u.id", nativeQuery = true)
     List<Object[]> findBasicData();
 
     // Buscar apenas o nome por ID para evitar carregar toda a entidade (e colunas inexistentes em alguns ambientes)

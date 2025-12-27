@@ -57,6 +57,7 @@ const Medicao: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedBulletin, setSelectedBulletin] = useState<MeasurementBulletin | null>(null);
   const [editingBulletin, setEditingBulletin] = useState<MeasurementBulletin | null>(null);
+  const [editingSimplifiedBulletin, setEditingSimplifiedBulletin] = useState<MeasurementBulletin | null>(null);
   const [bulletinToDelete, setBulletinToDelete] = useState<MeasurementBulletin | null>(null);
   const [loading, setLoading] = useState(false);
   const [dashboardData, setDashboardData] = useState({
@@ -238,6 +239,11 @@ const Medicao: React.FC = () => {
     setShowBulletinModal(true);
   };
 
+  const handleEditSimplifiedBulletin = (bulletin: MeasurementBulletin) => {
+    setEditingSimplifiedBulletin(bulletin);
+    setShowSimplifiedModal(true);
+  };
+
   const handleDeleteBulletin = (bulletin: MeasurementBulletin) => {
     setBulletinToDelete(bulletin);
     setShowDeleteDialog(true);
@@ -249,7 +255,7 @@ const Medicao: React.FC = () => {
   };
 
   const handleCreateSimplifiedBulletin = () => {
-    setEditingBulletin(null);
+    setEditingSimplifiedBulletin(null);
     setShowSimplifiedModal(true);
   };
 
@@ -266,6 +272,7 @@ const Medicao: React.FC = () => {
     setShowDeleteDialog(false);
     setSelectedBulletin(null);
     setEditingBulletin(null);
+    setEditingSimplifiedBulletin(null);
     setBulletinToDelete(null);
   };
 
@@ -644,7 +651,7 @@ const Medicao: React.FC = () => {
           <TabsContent value="simplificada">
             <MeasurementSimpleTable
               onView={handleViewBulletin}
-              onEdit={handleEditBulletin}
+              onEdit={handleEditSimplifiedBulletin}
               onDelete={handleDeleteBulletin}
               onCreate={handleCreateSimplifiedBulletin}
               onValidate={handleValidateBulletin}
@@ -669,8 +676,10 @@ const Medicao: React.FC = () => {
           <SimplifiedMeasurementModal
             open={showSimplifiedModal}
             onOpenChange={setShowSimplifiedModal}
+            bulletin={editingSimplifiedBulletin}
             onSuccess={() => {
               handleCloseModals();
+              setEditingSimplifiedBulletin(null);
               // Aqui você pode adicionar lógica para recarregar as tabelas
             }}
           />

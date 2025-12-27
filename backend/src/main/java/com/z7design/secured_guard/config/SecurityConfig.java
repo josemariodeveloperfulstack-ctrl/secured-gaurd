@@ -155,6 +155,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/user-terms-consent/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de contratos - requerem permissões específicas
                 .requestMatchers("/api/contracts/**").hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE", "CONTRACTS_CREATE", "CONTRACTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR")
+                // Endpoints de propostas - requerem permissões específicas
+                .requestMatchers("/api/proposals/**").hasAnyAuthority("PROPOSALS_READ", "PROPOSALS_WRITE", "PROPOSALS_CREATE", "PROPOSALS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_COMERCIAL")
                 // Endpoints financeiros - requerem permissões específicas
                 .requestMatchers("/api/financial/**").hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
                 // Endpoints de invoices (contas a pagar)

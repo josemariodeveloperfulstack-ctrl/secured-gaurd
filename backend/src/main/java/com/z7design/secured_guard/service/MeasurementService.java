@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.Hibernate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -222,10 +223,26 @@ public class MeasurementService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public MeasurementBulletinDTO getBulletinById(UUID id) {
         log.info("Buscando boletim por ID: {}", id);
         MeasurementBulletin bulletin = bulletinRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Boletim de medição não encontrado: " + id));
+        
+        // Inicializar relacionamentos lazy dentro da transação
+        if (bulletin.getClient() != null) {
+            Hibernate.initialize(bulletin.getClient());
+        }
+        if (bulletin.getContract() != null) {
+            Hibernate.initialize(bulletin.getContract());
+        }
+        if (bulletin.getUnit() != null) {
+            Hibernate.initialize(bulletin.getUnit());
+        }
+        if (bulletin.getItems() != null) {
+            Hibernate.initialize(bulletin.getItems());
+        }
+        
         return MeasurementBulletinDTO.fromEntity(bulletin);
     }
 
@@ -342,8 +359,17 @@ public class MeasurementService {
 
         // Atualizar entidades relacionadas
         if (dto.getClientId() != null) {
-            existingBulletin.setClient(clientRepository.findById(dto.getClientId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado: " + dto.getClientId())));
+            try {
+                existingBulletin.setClient(clientRepository.findById(dto.getClientId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado: " + dto.getClientId())));
+            } catch (ResourceNotFoundException e) {
+                log.warn("Cliente não encontrado ao atualizar boletim: {}. Mantendo cliente atual ou removendo se necessário.", dto.getClientId());
+                // Se o cliente não existe, manter o cliente atual ou definir como null
+                // Não falhar a atualização por causa disso
+                if (existingBulletin.getClient() == null || !existingBulletin.getClient().getId().equals(dto.getClientId())) {
+                    existingBulletin.setClient(null);
+                }
+            }
         }
 
         if (dto.getContractId() != null) {

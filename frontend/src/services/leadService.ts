@@ -1,21 +1,26 @@
 import api from '@/lib/axios';
 
 export interface Lead {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   phone: string;
+  mobile?: string;
   company: string;
   position: string;
   source: string;
   status: string;
   description: string;
+  notes?: string;
+  estimatedValue?: number;
   assignedTo?: {
-    id: number;
+    id: number | string;
     name: string;
   };
+  assignedToName?: string;
+  nextFollowUp?: string;
   createdBy: {
-    id: number;
+    id: number | string;
     name: string;
   };
   createdAt: string;
@@ -29,8 +34,11 @@ export interface CreateLeadRequest {
   company?: string;
   position?: string;
   source: string;
+  status?: string;
   description?: string;
-  assignedToId?: number;
+  assignedToId?: number | string;
+  nextFollowUp?: string;
+  estimatedValue?: number;
 }
 
 export interface UpdateLeadRequest extends CreateLeadRequest {

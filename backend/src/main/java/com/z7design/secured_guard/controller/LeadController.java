@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,15 +40,68 @@ public class LeadController {
 
     @GetMapping("/all")
     @Operation(summary = "Listar todos os leads sem paginação", description = "Retorna uma lista completa de todos os leads")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<Lead>> getAllLeadsList() {
         List<Lead> leads = leadService.findAll();
+        // Forçar inicialização completa do assignedTo antes da serialização JSON
+        // Isso garante que o Jackson possa serializar o relacionamento lazy
+        for (Lead lead : leads) {
+            if (lead.getAssignedTo() != null) {
+                try {
+                    // Acessar TODOS os campos do assignedTo para garantir inicialização completa
+                    // Isso força o Hibernate a carregar o objeto completo antes da serialização
+                    var assignedTo = lead.getAssignedTo();
+                    UUID id = assignedTo.getId();
+                    String name = assignedTo.getName();
+                    String username = assignedTo.getUsername();
+                    // Acessar mais campos para garantir que o objeto está totalmente carregado
+                    assignedTo.getEmail();
+                    assignedTo.isEnabled();
+                    assignedTo.isAccountNonExpired();
+                    // Popular assignedToName para facilitar serialização
+                    lead.setAssignedToName(name != null ? name : username);
+                    log.info("✅ Lead {} - AssignedTo inicializado: ID={}, Name={}, Username={}, AssignedToName={}", 
+                        lead.getId(), id, name, username, lead.getAssignedToName());
+                } catch (Exception e) {
+                    log.warn("❌ Erro ao acessar assignedTo do lead {}: {}", lead.getId(), e.getMessage());
+                }
+            } else {
+                log.debug("⚠️ Lead {} - AssignedTo é null", lead.getId());
+            }
+        }
         return ResponseEntity.ok(leads);
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar lead por ID", description = "Retorna um lead específico pelo ID")
+    @Transactional(readOnly = true)
     public ResponseEntity<Lead> getLeadById(@PathVariable String id) {
         Lead lead = leadService.findById(UUID.fromString(id));
+        
+        // Forçar inicialização completa do assignedTo antes da serialização JSON
+        if (lead.getAssignedTo() != null) {
+            try {
+                // Acessar TODOS os campos do assignedTo para garantir inicialização completa
+                // Isso força o Hibernate a carregar o objeto completo antes da serialização
+                var assignedTo = lead.getAssignedTo();
+                UUID assignedToId = assignedTo.getId();
+                String name = assignedTo.getName();
+                String username = assignedTo.getUsername();
+                // Acessar mais campos para garantir que o objeto está totalmente carregado
+                assignedTo.getEmail();
+                assignedTo.isEnabled();
+                assignedTo.isAccountNonExpired();
+                // Popular assignedToName para facilitar serialização
+                lead.setAssignedToName(name != null ? name : username);
+                log.info("✅ Lead {} - AssignedTo inicializado no getLeadById: ID={}, Name={}, Username={}, AssignedToName={}", 
+                    lead.getId(), assignedToId, name, username, lead.getAssignedToName());
+            } catch (Exception e) {
+                log.warn("❌ Erro ao acessar assignedTo do lead {} no getLeadById: {}", lead.getId(), e.getMessage());
+            }
+        } else {
+            log.debug("⚠️ Lead {} - AssignedTo é null no getLeadById", lead.getId());
+        }
+        
         return ResponseEntity.ok(lead);
     }
 
@@ -74,8 +128,35 @@ public class LeadController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar lead", description = "Atualiza um lead existente")
+    @Transactional(readOnly = true)
     public ResponseEntity<Lead> updateLead(@PathVariable String id, @RequestBody LeadDTO leadDTO) {
+        log.info("📡 RECEBIDO UPDATE LEAD ID: {}", id);
+        log.info("📦 Payload: {}", leadDTO);
         Lead updatedLead = leadService.update(UUID.fromString(id), leadDTO);
+        
+        // Forçar inicialização completa do assignedTo antes da serialização JSON
+        if (updatedLead.getAssignedTo() != null) {
+            try {
+                // Acessar TODOS os campos do assignedTo para garantir inicialização completa
+                var assignedTo = updatedLead.getAssignedTo();
+                UUID assignedToId = assignedTo.getId();
+                String name = assignedTo.getName();
+                String username = assignedTo.getUsername();
+                // Acessar mais campos para garantir que o objeto está totalmente carregado
+                assignedTo.getEmail();
+                assignedTo.isEnabled();
+                assignedTo.isAccountNonExpired();
+                // Popular assignedToName para facilitar serialização
+                updatedLead.setAssignedToName(name != null ? name : username);
+                log.info("✅ Lead {} atualizado - AssignedTo inicializado: ID={}, Name={}, Username={}, AssignedToName={}", 
+                    updatedLead.getId(), assignedToId, name, username, updatedLead.getAssignedToName());
+            } catch (Exception e) {
+                log.warn("❌ Erro ao acessar assignedTo do lead {} após atualização: {}", updatedLead.getId(), e.getMessage());
+            }
+        } else {
+            log.debug("⚠️ Lead {} atualizado - AssignedTo é null", updatedLead.getId());
+        }
+        
         return ResponseEntity.ok(updatedLead);
     }
 

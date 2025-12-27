@@ -11,6 +11,7 @@ import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.LeadRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -69,9 +70,15 @@ public class QuoteService {
         // Inicializar Client
         if (quote.getClient() != null) {
             try {
-                quote.getClient().getName(); // Força inicialização
+                // Usar Hibernate.initialize() para forçar inicialização dentro da transação
+                Hibernate.initialize(quote.getClient());
+                // Acessar um campo para garantir que foi carregado
+                quote.getClient().getName();
             } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
                 // Client foi deletado ou não pode ser inicializado, definir como null
+                quote.setClient(null);
+            } catch (Exception e) {
+                // Outros erros também resultam em null para evitar problemas
                 quote.setClient(null);
             }
         }
@@ -79,9 +86,11 @@ public class QuoteService {
         // Inicializar Lead
         if (quote.getLead() != null) {
             try {
-                quote.getLead().getName(); // Força inicialização
+                Hibernate.initialize(quote.getLead());
+                quote.getLead().getName();
             } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
-                // Lead foi deletado ou não pode ser inicializado, definir como null
+                quote.setLead(null);
+            } catch (Exception e) {
                 quote.setLead(null);
             }
         }
@@ -89,9 +98,11 @@ public class QuoteService {
         // Inicializar CreatedBy
         if (quote.getCreatedBy() != null) {
             try {
-                quote.getCreatedBy().getName(); // Força inicialização
+                Hibernate.initialize(quote.getCreatedBy());
+                quote.getCreatedBy().getUsername();
             } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
-                // User foi deletado ou não pode ser inicializado, definir como null
+                quote.setCreatedBy(null);
+            } catch (Exception e) {
                 quote.setCreatedBy(null);
             }
         }
@@ -99,9 +110,11 @@ public class QuoteService {
         // Inicializar AssignedTo
         if (quote.getAssignedTo() != null) {
             try {
-                quote.getAssignedTo().getName(); // Força inicialização
+                Hibernate.initialize(quote.getAssignedTo());
+                quote.getAssignedTo().getUsername();
             } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
-                // User foi deletado ou não pode ser inicializado, definir como null
+                quote.setAssignedTo(null);
+            } catch (Exception e) {
                 quote.setAssignedTo(null);
             }
         }
@@ -281,6 +294,103 @@ public class QuoteService {
             initializeQuoteRelationships(quote);
         }
         return quotes;
+    }
+
+    /**
+     * Converte uma entidade Quote para DTO, inicializando relacionamentos lazy dentro da transação
+     */
+    @Transactional(readOnly = true)
+    public QuoteDTO convertToDTO(Quote quote) {
+        if (quote == null) {
+            return null;
+        }
+        
+        // Garantir que relacionamentos lazy sejam inicializados
+        initializeQuoteRelationships(quote);
+        
+        QuoteDTO dto = new QuoteDTO();
+        dto.setId(quote.getId());
+        dto.setTitle(quote.getTitle());
+        dto.setQuoteNumber(quote.getQuoteNumber());
+        dto.setStatus(quote.getStatus());
+        dto.setTotalValue(quote.getTotalValue());
+        dto.setValidUntil(quote.getValidUntil());
+        dto.setDescription(quote.getDescription());
+        dto.setNotes(quote.getNotes());
+        dto.setCreatedAt(quote.getCreatedAt());
+        dto.setUpdatedAt(quote.getUpdatedAt());
+        
+        // Preencher informações do Client
+        if (quote.getClient() != null) {
+            dto.setClientId(quote.getClient().getId());
+            dto.setClientName(quote.getClient().getName());
+        }
+        
+        // Preencher informações do Lead
+        if (quote.getLead() != null) {
+            dto.setLeadId(quote.getLead().getId());
+            dto.setLeadName(quote.getLead().getName());
+        }
+        
+        // Preencher informações do CreatedBy
+        if (quote.getCreatedBy() != null) {
+            dto.setCreatedById(quote.getCreatedBy().getId());
+            dto.setCreatedByName(quote.getCreatedBy().getName());
+        }
+        
+        // Preencher informações do AssignedTo
+        if (quote.getAssignedTo() != null) {
+            dto.setAssignedToId(quote.getAssignedTo().getId());
+            dto.setAssignedToName(quote.getAssignedTo().getName());
+        }
+        
+        // Converter itens - inicializar lazy collection dentro da transação
+        if (quote.getItems() != null) {
+            try {
+                Hibernate.initialize(quote.getItems());
+                if (!quote.getItems().isEmpty()) {
+                    List<QuoteItemDTO> itemDTOs = quote.getItems().stream()
+                        .map(item -> {
+                            QuoteItemDTO itemDTO = new QuoteItemDTO();
+                            itemDTO.setId(item.getId());
+                            itemDTO.setQuoteId(quote.getId());
+                            itemDTO.setDescription(item.getDescription());
+                            itemDTO.setQuantity(item.getQuantity());
+                            itemDTO.setUnitPrice(item.getUnitPrice());
+                            itemDTO.setTotalPrice(item.getTotalPrice());
+                            itemDTO.setNotes(item.getNotes());
+                            itemDTO.setCreatedAt(item.getCreatedAt());
+                            itemDTO.setUpdatedAt(item.getUpdatedAt());
+                            return itemDTO;
+                        })
+                        .toList();
+                    dto.setItems(itemDTOs);
+                }
+            } catch (Exception e) {
+                // Se houver erro ao inicializar itens, definir como lista vazia
+                dto.setItems(new java.util.ArrayList<>());
+            }
+        }
+        
+        return dto;
+    }
+    
+    /**
+     * Converte uma lista de Quotes para DTOs
+     */
+    @Transactional(readOnly = true)
+    public List<QuoteDTO> convertToDTOList(List<Quote> quotes) {
+        return quotes.stream()
+            .map(this::convertToDTO)
+            .toList();
+    }
+    
+    /**
+     * Converte uma Page de Quotes para Page de DTOs
+     */
+    @Transactional(readOnly = true)
+    public Page<QuoteDTO> convertToDTOPage(Page<Quote> quotes) {
+        return quotes.map(this::convertToDTO);
     }
 
     private String generateQuoteNumber() {

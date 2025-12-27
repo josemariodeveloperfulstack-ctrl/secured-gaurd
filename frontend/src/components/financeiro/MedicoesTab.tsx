@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -899,132 +900,159 @@ const MedicoesTab: React.FC = () => {
 
       {/* Modal de Formulário */}
       <Dialog open={showFormModal} onOpenChange={setShowFormModal}>
-        <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-600">
-          <DialogHeader>
-            <DialogTitle className="text-seguranca-lightgray">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
+            <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <FileText className="h-6 w-6" />
+              </div>
               {editingBulletin ? 'Editar Boletim' : 'Novo Boletim de Medição'}
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-white/80 text-sm">
               {editingBulletin ? 'Atualize os dados do boletim' : 'Preencha os dados do novo boletim de medição'}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Nome da Empresa *</label>
-              <Select
-                value={(() => {
-                  // Priorizar companyId se estiver definido
-                  if (companyId) {
-                    return companyId;
-                  }
-                  // Tentar encontrar empresa por nome se companyId não estiver definido
-                  if (formData.companyName && companies.length > 0) {
-                    const found = companies.find(c => {
-                      const companyName = c.name?.trim().toLowerCase() || '';
-                      const formName = formData.companyName?.trim().toLowerCase() || '';
-                      return companyName === formName || 
-                             companyName.includes(formName) || 
-                             formName.includes(companyName);
-                    });
-                    if (found) {
-                      // Atualizar companyId se encontrou
-                      setCompanyId(found.id);
-                      return found.id;
-                    }
-                  }
-                  return '';
-                })()}
-                onValueChange={(value) => {
-                  const selectedCompany = companies.find(c => c.id === value);
-                  setCompanyId(value);
-                  setFormData({
-                    ...formData,
-                    companyName: selectedCompany?.name || ''
-                  });
-                }}
-                disabled={loadingData}
-              >
-                <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
-                  <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-gray-600">
-                  {companies.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-6">
+            {/* Seção: Informações Básicas */}
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                    <Building className="h-5 w-5 text-seguranca-red" />
+                  </div>
+                  Informações Básicas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray font-medium">Nome da Empresa <span className="text-seguranca-red">*</span></Label>
+                  <Select
+                    value={(() => {
+                      // Priorizar companyId se estiver definido
+                      if (companyId) {
+                        return companyId;
+                      }
+                      // Tentar encontrar empresa por nome se companyId não estiver definido
+                      if (formData.companyName && companies.length > 0) {
+                        const found = companies.find(c => {
+                          const companyName = c.name?.trim().toLowerCase() || '';
+                          const formName = formData.companyName?.trim().toLowerCase() || '';
+                          return companyName === formName || 
+                                 companyName.includes(formName) || 
+                                 formName.includes(companyName);
+                        });
+                        if (found) {
+                          // Atualizar companyId se encontrou
+                          setCompanyId(found.id);
+                          return found.id;
+                        }
+                      }
+                      return '';
+                    })()}
+                    onValueChange={(value) => {
+                      const selectedCompany = companies.find(c => c.id === value);
+                      setCompanyId(value);
+                      setFormData({
+                        ...formData,
+                        companyName: selectedCompany?.name || ''
+                      });
+                    }}
+                    disabled={loadingData}
+                  >
+                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
+                      {companies.map(company => (
+                        <SelectItem key={company.id} value={company.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Número do Contrato *</label>
-                <Select
-                  value={formData.contractNumber}
-                  onValueChange={(value) => {
-                    const selectedContract = contracts.find(c => c.contractNumber === value);
-                    setContractId(selectedContract?.id || '');
-                    setFormData({
-                      ...formData,
-                      contractNumber: value,
-                      contractStart: selectedContract?.startDate || '',
-                      contractEnd: selectedContract?.endDate || ''
-                    });
-                  }}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o contrato"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {contracts.map(contract => (
-                      <SelectItem key={contract.id} value={contract.contractNumber}>
-                        {contract.contractNumber} - {contract.clientName || contract.description}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Status</label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value as any})}>
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DRAFT">Rascunho</SelectItem>
-                    <SelectItem value="PENDING">Pendente</SelectItem>
-                    <SelectItem value="VALIDATED">Validado</SelectItem>
-                    <SelectItem value="CANCELLED">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Número do Contrato <span className="text-seguranca-red">*</span></Label>
+                    <Select
+                      value={formData.contractNumber}
+                      onValueChange={(value) => {
+                        const selectedContract = contracts.find(c => c.contractNumber === value);
+                        setContractId(selectedContract?.id || '');
+                        setFormData({
+                          ...formData,
+                          contractNumber: value,
+                          contractStart: selectedContract?.startDate || '',
+                          contractEnd: selectedContract?.endDate || ''
+                        });
+                      }}
+                      disabled={loadingData}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o contrato"} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
+                        {contracts.map(contract => (
+                          <SelectItem key={contract.id} value={contract.contractNumber} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                            {contract.contractNumber} - {contract.clientName || contract.description}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Status</Label>
+                    <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value as any})}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="DRAFT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Rascunho</SelectItem>
+                        <SelectItem value="PENDING" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Pendente</SelectItem>
+                        <SelectItem value="VALIDATED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Validado</SelectItem>
+                        <SelectItem value="CANCELLED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Data Início do Período *</label>
-                <Input
-                  type="date"
-                  value={formData.periodStart}
-                  onChange={(e) => setFormData({...formData, periodStart: e.target.value})}
-                  className="bg-seguranca-black border-gray-600 text-white"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Data Fim do Período *</label>
-                <Input
-                  type="date"
-                  value={formData.periodEnd}
-                  onChange={(e) => setFormData({...formData, periodEnd: e.target.value})}
-                  className="bg-seguranca-black border-gray-600 text-white"
-                />
-              </div>
-            </div>
+            {/* Seção: Período e Valor */}
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                    <Calendar className="h-5 w-5 text-seguranca-red" />
+                  </div>
+                  Período e Valor
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Data Início do Período <span className="text-seguranca-red">*</span></Label>
+                    <Input
+                      type="date"
+                      value={formData.periodStart}
+                      onChange={(e) => setFormData({...formData, periodStart: e.target.value})}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Data Fim do Período <span className="text-seguranca-red">*</span></Label>
+                    <Input
+                      type="date"
+                      value={formData.periodEnd}
+                      onChange={(e) => setFormData({...formData, periodEnd: e.target.value})}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+                </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1082,29 +1110,31 @@ const MedicoesTab: React.FC = () => {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Valor Total (R$)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">R$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.subtotal || ''}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
-                    setFormData({...formData, subtotal: value});
-                  }}
-                  placeholder="0.00"
-                  className="bg-seguranca-black border-gray-600 text-white pl-10"
-                />
-              </div>
-              {formData.subtotal && formData.subtotal > 0 && (
-                <p className="text-sm text-gray-400">
-                  {formatCurrency(formData.subtotal)}
-                </p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Valor Total (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.subtotal || ''}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setFormData({...formData, subtotal: value});
+                    }}
+                    placeholder="0.00"
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                  />
+                  {formData.subtotal && formData.subtotal > 0 && (
+                    <p className="text-sm text-gray-400">
+                      {formatCurrency(formData.subtotal)}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
             
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-300">Observações</label>
@@ -1118,9 +1148,10 @@ const MedicoesTab: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex justify-between gap-2 pt-4">
-            {editingBulletin && (
+          <DialogFooter className="gap-2 pt-4">
+            {editingBulletin && editingBulletin.id && (
               <Button
+                type="button"
                 variant="outline"
                 onClick={async () => {
                   try {
@@ -1148,28 +1179,28 @@ const MedicoesTab: React.FC = () => {
                     });
                   }
                 }}
-                className="border-gray-600 text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="mr-2 h-4 w-4" />
                 Gerar PDF
               </Button>
             )}
-            <div className="flex gap-2 ml-auto">
-              <Button
-                variant="outline"
-                onClick={() => setShowFormModal(false)}
-                className="border-gray-600 text-gray-300 hover:bg-gray-700"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSalvarBoletim}
-                className="bg-seguranca-yellow hover:bg-yellow-600 text-black"
-              >
-                {editingBulletin ? 'Atualizar' : 'Criar'} Boletim
-              </Button>
-            </div>
-          </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowFormModal(false)}
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSalvarBoletim}
+              className="bg-gradient-to-r from-seguranca-yellow to-yellow-500 hover:from-seguranca-yellow/90 hover:to-yellow-500/90 text-black font-semibold shadow-lg"
+            >
+              {editingBulletin ? 'Atualizar Boletim' : 'Criar Boletim'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

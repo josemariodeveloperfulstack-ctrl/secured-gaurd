@@ -224,6 +224,11 @@ public class EmployeeController {
                     employee.put("unit", unit);
                 }
                 
+                // Adicionar userId se existir (index 21)
+                if (row.length > 21 && row[21] != null) {
+                    employee.put("userId", row[21]);
+                }
+                
                 employees.add(employee);
             }
             
@@ -295,6 +300,11 @@ public class EmployeeController {
                         java.util.Map<String, Object> unit = new java.util.HashMap<>();
                         unit.put("name", row[20]); // unit_name
                         employee.put("unit", unit);
+                    }
+
+                    // Adicionar userId se existir (index 21)
+                    if (row.length > 21 && row[21] != null) {
+                        employee.put("userId", row[21]);
                     }
                     
                     employees.add(employee);

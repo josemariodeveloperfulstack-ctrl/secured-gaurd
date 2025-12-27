@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.z7design.secured_guard.model.enums.LeadSource;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import jakarta.persistence.*;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -64,7 +66,13 @@ public class Lead {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_to_id")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private User assignedTo;
+    
+    // Campo transiente para facilitar serialização JSON
+    @Transient
+    @JsonProperty("assignedToName")
+    private String assignedToName;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id", nullable = false)
@@ -184,6 +192,24 @@ public class Lead {
     
     public void setAssignedTo(User assignedTo) {
         this.assignedTo = assignedTo;
+        // Atualizar assignedToName quando assignedTo for definido
+        if (assignedTo != null) {
+            this.assignedToName = assignedTo.getName() != null ? assignedTo.getName() : assignedTo.getUsername();
+        } else {
+            this.assignedToName = null;
+        }
+    }
+    
+    public String getAssignedToName() {
+        // Se assignedToName não estiver definido, tentar obter de assignedTo
+        if (assignedToName == null && assignedTo != null) {
+            return assignedTo.getName() != null ? assignedTo.getName() : assignedTo.getUsername();
+        }
+        return assignedToName;
+    }
+    
+    public void setAssignedToName(String assignedToName) {
+        this.assignedToName = assignedToName;
     }
     
     public User getCreatedBy() {
