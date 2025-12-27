@@ -11,6 +11,9 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -263,11 +266,224 @@ public class MeasurementReportService {
     }
     
     /**
-     * Gera Excel de um boletim específico (temporariamente desabilitado)
+     * Gera Excel de um boletim específico com informações completas
      */
     public byte[] generateBulletinExcel(UUID bulletinId) throws IOException {
-        log.info("Excel não implementado ainda para boletim: {}", bulletinId);
-        throw new IOException("Geração de Excel temporariamente não disponível");
+        log.info("Gerando Excel para boletim: {} com informações completas", bulletinId);
+        
+        // Buscar o boletim no banco de dados
+        MeasurementBulletin bulletin = bulletinRepository.findById(bulletinId)
+                .orElseThrow(() -> new RuntimeException("Boletim não encontrado: " + bulletinId));
+        
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Boletim de Medição");
+            
+            // Estilos
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setFontHeightInPoints((short) 14);
+            headerStyle.setFont(headerFont);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 16);
+            titleStyle.setFont(titleFont);
+            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+            
+            CellStyle labelStyle = workbook.createCellStyle();
+            Font labelFont = workbook.createFont();
+            labelFont.setBold(true);
+            labelStyle.setFont(labelFont);
+            
+            CellStyle currencyStyle = workbook.createCellStyle();
+            DataFormat format = workbook.createDataFormat();
+            currencyStyle.setDataFormat(format.getFormat("R$ #,##0.00"));
+            
+            CellStyle tableHeaderStyle = workbook.createCellStyle();
+            Font tableHeaderFont = workbook.createFont();
+            tableHeaderFont.setBold(true);
+            tableHeaderStyle.setFont(tableHeaderFont);
+            tableHeaderStyle.setAlignment(HorizontalAlignment.CENTER);
+            tableHeaderStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            tableHeaderStyle.setFillForegroundColor(IndexedColors.LIGHT_BLUE.getIndex());
+            tableHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            tableHeaderStyle.setBorderBottom(BorderStyle.THIN);
+            tableHeaderStyle.setBorderTop(BorderStyle.THIN);
+            tableHeaderStyle.setBorderLeft(BorderStyle.THIN);
+            tableHeaderStyle.setBorderRight(BorderStyle.THIN);
+            
+            CellStyle tableCellStyle = workbook.createCellStyle();
+            tableCellStyle.setBorderBottom(BorderStyle.THIN);
+            tableCellStyle.setBorderTop(BorderStyle.THIN);
+            tableCellStyle.setBorderLeft(BorderStyle.THIN);
+            tableCellStyle.setBorderRight(BorderStyle.THIN);
+            tableCellStyle.setAlignment(HorizontalAlignment.CENTER);
+            tableCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            
+            int rowIndex = 0;
+            
+            // Cabeçalho da empresa
+            Row companyRow = sheet.createRow(rowIndex++);
+            Cell companyCell = companyRow.createCell(0);
+            companyCell.setCellValue("Promover Vigilância & Serviços");
+            companyCell.setCellStyle(titleStyle);
+            sheet.addMergedRegion(new CellRangeAddress(rowIndex - 1, rowIndex - 1, 0, 6));
+            
+            // Título
+            Row titleRow = sheet.createRow(rowIndex++);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("BOLETIM DE MEDIÇÃO");
+            titleCell.setCellStyle(headerStyle);
+            sheet.addMergedRegion(new CellRangeAddress(rowIndex - 1, rowIndex - 1, 0, 6));
+            
+            rowIndex++; // Linha em branco
+            
+            // Informações do contrato
+            Row contractRow = sheet.createRow(rowIndex++);
+            contractRow.createCell(0).setCellValue("Nº Contrato:");
+            contractRow.getCell(0).setCellStyle(labelStyle);
+            contractRow.createCell(1).setCellValue(bulletin.getContractNumber() != null ? bulletin.getContractNumber() : "N/A");
+            
+            // Período
+            Row periodRow = sheet.createRow(rowIndex++);
+            periodRow.createCell(0).setCellValue("Período:");
+            periodRow.getCell(0).setCellStyle(labelStyle);
+            String period = formatPeriod(bulletin.getPeriodStart(), bulletin.getPeriodEnd());
+            periodRow.createCell(1).setCellValue(period);
+            
+            // Empresa
+            Row companyInfoRow = sheet.createRow(rowIndex++);
+            companyInfoRow.createCell(0).setCellValue("Empresa:");
+            companyInfoRow.getCell(0).setCellStyle(labelStyle);
+            companyInfoRow.createCell(1).setCellValue(bulletin.getCompanyName() != null ? bulletin.getCompanyName() : "N/A");
+            
+            rowIndex++; // Linha em branco
+            
+            // Tabela de itens
+            if (bulletin.getItems() != null && !bulletin.getItems().isEmpty()) {
+                // Cabeçalho da tabela
+                Row tableHeader = sheet.createRow(rowIndex++);
+                String[] headers = {"Item", "Código", "Descrição", "Unidade", "Quantidade", "Preço Un.", "Valor Total"};
+                for (int i = 0; i < headers.length; i++) {
+                    Cell cell = tableHeader.createCell(i);
+                    cell.setCellValue(headers[i]);
+                    cell.setCellStyle(tableHeaderStyle);
+                }
+                
+                // Dados dos itens
+                for (var item : bulletin.getItems()) {
+                    Row itemRow = sheet.createRow(rowIndex++);
+                    
+                    if (item.getItemNumber() != null) {
+                        itemRow.createCell(0).setCellValue(item.getItemNumber());
+                    } else {
+                        itemRow.createCell(0).setCellValue("");
+                    }
+                    itemRow.getCell(0).setCellStyle(tableCellStyle);
+                    
+                    itemRow.createCell(1).setCellValue(item.getCode() != null ? item.getCode() : "");
+                    itemRow.getCell(1).setCellStyle(tableCellStyle);
+                    
+                    itemRow.createCell(2).setCellValue(item.getDescription() != null ? item.getDescription() : "");
+                    itemRow.getCell(2).setCellStyle(tableCellStyle);
+                    
+                    itemRow.createCell(3).setCellValue(item.getUnit() != null ? item.getUnit() : "");
+                    itemRow.getCell(3).setCellStyle(tableCellStyle);
+                    
+                    if (item.getQuantity() != null) {
+                        itemRow.createCell(4).setCellValue(item.getQuantity().doubleValue());
+                    } else {
+                        itemRow.createCell(4).setCellValue("");
+                    }
+                    itemRow.getCell(4).setCellStyle(tableCellStyle);
+                    
+                    if (item.getUnitPrice() != null) {
+                        Cell priceCell = itemRow.createCell(5);
+                        priceCell.setCellValue(item.getUnitPrice().doubleValue());
+                        priceCell.setCellStyle(currencyStyle);
+                    } else {
+                        itemRow.createCell(5).setCellValue("");
+                        itemRow.getCell(5).setCellStyle(tableCellStyle);
+                    }
+                    
+                    if (item.getTotalValue() != null) {
+                        Cell totalCell = itemRow.createCell(6);
+                        totalCell.setCellValue(item.getTotalValue().doubleValue());
+                        totalCell.setCellStyle(currencyStyle);
+                    } else {
+                        itemRow.createCell(6).setCellValue("");
+                        itemRow.getCell(6).setCellStyle(tableCellStyle);
+                    }
+                }
+            }
+            
+            rowIndex++; // Linha em branco
+            
+            // Subtotal
+            Row subtotalRow = sheet.createRow(rowIndex++);
+            subtotalRow.createCell(5).setCellValue("Subtotal:");
+            subtotalRow.getCell(5).setCellStyle(labelStyle);
+            if (bulletin.getSubtotal() != null) {
+                Cell subtotalCell = subtotalRow.createCell(6);
+                subtotalCell.setCellValue(bulletin.getSubtotal().doubleValue());
+                subtotalCell.setCellStyle(currencyStyle);
+            }
+            
+            rowIndex += 2; // Linhas em branco
+            
+            // Seções de assinatura
+            Row signature1LabelRow = sheet.createRow(rowIndex++);
+            signature1LabelRow.createCell(0).setCellValue("ELABORADO/APROVADO POR:");
+            signature1LabelRow.getCell(0).setCellStyle(labelStyle);
+            
+            Row signature1LineRow = sheet.createRow(rowIndex++);
+            signature1LineRow.createCell(0).setCellValue("________________________________");
+            
+            Row signature1ValueRow = sheet.createRow(rowIndex++);
+            signature1ValueRow.createCell(0).setCellValue(bulletin.getElaboratedBy() != null ? bulletin.getElaboratedBy() : "");
+            
+            rowIndex++; // Linha em branco
+            
+            Row signature2LabelRow = sheet.createRow(rowIndex++);
+            signature2LabelRow.createCell(0).setCellValue("RESPONSÁVEL PELA MEDIÇÃO:");
+            signature2LabelRow.getCell(0).setCellStyle(labelStyle);
+            
+            Row signature2LineRow = sheet.createRow(rowIndex++);
+            signature2LineRow.createCell(0).setCellValue("________________________________");
+            
+            Row signature2ValueRow = sheet.createRow(rowIndex++);
+            signature2ValueRow.createCell(0).setCellValue(bulletin.getMeasuredBy() != null ? bulletin.getMeasuredBy() : "");
+            
+            rowIndex += 2; // Linhas em branco
+            
+            // Data de geração
+            Row dateRow = sheet.createRow(rowIndex++);
+            Cell dateCell = dateRow.createCell(0);
+            dateCell.setCellValue("Gerado em: " + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+            dateCell.setCellStyle(titleStyle);
+            sheet.addMergedRegion(new CellRangeAddress(rowIndex - 1, rowIndex - 1, 0, 6));
+            
+            // Ajustar largura das colunas
+            for (int i = 0; i < 7; i++) {
+                sheet.autoSizeColumn(i);
+                // Adicionar um pouco de espaço extra
+                sheet.setColumnWidth(i, sheet.getColumnWidth(i) + 1000);
+            }
+            
+            workbook.write(out);
+            byte[] result = out.toByteArray();
+            log.info("Excel gerado com sucesso, tamanho: {} bytes", result.length);
+            return result;
+        } catch (Exception e) {
+            log.error("Erro ao gerar Excel para boletim {}: {}", bulletinId, e.getMessage(), e);
+            throw new IOException("Erro ao gerar Excel: " + e.getMessage(), e);
+        }
     }
     
     /**
