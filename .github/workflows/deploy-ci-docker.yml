@@ -210,15 +210,51 @@ jobs:
           
           # Build frontend image com variáveis de ambiente do CI (sem cache para garantir atualização)
           echo "🎨 Construindo imagem frontend..."
+          
+          # Verificar código ANTES do build
+          echo "🔍 Verificando código ANTES do build:"
+          if [ -f "frontend/src/pages/Propostas.tsx" ]; then
+            echo "  ✅ Propostas.tsx existe"
+            if grep -q "Proposta de Acordo" frontend/src/pages/Propostas.tsx; then
+              echo "  ✅ 'Proposta de Acordo' encontrado no código fonte"
+            else
+              echo "  ❌ 'Proposta de Acordo' NÃO encontrado no código fonte!"
+              exit 1
+            fi
+          else
+            echo "  ❌ Propostas.tsx NÃO existe!"
+            exit 1
+          fi
+          
+          # Adicionar timestamp ao build para garantir que é único
+          BUILD_TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          echo "  📅 Build timestamp: $BUILD_TIMESTAMP"
+          
           docker build --no-cache --progress=plain -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
+            --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP \
+            --label "build.timestamp=$BUILD_TIMESTAMP" \
+            --label "build.sha=${{ github.sha }}" \
             -f frontend/Dockerfile.prod ./frontend || {
             echo "❌ Erro ao construir imagem frontend"
             exit 1
           }
           echo "✅ Frontend construído!"
+          echo ""
+          
+          # Verificar código DEPOIS do build (dentro da imagem)
+          echo "🔍 Verificando código DEPOIS do build (dentro da imagem):"
+          if docker run --rm z7design/secured-guard-frontend:ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3; then
+            echo "  ✅ 'Proposta de Acordo' encontrado na imagem construída!"
+          else
+            echo "  ❌ 'Proposta de Acordo' NÃO encontrado na imagem construída!"
+            echo "  📋 Isso indica que o build não incluiu o código atualizado"
+            echo "  📋 Verificando arquivos JS na imagem:"
+            docker run --rm z7design/secured-guard-frontend:ci find /usr/share/nginx/html -name "*.js" -type f | head -5
+            exit 1
+          fi
           echo ""
           
           # Build WhatsApp service image (Baileys) (sem cache para garantir atualização)
@@ -1306,11 +1342,18 @@ jobs:
     echo "🧹 Removendo imagens antigas para forçar pull das novas..."
     
     # Remover imagens antigas para forçar pull
-    $DOCKER_CMD rmi z7design/secured-guard-backend:ci 2>/dev/null || echo "  ℹ️ Imagem backend não encontrada (será baixada)"
-    $DOCKER_CMD rmi z7design/secured-guard-frontend:ci 2>/dev/null || echo "  ℹ️ Imagem frontend não encontrada (será baixada)"
-    $DOCKER_CMD rmi z7design/secured-guard-whatsapp:ci 2>/dev/null || echo "  ℹ️ Imagem whatsapp não encontrada (será baixada)"
+    echo "🗑️ Removendo TODAS as imagens antigas (incluindo dangling)..."
+    $DOCKER_CMD rmi z7design/secured-guard-backend:ci 2>/dev/null || echo "  ℹ️ Imagem backend não encontrada"
+    $DOCKER_CMD rmi z7design/secured-guard-frontend:ci 2>/dev/null || echo "  ℹ️ Imagem frontend não encontrada"
+    $DOCKER_CMD rmi z7design/secured-guard-whatsapp:ci 2>/dev/null || echo "  ℹ️ Imagem whatsapp não encontrada"
     
-    echo "✅ Imagens antigas removidas!"
+    # Remover imagens dangling (sem tag)
+    $DOCKER_CMD image prune -f || true
+    
+    # Remover TODAS as imagens relacionadas (incluindo variantes)
+    $DOCKER_CMD images | grep "z7design/secured-guard" | awk '{print $3}' | xargs -r $DOCKER_CMD rmi -f 2>/dev/null || true
+    
+    echo "✅ Imagens antigas removidas completamente!"
     echo ""
     sleep 5
             
@@ -1338,6 +1381,18 @@ jobs:
             echo ""
             echo "📋 Imagens disponíveis ANTES de iniciar containers:"
             docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
+            echo ""
+            
+            # Verificar conteúdo da imagem frontend ANTES de iniciar container
+            echo "🔍 Verificando conteúdo da imagem frontend baixada..."
+            if docker run --rm z7design/secured-guard-frontend:ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3; then
+              echo "  ✅ 'Proposta de Acordo' encontrado na imagem baixada!"
+            else
+              echo "  ❌ 'Proposta de Acordo' NÃO encontrado na imagem baixada!"
+              echo "  📋 A imagem no Docker Hub pode estar desatualizada"
+              echo "  🔄 Verificando labels da imagem:"
+              docker inspect z7design/secured-guard-frontend:ci --format='{{range .Config.Labels}}{{.}}{{"\n"}}{{end}}' 2>/dev/null || echo "  ⚠️ Não foi possível verificar labels"
+            fi
             echo ""
             
             # Verificar se as imagens foram realmente baixadas
