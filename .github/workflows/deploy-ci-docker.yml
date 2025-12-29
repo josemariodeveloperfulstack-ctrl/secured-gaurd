@@ -1267,12 +1267,34 @@ jobs:
     
     # Remover containers manualmente por nome (garantir remoção completa)
     echo "🗑️ Removendo containers manualmente por nome..."
+    
+    # FORÇAR remoção completa do frontend primeiro (CRÍTICO para atualização)
+    echo "🗑️ FORÇANDO remoção completa do container frontend..."
+    $DOCKER_CMD stop secured-guard-frontend-ci 2>/dev/null || true
+    $DOCKER_CMD rm -f secured-guard-frontend-ci 2>/dev/null || true
+    sleep 3
+    
     for container_name in secured-guard-backend-ci secured-guard-frontend-ci secured-guard-whatsapp-ci secured-guard-db-ci secured-guard-redis-ci secured-guard-nginx-ci; do
       if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^${container_name}$"; then
         echo "  🗑️ Removendo container: $container_name"
+        $DOCKER_CMD stop "$container_name" 2>/dev/null || true
         $DOCKER_CMD rm -f "$container_name" 2>&1 || true
       fi
     done
+    
+    # Verificar se o container frontend foi realmente removido
+    if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+      echo "❌ ERRO: Container frontend ainda existe! Forçando remoção novamente..."
+      $DOCKER_CMD stop secured-guard-frontend-ci 2>/dev/null || true
+      $DOCKER_CMD rm -f secured-guard-frontend-ci 2>&1 || true
+      sleep 3
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+        echo "❌ ERRO CRÍTICO: Não foi possível remover container frontend!"
+        exit 1
+      fi
+    else
+      echo "✅ Container frontend removido com sucesso"
+    fi
     
     # Remover containers por padrão (caso tenham nomes diferentes)
     echo "🗑️ Removendo containers por padrão..."
@@ -1419,6 +1441,16 @@ jobs:
               echo ""
               echo "🔍 Verificando arquivos JS mais recentes:"
               $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -10 || echo "⚠️ Nenhum arquivo JS encontrado"
+              
+              echo ""
+              echo "🔍 Verificando se o código contém 'Proposta de Acordo' (nova aba):"
+              # Procurar em arquivos JS compilados
+              if $DOCKER_CMD exec secured-guard-frontend-ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3; then
+                echo "  ✅ 'Proposta de Acordo' encontrado nos arquivos compilados!"
+              else
+                echo "  ⚠️ 'Proposta de Acordo' NÃO encontrado nos arquivos compilados"
+                echo "  📋 Isso pode indicar que o build não incluiu as alterações"
+              fi
               
               echo ""
               echo "🔄 Forçando recarregamento do Nginx no container frontend..."
