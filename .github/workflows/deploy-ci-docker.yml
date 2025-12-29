@@ -243,15 +243,17 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣9️⃣ VERIFY AND FIX JWT_SECRET IN CONTAINER
+      # 1️⃣9️⃣ VERIFY .ENV AND JWT_SECRET IN CONTAINERS
       # ============================================
-      - name: 🔐 Verify and fix JWT_SECRET in container
+      - name: 🔐 Verify .env and JWT_SECRET in containers
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
             if [ -z "$JWT_SECRET" ]; then
               JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
             fi
+            cd /var/www/secured_guard/ci
+            cat .env | grep JWT_SECRET
             docker exec secured-guard-backend-ci sh -c "export JWT_SECRET=$JWT_SECRET" || true
           EOF
 
@@ -296,7 +298,7 @@ jobs:
       # ============================================
       # 2️⃣4️⃣ ENSURE TRAEFIK IS RUNNING
       # ============================================
-      - name: 🔄 Ensure Traefik is running
+      - name: 🔄 Ensure traefik is running
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             if ! docker ps | grep -q traefik; then
@@ -318,9 +320,9 @@ jobs:
           ./scripts/health-check-ci.sh
 
       # ============================================
-      # 2️⃣6️⃣ TEST LOGIN AFTER DEPLOY
+      # 2️⃣6️⃣ RUN LOGIN AFTER DEPLOY
       # ============================================
-      - name: 🔐 Test login after deploy
+      - name: 🔐 Run login after deploy
         run: |
           sleep 30
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
