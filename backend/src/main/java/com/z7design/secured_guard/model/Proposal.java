@@ -1,12 +1,13 @@
 package com.z7design.secured_guard.model;
 
 import com.z7design.secured_guard.model.enums.ProposalStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.proxy.HibernateProxy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -36,6 +37,7 @@ public class Proposal {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lead_id")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Lead lead;
     
     @Enumerated(EnumType.STRING)
@@ -119,7 +121,34 @@ public class Proposal {
     }
     
     public Lead getLead() {
-        return lead;
+        if (lead == null) {
+            return null;
+        }
+        
+        // Tratar caso onde o Lead foi deletado mas a referência ainda existe
+        try {
+            // Se for um proxy do Hibernate, tentar inicializar
+            if (lead instanceof HibernateProxy) {
+                HibernateProxy proxy = (HibernateProxy) lead;
+                try {
+                    proxy.getHibernateLazyInitializer().initialize();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    // Lead foi deletado, retornar null
+                    this.lead = null;
+                    return null;
+                }
+            }
+            // Verificar se o Lead ainda existe acessando um campo simples
+            lead.getId();
+            return lead;
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            // Lead foi deletado, limpar referência e retornar null
+            this.lead = null;
+            return null;
+        } catch (Exception e) {
+            // Outro erro, retornar null para evitar quebrar a serialização
+            return null;
+        }
     }
     
     public void setLead(Lead lead) {

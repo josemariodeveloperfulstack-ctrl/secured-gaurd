@@ -43,11 +43,43 @@ public class ProposalService {
     private UserRepository userRepository;
 
     public List<Proposal> findAll() {
-        return proposalRepository.findAll();
+        List<Proposal> proposals = proposalRepository.findAll();
+        // Limpar referências órfãs de Lead
+        for (Proposal proposal : proposals) {
+            if (proposal.getLead() != null) {
+                try {
+                    // Tentar acessar o Lead para verificar se ainda existe
+                    proposal.getLead().getId();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    // Lead foi deletado, limpar referência
+                    proposal.setLead(null);
+                } catch (Exception e) {
+                    // Outro erro, limpar referência para evitar problemas na serialização
+                    proposal.setLead(null);
+                }
+            }
+        }
+        return proposals;
     }
 
     public Page<Proposal> findAll(Pageable pageable) {
-        return proposalRepository.findAll(pageable);
+        Page<Proposal> proposals = proposalRepository.findAll(pageable);
+        // Limpar referências órfãs de Lead
+        proposals.getContent().forEach(proposal -> {
+            if (proposal.getLead() != null) {
+                try {
+                    // Tentar acessar o Lead para verificar se ainda existe
+                    proposal.getLead().getId();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    // Lead foi deletado, limpar referência
+                    proposal.setLead(null);
+                } catch (Exception e) {
+                    // Outro erro, limpar referência para evitar problemas na serialização
+                    proposal.setLead(null);
+                }
+            }
+        });
+        return proposals;
     }
 
     public Proposal findById(UUID id) {
