@@ -18,6 +18,32 @@ jobs:
     
     steps:
       # ============================================
+      # 0️⃣ VERIFICAR SECRETS (antes de começar)
+      # ============================================
+      - name: 🔐 Verificar secrets necessários
+        continue-on-error: true
+        run: |
+          echo "🔐 Verificando se os secrets estão configurados..."
+          echo ""
+          echo "📋 Secrets necessários:"
+          echo "  - DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - VPS_HOST_CI: ${{ secrets.VPS_HOST_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - VPS_USER_CI: ${{ secrets.VPS_USER_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - VPS_PASSWORD_CI: ${{ secrets.VPS_PASSWORD_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - POSTGRES_PASSWORD_CI: ${{ secrets.POSTGRES_PASSWORD_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - REDIS_PASSWORD_CI: ${{ secrets.REDIS_PASSWORD_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
+          echo "  - JWT_SECRET_CI: ${{ secrets.JWT_SECRET_CI != '' && '✅ Configurado' || '❌ Não configurado (usará padrão)' }}"
+          echo ""
+          if [ -z "${{ secrets.VPS_HOST_CI }}" ] || [ -z "${{ secrets.VPS_USER_CI }}" ] || [ -z "${{ secrets.VPS_PASSWORD_CI }}" ]; then
+            echo "❌ ERRO: Secrets de VPS não estão configurados!"
+            echo "   Configure os secrets em: Settings → Secrets and variables → Actions"
+            echo "   Veja SECRETS_CONFIG.md para a lista completa"
+            exit 1
+          fi
+          echo "✅ Secrets básicos configurados. Continuando com o deploy..."
+
+      # ============================================
       # 1️⃣ CHECKOUT DO CÓDIGO
       # ============================================
       - name: 📥 Checkout code
@@ -312,6 +338,18 @@ jobs:
         run: |
           echo "⚙️ Criando arquivo .env localmente..."
           
+          # Determinar qual secret usar para POSTGRES_PASSWORD_CI
+          if [ -n "${{ secrets.POSTGRES_PASSWORD_CI }}" ]; then
+            POSTGRES_PASSWORD_VALUE="${{ secrets.POSTGRES_PASSWORD_CI }}"
+            echo "✅ Usando POSTGRES_PASSWORD_CI do GitHub Secrets"
+          elif [ -n "${{ secrets.POSTGRES_PASSWORD }}" ]; then
+            POSTGRES_PASSWORD_VALUE="${{ secrets.POSTGRES_PASSWORD }}"
+            echo "⚠️ POSTGRES_PASSWORD_CI não encontrado, usando POSTGRES_PASSWORD"
+          else
+            POSTGRES_PASSWORD_VALUE="4KaCiJc6an@7sgbdcid2025"
+            echo "⚠️ Nenhum secret de PostgreSQL encontrado, usando valor padrão"
+          fi
+          
           # Criar arquivo .env localmente usando echo para evitar problemas com YAML parser
           {
             echo "# ===== AMBIENTE CI ====="
@@ -319,7 +357,7 @@ jobs:
             echo "APP_URL=https://ci.z7botsolutions.com.br"
             echo ""
             echo "# ===== BANCO DE DADOS ====="
-            echo "POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}"
+            echo "POSTGRES_PASSWORD_CI=${POSTGRES_PASSWORD_VALUE}"
             echo ""
             echo "# ===== REDIS ====="
             echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_CI }}"
