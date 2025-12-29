@@ -96,19 +96,19 @@ jobs:
         run: |
           echo "🐳 Construindo imagens Docker..."
           
-          # Build backend image
-          docker build -t z7design/secured-guard-backend:ci \
+          # Build backend image (sem cache para garantir atualização)
+          docker build --no-cache -t z7design/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend
           
-          # Build frontend image com variáveis de ambiente do CI
-          docker build -t z7design/secured-guard-frontend:ci \
+          # Build frontend image com variáveis de ambiente do CI (sem cache para garantir atualização)
+          docker build --no-cache -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
             -f frontend/Dockerfile.prod ./frontend
           
-          # Build WhatsApp service image (Baileys)
-          docker build -t z7design/secured-guard-whatsapp:ci \
+          # Build WhatsApp service image (Baileys) (sem cache para garantir atualização)
+          docker build --no-cache -t z7design/secured-guard-whatsapp:ci \
             -f whatsapp-service/Dockerfile ./whatsapp-service
           
           echo "✅ Imagens Docker construídas!"
@@ -141,7 +141,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sshpass
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.VPS_HOST_CI }} >> ~/.ssh/known_hosts
           echo "✅ SSH configurado para usar senha"
 
       # ============================================
@@ -159,7 +159,7 @@ jobs:
           MAX_ATTEMPTS=3
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
               "mkdir -p /var/www/secured_guard/ci /var/www/secured_guard/ci/uploads /var/www/secured_guard/ci/logs /var/www/secured_guard/ci/nginx /var/www/secured_guard/ci/postgres_data /var/www/secured_guard/ci/redis_data /var/www/secured_guard/ci/evolution_instances /var/www/secured_guard/ci/holerites /var/www/secured_guard/ci/whatsapp_sessions" 2>&1
             then
               echo "✅ Diretórios criados com sucesso!"
@@ -180,8 +180,8 @@ jobs:
           echo "📤 Transferindo docker-compose.ci.yml..."
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD }}" scp $SSH_OPTS docker-compose.ci.yml \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/
+            if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml \
+              ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
             then
               echo "✅ docker-compose.ci.yml transferido!"
               break
@@ -201,8 +201,8 @@ jobs:
           echo "📤 Transferindo nginx/ci.conf..."
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD }}" scp $SSH_OPTS nginx/ci.conf \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/nginx/
+            if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf \
+              ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
             then
               echo "✅ nginx/ci.conf transferido!"
               break
@@ -223,15 +223,15 @@ jobs:
             echo "📤 Transferindo traefik-dynamic-ci.yml..."
             ATTEMPT=1
             while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-              if sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
                 "mkdir -p /var/www/secured_guard/traefik/dynamic" && \
-                sshpass -p "${{ secrets.VPS_PASSWORD }}" scp $SSH_OPTS traefik-dynamic-ci.yml \
-                  ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/traefik/dynamic/ci.yml
+                sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml \
+                  ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik/dynamic/ci.yml
               then
                 echo "✅ traefik-dynamic-ci.yml transferido!"
                 
                 # Verificar se o arquivo foi transferido corretamente
-                sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh $SSH_OPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY_EOF'
+                sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'VERIFY_EOF'
                   if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
                     echo "✅ Arquivo existe no servidor"
                     # Verificar se não tem healthCheck ou path solto
@@ -279,7 +279,7 @@ jobs:
           DEFAULT_JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
           
           # Atribuir secret a uma variável primeiro para poder verificar o tamanho
-          JWT_SECRET_FROM_SECRETS="${{ secrets.JWT_SECRET }}"
+          JWT_SECRET_FROM_SECRETS="${{ secrets.JWT_SECRET_CI }}"
           
           # Usar secret se estiver definido e tiver pelo menos 64 caracteres
           if [ -n "$JWT_SECRET_FROM_SECRETS" ] && [ ${#JWT_SECRET_FROM_SECRETS} -ge 64 ]; then
@@ -322,7 +322,7 @@ jobs:
             echo "POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI }}"
             echo ""
             echo "# ===== REDIS ====="
-            echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}"
+            echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_CI }}"
             echo ""
             echo "# ===== JWT ====="
             echo "# Valor padrão seguro (80 caracteres) se não estiver definido no host"
@@ -344,15 +344,15 @@ jobs:
           
           # Transferir arquivo para VPS
           echo "📤 Transferindo .env para VPS..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp .env.ci \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/secured_guard/ci/.env
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp .env.ci \
+            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/.env
           
           # Definir permissões corretas
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
             "chmod 600 /var/www/secured_guard/ci/.env && echo '✅ Arquivo .env criado e configurado!'"
           
           # Verificar no servidor remoto
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔍 Verificando JWT_SECRET no .env remoto..."
             JWT_LENGTH=$(grep "^JWT_SECRET=" /var/www/secured_guard/ci/.env | cut -d'=' -f2 | wc -c)
             echo "Tamanho do JWT_SECRET no servidor: $((JWT_LENGTH - 1)) caracteres"
@@ -371,7 +371,7 @@ jobs:
         env:
           JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
             echo "🔐 Verificando e corrigindo JWT_SECRET no host e .env..."
             
             # Valor correto do JWT_SECRET
@@ -441,7 +441,7 @@ jobs:
         env:
           JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
             echo "🔧 Forçando correção do .env antes de parar containers..."
             
             cd /var/www/secured_guard/ci
@@ -479,7 +479,7 @@ jobs:
       # ============================================
       - name: 🔧 Force exit Swarm mode and complete cleanup
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔧 =========================================="
             echo "🔧 FORÇANDO SAÍDA DO SWARM MODE E LIMPEZA"
             echo "🔧 ========================================="
@@ -552,7 +552,7 @@ jobs:
       # ============================================
       - name: 💾 Backup and stop old containers
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "💾 Fazendo backup e parando containers antigos..."
             
             cd /var/www/secured_guard/ci
@@ -580,7 +580,7 @@ jobs:
       # ============================================
       - name: 📥 Pull new images
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "📥 Fazendo pull das novas imagens..."
             
             cd /var/www/secured_guard/ci
@@ -588,7 +588,14 @@ jobs:
             # Login no Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
-            # Pull das imagens
+            # Remover imagens antigas para forçar pull das novas
+            echo "🧹 Removendo imagens antigas para forçar atualização..."
+            docker rmi z7design/secured-guard-backend:ci 2>/dev/null || true
+            docker rmi z7design/secured-guard-frontend:ci 2>/dev/null || true
+            docker rmi z7design/secured-guard-whatsapp:ci 2>/dev/null || true
+            
+            # Pull das imagens (forçando atualização)
+            echo "📥 Fazendo pull das imagens atualizadas..."
             docker pull z7design/secured-guard-backend:ci || echo "⚠️ Erro ao fazer pull do backend"
             docker pull z7design/secured-guard-frontend:ci || echo "⚠️ Erro ao fazer pull do frontend"
             docker pull z7design/secured-guard-whatsapp:ci || echo "⚠️ Erro ao fazer pull do whatsapp"
@@ -599,6 +606,11 @@ jobs:
             echo ""
             echo "🔍 Verificando imagens baixadas..."
             docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem z7design/secured-guard encontrada"
+            
+            # Mostrar data de criação das imagens para confirmar que são novas
+            echo ""
+            echo "📅 Data das imagens baixadas:"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
           EOF
 
       # ============================================
@@ -606,7 +618,7 @@ jobs:
       # ============================================
       - name: 🔍 Verify images before starting
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔍 Verificando imagens antes de iniciar containers..."
             
             cd /var/www/secured_guard/ci
@@ -657,7 +669,7 @@ jobs:
       # ============================================
       - name: 🚀 Start new containers
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🚀 =========================================="
             echo "🚀 INICIANDO NOVOS CONTAINERS"
             echo "🚀 ========================================="
@@ -1049,7 +1061,7 @@ jobs:
       # ============================================
       - name: 🔧 Fix containers that are not running
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔧 Verificando e corrigindo containers que não estão rodando..."
             
             cd /var/www/secured_guard/ci
@@ -1141,7 +1153,7 @@ jobs:
         env:
           JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
             echo "🔐 Verificando e corrigindo JWT_SECRET no container backend..."
             
             # Aguardar container iniciar
@@ -1229,7 +1241,7 @@ jobs:
       # ============================================
       - name: 👥 Ensure user roles and permissions
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "👥 Verificando e garantindo roles e permissões dos usuários..."
             
             # Aguardar backend estar totalmente pronto
@@ -1274,7 +1286,7 @@ jobs:
       # ============================================
       - name: 🔍 Diagnostic - Container Status
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔍 Verificando status dos containers..."
             cd /var/www/secured_guard/ci
             docker-compose -f docker-compose.ci.yml ps
@@ -1301,7 +1313,7 @@ jobs:
       # ============================================
       - name: 🌐 Diagnostic - Network Connectivity
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🌐 Testando conectividade..."
             
             # Testar backend diretamente
@@ -1326,7 +1338,7 @@ jobs:
       # ============================================
       - name: 🔍 Verify containers are running
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔍 Verificando status dos containers..."
             cd /var/www/secured_guard/ci
             
@@ -1349,7 +1361,7 @@ jobs:
       # ============================================
       - name: 🔄 Ensure Traefik is running
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "🔄 Verificando e iniciando Traefik (crítico para Cloudflare)..."
             
             cd /var/www/secured_guard
@@ -1480,7 +1492,7 @@ jobs:
       - name: 🔧 Fix 404 Traefik
         run: |
           echo "🔧 Corrigindo problema de 404 no Traefik..."
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             cd /var/www/secured_guard/ci
             
             # Verificar se script existe, se não, criar inline
@@ -1546,9 +1558,9 @@ jobs:
       # ============================================
       - name: 🏥 Health check
         env:
-          SSH_USER: ${{ secrets.VPS_USER }}
-          SSH_HOST: ${{ secrets.VPS_HOST }}
-          SSH_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          SSH_USER: ${{ secrets.VPS_USER_CI }}
+          SSH_HOST: ${{ secrets.VPS_HOST_CI }}
+          SSH_PASSWORD: ${{ secrets.VPS_PASSWORD_CI }}
         run: |
           chmod +x scripts/health-check-ci.sh
           ./scripts/health-check-ci.sh
@@ -1576,7 +1588,7 @@ jobs:
           elif [ "$HTTP_CODE" = "500" ]; then
             echo "❌ ERRO: Login retornou 500 (Internal Server Error)"
             echo "📋 Verificando logs do backend para erro de JWT..."
-            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i 'jwt\|token\|secret' | tail -20 || echo 'Nenhum log JWT encontrado'"
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} "docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i 'jwt\|token\|secret' | tail -20 || echo 'Nenhum log JWT encontrado'"
             exit 1
           elif [ "$HTTP_CODE" = "000" ]; then
             echo "⚠️ Timeout ao testar login (aplicação pode ainda estar iniciando)"
@@ -1608,7 +1620,7 @@ jobs:
           echo "❌ Deploy falhou! Iniciando rollback..."
           
           # Não deixar erros de rollback derrubarem o job inteiro
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF' || true
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF' || true
             # Carregar PATH do Docker (necessário em sessões SSH não-interativas)
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             

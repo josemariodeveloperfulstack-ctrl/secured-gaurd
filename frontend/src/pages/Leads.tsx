@@ -26,13 +26,13 @@ import {
   DialogTitle,
   DialogDescription,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import leadService, { Lead, CreateLeadRequest, UpdateLeadRequest } from '@/services/leadService';
-import { employeeService } from '@/services/employeeService';
 import {
   Users,
   Plus,
@@ -47,7 +47,10 @@ import {
   Calendar,
   DollarSign,
   Loader2,
-  User
+  User,
+  FileText,
+  Briefcase,
+  Tag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -65,8 +68,6 @@ const Leads = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [employees, setEmployees] = useState<Array<{ id: string | number; name: string }>>([]);
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<CreateLeadRequest>({
@@ -78,7 +79,6 @@ const Leads = () => {
     source: 'WEBSITE',
     status: 'NEW',
     description: '',
-    assignedToId: undefined,
     nextFollowUp: undefined,
     estimatedValue: undefined
   });
@@ -92,27 +92,6 @@ const Leads = () => {
 
       // Map backend data to frontend format
       const mappedLeads = data.map((lead: any) => {
-        // Debug logger for specific lead assignment issues
-        if (lead.assignedTo || lead.assignedToName) {
-          console.log(`🔍 Processing lead ${lead.id} assignment:`, {
-            assignedTo: lead.assignedTo,
-            assignedToName: lead.assignedToName,
-            assignedToId: lead.assignedTo?.id
-          });
-        }
-
-        // Robust name extraction
-        let finalAssignedToName = 'Não atribuído';
-        if (lead.assignedToName) {
-          finalAssignedToName = lead.assignedToName;
-        } else if (lead.assignedTo) {
-          if (typeof lead.assignedTo === 'string') {
-            finalAssignedToName = lead.assignedTo; // In case backend sends name string directly
-          } else if (typeof lead.assignedTo === 'object') {
-            finalAssignedToName = lead.assignedTo.name || lead.assignedTo.username || lead.assignedTo.email || 'Usuário sem nome';
-          }
-        }
-
         return {
           id: lead.id,
           name: lead.name || '',
@@ -126,11 +105,6 @@ const Leads = () => {
           estimatedValue: lead.estimatedValue ? Number(lead.estimatedValue) : 0,
           notes: lead.notes || lead.description || '',
           description: lead.description || lead.notes || '',
-          assignedTo: lead.assignedTo ? {
-            id: lead.assignedTo.id,
-            name: lead.assignedTo.name || lead.assignedTo.username || ''
-          } : undefined,
-          assignedToName: finalAssignedToName,
           nextFollowUp: lead.nextFollowUp ? new Date(lead.nextFollowUp).toISOString().split('T')[0] : '',
           createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
         };
@@ -149,59 +123,9 @@ const Leads = () => {
     }
   };
 
-  // Load employees for assignment
-  const loadEmployees = async () => {
-    try {
-      setLoadingEmployees(true);
-      const data = await employeeService.getAllEmployees();
-      const normalizedEmployees = Array.isArray(data) ? data.map((emp: any) => ({
-        // PREFERÊNCIA CRÍTICA: Usar userId se disponível, pois o LeadService espera um ID de Usuário (users table) e não de Funcionário (employees table).
-        // Se userId não existir, fallback para id (assumindo que seja o mesmo ou compatível, ou erro de mapeamento)
-        id: emp.userId || emp.id || emp.uuid || String(emp.id),
-        // Guardar o ID original do funcionário para referência se necessário
-        employeeId: emp.id,
-        name: emp.name || emp.nome || ''
-      })) : [];
-      setEmployees(normalizedEmployees);
-    } catch (error: any) {
-      console.error('Erro ao carregar funcionários:', error);
-      setEmployees([]);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
-
   useEffect(() => {
     loadLeads();
   }, []);
-
-  useEffect(() => {
-    if ((isCreateModalOpen || isEditModalOpen) && employees.length === 0) {
-      loadEmployees();
-    }
-  }, [isCreateModalOpen, isEditModalOpen]);
-
-  // Atualizar assignedToId quando funcionários forem carregados e houver um lead selecionado
-  useEffect(() => {
-    if (isEditModalOpen && selectedLead && employees.length > 0 && !formData.assignedToId) {
-      // Tentar obter assignedToId do lead selecionado
-      let assignedToId: string | undefined = undefined;
-
-      if ((selectedLead as any).assignedToId) {
-        assignedToId = String((selectedLead as any).assignedToId);
-      } else if (selectedLead.assignedTo?.id) {
-        assignedToId = String(selectedLead.assignedTo.id);
-      }
-
-      if (assignedToId) {
-        console.log('🔄 Atualizando assignedToId após carregar funcionários:', {
-          assignedToId,
-          matchingEmployee: employees.find(emp => String(emp.id) === String(assignedToId))
-        });
-        setFormData(prev => ({ ...prev, assignedToId }));
-      }
-    }
-  }, [isEditModalOpen, selectedLead, employees, formData.assignedToId]);
 
   useEffect(() => {
     let filtered = leads;
@@ -273,19 +197,11 @@ const Leads = () => {
     try {
       setIsSubmitting(true);
 
-      // Converter assignedToId para string UUID se necessário, ou undefined se vazio
-      let assignedToId: string | undefined = undefined;
-      if (formData.assignedToId) {
-        const assignedToIdStr = typeof formData.assignedToId === 'string' ? formData.assignedToId : String(formData.assignedToId);
-        // Validar se é um UUID válido (não vazio, não "null", não "undefined")
-        if (assignedToIdStr && assignedToIdStr.trim() !== '' &&
-          assignedToIdStr !== 'null' && assignedToIdStr !== 'undefined' &&
-          assignedToIdStr !== 'NaN') {
-          assignedToId = assignedToIdStr.trim();
-        }
-      }
-
       // Preparar dados de atualização
+      // IMPORTANTE: Sempre enviar o status do formData (que foi carregado do lead ou alterado pelo usuário)
+      // O status deve ser sempre enviado para garantir que seja atualizado
+      const statusToSend = formData.status || selectedLead?.status || 'NEW';
+      
       const updateData: UpdateLeadRequest = {
         name: formData.name,
         email: formData.email || undefined,
@@ -294,19 +210,16 @@ const Leads = () => {
         position: formData.position || undefined,
         source: formData.source,
         description: formData.description || undefined,
-        status: formData.status || selectedLead.status,
+        // SEMPRE enviar o status - usar o valor do formData que foi carregado corretamente no handleEdit
+        status: statusToSend,
         estimatedValue: formData.estimatedValue || undefined
       };
 
-      // Adicionar assignedToId sempre (mesmo que seja undefined, para permitir remover o responsável)
-      // Se assignedToId for válido, incluir; se for undefined, enviar explicitamente para manter o existente
-      updateData.assignedToId = assignedToId;
-
       console.log('📤 Enviando updateData:', {
         ...updateData,
-        assignedToId: updateData.assignedToId,
-        hasAssignedToId: !!updateData.assignedToId,
-        assignedToIdType: typeof updateData.assignedToId
+        status: updateData.status,
+        statusFromFormData: formData.status,
+        statusFromSelectedLead: selectedLead?.status
       });
 
       // Adicionar nextFollowUp apenas se tiver valor, convertendo para formato ISO com hora
@@ -325,9 +238,7 @@ const Leads = () => {
 
       console.log('📤 Atualizando lead:', {
         id: leadId,
-        data: updateData,
-        assignedToId: updateData.assignedToId,
-        hasAssignedToId: !!updateData.assignedToId
+        data: updateData
       });
 
       const updatedLead = await leadService.updateLead(leadId, updateData);
@@ -382,7 +293,6 @@ const Leads = () => {
       source: 'WEBSITE',
       status: 'NEW',
       description: '',
-      assignedToId: undefined,
       nextFollowUp: undefined,
       estimatedValue: undefined
     });
@@ -393,49 +303,10 @@ const Leads = () => {
   const handleEdit = async (lead: Lead) => {
     setSelectedLead(lead);
 
-    // Carregar funcionários se necessário
-    if (employees.length === 0) {
-      await loadEmployees();
-    }
-
-    // Buscar lead completo do backend para ter assignedToId e nextFollowUp
+    // Buscar lead completo do backend para ter nextFollowUp
     try {
       const leadId = typeof lead.id === 'string' ? lead.id : String(lead.id);
       const fullLead = await leadService.getLeadById(leadId);
-
-      // Tentar obter assignedToId de diferentes formas possíveis
-      let assignedToId: string | undefined = undefined;
-
-      // 1. Tentar do objeto fullLead (mais recente)
-      if ((fullLead as any).assignedToId) {
-        assignedToId = String((fullLead as any).assignedToId);
-      } else if (fullLead.assignedTo && fullLead.assignedTo.id) {
-        assignedToId = String(fullLead.assignedTo.id);
-      }
-
-      // 2. Fallback para o lead da lista (se o fullLead veio sem mas a lista tinha)
-      if (!assignedToId && lead.assignedTo && lead.assignedTo.id) {
-        console.log('⚠️ Usando fallback de assignedToId do lead da lista');
-        assignedToId = String(lead.assignedTo.id);
-      }
-
-      console.log('🔍 Lead carregado do backend:', {
-        leadId: leadId,
-        assignedToId: assignedToId,
-        fullLeadAssignedTo: fullLead.assignedTo,
-        listLeadAssignedTo: lead.assignedTo
-      });
-
-      // Se tivermos um ID mas ele não estiver na lista (e a lista já carregou), adicionar temporariamente?
-      // Melhor apenas logar aviso por enquanto.
-      if (assignedToId && employees.length > 0) {
-        const match = employees.find(e => String(e.id) === String(assignedToId));
-        if (!match) {
-          console.warn(`⚠️ ID ${assignedToId} não encontrado na lista de ${employees.length} funcionários`);
-        } else {
-          console.log(`✅ ID ${assignedToId} corresponde a ${match.name}`);
-        }
-      }
 
       const nextFollowUp = (fullLead as any).nextFollowUp
         ? new Date((fullLead as any).nextFollowUp).toISOString().split('T')[0]
@@ -450,36 +321,12 @@ const Leads = () => {
         source: fullLead.source || lead.source || 'WEBSITE',
         status: fullLead.status || lead.status || 'NEW',
         description: fullLead.description || fullLead.notes || lead.description || lead.notes || '',
-        assignedToId: assignedToId,
         nextFollowUp: nextFollowUp,
         estimatedValue: fullLead.estimatedValue !== undefined ? Number(fullLead.estimatedValue) : (lead.estimatedValue !== undefined ? lead.estimatedValue : undefined)
-      });
-
-
-      console.log('✅ FormData atualizado:', {
-        assignedToId: assignedToId,
-        formDataAssignedToId: assignedToId,
-        fullLeadAssignedTo: fullLead.assignedTo,
-        employeesCount: employees.length,
-        matchingEmployee: assignedToId ? employees.find(emp => String(emp.id) === String(assignedToId)) : null
       });
     } catch (error) {
       // Se falhar, usar os dados que temos
       console.error('Erro ao carregar lead completo:', error);
-      // Tentar obter assignedToId de diferentes formas possíveis (fallback)
-      let assignedToId: string | undefined = undefined;
-
-      if ((lead as any).assignedToId) {
-        assignedToId = String((lead as any).assignedToId);
-      } else if (lead.assignedTo?.id) {
-        assignedToId = String(lead.assignedTo.id);
-      }
-
-      console.log('🔍 Lead (fallback):', {
-        lead,
-        assignedToId,
-        assignedTo: lead.assignedTo
-      });
 
       setFormData({
         name: lead.name || '',
@@ -490,30 +337,12 @@ const Leads = () => {
         source: lead.source || 'WEBSITE',
         status: lead.status || 'NEW',
         description: lead.description || '',
-        assignedToId: assignedToId,
         nextFollowUp: lead.nextFollowUp || undefined,
         estimatedValue: lead.estimatedValue || 0
-      });
-
-      console.log('✅ FormData atualizado (fallback):', {
-        assignedToId: assignedToId,
-        formDataAssignedToId: assignedToId,
-        leadAssignedTo: lead.assignedTo,
-        employeesCount: employees.length,
-        matchingEmployee: assignedToId ? employees.find(emp => String(emp.id) === String(assignedToId)) : null
       });
     }
 
     setIsEditModalOpen(true);
-
-    // Aguardar um pouco para garantir que os funcionários foram carregados
-    setTimeout(() => {
-      console.log('⏰ Verificando após timeout:', {
-        assignedToId: formData.assignedToId,
-        employeesCount: employees.length,
-        selectedLeadAssignedTo: lead.assignedTo
-      });
-    }, 500);
   };
 
   const getStatusBadge = (status: string) => {
@@ -747,7 +576,6 @@ const Leads = () => {
                       <TableHead className="text-seguranca-lightgray">Status</TableHead>
                       <TableHead className="text-seguranca-lightgray">Fonte</TableHead>
                       <TableHead className="text-seguranca-lightgray">Valor Estimado</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
                       <TableHead className="text-seguranca-lightgray">Próximo Follow-up</TableHead>
                       <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
                     </TableRow>
@@ -771,9 +599,6 @@ const Leads = () => {
                         <TableCell>{getSourceBadge(lead.source)}</TableCell>
                         <TableCell className="text-seguranca-lightgray">
                           {lead.estimatedValue ? formatCurrency(lead.estimatedValue) : '-'}
-                        </TableCell>
-                        <TableCell className="text-seguranca-lightgray">
-                          {lead.assignedToName}
                         </TableCell>
                         <TableCell className="text-seguranca-lightgray">
                           {lead.nextFollowUp ? formatDate(lead.nextFollowUp) : '-'}
@@ -869,10 +694,6 @@ const Leads = () => {
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-400">Responsável</Label>
-                    <p className="text-seguranca-lightgray">{selectedLead.assignedToName}</p>
-                  </div>
-                  <div>
                     <Label className="text-gray-400">Próximo Follow-up</Label>
                     <p className="text-seguranca-lightgray">{formatDate(selectedLead.nextFollowUp)}</p>
                   </div>
@@ -912,200 +733,257 @@ const Leads = () => {
 
         {/* Modal de Edição */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-seguranca-lightgray">Editar Lead</DialogTitle>
-              <DialogDescription className="text-gray-400">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+            <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
+              <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Edit className="h-6 w-6" />
+                </div>
+                Editar Lead
+              </DialogTitle>
+              <DialogDescription className="text-white/80 text-sm">
                 Atualize as informações do lead
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-name" className="text-seguranca-lightgray">Nome *</Label>
-                  <Input
-                    id="edit-name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="Nome completo"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-email" className="text-seguranca-lightgray">Email</Label>
-                  <Input
-                    id="edit-email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="email@exemplo.com"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-phone" className="text-seguranca-lightgray">Telefone</Label>
-                  <Input
-                    id="edit-phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-company" className="text-seguranca-lightgray">Empresa</Label>
-                  <Input
-                    id="edit-company"
-                    value={formData.company}
-                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="Nome da empresa"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-position" className="text-seguranca-lightgray">Cargo</Label>
-                  <Input
-                    id="edit-position"
-                    value={formData.position}
-                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="Cargo/função"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-source" className="text-seguranca-lightgray">Fonte *</Label>
-                  <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione a fonte" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="WEBSITE">Website</SelectItem>
-                      <SelectItem value="REFERRAL">Indicação</SelectItem>
-                      <SelectItem value="COLD_CALL">Ligação a Frio</SelectItem>
-                      <SelectItem value="SOCIAL_MEDIA">Redes Sociais</SelectItem>
-                      <SelectItem value="EVENT">Evento</SelectItem>
-                      <SelectItem value="OTHER">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-status" className="text-seguranca-lightgray">Status</Label>
-                  <Select
-                    value={formData.status || selectedLead?.status || 'NEW'}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="NEW" className="text-seguranca-lightgray">Novo</SelectItem>
-                      <SelectItem value="CONTACTED" className="text-seguranca-lightgray">Contactado</SelectItem>
-                      <SelectItem value="QUALIFIED" className="text-seguranca-lightgray">Qualificado</SelectItem>
-                      <SelectItem value="PROPOSAL_SENT" className="text-seguranca-lightgray">Proposta Enviada</SelectItem>
-                      <SelectItem value="NEGOTIATION" className="text-seguranca-lightgray">Em Negociação</SelectItem>
-                      <SelectItem value="WON" className="text-seguranca-lightgray">Ganho</SelectItem>
-                      <SelectItem value="LOST" className="text-seguranca-lightgray">Perdido</SelectItem>
-                      <SelectItem value="INACTIVE" className="text-seguranca-lightgray">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-assignedTo" className="text-seguranca-lightgray">Responsável</Label>
-                  <Select
-                    value={formData.assignedToId ? String(formData.assignedToId) : ''}
-                    onValueChange={(value) => {
-                      console.log('🔄 Mudando responsável:', { value, currentValue: formData.assignedToId });
-                      setFormData({ ...formData, assignedToId: value || undefined });
-                    }}
-                    disabled={loadingEmployees}
-                  >
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o responsável"}>
-                        {formData.assignedToId && employees.find(emp => String(emp.id) === String(formData.assignedToId))?.name}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
-                      {employees.map((emp) => (
-                        <SelectItem
-                          key={emp.id}
-                          value={String(emp.id)}
-                          className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                        >
-                          {emp.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.assignedToId && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      ID selecionado: {String(formData.assignedToId)}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="edit-nextFollowUp" className="text-seguranca-lightgray">Próximo Follow-up</Label>
-                  <Input
-                    id="edit-nextFollowUp"
-                    type="date"
-                    value={formData.nextFollowUp || ''}
-                    onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-estimatedValue" className="text-seguranca-lightgray">Valor Estimado</Label>
-                  <Input
-                    id="edit-estimatedValue"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.estimatedValue || ''}
-                    onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value ? Number(e.target.value) : 0 })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <Label htmlFor="edit-description" className="text-seguranca-lightgray">Descrição</Label>
-                <Textarea
-                  id="edit-description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  placeholder="Informações adicionais sobre o lead..."
-                  rows={3}
-                />
-              </div>
+            <div className="space-y-6">
+              {/* Seção: Informações Básicas */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <User className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Informações Básicas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-name" className="text-seguranca-lightgray font-medium">
+                        Nome <span className="text-seguranca-red">*</span>
+                      </Label>
+                      <Input
+                        id="edit-name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="Nome completo"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-email" className="text-seguranca-lightgray font-medium">Email</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-phone" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        Telefone
+                      </Label>
+                      <Input
+                        id="edit-phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-company" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Building className="h-4 w-4" />
+                        Empresa
+                      </Label>
+                      <Input
+                        id="edit-company"
+                        value={formData.company}
+                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="Nome da empresa"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-position" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Cargo
+                      </Label>
+                      <Input
+                        id="edit-position"
+                        value={formData.position}
+                        onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="Cargo/função"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <div className="flex justify-end gap-2">
+              {/* Seção: Status e Classificação */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <Tag className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Status e Classificação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-source" className="text-seguranca-lightgray font-medium">
+                        Fonte <span className="text-seguranca-red">*</span>
+                      </Label>
+                      <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+                        <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                          <SelectValue placeholder="Selecione a fonte" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="WEBSITE" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Website</SelectItem>
+                          <SelectItem value="REFERRAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Indicação</SelectItem>
+                          <SelectItem value="COLD_CALL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Ligação a Frio</SelectItem>
+                          <SelectItem value="SOCIAL_MEDIA" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Redes Sociais</SelectItem>
+                          <SelectItem value="EVENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Evento</SelectItem>
+                          <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-status" className="text-seguranca-lightgray font-medium">Status</Label>
+                      <Select
+                        value={formData.status || 'NEW'}
+                        onValueChange={(value) => {
+                          console.log('🔄 Mudando status:', { value, currentValue: formData.status });
+                          setFormData({ ...formData, status: value });
+                        }}
+                      >
+                        <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="NEW" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Novo</SelectItem>
+                          <SelectItem value="CONTACTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Contactado</SelectItem>
+                          <SelectItem value="QUALIFIED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Qualificado</SelectItem>
+                          <SelectItem value="PROPOSAL_SENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Proposta Enviada</SelectItem>
+                          <SelectItem value="NEGOTIATION" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Em Negociação</SelectItem>
+                          <SelectItem value="WON" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Ganho</SelectItem>
+                          <SelectItem value="LOST" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Perdido</SelectItem>
+                          <SelectItem value="INACTIVE" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Inativo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Seção: Valores e Datas */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Valores e Datas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-estimatedValue" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Valor Estimado
+                      </Label>
+                      <Input
+                        id="edit-estimatedValue"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.estimatedValue || ''}
+                        onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value ? Number(e.target.value) : 0 })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-nextFollowUp" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Próximo Follow-up
+                      </Label>
+                      <Input
+                        id="edit-nextFollowUp"
+                        type="date"
+                        value={formData.nextFollowUp || ''}
+                        onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Seção: Observações */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <FileText className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Observações Adicionais
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description" className="text-seguranca-lightgray font-medium">
+                      Descrição
+                    </Label>
+                    <Textarea
+                      id="edit-description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow min-h-[100px]"
+                      placeholder="Informações adicionais sobre o lead..."
+                      rows={4}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <DialogFooter className="gap-2 pt-4">
                 <Button
+                  type="button"
                   variant="outline"
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                   onClick={() => {
                     setIsEditModalOpen(false);
                     resetForm();
                   }}
                   disabled={isSubmitting}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
                 >
                   Cancelar
                 </Button>
                 <Button
-                  className="bg-seguranca-red hover:bg-seguranca-darkred"
+                  type="button"
                   onClick={handleUpdateLead}
                   disabled={isSubmitting || !formData.name}
+                  className="bg-gradient-to-r from-seguranca-red to-red-600 hover:from-seguranca-red/90 hover:to-red-600/90 text-white font-semibold shadow-lg"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Atualizando...
                     </>
                   ) : (
                     'Atualizar Lead'
                   )}
                 </Button>
-              </div>
+              </DialogFooter>
             </div>
           </DialogContent>
         </Dialog>
@@ -1115,192 +993,254 @@ const Leads = () => {
           setIsCreateModalOpen(open);
           if (!open) resetForm();
         }}>
-          <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-seguranca-lightgray">Novo Lead</DialogTitle>
-              <DialogDescription className="text-gray-400">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+            <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
+              <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Plus className="h-6 w-6" />
+                </div>
+                Novo Lead
+              </DialogTitle>
+              <DialogDescription className="text-white/80 text-sm">
                 Preencha as informações para criar um novo lead
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name" className="text-seguranca-lightgray">Nome *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="Nome completo"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email" className="text-seguranca-lightgray">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="email@exemplo.com"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone" className="text-seguranca-lightgray">Telefone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="company" className="text-seguranca-lightgray">Empresa</Label>
-                  <Input
-                    id="company"
-                    value={formData.company}
-                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="Nome da empresa"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="position" className="text-seguranca-lightgray">Cargo</Label>
-                  <Input
-                    id="position"
-                    value={formData.position}
-                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="Cargo/função"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="source" className="text-seguranca-lightgray">Fonte *</Label>
-                  <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione a fonte" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="WEBSITE">Website</SelectItem>
-                      <SelectItem value="REFERRAL">Indicação</SelectItem>
-                      <SelectItem value="COLD_CALL">Ligação a Frio</SelectItem>
-                      <SelectItem value="SOCIAL_MEDIA">Redes Sociais</SelectItem>
-                      <SelectItem value="EVENT">Evento</SelectItem>
-                      <SelectItem value="OTHER">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="status" className="text-seguranca-lightgray">Status</Label>
-                  <Select
-                    value={formData.status || 'NEW'}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="NEW" className="text-seguranca-lightgray">Novo</SelectItem>
-                      <SelectItem value="CONTACTED" className="text-seguranca-lightgray">Contactado</SelectItem>
-                      <SelectItem value="QUALIFIED" className="text-seguranca-lightgray">Qualificado</SelectItem>
-                      <SelectItem value="PROPOSAL_SENT" className="text-seguranca-lightgray">Proposta Enviada</SelectItem>
-                      <SelectItem value="NEGOTIATION" className="text-seguranca-lightgray">Em Negociação</SelectItem>
-                      <SelectItem value="WON" className="text-seguranca-lightgray">Ganho</SelectItem>
-                      <SelectItem value="LOST" className="text-seguranca-lightgray">Perdido</SelectItem>
-                      <SelectItem value="INACTIVE" className="text-seguranca-lightgray">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="assignedTo" className="text-seguranca-lightgray">Responsável</Label>
-                  <Select
-                    value={formData.assignedToId ? String(formData.assignedToId) : ''}
-                    onValueChange={(value) => {
-                      setFormData({ ...formData, assignedToId: value || undefined });
-                    }}
-                    disabled={loadingEmployees}
-                  >
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o responsável"} />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
-                      {employees.map((emp) => (
-                        <SelectItem
-                          key={emp.id}
-                          value={String(emp.id)}
-                          className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                        >
-                          {emp.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="nextFollowUp" className="text-seguranca-lightgray">Próximo Follow-up</Label>
-                  <Input
-                    id="nextFollowUp"
-                    type="date"
-                    value={formData.nextFollowUp || ''}
-                    onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="estimatedValue" className="text-seguranca-lightgray">Valor Estimado</Label>
-                  <Input
-                    id="estimatedValue"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.estimatedValue || ''}
-                    onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value ? Number(e.target.value) : 0 })}
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <Label htmlFor="description" className="text-seguranca-lightgray">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  placeholder="Informações adicionais sobre o lead..."
-                  rows={3}
-                />
-              </div>
+            <div className="space-y-6">
+              {/* Seção: Informações Básicas */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <User className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Informações Básicas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-seguranca-lightgray font-medium">
+                        Nome <span className="text-seguranca-red">*</span>
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="Nome completo"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-seguranca-lightgray font-medium">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        Telefone
+                      </Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Building className="h-4 w-4" />
+                        Empresa
+                      </Label>
+                      <Input
+                        id="company"
+                        value={formData.company}
+                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="Nome da empresa"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="position" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Cargo
+                      </Label>
+                      <Input
+                        id="position"
+                        value={formData.position}
+                        onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="Cargo/função"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <div className="flex justify-end gap-2">
+              {/* Seção: Status e Classificação */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <Tag className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Status e Classificação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="source" className="text-seguranca-lightgray font-medium">
+                        Fonte <span className="text-seguranca-red">*</span>
+                      </Label>
+                      <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+                        <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                          <SelectValue placeholder="Selecione a fonte" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="WEBSITE" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Website</SelectItem>
+                          <SelectItem value="REFERRAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Indicação</SelectItem>
+                          <SelectItem value="COLD_CALL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Ligação a Frio</SelectItem>
+                          <SelectItem value="SOCIAL_MEDIA" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Redes Sociais</SelectItem>
+                          <SelectItem value="EVENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Evento</SelectItem>
+                          <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status" className="text-seguranca-lightgray font-medium">Status</Label>
+                      <Select
+                        value={formData.status || 'NEW'}
+                        onValueChange={(value) => setFormData({ ...formData, status: value })}
+                      >
+                        <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="NEW" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Novo</SelectItem>
+                          <SelectItem value="CONTACTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Contactado</SelectItem>
+                          <SelectItem value="QUALIFIED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Qualificado</SelectItem>
+                          <SelectItem value="PROPOSAL_SENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Proposta Enviada</SelectItem>
+                          <SelectItem value="NEGOTIATION" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Em Negociação</SelectItem>
+                          <SelectItem value="WON" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Ganho</SelectItem>
+                          <SelectItem value="LOST" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Perdido</SelectItem>
+                          <SelectItem value="INACTIVE" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Inativo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Seção: Valores e Datas */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Valores e Datas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="estimatedValue" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Valor Estimado
+                      </Label>
+                      <Input
+                        id="estimatedValue"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.estimatedValue || ''}
+                        onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value ? Number(e.target.value) : 0 })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nextFollowUp" className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Próximo Follow-up
+                      </Label>
+                      <Input
+                        id="nextFollowUp"
+                        type="date"
+                        value={formData.nextFollowUp || ''}
+                        onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Seção: Observações */}
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                    <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                      <FileText className="h-5 w-5 text-seguranca-red" />
+                    </div>
+                    Observações Adicionais
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-seguranca-lightgray font-medium">
+                      Descrição
+                    </Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow min-h-[100px]"
+                      placeholder="Informações adicionais sobre o lead..."
+                      rows={4}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <DialogFooter className="gap-2 pt-4">
                 <Button
+                  type="button"
                   variant="outline"
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                   onClick={() => {
                     setIsCreateModalOpen(false);
                     resetForm();
                   }}
                   disabled={isSubmitting}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
                 >
                   Cancelar
                 </Button>
                 <Button
-                  className="bg-seguranca-red hover:bg-seguranca-darkred"
+                  type="button"
                   onClick={handleCreateLead}
                   disabled={isSubmitting || !formData.name}
+                  className="bg-gradient-to-r from-seguranca-red to-red-600 hover:from-seguranca-red/90 hover:to-red-600/90 text-white font-semibold shadow-lg"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Criando...
                     </>
                   ) : (
                     'Criar Lead'
                   )}
                 </Button>
-              </div>
+              </DialogFooter>
             </div>
           </DialogContent>
         </Dialog>

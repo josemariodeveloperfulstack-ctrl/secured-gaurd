@@ -128,7 +128,7 @@ public class LeadController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar lead", description = "Atualiza um lead existente")
-    @Transactional(readOnly = true)
+    @Transactional
     public ResponseEntity<Lead> updateLead(@PathVariable String id, @RequestBody LeadDTO leadDTO) {
         log.info("📡 RECEBIDO UPDATE LEAD ID: {}", id);
         log.info("📦 Payload: {}", leadDTO);

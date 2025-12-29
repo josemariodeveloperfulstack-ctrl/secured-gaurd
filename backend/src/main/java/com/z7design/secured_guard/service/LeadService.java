@@ -97,8 +97,10 @@ public class LeadService {
                         // Acessar mais campos para garantir inicialização completa
                         assignedUser.isEnabled();
                         assignedUser.isAccountNonExpired();
-                        log.info("✅ AssignedTo inicializado: ID={}, Name={}, Username={}, Email={}", 
-                            assignedUserId, userName, userUsername, userEmail);
+                        // Popular assignedToName para facilitar serialização
+                        lead.setAssignedToName(userName != null ? userName : userUsername);
+                        log.info("✅ AssignedTo inicializado: ID={}, Name={}, Username={}, Email={}, AssignedToName={}", 
+                            assignedUserId, userName, userUsername, userEmail, lead.getAssignedToName());
                     }
                 } else {
                     // Já está inicializado, apenas verificar se existe
@@ -115,21 +117,26 @@ public class LeadService {
                         String userEmail = assignedUser.getEmail();
                         assignedUser.isEnabled();
                         assignedUser.isAccountNonExpired();
-                        log.info("✅ AssignedTo já inicializado: ID={}, Name={}, Username={}, Email={}", 
-                            userId, userName, userUsername, userEmail);
+                        // Popular assignedToName para facilitar serialização
+                        lead.setAssignedToName(userName != null ? userName : userUsername);
+                        log.info("✅ AssignedTo já inicializado: ID={}, Name={}, Username={}, Email={}, AssignedToName={}", 
+                            userId, userName, userUsername, userEmail, lead.getAssignedToName());
                     }
                 }
             } catch (EntityNotFoundException | org.hibernate.LazyInitializationException e) {
                 // User foi deletado ou não pode ser inicializado, definir como null
                 log.warn("Erro ao inicializar assignedTo: {}. Definindo como null.", e.getMessage());
                 lead.setAssignedTo(null);
+                lead.setAssignedToName(null);
             } catch (Exception e) {
                 // Outros erros também resultam em null para evitar problemas
                 log.error("Erro inesperado ao inicializar assignedTo: {}", e.getMessage(), e);
                 lead.setAssignedTo(null);
+                lead.setAssignedToName(null);
             }
         } else {
             log.debug("Lead {} não tem assignedTo", lead.getId());
+            lead.setAssignedToName(null);
         }
     }
 
@@ -157,9 +164,11 @@ public class LeadService {
                 } catch (Exception e) {
                     log.warn("❌ Erro ao acessar assignedTo do lead {}: {}", lead.getId(), e.getMessage(), e);
                     lead.setAssignedTo(null);
+                    lead.setAssignedToName(null);
                 }
             } else {
                 log.debug("⚠️ Lead {} - AssignedTo é null", lead.getId());
+                lead.setAssignedToName(null);
             }
         }
         return leads;
@@ -171,6 +180,20 @@ public class LeadService {
         // Inicializar relacionamentos lazy dentro da transação
         for (Lead lead : leads.getContent()) {
             initializeLeadRelationships(lead);
+            // Popular assignedToName para facilitar serialização
+            if (lead.getAssignedTo() != null) {
+                try {
+                    User assignedUser = lead.getAssignedTo();
+                    String name = assignedUser.getName();
+                    String username = assignedUser.getUsername();
+                    lead.setAssignedToName(name != null ? name : username);
+                } catch (Exception e) {
+                    log.warn("Erro ao popular assignedToName do lead {}: {}", lead.getId(), e.getMessage());
+                    lead.setAssignedToName(null);
+                }
+            } else {
+                lead.setAssignedToName(null);
+            }
         }
         return leads;
     }
@@ -183,19 +206,25 @@ public class LeadService {
         initializeLeadRelationships(lead);
         
         // Forçar acesso ao assignedTo antes de retornar para garantir serialização
+        // IMPORTANTE: Popular assignedToName para facilitar serialização
         if (lead.getAssignedTo() != null) {
             try {
                 User assignedUser = lead.getAssignedTo();
-                assignedUser.getId();
-                assignedUser.getName();
-                assignedUser.getUsername();
-                log.info("✅ Lead {} encontrado - AssignedTo: ID={}, Name={}", 
-                    lead.getId(), assignedUser.getId(), assignedUser.getName());
+                UUID assignedToId = assignedUser.getId();
+                String name = assignedUser.getName();
+                String username = assignedUser.getUsername();
+                assignedUser.getEmail();
+                // Popular assignedToName para facilitar serialização
+                lead.setAssignedToName(name != null ? name : username);
+                log.info("✅ Lead {} encontrado - AssignedTo: ID={}, Name={}, AssignedToName={}", 
+                    lead.getId(), assignedToId, name, lead.getAssignedToName());
             } catch (Exception e) {
                 log.warn("❌ Erro ao acessar assignedTo do lead {}: {}", lead.getId(), e.getMessage());
+                lead.setAssignedToName(null);
             }
         } else {
             log.debug("⚠️ Lead {} encontrado - AssignedTo é null", lead.getId());
+            lead.setAssignedToName(null);
         }
         
         return lead;
@@ -260,6 +289,7 @@ public class LeadService {
         return leadRepository.save(lead);
     }
 
+    @Transactional
     public Lead update(UUID id, LeadDTO leadDTO) {
         log.info("🔄 Iniciando atualização do lead ID: {}", id);
         log.info("📦 DTO recebido: Name={}, Status={}, AssignedToId={}", 
@@ -288,41 +318,55 @@ public class LeadService {
         
         // Atualizar status se fornecido
         if (leadDTO.getStatus() != null) {
+            log.info("🔄 Atualizando status de {} para {}", lead.getStatus(), leadDTO.getStatus());
             lead.setStatus(leadDTO.getStatus());
+            log.info("✅ Status atualizado para: {}", lead.getStatus());
+        } else {
+            log.warn("⚠️ Status não fornecido no DTO - mantendo status existente: {}", lead.getStatus());
         }
         
-        // Atualizar assignedTo apenas se assignedToId for fornecido e válido
-        // IMPORTANTE: Se assignedToId não for fornecido, manter o valor existente (não definir como null)
-        if (leadDTO.getAssignedToId() != null) {
+        // Atualizar assignedTo baseado no assignedToId fornecido
+        // IMPORTANTE: 
+        // - Se assignedToId for fornecido e válido (UUID), atualizar
+        // - Se assignedToId for null (enviado explicitamente), remover assignedTo
+        // - Se assignedToId não for fornecido (campo ausente no JSON), manter o valor existente
+        // 
+        // Como o Jackson não distingue facilmente entre "campo ausente" e "campo null",
+        // vamos processar sempre que o campo estiver presente no JSON.
+        // O frontend sempre envia assignedToId no updateData, então vamos processar sempre.
+        
+        // Verificar se assignedToId foi fornecido
+        // Se for null, significa que o frontend enviou explicitamente null para remover
+        // Se for um UUID válido, atualizar
+        // Se for string vazia (não deve acontecer com UUID, mas vamos tratar), remover
+        
+        UUID assignedToIdFromDTO = leadDTO.getAssignedToId();
+        
+        if (assignedToIdFromDTO != null) {
+            // assignedToId foi fornecido e não é null - tentar atualizar
             try {
-                String assignedToIdStr = leadDTO.getAssignedToId().toString().trim();
-                // Verificar se não é uma string vazia ou "null"
-                if (!assignedToIdStr.isEmpty() && !assignedToIdStr.equalsIgnoreCase("null") && !assignedToIdStr.equalsIgnoreCase("undefined")) {
-                    UUID assignedToUUID = UUID.fromString(assignedToIdStr);
-                    var userOptional = userRepository.findById(assignedToUUID);
-                    if (userOptional.isPresent()) {
-                        lead.setAssignedTo(userOptional.get());
-                        log.info("✅ AssignedTo ATUALIZADO para: ID={}, Name={}", 
-                            userOptional.get().getId(), userOptional.get().getName());
-                    } else {
-                        // Se o usuário não existir, definir como null em vez de lançar exceção
-                        log.error("❌ FALHA AO ATUALIZAR: Usuário não encontrado com ID: {}", assignedToIdStr);
-                        log.warn("Usuário responsável não encontrado com ID: {}. Definindo como null.", assignedToIdStr);
-                        lead.setAssignedTo(null);
-                    }
+                var userOptional = userRepository.findById(assignedToIdFromDTO);
+                if (userOptional.isPresent()) {
+                    lead.setAssignedTo(userOptional.get());
+                    log.info("✅ AssignedTo ATUALIZADO para: ID={}, Name={}", 
+                        userOptional.get().getId(), userOptional.get().getName());
                 } else {
-                    // String vazia ou "null" - remover assignedTo
-                    log.info("AssignedToId vazio ou 'null' - removendo assignedTo");
+                    // Se o usuário não existir, definir como null em vez de lançar exceção
+                    log.error("❌ FALHA AO ATUALIZAR: Usuário não encontrado com ID: {}", assignedToIdFromDTO);
+                    log.warn("Usuário responsável não encontrado com ID: {}. Definindo como null.", assignedToIdFromDTO);
                     lead.setAssignedTo(null);
                 }
-            } catch (IllegalArgumentException e) {
-                log.warn("ID do usuário responsável inválido: {}. Mantendo assignedTo existente.", leadDTO.getAssignedToId());
-                // Não alterar o assignedTo se o ID for inválido
+            } catch (Exception e) {
+                log.warn("Erro ao processar assignedToId {}: {}. Mantendo assignedTo existente.", assignedToIdFromDTO, e.getMessage());
+                // Não alterar o assignedTo se houver erro
             }
         } else {
-            // Se assignedToId não for fornecido, manter o valor existente
-            log.debug("AssignedToId não fornecido - mantendo assignedTo existente: {}", 
-                lead.getAssignedTo() != null ? lead.getAssignedTo().getId() : "null");
+            // assignedToId é null - pode ser que foi enviado explicitamente para remover
+            // ou pode ser que não foi enviado.
+            // Como o frontend sempre envia assignedToId no updateData (mesmo que seja o valor existente),
+            // se chegou aqui como null, significa que o frontend enviou null explicitamente para remover
+            log.info("🔄 AssignedToId é null - removendo assignedTo (enviado explicitamente)");
+            lead.setAssignedTo(null);
         }
 
         Lead savedLead = leadRepository.save(lead);
@@ -337,6 +381,24 @@ public class LeadService {
         
         // Inicializar relacionamentos antes de retornar
         initializeLeadRelationships(savedLead);
+        
+        // IMPORTANTE: Popular assignedToName após inicializar relacionamentos
+        // Isso garante que o campo transiente seja populado corretamente para serialização JSON
+        if (savedLead.getAssignedTo() != null) {
+            try {
+                User assignedUser = savedLead.getAssignedTo();
+                String name = assignedUser.getName();
+                String username = assignedUser.getUsername();
+                savedLead.setAssignedToName(name != null ? name : username);
+                log.info("✅ Lead {} - AssignedToName populado: {}", savedLead.getId(), savedLead.getAssignedToName());
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao popular assignedToName do lead {}: {}", savedLead.getId(), e.getMessage());
+            }
+        } else {
+            // Se assignedTo for null, limpar assignedToName
+            savedLead.setAssignedToName(null);
+            log.debug("⚠️ Lead {} - AssignedToName limpo (assignedTo é null)", savedLead.getId());
+        }
         
         return savedLead;
     }
