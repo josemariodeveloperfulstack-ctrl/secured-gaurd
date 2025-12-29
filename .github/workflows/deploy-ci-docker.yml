@@ -172,6 +172,64 @@ jobs:
           echo "✅ SSH configurado para usar senha"
 
       # ============================================
+      # 🔟 CORRIGIR REPOSITÓRIO REMOTO NA VPS
+      # ============================================
+      - name: 🔧 Corrigir repositório remoto na VPS
+        run: |
+          echo "🔧 Verificando e corrigindo URL do repositório remoto na VPS..."
+          
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o BatchMode=no"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'FIX_REPO_EOF'
+            echo "🔧 Verificando repositório remoto..."
+            
+            # Verificar se existe um repositório git no diretório de deploy
+            if [ -d "/var/www/secured_guard/ci/.git" ]; then
+              cd /var/www/secured_guard/ci
+              
+              echo "📋 URL atual do repositório remoto:"
+              git remote -v || echo "  ⚠️ Não foi possível verificar remotes"
+              
+              # Verificar se a URL está incorreta
+              CURRENT_URL=$(git remote get-url origin 2>/dev/null || echo "")
+              CORRECT_URL="https://github.com/zemarioramos/secured-guard.git"
+              
+              if [ -n "$CURRENT_URL" ]; then
+                echo ""
+                echo "🔍 URL atual: $CURRENT_URL"
+                echo "✅ URL correta: $CORRECT_URL"
+                
+                if [ "$CURRENT_URL" != "$CORRECT_URL" ]; then
+                  echo ""
+                  echo "🔄 Corrigindo URL do repositório remoto..."
+                  git remote set-url origin "$CORRECT_URL" || {
+                    echo "⚠️ Erro ao definir URL. Tentando remover e adicionar novamente..."
+                    git remote remove origin 2>/dev/null || true
+                    git remote add origin "$CORRECT_URL"
+                  }
+                  
+                  echo "✅ URL corrigida!"
+                  echo ""
+                  echo "📋 Nova URL do repositório remoto:"
+                  git remote -v
+                else
+                  echo "✅ URL já está correta!"
+                fi
+              else
+                echo "⚠️ Nenhum remote 'origin' encontrado. Adicionando..."
+                git remote add origin "$CORRECT_URL"
+                echo "✅ Remote 'origin' adicionado com URL correta!"
+              fi
+            else
+              echo "ℹ️ Diretório .git não encontrado em /var/www/secured_guard/ci/"
+              echo "   Isso é normal se o código não foi clonado diretamente na VPS"
+              echo "   O deploy usa Docker, então não é necessário ter o repositório git na VPS"
+            fi
+          FIX_REPO_EOF
+          
+          echo "✅ Verificação do repositório concluída!"
+
+      # ============================================
       # 🔟 TRANSFERIR ARQUIVOS PARA VPS
       # ============================================
       - name: 📤 Transfer files to VPS
