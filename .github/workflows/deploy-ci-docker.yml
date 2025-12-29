@@ -799,7 +799,9 @@ jobs:
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
             echo "🚀 Iniciando TODOS os containers..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
+            echo "📥 Forçando pull das imagens mais recentes..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml pull
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
             
             if [ $? -ne 0 ]; then
               echo "❌ ERRO ao iniciar containers!"
@@ -995,7 +997,8 @@ jobs:
                   # Tentar reiniciar o serviço
                   $COMPOSE_CMD -f docker-compose.ci.yml restart "$service" 2>&1 || {
                     echo "  ⚠️ Erro ao reiniciar $service. Tentando recriar..."
-                    $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate "$service" 2>&1 || echo "  ⚠️ Erro ao recriar $service"
+                    $COMPOSE_CMD -f docker-compose.ci.yml pull "$service" 2>&1 || echo "  ⚠️ Erro ao fazer pull de $service"
+                    $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always "$service" 2>&1 || echo "  ⚠️ Erro ao recriar $service"
                   }
                 done
                 
@@ -1084,9 +1087,11 @@ jobs:
                   
                   # Recriar o serviço
                   if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-                    docker compose -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME"
+                    docker compose -f docker-compose.ci.yml pull "$SERVICE_NAME" 2>&1 || echo "  ⚠️ Erro ao fazer pull de $SERVICE_NAME"
+                    docker compose -f docker-compose.ci.yml up -d --force-recreate --pull always --no-deps "$SERVICE_NAME"
                   else
-                    docker-compose -f docker-compose.ci.yml up -d --force-recreate --no-deps "$SERVICE_NAME"
+                    docker-compose -f docker-compose.ci.yml pull "$SERVICE_NAME" 2>&1 || echo "  ⚠️ Erro ao fazer pull de $SERVICE_NAME"
+                    docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull always --no-deps "$SERVICE_NAME"
                   fi
                   
                   echo "⏳ Aguardando $container iniciar (15s)..."
