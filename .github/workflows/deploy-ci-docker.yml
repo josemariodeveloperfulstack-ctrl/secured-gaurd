@@ -1463,8 +1463,144 @@ jobs:
               echo "⚠️ Container frontend não está rodando ainda"
             fi
             
-            echo "⏳ Aguardando containers iniciarem (60s)..."
-            sleep 60
+            echo ""
+            echo "🏥 ========================================"
+            echo "🏥 AGUARDANDO HEALTH CHECKS DOS CONTAINERS"
+            echo "🏥 ========================================"
+            echo ""
+            
+            # Aguardar health checks dos containers
+            MAX_WAIT=300  # 5 minutos máximo
+            WAIT_INTERVAL=10  # Verificar a cada 10 segundos
+            ELAPSED=0
+            
+            echo "⏳ Aguardando containers ficarem saudáveis..."
+            
+            # Verificar health status de cada container
+            check_container_health() {
+              local container=$1
+              local health_status=$($DOCKER_CMD inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "none")
+              echo "$health_status"
+            }
+            
+            while [ $ELAPSED -lt $MAX_WAIT ]; do
+              echo ""
+              echo "🔍 Verificando health status (${ELAPSED}s/${MAX_WAIT}s)..."
+              
+              BACKEND_HEALTH=$(check_container_health "secured-guard-backend-ci")
+              FRONTEND_HEALTH=$(check_container_health "secured-guard-frontend-ci")
+              WHATSAPP_HEALTH=$(check_container_health "secured-guard-whatsapp-ci")
+              NGINX_HEALTH=$(check_container_health "secured-guard-nginx-ci")
+              
+              echo "  Backend: $BACKEND_HEALTH"
+              echo "  Frontend: $FRONTEND_HEALTH"
+              echo "  WhatsApp: $WHATSAPP_HEALTH"
+              echo "  Nginx: $NGINX_HEALTH"
+              
+              # Verificar se todos estão healthy ou starting (ainda iniciando)
+              if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$NGINX_HEALTH" = "healthy" ]; then
+                echo ""
+                echo "✅ Todos os containers principais estão saudáveis!"
+                break
+              fi
+              
+              # Se algum container estiver unhealthy, mostrar logs
+              if [ "$BACKEND_HEALTH" = "unhealthy" ]; then
+                echo "  ⚠️ Backend está unhealthy. Logs:"
+                $DOCKER_CMD logs --tail 20 secured-guard-backend-ci 2>&1 | tail -10
+              fi
+              
+              if [ "$FRONTEND_HEALTH" = "unhealthy" ]; then
+                echo "  ⚠️ Frontend está unhealthy. Logs:"
+                $DOCKER_CMD logs --tail 20 secured-guard-frontend-ci 2>&1 | tail -10
+              fi
+              
+              sleep $WAIT_INTERVAL
+              ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+            done
+            
+            if [ $ELAPSED -ge $MAX_WAIT ]; then
+              echo ""
+              echo "⚠️ Timeout aguardando health checks (${MAX_WAIT}s)"
+              echo "📋 Status final dos containers:"
+              $DOCKER_CMD ps --format "table {{.Names}}\t{{.Status}}\t{{.Health}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
+            else
+              echo ""
+              echo "✅ Health checks concluídos em ${ELAPSED}s"
+            fi
+            
+            echo ""
+            echo "⏳ Aguardando mais 30s para aplicação estabilizar..."
+            sleep 30
+            
+            echo ""
+            echo "🔍 ========================================"
+            echo "🔍 VERIFICAÇÃO FINAL DO FRONTEND"
+            echo "🔍 ========================================"
+            echo ""
+            
+            # Verificar conteúdo do frontend após health checks
+            if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+              echo "✅ Container frontend está rodando"
+              
+              echo ""
+              echo "📂 Verificando conteúdo do container frontend:"
+              $DOCKER_CMD exec secured-guard-frontend-ci ls -lah /usr/share/nginx/html/ | head -20 || echo "⚠️ Não foi possível listar arquivos"
+              
+              echo ""
+              echo "🔍 Verificando se index.html existe e seu tamanho:"
+              INDEX_SIZE=$($DOCKER_CMD exec secured-guard-frontend-ci ls -lh /usr/share/nginx/html/index.html 2>/dev/null | awk '{print $5}' || echo "N/A")
+              echo "  Tamanho do index.html: $INDEX_SIZE"
+              
+              echo ""
+              echo "🔍 Verificando arquivos JS mais recentes:"
+              $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -10 || echo "⚠️ Nenhum arquivo JS encontrado"
+              
+              echo ""
+              echo "🔍 Verificando se o código contém 'Proposta de Acordo' (nova aba):"
+              SEARCH_RESULT=$($DOCKER_CMD exec secured-guard-frontend-ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3 || echo "")
+              if [ -n "$SEARCH_RESULT" ]; then
+                echo "  ✅ 'Proposta de Acordo' encontrado nos arquivos compilados!"
+                echo "  📋 Resultado:"
+                echo "$SEARCH_RESULT" | sed 's/^/    /'
+              else
+                echo "  ❌ 'Proposta de Acordo' NÃO encontrado nos arquivos compilados!"
+                echo "  📋 Isso indica que o build não incluiu as alterações"
+                echo "  🔄 Verificando se há outros arquivos relacionados..."
+                $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec grep -l "Proposta\|proposta" {} \; 2>/dev/null | head -5 || echo "    Nenhum arquivo encontrado"
+              fi
+              
+              echo ""
+              echo "🌐 Testando acesso ao frontend via HTTP:"
+              FRONTEND_HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ 2>/dev/null || echo "000")
+              if [ "$FRONTEND_HTTP" = "200" ]; then
+                echo "  ✅ Frontend responde na porta 3000 (HTTP 200)"
+              else
+                echo "  ⚠️ Frontend retornou HTTP $FRONTEND_HTTP na porta 3000"
+              fi
+              
+              echo ""
+              echo "🌐 Testando acesso via Nginx (porta 8082):"
+              NGINX_HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/ 2>/dev/null || echo "000")
+              if [ "$NGINX_HTTP" = "200" ]; then
+                echo "  ✅ Nginx responde na porta 8082 (HTTP 200)"
+              else
+                echo "  ⚠️ Nginx retornou HTTP $NGINX_HTTP na porta 8082"
+              fi
+              
+              echo ""
+              echo "🔄 Forçando recarregamento do Nginx no container frontend..."
+              $DOCKER_CMD exec secured-guard-frontend-ci nginx -s reload 2>/dev/null || {
+                echo "⚠️ Não foi possível recarregar nginx"
+                echo "🔄 Reiniciando container frontend para garantir..."
+                $DOCKER_CMD restart secured-guard-frontend-ci || true
+                sleep 10
+              }
+            else
+              echo "❌ Container frontend NÃO está rodando!"
+              echo "📋 Containers em execução:"
+              $DOCKER_CMD ps --format "table {{.Names}}\t{{.Status}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
+            fi
             
             # Verificar containers que saíram imediatamente
             echo ""
@@ -2191,6 +2327,75 @@ jobs:
               else
                 echo "⚠️ Ainda retornando HTTP $HTTP_CODE"
               fi
+            fi
+          EOF
+
+      # ============================================
+      # 2️⃣2️⃣.5️⃣ VERIFICAÇÃO DO CONTEÚDO DO FRONTEND NA VPS
+      # ============================================
+      - name: 🔍 Verificar conteúdo do frontend na VPS
+        run: |
+          echo "🔍 ========================================"
+          echo "🔍 VERIFICANDO CONTEÚDO DO FRONTEND NA VPS"
+          echo "🔍 ========================================"
+          echo ""
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            echo "🔍 Verificando container frontend..."
+            
+            if docker ps --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+              echo "✅ Container frontend está rodando"
+              
+              echo ""
+              echo "📂 Listando arquivos no container:"
+              docker exec secured-guard-frontend-ci ls -lah /usr/share/nginx/html/ | head -20 || echo "⚠️ Erro ao listar arquivos"
+              
+              echo ""
+              echo "🔍 Verificando se 'Proposta de Acordo' está no código compilado:"
+              SEARCH_RESULT=$(docker exec secured-guard-frontend-ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -5 || echo "")
+              
+              if [ -n "$SEARCH_RESULT" ]; then
+                echo "  ✅ 'Proposta de Acordo' ENCONTRADO no código compilado!"
+                echo "  📋 Resultado:"
+                echo "$SEARCH_RESULT" | sed 's/^/    /'
+              else
+                echo "  ❌ 'Proposta de Acordo' NÃO encontrado no código compilado!"
+                echo "  📋 Isso indica que o build não incluiu as alterações mais recentes"
+                echo ""
+                echo "  🔍 Verificando arquivos JS disponíveis:"
+                docker exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f | head -10 || echo "    Nenhum arquivo JS encontrado"
+                echo ""
+                echo "  🔍 Tentando encontrar qualquer referência a 'Proposta':"
+                docker exec secured-guard-frontend-ci grep -r "Proposta" /usr/share/nginx/html/ 2>/dev/null | head -5 || echo "    Nenhuma referência encontrada"
+              fi
+              
+              echo ""
+              echo "📅 Verificando data de modificação dos arquivos:"
+              docker exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -5 || echo "⚠️ Erro ao verificar datas"
+              
+              echo ""
+              echo "🌐 Testando acesso HTTP ao frontend:"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ 2>/dev/null || echo "000")
+              echo "  Porta 3000 (frontend direto): HTTP $HTTP_CODE"
+              
+              HTTP_CODE_NGINX=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/ 2>/dev/null || echo "000")
+              echo "  Porta 8082 (via nginx): HTTP $HTTP_CODE_NGINX"
+              
+              echo ""
+              echo "📋 Verificando imagem usada pelo container:"
+              IMAGE_USED=$(docker inspect --format='{{.Config.Image}}' secured-guard-frontend-ci 2>/dev/null || echo "N/A")
+              echo "  Imagem: $IMAGE_USED"
+              
+              IMAGE_CREATED=$(docker inspect --format='{{.Created}}' secured-guard-frontend-ci 2>/dev/null || echo "N/A")
+              echo "  Container criado: $IMAGE_CREATED"
+              
+              echo ""
+              echo "📋 Verificando data da imagem Docker:"
+              docker images --format "{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}" | grep "z7design/secured-guard-frontend:ci" || echo "  Imagem não encontrada"
+            else
+              echo "❌ Container frontend NÃO está rodando!"
+              echo "📋 Containers em execução:"
+              docker ps --format "table {{.Names}}\t{{.Status}}" | grep "secured-guard" || echo "  Nenhum container encontrado"
             fi
           EOF
 
