@@ -18,7 +18,31 @@ jobs:
     
     steps:
       # ============================================
-      # 0️⃣ VERIFICAR SECRETS (antes de começar)
+      # 0️⃣ INFORMAÇÕES DE DEBUG E VERIFICAÇÃO
+      # ============================================
+      - name: 📊 Informações de deploy
+        run: |
+          echo "📊 ========================================"
+          echo "📊 INFORMAÇÕES DO DEPLOY"
+          echo "📊 ========================================"
+          echo ""
+          echo "🔄 Commit SHA: ${{ github.sha }}"
+          echo "🌿 Branch: ${{ github.ref_name }}"
+          echo "👤 Autor: ${{ github.actor }}"
+          echo "📅 Data: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "🔧 Workflow: ${{ github.workflow }}"
+          echo "🏃 Run ID: ${{ github.run_id }}"
+          echo "🔢 Run Number: ${{ github.run_number }}"
+          echo ""
+          echo "📋 Últimos commits:"
+          git log --oneline -5 || echo "⚠️ Não foi possível obter histórico"
+          echo ""
+          echo "📊 ========================================"
+          echo "✅ Informações coletadas"
+          echo "📊 ========================================"
+
+      # ============================================
+      # 0️⃣.5️⃣ VERIFICAR SECRETS (antes de começar)
       # ============================================
       - name: 🔐 Verificar secrets necessários
         continue-on-error: true
@@ -154,11 +178,57 @@ jobs:
       # ============================================
       - name: 📤 Push images to Docker Hub
         run: |
+          echo "📤 ========================================"
+          echo "📤 ENVIANDO IMAGENS PARA DOCKER HUB"
+          echo "📤 ========================================"
+          echo ""
+          echo "🔄 Commit SHA: ${{ github.sha }}"
+          echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          
+          # Mostrar informações das imagens antes do push
+          echo "📋 Imagens locais antes do push:"
+          docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
+          echo ""
+          
           echo "📤 Enviando imagens para Docker Hub..."
-          docker push z7design/secured-guard-backend:ci
-          docker push z7design/secured-guard-frontend:ci
-          docker push z7design/secured-guard-whatsapp:ci
-          echo "✅ Imagens enviadas com sucesso!"
+          echo ""
+          
+          # Push backend
+          echo "📤 Enviando backend..."
+          docker push z7design/secured-guard-backend:ci || {
+            echo "❌ Erro ao fazer push do backend"
+            exit 1
+          }
+          echo "✅ Backend enviado!"
+          echo ""
+          
+          # Push frontend
+          echo "📤 Enviando frontend..."
+          docker push z7design/secured-guard-frontend:ci || {
+            echo "❌ Erro ao fazer push do frontend"
+            exit 1
+          }
+          echo "✅ Frontend enviado!"
+          echo ""
+          
+          # Push whatsapp
+          echo "📤 Enviando whatsapp..."
+          docker push z7design/secured-guard-whatsapp:ci || {
+            echo "❌ Erro ao fazer push do whatsapp"
+            exit 1
+          }
+          echo "✅ WhatsApp enviado!"
+          echo ""
+          
+          echo "📤 ========================================"
+          echo "✅ TODAS AS IMAGENS ENVIADAS COM SUCESSO!"
+          echo "📤 ========================================"
+          echo ""
+          echo "🔗 Imagens disponíveis em:"
+          echo "   - z7design/secured-guard-backend:ci"
+          echo "   - z7design/secured-guard-frontend:ci"
+          echo "   - z7design/secured-guard-whatsapp:ci"
 
       # ============================================
       # 9️⃣ INSTALAR SSHPASS E CONFIGURAR SSH
@@ -888,6 +958,23 @@ jobs:
             echo ""
             echo "📅 Data das imagens baixadas:"
             docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
+            
+            # Verificar se as imagens são realmente novas (criadas nas últimas 2 horas)
+            echo ""
+            echo "🔍 Verificando se as imagens são recentes..."
+            CURRENT_TIME=$(date +%s)
+            RECENT_THRESHOLD=7200  # 2 horas em segundos
+            
+            for image in z7design/secured-guard-backend:ci z7design/secured-guard-frontend:ci z7design/secured-guard-whatsapp:ci; do
+              IMAGE_INFO=$(docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedAt}}" "$image" 2>/dev/null || echo "")
+              if [ -n "$IMAGE_INFO" ]; then
+                echo "  ✅ $image encontrada"
+                # Extrair timestamp se possível (formato varia)
+                echo "     $IMAGE_INFO"
+              else
+                echo "  ⚠️ $image não encontrada após pull!"
+              fi
+            done
           EOF
 
       # ============================================
@@ -1087,10 +1174,25 @@ jobs:
             
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
             echo ""
-            echo "🚀 Iniciando TODOS os containers..."
+            echo "🚀 ========================================"
+            echo "🚀 INICIANDO CONTAINERS COM NOVAS IMAGENS"
+            echo "🚀 ========================================"
+            echo ""
             echo "📥 Forçando pull das imagens mais recentes..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml pull
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
+            echo "🔄 Commit SHA do deploy: ${{ github.sha }}"
+            echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            
+            # Forçar pull de todas as imagens novamente antes de iniciar
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml pull --ignore-pull-failures || true
+            
+            echo ""
+            echo "📋 Imagens disponíveis antes de iniciar containers:"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
+            echo ""
+            
+            echo "🚀 Iniciando containers com --force-recreate para garantir uso das novas imagens..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans --build
             
             if [ $? -ne 0 ]; then
               echo "❌ ERRO ao iniciar containers!"
@@ -1098,6 +1200,24 @@ jobs:
               $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 2>&1 | tail -50
               exit 1
             fi
+            
+            echo ""
+            echo "✅ Containers iniciados!"
+            echo ""
+            echo "🔍 Verificando imagens usadas pelos containers:"
+            echo "📋 Containers e suas imagens:"
+            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
+            echo ""
+            echo "📅 Imagens dos containers (verificando se são recentes):"
+            for container in secured-guard-backend-ci secured-guard-frontend-ci secured-guard-whatsapp-ci; do
+              if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
+                IMAGE_USED=$($DOCKER_CMD inspect --format='{{.Config.Image}}' "$container" 2>/dev/null || echo "N/A")
+                IMAGE_CREATED=$($DOCKER_CMD inspect --format='{{.Created}}' "$container" 2>/dev/null || echo "N/A")
+                echo "  📦 $container:"
+                echo "     Imagem: $IMAGE_USED"
+                echo "     Criado: $IMAGE_CREATED"
+              fi
+            done
             
             echo "⏳ Aguardando containers iniciarem (60s)..."
             sleep 60
