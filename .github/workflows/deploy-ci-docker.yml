@@ -296,6 +296,132 @@ jobs:
           echo "✅ Arquivos transferidos com sucesso!"
 
       # ============================================
+      # 🔟.5️⃣ VERIFICAR ARQUIVOS TRANSFERIDOS NA VPS
+      # ============================================
+      - name: ✅ Verificar arquivos transferidos na VPS
+        run: |
+          echo "✅ Verificando se os arquivos foram transferidos corretamente para a VPS..."
+          
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o BatchMode=no"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'VERIFY_FILES_EOF'
+            echo "🔍 ========================================"
+            echo "🔍 VERIFICAÇÃO DE ARQUIVOS TRANSFERIDOS"
+            echo "🔍 ========================================"
+            echo ""
+            
+            cd /var/www/secured_guard/ci
+            
+            # Verificar docker-compose.ci.yml
+            echo "📋 Verificando docker-compose.ci.yml..."
+            if [ -f "docker-compose.ci.yml" ]; then
+              FILE_SIZE=$(stat -c%s docker-compose.ci.yml 2>/dev/null || stat -f%z docker-compose.ci.yml 2>/dev/null || echo "0")
+              FILE_DATE=$(stat -c%y docker-compose.ci.yml 2>/dev/null || stat -f%Sm docker-compose.ci.yml 2>/dev/null || echo "N/A")
+              echo "  ✅ docker-compose.ci.yml existe"
+              echo "     Tamanho: $FILE_SIZE bytes"
+              echo "     Data: $FILE_DATE"
+              
+              # Verificar se o arquivo não está vazio
+              if [ "$FILE_SIZE" -eq 0 ]; then
+                echo "  ⚠️ AVISO: docker-compose.ci.yml está vazio!"
+              else
+                echo "  ✅ docker-compose.ci.yml tem conteúdo"
+              fi
+            else
+              echo "  ❌ ERRO: docker-compose.ci.yml NÃO existe!"
+              exit 1
+            fi
+            
+            echo ""
+            
+            # Verificar nginx/ci.conf
+            echo "📋 Verificando nginx/ci.conf..."
+            if [ -f "nginx/ci.conf" ]; then
+              FILE_SIZE=$(stat -c%s nginx/ci.conf 2>/dev/null || stat -f%z nginx/ci.conf 2>/dev/null || echo "0")
+              FILE_DATE=$(stat -c%y nginx/ci.conf 2>/dev/null || stat -f%Sm nginx/ci.conf 2>/dev/null || echo "N/A")
+              echo "  ✅ nginx/ci.conf existe"
+              echo "     Tamanho: $FILE_SIZE bytes"
+              echo "     Data: $FILE_DATE"
+              
+              if [ "$FILE_SIZE" -eq 0 ]; then
+                echo "  ⚠️ AVISO: nginx/ci.conf está vazio!"
+              else
+                echo "  ✅ nginx/ci.conf tem conteúdo"
+              fi
+            else
+              echo "  ❌ ERRO: nginx/ci.conf NÃO existe!"
+              exit 1
+            fi
+            
+            echo ""
+            
+            # Verificar traefik-dynamic-ci.yml (se foi transferido)
+            echo "📋 Verificando traefik-dynamic-ci.yml..."
+            if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
+              FILE_SIZE=$(stat -c%s /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || stat -f%z /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || echo "0")
+              FILE_DATE=$(stat -c%y /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || stat -f%Sm /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || echo "N/A")
+              echo "  ✅ traefik-dynamic-ci.yml existe"
+              echo "     Tamanho: $FILE_SIZE bytes"
+              echo "     Data: $FILE_DATE"
+            else
+              echo "  ⚠️ traefik-dynamic-ci.yml não foi transferido (pode ser normal se não existir no repositório)"
+            fi
+            
+            echo ""
+            
+            # Verificar diretórios criados
+            echo "📋 Verificando diretórios criados..."
+            DIRS=(
+              "/var/www/secured_guard/ci"
+              "/var/www/secured_guard/ci/uploads"
+              "/var/www/secured_guard/ci/logs"
+              "/var/www/secured_guard/ci/nginx"
+              "/var/www/secured_guard/ci/postgres_data"
+              "/var/www/secured_guard/ci/redis_data"
+              "/var/www/secured_guard/ci/evolution_instances"
+              "/var/www/secured_guard/ci/holerites"
+              "/var/www/secured_guard/ci/whatsapp_sessions"
+            )
+            
+            ALL_DIRS_OK=true
+            for dir in "${DIRS[@]}"; do
+              if [ -d "$dir" ]; then
+                echo "  ✅ $dir existe"
+              else
+                echo "  ❌ $dir NÃO existe!"
+                ALL_DIRS_OK=false
+              fi
+            done
+            
+            if [ "$ALL_DIRS_OK" = false ]; then
+              echo ""
+              echo "⚠️ AVISO: Alguns diretórios não foram criados!"
+            else
+              echo ""
+              echo "✅ Todos os diretórios foram criados com sucesso!"
+            fi
+            
+            echo ""
+            echo "🔍 ========================================"
+            echo "✅ VERIFICAÇÃO CONCLUÍDA"
+            echo "🔍 ========================================"
+            
+            # Listar conteúdo do diretório principal
+            echo ""
+            echo "📂 Conteúdo do diretório /var/www/secured_guard/ci:"
+            ls -lah /var/www/secured_guard/ci/ | head -20 || echo "  ⚠️ Erro ao listar conteúdo"
+          VERIFY_FILES_EOF
+          
+          if [ $? -eq 0 ]; then
+            echo ""
+            echo "✅ Todos os arquivos foram verificados com sucesso na VPS!"
+          else
+            echo ""
+            echo "❌ ERRO: Falha na verificação dos arquivos na VPS!"
+            exit 1
+          fi
+
+      # ============================================
       # 1️⃣1️⃣ VALIDAR E CONFIGURAR JWT_SECRET
       # ============================================
       - name: 🔐 Validate and configure JWT_SECRET
