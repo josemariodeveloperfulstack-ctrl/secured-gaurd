@@ -141,28 +141,111 @@ jobs:
           ls -lh dist/ || echo "⚠️ Diretório dist/ não encontrado"
 
       # ============================================
-      # 6️⃣ BUILD DOCKER IMAGES
+      # 6️⃣ VERIFICAR CÓDIGO ANTES DO BUILD
+      # ============================================
+      - name: 🔍 Verificar código antes do build
+        run: |
+          echo "🔍 ========================================"
+          echo "🔍 VERIFICANDO CÓDIGO ANTES DO BUILD"
+          echo "🔍 ========================================"
+          echo ""
+          echo "🔄 Commit SHA: ${{ github.sha }}"
+          echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "📋 Verificando arquivos do frontend (Propostas):"
+          if [ -f "frontend/src/pages/Propostas.tsx" ]; then
+            echo "  ✅ frontend/src/pages/Propostas.tsx existe"
+            echo "  📏 Tamanho: $(wc -l < frontend/src/pages/Propostas.tsx) linhas"
+            # Verificar se contém "Proposta de Acordo" (nova aba)
+            if grep -q "Proposta de Acordo\|Propostas de Acordo" frontend/src/pages/Propostas.tsx; then
+              echo "  ✅ Contém 'Proposta de Acordo' (nova aba encontrada)"
+            else
+              echo "  ⚠️ Não encontrou 'Proposta de Acordo' no arquivo"
+            fi
+          else
+            echo "  ❌ frontend/src/pages/Propostas.tsx NÃO existe!"
+          fi
+          echo ""
+          echo "📋 Verificando arquivos do backend:"
+          if [ -f "backend/src/main/java/com/z7design/secured_guard/model/Proposal.java" ]; then
+            echo "  ✅ Proposal.java existe"
+          else
+            echo "  ❌ Proposal.java NÃO existe!"
+          fi
+          echo ""
+          echo "📋 Últimos arquivos modificados:"
+          git log --name-only --oneline -5 --pretty=format:"%h %s" | head -20 || echo "⚠️ Não foi possível obter histórico"
+          echo ""
+          echo "🔍 ========================================"
+          echo "✅ Verificação concluída"
+          echo "🔍 ========================================"
+
+      # ============================================
+      # 6️⃣.5️⃣ BUILD DOCKER IMAGES
       # ============================================
       - name: 🐳 Build Docker images
         run: |
-          echo "🐳 Construindo imagens Docker..."
+          echo "🐳 ========================================"
+          echo "🐳 CONSTRUINDO IMAGENS DOCKER"
+          echo "🐳 ========================================"
+          echo ""
+          echo "🔄 Commit SHA: ${{ github.sha }}"
+          echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          
+          # Limpar cache do Docker antes de buildar
+          echo "🧹 Limpando cache do Docker..."
+          docker builder prune -f || true
+          echo ""
           
           # Build backend image (sem cache para garantir atualização)
-          docker build --no-cache -t z7design/secured-guard-backend:ci \
-            -f backend/Dockerfile.prod ./backend
+          echo "🔨 Construindo imagem backend..."
+          docker build --no-cache --progress=plain -t z7design/secured-guard-backend:ci \
+            -f backend/Dockerfile.prod ./backend || {
+            echo "❌ Erro ao construir imagem backend"
+            exit 1
+          }
+          echo "✅ Backend construído!"
+          echo ""
           
           # Build frontend image com variáveis de ambiente do CI (sem cache para garantir atualização)
-          docker build --no-cache -t z7design/secured-guard-frontend:ci \
+          echo "🎨 Construindo imagem frontend..."
+          docker build --no-cache --progress=plain -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
-            -f frontend/Dockerfile.prod ./frontend
+            -f frontend/Dockerfile.prod ./frontend || {
+            echo "❌ Erro ao construir imagem frontend"
+            exit 1
+          }
+          echo "✅ Frontend construído!"
+          echo ""
           
           # Build WhatsApp service image (Baileys) (sem cache para garantir atualização)
-          docker build --no-cache -t z7design/secured-guard-whatsapp:ci \
-            -f whatsapp-service/Dockerfile ./whatsapp-service
+          echo "📱 Construindo imagem WhatsApp..."
+          docker build --no-cache --progress=plain -t z7design/secured-guard-whatsapp:ci \
+            -f whatsapp-service/Dockerfile ./whatsapp-service || {
+            echo "❌ Erro ao construir imagem WhatsApp"
+            exit 1
+          }
+          echo "✅ WhatsApp construído!"
+          echo ""
           
-          echo "✅ Imagens Docker construídas!"
+          echo "🐳 ========================================"
+          echo "✅ TODAS AS IMAGENS CONSTRUÍDAS!"
+          echo "🐳 ========================================"
+          echo ""
+          echo "📋 Imagens criadas:"
+          docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
+          
+          # Verificar conteúdo das imagens
+          echo ""
+          echo "🔍 Verificando conteúdo da imagem frontend..."
+          docker run --rm z7design/secured-guard-frontend:ci ls -la /usr/share/nginx/html/ | head -20 || echo "⚠️ Não foi possível verificar conteúdo"
+          
+          echo ""
+          echo "🔍 Verificando se arquivos JS foram gerados..."
+          docker run --rm z7design/secured-guard-frontend:ci find /usr/share/nginx/html -name "*.js" -type f | head -10 || echo "⚠️ Não foi possível verificar arquivos JS"
 
       # ============================================
       # 7️⃣ LOGIN NO DOCKER HUB
@@ -1322,6 +1405,31 @@ jobs:
             echo "🔍 ========================================"
             echo "✅ VERIFICAÇÃO CONCLUÍDA"
             echo "🔍 ========================================"
+            
+            echo ""
+            echo "🔍 Verificando conteúdo do container frontend..."
+            if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
+              echo "📂 Listando arquivos no container frontend:"
+              $DOCKER_CMD exec secured-guard-frontend-ci ls -lah /usr/share/nginx/html/ | head -20 || echo "⚠️ Não foi possível listar arquivos"
+              
+              echo ""
+              echo "🔍 Verificando se index.html existe e seu tamanho:"
+              $DOCKER_CMD exec secured-guard-frontend-ci ls -lh /usr/share/nginx/html/index.html 2>/dev/null || echo "⚠️ index.html não encontrado"
+              
+              echo ""
+              echo "🔍 Verificando arquivos JS mais recentes:"
+              $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -10 || echo "⚠️ Nenhum arquivo JS encontrado"
+              
+              echo ""
+              echo "🔄 Forçando recarregamento do Nginx no container frontend..."
+              $DOCKER_CMD exec secured-guard-frontend-ci nginx -s reload 2>/dev/null || {
+                echo "⚠️ Não foi possível recarregar nginx (pode estar iniciando)"
+                echo "🔄 Reiniciando container frontend para garantir..."
+                $DOCKER_CMD restart secured-guard-frontend-ci || true
+              }
+            else
+              echo "⚠️ Container frontend não está rodando ainda"
+            fi
             
             echo "⏳ Aguardando containers iniciarem (60s)..."
             sleep 60
