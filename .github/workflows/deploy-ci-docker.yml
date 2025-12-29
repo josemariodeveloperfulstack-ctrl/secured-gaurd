@@ -1165,11 +1165,48 @@ jobs:
             echo "📋 Redes Docker disponíveis:"
             $DOCKER_CMD network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
             
-    # Parar containers existentes antes de recriar (sem remover redes compartilhadas)
+    # Parar e REMOVER COMPLETAMENTE containers existentes antes de recriar
     echo ""
-    echo "🛑 Parando containers existentes..."
+    echo "🛑 ========================================"
+    echo "🛑 REMOVENDO CONTAINERS ANTIGOS COMPLETAMENTE"
+    echo "🛑 ========================================"
+    echo ""
+    
+    # Parar todos os containers
+    echo "🛑 Parando todos os containers..."
     $COMPOSE_CMD -f docker-compose.ci.yml stop 2>&1 || true
+    sleep 2
+    
+    # Remover containers usando docker-compose
+    echo "🗑️ Removendo containers com docker-compose..."
     $COMPOSE_CMD -f docker-compose.ci.yml rm -f 2>&1 || true
+    sleep 2
+    
+    # Remover containers manualmente por nome (garantir remoção completa)
+    echo "🗑️ Removendo containers manualmente por nome..."
+    for container_name in secured-guard-backend-ci secured-guard-frontend-ci secured-guard-whatsapp-ci secured-guard-db-ci secured-guard-redis-ci secured-guard-nginx-ci; do
+      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^${container_name}$"; then
+        echo "  🗑️ Removendo container: $container_name"
+        $DOCKER_CMD rm -f "$container_name" 2>&1 || true
+      fi
+    done
+    
+    # Remover containers por padrão (caso tenham nomes diferentes)
+    echo "🗑️ Removendo containers por padrão..."
+    $DOCKER_CMD ps -a --format "{{.ID}} {{.Names}}" | grep -E "(secured-guard|ci)" | awk '{print $1}' | xargs -r $DOCKER_CMD rm -f 2>/dev/null || true
+    
+    echo ""
+    echo "✅ Containers antigos removidos completamente!"
+    echo ""
+    echo "🧹 Removendo imagens antigas para forçar pull das novas..."
+    
+    # Remover imagens antigas para forçar pull
+    $DOCKER_CMD rmi z7design/secured-guard-backend:ci 2>/dev/null || echo "  ℹ️ Imagem backend não encontrada (será baixada)"
+    $DOCKER_CMD rmi z7design/secured-guard-frontend:ci 2>/dev/null || echo "  ℹ️ Imagem frontend não encontrada (será baixada)"
+    $DOCKER_CMD rmi z7design/secured-guard-whatsapp:ci 2>/dev/null || echo "  ℹ️ Imagem whatsapp não encontrada (será baixada)"
+    
+    echo "✅ Imagens antigas removidas!"
+    echo ""
     sleep 5
             
             # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
@@ -1183,16 +1220,47 @@ jobs:
             echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
             echo ""
             
-            # Forçar pull de todas as imagens novamente antes de iniciar
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml pull --ignore-pull-failures || true
+            # Forçar pull de todas as imagens novamente antes de iniciar (SEM --ignore-pull-failures para garantir que falhe se não conseguir)
+            echo "📥 Fazendo pull forçado de TODAS as imagens..."
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml pull || {
+              echo "⚠️ Erro no pull via docker-compose. Tentando pull direto..."
+              echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+              docker pull z7design/secured-guard-backend:ci || echo "❌ Erro ao fazer pull do backend"
+              docker pull z7design/secured-guard-frontend:ci || echo "❌ Erro ao fazer pull do frontend"
+              docker pull z7design/secured-guard-whatsapp:ci || echo "❌ Erro ao fazer pull do whatsapp"
+            }
             
             echo ""
-            echo "📋 Imagens disponíveis antes de iniciar containers:"
+            echo "📋 Imagens disponíveis ANTES de iniciar containers:"
             docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
             echo ""
             
+            # Verificar se as imagens foram realmente baixadas
+            BACKEND_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "z7design/secured-guard-backend:ci" && echo "yes" || echo "no")
+            FRONTEND_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "z7design/secured-guard-frontend:ci" && echo "yes" || echo "no")
+            WHATSAPP_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "z7design/secured-guard-whatsapp:ci" && echo "yes" || echo "no")
+            
+            if [ "$BACKEND_EXISTS" = "no" ] || [ "$FRONTEND_EXISTS" = "no" ] || [ "$WHATSAPP_EXISTS" = "no" ]; then
+              echo "❌ ERRO: Algumas imagens não foram baixadas!"
+              echo "  Backend: $BACKEND_EXISTS"
+              echo "  Frontend: $FRONTEND_EXISTS"
+              echo "  WhatsApp: $WHATSAPP_EXISTS"
+              echo "🔄 Tentando pull novamente..."
+              echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+              docker pull z7design/secured-guard-backend:ci || exit 1
+              docker pull z7design/secured-guard-frontend:ci || exit 1
+              docker pull z7design/secured-guard-whatsapp:ci || exit 1
+            fi
+            
+            echo ""
             echo "🚀 Iniciando containers com --force-recreate para garantir uso das novas imagens..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans --build
+            echo "🔄 Usando flags: --force-recreate --pull always --remove-orphans --no-deps"
+            
+            # Usar --no-deps para evitar problemas com dependências e forçar recriação
+            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans --no-deps backend-ci frontend-ci whatsapp-service-ci nginx-ci || {
+              echo "⚠️ Erro ao iniciar com --no-deps. Tentando sem --no-deps..."
+              COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
+            }
             
             if [ $? -ne 0 ]; then
               echo "❌ ERRO ao iniciar containers!"
@@ -1204,20 +1272,56 @@ jobs:
             echo ""
             echo "✅ Containers iniciados!"
             echo ""
-            echo "🔍 Verificando imagens usadas pelos containers:"
-            echo "📋 Containers e suas imagens:"
-            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
+            echo "🔍 ========================================"
+            echo "🔍 VERIFICAÇÃO FINAL DAS IMAGENS"
+            echo "🔍 ========================================"
             echo ""
-            echo "📅 Imagens dos containers (verificando se são recentes):"
+            echo "📋 Containers e suas imagens:"
+            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
+            echo ""
+            echo "📅 Verificando imagens usadas pelos containers:"
+            DEPLOY_TIMESTAMP=$(date -u +%s)
+            RECENT_THRESHOLD=3600  # 1 hora em segundos
+            
             for container in secured-guard-backend-ci secured-guard-frontend-ci secured-guard-whatsapp-ci; do
               if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
                 IMAGE_USED=$($DOCKER_CMD inspect --format='{{.Config.Image}}' "$container" 2>/dev/null || echo "N/A")
-                IMAGE_CREATED=$($DOCKER_CMD inspect --format='{{.Created}}' "$container" 2>/dev/null || echo "N/A")
+                CONTAINER_CREATED=$($DOCKER_CMD inspect --format='{{.Created}}' "$container" 2>/dev/null || echo "N/A")
+                CONTAINER_ID=$($DOCKER_CMD inspect --format='{{.Id}}' "$container" 2>/dev/null || echo "N/A")
+                
+                echo ""
                 echo "  📦 $container:"
+                echo "     ID: ${CONTAINER_ID:0:12}..."
                 echo "     Imagem: $IMAGE_USED"
-                echo "     Criado: $IMAGE_CREATED"
+                echo "     Criado: $CONTAINER_CREATED"
+                
+                # Verificar se o container foi criado recentemente (última hora)
+                if [ "$CONTAINER_CREATED" != "N/A" ]; then
+                  # Converter data de criação para timestamp (aproximado)
+                  CONTAINER_AGE=$((DEPLOY_TIMESTAMP - $(date -d "$CONTAINER_CREATED" +%s 2>/dev/null || echo $DEPLOY_TIMESTAMP)))
+                  if [ $CONTAINER_AGE -lt $RECENT_THRESHOLD ]; then
+                    echo "     ✅ Container foi criado recentemente (há $((CONTAINER_AGE / 60)) minutos)"
+                  else
+                    echo "     ⚠️ Container pode ser antigo (criado há $((CONTAINER_AGE / 3600)) horas)"
+                  fi
+                fi
+                
+                # Verificar se a imagem usada é a correta
+                if echo "$IMAGE_USED" | grep -q "z7design/secured-guard.*:ci"; then
+                  echo "     ✅ Imagem correta"
+                else
+                  echo "     ❌ ERRO: Imagem incorreta!"
+                fi
+              else
+                echo ""
+                echo "  ❌ $container NÃO está rodando!"
               fi
             done
+            
+            echo ""
+            echo "🔍 ========================================"
+            echo "✅ VERIFICAÇÃO CONCLUÍDA"
+            echo "🔍 ========================================"
             
             echo "⏳ Aguardando containers iniciarem (60s)..."
             sleep 60
