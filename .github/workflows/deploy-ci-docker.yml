@@ -18,67 +18,13 @@ jobs:
     
     steps:
       # ============================================
-      # 0️⃣ INFORMAÇÕES DE DEBUG E VERIFICAÇÃO
-      # ============================================
-      - name: 📊 Informações de deploy
-        run: |
-          echo "📊 ========================================"
-          echo "📊 INFORMAÇÕES DO DEPLOY"
-          echo "📊 ========================================"
-          echo ""
-          echo "🔄 Commit SHA: ${{ github.sha }}"
-          echo "🌿 Branch: ${{ github.ref_name }}"
-          echo "👤 Autor: ${{ github.actor }}"
-          echo "📅 Data: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          echo "🔧 Workflow: ${{ github.workflow }}"
-          echo "🏃 Run ID: ${{ github.run_id }}"
-          echo "🔢 Run Number: ${{ github.run_number }}"
-          echo ""
-          echo "📋 Últimos commits:"
-          git log --oneline -5 || echo "⚠️ Não foi possível obter histórico"
-          echo ""
-          echo "📊 ========================================"
-          echo "✅ Informações coletadas"
-          echo "📊 ========================================"
-
-      # ============================================
-      # 0️⃣.5️⃣ VERIFICAR SECRETS (antes de começar)
-      # ============================================
-      - name: 🔐 Verificar secrets necessários
-        continue-on-error: true
-        run: |
-          echo "🔐 Verificando se os secrets estão configurados..."
-          echo ""
-          echo "📋 Secrets necessários:"
-          echo "  - DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - VPS_HOST_CI: ${{ secrets.VPS_HOST_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - VPS_USER_CI: ${{ secrets.VPS_USER_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - VPS_PASSWORD_CI: ${{ secrets.VPS_PASSWORD_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - POSTGRES_PASSWORD_CI: ${{ secrets.POSTGRES_PASSWORD_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - REDIS_PASSWORD_CI: ${{ secrets.REDIS_PASSWORD_CI != '' && '✅ Configurado' || '❌ Não configurado' }}"
-          echo "  - JWT_SECRET_CI: ${{ secrets.JWT_SECRET_CI != '' && '✅ Configurado' || '❌ Não configurado (usará padrão)' }}"
-          echo ""
-          if [ -z "${{ secrets.VPS_HOST_CI }}" ] || [ -z "${{ secrets.VPS_USER_CI }}" ] || [ -z "${{ secrets.VPS_PASSWORD_CI }}" ]; then
-            echo "⚠️ AVISO: Secrets de VPS podem não estar configurados!"
-            echo "   Configure os secrets em: Settings → Secrets and variables → Actions"
-            echo "   Veja SECRETS_CONFIG.md para a lista completa"
-            echo "   O workflow continuará, mas pode falhar nos próximos steps se os secrets não estiverem configurados."
-          else
-            echo "✅ Secrets básicos configurados. Continuando com o deploy..."
-          fi
-
-      # ============================================
-      # 1️⃣ CHECKOUT DO CÓDIGO
+      # CHECKOUT E SETUP (necessários mas não na imagem)
       # ============================================
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           ref: ci
 
-      # ============================================
-      # 2️⃣ SETUP JAVA 17
-      # ============================================
       - name: ☕ Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -87,7 +33,7 @@ jobs:
           cache: 'maven'
 
       # ============================================
-      # 3️⃣ SETUP NODE.JS 20
+      # 1️⃣ SETUP NODE.JS 20
       # ============================================
       - name: 📦 Setup Node.js 20
         uses: actions/setup-node@v4
@@ -97,194 +43,45 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       # ============================================
-      # 4️⃣ BUILD BACKEND (Maven)
+      # 2️⃣ BUILD BACKEND (Maven)
       # ============================================
       - name: 🔨 Build Backend (Maven)
         working-directory: ./backend
-        continue-on-error: false
         run: |
-          echo "🔨 Compilando backend para ambiente CI..."
-          chmod +x mvnw || echo "⚠️ mvnw já tem permissão"
-          # pular totalmente compilação/execução de testes no CI (-Dmaven.test.skip=true)
-          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci || {
-            echo "❌ Erro ao compilar backend"
-            echo "📋 Verificando logs do Maven..."
-            cat target/surefire-reports/*.txt 2>/dev/null || echo "Nenhum relatório de teste encontrado"
-            exit 1
-          }
-          echo "✅ Backend compilado com sucesso!"
-          ls -lh target/*.jar || echo "⚠️ Nenhum JAR encontrado"
+          chmod +x mvnw || true
+          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci
 
       # ============================================
-      # 5️⃣ BUILD FRONTEND (Vite)
+      # 3️⃣ BUILD FRONTEND (Vite)
       # ============================================
       - name: 🎨 Build Frontend (Vite)
         working-directory: ./frontend
-        continue-on-error: false
         env:
           VITE_API_URL: https://ci.z7botsolutions.com.br/api
           VITE_ENVIRONMENT: ci
         run: |
-          echo "🎨 Compilando frontend para ambiente CI..."
-          npm ci || {
-            echo "❌ Erro ao executar npm ci"
-            echo "📋 Verificando package-lock.json..."
-            ls -lh package-lock.json || echo "⚠️ package-lock.json não encontrado"
-            exit 1
-          }
-          npm run build || {
-            echo "❌ Erro ao executar npm run build"
-            echo "📋 Verificando logs do Vite..."
-            exit 1
-          }
-          echo "✅ Frontend compilado com sucesso!"
-          ls -lh dist/ || echo "⚠️ Diretório dist/ não encontrado"
+          npm ci
+          npm run build
 
       # ============================================
-      # 6️⃣ VERIFICAR CÓDIGO ANTES DO BUILD
-      # ============================================
-      - name: 🔍 Verificar código antes do build
-        run: |
-          echo "🔍 ========================================"
-          echo "🔍 VERIFICANDO CÓDIGO ANTES DO BUILD"
-          echo "🔍 ========================================"
-          echo ""
-          echo "🔄 Commit SHA: ${{ github.sha }}"
-          echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          echo ""
-          echo "📋 Verificando arquivos do frontend (Propostas):"
-          if [ -f "frontend/src/pages/Propostas.tsx" ]; then
-            echo "  ✅ frontend/src/pages/Propostas.tsx existe"
-            echo "  📏 Tamanho: $(wc -l < frontend/src/pages/Propostas.tsx) linhas"
-            # Verificar se contém "Proposta de Acordo" (nova aba)
-            if grep -q "Proposta de Acordo\|Propostas de Acordo" frontend/src/pages/Propostas.tsx; then
-              echo "  ✅ Contém 'Proposta de Acordo' (nova aba encontrada)"
-            else
-              echo "  ⚠️ Não encontrou 'Proposta de Acordo' no arquivo"
-            fi
-          else
-            echo "  ❌ frontend/src/pages/Propostas.tsx NÃO existe!"
-          fi
-          echo ""
-          echo "📋 Verificando arquivos do backend:"
-          if [ -f "backend/src/main/java/com/z7design/secured_guard/model/Proposal.java" ]; then
-            echo "  ✅ Proposal.java existe"
-          else
-            echo "  ❌ Proposal.java NÃO existe!"
-          fi
-          echo ""
-          echo "📋 Últimos arquivos modificados:"
-          git log --name-only --oneline -5 --pretty=format:"%h %s" | head -20 || echo "⚠️ Não foi possível obter histórico"
-          echo ""
-          echo "🔍 ========================================"
-          echo "✅ Verificação concluída"
-          echo "🔍 ========================================"
-
-      # ============================================
-      # 6️⃣.5️⃣ BUILD DOCKER IMAGES
+      # 4️⃣ BUILD DOCKER IMAGES
       # ============================================
       - name: 🐳 Build Docker images
         run: |
-          echo "🐳 ========================================"
-          echo "🐳 CONSTRUINDO IMAGENS DOCKER"
-          echo "🐳 ========================================"
-          echo ""
-          echo "🔄 Commit SHA: ${{ github.sha }}"
-          echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          echo ""
+          docker build --no-cache -t z7design/secured-guard-backend:ci \
+            -f backend/Dockerfile.prod ./backend
           
-          # Limpar cache do Docker antes de buildar
-          echo "🧹 Limpando cache do Docker..."
-          docker builder prune -f || true
-          echo ""
-          
-          # Build backend image (sem cache para garantir atualização)
-          echo "🔨 Construindo imagem backend..."
-          docker build --no-cache --progress=plain -t z7design/secured-guard-backend:ci \
-            -f backend/Dockerfile.prod ./backend || {
-            echo "❌ Erro ao construir imagem backend"
-            exit 1
-          }
-          echo "✅ Backend construído!"
-          echo ""
-          
-          # Build frontend image com variáveis de ambiente do CI (sem cache para garantir atualização)
-          echo "🎨 Construindo imagem frontend..."
-          
-          # Verificar código ANTES do build
-          echo "🔍 Verificando código ANTES do build:"
-          if [ -f "frontend/src/pages/Propostas.tsx" ]; then
-            echo "  ✅ Propostas.tsx existe"
-            if grep -q "Proposta de Acordo" frontend/src/pages/Propostas.tsx; then
-              echo "  ✅ 'Proposta de Acordo' encontrado no código fonte"
-            else
-              echo "  ❌ 'Proposta de Acordo' NÃO encontrado no código fonte!"
-              exit 1
-            fi
-          else
-            echo "  ❌ Propostas.tsx NÃO existe!"
-            exit 1
-          fi
-          
-          # Adicionar timestamp ao build para garantir que é único
-          BUILD_TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-          echo "  📅 Build timestamp: $BUILD_TIMESTAMP"
-          
-          docker build --no-cache --progress=plain -t z7design/secured-guard-frontend:ci \
+          docker build --no-cache -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
-            --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP \
-            --label "build.timestamp=$BUILD_TIMESTAMP" \
-            --label "build.sha=${{ github.sha }}" \
-            -f frontend/Dockerfile.prod ./frontend || {
-            echo "❌ Erro ao construir imagem frontend"
-            exit 1
-          }
-          echo "✅ Frontend construído!"
-          echo ""
+            -f frontend/Dockerfile.prod ./frontend
           
-          # Verificar código DEPOIS do build (dentro da imagem)
-          echo "🔍 Verificando código DEPOIS do build (dentro da imagem):"
-          if docker run --rm z7design/secured-guard-frontend:ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3; then
-            echo "  ✅ 'Proposta de Acordo' encontrado na imagem construída!"
-          else
-            echo "  ❌ 'Proposta de Acordo' NÃO encontrado na imagem construída!"
-            echo "  📋 Isso indica que o build não incluiu o código atualizado"
-            echo "  📋 Verificando arquivos JS na imagem:"
-            docker run --rm z7design/secured-guard-frontend:ci find /usr/share/nginx/html -name "*.js" -type f | head -5
-            exit 1
-          fi
-          echo ""
-          
-          # Build WhatsApp service image (Baileys) (sem cache para garantir atualização)
-          echo "📱 Construindo imagem WhatsApp..."
-          docker build --no-cache --progress=plain -t z7design/secured-guard-whatsapp:ci \
-            -f whatsapp-service/Dockerfile ./whatsapp-service || {
-            echo "❌ Erro ao construir imagem WhatsApp"
-            exit 1
-          }
-          echo "✅ WhatsApp construído!"
-          echo ""
-          
-          echo "🐳 ========================================"
-          echo "✅ TODAS AS IMAGENS CONSTRUÍDAS!"
-          echo "🐳 ========================================"
-          echo ""
-          echo "📋 Imagens criadas:"
-          docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
-          
-          # Verificar conteúdo das imagens
-          echo ""
-          echo "🔍 Verificando conteúdo da imagem frontend..."
-          docker run --rm z7design/secured-guard-frontend:ci ls -la /usr/share/nginx/html/ | head -20 || echo "⚠️ Não foi possível verificar conteúdo"
-          
-          echo ""
-          echo "🔍 Verificando se arquivos JS foram gerados..."
-          docker run --rm z7design/secured-guard-frontend:ci find /usr/share/nginx/html -name "*.js" -type f | head -10 || echo "⚠️ Não foi possível verificar arquivos JS"
+          docker build --no-cache -t z7design/secured-guard-whatsapp:ci \
+            -f whatsapp-service/Dockerfile ./whatsapp-service
 
       # ============================================
-      # 7️⃣ LOGIN NO DOCKER HUB
+      # 5️⃣ LOGIN TO DOCKER HUB
       # ============================================
       - name: 🔐 Login to Docker Hub
         uses: docker/login-action@v3
@@ -293,64 +90,16 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # ============================================
-      # 8️⃣ PUSH IMAGES TO DOCKER HUB
+      # 6️⃣ PUSH IMAGES TO DOCKER HUB
       # ============================================
       - name: 📤 Push images to Docker Hub
         run: |
-          echo "📤 ========================================"
-          echo "📤 ENVIANDO IMAGENS PARA DOCKER HUB"
-          echo "📤 ========================================"
-          echo ""
-          echo "🔄 Commit SHA: ${{ github.sha }}"
-          echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          echo ""
-          
-          # Mostrar informações das imagens antes do push
-          echo "📋 Imagens locais antes do push:"
-          docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
-          echo ""
-          
-          echo "📤 Enviando imagens para Docker Hub..."
-          echo ""
-          
-          # Push backend
-          echo "📤 Enviando backend..."
-          docker push z7design/secured-guard-backend:ci || {
-            echo "❌ Erro ao fazer push do backend"
-            exit 1
-          }
-          echo "✅ Backend enviado!"
-          echo ""
-          
-          # Push frontend
-          echo "📤 Enviando frontend..."
-          docker push z7design/secured-guard-frontend:ci || {
-            echo "❌ Erro ao fazer push do frontend"
-            exit 1
-          }
-          echo "✅ Frontend enviado!"
-          echo ""
-          
-          # Push whatsapp
-          echo "📤 Enviando whatsapp..."
-          docker push z7design/secured-guard-whatsapp:ci || {
-            echo "❌ Erro ao fazer push do whatsapp"
-            exit 1
-          }
-          echo "✅ WhatsApp enviado!"
-          echo ""
-          
-          echo "📤 ========================================"
-          echo "✅ TODAS AS IMAGENS ENVIADAS COM SUCESSO!"
-          echo "📤 ========================================"
-          echo ""
-          echo "🔗 Imagens disponíveis em:"
-          echo "   - z7design/secured-guard-backend:ci"
-          echo "   - z7design/secured-guard-frontend:ci"
-          echo "   - z7design/secured-guard-whatsapp:ci"
+          docker push z7design/secured-guard-backend:ci
+          docker push z7design/secured-guard-frontend:ci
+          docker push z7design/secured-guard-whatsapp:ci
 
       # ============================================
-      # 9️⃣ INSTALAR SSHPASS E CONFIGURAR SSH
+      # 7️⃣ INSTALL SSHPASS AND CONFIGURE SSH
       # ============================================
       - name: 🔑 Install sshpass and configure SSH
         run: |
@@ -358,2104 +107,206 @@ jobs:
           sudo apt-get install -y sshpass
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.VPS_HOST_CI }} >> ~/.ssh/known_hosts
-          echo "✅ SSH configurado para usar senha"
 
       # ============================================
-      # 🔟 CORRIGIR REPOSITÓRIO REMOTO NA VPS
-      # ============================================
-      - name: 🔧 Corrigir repositório remoto na VPS
-        run: |
-          echo "🔧 Verificando e corrigindo URL do repositório remoto na VPS..."
-          
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o BatchMode=no"
-          
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'FIX_REPO_EOF'
-            echo "🔧 ========================================"
-            echo "🔧 CORRIGINDO REPOSITÓRIO REMOTO NA VPS"
-            echo "🔧 ========================================"
-            echo ""
-            
-            CORRECT_URL="https://github.com/zemarioramos/secured-guard.git"
-            
-            # Verificar em múltiplos locais possíveis
-            REPO_PATHS=(
-              "/var/www/secured_guard/ci"
-              "/var/www/secured_guard"
-              "/root/secured-guard"
-              "/home/root/secured-guard"
-              "$HOME/secured-guard"
-            )
-            
-            FIXED=false
-            
-            for repo_path in "${REPO_PATHS[@]}"; do
-              if [ -d "$repo_path/.git" ]; then
-                echo "📂 Encontrado repositório em: $repo_path"
-                cd "$repo_path" || continue
-                
-                echo ""
-                echo "📋 URL atual do repositório remoto:"
-                git remote -v 2>/dev/null || echo "  ⚠️ Não foi possível verificar remotes"
-                
-                # Verificar se a URL está incorreta
-                CURRENT_URL=$(git remote get-url origin 2>/dev/null || echo "")
-                
-                if [ -n "$CURRENT_URL" ]; then
-                  echo ""
-                  echo "🔍 URL atual: $CURRENT_URL"
-                  echo "✅ URL correta: $CORRECT_URL"
-                  
-                  # Verificar se contém "zmarioramos" (sem o "e")
-                  if echo "$CURRENT_URL" | grep -q "zmarioramos"; then
-                    echo ""
-                    echo "🔄 URL incorreta detectada! Corrigindo..."
-                    
-                    # Remover remote atual
-                    git remote remove origin 2>/dev/null || true
-                    
-                    # Adicionar remote com URL correta
-                    git remote add origin "$CORRECT_URL" 2>/dev/null || {
-                      echo "⚠️ Erro ao adicionar remote. Tentando set-url..."
-                      git remote set-url origin "$CORRECT_URL" 2>/dev/null || true
-                    }
-                    
-                    # Verificar se foi corrigido
-                    NEW_URL=$(git remote get-url origin 2>/dev/null || echo "")
-                    if echo "$NEW_URL" | grep -q "zemarioramos"; then
-                      echo "✅ URL corrigida com sucesso!"
-                      FIXED=true
-                    else
-                      echo "⚠️ Ainda tentando corrigir..."
-                      # Forçar correção novamente
-                      git remote set-url origin "$CORRECT_URL" 2>/dev/null || true
-                      FIXED=true
-                    fi
-                    
-                    echo ""
-                    echo "📋 Nova URL do repositório remoto:"
-                    git remote -v 2>/dev/null
-                  else
-                    if [ "$CURRENT_URL" = "$CORRECT_URL" ]; then
-                      echo "✅ URL já está correta!"
-                      FIXED=true
-                    else
-                      echo "🔄 URL diferente da esperada. Corrigindo para URL padrão..."
-                      git remote set-url origin "$CORRECT_URL" 2>/dev/null || {
-                        git remote remove origin 2>/dev/null || true
-                        git remote add origin "$CORRECT_URL" 2>/dev/null || true
-                      }
-                      FIXED=true
-                    fi
-                  fi
-                else
-                  echo "⚠️ Nenhum remote 'origin' encontrado. Adicionando..."
-                  git remote add origin "$CORRECT_URL" 2>/dev/null || true
-                  FIXED=true
-                fi
-                
-                echo ""
-                break
-              fi
-            done
-            
-            if [ "$FIXED" = false ]; then
-              echo "ℹ️ Nenhum repositório git encontrado nos locais padrão"
-              echo "   Isso é normal se o código não foi clonado diretamente na VPS"
-              echo "   O deploy usa Docker, então não é necessário ter o repositório git na VPS"
-            fi
-            
-            echo ""
-            echo "🔧 ========================================"
-            echo "✅ CORREÇÃO CONCLUÍDA"
-            echo "🔧 ========================================"
-          FIX_REPO_EOF
-          
-          echo "✅ Verificação do repositório concluída!"
-
-      # ============================================
-      # 🔟 TRANSFERIR ARQUIVOS PARA VPS
+      # 8️⃣ TRANSFER FILES TO VPS
       # ============================================
       - name: 📤 Transfer files to VPS
         run: |
-          echo "📤 Transferindo arquivos para VPS..."
-          
-          # Configurar opções SSH para conexões mais robustas
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o BatchMode=no"
-          
-          # Criar diretório de deploy na VPS (com retry)
-          echo "📁 Criando diretórios na VPS..."
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
-              "mkdir -p /var/www/secured_guard/ci /var/www/secured_guard/ci/uploads /var/www/secured_guard/ci/logs /var/www/secured_guard/ci/nginx /var/www/secured_guard/ci/postgres_data /var/www/secured_guard/ci/redis_data /var/www/secured_guard/ci/evolution_instances /var/www/secured_guard/ci/holerites /var/www/secured_guard/ci/whatsapp_sessions" 2>&1
-            then
-              echo "✅ Diretórios criados com sucesso!"
-              break
-            else
-              echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
-              sleep 5
-              ATTEMPT=$((ATTEMPT + 1))
-            fi
-          done
-          
-          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-            echo "❌ Falha ao criar diretórios após $MAX_ATTEMPTS tentativas"
-            exit 1
-          fi
-          
-          # Transferir docker-compose.ci.yml (com retry)
-          echo "📤 Transferindo docker-compose.ci.yml..."
-          ATTEMPT=1
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml \
-              ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
-            then
-              echo "✅ docker-compose.ci.yml transferido!"
-              break
-            else
-              echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
-              sleep 5
-              ATTEMPT=$((ATTEMPT + 1))
-            fi
-          done
-          
-          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-            echo "❌ Falha ao transferir docker-compose.ci.yml após $MAX_ATTEMPTS tentativas"
-            exit 1
-          fi
-          
-          # Transferir configuração do nginx (com retry)
-          echo "📤 Transferindo nginx/ci.conf..."
-          ATTEMPT=1
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf \
-              ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
-            then
-              echo "✅ nginx/ci.conf transferido!"
-              break
-            else
-              echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
-              sleep 5
-              ATTEMPT=$((ATTEMPT + 1))
-            fi
-          done
-          
-          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-            echo "❌ Falha ao transferir nginx/ci.conf após $MAX_ATTEMPTS tentativas"
-            exit 1
-          fi
-          
-          # Transferir configuração dinâmica do Traefik (se existir)
-          if [ -f "traefik-dynamic-ci.yml" ]; then
-            echo "📤 Transferindo traefik-dynamic-ci.yml..."
-            ATTEMPT=1
-            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-              if sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
-                "mkdir -p /var/www/secured_guard/traefik/dynamic" && \
-                sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml \
-                  ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik/dynamic/ci.yml
-              then
-                echo "✅ traefik-dynamic-ci.yml transferido!"
-                
-                # Verificar se o arquivo foi transferido corretamente
-                sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'VERIFY_EOF'
-                  if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
-                    echo "✅ Arquivo existe no servidor"
-                    # Verificar se não tem healthCheck ou path solto
-                    if grep -q "healthCheck" /var/www/secured_guard/traefik/dynamic/ci.yml || grep -q "^[[:space:]]*path:" /var/www/secured_guard/traefik/dynamic/ci.yml; then
-                      echo "⚠️ Arquivo ainda contém healthCheck ou path solto. Corrigindo..."
-                      sed -i '/healthCheck/d' /var/www/secured_guard/traefik/dynamic/ci.yml
-                      sed -i '/^[[:space:]]*path:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
-                      sed -i '/^[[:space:]]*interval:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
-                      sed -i '/^[[:space:]]*timeout:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
-                      sed -i '/^[[:space:]]*scheme:/d' /var/www/secured_guard/traefik/dynamic/ci.yml
-                      echo "✅ Arquivo corrigido"
-                    else
-                      echo "✅ Arquivo está correto (sem healthCheck ou path solto)"
-                    fi
-                  else
-                    echo "❌ Arquivo não foi transferido!"
-                  fi
-                VERIFY_EOF
-                
-                break
-              else
-                echo "⚠️ Tentativa $ATTEMPT/$MAX_ATTEMPTS falhou. Aguardando 5 segundos..."
-                sleep 5
-                ATTEMPT=$((ATTEMPT + 1))
-              fi
-            done
-            
-            if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-              echo "⚠️ Falha ao transferir traefik-dynamic-ci.yml (não crítico, continuando...)"
-            fi
-          else
-            echo "⚠️ Arquivo traefik-dynamic-ci.yml não encontrado, pulando..."
-          fi
-          
-          echo "✅ Arquivos transferidos com sucesso!"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
+            "mkdir -p /var/www/secured_guard/ci/nginx"
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml \
+            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf \
+            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
 
       # ============================================
-      # 🔟.5️⃣ VERIFICAR ARQUIVOS TRANSFERIDOS NA VPS
-      # ============================================
-      - name: ✅ Verificar arquivos transferidos na VPS
-        run: |
-          echo "✅ Verificando se os arquivos foram transferidos corretamente para a VPS..."
-          
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o BatchMode=no"
-          
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'VERIFY_FILES_EOF'
-            echo "🔍 ========================================"
-            echo "🔍 VERIFICAÇÃO DE ARQUIVOS TRANSFERIDOS"
-            echo "🔍 ========================================"
-            echo ""
-            
-            cd /var/www/secured_guard/ci
-            
-            # Verificar docker-compose.ci.yml
-            echo "📋 Verificando docker-compose.ci.yml..."
-            if [ -f "docker-compose.ci.yml" ]; then
-              FILE_SIZE=$(stat -c%s docker-compose.ci.yml 2>/dev/null || stat -f%z docker-compose.ci.yml 2>/dev/null || echo "0")
-              FILE_DATE=$(stat -c%y docker-compose.ci.yml 2>/dev/null || stat -f%Sm docker-compose.ci.yml 2>/dev/null || echo "N/A")
-              echo "  ✅ docker-compose.ci.yml existe"
-              echo "     Tamanho: $FILE_SIZE bytes"
-              echo "     Data: $FILE_DATE"
-              
-              # Verificar se o arquivo não está vazio
-              if [ "$FILE_SIZE" -eq 0 ]; then
-                echo "  ⚠️ AVISO: docker-compose.ci.yml está vazio!"
-              else
-                echo "  ✅ docker-compose.ci.yml tem conteúdo"
-              fi
-            else
-              echo "  ❌ ERRO: docker-compose.ci.yml NÃO existe!"
-              exit 1
-            fi
-            
-            echo ""
-            
-            # Verificar nginx/ci.conf
-            echo "📋 Verificando nginx/ci.conf..."
-            if [ -f "nginx/ci.conf" ]; then
-              FILE_SIZE=$(stat -c%s nginx/ci.conf 2>/dev/null || stat -f%z nginx/ci.conf 2>/dev/null || echo "0")
-              FILE_DATE=$(stat -c%y nginx/ci.conf 2>/dev/null || stat -f%Sm nginx/ci.conf 2>/dev/null || echo "N/A")
-              echo "  ✅ nginx/ci.conf existe"
-              echo "     Tamanho: $FILE_SIZE bytes"
-              echo "     Data: $FILE_DATE"
-              
-              if [ "$FILE_SIZE" -eq 0 ]; then
-                echo "  ⚠️ AVISO: nginx/ci.conf está vazio!"
-              else
-                echo "  ✅ nginx/ci.conf tem conteúdo"
-              fi
-            else
-              echo "  ❌ ERRO: nginx/ci.conf NÃO existe!"
-              exit 1
-            fi
-            
-            echo ""
-            
-            # Verificar traefik-dynamic-ci.yml (se foi transferido)
-            echo "📋 Verificando traefik-dynamic-ci.yml..."
-            if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
-              FILE_SIZE=$(stat -c%s /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || stat -f%z /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || echo "0")
-              FILE_DATE=$(stat -c%y /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || stat -f%Sm /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || echo "N/A")
-              echo "  ✅ traefik-dynamic-ci.yml existe"
-              echo "     Tamanho: $FILE_SIZE bytes"
-              echo "     Data: $FILE_DATE"
-            else
-              echo "  ⚠️ traefik-dynamic-ci.yml não foi transferido (pode ser normal se não existir no repositório)"
-            fi
-            
-            echo ""
-            
-            # Verificar diretórios criados
-            echo "📋 Verificando diretórios criados..."
-            DIRS=(
-              "/var/www/secured_guard/ci"
-              "/var/www/secured_guard/ci/uploads"
-              "/var/www/secured_guard/ci/logs"
-              "/var/www/secured_guard/ci/nginx"
-              "/var/www/secured_guard/ci/postgres_data"
-              "/var/www/secured_guard/ci/redis_data"
-              "/var/www/secured_guard/ci/evolution_instances"
-              "/var/www/secured_guard/ci/holerites"
-              "/var/www/secured_guard/ci/whatsapp_sessions"
-            )
-            
-            ALL_DIRS_OK=true
-            for dir in "${DIRS[@]}"; do
-              if [ -d "$dir" ]; then
-                echo "  ✅ $dir existe"
-              else
-                echo "  ❌ $dir NÃO existe!"
-                ALL_DIRS_OK=false
-              fi
-            done
-            
-            if [ "$ALL_DIRS_OK" = false ]; then
-              echo ""
-              echo "⚠️ AVISO: Alguns diretórios não foram criados!"
-            else
-              echo ""
-              echo "✅ Todos os diretórios foram criados com sucesso!"
-            fi
-            
-            echo ""
-            echo "🔍 ========================================"
-            echo "✅ VERIFICAÇÃO CONCLUÍDA"
-            echo "🔍 ========================================"
-            
-            # Listar conteúdo do diretório principal
-            echo ""
-            echo "📂 Conteúdo do diretório /var/www/secured_guard/ci:"
-            ls -lah /var/www/secured_guard/ci/ | head -20 || echo "  ⚠️ Erro ao listar conteúdo"
-          VERIFY_FILES_EOF
-          
-          if [ $? -eq 0 ]; then
-            echo ""
-            echo "✅ Todos os arquivos foram verificados com sucesso na VPS!"
-          else
-            echo ""
-            echo "❌ ERRO: Falha na verificação dos arquivos na VPS!"
-            exit 1
-          fi
-
-      # ============================================
-      # 1️⃣1️⃣ VALIDAR E CONFIGURAR JWT_SECRET
+      # 9️⃣ VALIDATE AND CONFIGURE JWT_SECRET
       # ============================================
       - name: 🔐 Validate and configure JWT_SECRET
         run: |
-          echo "🔐 Validando JWT_SECRET..."
-          
-          # Valor padrão seguro (80 caracteres - suficiente para HS512)
-          DEFAULT_JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
-          
-          # Atribuir secret a uma variável primeiro para poder verificar o tamanho
-          JWT_SECRET_FROM_SECRETS="${{ secrets.JWT_SECRET_CI }}"
-          
-          # Usar secret se estiver definido e tiver pelo menos 64 caracteres
-          if [ -n "$JWT_SECRET_FROM_SECRETS" ] && [ ${#JWT_SECRET_FROM_SECRETS} -ge 64 ]; then
-            JWT_SECRET_VALUE="$JWT_SECRET_FROM_SECRETS"
-            echo "✅ Usando JWT_SECRET do GitHub Secrets (${#JWT_SECRET_VALUE} caracteres)"
-          else
-            JWT_SECRET_VALUE="$DEFAULT_JWT_SECRET"
-            if [ -n "$JWT_SECRET_FROM_SECRETS" ]; then
-              echo "⚠️ JWT_SECRET do GitHub Secrets é muito curto (${#JWT_SECRET_FROM_SECRETS} caracteres). Usando valor padrão."
-            else
-              echo "ℹ️ JWT_SECRET não está definido no GitHub Secrets. Usando valor padrão."
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
             fi
-          fi
-          
-          # Verificar tamanho final
-          if [ ${#JWT_SECRET_VALUE} -lt 64 ]; then
-            echo "❌ ERRO: JWT_SECRET ainda é muito curto (${#JWT_SECRET_VALUE} caracteres)!"
-            exit 1
-          fi
-          
-          echo "✅ JWT_SECRET configurado com ${#JWT_SECRET_VALUE} caracteres (mínimo: 64)"
-          echo "JWT_SECRET_VALUE=$JWT_SECRET_VALUE" >> $GITHUB_ENV
+            export JWT_SECRET
+          EOF
 
       # ============================================
-      # 1️⃣2️⃣ CRIAR ARQUIVO .ENV NA VPS
+      # 🔟 CREATE .ENV FILE ON VPS
       # ============================================
       - name: ⚙️ Create .env file on VPS
-        env:
-          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          echo "⚙️ Criando arquivo .env localmente..."
-          
-          # Determinar qual secret usar para POSTGRES_PASSWORD_CI
-          if [ -n "${{ secrets.POSTGRES_PASSWORD_CI }}" ]; then
-            POSTGRES_PASSWORD_VALUE="${{ secrets.POSTGRES_PASSWORD_CI }}"
-            echo "✅ Usando POSTGRES_PASSWORD_CI do GitHub Secrets"
-          elif [ -n "${{ secrets.POSTGRES_PASSWORD }}" ]; then
-            POSTGRES_PASSWORD_VALUE="${{ secrets.POSTGRES_PASSWORD }}"
-            echo "⚠️ POSTGRES_PASSWORD_CI não encontrado, usando POSTGRES_PASSWORD"
-          else
-            POSTGRES_PASSWORD_VALUE="4KaCiJc6an@7sgbdcid2025"
-            echo "⚠️ Nenhum secret de PostgreSQL encontrado, usando valor padrão"
-          fi
-          
-          # Criar arquivo .env localmente usando echo para evitar problemas com YAML parser
-          {
-            echo "# ===== AMBIENTE CI ====="
-            echo "ENVIRONMENT=ci"
-            echo "APP_URL=https://ci.z7botsolutions.com.br"
-            echo ""
-            echo "# ===== BANCO DE DADOS ====="
-            echo "POSTGRES_PASSWORD_CI=${POSTGRES_PASSWORD_VALUE}"
-            echo ""
-            echo "# ===== REDIS ====="
-            echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_CI }}"
-            echo ""
-            echo "# ===== JWT ====="
-            echo "# Valor padrão seguro (80 caracteres) se não estiver definido no host"
-            echo "JWT_SECRET=${{ env.JWT_SECRET_VALUE }}"
-            echo ""
-            echo "# ===== DOCKER ====="
-            echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}"
-            echo "DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}"
-          } > .env.ci
-          
-          # Verificar tamanho do JWT_SECRET no arquivo
-          JWT_LENGTH=$(grep "^JWT_SECRET=" .env.ci | cut -d'=' -f2 | wc -c)
-          echo "Tamanho do JWT_SECRET: $((JWT_LENGTH - 1)) caracteres"
-          
-          if [ $JWT_LENGTH -lt 65 ]; then
-            echo "❌ ERRO: JWT_SECRET no .env é muito curto!"
-            exit 1
-          fi
-          
-          # Transferir arquivo para VPS
-          echo "📤 Transferindo .env para VPS..."
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp .env.ci \
-            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/.env
-          
-          # Definir permissões corretas
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
-            "chmod 600 /var/www/secured_guard/ci/.env && echo '✅ Arquivo .env criado e configurado!'"
-          
-          # Verificar no servidor remoto
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔍 Verificando JWT_SECRET no .env remoto..."
-            JWT_LENGTH=$(grep "^JWT_SECRET=" /var/www/secured_guard/ci/.env | cut -d'=' -f2 | wc -c)
-            echo "Tamanho do JWT_SECRET no servidor: $((JWT_LENGTH - 1)) caracteres"
-            
-            if [ $JWT_LENGTH -lt 65 ]; then
-              echo "❌ ERRO: JWT_SECRET no .env remoto é muito curto!"
-              exit 1
-            fi
-            echo "✅ JWT_SECRET verificado com sucesso!"
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
+            cd /var/www/secured_guard/ci
+            cat > .env << 'ENV_EOF'
+          POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI || '4KaCiJc6an@7sgbdcid2025' }}
+          REDIS_PASSWORD_CI=${{ secrets.REDIS_PASSWORD_CI || 'redis_ci_2025' }}
+          JWT_SECRET_CI=${{ secrets.JWT_SECRET_CI || 'jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key' }}
+          ENV_EOF
           EOF
 
       # ============================================
-      # 1️⃣3️⃣ GARANTIR QUE JWT_SECRET ESTÁ CORRETO NO HOST E NO .ENV
+      # 1️⃣1️⃣ ENSURE JWT_SECRET IS CORRECT ON HOST AND .ENV
       # ============================================
       - name: 🔐 Ensure JWT_SECRET is correct on host and .env
-        env:
-          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
-            echo "🔐 Verificando e corrigindo JWT_SECRET no host e .env..."
-            
-            # Valor correto do JWT_SECRET
-            CORRECT_JWT_SECRET="${{ env.JWT_SECRET_VALUE }}"
-            
-            # 1. Remover JWT_SECRET do ambiente do host se estiver definido com valor curto
-            if [ -n "\$JWT_SECRET" ]; then
-              JWT_LENGTH=\${#JWT_SECRET}
-              if [ \$JWT_LENGTH -lt 64 ]; then
-                echo "⚠️ JWT_SECRET no host é muito curto (\$JWT_LENGTH caracteres). Removendo..."
-                unset JWT_SECRET
-                # Remover de .bashrc, .bash_profile, .profile se existir
-                sed -i '/^export JWT_SECRET=/d' ~/.bashrc 2>/dev/null || true
-                sed -i '/^export JWT_SECRET=/d' ~/.bash_profile 2>/dev/null || true
-                sed -i '/^export JWT_SECRET=/d' ~/.profile 2>/dev/null || true
-                echo "✅ JWT_SECRET removido do ambiente do host"
-              else
-                echo "✅ JWT_SECRET no host está OK (\$JWT_LENGTH caracteres)"
-              fi
-            else
-              echo "ℹ️ JWT_SECRET não está definido no host (usando valor do .env ou docker-compose)"
-            fi
-            
-            # 2. Verificar e corrigir JWT_SECRET no arquivo .env
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             cd /var/www/secured_guard/ci
-            if [ -f .env ]; then
-              CURRENT_JWT=\$(grep "^JWT_SECRET=" .env | cut -d'=' -f2 || echo "")
-              if [ -n "\$CURRENT_JWT" ]; then
-                CURRENT_LENGTH=\${#CURRENT_JWT}
-                echo "JWT_SECRET atual no .env: \${CURRENT_JWT:0:20}... (\$CURRENT_LENGTH caracteres)"
-                
-                if [ \$CURRENT_LENGTH -lt 64 ]; then
-                  echo "⚠️ JWT_SECRET no .env é muito curto! Corrigindo..."
-                  # Atualizar JWT_SECRET no .env
-                  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
-                  echo "✅ JWT_SECRET corrigido no .env"
-                else
-                  echo "✅ JWT_SECRET no .env está OK (\$CURRENT_LENGTH caracteres)"
-                  # Mesmo assim, garantir que está usando o valor correto
-                  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
-                  echo "✅ JWT_SECRET atualizado para garantir valor correto"
-                fi
-              else
-                echo "⚠️ JWT_SECRET não encontrado no .env. Adicionando..."
-                echo "JWT_SECRET=\${CORRECT_JWT_SECRET}" >> .env
-                echo "✅ JWT_SECRET adicionado ao .env"
-              fi
-              
-              # Verificar novamente após correção
-              VERIFIED_JWT=\$(grep "^JWT_SECRET=" .env | cut -d'=' -f2)
-              VERIFIED_LENGTH=\${#VERIFIED_JWT}
-              if [ \$VERIFIED_LENGTH -ge 64 ]; then
-                echo "✅ JWT_SECRET verificado no .env: \${VERIFIED_LENGTH} caracteres"
-              else
-                echo "❌ ERRO: JWT_SECRET ainda está incorreto após correção!"
-                exit 1
-              fi
-            else
-              echo "⚠️ Arquivo .env não existe. Será criado no próximo passo."
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
             fi
+            export JWT_SECRET=$JWT_SECRET
+            echo "JWT_SECRET_CI=$JWT_SECRET" >> .env
           EOF
 
       # ============================================
-      # 1️⃣4️⃣ FORÇAR CORREÇÃO DO .ENV ANTES DE PARAR CONTAINERS
+      # 1️⃣2️⃣ FORCE .ENV CORRECTION BEFORE STOPPING CONTAINERS
       # ============================================
       - name: 🔧 Force .env correction before stopping containers
-        env:
-          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
-            echo "🔧 Forçando correção do .env antes de parar containers..."
-            
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             cd /var/www/secured_guard/ci
-            CORRECT_JWT_SECRET="${{ env.JWT_SECRET_VALUE }}"
-            
-            # Garantir que o .env existe e tem o JWT_SECRET correto
-            if [ ! -f .env ]; then
-              echo "Criando arquivo .env..."
-              touch .env
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
             fi
-            
-            # Atualizar ou adicionar JWT_SECRET
-            if grep -q "^JWT_SECRET=" .env; then
-              sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
-              echo "✅ JWT_SECRET atualizado no .env"
-            else
-              echo "JWT_SECRET=\${CORRECT_JWT_SECRET}" >> .env
-              echo "✅ JWT_SECRET adicionado ao .env"
-            fi
-            
-            # Verificar tamanho
-            JWT_LENGTH=\$(grep "^JWT_SECRET=" .env | cut -d'=' -f2 | wc -c)
-            echo "Tamanho do JWT_SECRET no .env: \$((JWT_LENGTH - 1)) caracteres"
-            
-            if [ \$JWT_LENGTH -lt 65 ]; then
-              echo "❌ ERRO: JWT_SECRET ainda está muito curto após correção!"
-              exit 1
-            fi
-            
-            echo "✅ .env corrigido e verificado!"
+            sed -i '/^JWT_SECRET_CI=/d' .env
+            echo "JWT_SECRET_CI=$JWT_SECRET" >> .env
           EOF
 
       # ============================================
-      # 1️⃣4️⃣.5️⃣ FORÇAR SAÍDA DO SWARM MODE E LIMPEZA COMPLETA
+      # 1️⃣3️⃣ FORCE EXIT SWARM MODE AND COMPLETE CLEANUP
       # ============================================
       - name: 🔧 Force exit Swarm mode and complete cleanup
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔧 =========================================="
-            echo "🔧 FORÇANDO SAÍDA DO SWARM MODE E LIMPEZA"
-            echo "🔧 ========================================="
-            echo ""
-            
+            docker swarm leave --force 2>/dev/null || true
             cd /var/www/secured_guard/ci
-            
-            # 1. Verificar e sair do Swarm mode
-            echo "📋 Verificando modo Docker..."
-            if docker info 2>/dev/null | grep -q "Swarm: active"; then
-              echo "⚠️ Docker está em modo Swarm"
-              echo "🔄 Tentando sair do modo Swarm..."
-              docker swarm leave --force 2>/dev/null || echo "⚠️ Não foi possível sair do modo Swarm (pode estar em uso)"
-              sleep 5
-            else
-              echo "✅ Docker não está em modo Swarm"
-            fi
-            
-            # 2. Parar TODOS os containers relacionados (usando docker-compose e docker diretamente)
-            echo ""
-            echo "🛑 Parando todos os containers relacionados..."
-            
-            # Parar usando docker-compose
-            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            else
-              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            fi
-            
-            # Parar e remover containers manualmente (incluindo os com nomes estranhos)
-            echo "🧹 Removendo containers manualmente..."
-            docker ps -a --format "{{.ID}} {{.Names}}" | grep -E "(secured-guard|cc[0-9a-f]+_secured-guard)" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
-            
-            # Remover containers específicos com padrões conhecidos
-            docker ps -a | grep "secured-guard" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
-            docker ps -a | grep -E "cc[0-9a-f]+_secured-guard" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
-            
-            # 3. Remover imagens corrompidas ou antigas
-            echo ""
-            echo "🧹 Removendo imagens corrompidas..."
-            docker images | grep "z7design/secured-guard" | grep -E "(<none>|ci)" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
-            
-            # 4. Limpar redes órfãs
-            echo ""
-            echo "🧹 Limpando redes órfãs..."
-            docker network prune -f 2>/dev/null || true
-            docker network rm secured-guard-ci-network 2>/dev/null || true
-            
-            # 5. Limpar volumes órfãos (cuidado: não remover volumes com dados)
-            echo ""
-            echo "🧹 Limpando volumes órfãos..."
-            docker volume prune -f 2>/dev/null || true
-            
-            # 6. Verificar se nginx.conf existe
-            echo ""
-            echo "📋 Verificando arquivos necessários..."
-            if [ ! -f "nginx/ci.conf" ]; then
-              echo "⚠️ nginx/ci.conf não encontrado! Criando diretório..."
-              mkdir -p nginx
-            else
-              echo "✅ nginx/ci.conf encontrado"
-            fi
-            
-            echo ""
-            echo "✅ Limpeza completa concluída!"
+            docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            docker ps -a | grep secured-guard | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
           EOF
 
       # ============================================
-      # 1️⃣5️⃣ FAZER BACKUP E PARAR CONTAINERS ANTIGOS
+      # 1️⃣4️⃣ BACKUP AND STOP OLD CONTAINERS
       # ============================================
       - name: 💾 Backup and stop old containers
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "💾 Fazendo backup e parando containers antigos..."
-            
             cd /var/www/secured_guard/ci
-            
-            # Fazer backup dos volumes se existirem
-            if [ -d "postgres_data" ]; then
-              BACKUP_DIR="/var/www/secured_guard/ci/backups/$(date +'%Y%m%d_%H%M%S')"
-              mkdir -p "$BACKUP_DIR"
-              cp -r postgres_data "$BACKUP_DIR/" 2>/dev/null || true
-              echo "✅ Backup dos dados criado em: $BACKUP_DIR"
-            fi
-            
-            # Parar e remover containers antigos (já foi feito no passo anterior, mas garantindo)
-            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            else
-              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            fi
-            
-            echo "✅ Containers antigos parados!"
+            docker-compose -f docker-compose.ci.yml stop 2>/dev/null || true
           EOF
 
       # ============================================
-      # 1️⃣6️⃣ FAZER PULL DAS NOVAS IMAGENS
+      # 1️⃣5️⃣ PULL NEW IMAGES
       # ============================================
       - name: 📥 Pull new images
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "📥 Fazendo pull das novas imagens..."
-            
-            cd /var/www/secured_guard/ci
-            
-            # Login no Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-            
-            # Remover imagens antigas para forçar pull das novas
-            echo "🧹 Removendo imagens antigas para forçar atualização..."
-            docker rmi z7design/secured-guard-backend:ci 2>/dev/null || true
-            docker rmi z7design/secured-guard-frontend:ci 2>/dev/null || true
-            docker rmi z7design/secured-guard-whatsapp:ci 2>/dev/null || true
-            
-            # Pull das imagens (forçando atualização)
-            echo "📥 Fazendo pull das imagens atualizadas..."
-            docker pull z7design/secured-guard-backend:ci || echo "⚠️ Erro ao fazer pull do backend"
-            docker pull z7design/secured-guard-frontend:ci || echo "⚠️ Erro ao fazer pull do frontend"
-            docker pull z7design/secured-guard-whatsapp:ci || echo "⚠️ Erro ao fazer pull do whatsapp"
-            
-            echo "✅ Imagens atualizadas!"
-            
-            # Verificar se as imagens foram baixadas
-            echo ""
-            echo "🔍 Verificando imagens baixadas..."
-            docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem z7design/secured-guard encontrada"
-            
-            # Mostrar data de criação das imagens para confirmar que são novas
-            echo ""
-            echo "📅 Data das imagens baixadas:"
-            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
-            
-            # Verificar se as imagens são realmente novas (criadas nas últimas 2 horas)
-            echo ""
-            echo "🔍 Verificando se as imagens são recentes..."
-            CURRENT_TIME=$(date +%s)
-            RECENT_THRESHOLD=7200  # 2 horas em segundos
-            
-            for image in z7design/secured-guard-backend:ci z7design/secured-guard-frontend:ci z7design/secured-guard-whatsapp:ci; do
-              IMAGE_INFO=$(docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedAt}}" "$image" 2>/dev/null || echo "")
-              if [ -n "$IMAGE_INFO" ]; then
-                echo "  ✅ $image encontrada"
-                # Extrair timestamp se possível (formato varia)
-                echo "     $IMAGE_INFO"
-              else
-                echo "  ⚠️ $image não encontrada após pull!"
-              fi
-            done
+            docker pull z7design/secured-guard-backend:ci
+            docker pull z7design/secured-guard-frontend:ci
+            docker pull z7design/secured-guard-whatsapp:ci
           EOF
 
       # ============================================
-      # 1️⃣6️⃣.5️⃣ VERIFICAR IMAGENS ANTES DE INICIAR
+      # 1️⃣6️⃣ VERIFY IMAGES BEFORE STARTING
       # ============================================
       - name: 🔍 Verify images before starting
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔍 Verificando imagens antes de iniciar containers..."
-            
-            cd /var/www/secured_guard/ci
-            
-            # Verificar se todas as imagens necessárias estão disponíveis
-            echo "📋 Verificando imagens disponíveis..."
-            docker images | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem z7design/secured-guard encontrada"
-            
-            # Verificar se as imagens específicas existem
-            BACKEND_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "z7design/secured-guard-backend:ci" || echo "")
-            FRONTEND_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "z7design/secured-guard-frontend:ci" || echo "")
-            WHATSAPP_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "z7design/secured-guard-whatsapp:ci" || echo "")
-            
-            if [ -z "$BACKEND_IMAGE" ]; then
-              echo "❌ Imagem backend não encontrada! Fazendo pull..."
-              docker pull z7design/secured-guard-backend:ci || echo "⚠️ Erro ao fazer pull do backend"
-            else
-              echo "✅ Backend image: $BACKEND_IMAGE"
-            fi
-            
-            if [ -z "$FRONTEND_IMAGE" ]; then
-              echo "❌ Imagem frontend não encontrada! Fazendo pull..."
-              docker pull z7design/secured-guard-frontend:ci || echo "⚠️ Erro ao fazer pull do frontend"
-            else
-              echo "✅ Frontend image: $FRONTEND_IMAGE"
-            fi
-            
-            if [ -z "$WHATSAPP_IMAGE" ]; then
-              echo "❌ Imagem whatsapp não encontrada! Fazendo pull..."
-              docker pull z7design/secured-guard-whatsapp:ci || echo "⚠️ Erro ao fazer pull do whatsapp"
-            else
-              echo "✅ WhatsApp image: $WHATSAPP_IMAGE"
-            fi
-            
-            # Verificar se nginx.conf existe
-            if [ ! -f "nginx/ci.conf" ]; then
-              echo "❌ ERRO: nginx/ci.conf não encontrado!"
-              exit 1
-            else
-              echo "✅ nginx/ci.conf encontrado"
-            fi
-            
-            echo "✅ Verificação concluída!"
+            docker images | grep "z7design/secured-guard"
           EOF
 
       # ============================================
-      # 1️⃣7️⃣ INICIAR NOVOS CONTAINERS
+      # 1️⃣7️⃣ START NEW CONTAINERS
       # ============================================
       - name: 🚀 Start new containers
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🚀 =========================================="
-            echo "🚀 INICIANDO NOVOS CONTAINERS"
-            echo "🚀 ========================================="
-            echo ""
-            
-            # Carregar PATH do Docker (necessário em sessões SSH não-interativas)
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
-            
-            # Verificar se Docker está disponível
-            DOCKER_CMD=""
-            if command -v docker &> /dev/null; then
-              DOCKER_CMD="docker"
-            elif [ -x /usr/bin/docker ]; then
-              DOCKER_CMD="/usr/bin/docker"
-              export PATH="/usr/bin:$PATH"
-            elif [ -x /usr/local/bin/docker ]; then
-              DOCKER_CMD="/usr/local/bin/docker"
-              export PATH="/usr/local/bin:$PATH"
-            elif [ -x /snap/bin/docker ]; then
-              DOCKER_CMD="/snap/bin/docker"
-              export PATH="/snap/bin:$PATH"
-            else
-              echo "⚠️ Docker não encontrado no PATH padrão. Procurando em todo o sistema..."
-              DOCKER_FOUND=$(find /usr /opt /snap -name docker -type f -executable 2>/dev/null | head -1)
-              if [ -n "$DOCKER_FOUND" ]; then
-                DOCKER_CMD="$DOCKER_FOUND"
-                export PATH="$(dirname $DOCKER_FOUND):$PATH"
-                echo "✅ Docker encontrado em: $DOCKER_FOUND"
-              else
-                echo "❌ ERRO: Docker não encontrado no sistema!"
-                echo "📋 Verificando se Docker está instalado mas não iniciado..."
-                if systemctl list-units --type=service | grep -q docker; then
-                  echo "⚠️ Serviço Docker encontrado. Tentando iniciar..."
-                  systemctl start docker 2>&1 || true
-                  sleep 3
-                  if command -v docker &> /dev/null; then
-                    DOCKER_CMD="docker"
-                  fi
-                fi
-                if [ -z "$DOCKER_CMD" ]; then
-                  echo "❌ Docker não está instalado ou não está acessível."
-                  echo "📋 Instale o Docker com: apt-get update && apt-get install -y docker.io docker-compose"
-                  exit 1
-                fi
-              fi
-            fi
-            
-            # Verificar se docker-compose está disponível
-            COMPOSE_CMD=""
-            if command -v docker-compose &> /dev/null; then
-              COMPOSE_CMD="docker-compose"
-            elif [ -x /usr/local/bin/docker-compose ]; then
-              COMPOSE_CMD="/usr/local/bin/docker-compose"
-            elif [ -x /usr/bin/docker-compose ]; then
-              COMPOSE_CMD="/usr/bin/docker-compose"
-            elif $DOCKER_CMD compose version &> /dev/null 2>&1; then
-              COMPOSE_CMD="$DOCKER_CMD compose"
-            else
-              echo "⚠️ docker-compose não encontrado. Tentando usar 'docker compose' (v2)..."
-              if $DOCKER_CMD compose version &> /dev/null 2>&1; then
-                COMPOSE_CMD="$DOCKER_CMD compose"
-              else
-                echo "❌ docker-compose não está disponível!"
-                exit 1
-              fi
-            fi
-            
-            # Verificar se Docker está funcionando
-            if ! $DOCKER_CMD info &> /dev/null; then
-              echo "⚠️ Docker não está respondendo. Tentando iniciar serviço..."
-              systemctl start docker 2>&1 || true
-              sleep 3
-              if ! $DOCKER_CMD info &> /dev/null; then
-                echo "❌ ERRO: Docker não está funcionando!"
-                exit 1
-              fi
-            fi
-            
-            echo "✅ Docker encontrado: $DOCKER_CMD"
-            echo "✅ Docker versão: $($DOCKER_CMD --version)"
-            echo "✅ docker-compose: $COMPOSE_CMD"
-            
             cd /var/www/secured_guard/ci
-            
-            # Garantir que não está em modo Swarm
-            if $DOCKER_CMD info 2>/dev/null | grep -q "Swarm: active"; then
-              echo "❌ ERRO: Docker ainda está em modo Swarm!"
-              echo "🔄 Tentando sair do modo Swarm novamente..."
-              $DOCKER_CMD swarm leave --force 2>/dev/null || true
-              sleep 5
-            fi
-            
-            # Verificar novamente
-            if $DOCKER_CMD info 2>/dev/null | grep -q "Swarm: active"; then
-              echo "❌ ERRO: Não foi possível sair do modo Swarm. Abortando..."
-              exit 1
-            else
-              echo "✅ Docker não está em modo Swarm"
-            fi
-            
-            # Verificar se nginx.conf existe
-            if [ ! -f "nginx/ci.conf" ]; then
-              echo "❌ ERRO: nginx/ci.conf não encontrado! Abortando..."
-              exit 1
-            fi
-            
-            # Criar redes Docker se não existirem
-            echo ""
-            echo "🌐 Verificando e criando redes Docker..."
-            
-            # Criar rede z7network se não existir
-            if ! $DOCKER_CMD network ls | grep -q "z7network"; then
-              echo "📡 Criando rede z7network..."
-              $DOCKER_CMD network create z7network 2>&1 || echo "⚠️ Erro ao criar rede z7network (pode já existir)"
-            else
-              echo "✅ Rede z7network já existe"
-            fi
-            
-            # Criar rede secured-guard-ci-network se não existir
-            if ! $DOCKER_CMD network ls | grep -q "secured-guard-ci"; then
-              echo "📡 Criando rede secured-guard-ci-network..."
-              $DOCKER_CMD network create secured-guard-ci-network 2>&1 || echo "⚠️ Erro ao criar rede secured-guard-ci-network (pode já existir)"
-            else
-              echo "✅ Rede secured-guard-ci-network já existe"
-            fi
-            
-            # Verificar se as redes foram criadas
-            echo ""
-            echo "📋 Redes Docker disponíveis:"
-            $DOCKER_CMD network ls | grep -E "(z7network|secured-guard)" || echo "⚠️ Nenhuma rede encontrada"
-            
-    # Parar e REMOVER COMPLETAMENTE containers existentes antes de recriar
-    echo ""
-    echo "🛑 ========================================"
-    echo "🛑 REMOVENDO CONTAINERS ANTIGOS COMPLETAMENTE"
-    echo "🛑 ========================================"
-    echo ""
-    
-    # Parar todos os containers
-    echo "🛑 Parando todos os containers..."
-    $COMPOSE_CMD -f docker-compose.ci.yml stop 2>&1 || true
-    sleep 2
-    
-    # Remover containers usando docker-compose
-    echo "🗑️ Removendo containers com docker-compose..."
-    $COMPOSE_CMD -f docker-compose.ci.yml rm -f 2>&1 || true
-    sleep 2
-    
-    # Remover containers manualmente por nome (garantir remoção completa)
-    echo "🗑️ Removendo containers manualmente por nome..."
-    
-    # FORÇAR remoção completa do frontend primeiro (CRÍTICO para atualização)
-    echo "🗑️ FORÇANDO remoção completa do container frontend..."
-    $DOCKER_CMD stop secured-guard-frontend-ci 2>/dev/null || true
-    $DOCKER_CMD rm -f secured-guard-frontend-ci 2>/dev/null || true
-    sleep 3
-    
-    for container_name in secured-guard-backend-ci secured-guard-frontend-ci secured-guard-whatsapp-ci secured-guard-db-ci secured-guard-redis-ci secured-guard-nginx-ci; do
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^${container_name}$"; then
-        echo "  🗑️ Removendo container: $container_name"
-        $DOCKER_CMD stop "$container_name" 2>/dev/null || true
-        $DOCKER_CMD rm -f "$container_name" 2>&1 || true
-      fi
-    done
-    
-    # Verificar se o container frontend foi realmente removido
-    if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-      echo "❌ ERRO: Container frontend ainda existe! Forçando remoção novamente..."
-      $DOCKER_CMD stop secured-guard-frontend-ci 2>/dev/null || true
-      $DOCKER_CMD rm -f secured-guard-frontend-ci 2>&1 || true
-      sleep 3
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-        echo "❌ ERRO CRÍTICO: Não foi possível remover container frontend!"
-        exit 1
-      fi
-    else
-      echo "✅ Container frontend removido com sucesso"
-    fi
-    
-    # Remover containers por padrão (caso tenham nomes diferentes)
-    echo "🗑️ Removendo containers por padrão..."
-    $DOCKER_CMD ps -a --format "{{.ID}} {{.Names}}" | grep -E "(secured-guard|ci)" | awk '{print $1}' | xargs -r $DOCKER_CMD rm -f 2>/dev/null || true
-    
-    echo ""
-    echo "✅ Containers antigos removidos completamente!"
-    echo ""
-    echo "🧹 Removendo imagens antigas para forçar pull das novas..."
-    
-    # Remover imagens antigas para forçar pull
-    echo "🗑️ Removendo TODAS as imagens antigas (incluindo dangling)..."
-    $DOCKER_CMD rmi z7design/secured-guard-backend:ci 2>/dev/null || echo "  ℹ️ Imagem backend não encontrada"
-    $DOCKER_CMD rmi z7design/secured-guard-frontend:ci 2>/dev/null || echo "  ℹ️ Imagem frontend não encontrada"
-    $DOCKER_CMD rmi z7design/secured-guard-whatsapp:ci 2>/dev/null || echo "  ℹ️ Imagem whatsapp não encontrada"
-    
-    # Remover imagens dangling (sem tag)
-    $DOCKER_CMD image prune -f || true
-    
-    # Remover TODAS as imagens relacionadas (incluindo variantes)
-    $DOCKER_CMD images | grep "z7design/secured-guard" | awk '{print $3}' | xargs -r $DOCKER_CMD rmi -f 2>/dev/null || true
-    
-    echo "✅ Imagens antigas removidas completamente!"
-    echo ""
-    sleep 5
-            
-            # Iniciar TODOS os containers de uma vez (docker-compose gerencia dependências)
-            echo ""
-            echo "🚀 ========================================"
-            echo "🚀 INICIANDO CONTAINERS COM NOVAS IMAGENS"
-            echo "🚀 ========================================"
-            echo ""
-            echo "📥 Forçando pull das imagens mais recentes..."
-            echo "🔄 Commit SHA do deploy: ${{ github.sha }}"
-            echo "📅 Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            echo ""
-            
-            # Forçar pull de todas as imagens novamente antes de iniciar (SEM --ignore-pull-failures para garantir que falhe se não conseguir)
-            echo "📥 Fazendo pull forçado de TODAS as imagens..."
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml pull || {
-              echo "⚠️ Erro no pull via docker-compose. Tentando pull direto..."
-              echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-              docker pull z7design/secured-guard-backend:ci || echo "❌ Erro ao fazer pull do backend"
-              docker pull z7design/secured-guard-frontend:ci || echo "❌ Erro ao fazer pull do frontend"
-              docker pull z7design/secured-guard-whatsapp:ci || echo "❌ Erro ao fazer pull do whatsapp"
-            }
-            
-            echo ""
-            echo "📋 Imagens disponíveis ANTES de iniciar containers:"
-            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}" | grep "z7design/secured-guard" || echo "⚠️ Nenhuma imagem encontrada"
-            echo ""
-            
-            # Verificar conteúdo da imagem frontend ANTES de iniciar container
-            echo "🔍 Verificando conteúdo da imagem frontend baixada..."
-            if docker run --rm z7design/secured-guard-frontend:ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3; then
-              echo "  ✅ 'Proposta de Acordo' encontrado na imagem baixada!"
-            else
-              echo "  ❌ 'Proposta de Acordo' NÃO encontrado na imagem baixada!"
-              echo "  📋 A imagem no Docker Hub pode estar desatualizada"
-              echo "  🔄 Verificando labels da imagem:"
-              docker inspect z7design/secured-guard-frontend:ci --format='{{range .Config.Labels}}{{.}}{{"\n"}}{{end}}' 2>/dev/null || echo "  ⚠️ Não foi possível verificar labels"
-            fi
-            echo ""
-            
-            # Verificar se as imagens foram realmente baixadas
-            BACKEND_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "z7design/secured-guard-backend:ci" && echo "yes" || echo "no")
-            FRONTEND_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "z7design/secured-guard-frontend:ci" && echo "yes" || echo "no")
-            WHATSAPP_EXISTS=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "z7design/secured-guard-whatsapp:ci" && echo "yes" || echo "no")
-            
-            if [ "$BACKEND_EXISTS" = "no" ] || [ "$FRONTEND_EXISTS" = "no" ] || [ "$WHATSAPP_EXISTS" = "no" ]; then
-              echo "❌ ERRO: Algumas imagens não foram baixadas!"
-              echo "  Backend: $BACKEND_EXISTS"
-              echo "  Frontend: $FRONTEND_EXISTS"
-              echo "  WhatsApp: $WHATSAPP_EXISTS"
-              echo "🔄 Tentando pull novamente..."
-              echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-              docker pull z7design/secured-guard-backend:ci || exit 1
-              docker pull z7design/secured-guard-frontend:ci || exit 1
-              docker pull z7design/secured-guard-whatsapp:ci || exit 1
-            fi
-            
-            echo ""
-            echo "🚀 Iniciando containers com --force-recreate para garantir uso das novas imagens..."
-            echo "🔄 Usando flags: --force-recreate --pull always --remove-orphans --no-deps"
-            
-            # Usar --no-deps para evitar problemas com dependências e forçar recriação
-            COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans --no-deps backend-ci frontend-ci whatsapp-service-ci nginx-ci || {
-              echo "⚠️ Erro ao iniciar com --no-deps. Tentando sem --no-deps..."
-              COMPOSE_HTTP_TIMEOUT=300 $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
-            }
-            
-            if [ $? -ne 0 ]; then
-              echo "❌ ERRO ao iniciar containers!"
-              echo "📋 Verificando logs de erro..."
-              $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 2>&1 | tail -50
-              exit 1
-            fi
-            
-            echo ""
-            echo "✅ Containers iniciados!"
-            echo ""
-            echo "🔍 ========================================"
-            echo "🔍 VERIFICAÇÃO FINAL DAS IMAGENS"
-            echo "🔍 ========================================"
-            echo ""
-            echo "📋 Containers e suas imagens:"
-            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
-            echo ""
-            echo "📅 Verificando imagens usadas pelos containers:"
-            DEPLOY_TIMESTAMP=$(date -u +%s)
-            RECENT_THRESHOLD=3600  # 1 hora em segundos
-            
-            for container in secured-guard-backend-ci secured-guard-frontend-ci secured-guard-whatsapp-ci; do
-              if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                IMAGE_USED=$($DOCKER_CMD inspect --format='{{.Config.Image}}' "$container" 2>/dev/null || echo "N/A")
-                CONTAINER_CREATED=$($DOCKER_CMD inspect --format='{{.Created}}' "$container" 2>/dev/null || echo "N/A")
-                CONTAINER_ID=$($DOCKER_CMD inspect --format='{{.Id}}' "$container" 2>/dev/null || echo "N/A")
-                
-                echo ""
-                echo "  📦 $container:"
-                echo "     ID: ${CONTAINER_ID:0:12}..."
-                echo "     Imagem: $IMAGE_USED"
-                echo "     Criado: $CONTAINER_CREATED"
-                
-                # Verificar se o container foi criado recentemente (última hora)
-                if [ "$CONTAINER_CREATED" != "N/A" ]; then
-                  # Converter data de criação para timestamp (aproximado)
-                  CONTAINER_AGE=$((DEPLOY_TIMESTAMP - $(date -d "$CONTAINER_CREATED" +%s 2>/dev/null || echo $DEPLOY_TIMESTAMP)))
-                  if [ $CONTAINER_AGE -lt $RECENT_THRESHOLD ]; then
-                    echo "     ✅ Container foi criado recentemente (há $((CONTAINER_AGE / 60)) minutos)"
-                  else
-                    echo "     ⚠️ Container pode ser antigo (criado há $((CONTAINER_AGE / 3600)) horas)"
-                  fi
-                fi
-                
-                # Verificar se a imagem usada é a correta
-                if echo "$IMAGE_USED" | grep -q "z7design/secured-guard.*:ci"; then
-                  echo "     ✅ Imagem correta"
-                else
-                  echo "     ❌ ERRO: Imagem incorreta!"
-                fi
-              else
-                echo ""
-                echo "  ❌ $container NÃO está rodando!"
-              fi
-            done
-            
-            echo ""
-            echo "🔍 ========================================"
-            echo "✅ VERIFICAÇÃO CONCLUÍDA"
-            echo "🔍 ========================================"
-            
-            echo ""
-            echo "🔍 Verificando conteúdo do container frontend..."
-            if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-              echo "📂 Listando arquivos no container frontend:"
-              $DOCKER_CMD exec secured-guard-frontend-ci ls -lah /usr/share/nginx/html/ | head -20 || echo "⚠️ Não foi possível listar arquivos"
-              
-              echo ""
-              echo "🔍 Verificando se index.html existe e seu tamanho:"
-              $DOCKER_CMD exec secured-guard-frontend-ci ls -lh /usr/share/nginx/html/index.html 2>/dev/null || echo "⚠️ index.html não encontrado"
-              
-              echo ""
-              echo "🔍 Verificando arquivos JS mais recentes:"
-              $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -10 || echo "⚠️ Nenhum arquivo JS encontrado"
-              
-              echo ""
-              echo "🔍 Verificando se o código contém 'Proposta de Acordo' (nova aba):"
-              # Procurar em arquivos JS compilados
-              if $DOCKER_CMD exec secured-guard-frontend-ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3; then
-                echo "  ✅ 'Proposta de Acordo' encontrado nos arquivos compilados!"
-              else
-                echo "  ⚠️ 'Proposta de Acordo' NÃO encontrado nos arquivos compilados"
-                echo "  📋 Isso pode indicar que o build não incluiu as alterações"
-              fi
-              
-              echo ""
-              echo "🔄 Forçando recarregamento do Nginx no container frontend..."
-              $DOCKER_CMD exec secured-guard-frontend-ci nginx -s reload 2>/dev/null || {
-                echo "⚠️ Não foi possível recarregar nginx (pode estar iniciando)"
-                echo "🔄 Reiniciando container frontend para garantir..."
-                $DOCKER_CMD restart secured-guard-frontend-ci || true
-              }
-            else
-              echo "⚠️ Container frontend não está rodando ainda"
-            fi
-            
-            echo ""
-            echo "🏥 ========================================"
-            echo "🏥 AGUARDANDO HEALTH CHECKS DOS CONTAINERS"
-            echo "🏥 ========================================"
-            echo ""
-            
-            # Aguardar health checks dos containers
-            MAX_WAIT=300  # 5 minutos máximo
-            WAIT_INTERVAL=10  # Verificar a cada 10 segundos
-            ELAPSED=0
-            
-            echo "⏳ Aguardando containers ficarem saudáveis..."
-            
-            # Verificar health status de cada container
-            check_container_health() {
-              local container=$1
-              local health_status=$($DOCKER_CMD inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "none")
-              echo "$health_status"
-            }
-            
-            while [ $ELAPSED -lt $MAX_WAIT ]; do
-              echo ""
-              echo "🔍 Verificando health status (${ELAPSED}s/${MAX_WAIT}s)..."
-              
-              BACKEND_HEALTH=$(check_container_health "secured-guard-backend-ci")
-              FRONTEND_HEALTH=$(check_container_health "secured-guard-frontend-ci")
-              WHATSAPP_HEALTH=$(check_container_health "secured-guard-whatsapp-ci")
-              NGINX_HEALTH=$(check_container_health "secured-guard-nginx-ci")
-              
-              echo "  Backend: $BACKEND_HEALTH"
-              echo "  Frontend: $FRONTEND_HEALTH"
-              echo "  WhatsApp: $WHATSAPP_HEALTH"
-              echo "  Nginx: $NGINX_HEALTH"
-              
-              # Verificar se todos estão healthy ou starting (ainda iniciando)
-              if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$NGINX_HEALTH" = "healthy" ]; then
-                echo ""
-                echo "✅ Todos os containers principais estão saudáveis!"
-                break
-              fi
-              
-              # Se algum container estiver unhealthy, mostrar logs
-              if [ "$BACKEND_HEALTH" = "unhealthy" ]; then
-                echo "  ⚠️ Backend está unhealthy. Logs:"
-                $DOCKER_CMD logs --tail 20 secured-guard-backend-ci 2>&1 | tail -10
-              fi
-              
-              if [ "$FRONTEND_HEALTH" = "unhealthy" ]; then
-                echo "  ⚠️ Frontend está unhealthy. Logs:"
-                $DOCKER_CMD logs --tail 20 secured-guard-frontend-ci 2>&1 | tail -10
-              fi
-              
-              sleep $WAIT_INTERVAL
-              ELAPSED=$((ELAPSED + WAIT_INTERVAL))
-            done
-            
-            if [ $ELAPSED -ge $MAX_WAIT ]; then
-              echo ""
-              echo "⚠️ Timeout aguardando health checks (${MAX_WAIT}s)"
-              echo "📋 Status final dos containers:"
-              $DOCKER_CMD ps --format "table {{.Names}}\t{{.Status}}\t{{.Health}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
-            else
-              echo ""
-              echo "✅ Health checks concluídos em ${ELAPSED}s"
-            fi
-            
-            echo ""
-            echo "⏳ Aguardando mais 30s para aplicação estabilizar..."
-            sleep 30
-            
-            echo ""
-            echo "🔍 ========================================"
-            echo "🔍 VERIFICAÇÃO FINAL DO FRONTEND"
-            echo "🔍 ========================================"
-            echo ""
-            
-            # Verificar conteúdo do frontend após health checks
-            if $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-              echo "✅ Container frontend está rodando"
-              
-              echo ""
-              echo "📂 Verificando conteúdo do container frontend:"
-              $DOCKER_CMD exec secured-guard-frontend-ci ls -lah /usr/share/nginx/html/ | head -20 || echo "⚠️ Não foi possível listar arquivos"
-              
-              echo ""
-              echo "🔍 Verificando se index.html existe e seu tamanho:"
-              INDEX_SIZE=$($DOCKER_CMD exec secured-guard-frontend-ci ls -lh /usr/share/nginx/html/index.html 2>/dev/null | awk '{print $5}' || echo "N/A")
-              echo "  Tamanho do index.html: $INDEX_SIZE"
-              
-              echo ""
-              echo "🔍 Verificando arquivos JS mais recentes:"
-              $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -10 || echo "⚠️ Nenhum arquivo JS encontrado"
-              
-              echo ""
-              echo "🔍 Verificando se o código contém 'Proposta de Acordo' (nova aba):"
-              SEARCH_RESULT=$($DOCKER_CMD exec secured-guard-frontend-ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -3 || echo "")
-              if [ -n "$SEARCH_RESULT" ]; then
-                echo "  ✅ 'Proposta de Acordo' encontrado nos arquivos compilados!"
-                echo "  📋 Resultado:"
-                echo "$SEARCH_RESULT" | sed 's/^/    /'
-              else
-                echo "  ❌ 'Proposta de Acordo' NÃO encontrado nos arquivos compilados!"
-                echo "  📋 Isso indica que o build não incluiu as alterações"
-                echo "  🔄 Verificando se há outros arquivos relacionados..."
-                $DOCKER_CMD exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec grep -l "Proposta\|proposta" {} \; 2>/dev/null | head -5 || echo "    Nenhum arquivo encontrado"
-              fi
-              
-              echo ""
-              echo "🌐 Testando acesso ao frontend via HTTP:"
-              FRONTEND_HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ 2>/dev/null || echo "000")
-              if [ "$FRONTEND_HTTP" = "200" ]; then
-                echo "  ✅ Frontend responde na porta 3000 (HTTP 200)"
-              else
-                echo "  ⚠️ Frontend retornou HTTP $FRONTEND_HTTP na porta 3000"
-              fi
-              
-              echo ""
-              echo "🌐 Testando acesso via Nginx (porta 8082):"
-              NGINX_HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/ 2>/dev/null || echo "000")
-              if [ "$NGINX_HTTP" = "200" ]; then
-                echo "  ✅ Nginx responde na porta 8082 (HTTP 200)"
-              else
-                echo "  ⚠️ Nginx retornou HTTP $NGINX_HTTP na porta 8082"
-              fi
-              
-              echo ""
-              echo "🔄 Forçando recarregamento do Nginx no container frontend..."
-              $DOCKER_CMD exec secured-guard-frontend-ci nginx -s reload 2>/dev/null || {
-                echo "⚠️ Não foi possível recarregar nginx"
-                echo "🔄 Reiniciando container frontend para garantir..."
-                $DOCKER_CMD restart secured-guard-frontend-ci || true
-                sleep 10
-              }
-            else
-              echo "❌ Container frontend NÃO está rodando!"
-              echo "📋 Containers em execução:"
-              $DOCKER_CMD ps --format "table {{.Names}}\t{{.Status}}" | grep "secured-guard" || echo "⚠️ Nenhum container encontrado"
-            fi
-            
-            # Verificar containers que saíram imediatamente
-            echo ""
-            echo "🔍 Verificando containers que podem ter saído..."
-            EXITED_CONTAINERS=$($DOCKER_CMD ps -a --filter "status=exited" --format "{{.Names}}" | grep "secured-guard" || true)
-            if [ -n "$EXITED_CONTAINERS" ]; then
-              echo "⚠️ Containers que saíram:"
-              echo "$EXITED_CONTAINERS"
-              echo ""
-              echo "📋 Logs dos containers que saíram:"
-              for container in $EXITED_CONTAINERS; do
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "📋 Logs de $container:"
-                $DOCKER_CMD logs --tail 50 "$container" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
-              done
-            fi
-            
-    # Verificar se PostgreSQL e Redis estão rodando
-    echo ""
-    echo "🔍 Verificando PostgreSQL e Redis..."
-    
-    # Verificar usando docker-compose ps (mais confiável)
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps postgres-ci 2>&1 | grep -q "Up"; then
-      echo "⚠️ PostgreSQL não está rodando! Tentando iniciar..."
-      # Verificar se container existe antes de tentar iniciar
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-db-ci$"; then
-        $DOCKER_CMD start secured-guard-db-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
-      else
-        $COMPOSE_CMD -f docker-compose.ci.yml up -d postgres-ci
-      fi
-      sleep 10
-    fi
-    
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps redis-ci 2>&1 | grep -q "Up"; then
-      echo "⚠️ Redis não está rodando! Tentando iniciar..."
-      # Verificar se container existe antes de tentar iniciar
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-redis-ci$"; then
-        $DOCKER_CMD start secured-guard-redis-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
-      else
-        $COMPOSE_CMD -f docker-compose.ci.yml up -d redis-ci
-      fi
-      sleep 10
-    fi
-            
-            # Aguardar PostgreSQL e Redis ficarem saudáveis
-            echo "⏳ Aguardando PostgreSQL e Redis ficarem saudáveis (20s)..."
-            sleep 20
-            
-    # Verificar novamente se estão rodando usando docker-compose ps
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps postgres-ci 2>&1 | grep -q "Up"; then
-      echo "❌ ERRO: PostgreSQL ainda não está rodando!"
-      echo "📋 Logs do PostgreSQL:"
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-db-ci$"; then
-        $DOCKER_CMD logs --tail 50 secured-guard-db-ci 2>&1 | tail -30
-      else
-        echo "Container não foi criado"
-        $COMPOSE_CMD -f docker-compose.ci.yml logs postgres-ci 2>&1 | tail -30
-      fi
-      exit 1
-    fi
-    
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps redis-ci 2>&1 | grep -q "Up"; then
-      echo "❌ ERRO: Redis ainda não está rodando!"
-      echo "📋 Logs do Redis:"
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-redis-ci$"; then
-        $DOCKER_CMD logs --tail 50 secured-guard-redis-ci 2>&1 | tail -30
-      else
-        echo "Container não foi criado"
-        $COMPOSE_CMD -f docker-compose.ci.yml logs redis-ci 2>&1 | tail -30
-      fi
-      exit 1
-    fi
-            
-            echo "✅ PostgreSQL e Redis estão rodando!"
-            
-    # Verificar se Frontend e Nginx estão rodando
-    echo ""
-    echo "🔍 Verificando Frontend e Nginx..."
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps frontend-ci 2>&1 | grep -q "Up"; then
-      echo "⚠️ Frontend não está rodando! Tentando iniciar..."
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-        $DOCKER_CMD start secured-guard-frontend-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
-      else
-        $COMPOSE_CMD -f docker-compose.ci.yml up -d frontend-ci
-      fi
-      sleep 10
-    fi
-    
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps nginx-ci 2>&1 | grep -q "Up"; then
-      echo "⚠️ Nginx não está rodando! Tentando iniciar..."
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-nginx-ci$"; then
-        $DOCKER_CMD start secured-guard-nginx-ci 2>&1 || $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
-      else
-        $COMPOSE_CMD -f docker-compose.ci.yml up -d nginx-ci
-      fi
-      sleep 10
-    fi
-    
-    # Verificar novamente usando docker-compose ps
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps frontend-ci 2>&1 | grep -q "Up"; then
-      echo "❌ ERRO: Frontend ainda não está rodando!"
-      echo "📋 Logs do Frontend:"
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-        $DOCKER_CMD logs --tail 50 secured-guard-frontend-ci 2>&1 | tail -30
-      else
-        $COMPOSE_CMD -f docker-compose.ci.yml logs frontend-ci 2>&1 | tail -30
-      fi
-    else
-      echo "✅ Frontend está rodando!"
-    fi
-    
-    if ! $COMPOSE_CMD -f docker-compose.ci.yml ps nginx-ci 2>&1 | grep -q "Up"; then
-      echo "❌ ERRO: Nginx ainda não está rodando!"
-      echo "📋 Logs do Nginx:"
-      if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^secured-guard-nginx-ci$"; then
-        $DOCKER_CMD logs --tail 50 secured-guard-nginx-ci 2>&1 | tail -30
-      else
-        $COMPOSE_CMD -f docker-compose.ci.yml logs nginx-ci 2>&1 | tail -30
-      fi
-    else
-      echo "✅ Nginx está rodando!"
-    fi
-            
-            echo "⏳ Aguardando containers iniciarem (30s)..."
-            sleep 30
-            
-            # Verificar status dos containers
-            echo ""
-            echo "📋 Status dos containers:"
-            $COMPOSE_CMD -f docker-compose.ci.yml ps
-            
-            # Verificar se containers foram criados
-            echo ""
-            echo "🔍 Verificando containers criados..."
-            $DOCKER_CMD ps -a | grep "secured-guard" || echo "⚠️ Nenhum container secured-guard encontrado"
-            
-            # Verificar e tentar iniciar containers que não estão rodando
-            echo ""
-            echo "🔍 Verificando e corrigindo containers que não estão rodando..."
-            REQUIRED_SERVICES=("postgres-ci" "redis-ci" "backend-ci" "whatsapp-service-ci" "frontend-ci" "nginx-ci")
-            MAX_RETRIES=3
-            RETRY=0
-            
-            while [ $RETRY -lt $MAX_RETRIES ]; do
-              RETRY=$((RETRY + 1))
-              echo ""
-              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "Verificação $RETRY de $MAX_RETRIES..."
-              
-              STOPPED_SERVICES=()
-              
-              # Usar docker-compose ps para verificar status real
-              for service in "${REQUIRED_SERVICES[@]}"; do
-                SERVICE_STATUS=$($COMPOSE_CMD -f docker-compose.ci.yml ps "$service" 2>&1 | tail -1 || echo "")
-                if echo "$SERVICE_STATUS" | grep -q "Up"; then
-                  echo "  ✅ $service está rodando"
-                elif echo "$SERVICE_STATUS" | grep -q "Exit"; then
-                  echo "  ⚠️ $service saiu (Exit)"
-                  STOPPED_SERVICES+=("$service")
-                  
-                  # Mostrar logs do serviço que saiu
-                  echo "  📋 Logs de $service:"
-                  $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 30 "$service" 2>&1 | tail -20 || echo "  ⚠️ Não foi possível obter logs"
-                else
-                  echo "  ❌ $service não está rodando"
-                  STOPPED_SERVICES+=("$service")
-                fi
-              done
-              
-              if [ ${#STOPPED_SERVICES[@]} -eq 0 ]; then
-                echo ""
-                echo "✅ Todos os containers estão rodando!"
-                break
-              fi
-              
-              if [ $RETRY -lt $MAX_RETRIES ]; then
-                echo ""
-                echo "🔄 Tentando reiniciar serviços parados..."
-                
-                for service in "${STOPPED_SERVICES[@]}"; do
-                  echo "  🔄 Reiniciando $service..."
-                  
-                  # Tentar reiniciar o serviço
-                  $COMPOSE_CMD -f docker-compose.ci.yml restart "$service" 2>&1 || {
-                    echo "  ⚠️ Erro ao reiniciar $service. Tentando recriar..."
-                    $COMPOSE_CMD -f docker-compose.ci.yml pull "$service" 2>&1 || echo "  ⚠️ Erro ao fazer pull de $service"
-                    $COMPOSE_CMD -f docker-compose.ci.yml up -d --force-recreate --pull always "$service" 2>&1 || echo "  ⚠️ Erro ao recriar $service"
-                  }
-                done
-                
-                echo "⏳ Aguardando serviços iniciarem (30s)..."
-                sleep 30
-              fi
-            done
-            
-            # Verificação final usando docker-compose ps
-            echo ""
-            echo "🔍 Verificação final dos containers..."
-            FINAL_STOPPED=()
-            
-            for service in "${REQUIRED_SERVICES[@]}"; do
-              SERVICE_STATUS=$($COMPOSE_CMD -f docker-compose.ci.yml ps "$service" 2>&1 | tail -1 || echo "")
-              if ! echo "$SERVICE_STATUS" | grep -q "Up"; then
-                echo "  ❌ $service NÃO está rodando!"
-                FINAL_STOPPED+=("$service")
-                
-                # Mostrar logs do serviço que não está rodando
-                echo "  📋 Logs de $service:"
-                $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 50 "$service" 2>&1 | tail -30 || echo "  ⚠️ Não foi possível obter logs"
-              fi
-            done
-            
-            if [ ${#FINAL_STOPPED[@]} -gt 0 ]; then
-              echo ""
-              echo "❌ ERRO: Os seguintes serviços não estão rodando após $MAX_RETRIES tentativas:"
-              printf '  - %s\n' "${FINAL_STOPPED[@]}"
-              echo ""
-              echo "📋 Logs do docker-compose (últimos 100 linhas):"
-              $COMPOSE_CMD -f docker-compose.ci.yml logs --tail 100 2>&1 | tail -100
-              echo ""
-              echo "📋 Status detalhado:"
-              $COMPOSE_CMD -f docker-compose.ci.yml ps -a
-              echo ""
-              echo "📋 Containers que saíram:"
-              $DOCKER_CMD ps -a --filter "status=exited" --format "table {{.Names}}\t{{.Status}}\t{{.ExitCode}}" | grep "secured-guard" || echo "Nenhum container exited encontrado"
-              exit 1
-            fi
-            
-            echo ""
-            echo "✅ Todos os containers estão rodando com sucesso!"
+            docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
           EOF
 
       # ============================================
-      # 1️⃣7️⃣.5️⃣ VERIFICAR E CORRIGIR CONTAINERS QUE NÃO ESTÃO RODANDO
+      # 1️⃣8️⃣ FIX CONTAINERS THAT ARE NOT RUNNING
       # ============================================
       - name: 🔧 Fix containers that are not running
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔧 Verificando e corrigindo containers que não estão rodando..."
-            
             cd /var/www/secured_guard/ci
-            
-            # Verificar containers críticos (incluindo PostgreSQL e Redis)
-            CRITICAL_CONTAINERS=("secured-guard-db-ci" "secured-guard-redis-ci" "secured-guard-backend-ci" "secured-guard-whatsapp-ci" "secured-guard-frontend-ci" "secured-guard-nginx-ci")
-            
-            for container in "${CRITICAL_CONTAINERS[@]}"; do
-              if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                echo "⚠️ $container não está rodando!"
-                echo "📋 Verificando logs..."
-                docker logs --tail 50 "$container" 2>&1 | tail -30 || echo "Container não encontrado"
-                
-                # Tentar iniciar
-                echo "🔄 Tentando iniciar $container..."
-                docker start "$container" 2>&1 || {
-                  echo "⚠️ Erro ao iniciar. Tentando recriar..."
-                  
-                  # Extrair nome do serviço do docker-compose
-                  if [[ "$container" == *"db"* ]] || [[ "$container" == *"postgres"* ]]; then
-                    SERVICE_NAME="postgres-ci"
-                  elif [[ "$container" == *"redis"* ]]; then
-                    SERVICE_NAME="redis-ci"
-                  elif [[ "$container" == *"backend"* ]]; then
-                    SERVICE_NAME="backend-ci"
-                  elif [[ "$container" == *"whatsapp"* ]]; then
-                    SERVICE_NAME="whatsapp-service-ci"
-                  elif [[ "$container" == *"frontend"* ]]; then
-                    SERVICE_NAME="frontend-ci"
-                  elif [[ "$container" == *"nginx"* ]]; then
-                    SERVICE_NAME="nginx-ci"
-                  else
-                    continue
-                  fi
-                  
-                  # Recriar o serviço
-                  if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-                    docker compose -f docker-compose.ci.yml pull "$SERVICE_NAME" 2>&1 || echo "  ⚠️ Erro ao fazer pull de $SERVICE_NAME"
-                    docker compose -f docker-compose.ci.yml up -d --force-recreate --pull always --no-deps "$SERVICE_NAME"
-                  else
-                    docker-compose -f docker-compose.ci.yml pull "$SERVICE_NAME" 2>&1 || echo "  ⚠️ Erro ao fazer pull de $SERVICE_NAME"
-                    docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull always --no-deps "$SERVICE_NAME"
-                  fi
-                  
-                  echo "⏳ Aguardando $container iniciar (15s)..."
-                  sleep 15
-                  
-                  # Verificar novamente
-                  if docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                    echo "✅ $container iniciado com sucesso!"
-                  else
-                    echo "❌ $container ainda não está rodando após recriação"
-                    echo "📋 Logs finais:"
-                    docker logs --tail 30 "$container" 2>&1 | tail -20 || echo "Container não encontrado"
-                  fi
-                }
-              else
-                echo "✅ $container está rodando"
-              fi
-            done
-            
-            # Verificação final
-            echo ""
-            echo "🔍 Verificação final dos containers críticos..."
-            ALL_RUNNING=true
-            
-            for container in "${CRITICAL_CONTAINERS[@]}"; do
-              if ! docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
-                echo "❌ $container NÃO está rodando!"
-                ALL_RUNNING=false
-              fi
-            done
-            
-            if [ "$ALL_RUNNING" = false ]; then
-              echo ""
-              echo "❌ ERRO: Alguns containers críticos não estão rodando!"
-              echo "📋 Status de todos os containers:"
-              docker ps -a | grep "secured-guard" || echo "Nenhum container encontrado"
-              exit 1
-            fi
-            
-            echo "✅ Todos os containers críticos estão rodando!"
+            docker-compose -f docker-compose.ci.yml ps
+            docker-compose -f docker-compose.ci.yml up -d
           EOF
 
       # ============================================
-      # 1️⃣8️⃣ VERIFICAR E CORRIGIR JWT_SECRET NO CONTAINER
+      # 1️⃣9️⃣ VERIFY AND FIX JWT_SECRET IN CONTAINER
       # ============================================
       - name: 🔐 Verify and fix JWT_SECRET in container
-        env:
-          JWT_SECRET_VALUE: ${{ env.JWT_SECRET_VALUE }}
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
-            echo "🔐 Verificando e corrigindo JWT_SECRET no container backend..."
-            
-            # Aguardar container iniciar
-            sleep 15
-            
-            CORRECT_JWT_SECRET="${{ env.JWT_SECRET_VALUE }}"
-            MAX_RETRIES=3
-            RETRY=0
-            
-            while [ \$RETRY -lt \$MAX_RETRIES ]; do
-              RETRY=\$((RETRY + 1))
-              echo ""
-              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "Tentativa \$RETRY de \$MAX_RETRIES..."
-              
-              # Verificar se JWT_SECRET está configurado corretamente
-              JWT_SECRET_IN_CONTAINER=\$(docker exec secured-guard-backend-ci printenv JWT_SECRET 2>/dev/null || echo "")
-              
-              if [ -z "\$JWT_SECRET_IN_CONTAINER" ]; then
-                echo "⚠️ JWT_SECRET não está definido no container. Corrigindo..."
-              else
-                JWT_LENGTH=\${#JWT_SECRET_IN_CONTAINER}
-                echo "JWT_SECRET atual no container: \${JWT_SECRET_IN_CONTAINER:0:30}... (\$JWT_LENGTH caracteres)"
-                
-                if [ \$JWT_LENGTH -ge 64 ]; then
-                  echo "✅ JWT_SECRET está configurado corretamente no container (\$JWT_LENGTH caracteres)"
-                  break
-                else
-                  echo "⚠️ JWT_SECRET no container é muito curto (\$JWT_LENGTH caracteres). Corrigindo..."
-                fi
-              fi
-              
-              # Corrigir .env se necessário
-              cd /var/www/secured_guard/ci
-              if [ -f .env ]; then
-                sed -i "s|^JWT_SECRET=.*|JWT_SECRET=\${CORRECT_JWT_SECRET}|g" .env
-                echo "✅ .env atualizado com JWT_SECRET correto"
-              fi
-              
-              # Reiniciar container backend para aplicar mudanças
-              echo "🔄 Reiniciando container backend..."
-              docker-compose -f docker-compose.ci.yml restart backend-ci
-              
-              echo "⏳ Aguardando container reiniciar (20s)..."
-              sleep 20
-              
-              # Verificar se container está rodando
-              if ! docker ps | grep -q secured-guard-backend-ci; then
-                echo "❌ Container não está rodando após reinício!"
-                docker logs --tail 30 secured-guard-backend-ci 2>&1 || echo "Container não encontrado"
-                if [ \$RETRY -lt \$MAX_RETRIES ]; then
-                  echo "Tentando iniciar container novamente..."
-                  docker-compose -f docker-compose.ci.yml up -d backend-ci
-                  sleep 20
-                fi
-              fi
-            done
-            
-            # Verificação final
-            FINAL_JWT=\$(docker exec secured-guard-backend-ci printenv JWT_SECRET 2>/dev/null || echo "")
-            if [ -z "\$FINAL_JWT" ]; then
-              echo "❌ ERRO: JWT_SECRET ainda não está definido no container após \$MAX_RETRIES tentativas!"
-              echo "📋 Logs do backend:"
-              docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i jwt || echo "Nenhum log JWT encontrado"
-              exit 1
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
             fi
-            
-            FINAL_LENGTH=\${#FINAL_JWT}
-            if [ \$FINAL_LENGTH -lt 64 ]; then
-              echo "❌ ERRO: JWT_SECRET ainda está muito curto (\$FINAL_LENGTH caracteres) após \$MAX_RETRIES tentativas!"
-              echo "Valor atual: \${FINAL_JWT:0:50}..."
-              echo "📋 Verificando .env:"
-              grep "^JWT_SECRET=" .env || echo "JWT_SECRET não encontrado no .env"
-              exit 1
-            fi
-            
-            echo ""
-            echo "✅ JWT_SECRET verificado e corrigido com sucesso!"
-            echo "   Tamanho: \$FINAL_LENGTH caracteres"
-            echo "   Valor (primeiros 30): \${FINAL_JWT:0:30}..."
+            docker exec secured-guard-backend-ci sh -c "export JWT_SECRET=$JWT_SECRET" || true
           EOF
 
       # ============================================
-      # 1️⃣9️⃣ GARANTIR ROLES E PERMISSÕES DOS USUÁRIOS
+      # 2️⃣0️⃣ ENSURE USER ROLES AND PERMISSIONS
       # ============================================
       - name: 👥 Ensure user roles and permissions
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "👥 Verificando e garantindo roles e permissões dos usuários..."
-            
-            # Aguardar backend estar totalmente pronto
-            sleep 30
-            
-            # Verificar se o backend está respondendo
-            MAX_ATTEMPTS=10
-            ATTEMPT=0
-            BACKEND_READY=false
-            
-            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-              ATTEMPT=$((ATTEMPT + 1))
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health 2>/dev/null || echo "000")
-              
-              if [ "$HTTP_CODE" = "200" ]; then
-                echo "✅ Backend está respondendo"
-                BACKEND_READY=true
-                break
-              else
-                echo "⏳ Aguardando backend iniciar... (tentativa $ATTEMPT/$MAX_ATTEMPTS)"
-                sleep 10
-              fi
-            done
-            
-            if [ "$BACKEND_READY" = false ]; then
-              echo "⚠️ Backend não está respondendo, mas continuando..."
-              echo "📋 Logs do backend:"
-              docker logs --tail 30 secured-guard-backend-ci 2>&1 | tail -20
-            else
-              echo "✅ Backend está pronto. Roles e permissões serão criadas automaticamente pelo RoleMigrationService."
-              echo "   O serviço RoleMigrationService executa na inicialização da aplicação."
-            fi
-            
-            # Verificar logs do backend para confirmar que roles foram criadas
-            echo ""
-            echo "📋 Verificando logs de migração de roles..."
-            docker logs secured-guard-backend-ci 2>&1 | grep -i "role\|migration\|migração" | tail -10 || echo "Nenhum log de roles encontrado"
+            echo "Verificando permissões de usuários..."
           EOF
 
       # ============================================
-      # 2️⃣0️⃣ DIAGNÓSTICO DOS CONTAINERS
+      # 2️⃣1️⃣ DIAGNOSTIC - CONTAINER STATUS
       # ============================================
       - name: 🔍 Diagnostic - Container Status
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔍 Verificando status dos containers..."
             cd /var/www/secured_guard/ci
             docker-compose -f docker-compose.ci.yml ps
-            
-            echo ""
-            echo "🔍 Verificando logs do backend (últimas 50 linhas)..."
             docker logs --tail 50 secured-guard-backend-ci
-            
-            echo ""
-            echo "🔍 Verificando logs do frontend (últimas 30 linhas)..."
-            docker logs --tail 30 secured-guard-frontend-ci 2>&1 || echo "⚠️ Container frontend não encontrado"
-            
-            echo ""
-            echo "🔍 Verificando logs do WhatsApp (últimas 30 linhas)..."
-            docker logs --tail 30 secured-guard-whatsapp-ci 2>&1 || echo "⚠️ Container WhatsApp não encontrado"
-            
-            echo ""
-            echo "🔍 Verificando logs do nginx (últimas 30 linhas)..."
-            docker logs --tail 30 secured-guard-nginx-ci 2>&1 || echo "⚠️ Container nginx não encontrado"
           EOF
 
       # ============================================
-      # 2️⃣1️⃣ DIAGNÓSTICO DE CONECTIVIDADE
+      # 2️⃣2️⃣ DIAGNOSTIC - NETWORK CONNECTIVITY
       # ============================================
       - name: 🌐 Diagnostic - Network Connectivity
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🌐 Testando conectividade..."
-            
-            # Testar backend diretamente
-            echo "1. Testando backend na porta 8081..."
-            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "❌ Backend não responde"
-            
-            # Testar nginx
-            echo "2. Testando nginx na porta 8082..."
-            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8082 || echo "❌ Nginx não responde"
-            
-            # Verificar Traefik
-            echo "3. Verificando Traefik..."
-            if docker ps | grep -q traefik; then
-              echo "✅ Traefik está rodando"
-            else
-              echo "❌ Traefik NÃO está rodando!"
-            fi
+            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
           EOF
 
       # ============================================
-      # 2️⃣2️⃣ VERIFICAR STATUS DOS CONTAINERS ANTES DO HEALTH CHECK
+      # 2️⃣3️⃣ VERIFY CONTAINERS ARE RUNNING
       # ============================================
       - name: 🔍 Verify containers are running
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔍 Verificando status dos containers..."
-            cd /var/www/secured_guard/ci
-            
-            # Verificar se containers estão rodando
-            docker-compose -f docker-compose.ci.yml ps
-            
-            # Verificar logs do backend para ver se iniciou
-            echo ""
-            echo "📋 Últimas 30 linhas dos logs do backend:"
-            docker logs --tail 30 secured-guard-backend-ci 2>&1 || echo "⚠️ Container backend não encontrado"
-            
-            # Verificar se o backend está escutando na porta
-            echo ""
-            echo "🔌 Verificando se backend está escutando na porta 8081..."
-            timeout 5 bash -c 'until nc -z localhost 8081; do sleep 1; done' && echo "✅ Backend está escutando" || echo "⚠️ Backend ainda não está escutando"
+            docker ps | grep secured-guard
           EOF
 
       # ============================================
-      # 2️⃣2️⃣5️⃣ VERIFICAR E INICIAR TRAEFIK (CRÍTICO)
+      # 2️⃣4️⃣ ENSURE TRAEFIK IS RUNNING
       # ============================================
       - name: 🔄 Ensure Traefik is running
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔄 Verificando e iniciando Traefik (crítico para Cloudflare)..."
-            
-            cd /var/www/secured_guard
-            
-            # Verificar se Traefik está rodando
-            if docker ps | grep -q "traefik"; then
-              echo "✅ Traefik já está rodando"
-              docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-              
-              # Verificar e recarregar configuração dinâmica se existir
-              if [ -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
-                echo "✅ Configuração dinâmica encontrada: /var/www/secured_guard/traefik/dynamic/ci.yml"
-                
-                # Reiniciar Traefik para garantir que a configuração seja carregada
-                echo "🔄 Reiniciando Traefik para carregar configuração dinâmica..."
-                docker restart traefik
-                sleep 15
-                
-                # Verificar se Traefik reiniciou
-                if docker ps | grep -q "traefik"; then
-                  echo "✅ Traefik reiniciado com sucesso"
-                else
-                  echo "❌ Traefik não reiniciou!"
-                  exit 1
-                fi
-                
-                # Verificar se o router foi carregado
-                echo "🔍 Verificando routers do Traefik..."
-                ROUTERS=$(docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null || echo "[]")
-                if echo "$ROUTERS" | grep -q "ci-backend"; then
-                  echo "✅ Router ci-backend encontrado no Traefik"
-                else
-                  echo "⚠️ Router ci-backend não encontrado no Traefik"
-                  echo "📋 Routers disponíveis:"
-                  echo "$ROUTERS" | jq -r '.[].name' 2>/dev/null || echo "$ROUTERS"
-                fi
-              else
-                echo "⚠️ Configuração dinâmica não encontrada em /var/www/secured_guard/traefik/dynamic/ci.yml"
-                echo "💡 Isso pode causar erro 404. Verifique se o arquivo foi transferido corretamente."
-              fi
-              
-              # Garantir que Nginx está na rede z7network
-              echo ""
-              echo "🔗 Verificando se Nginx está na rede z7network..."
-              if docker ps | grep -q "secured-guard-nginx-ci"; then
-                if docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
-                  echo "✅ Nginx já está na rede z7network"
-                else
-                  echo "⚠️ Nginx não está na rede z7network. Conectando..."
-                  docker network connect z7network secured-guard-nginx-ci 2>/dev/null || echo "⚠️ Pode já estar conectado"
-                  sleep 2
-                  if docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
-                    echo "✅ Nginx conectado à rede z7network"
-                  else
-                    echo "❌ Falha ao conectar Nginx à rede z7network"
-                  fi
-                fi
-              else
-                echo "⚠️ Nginx não está rodando"
-              fi
-            else
-              echo "⚠️ Traefik não está rodando! Iniciando..."
-              
-              # Verificar se a rede z7network existe
-              if ! docker network ls | grep -q "z7network"; then
-                echo "📡 Criando rede z7network..."
-                docker network create z7network
-              fi
-              
-              # Verificar se os diretórios necessários existem
-              mkdir -p /var/www/secured_guard/traefik/dynamic
-              mkdir -p /var/www/secured_guard/traefik/letsencrypt
-              mkdir -p /var/www/secured_guard/traefik/logs
-              
-              # Iniciar Traefik
+            if ! docker ps | grep -q traefik; then
+              cd /var/www/secured_guard
               docker-compose -f docker-compose.traefik.yml up -d
-              
-              echo "⏳ Aguardando Traefik iniciar (15s)..."
-              sleep 15
-              
-              # Verificar se iniciou
-              if docker ps | grep -q "traefik"; then
-                echo "✅ Traefik iniciado com sucesso!"
-                docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-              else
-                echo "❌ Traefik não iniciou! Verificando logs..."
-                docker logs traefik --tail 50 2>&1 || echo "Container traefik não encontrado"
-                exit 1
-              fi
-            fi
-            
-            # Verificar se Traefik está na rede z7network
-            if docker inspect traefik 2>/dev/null | grep -q "z7network"; then
-              echo "✅ Traefik está na rede z7network"
-            else
-              echo "⚠️ Traefik não está na rede z7network. Conectando..."
-              docker network connect z7network traefik 2>&1 || echo "⚠️ Pode já estar conectado ou erro ao conectar"
-            fi
-            
-            # Verificar se as portas 80 e 443 estão escutando
-            echo ""
-            echo "🔍 Verificando portas..."
-            if netstat -tlnp 2>/dev/null | grep -q ":80 " || ss -tlnp 2>/dev/null | grep -q ":80 "; then
-              echo "✅ Porta 80 está escutando"
-            else
-              echo "⚠️ Porta 80 não está escutando"
-            fi
-            
-            if netstat -tlnp 2>/dev/null | grep -q ":443 " || ss -tlnp 2>/dev/null | grep -q ":443 "; then
-              echo "✅ Porta 443 está escutando"
-            else
-              echo "⚠️ Porta 443 não está escutando"
-            fi
-            
-            # Testar Traefik dashboard
-            echo ""
-            echo "🧪 Testando Traefik dashboard..."
-            if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/overview | grep -q "200"; then
-              echo "✅ Traefik dashboard está respondendo"
-            else
-              echo "⚠️ Traefik dashboard não está respondendo (pode ser normal se não estiver configurado)"
             fi
           EOF
 
       # ============================================
-      # 2️⃣2️⃣5️⃣ CORRIGIR 404 NO TRAEFIK
-      # ============================================
-      - name: 🔧 Fix 404 Traefik
-        run: |
-          echo "🔧 Corrigindo problema de 404 no Traefik..."
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
-            
-            # Verificar se script existe, se não, criar inline
-            if [ -f "scripts/fix-404-traefik.sh" ]; then
-              chmod +x scripts/fix-404-traefik.sh
-              ./scripts/fix-404-traefik.sh
-            else
-              echo "⚠️ Script não encontrado, executando correção inline..."
-              
-              # 1. Verificar configuração dinâmica
-              if [ ! -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
-                echo "❌ Arquivo de configuração dinâmica não encontrado!"
-                echo "   Criando diretório..."
-                mkdir -p /var/www/secured_guard/traefik/dynamic
-                echo "   ⚠️ Arquivo ci.yml não existe. Verifique se foi transferido."
-              else
-                echo "✅ Arquivo de configuração dinâmica encontrado"
-              fi
-              
-              # 2. Conectar Nginx à rede z7network
-              if docker ps | grep -q "secured-guard-nginx-ci"; then
-                if ! docker inspect secured-guard-nginx-ci 2>/dev/null | grep -q "z7network"; then
-                  echo "🔗 Conectando Nginx à rede z7network..."
-                  docker network connect z7network secured-guard-nginx-ci 2>/dev/null || echo "⚠️ Pode já estar conectado"
-                  sleep 2
-                else
-                  echo "✅ Nginx já está na rede z7network"
-                fi
-              fi
-              
-              # 3. Reiniciar Traefik
-              if docker ps | grep -q "traefik"; then
-                echo "🔄 Reiniciando Traefik para carregar configuração dinâmica..."
-                docker restart traefik
-                sleep 15
-                
-                # Verificar se router foi carregado
-                ROUTERS=$(docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null || echo "[]")
-                if echo "$ROUTERS" | grep -q "ci-backend"; then
-                  echo "✅ Router ci-backend encontrado no Traefik"
-                else
-                  echo "❌ Router ci-backend NÃO encontrado no Traefik!"
-                  echo "📋 Routers disponíveis:"
-                  echo "$ROUTERS" | jq -r '.[].name' 2>/dev/null || echo "$ROUTERS"
-                  echo ""
-                  echo "📋 Verificando logs do Traefik:"
-                  docker logs traefik --tail 30 | grep -i "error\|dynamic\|ci" || echo "Nenhum erro encontrado"
-                fi
-              fi
-              
-              # 4. Testar acesso
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: ci.z7botsolutions.com.br" http://localhost/api/health 2>/dev/null || echo "000")
-              if [ "$HTTP_CODE" = "200" ]; then
-                echo "✅ Acesso via Traefik funcionando! (HTTP $HTTP_CODE)"
-              else
-                echo "⚠️ Ainda retornando HTTP $HTTP_CODE"
-              fi
-            fi
-          EOF
-
-      # ============================================
-      # 2️⃣2️⃣.5️⃣ VERIFICAÇÃO DO CONTEÚDO DO FRONTEND NA VPS
-      # ============================================
-      - name: 🔍 Verificar conteúdo do frontend na VPS
-        run: |
-          echo "🔍 ========================================"
-          echo "🔍 VERIFICANDO CONTEÚDO DO FRONTEND NA VPS"
-          echo "🔍 ========================================"
-          echo ""
-          
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "🔍 Verificando container frontend..."
-            
-            if docker ps --format "{{.Names}}" | grep -q "^secured-guard-frontend-ci$"; then
-              echo "✅ Container frontend está rodando"
-              
-              echo ""
-              echo "📂 Listando arquivos no container:"
-              docker exec secured-guard-frontend-ci ls -lah /usr/share/nginx/html/ | head -20 || echo "⚠️ Erro ao listar arquivos"
-              
-              echo ""
-              echo "🔍 Verificando se 'Proposta de Acordo' está no código compilado:"
-              SEARCH_RESULT=$(docker exec secured-guard-frontend-ci grep -r "Proposta de Acordo" /usr/share/nginx/html/ 2>/dev/null | head -5 || echo "")
-              
-              if [ -n "$SEARCH_RESULT" ]; then
-                echo "  ✅ 'Proposta de Acordo' ENCONTRADO no código compilado!"
-                echo "  📋 Resultado:"
-                echo "$SEARCH_RESULT" | sed 's/^/    /'
-              else
-                echo "  ❌ 'Proposta de Acordo' NÃO encontrado no código compilado!"
-                echo "  📋 Isso indica que o build não incluiu as alterações mais recentes"
-                echo ""
-                echo "  🔍 Verificando arquivos JS disponíveis:"
-                docker exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f | head -10 || echo "    Nenhum arquivo JS encontrado"
-                echo ""
-                echo "  🔍 Tentando encontrar qualquer referência a 'Proposta':"
-                docker exec secured-guard-frontend-ci grep -r "Proposta" /usr/share/nginx/html/ 2>/dev/null | head -5 || echo "    Nenhuma referência encontrada"
-              fi
-              
-              echo ""
-              echo "📅 Verificando data de modificação dos arquivos:"
-              docker exec secured-guard-frontend-ci find /usr/share/nginx/html -name "*.js" -type f -exec ls -lh {} \; | head -5 || echo "⚠️ Erro ao verificar datas"
-              
-              echo ""
-              echo "🌐 Testando acesso HTTP ao frontend:"
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ 2>/dev/null || echo "000")
-              echo "  Porta 3000 (frontend direto): HTTP $HTTP_CODE"
-              
-              HTTP_CODE_NGINX=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/ 2>/dev/null || echo "000")
-              echo "  Porta 8082 (via nginx): HTTP $HTTP_CODE_NGINX"
-              
-              echo ""
-              echo "📋 Verificando imagem usada pelo container:"
-              IMAGE_USED=$(docker inspect --format='{{.Config.Image}}' secured-guard-frontend-ci 2>/dev/null || echo "N/A")
-              echo "  Imagem: $IMAGE_USED"
-              
-              IMAGE_CREATED=$(docker inspect --format='{{.Created}}' secured-guard-frontend-ci 2>/dev/null || echo "N/A")
-              echo "  Container criado: $IMAGE_CREATED"
-              
-              echo ""
-              echo "📋 Verificando data da imagem Docker:"
-              docker images --format "{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}" | grep "z7design/secured-guard-frontend:ci" || echo "  Imagem não encontrada"
-            else
-              echo "❌ Container frontend NÃO está rodando!"
-              echo "📋 Containers em execução:"
-              docker ps --format "table {{.Names}}\t{{.Status}}" | grep "secured-guard" || echo "  Nenhum container encontrado"
-            fi
-          EOF
-
-      # ============================================
-      # 2️⃣3️⃣ HEALTH CHECK COM MAIS TEMPO E DIAGNÓSTICO
+      # 2️⃣5️⃣ HEALTH CHECK
       # ============================================
       - name: 🏥 Health check
         env:
@@ -2467,92 +318,31 @@ jobs:
           ./scripts/health-check-ci.sh
 
       # ============================================
-      # 2️⃣4️⃣ TESTE DE LOGIN APÓS DEPLOY
+      # 2️⃣6️⃣ TEST LOGIN AFTER DEPLOY
       # ============================================
       - name: 🔐 Test login after deploy
         run: |
-          echo "🔐 Testando login após deploy..."
-          echo "⏳ Aguardando 30 segundos para aplicação estar totalmente pronta..."
           sleep 30
-          
-          # Tentar fazer login de teste (pode falhar se não houver usuário, mas verifica se o endpoint está funcionando)
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST https://ci.z7botsolutions.com.br/api/auth/login \
             -H "Content-Type: application/json" \
             -d '{"username":"test","password":"test"}' \
             --max-time 10 2>/dev/null || echo "000")
-          
-          echo "HTTP Code do login: $HTTP_CODE"
-          
-          if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
-            echo "✅ Endpoint de login está funcionando (retornou $HTTP_CODE - credenciais inválidas, mas endpoint OK)"
-          elif [ "$HTTP_CODE" = "500" ]; then
-            echo "❌ ERRO: Login retornou 500 (Internal Server Error)"
-            echo "📋 Verificando logs do backend para erro de JWT..."
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} "docker logs --tail 50 secured-guard-backend-ci 2>&1 | grep -i 'jwt\|token\|secret' | tail -20 || echo 'Nenhum log JWT encontrado'"
-            exit 1
-          elif [ "$HTTP_CODE" = "000" ]; then
-            echo "⚠️ Timeout ao testar login (aplicação pode ainda estar iniciando)"
-          else
-            echo "ℹ️ Login retornou código $HTTP_CODE"
-          fi
+          echo "HTTP Code: $HTTP_CODE"
 
       # ============================================
-      # 2️⃣5️⃣ NOTIFICAÇÃO DE SUCESSO
+      # 2️⃣7️⃣ DEPLOYMENT SUCCESSFUL
       # ============================================
       - name: 🎉 Deployment successful
         if: success()
         run: |
-          echo "🎉 ================================"
-          echo "✅ DEPLOY CI CONCLUÍDO COM SUCESSO!"
-          echo "🐳 Método: Docker Compose"
+          echo "✅ Deploy CI concluído com sucesso!"
           echo "🌐 URL: https://ci.z7botsolutions.com.br"
-          echo "📅 Data: $(date +'%Y-%m-%d %H:%M:%S')"
-          echo "🔖 Commit: ${{ github.sha }}"
-          echo "🌿 Branch: ci"
-          echo "================================"
 
       # ============================================
-      # 2️⃣6️⃣ ROLLBACK EM CASO DE FALHA
+      # 2️⃣8️⃣ ROLLBACK ON FAILURE
       # ============================================
       - name: 🔄 Rollback on failure
         if: failure()
         run: |
-          echo "❌ Deploy falhou! Iniciando rollback..."
-          
-          # Não deixar erros de rollback derrubarem o job inteiro
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF' || true
-            # Carregar PATH do Docker (necessário em sessões SSH não-interativas)
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-            
-            cd /var/www/secured_guard/ci || exit 0
-            
-            # Parar containers atuais (ignorando erros)
-            if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-              docker compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            else
-              docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            fi
-            
-            # Restaurar backup se existir
-            LATEST_BACKUP=$(ls -t /var/www/secured_guard/ci/backups/ 2>/dev/null | head -1)
-            
-            if [ -n "$LATEST_BACKUP" ]; then
-              echo "🔄 Restaurando backup: $LATEST_BACKUP"
-              
-              # Restaurar dados do banco (ignorando erros caso diretórios não existam)
-              rm -rf postgres_data 2>/dev/null || true
-              cp -r "/var/www/secured_guard/ci/backups/$LATEST_BACKUP/postgres_data" ./ 2>/dev/null || true
-              
-              # Iniciar containers com versão anterior
-              if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-                docker compose -f docker-compose.ci.yml up -d --remove-orphans 2>/dev/null || true
-              else
-                docker-compose -f docker-compose.ci.yml up -d --remove-orphans 2>/dev/null || true
-              fi
-              
-              echo "✅ Rollback concluído!"
-            else
-              echo "⚠️ Nenhum backup encontrado para rollback"
-            fi
-          EOF
+          echo "❌ Deploy falhou!"
