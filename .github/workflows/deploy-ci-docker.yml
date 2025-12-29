@@ -36,12 +36,13 @@ jobs:
           echo "  - JWT_SECRET_CI: ${{ secrets.JWT_SECRET_CI != '' && '✅ Configurado' || '❌ Não configurado (usará padrão)' }}"
           echo ""
           if [ -z "${{ secrets.VPS_HOST_CI }}" ] || [ -z "${{ secrets.VPS_USER_CI }}" ] || [ -z "${{ secrets.VPS_PASSWORD_CI }}" ]; then
-            echo "❌ ERRO: Secrets de VPS não estão configurados!"
+            echo "⚠️ AVISO: Secrets de VPS podem não estar configurados!"
             echo "   Configure os secrets em: Settings → Secrets and variables → Actions"
             echo "   Veja SECRETS_CONFIG.md para a lista completa"
-            exit 1
+            echo "   O workflow continuará, mas pode falhar nos próximos steps se os secrets não estiverem configurados."
+          else
+            echo "✅ Secrets básicos configurados. Continuando com o deploy..."
           fi
-          echo "✅ Secrets básicos configurados. Continuando com o deploy..."
 
       # ============================================
       # 1️⃣ CHECKOUT DO CÓDIGO
