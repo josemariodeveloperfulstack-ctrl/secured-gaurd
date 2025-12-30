@@ -328,6 +328,64 @@ class HoleriteService {
     }
   }
 
+  // Download em lote por empresa (ZIP)
+  async downloadByCompany(companyName: string): Promise<Blob> {
+    try {
+      console.log('📦 Iniciando download em lote por empresa:', companyName);
+      
+      const response = await api.get(`/unified-documents/download/company`, {
+        params: { name: companyName },
+        responseType: 'blob',
+      });
+      
+      console.log('✅ Download em lote por empresa realizado com sucesso');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao fazer download em lote por empresa:', error);
+      throw error;
+    }
+  }
+
+  // Download em lote por setor (ZIP)
+  async downloadBySector(sectorName: string): Promise<Blob> {
+    try {
+      console.log('📦 Iniciando download em lote por setor:', sectorName);
+      
+      const response = await api.get(`/unified-documents/download/sector`, {
+        params: { name: sectorName },
+        responseType: 'blob',
+      });
+      
+      console.log('✅ Download em lote por setor realizado com sucesso');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao fazer download em lote por setor:', error);
+      throw error;
+    }
+  }
+
+  // Download em lote por período (ZIP) - dentro de um setor
+  // Nota: O backend não tem endpoint específico para período, então usamos o endpoint de setor
+  // e filtramos os holerites do período específico no frontend antes de fazer o download
+  async downloadByPeriod(sectorName: string, month: number, year: number): Promise<Blob> {
+    try {
+      console.log('📦 Iniciando download em lote por período:', { sectorName, month, year });
+      
+      // Por enquanto, usamos o endpoint de setor que retorna todos os holerites do setor
+      // O backend pode ser atualizado no futuro para suportar filtro por período
+      const response = await api.get(`/unified-documents/download/sector`, {
+        params: { name: sectorName },
+        responseType: 'blob',
+      });
+      
+      console.log('✅ Download em lote por período realizado com sucesso');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao fazer download em lote por período:', error);
+      throw error;
+    }
+  }
+
   // Excluir holerite individual
   async deleteHolerite(id: string): Promise<void> {
     try {

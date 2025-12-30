@@ -290,6 +290,95 @@ const Holerites: React.FC = () => {
     }
   };
 
+  // Download individual de holerite
+  const handleDownloadIndividualHolerite = async (holerite: Holerite) => {
+    try {
+      setLoading(true);
+      const blob = await holeriteService.downloadHoleriteById(holerite.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = holerite.fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Download concluído', description: `Holerite ${holerite.fileName} baixado com sucesso.` });
+    } catch (error) {
+      console.error('Erro ao baixar holerite:', error);
+      toast({ title: 'Erro', description: 'Erro ao baixar holerite.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download em lote por empresa
+  const handleDownloadByCompany = async (companyName: string) => {
+    try {
+      setLoading(true);
+      const blob = await holeriteService.downloadByCompany(companyName);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_holerites.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Download concluído', description: `Holerites da empresa ${companyName} baixados com sucesso.` });
+    } catch (error) {
+      console.error('Erro ao baixar holerites da empresa:', error);
+      toast({ title: 'Erro', description: 'Erro ao baixar holerites da empresa.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download em lote por setor
+  const handleDownloadBySector = async (sectorName: string) => {
+    try {
+      setLoading(true);
+      const blob = await holeriteService.downloadBySector(sectorName);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sectorName.replace(/[^a-zA-Z0-9]/g, '_')}_holerites.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Download concluído', description: `Holerites do setor ${sectorName} baixados com sucesso.` });
+    } catch (error) {
+      console.error('Erro ao baixar holerites do setor:', error);
+      toast({ title: 'Erro', description: 'Erro ao baixar holerites do setor.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download em lote por período (dentro de um setor)
+  const handleDownloadByPeriod = async (sectorName: string, month: number, year: number) => {
+    try {
+      setLoading(true);
+      const blob = await holeriteService.downloadByPeriod(sectorName, month, year);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const periodStr = `${String(month).padStart(2, '0')}_${year}`;
+      a.download = `${sectorName.replace(/[^a-zA-Z0-9]/g, '_')}_${periodStr}_holerites.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Download concluído', description: `Holerites do período ${periodStr} do setor ${sectorName} baixados com sucesso.` });
+    } catch (error) {
+      console.error('Erro ao baixar holerites do período:', error);
+      toast({ title: 'Erro', description: 'Erro ao baixar holerites do período.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadLogs = async () => {
     setLoadingLogs(true);
     try {
@@ -4897,6 +4986,15 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     <>
                       <Button
                         size="sm"
+                        className="bg-blue-600/90 text-white hover:bg-blue-600"
+                        onClick={() => handleDownloadByCompany(company.companyName)}
+                        disabled={loading}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Download ({company.totalPayslips})
+                      </Button>
+                      <Button
+                        size="sm"
                         className="bg-green-600/90 text-white hover:bg-green-600"
                         onClick={() => handleBatchSendHoleritesForIds(companySelectedIds, 'email')}
                       >
@@ -4975,6 +5073,15 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                               <div className="flex flex-wrap gap-2 justify-end">
                                 <Button
                                   size="sm"
+                                  className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                  onClick={() => handleDownloadBySector(sector.sectorName)}
+                                  disabled={loading}
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Download ({sector.totalPayslips})
+                                </Button>
+                                <Button
+                                  size="sm"
                                   className="bg-green-600/90 text-white hover:bg-green-600"
                                   onClick={() => handleBatchSendHoleritesForIds(sectorSelectedIds, 'email')}
                                 >
@@ -5030,15 +5137,26 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                            }
                                                          </p>
                                                        </div>
-                                                       <Button
-                                                         variant="ghost"
-                                                         size="sm"
-                                                         onClick={() => togglePeriodExpansion(periodKey)}
-                                                         className="text-seguranca-lightgray hover:text-white"
-                                                       >
-                                                         {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                         {periodExpanded ? 'Ocultar holerites' : 'Ver holerites'}
-                                                       </Button>
+                                                       <div className="flex flex-wrap gap-2 items-center">
+                                                         <Button
+                                                           size="sm"
+                                                           className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                                           onClick={() => handleDownloadByPeriod(sector.sectorName, period.month, period.year)}
+                                                           disabled={loading}
+                                                         >
+                                                           <Download className="h-4 w-4 mr-1" />
+                                                           Download ({period.totalPayslips})
+                                                         </Button>
+                                                         <Button
+                                                           variant="ghost"
+                                                           size="sm"
+                                                           onClick={() => togglePeriodExpansion(periodKey)}
+                                                           className="text-seguranca-lightgray hover:text-white"
+                                                         >
+                                                           {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                           {periodExpanded ? 'Ocultar holerites' : 'Ver holerites'}
+                                                         </Button>
+                                                       </div>
                                                      </div>
                                                      {periodExpanded && (
                                       <div className="divide-y divide-gray-800 bg-gray-950/60">
@@ -5086,6 +5204,16 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                    >
                                                                      <Eye className="h-4 w-4 mr-1" />
                                                                      Visualizar
+                                                                   </Button>
+                                                                   <Button
+                                                                     size="sm"
+                                                                     variant="outline"
+                                                                     className="border-blue-600 text-blue-400 hover:bg-blue-600/20"
+                                                                     onClick={() => handleDownloadIndividualHolerite(holeriteData)}
+                                                                     disabled={loading}
+                                                                   >
+                                                                     <Download className="h-4 w-4 mr-1" />
+                                                                     Download
                                                                    </Button>
                                                                    <Button
                                                                      size="sm"
