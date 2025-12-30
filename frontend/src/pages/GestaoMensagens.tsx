@@ -101,29 +101,13 @@ const GestaoMensagens: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Carregar mensagens recebidas
-      const messagesResponse = await fetch('/api/v1/messages/received?page=0&size=50', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (messagesResponse.ok) {
-        const messagesData = await messagesResponse.json();
-        setMessages(messagesData.content || []);
-      }
+      // Carregar mensagens recebidas usando messageService
+      const messagesData = await messageService.getSystemMessages(0, 50);
+      setMessages(messagesData.messages || []);
 
-      // Carregar contagem de não lidas
-      const unreadResponse = await fetch('/api/v1/messages/unread/count', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (unreadResponse.ok) {
-        const count = await unreadResponse.json();
-        setUnreadCount(count);
-      }
+      // Carregar contagem de não lidas usando messageService (já trata ERR_TOO_MANY_REDIRECTS)
+      const count = await messageService.getUnreadSystemCount();
+      setUnreadCount(count);
 
       // Carregar usuários e departamentos (simulado por enquanto)
       setUsers([
@@ -212,19 +196,13 @@ const GestaoMensagens: React.FC = () => {
 
   const handleMarkAsRead = async (messageId: string) => {
     try {
-      const response = await fetch(`/api/v1/messages/${messageId}/read`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.ok) {
-        setMessages(messages.map(msg => 
-          msg.id === messageId ? { ...msg, readAt: new Date().toISOString() } : msg
-        ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
+      // Usar messageService que já trata erros adequadamente
+      await messageService.markSystemMessageAsRead(messageId);
+      
+      setMessages(messages.map(msg => 
+        msg.id === messageId ? { ...msg, readAt: new Date().toISOString() } : msg
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Erro ao marcar como lida:', error);
     }
