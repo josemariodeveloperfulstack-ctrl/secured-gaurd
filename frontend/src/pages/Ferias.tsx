@@ -104,8 +104,7 @@ const FeriasPage: React.FC = () => {
     switch (status) {
       case 'PENDENTE': return 'bg-yellow-500 text-black';
       case 'APROVADO': return 'bg-green-500 text-white';
-      case 'EM_ANDAMENTO': return 'bg-blue-500 text-white';
-      case 'CONCLUIDO': return 'bg-gray-500 text-white';
+      case 'REJECTED': return 'bg-red-500 text-white';
       case 'CANCELADO': return 'bg-red-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
@@ -186,6 +185,14 @@ const FeriasPage: React.FC = () => {
     console.log('Abrindo modal de aprovação:', item);
     setSelectedItem(item);
     setApprovalModalOpen(true);
+  };
+
+  const handleApprovalClose = () => {
+    setApprovalModalOpen(false);
+    setSelectedItem(null);
+    // Recarregar dados após aprovar/rejeitar
+    queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    queryClient.invalidateQueries({ queryKey: ['afastamentos'] });
   };
 
   const handleDelete = async (item: FeriasPeriodo | Afastamento) => {
@@ -537,7 +544,7 @@ const FeriasPage: React.FC = () => {
                               </td>
                               <td className="p-3 text-sm">{formatDate(afastamento.dataInicio)}</td>
                               <td className="p-3 text-sm">{formatDate(afastamento.dataFim)}</td>
-                              <td className="p-3 text-sm">{calculateDays(afastamento.dataInicio, afastamento.dataFim)} dias</td>
+                              <td className="p-3 text-sm">{calculateDays(afastamento.dataInicio, afastamento.dataFim)} dia{calculateDays(afastamento.dataInicio, afastamento.dataFim) !== 1 ? 's' : ''}</td>
                               <td className="p-3 text-sm max-w-xs truncate">{afastamento.motivo}</td>
                               <td className="p-3 text-sm">
                                 <Badge className={getStatusColor(afastamento.status)}>
@@ -602,6 +609,7 @@ const FeriasPage: React.FC = () => {
         <FeriasFormModal
           onSuccess={handleCloseModals}
           onClose={handleCloseModals}
+          editingId={selectedItem && 'tipo' in selectedItem ? selectedItem.id : undefined}
           initialData={selectedItem && 'tipo' in selectedItem ? {
             employeeId: selectedItem.employeeId,
             periodoAquisitivo: selectedItem.periodoAquisitivo || '',
@@ -617,6 +625,7 @@ const FeriasPage: React.FC = () => {
         <AfastamentoFormModal
           onSuccess={handleCloseModals}
           onClose={handleCloseModals}
+          editingId={selectedItem && 'motivo' in selectedItem ? selectedItem.id : undefined}
           initialData={selectedItem && 'motivo' in selectedItem ? {
             employeeId: selectedItem.employeeId,
             tipo: selectedItem.tipo as any,
@@ -712,7 +721,7 @@ const FeriasPage: React.FC = () => {
       {approvalModalOpen && selectedItem && (
         <ApprovalModal
           isOpen={approvalModalOpen}
-          onClose={() => setApprovalModalOpen(false)}
+          onClose={handleApprovalClose}
           item={selectedItem}
           type={selectedItem && 'tipo' in selectedItem && (selectedItem.tipo === 'FERIAS_NORMAIS' || selectedItem.tipo === 'FERIAS_VENDIDAS' || selectedItem.tipo === 'ABONO_PECUNIARIO') ? 'ferias' : 'afastamento'}
         />

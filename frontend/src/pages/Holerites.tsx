@@ -312,23 +312,39 @@ const Holerites: React.FC = () => {
     }
   };
 
-  // Download em lote por empresa
+  // Download em lote por empresa - Organizado por Empresa/Setor/Período/Funcionário
   const handleDownloadByCompany = async (companyName: string) => {
     try {
       setLoading(true);
-      const blob = await holeriteService.downloadByCompany(companyName);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_holerites.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast({ title: 'Download concluído', description: `Holerites da empresa ${companyName} baixados com sucesso.` });
-    } catch (error) {
+      const url = `/api/unified-documents/download/company`;
+      const response = await api.get(url, { 
+        params: { name: companyName },
+        responseType: 'blob',
+        timeout: 300000 // 5 minutos para downloads grandes
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_holerites.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(link.href);
+      
+      toast({ 
+        title: '✅ Download iniciado', 
+        description: `Baixando documentos da empresa ${companyName}. O ZIP está organizado por Empresa/Setor/Período/Funcionário.`,
+        duration: 5000,
+      });
+    } catch (error: any) {
       console.error('Erro ao baixar holerites da empresa:', error);
-      toast({ title: 'Erro', description: 'Erro ao baixar holerites da empresa.', variant: 'destructive' });
+      toast({ 
+        title: '❌ Erro no download', 
+        description: error.response?.data?.message || error.message || 'Erro ao baixar documentos da empresa. Verifique se todos os arquivos existem.',
+        variant: 'destructive',
+        duration: 5000,
+      });
     } finally {
       setLoading(false);
     }
@@ -1578,34 +1594,6 @@ const Holerites: React.FC = () => {
     }
   };
 
-  // Download por empresa (ZIP)
-  const downloadByCompany = async (companyName: string) => {
-    try {
-      const url = `/api/unified-documents/download/company`;
-      const response = await api.get(url, { 
-        params: { name: companyName },
-        responseType: 'blob' 
-      });
-      
-      const blob = new Blob([response.data], { type: 'application/zip' });
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.download = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_documentos_unificados.zip`;
-      link.click();
-      
-      toast({
-        title: '✅ Download iniciado',
-        description: `Baixando documentos da empresa ${companyName}...`,
-      });
-    } catch (error: any) {
-      console.error('Erro ao baixar por empresa:', error);
-      toast({
-        title: '❌ Erro no download',
-        description: error.response?.data?.message || 'Erro ao baixar documentos da empresa',
-        variant: 'destructive',
-      });
-    }
-  };
 
   // Download por setor (ZIP)
   const downloadBySector = async (sectorName: string) => {
@@ -4980,51 +4968,58 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   />
                   <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
                 </div>
-                <div className="flex flex-wrap gap-2 justify-end">
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between w-full">
                   {/* Botões de ação em massa - aparecem quando "Selecionar empresa" está marcado */}
                   {companySelectedCount > 0 && (
-                    <>
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                       <Button
                         size="sm"
-                        className="bg-blue-600/90 text-white hover:bg-blue-600"
+                        className="bg-blue-600/90 text-white hover:bg-blue-600 flex-1 sm:flex-initial"
                         onClick={() => handleDownloadByCompany(company.companyName)}
                         disabled={loading}
                       >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download ({company.totalPayslips})
+                        <Download className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">Download</span>
+                        <span className="sm:hidden">Baixar</span>
+                        <span className="ml-1">({company.totalPayslips})</span>
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-green-600/90 text-white hover:bg-green-600"
+                        className="bg-green-600/90 text-white hover:bg-green-600 flex-1 sm:flex-initial"
                         onClick={() => handleBatchSendHoleritesForIds(companySelectedIds, 'email')}
                       >
-                        <Mail className="h-4 w-4 mr-1" />
-                        Email ({companySelectedCount})
+                        <Mail className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">Email</span>
+                        <span className="ml-1">({companySelectedCount})</span>
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-blue-600/90 text-white hover:bg-blue-600"
+                        className="bg-emerald-600/90 text-white hover:bg-emerald-600 flex-1 sm:flex-initial"
                         onClick={() => handleBatchSendHoleritesForIds(companySelectedIds, 'whatsapp')}
                       >
-                        <MessageSquare className="h-4 w-4 mr-1" />
-                        WhatsApp ({companySelectedCount})
+                        <MessageSquare className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">WhatsApp</span>
+                        <span className="sm:hidden">WA</span>
+                        <span className="ml-1">({companySelectedCount})</span>
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                        className="bg-red-600/90 hover:bg-red-700 border-red-700 flex-1 sm:flex-initial"
                         onClick={() => handleBatchDeleteHoleritesByIds(companySelectedIds)}
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Excluir ({companySelectedCount})
+                        <Trash2 className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">Excluir</span>
+                        <span className="sm:hidden">Del</span>
+                        <span className="ml-1">({companySelectedCount})</span>
                       </Button>
-                    </>
+                    </div>
                   )}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleCompanyExpansion(companyKey)}
-                    className="w-full sm:w-auto text-seguranca-lightgray hover:text-white"
+                    className="w-full sm:w-auto text-seguranca-lightgray hover:text-white border border-gray-600 hover:border-gray-500"
                   >
                     {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
                     {companyExpanded ? 'Ocultar setores' : 'Ver setores'}

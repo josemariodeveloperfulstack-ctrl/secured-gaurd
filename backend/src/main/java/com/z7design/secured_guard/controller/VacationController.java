@@ -272,9 +272,10 @@ public class VacationController {
     @PreAuthorize("hasAnyAuthority('HR_APPROVE', 'HR_READ', 'HR_WRITE', 'HR_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<VacationDTO> rejectVacation(
             @Parameter(description = "ID da solicitação de férias a ser rejeitada") @PathVariable UUID id,
-            @RequestBody ApprovalRequest request) {
+            @RequestBody(required = false) ApprovalRequest request) {
         try {
-            Vacation vacation = vacationService.rejectVacation(id, request.getObservacoes());
+            String motivo = (request != null && request.getObservacoes() != null) ? request.getObservacoes() : "Motivo não especificado";
+            Vacation vacation = vacationService.rejectVacation(id, motivo);
             return ResponseEntity.ok(VacationDTO.fromEntity(vacation));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();

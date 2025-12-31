@@ -12,6 +12,7 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.VacationStatus;
+import com.z7design.secured_guard.model.enums.VacationType;
 import com.z7design.secured_guard.repository.VacationRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 
@@ -31,19 +32,32 @@ public class VacationService {
         if (vacation.getStatus() == null) {
             vacation.setStatus(VacationStatus.PENDING);
         }
+        if (vacation.getVacationType() == null) {
+            vacation.setVacationType(VacationType.NORMAL);
+        }
         return vacationRepository.save(vacation);
     }
     
     @Transactional
     public Vacation update(UUID id, Vacation vacation) {
         Vacation existingVacation = findById(id);
-        validateVacationDates(vacation);
+        validateVacationDatesForUpdate(vacation);
         calculateVacationDays(vacation);
         
         existingVacation.setStartDate(vacation.getStartDate());
         existingVacation.setEndDate(vacation.getEndDate());
         existingVacation.setDaysTaken(vacation.getDaysTaken());
         existingVacation.setRemainingDays(vacation.getRemainingDays());
+        
+        // Atualizar status se fornecido
+        if (vacation.getStatus() != null) {
+            existingVacation.setStatus(vacation.getStatus());
+        }
+        
+        // Atualizar tipo se fornecido
+        if (vacation.getVacationType() != null) {
+            existingVacation.setVacationType(vacation.getVacationType());
+        }
         
         return vacationRepository.save(existingVacation);
     }
@@ -113,6 +127,14 @@ public class VacationService {
         
         if (vacation.getStartDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException("Data de início não pode ser anterior à data atual");
+        }
+    }
+    
+    private void validateVacationDatesForUpdate(Vacation vacation) {
+        // Validação para atualização: permite editar férias mesmo que a data de início seja no passado
+        // Apenas valida que a data de início não seja posterior à data de fim
+        if (vacation.getStartDate().isAfter(vacation.getEndDate())) {
+            throw new IllegalArgumentException("Data de início não pode ser posterior à data de fim");
         }
     }
     

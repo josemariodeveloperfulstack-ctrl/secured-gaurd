@@ -142,14 +142,35 @@ public class AbsenceService {
                 .orElseThrow(() -> new RuntimeException("Falta não encontrada"));
 
         // Atualizar campos permitidos
-        existingAbsence.setAbsenceDate(updatedAbsence.getAbsenceDate());
-        existingAbsence.setAbsenceType(updatedAbsence.getAbsenceType());
-        existingAbsence.setReason(updatedAbsence.getReason());
-        existingAbsence.setMedicalCertificateDays(updatedAbsence.getMedicalCertificateDays());
-        existingAbsence.setDocumentUrl(updatedAbsence.getDocumentUrl());
-        existingAbsence.setStatus(updatedAbsence.getStatus());
-        existingAbsence.setIsJustified(updatedAbsence.getIsJustified());
-        existingAbsence.setCoverageNotes(updatedAbsence.getCoverageNotes());
+        // IMPORTANTE: Atualizar absenceType sempre que fornecido (não null)
+        if (updatedAbsence.getAbsenceType() != null) {
+            existingAbsence.setAbsenceType(updatedAbsence.getAbsenceType());
+            log.info("✅ Atualizando absenceType de '{}' para '{}'", existingAbsence.getAbsenceType(), updatedAbsence.getAbsenceType());
+        } else {
+            log.warn("⚠️ absenceType é null no update - mantendo valor atual: {}", existingAbsence.getAbsenceType());
+        }
+        
+        if (updatedAbsence.getAbsenceDate() != null) {
+            existingAbsence.setAbsenceDate(updatedAbsence.getAbsenceDate());
+        }
+        if (updatedAbsence.getReason() != null) {
+            existingAbsence.setReason(updatedAbsence.getReason());
+        }
+        if (updatedAbsence.getMedicalCertificateDays() != null) {
+            existingAbsence.setMedicalCertificateDays(updatedAbsence.getMedicalCertificateDays());
+        }
+        if (updatedAbsence.getDocumentUrl() != null) {
+            existingAbsence.setDocumentUrl(updatedAbsence.getDocumentUrl());
+        }
+        if (updatedAbsence.getStatus() != null) {
+            existingAbsence.setStatus(updatedAbsence.getStatus());
+        }
+        if (updatedAbsence.getIsJustified() != null) {
+            existingAbsence.setIsJustified(updatedAbsence.getIsJustified());
+        }
+        if (updatedAbsence.getCoverageNotes() != null) {
+            existingAbsence.setCoverageNotes(updatedAbsence.getCoverageNotes());
+        }
 
         // Validar e atualizar funcionário que cobriu a falta se fornecido
         if (updatedAbsence.getCoverageEmployee() != null) {
@@ -203,7 +224,28 @@ public class AbsenceService {
         absence.setStatus(Absence.AbsenceStatus.APPROVED);
         // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
         
-        return absenceRepository.save(absence);
+        Absence savedAbsence = absenceRepository.save(absence);
+        
+        // Inicializar relacionamentos lazy dentro da transação para evitar LazyInitializationException
+        try {
+            if (savedAbsence.getEmployee() != null) {
+                savedAbsence.getEmployee().getName();
+                savedAbsence.getEmployee().getId();
+                savedAbsence.getEmployee().getRegistrationNumber();
+            }
+            if (savedAbsence.getCoverageEmployee() != null) {
+                savedAbsence.getCoverageEmployee().getName();
+                savedAbsence.getCoverageEmployee().getId();
+            }
+            if (savedAbsence.getApprovedBy() != null) {
+                savedAbsence.getApprovedBy().getName();
+                savedAbsence.getApprovedBy().getId();
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao inicializar relacionamentos do afastamento {}: {}", absenceId, e.getMessage());
+        }
+        
+        return savedAbsence;
     }
 
     @Transactional
@@ -218,6 +260,27 @@ public class AbsenceService {
         absence.setStatus(Absence.AbsenceStatus.REJECTED);
         // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
         
-        return absenceRepository.save(absence);
+        Absence savedAbsence = absenceRepository.save(absence);
+        
+        // Inicializar relacionamentos lazy dentro da transação para evitar LazyInitializationException
+        try {
+            if (savedAbsence.getEmployee() != null) {
+                savedAbsence.getEmployee().getName();
+                savedAbsence.getEmployee().getId();
+                savedAbsence.getEmployee().getRegistrationNumber();
+            }
+            if (savedAbsence.getCoverageEmployee() != null) {
+                savedAbsence.getCoverageEmployee().getName();
+                savedAbsence.getCoverageEmployee().getId();
+            }
+            if (savedAbsence.getApprovedBy() != null) {
+                savedAbsence.getApprovedBy().getName();
+                savedAbsence.getApprovedBy().getId();
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao inicializar relacionamentos do afastamento {}: {}", absenceId, e.getMessage());
+        }
+        
+        return savedAbsence;
     }
 }

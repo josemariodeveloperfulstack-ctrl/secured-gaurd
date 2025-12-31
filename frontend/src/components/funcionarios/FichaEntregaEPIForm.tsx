@@ -31,6 +31,18 @@ const epiOptions = [
   'Outros',
 ];
 
+const uniformePecasOptions = [
+  { value: 'CALCA', label: 'Calça' },
+  { value: 'CAMISA', label: 'Camisa' },
+  { value: 'CAMISA_SOCIAL', label: 'Camisa Social' },
+  { value: 'JAQUETA', label: 'Jaqueta' },
+  { value: 'SAPATO', label: 'Sapato' },
+  { value: 'SAPATA_SOCIAL', label: 'Sapata Social' },
+  { value: 'PERNEIRA', label: 'Perneira' },
+  { value: 'BLASER', label: 'Blaser' },
+  { value: 'LUVA_LATEX', label: 'Luva Latex' },
+];
+
 const FichaEntregaEPIForm = () => {
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -47,7 +59,9 @@ const FichaEntregaEPIForm = () => {
       quantidade: '1', 
       ca: '', // Certificado de Aprovação
       validade: '',
-      observacoes: ''
+      observacoes: '',
+      uniformeTipo: '', // 'COMPLETO' ou 'INDIVIDUAL'
+      uniformePeca: '' // Peça específica se for individual
     }
   ]);
 
@@ -87,9 +101,11 @@ const FichaEntregaEPIForm = () => {
   };
 
   const handleEpiChange = (idx: number, field: string, value: string) => {
-    setEpis(epis.map((epi, i) => 
-      i === idx ? { ...epi, [field]: value } : epi
-    ));
+    setEpis(prevEpis => {
+      const updatedEpis = [...prevEpis];
+      updatedEpis[idx] = { ...updatedEpis[idx], [field]: value };
+      return updatedEpis;
+    });
   };
 
   const addEpi = () => {
@@ -98,7 +114,9 @@ const FichaEntregaEPIForm = () => {
       quantidade: '1', 
       ca: '', 
       validade: '', 
-      observacoes: '' 
+      observacoes: '',
+      uniformeTipo: '',
+      uniformePeca: ''
     }]);
   };
 
@@ -122,6 +140,25 @@ const FichaEntregaEPIForm = () => {
       toast({
         title: 'Atenção',
         description: 'Preencha o nome de todos os EPIs para visualizar a ficha!',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Validar campos específicos de Uniforme de Trabalho
+    if (epis.some(epi => epi.nome === 'Uniforme de Trabalho' && !epi.uniformeTipo)) {
+      toast({
+        title: 'Atenção',
+        description: 'Para Uniforme de Trabalho, é necessário selecionar se é Completo ou Individual!',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (epis.some(epi => epi.nome === 'Uniforme de Trabalho' && epi.uniformeTipo === 'INDIVIDUAL' && !epi.uniformePeca)) {
+      toast({
+        title: 'Atenção',
+        description: 'Para Uniforme de Trabalho Individual, é necessário selecionar a peça específica!',
         variant: 'destructive'
       });
       return;
@@ -159,13 +196,28 @@ const FichaEntregaEPIForm = () => {
         cnpj: empresa.cnpj || '',
         dataEntrega: form.dataEntrega,
         responsavelEntrega: responsavel?.name || '',
-        epis: epis.map(epi => ({
-          nome: epi.nome,
-          quantidade: epi.quantidade,
-          ca: epi.ca || '',
-          validade: epi.validade || '',
-          observacoes: epi.observacoes || ''
-        })),
+        epis: epis.map(epi => {
+          // Formatar nome do EPI para incluir informações de uniforme se aplicável
+          let nomeFormatado = epi.nome;
+          if (epi.nome === 'Uniforme de Trabalho') {
+            if (epi.uniformeTipo === 'INDIVIDUAL' && epi.uniformePeca) {
+              const pecaLabel = uniformePecasOptions.find(p => p.value === epi.uniformePeca)?.label || epi.uniformePeca;
+              nomeFormatado = `Uniforme de Trabalho - Individual (${pecaLabel})`;
+            } else if (epi.uniformeTipo === 'COMPLETO') {
+              nomeFormatado = 'Uniforme de Trabalho - Completo';
+            }
+          }
+          
+          return {
+            nome: nomeFormatado,
+            quantidade: epi.quantidade,
+            ca: epi.ca || '',
+            validade: epi.validade || '',
+            observacoes: epi.observacoes || '',
+            uniformeTipo: epi.uniformeTipo || '',
+            uniformePeca: epi.uniformePeca || ''
+          };
+        }),
         observacoes: form.observacoes || '',
         dataAtual: new Date().toLocaleDateString('pt-BR')
       };
@@ -243,13 +295,28 @@ const FichaEntregaEPIForm = () => {
         cnpj: empresa.cnpj || '',
         dataEntrega: form.dataEntrega,
         responsavelEntrega: responsavel?.name || '',
-        epis: epis.map(epi => ({
-          nome: epi.nome,
-          quantidade: epi.quantidade,
-          ca: epi.ca || '',
-          validade: epi.validade || '',
-          observacoes: epi.observacoes || ''
-        })),
+        epis: epis.map(epi => {
+          // Formatar nome do EPI para incluir informações de uniforme se aplicável
+          let nomeFormatado = epi.nome;
+          if (epi.nome === 'Uniforme de Trabalho') {
+            if (epi.uniformeTipo === 'INDIVIDUAL' && epi.uniformePeca) {
+              const pecaLabel = uniformePecasOptions.find(p => p.value === epi.uniformePeca)?.label || epi.uniformePeca;
+              nomeFormatado = `Uniforme de Trabalho - Individual (${pecaLabel})`;
+            } else if (epi.uniformeTipo === 'COMPLETO') {
+              nomeFormatado = 'Uniforme de Trabalho - Completo';
+            }
+          }
+          
+          return {
+            nome: nomeFormatado,
+            quantidade: epi.quantidade,
+            ca: epi.ca || '',
+            validade: epi.validade || '',
+            observacoes: epi.observacoes || '',
+            uniformeTipo: epi.uniformeTipo || '',
+            uniformePeca: epi.uniformePeca || ''
+          };
+        }),
         observacoes: form.observacoes || '',
         dataAtual: new Date().toLocaleDateString('pt-BR')
       };
@@ -579,53 +646,170 @@ const FichaEntregaEPIForm = () => {
                       <Badge variant="secondary" className="font-mono">#{idx + 1}</Badge>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2 lg:col-span-2">
-                        <Label>Nome do EPI</Label>
-                        <Select value={epi.nome} onValueChange={(value) => handleEpiChange(idx, 'nome', value)}>
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="Selecione o EPI" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {epiOptions.map(option => (
-                              <SelectItem key={option} value={option}>{option}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div className="space-y-4">
+                      {/* Primeira linha: Nome do EPI */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-2 lg:col-span-2">
+                          <Label>Nome do EPI</Label>
+                          <Select 
+                            value={epi.nome || undefined} 
+                            onValueChange={(value) => {
+                              handleEpiChange(idx, 'nome', value);
+                              // Limpar campos de uniforme se mudar o EPI
+                              if (value !== 'Uniforme de Trabalho') {
+                                handleEpiChange(idx, 'uniformeTipo', '');
+                                handleEpiChange(idx, 'uniformePeca', '');
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="bg-background w-full">
+                              <SelectValue placeholder="Selecione o EPI" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              {epiOptions.map(option => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Campos padrão quando NÃO é Uniforme de Trabalho */}
+                        {epi.nome !== 'Uniforme de Trabalho' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Quantidade</Label>
+                              <Input 
+                                type="number" 
+                                min="1"
+                                value={epi.quantidade} 
+                                onChange={(e) => handleEpiChange(idx, 'quantidade', e.target.value)}
+                                className="bg-background"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>CA</Label>
+                              <Input 
+                                value={epi.ca} 
+                                onChange={(e) => handleEpiChange(idx, 'ca', e.target.value)}
+                                placeholder="Certificado de Aprovação"
+                                className="bg-background"
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                       
+                      {/* Campos específicos para Uniforme de Trabalho */}
+                      {epi.nome === 'Uniforme de Trabalho' && (
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800 space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="font-semibold">Tipo de Uniforme *</Label>
+                              <Select 
+                                value={epi.uniformeTipo} 
+                                onValueChange={(value) => {
+                                  handleEpiChange(idx, 'uniformeTipo', value);
+                                  if (value !== 'INDIVIDUAL') {
+                                    handleEpiChange(idx, 'uniformePeca', '');
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="bg-background">
+                                  <SelectValue placeholder="Selecione o tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="COMPLETO">Completo</SelectItem>
+                                  <SelectItem value="INDIVIDUAL">Individual</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            {/* Se for Individual, mostrar seleção de peça */}
+                            {epi.uniformeTipo === 'INDIVIDUAL' && (
+                              <div className="space-y-2">
+                                <Label className="font-semibold">Peça do Uniforme *</Label>
+                                <Select 
+                                  value={epi.uniformePeca} 
+                                  onValueChange={(value) => handleEpiChange(idx, 'uniformePeca', value)}
+                                >
+                                  <SelectTrigger className="bg-background">
+                                    <SelectValue placeholder="Selecione a peça" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {uniformePecasOptions.map(option => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                            
+                            {/* Campos comuns para uniforme */}
+                            {epi.uniformeTipo && (
+                              <>
+                                <div className="space-y-2">
+                                  <Label>Quantidade</Label>
+                                  <Input 
+                                    type="number" 
+                                    min="1"
+                                    value={epi.quantidade} 
+                                    onChange={(e) => handleEpiChange(idx, 'quantidade', e.target.value)}
+                                    className="bg-background"
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label>CA</Label>
+                                  <Input 
+                                    value={epi.ca} 
+                                    onChange={(e) => handleEpiChange(idx, 'ca', e.target.value)}
+                                    placeholder="Certificado de Aprovação"
+                                    className="bg-background"
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          
+                          {/* Validade para uniforme */}
+                          {epi.uniformeTipo && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Validade</Label>
+                                <Input 
+                                  type="date" 
+                                  value={epi.validade} 
+                                  onChange={(e) => handleEpiChange(idx, 'validade', e.target.value)}
+                                  className="bg-background"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Validade para EPIs que não são uniforme */}
+                      {epi.nome !== 'Uniforme de Trabalho' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label>Validade</Label>
+                            <Input 
+                              type="date" 
+                              value={epi.validade} 
+                              onChange={(e) => handleEpiChange(idx, 'validade', e.target.value)}
+                              className="bg-background"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Observações do Item (sempre visível) */}
                       <div className="space-y-2">
-                        <Label>Quantidade</Label>
-                        <Input 
-                          type="number" 
-                          min="1"
-                          value={epi.quantidade} 
-                          onChange={(e) => handleEpiChange(idx, 'quantidade', e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>CA</Label>
-                        <Input 
-                          value={epi.ca} 
-                          onChange={(e) => handleEpiChange(idx, 'ca', e.target.value)}
-                          placeholder="Certificado de Aprovação"
-                          className="bg-background"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>Validade</Label>
-                        <Input 
-                          type="date" 
-                          value={epi.validade} 
-                          onChange={(e) => handleEpiChange(idx, 'validade', e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2 lg:col-span-3">
                         <Label>Observações do Item</Label>
                         <Input 
                           value={epi.observacoes} 

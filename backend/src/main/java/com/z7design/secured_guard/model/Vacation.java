@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.z7design.secured_guard.model.enums.VacationStatus;
+import com.z7design.secured_guard.model.enums.VacationType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -67,6 +68,11 @@ public class Vacation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private VacationStatus status;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "vacation_type")
+    @Builder.Default
+    private VacationType vacationType = VacationType.NORMAL;
     
     @ManyToOne
     @JoinColumn(name = "approved_by")

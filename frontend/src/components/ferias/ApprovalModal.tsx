@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { feriasService } from '@/services/feriasService';
 import { 
   CheckCircle, 
@@ -39,6 +40,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
   const [observacoes, setObservacoes] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   if (!item) return null;
 
@@ -53,6 +55,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
           description: "Solicitação de férias aprovada com sucesso!",
           variant: "default"
         });
+        queryClient.invalidateQueries({ queryKey: ['ferias'] });
       } else {
         await feriasService.approveAfastamento(item.id, observacoes);
         toast({
@@ -60,6 +63,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
           description: "Afastamento aprovado com sucesso!",
           variant: "default"
         });
+        queryClient.invalidateQueries({ queryKey: ['afastamentos'] });
       }
       
       onClose();
@@ -86,6 +90,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
           description: "Solicitação de férias rejeitada com sucesso!",
           variant: "default"
         });
+        queryClient.invalidateQueries({ queryKey: ['ferias'] });
       } else {
         await feriasService.rejectAfastamento(item.id, observacoes);
         toast({
@@ -93,6 +98,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
           description: "Afastamento rejeitado com sucesso!",
           variant: "default"
         });
+        queryClient.invalidateQueries({ queryKey: ['afastamentos'] });
       }
       
       onClose();

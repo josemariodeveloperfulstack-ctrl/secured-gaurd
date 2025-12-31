@@ -63,4 +63,21 @@ public interface PayslipRepository extends JpaRepository<Payslip, java.util.UUID
         @Param("month") Integer month,
         @Param("year") Integer year
     );
+    
+    // Buscar payslips por nome da empresa (busca flexível - case insensitive e contém)
+    @Query("SELECT p FROM Payslip p WHERE " +
+           "LOWER(TRIM(p.companyName)) LIKE LOWER(CONCAT('%', TRIM(:companyName), '%')) " +
+           "ORDER BY p.year DESC, p.month DESC, p.processedAt DESC")
+    List<Payslip> findByCompanyNameContainingIgnoreCase(@Param("companyName") String companyName);
+    
+    // Buscar payslips por CNPJ da empresa
+    @Query("SELECT p FROM Payslip p WHERE p.companyCnpj = :companyCnpj " +
+           "ORDER BY p.year DESC, p.month DESC, p.processedAt DESC")
+    List<Payslip> findByCompanyCnpj(@Param("companyCnpj") String companyCnpj);
+    
+    // Buscar payslips por nome do setor (workPostName) - busca flexível
+    @Query("SELECT p FROM Payslip p WHERE " +
+           "LOWER(TRIM(p.workPostName)) LIKE LOWER(CONCAT('%', TRIM(:sectorName), '%')) " +
+           "ORDER BY p.year DESC, p.month DESC, p.processedAt DESC")
+    List<Payslip> findByWorkPostNameContainingIgnoreCase(@Param("sectorName") String sectorName);
 } 

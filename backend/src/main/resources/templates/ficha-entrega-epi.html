@@ -4,98 +4,137 @@
   <meta charset="UTF-8"/>
   <title>Ficha de Entrega de EPI</title>
   <style>
+    @page {
+      size: A4;
+      margin: 15mm 10mm;
+    }
+    
     body { 
       font-family: Arial, sans-serif; 
-      font-size: 11px; 
-      margin: 20px;
+      font-size: 10px; 
+      margin: 0;
+      padding: 0;
       color: #333;
     }
     
     .header { 
       text-align: center; 
-      margin-bottom: 30px;
-      border-bottom: 3px solid #333;
-      padding-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #333;
+      padding-bottom: 8px;
+      page-break-after: avoid;
     }
     
     .header h1 { 
-      font-size: 18px; 
-      margin: 0 0 5px 0;
+      font-size: 16px; 
+      margin: 0 0 3px 0;
       text-transform: uppercase;
       font-weight: bold;
     }
     
     .header p {
-      margin: 2px 0;
-      font-size: 10px;
+      margin: 1px 0;
+      font-size: 9px;
       color: #666;
     }
     
     .secao { 
-      margin-bottom: 20px;
+      margin-bottom: 12px;
       page-break-inside: avoid;
     }
     
     .secao-titulo {
       background-color: #f5f5f5;
-      padding: 6px 10px;
+      padding: 4px 8px;
       font-weight: bold;
-      font-size: 12px;
-      border-left: 4px solid #333;
-      margin-bottom: 10px;
+      font-size: 11px;
+      border-left: 3px solid #333;
+      margin-bottom: 6px;
       text-transform: uppercase;
     }
     
     .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-bottom: 15px;
+      display: table;
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    
+    .info-grid-row {
+      display: table-row;
     }
     
     .info-item {
-      padding: 8px;
+      display: table-cell;
+      padding: 5px 8px;
       border: 1px solid #ddd;
-      border-radius: 4px;
       background-color: #fafafa;
+      width: 50%;
+      vertical-align: top;
+    }
+    
+    .info-grid .info-item:first-child {
+      border-right: none;
+    }
+    
+    .info-grid .info-item:last-child {
+      border-left: 1px solid #ddd;
     }
     
     .info-item label {
       font-weight: bold;
       display: block;
-      margin-bottom: 4px;
-      font-size: 9px;
+      margin-bottom: 2px;
+      font-size: 8px;
       text-transform: uppercase;
       color: #666;
     }
     
     .info-item .valor {
-      font-size: 11px;
+      font-size: 10px;
       color: #333;
     }
     
     table { 
       width: 100%; 
       border-collapse: collapse; 
-      margin: 15px 0;
+      margin: 10px 0;
+      -fs-table-paginate: paginate;
+    }
+    
+    thead {
+      display: table-header-group;
+    }
+    
+    thead tr {
+      page-break-inside: avoid;
+      page-break-after: avoid;
+    }
+    
+    tbody {
+      display: table-row-group;
+    }
+    
+    tbody tr {
       page-break-inside: avoid;
     }
     
     th { 
       background-color: #333;
       color: white;
-      padding: 8px;
+      padding: 6px 5px;
       text-align: left;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: bold;
       text-transform: uppercase;
+      border: 1px solid #222;
     }
     
     td { 
       border: 1px solid #ddd;
-      padding: 8px;
+      padding: 5px;
       text-align: left;
-      font-size: 10px;
+      font-size: 9px;
       background-color: white;
     }
     
@@ -104,66 +143,73 @@
     }
     
     .observacoes {
-      margin-top: 20px;
-      padding: 12px;
+      margin-top: 12px;
+      padding: 8px;
       border: 1px solid #ddd;
-      border-radius: 4px;
       background-color: #fafafa;
-      min-height: 60px;
+      page-break-inside: avoid;
     }
     
     .observacoes label {
       font-weight: bold;
       display: block;
-      margin-bottom: 8px;
-      font-size: 11px;
+      margin-bottom: 4px;
+      font-size: 10px;
       text-transform: uppercase;
     }
     
     .assinatura-container {
-      margin-top: 50px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
+      margin-top: 20px;
+      display: table;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 30px 0;
       page-break-inside: avoid;
     }
     
     .assinatura {
+      display: table-cell;
       text-align: center;
-      padding-top: 40px;
+      padding-top: 30px;
+      width: 50%;
     }
     
     .linha-assinatura {
       border-top: 2px solid #333;
-      margin-bottom: 8px;
-      padding-top: 8px;
+      margin-bottom: 6px;
+      padding-top: 6px;
     }
     
     .assinatura-nome {
       font-weight: bold;
-      font-size: 11px;
+      font-size: 10px;
     }
     
     .assinatura-info {
-      font-size: 9px;
+      font-size: 8px;
       color: #666;
-      margin-top: 3px;
+      margin-top: 2px;
     }
     
     .footer {
-      margin-top: 30px;
+      margin-top: 15px;
       text-align: center;
-      font-size: 9px;
+      font-size: 8px;
       color: #999;
       border-top: 1px solid #ddd;
-      padding-top: 10px;
+      padding-top: 6px;
+      page-break-inside: avoid;
     }
     
     .data-local {
       text-align: right;
-      font-size: 10px;
-      margin-bottom: 20px;
+      font-size: 9px;
+      margin-bottom: 10px;
       color: #666;
+    }
+    
+    .table-wrapper {
+      page-break-inside: auto;
     }
   </style>
 </head>
@@ -180,7 +226,7 @@
     <b>Data de Entrega:</b> <span th:text="${dataEntrega}"></span>
   </div>
   
-  <!-- Dados do Funcionário -->
+  <!-- Dados do Funcionário e Empresa -->
   <div class="secao">
     <div class="secao-titulo">Dados do Funcionário</div>
     <div class="info-grid">
@@ -192,6 +238,8 @@
         <label>CPF</label>
         <div class="valor" th:text="${cpf} ?: '-'">-</div>
       </div>
+    </div>
+    <div class="info-grid">
       <div class="info-item">
         <label>Cargo</label>
         <div class="valor" th:text="${cargo} ?: '-'">-</div>
@@ -201,11 +249,7 @@
         <div class="valor" th:text="${setor} ?: '-'">-</div>
       </div>
     </div>
-  </div>
-  
-  <!-- Dados da Empresa -->
-  <div class="secao">
-    <div class="secao-titulo">Dados da Empresa</div>
+    <div class="secao-titulo" style="margin-top: 8px;">Dados da Empresa</div>
     <div class="info-grid">
       <div class="info-item">
         <label>Razão Social</label>
@@ -219,27 +263,29 @@
   </div>
   
   <!-- Lista de EPIs Entregues -->
-  <div class="secao">
+  <div class="table-wrapper">
     <div class="secao-titulo">Relação de EPIs Entregues</div>
     <table>
       <thead>
         <tr>
-          <th style="width: 5%;">#</th>
-          <th style="width: 35%;">Nome do EPI</th>
-          <th style="width: 10%;">Qtd</th>
-          <th style="width: 15%;">CA</th>
-          <th style="width: 15%;">Validade</th>
-          <th style="width: 20%;">Observações</th>
+          <th style="width: 4%;">#</th>
+          <th style="width: 38%;">Equipamento</th>
+          <th style="width: 6%;">Nº</th>
+          <th style="width: 12%;">CA</th>
+          <th style="width: 12%;">Validade</th>
+          <th style="width: 15%;">Entrega</th>
+          <th style="width: 13%;">Devolução</th>
         </tr>
       </thead>
       <tbody>
         <tr th:each="epi, iterStat : ${epis}">
-          <td th:text="${iterStat.count}">1</td>
+          <td style="text-align: center;" th:text="${iterStat.count}">1</td>
           <td th:text="${epi.nome}">-</td>
-          <td th:text="${epi.quantidade}">-</td>
-          <td th:text="${epi.ca} ?: '-'">-</td>
-          <td th:text="${epi.validade} ?: '-'">-</td>
-          <td th:text="${epi.observacoes} ?: '-'">-</td>
+          <td style="text-align: center;" th:text="${epi.quantidade}">-</td>
+          <td style="text-align: center;" th:text="${epi.ca} ?: '-'">-</td>
+          <td style="text-align: center;" th:text="${epi.validade} ?: '-'">-</td>
+          <td style="text-align: center;" th:text="${dataEntrega}">-</td>
+          <td style="text-align: center;">-</td>
         </tr>
       </tbody>
     </table>

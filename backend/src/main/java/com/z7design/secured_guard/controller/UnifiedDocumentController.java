@@ -7,6 +7,7 @@ import com.z7design.secured_guard.service.PayslipService;
 import com.z7design.secured_guard.model.Payslip;
 import com.z7design.secured_guard.model.PaymentReceipt;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
+import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,8 +56,14 @@ public class UnifiedDocumentController {
     private final PaymentReceiptRepository paymentReceiptRepository;
     private final AuthenticatedCpfResolver authenticatedCpfResolver;
     private final com.z7design.secured_guard.repository.UserRepository userRepository;
+    private final PayslipRepository payslipRepository;
 
     private static final Pattern CPF_PATTERN = Pattern.compile("(\\d{11})");
+    
+    // Log de inicialização para confirmar que o controller foi carregado
+    {
+        log.info("✅ UnifiedDocumentController inicializado - Endpoint /download/company disponível");
+    }
 
     /**
      * Cria documento unificado para um funcionário específico
@@ -603,6 +610,433 @@ public class UnifiedDocumentController {
     }
 
     /**
+     * Download em lote por empresa (ZIP) - VERSÃO OTIMIZADA
+     * Busca diretamente do banco de dados para melhor performance
+     * IMPORTANTE: Este endpoint deve vir ANTES do /download/{fileName} para evitar conflito de rotas
+     */
+    @GetMapping("/download/company")
+    public ResponseEntity<StreamingResponseBody> downloadByCompany(@RequestParam("name") String companyName) {
+        long startTime = System.currentTimeMillis();
+        try {
+            // Decodificar o nome da empresa (pode vir com %20 para espaços)
+            String decodedCompanyName = java.net.URLDecoder.decode(companyName, "UTF-8");
+            log.info("📦 [OTIMIZADO] Download em lote por empresa: '{}'", decodedCompanyName);
+            
+            // OTIMIZAÇÃO: Buscar payslips diretamente do banco de dados usando query otimizada
+            // Primeiro tentar buscar por CNPJ (mais rápido e preciso)
+            List<Payslip> companyPayslips = payslipRepository.findByCompanyCnpj(decodedCompanyName);
+            
+            // Se não encontrou por CNPJ, buscar por nome da empresa (busca flexível)
+            if (companyPayslips.isEmpty()) {
+                companyPayslips = payslipRepository.findByCompanyNameContainingIgnoreCase(decodedCompanyName);
+            }
+            
+            log.info("✅ {} payslip(s) encontrado(s) para a empresa '{}'", companyPayslips.size(), decodedCompanyName);
+            
+            if (companyPayslips.isEmpty()) {
+                log.warn("⚠️ Nenhum payslip encontrado para a empresa: '{}'", decodedCompanyName);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Criar mapa para organizar arquivos por estrutura: Empresa/Setor/Período/Funcionário
+            // Usar Payslip como chave para manter a relação arquivo -> payslip
+            Map<Payslip, Path> payslipToFileMap = new java.util.HashMap<>();
+            
+            // Mapear cada payslip para seu arquivo encontrado
+            for (Payslip payslip : companyPayslips) {
+                String fileName = payslip.getFileName();
+                if (fileName == null || fileName.isEmpty()) {
+                    continue;
+                }
+                
+                // Tentar encontrar o arquivo para este payslip específico
+                Path foundFile = null;
+                
+                // PRIORIDADE 1: Usar arquivo_caminho se disponível
+                if (payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+                    Path candidate = Paths.get(payslip.getArquivoCaminho());
+                    if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                        foundFile = candidate;
+                    }
+                }
+                
+                // PRIORIDADE 2: Estrutura PRD completa
+                if (foundFile == null && payslip.getCompanyCnpj() != null && payslip.getWorkPostName() != null) {
+                    String empresaCnpj = normalizeCnpjForPath(payslip.getCompanyCnpj());
+                    String setorNome = normalizeSectorNameForPath(payslip.getWorkPostName());
+                    String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+                    String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeNameForPath(payslip.getEmployeeName()) : null;
+                    String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+                    
+                    if (empresaCnpj != null && setorNome != null && funcionarioNome != null && funcionarioCpf != null) {
+                        String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                        Path candidate = Paths.get("backend/holerites", empresaCnpj, setorNome, periodo, pastaFuncionario, fileName);
+                        if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                            foundFile = candidate;
+                        }
+                    }
+                }
+                
+                // PRIORIDADE 3: Estrutura PRD sem pasta funcionário
+                if (foundFile == null && payslip.getCompanyCnpj() != null && payslip.getWorkPostName() != null) {
+                    String empresaCnpj = normalizeCnpjForPath(payslip.getCompanyCnpj());
+                    String setorNome = normalizeSectorNameForPath(payslip.getWorkPostName());
+                    String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+                    
+                    if (empresaCnpj != null && setorNome != null) {
+                        Path candidate = Paths.get("backend/holerites", empresaCnpj, setorNome, periodo, fileName);
+                        if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                            foundFile = candidate;
+                        }
+                    }
+                }
+                
+                // PRIORIDADE 4: Estrutura antiga
+                if (foundFile == null) {
+                    String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
+                    Path candidate = Paths.get("backend/holerites", mesAno, fileName);
+                    if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                        foundFile = candidate;
+                    }
+                }
+                
+                // PRIORIDADE 5: Buscar recursivamente
+                if (foundFile == null) {
+                    Path holeritesDir = Paths.get("backend/holerites");
+                    if (Files.exists(holeritesDir)) {
+                        try {
+                            java.util.stream.Stream<Path> stream = Files.walk(holeritesDir, 5);
+                            Optional<Path> found = stream
+                                .filter(Files::isRegularFile)
+                                .filter(p -> p.getFileName().toString().equals(fileName))
+                                .findFirst();
+                            stream.close();
+                            
+                            if (found.isPresent()) {
+                                foundFile = found.get();
+                            }
+                        } catch (IOException e) {
+                            log.warn("⚠️ Erro ao buscar arquivo recursivamente: {}", e.getMessage());
+                        }
+                    }
+                }
+                
+                // PRIORIDADE 6: Outros diretórios
+                if (foundFile == null) {
+                    String[] fallbackDirs = {
+                        System.getProperty("payslips.upload.dir", "uploads/payslips"),
+                        "uploads/holerites_processados",
+                        "backend/payslips_output",
+                        "holerites"
+                    };
+                    
+                    for (String baseDir : fallbackDirs) {
+                        Path filePath = Paths.get(baseDir, fileName);
+                        if (Files.exists(filePath) && Files.isRegularFile(filePath)) {
+                            foundFile = filePath;
+                            break;
+                        }
+                    }
+                }
+                
+                if (foundFile != null) {
+                    payslipToFileMap.put(payslip, foundFile);
+                } else {
+                    log.warn("⚠️ Arquivo não encontrado para payslip {}: {}", payslip.getId(), fileName);
+                }
+            }
+            
+            log.info("📊 {} arquivo(s) encontrado(s) de {} payslip(s) para empresa '{}'", 
+                payslipToFileMap.size(), companyPayslips.size(), decodedCompanyName);
+            
+            if (payslipToFileMap.isEmpty()) {
+                log.warn("⚠️ Nenhum arquivo físico encontrado para os payslips da empresa: '{}'", decodedCompanyName);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Normalizar nome da empresa para pasta
+            String empresaFolderName = normalizeCompanyNameForPath(decodedCompanyName);
+            
+            // Criar ZIP streaming com estrutura organizada: Empresa/Setor/Período/Funcionário/arquivo.pdf
+            log.info("📦 Criando ZIP organizado com {} arquivo(s) para empresa '{}'...", payslipToFileMap.size(), decodedCompanyName);
+            StreamingResponseBody responseBody = outputStream -> {
+                try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outputStream, 65536))) {
+                    int filesAdded = 0;
+                    
+                    for (Map.Entry<Payslip, Path> entry : payslipToFileMap.entrySet()) {
+                        Payslip payslip = entry.getKey();
+                        Path filePath = entry.getValue();
+                        
+                        // Construir caminho no ZIP: Empresa/Setor/Período/Funcionário/arquivo.pdf
+                        String setorNome = payslip.getWorkPostName() != null 
+                            ? normalizeSectorNameForPath(payslip.getWorkPostName()) 
+                            : "SETOR_NAO_INFORMADO";
+                        String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+                        String funcionarioNome = payslip.getEmployeeName() != null 
+                            ? normalizeEmployeeNameForPath(payslip.getEmployeeName()) 
+                            : "FUNCIONARIO_NAO_INFORMADO";
+                        String funcionarioCpf = payslip.getCpf() != null 
+                            ? payslip.getCpf().replaceAll("[^0-9]", "") 
+                            : "SEM_CPF";
+                        String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                        
+                        String fileName = filePath.getFileName().toString();
+                        String zipEntryPath = String.format("%s/%s/%s/%s/%s", 
+                            empresaFolderName, setorNome, periodo, pastaFuncionario, fileName);
+                        
+                        ZipEntry zipEntry = new ZipEntry(zipEntryPath);
+                        zos.putNextEntry(zipEntry);
+                        
+                        // Usar buffer maior para melhor performance
+                        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(filePath.toFile()), 65536)) {
+                            byte[] buffer = new byte[65536]; // 64KB buffer
+                            int bytesRead;
+                            while ((bytesRead = bis.read(buffer)) != -1) {
+                                zos.write(buffer, 0, bytesRead);
+                            }
+                        }
+                        zos.closeEntry();
+                        filesAdded++;
+                        
+                        if (filesAdded % 10 == 0) {
+                            log.debug("📦 Progresso: {} arquivo(s) adicionado(s)...", filesAdded);
+                        }
+                    }
+                    log.info("✅ ZIP criado com sucesso: {} arquivo(s) adicionado(s) em estrutura organizada", filesAdded);
+                } catch (Exception e) {
+                    log.error("💥 Erro ao criar ZIP: {}", e.getMessage(), e);
+                    throw new RuntimeException("Erro ao criar ZIP", e);
+                }
+            };
+            
+            String zipFileName = decodedCompanyName.replaceAll("[^a-zA-Z0-9]", "_") + "_documentos_unificados.zip";
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", zipFileName);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("⚡ Download otimizado concluído em {}ms para empresa '{}'", duration, decodedCompanyName);
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(responseBody);
+                
+        } catch (Exception e) {
+            log.error("💥 Erro ao fazer download por empresa: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Download em lote por setor (ZIP) - VERSÃO OTIMIZADA
+     * Busca diretamente do banco de dados para melhor performance
+     * IMPORTANTE: Este endpoint deve vir ANTES do /download/{fileName} para evitar conflito de rotas
+     */
+    @GetMapping("/download/sector")
+    public ResponseEntity<StreamingResponseBody> downloadBySector(@RequestParam("name") String sectorName) {
+        long startTime = System.currentTimeMillis();
+        try {
+            // Decodificar o nome do setor (pode vir com %20 para espaços)
+            String decodedSectorName = java.net.URLDecoder.decode(sectorName, "UTF-8");
+            log.info("📦 [OTIMIZADO] Download em lote por setor: '{}'", decodedSectorName);
+            
+            // OTIMIZAÇÃO: Buscar payslips diretamente do banco de dados usando query otimizada
+            List<Payslip> sectorPayslips = payslipRepository.findByWorkPostNameContainingIgnoreCase(decodedSectorName);
+            
+            log.info("✅ {} payslip(s) encontrado(s) para o setor '{}'", sectorPayslips.size(), decodedSectorName);
+            
+            if (sectorPayslips.isEmpty()) {
+                log.warn("⚠️ Nenhum payslip encontrado para o setor: '{}'", decodedSectorName);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Criar mapa para organizar arquivos por estrutura: Empresa/Setor/Período/Funcionário
+            Map<Payslip, Path> payslipToFileMap = new java.util.HashMap<>();
+            
+            log.info("🔍 Buscando arquivos físicos para {} payslip(s)...", sectorPayslips.size());
+            
+            // Mapear cada payslip para seu arquivo encontrado (mesma lógica do downloadByCompany)
+            for (Payslip payslip : sectorPayslips) {
+                String fileName = payslip.getFileName();
+                if (fileName == null || fileName.isEmpty()) {
+                    log.warn("⚠️ Payslip {} não tem fileName", payslip.getId());
+                    continue;
+                }
+                
+                Path foundFile = findPayslipFile(payslip, fileName);
+                if (foundFile != null) {
+                    payslipToFileMap.put(payslip, foundFile);
+                } else {
+                    log.warn("⚠️ Arquivo não encontrado para payslip {}: {}", payslip.getId(), fileName);
+                }
+            }
+            
+            log.info("📊 {} arquivo(s) encontrado(s) de {} payslip(s) para setor '{}'", 
+                payslipToFileMap.size(), sectorPayslips.size(), decodedSectorName);
+            
+            if (payslipToFileMap.isEmpty()) {
+                log.warn("⚠️ Nenhum arquivo físico encontrado para os payslips do setor: '{}'", decodedSectorName);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Normalizar nome do setor para pasta
+            String setorFolderName = normalizeSectorNameForPath(decodedSectorName);
+            
+            // Criar ZIP streaming com estrutura organizada: Empresa/Setor/Período/Funcionário/arquivo.pdf
+            log.info("📦 Criando ZIP organizado com {} arquivo(s) para setor '{}'...", payslipToFileMap.size(), decodedSectorName);
+            StreamingResponseBody responseBody = outputStream -> {
+                try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outputStream, 65536))) {
+                    int filesAdded = 0;
+                    
+                    for (Map.Entry<Payslip, Path> entry : payslipToFileMap.entrySet()) {
+                        Payslip payslip = entry.getKey();
+                        Path filePath = entry.getValue();
+                        
+                        // Construir caminho no ZIP: Empresa/Setor/Período/Funcionário/arquivo.pdf
+                        String empresaNome = payslip.getCompanyName() != null 
+                            ? normalizeCompanyNameForPath(payslip.getCompanyName()) 
+                            : "EMPRESA_NAO_INFORMADA";
+                        String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+                        String funcionarioNome = payslip.getEmployeeName() != null 
+                            ? normalizeEmployeeNameForPath(payslip.getEmployeeName()) 
+                            : "FUNCIONARIO_NAO_INFORMADO";
+                        String funcionarioCpf = payslip.getCpf() != null 
+                            ? payslip.getCpf().replaceAll("[^0-9]", "") 
+                            : "SEM_CPF";
+                        String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                        
+                        String fileName = filePath.getFileName().toString();
+                        String zipEntryPath = String.format("%s/%s/%s/%s/%s", 
+                            empresaNome, setorFolderName, periodo, pastaFuncionario, fileName);
+                        
+                        ZipEntry zipEntry = new ZipEntry(zipEntryPath);
+                        zos.putNextEntry(zipEntry);
+                        
+                        // Usar buffer maior para melhor performance
+                        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(filePath.toFile()), 65536)) {
+                            byte[] buffer = new byte[65536]; // 64KB buffer
+                            int bytesRead;
+                            while ((bytesRead = bis.read(buffer)) != -1) {
+                                zos.write(buffer, 0, bytesRead);
+                            }
+                        }
+                        zos.closeEntry();
+                        filesAdded++;
+                        
+                        if (filesAdded % 10 == 0) {
+                            log.debug("📦 Progresso: {} arquivo(s) adicionado(s)...", filesAdded);
+                        }
+                    }
+                    log.info("✅ ZIP criado com sucesso: {} arquivo(s) adicionado(s) em estrutura organizada", filesAdded);
+                } catch (Exception e) {
+                    log.error("💥 Erro ao criar ZIP: {}", e.getMessage(), e);
+                    throw new RuntimeException("Erro ao criar ZIP", e);
+                }
+            };
+            
+            String zipFileName = decodedSectorName.replaceAll("[^a-zA-Z0-9]", "_") + "_holerites.zip";
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", zipFileName);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("⚡ Download otimizado concluído em {}ms para setor '{}'", duration, decodedSectorName);
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(responseBody);
+                
+        } catch (Exception e) {
+            log.error("💥 Erro ao fazer download por setor: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * Método auxiliar para encontrar arquivo físico de um payslip
+     * Reutiliza a mesma lógica do downloadByCompany
+     */
+    private Path findPayslipFile(Payslip payslip, String fileName) {
+        // PRIORIDADE 1: Usar arquivo_caminho se disponível
+        if (payslip.getArquivoCaminho() != null && !payslip.getArquivoCaminho().isEmpty()) {
+            Path candidate = Paths.get(payslip.getArquivoCaminho());
+            if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                return candidate.toAbsolutePath();
+            }
+        }
+        
+        // PRIORIDADE 2: Estrutura PRD completa
+        if (payslip.getCompanyCnpj() != null && payslip.getWorkPostName() != null) {
+            String empresaCnpj = normalizeCnpjForPath(payslip.getCompanyCnpj());
+            String setorNome = normalizeSectorNameForPath(payslip.getWorkPostName());
+            String periodo = String.format("%d-%02d", payslip.getYear(), payslip.getMonth());
+            String funcionarioNome = payslip.getEmployeeName() != null ? normalizeEmployeeNameForPath(payslip.getEmployeeName()) : null;
+            String funcionarioCpf = payslip.getCpf() != null ? payslip.getCpf().replaceAll("[^0-9]", "") : null;
+            
+            if (empresaCnpj != null && setorNome != null && funcionarioNome != null && funcionarioCpf != null) {
+                String pastaFuncionario = String.format("%s_%s", funcionarioNome, funcionarioCpf);
+                Path candidate = Paths.get("backend/holerites", empresaCnpj, setorNome, periodo, pastaFuncionario, fileName);
+                if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                    return candidate.toAbsolutePath();
+                }
+            }
+            
+            // Tentar sem pasta funcionário
+            if (empresaCnpj != null && setorNome != null) {
+                Path candidate = Paths.get("backend/holerites", empresaCnpj, setorNome, periodo, fileName);
+                if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                    return candidate.toAbsolutePath();
+                }
+            }
+        }
+        
+        // PRIORIDADE 3: Estrutura antiga
+        String mesAno = String.format("%s-%s", payslip.getMonth(), payslip.getYear());
+        Path candidate = Paths.get("backend/holerites", mesAno, fileName);
+        if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+            return candidate.toAbsolutePath();
+        }
+        
+        // PRIORIDADE 4: Buscar recursivamente
+        Path holeritesDir = Paths.get("backend/holerites");
+        if (Files.exists(holeritesDir)) {
+            try {
+                java.util.stream.Stream<Path> stream = Files.walk(holeritesDir, 5);
+                Optional<Path> found = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().equals(fileName))
+                    .findFirst();
+                stream.close();
+                
+                if (found.isPresent()) {
+                    return found.get().toAbsolutePath();
+                }
+            } catch (IOException e) {
+                log.warn("⚠️ Erro ao buscar arquivo recursivamente: {}", e.getMessage());
+            }
+        }
+        
+        // PRIORIDADE 5: Outros diretórios
+        String[] fallbackDirs = {
+            System.getProperty("payslips.upload.dir", "uploads/payslips"),
+            "uploads/holerites_processados",
+            "backend/payslips_output",
+            "holerites"
+        };
+        
+        for (String baseDir : fallbackDirs) {
+            Path filePath = Paths.get(baseDir, fileName);
+            if (Files.exists(filePath) && Files.isRegularFile(filePath)) {
+                return filePath.toAbsolutePath();
+            }
+        }
+        
+        return null;
+    }
+
+    /**
      * Endpoint alternativo para download de arquivos unificados
      */
     @GetMapping("/download/{fileName:.+}")
@@ -825,6 +1259,77 @@ public class UnifiedDocumentController {
             .replaceAll("\\s+", " ")
             .trim()
             .toLowerCase();
+    }
+    
+    /**
+     * Normaliza CNPJ para uso em caminhos de arquivo (remove caracteres não numéricos)
+     */
+    private String normalizeCnpjForPath(String rawCnpj) {
+        if (rawCnpj == null) {
+            return null;
+        }
+        String digitsOnly = rawCnpj.replaceAll("\\D", "");
+        return digitsOnly.length() == 14 ? digitsOnly : null;
+    }
+    
+    /**
+     * Normaliza nome do setor para uso em pastas do sistema de arquivos
+     */
+    private String normalizeSectorNameForPath(String sector) {
+        if (sector == null || sector.trim().isEmpty()) {
+            return "SETOR_NAO_INFORMADO";
+        }
+        String upper = sector.trim().toUpperCase();
+        String normalized = java.text.Normalizer.normalize(upper, java.text.Normalizer.Form.NFD)
+            .replaceAll("[\\p{M}]", "")
+            .replaceAll("[^A-Z0-9]+", "_")
+            .replaceAll("^_+", "")
+            .replaceAll("_+$", "");
+        return normalized.isEmpty() ? "SETOR_NAO_INFORMADO" : normalized;
+    }
+    
+    /**
+     * Normaliza nome do funcionário para uso em pastas do sistema de arquivos
+     */
+    private String normalizeEmployeeNameForPath(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "FUNCIONARIO_NAO_INFORMADO";
+        }
+        String upper = name.trim().toUpperCase();
+        String normalized = java.text.Normalizer.normalize(upper, java.text.Normalizer.Form.NFD)
+            .replaceAll("[\\p{M}]", "")
+            .replaceAll("[^A-Z0-9]+", "_")
+            .replaceAll("^_+", "")
+            .replaceAll("_+$", "");
+        
+        // Limitar tamanho para evitar problemas com sistemas de arquivos (máximo 100 caracteres)
+        if (normalized.length() > 100) {
+            normalized = normalized.substring(0, 100);
+        }
+        
+        return normalized.isEmpty() ? "FUNCIONARIO_NAO_INFORMADO" : normalized;
+    }
+    
+    /**
+     * Normaliza nome da empresa para uso em pastas do sistema de arquivos
+     */
+    private String normalizeCompanyNameForPath(String companyName) {
+        if (companyName == null || companyName.trim().isEmpty()) {
+            return "EMPRESA_NAO_INFORMADA";
+        }
+        String upper = companyName.trim().toUpperCase();
+        String normalized = java.text.Normalizer.normalize(upper, java.text.Normalizer.Form.NFD)
+            .replaceAll("[\\p{M}]", "")
+            .replaceAll("[^A-Z0-9]+", "_")
+            .replaceAll("^_+", "")
+            .replaceAll("_+$", "");
+        
+        // Limitar tamanho para evitar problemas com sistemas de arquivos (máximo 150 caracteres)
+        if (normalized.length() > 150) {
+            normalized = normalized.substring(0, 150);
+        }
+        
+        return normalized.isEmpty() ? "EMPRESA_NAO_INFORMADA" : normalized;
     }
 
     /**
@@ -1816,353 +2321,6 @@ public class UnifiedDocumentController {
         }
     }
 
-    /**
-     * Download em lote por empresa (ZIP) - usando query parameter
-     */
-    @GetMapping("/download/company")
-    public ResponseEntity<StreamingResponseBody> downloadByCompany(@RequestParam("name") String companyName) {
-        try {
-            // Decodificar o nome da empresa (pode vir com %20 para espaços)
-            String decodedCompanyName = java.net.URLDecoder.decode(companyName, "UTF-8");
-            log.info("📦 Download em lote por empresa: '{}' (decodificado: '{}')", companyName, decodedCompanyName);
-            
-            // Obter organização de documentos unificados
-            com.z7design.secured_guard.dto.PayslipOrganizationResponse organization = 
-                unifiedDocumentService.organizeUnifiedDocumentsByCompany();
-            
-            log.info("📊 Total de empresas na organização: {}", organization.getCompanies() != null ? organization.getCompanies().size() : 0);
-            if (organization.getCompanies() != null) {
-                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.CompanyGroup c : organization.getCompanies()) {
-                    log.debug("  - Empresa: '{}' (CNPJ: {})", c.getCompanyName(), c.getCompanyCnpj());
-                }
-            }
-            
-            // Normalizar nomes para comparação (remover espaços extras, converter para minúsculas)
-            String normalizedSearchName = decodedCompanyName.trim().replaceAll("\\s+", " ").toLowerCase();
-            
-            // Encontrar a empresa (busca flexível)
-            com.z7design.secured_guard.dto.PayslipOrganizationResponse.CompanyGroup company = null;
-            if (organization.getCompanies() != null) {
-                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.CompanyGroup c : organization.getCompanies()) {
-                    if (c.getCompanyName() != null) {
-                        String normalizedCompanyName = c.getCompanyName().trim().replaceAll("\\s+", " ").toLowerCase();
-                        if (normalizedCompanyName.equals(normalizedSearchName) || 
-                            normalizedCompanyName.contains(normalizedSearchName) ||
-                            normalizedSearchName.contains(normalizedCompanyName)) {
-                            company = c;
-                            log.info("✅ Empresa encontrada: '{}'", c.getCompanyName());
-                            break;
-                        }
-                    }
-                    // Também verificar por CNPJ
-                    if (c.getCompanyCnpj() != null && c.getCompanyCnpj().equals(decodedCompanyName)) {
-                        company = c;
-                        log.info("✅ Empresa encontrada por CNPJ: '{}'", c.getCompanyName());
-                        break;
-                    }
-                }
-            }
-            
-            if (company == null) {
-                log.warn("⚠️ Empresa não encontrada: '{}' (decodificado: '{}')", companyName, decodedCompanyName);
-                log.warn("⚠️ Empresas disponíveis:");
-                if (organization.getCompanies() != null) {
-                    for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.CompanyGroup c : organization.getCompanies()) {
-                        log.warn("  - '{}' (CNPJ: {})", c.getCompanyName(), c.getCompanyCnpj());
-                    }
-                }
-                return ResponseEntity.notFound().build();
-            }
-            
-            // Buscar lista de documentos unificados para obter filePath
-            List<Map<String, Object>> allUnifiedDocs;
-            try {
-                allUnifiedDocs = unifiedDocumentService.listAllUnifiedDocuments();
-            } catch (IOException e) {
-                log.error("💥 Erro ao listar documentos unificados: {}", e.getMessage(), e);
-                return ResponseEntity.internalServerError().build();
-            }
-            
-            // Coletar todos os arquivos da empresa (usar Set para evitar duplicatas)
-            Set<Path> uniqueFiles = new java.util.HashSet<>();
-            int totalEntriesChecked = 0;
-            int entriesWithPath = 0;
-            int entriesFileExists = 0;
-            
-            log.info("📊 Coletando arquivos da empresa '{}'...", decodedCompanyName);
-            log.info("📊 Total de setores: {}", company.getSectors() != null ? company.getSectors().size() : 0);
-            log.info("📊 Total de documentos unificados disponíveis: {}", allUnifiedDocs.size());
-            
-            if (company.getSectors() != null) {
-                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.SectorGroup sector : company.getSectors()) {
-                    log.debug("  📁 Processando setor: '{}'", sector.getSectorName());
-                    if (sector.getPeriods() != null) {
-                        for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.PeriodGroup period : sector.getPeriods()) {
-                            log.debug("    📅 Processando período: {}/{}", period.getMonth(), period.getYear());
-                            if (period.getPayslips() != null) {
-                                log.debug("      📄 Total de documentos no período: {}", period.getPayslips().size());
-                                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.PayslipEntry entry : period.getPayslips()) {
-                                    totalEntriesChecked++;
-                                    // Buscar arquivo unificado correspondente
-                                    String filePath = findUnifiedDocumentPath(allUnifiedDocs, entry.getEmployeeName(), entry.getMonth(), entry.getYear());
-                                    if (filePath != null) {
-                                        entriesWithPath++;
-                                        Path path = Paths.get(filePath);
-                                        if (Files.exists(path)) {
-                                            entriesFileExists++;
-                                            uniqueFiles.add(path);
-                                            log.debug("      ✅ Arquivo encontrado: {} - {}/{} -> {}", 
-                                                entry.getEmployeeName(), entry.getMonth(), entry.getYear(), path.getFileName());
-                                        } else {
-                                            log.warn("      ⚠️ Arquivo físico não encontrado para o caminho: {}", filePath);
-                                        }
-                                    } else {
-                                        log.warn("      ⚠️ Caminho do documento unificado não encontrado para entrada: {} - {}/{}", 
-                                            entry.getEmployeeName(), entry.getMonth(), entry.getYear());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Converter Set para List
-            List<Path> filesToZip = new ArrayList<>(uniqueFiles);
-            
-            log.info("📊 Estatísticas da coleta: {} entradas verificadas, {} com caminho, {} arquivos existentes, {} arquivos únicos para ZIP", 
-                totalEntriesChecked, entriesWithPath, entriesFileExists, filesToZip.size());
-            
-            if (filesToZip.isEmpty()) {
-                log.warn("⚠️ Nenhum arquivo encontrado para a empresa: '{}' (decodificado: '{}')", companyName, decodedCompanyName);
-                log.warn("📊 Entradas verificadas: {}, com caminho: {}, arquivos existentes: {}", 
-                    totalEntriesChecked, entriesWithPath, entriesFileExists);
-                return ResponseEntity.notFound().build();
-            }
-            
-            log.info("✅ {} arquivo(s) único(s) encontrado(s) para download da empresa: '{}'", filesToZip.size(), decodedCompanyName);
-            
-            // Criar ZIP streaming
-            log.info("📦 Criando ZIP com {} arquivo(s) para empresa '{}'...", filesToZip.size(), decodedCompanyName);
-            StreamingResponseBody responseBody = outputStream -> {
-                try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outputStream, 8192))) {
-                    int filesAdded = 0;
-                    for (Path filePath : filesToZip) {
-                        String fileName = filePath.getFileName().toString();
-                        log.info("  📄 Adicionando arquivo {} ao ZIP: {}", filesAdded + 1, fileName);
-                        ZipEntry zipEntry = new ZipEntry(fileName);
-                        zos.putNextEntry(zipEntry);
-                        
-                        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(filePath.toFile()), 8192)) {
-                            byte[] buffer = new byte[8192];
-                            int bytesRead;
-                            long totalBytes = 0;
-                            while ((bytesRead = bis.read(buffer)) != -1) {
-                                zos.write(buffer, 0, bytesRead);
-                                totalBytes += bytesRead;
-                            }
-                            log.info("    ✅ Arquivo adicionado: {} ({} bytes)", fileName, totalBytes);
-                        }
-                        zos.closeEntry();
-                        filesAdded++;
-                    }
-                    log.info("✅ ZIP criado com sucesso: {} arquivo(s) adicionado(s) para empresa '{}'", filesAdded, decodedCompanyName);
-                } catch (Exception e) {
-                    log.error("💥 Erro ao criar ZIP: {}", e.getMessage(), e);
-                    throw new RuntimeException("Erro ao criar ZIP", e);
-                }
-            };
-            
-            String zipFileName = decodedCompanyName.replaceAll("[^a-zA-Z0-9]", "_") + "_documentos_unificados.zip";
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", zipFileName);
-            
-            return ResponseEntity.ok()
-                .headers(headers)
-                .body(responseBody);
-                
-        } catch (Exception e) {
-            log.error("💥 Erro ao fazer download por empresa: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    /**
-     * Download em lote por setor (ZIP) - usando query parameter
-     */
-    @GetMapping("/download/sector")
-    public ResponseEntity<StreamingResponseBody> downloadBySector(@RequestParam("name") String sectorName) {
-        try {
-            // Decodificar o nome do setor (pode vir com %20 para espaços)
-            String decodedSectorName = java.net.URLDecoder.decode(sectorName, "UTF-8");
-            log.info("📦 Download em lote por setor: '{}' (decodificado: '{}')", sectorName, decodedSectorName);
-            
-            // Obter organização de documentos unificados
-            com.z7design.secured_guard.dto.PayslipOrganizationResponse organization = 
-                unifiedDocumentService.organizeUnifiedDocumentsByCompany();
-            
-            log.info("📊 Total de empresas na organização: {}", organization.getCompanies() != null ? organization.getCompanies().size() : 0);
-            
-            // Normalizar nome do setor para comparação
-            String normalizedSearchName = normalizeNameForMatching(decodedSectorName);
-            log.info("🔍 Buscando setor normalizado: '{}' (original: '{}')", normalizedSearchName, decodedSectorName);
-            
-            // Listar todos os setores disponíveis para debug
-            Set<String> availableSectors = new java.util.HashSet<>();
-            if (organization.getCompanies() != null) {
-                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.CompanyGroup company : organization.getCompanies()) {
-                    if (company.getSectors() != null) {
-                        for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.SectorGroup sector : company.getSectors()) {
-                            if (sector.getSectorName() != null) {
-                                availableSectors.add(sector.getSectorName());
-                                log.debug("  📁 Setor disponível: '{}' (normalizado: '{}')", 
-                                    sector.getSectorName(), normalizeNameForMatching(sector.getSectorName()));
-                            }
-                        }
-                    }
-                }
-            }
-            log.info("📋 Total de setores únicos disponíveis: {}", availableSectors.size());
-            
-            // Buscar lista de documentos unificados para obter filePath
-            List<Map<String, Object>> allUnifiedDocs;
-            try {
-                allUnifiedDocs = unifiedDocumentService.listAllUnifiedDocuments();
-                log.info("📄 Total de documentos unificados disponíveis: {}", allUnifiedDocs.size());
-            } catch (IOException e) {
-                log.error("💥 Erro ao listar documentos unificados: {}", e.getMessage(), e);
-                return ResponseEntity.internalServerError().build();
-            }
-            
-            // Coletar todos os arquivos do setor (pode estar em múltiplas empresas)
-            // Usar Set para evitar duplicatas (mesmo arquivo pode aparecer em múltiplas empresas)
-            Set<Path> uniqueFiles = new java.util.HashSet<>();
-            boolean sectorFound = false;
-            int totalEntriesChecked = 0;
-            int entriesWithPath = 0;
-            int entriesFileExists = 0;
-            
-            if (organization.getCompanies() != null) {
-                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.CompanyGroup company : organization.getCompanies()) {
-                    if (company.getSectors() != null) {
-                        for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.SectorGroup sector : company.getSectors()) {
-                            if (sector.getSectorName() != null) {
-                                String normalizedSectorName = normalizeNameForMatching(sector.getSectorName());
-                                log.debug("  🔍 Comparando setor: '{}' (normalizado: '{}') vs '{}'", 
-                                    sector.getSectorName(), normalizedSectorName, normalizedSearchName);
-                                
-                                boolean nameMatches = normalizedSectorName.equals(normalizedSearchName) ||
-                                    normalizedSectorName.contains(normalizedSearchName) ||
-                                    normalizedSearchName.contains(normalizedSectorName);
-                                
-                                if (nameMatches) {
-                                    sectorFound = true;
-                                    log.info("✅ Setor encontrado: '{}' na empresa '{}'", sector.getSectorName(), company.getCompanyName());
-                                    
-                                    if (sector.getPeriods() != null) {
-                                        for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.PeriodGroup period : sector.getPeriods()) {
-                                            if (period.getPayslips() != null) {
-                                                for (com.z7design.secured_guard.dto.PayslipOrganizationResponse.PayslipEntry entry : period.getPayslips()) {
-                                                    totalEntriesChecked++;
-                                                    // Buscar arquivo unificado correspondente
-                                                    String filePath = findUnifiedDocumentPath(allUnifiedDocs, entry.getEmployeeName(), entry.getMonth(), entry.getYear());
-                                                    if (filePath != null) {
-                                                        entriesWithPath++;
-                                                        Path path = Paths.get(filePath);
-                                                        if (Files.exists(path)) {
-                                                            entriesFileExists++;
-                                                            // Adicionar ao Set para evitar duplicatas
-                                                            uniqueFiles.add(path);
-                                                            log.debug("  ✅ Arquivo encontrado: {} - {}/{}", entry.getEmployeeName(), entry.getMonth(), entry.getYear());
-                                                        } else {
-                                                            log.warn("  ⚠️ Arquivo não existe no caminho: {}", filePath);
-                                                        }
-                                                    } else {
-                                                        log.warn("  ⚠️ Caminho não encontrado para: {} - {}/{}", 
-                                                            entry.getEmployeeName(), entry.getMonth(), entry.getYear());
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Converter Set para List para manter compatibilidade
-            List<Path> filesToZip = new ArrayList<>(uniqueFiles);
-            
-            log.info("📊 Estatísticas da busca: {} entradas verificadas, {} com caminho, {} arquivos existentes, {} arquivos únicos para ZIP", 
-                totalEntriesChecked, entriesWithPath, entriesFileExists, filesToZip.size());
-            
-            if (!sectorFound) {
-                log.warn("⚠️ Setor não encontrado: '{}' (decodificado: '{}', normalizado: '{}')", 
-                    sectorName, decodedSectorName, normalizedSearchName);
-                log.warn("📋 Setores disponíveis: {}", availableSectors);
-                return ResponseEntity.notFound().build();
-            }
-            
-            if (filesToZip.isEmpty()) {
-                log.warn("⚠️ Nenhum arquivo encontrado para o setor: '{}' (decodificado: '{}')", sectorName, decodedSectorName);
-                log.warn("📊 Entradas verificadas: {}, com caminho: {}, arquivos existentes: {}", 
-                    totalEntriesChecked, entriesWithPath, entriesFileExists);
-                return ResponseEntity.notFound().build();
-            }
-            
-            log.info("✅ {} arquivo(s) encontrado(s) para download do setor: '{}'", filesToZip.size(), decodedSectorName);
-            
-            // Criar ZIP streaming
-            log.info("📦 Criando ZIP com {} arquivo(s) para setor '{}'...", filesToZip.size(), decodedSectorName);
-            StreamingResponseBody responseBody = outputStream -> {
-                try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outputStream, 8192))) {
-                    int filesAdded = 0;
-                    for (Path filePath : filesToZip) {
-                        String fileName = filePath.getFileName().toString();
-                        log.info("  📄 Adicionando arquivo {} ao ZIP: {}", filesAdded + 1, fileName);
-                        ZipEntry zipEntry = new ZipEntry(fileName);
-                        zos.putNextEntry(zipEntry);
-                        
-                        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(filePath.toFile()), 8192)) {
-                            byte[] buffer = new byte[8192];
-                            int bytesRead;
-                            long totalBytes = 0;
-                            while ((bytesRead = bis.read(buffer)) != -1) {
-                                zos.write(buffer, 0, bytesRead);
-                                totalBytes += bytesRead;
-                            }
-                            log.info("    ✅ Arquivo adicionado: {} ({} bytes)", fileName, totalBytes);
-                        }
-                        zos.closeEntry();
-                        filesAdded++;
-                    }
-                    log.info("✅ ZIP criado com sucesso: {} arquivo(s) adicionado(s) para setor '{}'", filesAdded, decodedSectorName);
-                } catch (Exception e) {
-                    log.error("💥 Erro ao criar ZIP: {}", e.getMessage(), e);
-                    throw new RuntimeException("Erro ao criar ZIP", e);
-                }
-            };
-            
-            String zipFileName = decodedSectorName.replaceAll("[^a-zA-Z0-9]", "_") + "_documentos_unificados.zip";
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", zipFileName);
-            
-            return ResponseEntity.ok()
-                .headers(headers)
-                .body(responseBody);
-                
-        } catch (Exception e) {
-            log.error("💥 Erro ao fazer download por setor: {}", e.getMessage(), e);
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
-        }
-    }
 
     /**
      * Endpoint de debug para verificar empresas disponíveis

@@ -193,10 +193,16 @@ public class AbsenceController {
     @PutMapping("/{id}")
     public ResponseEntity<AbsenceResponse> updateAbsence(@PathVariable UUID id, @RequestBody AbsenceDTO absenceDTO) {
         try {
+            log.info("🔄 Atualizando afastamento {} com dados: absenceType={}, status={}, reason={}", 
+                id, absenceDTO.getAbsenceType(), absenceDTO.getStatus(), absenceDTO.getReason());
+            
             // Buscar o funcionário pelo ID
             Employee employee = employeeService.findById(absenceDTO.getEmployeeId());
             Absence absence = absenceDTO.toEntity();
             absence.setEmployee(employee);
+            
+            // Log para debug
+            log.info("📝 Absence entity criado com absenceType: {}", absence.getAbsenceType());
             
             // Buscar funcionário de cobertura se fornecido
             if (absenceDTO.getCoverageEmployeeId() != null) {
@@ -205,8 +211,10 @@ public class AbsenceController {
             }
             
             Absence updatedAbsence = absenceService.updateAbsence(id, absence);
+            log.info("✅ Afastamento atualizado com sucesso. Novo absenceType: {}", updatedAbsence.getAbsenceType());
             return ResponseEntity.ok(AbsenceResponse.fromEntity(updatedAbsence));
         } catch (RuntimeException e) {
+            log.error("❌ Erro ao atualizar afastamento {}: {}", id, e.getMessage(), e);
             e.printStackTrace(); // Log para debug
             return ResponseEntity.badRequest().build();
         }
@@ -251,12 +259,19 @@ public class AbsenceController {
     @PreAuthorize("hasAnyAuthority('HR_APPROVE', 'HR_READ', 'HR_WRITE', 'HR_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<AbsenceResponse> rejectAbsence(
             @PathVariable UUID id,
-            @RequestBody ApprovalRequest request) {
+            @RequestBody(required = false) ApprovalRequest request) {
         try {
-            Absence absence = absenceService.rejectAbsence(id, request.getObservacoes());
+            String observacoes = (request != null && request.getObservacoes() != null) 
+                ? request.getObservacoes() 
+                : null;
+            Absence absence = absenceService.rejectAbsence(id, observacoes);
             return ResponseEntity.ok(AbsenceResponse.fromEntity(absence));
         } catch (RuntimeException e) {
+            log.error("Erro ao rejeitar afastamento {}: {}", id, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Erro inesperado ao rejeitar afastamento {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

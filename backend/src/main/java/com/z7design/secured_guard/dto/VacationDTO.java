@@ -2,6 +2,7 @@ package com.z7design.secured_guard.dto;
 
 import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.enums.VacationStatus;
+import com.z7design.secured_guard.model.enums.VacationType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +25,7 @@ public class VacationDTO {
     private Integer daysTaken;
     private Integer remainingDays;
     private VacationStatus status;
+    private VacationType vacationType;
     private UUID approvedById;
     private String approvedByName;
     private LocalDate approvalDate;
@@ -40,6 +42,7 @@ public class VacationDTO {
                 .daysTaken(vacation.getDaysTaken())
                 .remainingDays(vacation.getRemainingDays())
                 .status(vacation.getStatus())
+                .vacationType(vacation.getVacationType())
                 .approvedById(vacation.getApprovedBy() != null ? vacation.getApprovedBy().getId() : null)
                 .approvedByName(vacation.getApprovedBy() != null ? vacation.getApprovedBy().getName() : null)
                 .approvalDate(vacation.getApprovalDate())
@@ -56,6 +59,7 @@ public class VacationDTO {
                 .daysTaken(this.daysTaken)
                 .remainingDays(this.remainingDays)
                 .status(this.status)
+                .vacationType(this.vacationType != null ? this.vacationType : VacationType.NORMAL)
                 .approvalDate(this.approvalDate)
                 .build();
     }
