@@ -235,7 +235,7 @@ const ChatInterno: React.FC = () => {
       
       // Usar timeout para evitar múltiplos scrolls durante renderizações rápidas
       scrollTimeoutRef.current = setTimeout(() => {
-        scrollToBottom();
+    scrollToBottom();
         lastMessageCountRef.current = currentMessageCount;
       }, 100);
     }
@@ -424,14 +424,14 @@ const ChatInterno: React.FC = () => {
         }
       } else {
         // Enviar mensagem de texto
-        const messageData = {
-          content: newMessage,
-          recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
-          groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
-          departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
-          type: 'TEXT' as const,
-          replyToId: replyToMessage?.id
-        };
+      const messageData = {
+        content: newMessage,
+        recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
+        groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
+        departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
+        type: 'TEXT' as const,
+        replyToId: replyToMessage?.id
+      };
 
         sentMessage = await messageService.sendChatMessage(messageData);
       }
@@ -910,12 +910,12 @@ const ChatInterno: React.FC = () => {
 
     if (chatType === 'individual' && selectedUser) {
       newConversation = {
-        id: selectedUser.id,
-        name: selectedUser.name,
-        type: 'individual' as const,
-        unreadCount: 0,
-        isOnline: selectedUser.isOnline
-      };
+      id: selectedUser.id,
+      name: selectedUser.name,
+      type: 'individual' as const,
+      unreadCount: 0,
+      isOnline: selectedUser.isOnline
+    };
     } else if (chatType === 'group' && selectedGroup) {
       newConversation = {
         id: selectedGroup.id,
@@ -1088,11 +1088,11 @@ const ChatInterno: React.FC = () => {
                                   <SelectItem key={user.id} value={user.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
                                     <div className="flex items-center gap-2 w-full">
                                       <div className="relative flex-shrink-0">
-                                        <Avatar className="w-6 h-6">
+                                      <Avatar className="w-6 h-6">
                                           <AvatarFallback className="bg-seguranca-yellow/20 text-seguranca-yellow">
                                             {getInitials(user.name)}
                                           </AvatarFallback>
-                                        </Avatar>
+                                      </Avatar>
                                         {user.isOnline && (
                                           <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-seguranca-darkgray" />
                                         )}
@@ -1327,9 +1327,9 @@ const ChatInterno: React.FC = () => {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
+                  <Button variant="ghost" size="sm">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel>Opções da Conversa</DropdownMenuLabel>
@@ -1386,7 +1386,7 @@ const ChatInterno: React.FC = () => {
                 </div>
               </CardHeader>
 
-                {/* Área de Mensagens */}
+              {/* Área de Mensagens */}
               <CardContent className="flex-1 p-0 flex flex-col">
                 <div className="flex-1 px-2 sm:px-4 overflow-y-auto">
                   <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
@@ -1429,31 +1429,31 @@ const ChatInterno: React.FC = () => {
                               
                               <ContextMenu>
                                 <ContextMenuTrigger asChild>
-                                  <div
+                              <div
                                     className={`p-3 rounded-lg cursor-pointer transition-all hover:opacity-90 ${
-                                      isCurrentUser
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted'
+                                  isCurrentUser
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
                                     } ${selectedMessages.has(message.id) ? 'ring-2 ring-seguranca-yellow' : ''}`}
-                                  >
-                                    {editingMessage === message.id ? (
-                                      <div className="space-y-2">
-                                        <Textarea
-                                          value={editContent}
-                                          onChange={(e) => setEditContent(e.target.value)}
-                                          className="min-h-[60px]"
-                                        />
-                                        <div className="flex gap-2">
-                                          <Button size="sm" onClick={() => editMessage(message.id, editContent)}>
-                                            Salvar
-                                          </Button>
-                                          <Button size="sm" variant="outline" onClick={() => setEditingMessage(null)}>
-                                            Cancelar
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div>
+                              >
+                                {editingMessage === message.id ? (
+                                  <div className="space-y-2">
+                                    <Textarea
+                                      value={editContent}
+                                      onChange={(e) => setEditContent(e.target.value)}
+                                      className="min-h-[60px]"
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => editMessage(message.id, editContent)}>
+                                        Salvar
+                                      </Button>
+                                      <Button size="sm" variant="outline" onClick={() => setEditingMessage(null)}>
+                                        Cancelar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div>
                                         {/* Exibir arquivo se houver */}
                                         {message.fileUrl && (
                                           <div className="mb-2">
@@ -1557,11 +1557,11 @@ const ChatInterno: React.FC = () => {
                                           </div>
                                         )}
                                         
-                                        <div className="flex items-center justify-between mt-2">
-                                          <span className="text-xs opacity-70">
-                                            {format(new Date(message.createdAt), 'HH:mm', { locale: ptBR })}
-                                            {message.editedAt && ' (editada)'}
-                                          </span>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <span className="text-xs opacity-70">
+                                        {format(new Date(message.createdAt), 'HH:mm', { locale: ptBR })}
+                                        {message.editedAt && ' (editada)'}
+                                      </span>
                                         </div>
                                       </div>
                                     )}
@@ -1673,14 +1673,14 @@ const ChatInterno: React.FC = () => {
                                       Denunciar
                                     </ContextMenuItem>
                                   )}
-                                  {isCurrentUser && (
+                                      {isCurrentUser && (
                                     <>
                                       <ContextMenuSeparator />
                                       <ContextMenuItem
-                                        onClick={() => {
-                                          setEditingMessage(message.id);
-                                          setEditContent(message.content);
-                                        }}
+                                            onClick={() => {
+                                              setEditingMessage(message.id);
+                                              setEditContent(message.content);
+                                            }}
                                         className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow"
                                       >
                                         <Edit className="mr-2 h-4 w-4" />
@@ -1834,18 +1834,18 @@ const ChatInterno: React.FC = () => {
                           </Button>
                         </div>
                       ) : newMessage.trim() || selectedFile ? (
-                        <Button 
-                          onClick={sendMessage} 
+                    <Button 
+                      onClick={sendMessage} 
                           disabled={loading}
                           className="h-8 w-8 p-0 bg-primary hover:bg-primary/90 rounded-full"
                           title="Enviar"
-                        >
-                          {loading ? (
+                    >
+                      {loading ? (
                             <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          ) : (
+                      ) : (
                             <Send className="w-4 h-4 text-white" />
-                          )}
-                        </Button>
+                      )}
+                    </Button>
                       ) : (
                         <Button
                           type="button"

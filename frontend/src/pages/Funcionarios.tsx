@@ -64,8 +64,16 @@ const Funcionarios: React.FC = () => {
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
   const shouldOpenModal = params.get('novo') === '1';
+  const tabFromUrl = params.get('tab') || 'lista';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [modalOpen, setModalOpen] = useState(shouldOpenModal);
   const [dependentSearchTerm, setDependentSearchTerm] = useState('');
+  
+  // Atualizar aba quando mudar na URL
+  useEffect(() => {
+    const tab = params.get('tab') || 'lista';
+    setActiveTab(tab);
+  }, [location.search]);
 
   // Carregar funcionários
   const loadEmployees = async (filters: EmployeeFilters = {}) => {
@@ -376,7 +384,10 @@ Confirma a exclusão?`)) {
       title="Gestão de Funcionários"
       subtitle={`${filteredEmployees.length} funcionário${filteredEmployees.length !== 1 ? 's' : ''} no sistema`}
     >
-      <Tabs defaultValue="lista" className="w-full">
+      <Tabs value={activeTab} onValueChange={(value) => {
+        setActiveTab(value);
+        navigate(`/rh/funcionarios?tab=${value}`, { replace: true });
+      }} className="w-full">
         <TabsList className="mb-4 bg-seguranca-black/50 border border-gray-600/30 p-1 flex-wrap h-auto justify-start">
           <TabsTrigger value="lista" className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white flex-grow sm:flex-grow-0">
             <Users className="h-4 w-4 mr-2" />

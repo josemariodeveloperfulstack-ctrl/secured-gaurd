@@ -91,10 +91,35 @@ public class Employee {
     private Unit unit;
     
     @Column
-    private String address;
+    private String address; // Mantido para compatibilidade
+    
+    // Campos de endereço separados
+    @Column(name = "endereco_rua", length = 255)
+    private String enderecoRua;
+    
+    @Column(name = "endereco_numero", length = 20)
+    private String enderecoNumero;
+    
+    @Column(name = "endereco_complemento", length = 100)
+    private String enderecoComplemento;
+    
+    @Column(name = "endereco_bairro", length = 100)
+    private String enderecoBairro;
+    
+    @Column(name = "endereco_cidade", length = 100)
+    private String enderecoCidade;
+    
+    @Column(name = "endereco_estado", length = 2)
+    private String enderecoEstado;
+    
+    @Column(name = "endereco_cep", length = 10)
+    private String enderecoCep;
     
     @Column
     private String phone;
+    
+    @Column(name = "telefone_contato", length = 20)
+    private String telefoneContato;
     
     @Email(message = "Invalid email format")
     @Column
@@ -234,6 +259,28 @@ public class Employee {
     @Column(name = "carteira_identidade_data_emissao")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate carteiraIdentidadeDataEmissao;
+
+    // CIN - Carteira de Identidade Nacional
+    @Column(name = "cin_numero", length = 30)
+    private String cinNumero;
+
+    @Column(name = "cin_orgao_emissor", length = 50)
+    private String cinOrgaoEmissor;
+
+    @Column(name = "cin_data_emissao")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate cinDataEmissao;
+
+    // Upload PDF da CTPS Digital
+    @Column(name = "ctps_digital_pdf", columnDefinition = "BYTEA")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private byte[] ctpsDigitalPdf;
+
+    @Column(name = "ctps_digital_pdf_nome", length = 255)
+    private String ctpsDigitalPdfNome;
+
+    @Column(name = "ctps_digital_pdf_tamanho")
+    private Long ctpsDigitalPdfTamanho;
 
     @Column(name = "certificado_militar", length = 30)
     private String certificadoMilitar;

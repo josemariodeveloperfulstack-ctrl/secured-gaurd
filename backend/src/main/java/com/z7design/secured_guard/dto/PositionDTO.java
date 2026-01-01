@@ -32,6 +32,10 @@ public class PositionDTO {
     @Size(max = 500, message = "Descrição não pode exceder 500 caracteres")
     private String description;
 
+    @Schema(description = "Código Brasileiro de Ocupação (CBO)", example = "5171-10")
+    @Size(max = 10, message = "CBO não pode exceder 10 caracteres")
+    private String cbo;
+
     @Schema(description = "Salário base do cargo", example = "3500.00")
     @NotNull(message = "Salário base é obrigatório")
     @PositiveOrZero(message = "Salário base deve ser um valor positivo ou zero")
@@ -56,6 +60,7 @@ public class PositionDTO {
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
+                .cbo(entity.getCbo())
                 .baseSalary(entity.getBaseSalary())
                 .unitId(entity.getUnit() != null ? entity.getUnit().getId() : null)
                 .unitName(entity.getUnit() != null ? entity.getUnit().getName() : "Sem unidade")
@@ -70,6 +75,7 @@ public class PositionDTO {
         entity.setId(this.id);
         entity.setName(this.name);
         entity.setDescription(this.description);
+        entity.setCbo(this.cbo);
         entity.setBaseSalary(this.baseSalary);
         // A unidade deve ser setada pelo serviço
         entity.setCreatedAt(this.createdAt);

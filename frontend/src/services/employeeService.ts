@@ -46,6 +46,35 @@ export const employeeService = {
   },
 
   /**
+   * Buscar funcionários com filtros
+   */
+  async getEmployees(filters?: {
+    registrationNumber?: string;
+    positionId?: string;
+    positionDescription?: string;
+    unitId?: string;
+    status?: string;
+  }): Promise<Employee[]> {
+    try {
+      console.log('[EmployeeService] getEmployees chamado com filtros:', filters);
+      const params: any = {};
+      if (filters?.registrationNumber) params.registrationNumber = filters.registrationNumber;
+      if (filters?.positionId) params.positionId = filters.positionId;
+      if (filters?.positionDescription) params.positionDescription = filters.positionDescription;
+      if (filters?.unitId) params.unitId = filters.unitId;
+      if (filters?.status) params.status = filters.status;
+
+      console.log('[EmployeeService] Parâmetros da requisição:', params);
+      const response = await api.get('/api/employees', { params });
+      console.log('[EmployeeService] Resposta recebida:', response.data?.length || 0, 'funcionários');
+      return response.data || [];
+    } catch (error) {
+      console.error('[EmployeeService] Erro ao buscar funcionários com filtros:', error);
+      return [];
+    }
+  },
+
+  /**
    * Buscar funcionários simplificados para seleção
    */
   async getSimpleEmployees(): Promise<SimpleEmployee[]> {

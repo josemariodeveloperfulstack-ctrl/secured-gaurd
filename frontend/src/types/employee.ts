@@ -245,6 +245,7 @@ export interface CreateEmployeeDTO {
   nationality?: string;
   email?: string;
   phone?: string;
+  telefoneContato?: string;
   address?: {
     street: string;
     number?: string;
@@ -254,6 +255,13 @@ export interface CreateEmployeeDTO {
     state?: string;
     zipCode?: string;
   } | string;
+  enderecoRua?: string;
+  enderecoNumero?: string;
+  enderecoComplemento?: string;
+  enderecoBairro?: string;
+  enderecoCidade?: string;
+  enderecoEstado?: string;
+  enderecoCep?: string;
   registrationNumber?: string;
   hireDate?: string;
   status?: string;

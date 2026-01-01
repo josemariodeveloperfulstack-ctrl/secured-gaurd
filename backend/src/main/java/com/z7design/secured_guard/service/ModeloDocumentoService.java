@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.model.ModeloDocumento;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.ModeloDocumentoRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 @Transactional
 public class ModeloDocumentoService {
@@ -51,32 +53,80 @@ public class ModeloDocumentoService {
     public ModeloDocumento criarDeArquivo(MultipartFile arquivo, String nomeModelo, String categoria, 
                                          String descricao, User criadoPor) throws IOException {
         
-        // Validar arquivo
-        validarArquivo(arquivo);
-        
-        // Processar arquivo
-        DocumentProcessingService.ProcessamentoResultado resultado = 
-            documentProcessingService.processarArquivo(arquivo.getBytes(), arquivo.getOriginalFilename());
-        
-        // Criar modelo
-        ModeloDocumento modelo = ModeloDocumento.builder()
-                .nomeModelo(nomeModelo)
-                .tipoArquivo(resultado.getTipoArquivo())
-                .conteudoTemplate(resultado.getConteudoExtraido())
-                .arquivoOriginal(arquivo.getBytes())
-                .nomeArquivoOriginal(arquivo.getOriginalFilename())
-                .tamanhoArquivo(arquivo.getSize())
-                .categoria(categoria != null ? categoria : "GERAL")
-                .descricao(descricao)
-                .criadoPor(criadoPor)
-                .ativo(true)
-                .versao("1.0")
-                .extraivel(resultado.isExtraivel())
-                .build();
-        
-        modelo.setPlaceholdersFromList(resultado.getPlaceholders());
-        
-        return modeloDocumentoRepository.save(modelo);
+        try {
+            log.info("🔍 Iniciando criação de modelo de documento: nomeModelo={}, arquivo={}", 
+                nomeModelo, arquivo.getOriginalFilename());
+            
+            // Validar arquivo
+            log.debug("📋 Validando arquivo...");
+            validarArquivo(arquivo);
+            log.debug("✅ Arquivo validado com sucesso");
+            
+            // Processar arquivo
+            log.debug("⚙️ Processando arquivo...");
+            DocumentProcessingService.ProcessamentoResultado resultado = 
+                documentProcessingService.processarArquivo(arquivo.getBytes(), arquivo.getOriginalFilename());
+            log.info("✅ Arquivo processado: tipo={}, extraivel={}, placeholders={}", 
+                resultado.getTipoArquivo(), resultado.isExtraivel(), resultado.getPlaceholders().size());
+            
+            // Validar campos obrigatórios
+            if (nomeModelo == null || nomeModelo.trim().isEmpty()) {
+                throw new IllegalArgumentException("Nome do modelo é obrigatório");
+            }
+            
+            if (resultado.getTipoArquivo() == null) {
+                throw new IllegalArgumentException("Tipo de arquivo não pôde ser determinado");
+            }
+            
+            String nomeArquivoOriginal = arquivo.getOriginalFilename();
+            if (nomeArquivoOriginal == null || nomeArquivoOriginal.trim().isEmpty()) {
+                throw new IllegalArgumentException("Nome do arquivo original é obrigatório");
+            }
+            
+            // Criar modelo
+            log.debug("📝 Criando modelo de documento...");
+            String conteudoTemplate = resultado.getConteudoExtraido();
+            if (conteudoTemplate == null) {
+                conteudoTemplate = "";
+            }
+            
+            byte[] arquivoBytes = arquivo.getBytes();
+            log.debug("📦 Tamanho do arquivo em bytes: {} bytes", arquivoBytes.length);
+            log.debug("📦 Tamanho do arquivo (getSize): {} bytes", arquivo.getSize());
+            
+            // Criar modelo usando new e setters para garantir ordem correta
+            ModeloDocumento modelo = new ModeloDocumento();
+            modelo.setNomeModelo(nomeModelo.trim());
+            modelo.setTipoArquivo(resultado.getTipoArquivo());
+            modelo.setConteudoTemplate(conteudoTemplate);
+            modelo.setArquivoOriginal(arquivoBytes);
+            modelo.setNomeArquivoOriginal(nomeArquivoOriginal);
+            modelo.setTamanhoArquivo(arquivo.getSize());
+            modelo.setCategoria(categoria != null && !categoria.trim().isEmpty() ? categoria.trim() : "GERAL");
+            modelo.setDescricao(descricao != null ? descricao.trim() : null);
+            modelo.setCriadoPor(criadoPor);
+            modelo.setAtivo(true);
+            modelo.setVersao("1.0");
+            modelo.setExtraivel(resultado.isExtraivel());
+            
+            // Definir placeholders
+            if (resultado.getPlaceholders() != null) {
+                modelo.setPlaceholdersFromList(resultado.getPlaceholders());
+            } else {
+                modelo.setPlaceholdersFromList(List.of());
+            }
+            
+            // Data de criação será preenchida automaticamente pelo @CreationTimestamp
+            
+            log.debug("💾 Salvando modelo no banco de dados...");
+            ModeloDocumento modeloSalvo = modeloDocumentoRepository.save(modelo);
+            log.info("✅ Modelo de documento salvo com sucesso: id={}", modeloSalvo.getId());
+            
+            return modeloSalvo;
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar modelo de documento: {}", e.getMessage(), e);
+            throw e;
+        }
     }
     
     /**

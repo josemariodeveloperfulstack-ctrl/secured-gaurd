@@ -10,7 +10,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,14 +35,15 @@ public class ModeloDocumento {
     @Column(name = "nome_modelo", nullable = false)
     private String nomeModelo;
     
-    @NotBlank(message = "Tipo do arquivo é obrigatório")
-    @Enumerated(EnumType.STRING)
+    @NotNull(message = "Tipo do arquivo é obrigatório")
+    @Convert(converter = com.z7design.secured_guard.converter.TipoArquivoConverter.class)
     @Column(name = "tipo_arquivo", nullable = false, length = 10)
     private TipoArquivo tipoArquivo;
     
     @Column(name = "conteudo_template", columnDefinition = "TEXT")
     private String conteudoTemplate; // NULL para PDFs não extraíveis
     
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "placeholders", columnDefinition = "JSON")
     private String placeholders; // JSON string com lista de placeholders
     
@@ -50,8 +53,7 @@ public class ModeloDocumento {
     private String versao = "1.0";
     
     @JsonIgnore
-    @Lob
-    @Column(name = "arquivo_original", nullable = false)
+    @Column(name = "arquivo_original", nullable = false, columnDefinition = "BYTEA")
     private byte[] arquivoOriginal;
     
     @NotBlank(message = "Nome do arquivo original é obrigatório")

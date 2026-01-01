@@ -10,6 +10,7 @@ import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2 } from 'lucide-react';
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
@@ -43,15 +44,26 @@ const uniformePecasOptions = [
   { value: 'LUVA_LATEX', label: 'Luva Latex' },
 ];
 
-const FichaEntregaEPIForm = () => {
+interface FichaEntregaEPIFormProps {
+  employeeId?: string;
+}
+
+const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    funcionarioId: '',
+    funcionarioId: employeeId || '',
     empresaId: '',
     dataEntrega: '',
     responsavelEntrega: '',
     observacoes: '',
   });
+  
+  // Atualizar funcionarioId quando employeeId mudar
+  useEffect(() => {
+    if (employeeId) {
+      setForm(prev => ({ ...prev, funcionarioId: employeeId }));
+    }
+  }, [employeeId]);
 
   const [epis, setEpis] = useState([
     { 
@@ -336,10 +348,36 @@ const FichaEntregaEPIForm = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+
+      // Salvar ficha no banco de dados
+      try {
+        const formData = {
+          employeeId: form.funcionarioId,
+          companyId: form.empresaId,
+          deliveryDate: form.dataEntrega,
+          responsibleEmployeeId: form.responsavelEntregaId || undefined,
+          observations: form.observacoes || undefined,
+          items: epis.map(epi => ({
+            epiName: epi.nome,
+            quantity: parseInt(epi.quantidade) || 1,
+            ca: epi.ca || undefined,
+            validityDate: epi.validade || undefined,
+            uniformType: epi.uniformeTipo || undefined,
+            uniformPiece: epi.uniformePeca || undefined,
+            observations: epi.observacoes || undefined
+          }))
+        };
+
+        await epiDeliveryFormService.create(formData);
+        console.log('✅ Ficha de entrega de EPI salva no banco de dados');
+      } catch (saveError) {
+        console.error('⚠️ Erro ao salvar ficha no banco de dados:', saveError);
+        // Não interrompe o fluxo, apenas loga o erro
+      }
       
       toast({
         title: 'Sucesso',
-        description: 'Ficha de Entrega de EPI gerada com sucesso!',
+        description: 'Ficha de Entrega de EPI gerada e salva com sucesso!',
       });
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);

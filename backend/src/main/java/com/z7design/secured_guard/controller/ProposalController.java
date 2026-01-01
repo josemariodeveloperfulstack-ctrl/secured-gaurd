@@ -40,9 +40,60 @@ public class ProposalController {
 
     @GetMapping("/all")
     @Operation(summary = "Listar todas as propostas sem paginação", description = "Retorna uma lista completa de todas as propostas")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<Proposal>> getAllProposalsList() {
-        List<Proposal> proposals = proposalService.findAll();
-        return ResponseEntity.ok(proposals);
+        try {
+            List<Proposal> proposals = proposalService.findAll();
+            
+            // Inicializar relacionamentos lazy antes da serialização JSON
+            for (Proposal proposal : proposals) {
+                // Inicializar client
+                if (proposal.getClient() != null) {
+                    try {
+                        proposal.getClient().getId();
+                        proposal.getClient().getName();
+                    } catch (Exception e) {
+                        // Ignorar erros de lazy loading
+                    }
+                }
+                
+                // Inicializar createdBy
+                if (proposal.getCreatedBy() != null) {
+                    try {
+                        proposal.getCreatedBy().getId();
+                        proposal.getCreatedBy().getName();
+                    } catch (Exception e) {
+                        // Ignorar erros de lazy loading
+                    }
+                }
+                
+                // Inicializar assignedTo
+                if (proposal.getAssignedTo() != null) {
+                    try {
+                        proposal.getAssignedTo().getId();
+                        proposal.getAssignedTo().getName();
+                    } catch (Exception e) {
+                        // Ignorar erros de lazy loading
+                    }
+                }
+                
+                // Inicializar items
+                if (proposal.getItems() != null) {
+                    try {
+                        proposal.getItems().size();
+                        for (var item : proposal.getItems()) {
+                            item.getId();
+                        }
+                    } catch (Exception e) {
+                        // Ignorar erros de lazy loading
+                    }
+                }
+            }
+            
+            return ResponseEntity.ok(proposals);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/{id}")

@@ -44,11 +44,56 @@ public class ProposalService {
 
     public List<Proposal> findAll() {
         List<Proposal> proposals = proposalRepository.findAll();
-        // Limpar referências órfãs de Lead
+        
+        // Inicializar relacionamentos lazy dentro da transação
         for (Proposal proposal : proposals) {
+            // Inicializar client (obrigatório)
+            if (proposal.getClient() != null) {
+                try {
+                    org.hibernate.Hibernate.initialize(proposal.getClient());
+                    proposal.getClient().getId();
+                    proposal.getClient().getName();
+                } catch (Exception e) {
+                    // Ignorar erros de lazy loading
+                }
+            }
+            
+            // Inicializar createdBy (obrigatório)
+            if (proposal.getCreatedBy() != null) {
+                try {
+                    org.hibernate.Hibernate.initialize(proposal.getCreatedBy());
+                    proposal.getCreatedBy().getId();
+                    proposal.getCreatedBy().getName();
+                } catch (Exception e) {
+                    // Ignorar erros de lazy loading
+                }
+            }
+            
+            // Inicializar assignedTo (opcional)
+            if (proposal.getAssignedTo() != null) {
+                try {
+                    org.hibernate.Hibernate.initialize(proposal.getAssignedTo());
+                    proposal.getAssignedTo().getId();
+                    proposal.getAssignedTo().getName();
+                } catch (Exception e) {
+                    // Ignorar erros de lazy loading
+                }
+            }
+            
+            // Inicializar items
+            if (proposal.getItems() != null) {
+                try {
+                    org.hibernate.Hibernate.initialize(proposal.getItems());
+                    proposal.getItems().size();
+                } catch (Exception e) {
+                    // Ignorar erros de lazy loading
+                }
+            }
+            
+            // Limpar referências órfãs de Lead
             if (proposal.getLead() != null) {
                 try {
-                    // Tentar acessar o Lead para verificar se ainda existe
+                    org.hibernate.Hibernate.initialize(proposal.getLead());
                     proposal.getLead().getId();
                 } catch (jakarta.persistence.EntityNotFoundException e) {
                     // Lead foi deletado, limpar referência

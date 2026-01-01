@@ -14,7 +14,7 @@ import { userService } from '@/services/userService';
 import { User } from '@/types/user';
 import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
-import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2 } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import { EmployeeDataFromPDF } from '@/services/pdfProcessingService';
@@ -23,6 +23,7 @@ import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
 import { AccountingFormButton } from '@/components/funcionarios/AccountingFormButton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -37,7 +38,15 @@ const initialState: CreateEmployeeDTO = {
   rg: '',
   email: '',
   phone: '',
+  telefoneContato: '',
   address: '',
+  enderecoRua: '',
+  enderecoNumero: '',
+  enderecoComplemento: '',
+  enderecoBairro: '',
+  enderecoCidade: '',
+  enderecoEstado: '',
+  enderecoCep: '',
   birthDate: '',
   maritalStatus: 'SINGLE',
   nationality: 'Brasileiro',
@@ -71,6 +80,69 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingCep, setLoadingCep] = useState(false);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
+  
+  // Função para buscar CEP via API ViaCEP
+  const buscarCep = async (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+    
+    setLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        const enderecoCompleto = `${data.logradouro || ''}, ${data.bairro || ''}, ${data.localidade || ''} - ${data.uf || ''}, ${cepLimpo}`;
+        setForm(prev => ({
+          ...prev,
+          enderecoRua: data.logradouro || '',
+          enderecoBairro: data.bairro || '',
+          enderecoCidade: data.localidade || '',
+          enderecoEstado: data.uf || '',
+          enderecoCep: cepLimpo, // Salvar sem máscara
+          address: enderecoCompleto // Manter compatibilidade com campo antigo
+        }));
+        toast({
+          title: "CEP encontrado",
+          description: "Endereço preenchido automaticamente.",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "CEP não encontrado",
+          description: "Verifique o CEP digitado.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível buscar o CEP.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingCep(false);
+    }
+  };
+  
+  // Função para aplicar máscara de telefone
+  const aplicarMascaraTelefone = (valor: string) => {
+    const numeros = valor.replace(/\D/g, '');
+    if (numeros.length <= 10) {
+      return numeros.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    } else {
+      return numeros.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    }
+  };
+  
+  // Função para aplicar máscara de CEP
+  const aplicarMascaraCep = (valor: string) => {
+    const numeros = valor.replace(/\D/g, '');
+    return numeros.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+  };
   
   // Estados para os dados dos selects
   const [positions, setPositions] = useState<Position[]>([]);
@@ -99,6 +171,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   // Estados para dependentes
   const [employeeDependents, setEmployeeDependents] = useState<Dependent[]>([]);
+  const [pendingDependents, setPendingDependents] = useState<DependentCreateRequest[]>([]); // Dependentes pendentes para salvar após criar funcionário
   const [dependentModalOpen, setDependentModalOpen] = useState(false);
   const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
   const [loadingDependents, setLoadingDependents] = useState(false);
@@ -116,7 +189,16 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         rg: employeeToEdit.rg || '',
         email: employeeToEdit.email || '',
         phone: employeeToEdit.phone || '',
+        telefoneContato: (employeeToEdit as any).telefoneContato || '',
         address: employeeToEdit.address || '',
+        // Preencher campos separados se existirem, senão tentar extrair do campo address
+        enderecoRua: (employeeToEdit as any).enderecoRua || '',
+        enderecoNumero: (employeeToEdit as any).enderecoNumero || '',
+        enderecoComplemento: (employeeToEdit as any).enderecoComplemento || '',
+        enderecoBairro: (employeeToEdit as any).enderecoBairro || '',
+        enderecoCidade: (employeeToEdit as any).enderecoCidade || '',
+        enderecoEstado: (employeeToEdit as any).enderecoEstado || '',
+        enderecoCep: (employeeToEdit as any).enderecoCep || '',
         birthDate: employeeToEdit.birthDate || '',
         maritalStatus: employeeToEdit.maritalStatus || 'SINGLE',
         nationality: employeeToEdit.nationality || 'Brasileiro',
@@ -303,6 +385,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setDependentToEdit(null);
     setDependentModalOpen(true);
   };
+  
+  // Modificar callback para salvar dependente temporariamente se ainda não há funcionário criado
+  const handleDependentSavedInCreation = async (dependentData: DependentCreateRequest) => {
+    if (!isEditMode || !employeeToEdit?.id) {
+      // Se ainda não há funcionário criado, armazenar temporariamente
+      setPendingDependents(prev => [...prev, dependentData]);
+      setDependentModalOpen(false);
+      toast({
+        title: "Sucesso!",
+        description: "Dependente será adicionado após salvar o funcionário.",
+        variant: "default"
+      });
+    } else {
+      // Se já há funcionário, salvar normalmente
+      await handleDependentSaved();
+    }
+  };
 
   // Abrir modal para editar dependente
   const handleEditDependent = (dependent: Dependent) => {
@@ -473,6 +572,27 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }
   }, [form.position?.id, positions]);
 
+  // Atualizar campo address quando campos separados são alterados
+  useEffect(() => {
+    if (form.enderecoRua || form.enderecoNumero || form.enderecoBairro || form.enderecoCidade || form.enderecoEstado || form.enderecoCep) {
+      const partes = [
+        form.enderecoRua,
+        form.enderecoNumero ? `nº ${form.enderecoNumero}` : '',
+        form.enderecoComplemento || '',
+        form.enderecoBairro,
+        form.enderecoCidade,
+        form.enderecoEstado,
+        form.enderecoCep ? `CEP: ${form.enderecoCep}` : ''
+      ].filter(Boolean);
+      
+      const enderecoCompleto = partes.join(', ');
+      
+      setForm(prev => ({
+        ...prev,
+        address: enderecoCompleto
+      }));
+    }
+  }, [form.enderecoRua, form.enderecoNumero, form.enderecoComplemento, form.enderecoBairro, form.enderecoCidade, form.enderecoEstado, form.enderecoCep]);
 
   const loadSelectData = async () => {
     setLoadingData(true);
@@ -549,9 +669,15 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validações
-    if (!form.address) {
-      setError('Endereço é obrigatório para criar um funcionário.');
+    // Validações básicas
+    if (!form.name || !form.cpf || !form.email || !form.phone) {
+      setError('Campos obrigatórios: Nome, CPF, Email e Telefone.');
+      return;
+    }
+    
+    // Validações de endereço
+    if (!form.enderecoRua || !form.enderecoNumero || !form.enderecoBairro || !form.enderecoCidade || !form.enderecoEstado || !form.enderecoCep) {
+      setError('Todos os campos de endereço são obrigatórios (Rua, Número, Bairro, Cidade, Estado e CEP).');
       return;
     }
 
@@ -584,35 +710,56 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       
       if (isEditMode && employeeToEdit?.id) {
         // Modo de edição
-        await employeeService.updateEmployee(employeeToEdit.id, employeeData);
+        const updatedEmployee = await employeeService.updateEmployee(employeeToEdit.id, employeeData);
+        setCurrentEmployeeId(updatedEmployee.id || employeeToEdit.id);
         toast({
           title: "Sucesso!",
           description: "Funcionário atualizado com sucesso.",
           variant: "default"
         });
         onCreated(); // Atualizar lista
-        onClose(); // Fechar modal
+        // Não fechar o modal para permitir gerar fichas
       } else {
         // Modo de criação
         const createdEmployee = await employeeService.createEmployee(employeeData);
-        toast({
-          title: "Sucesso!",
-          description: "Funcionário criado com sucesso.",
-          variant: "default"
-        });
+        setCurrentEmployeeId(createdEmployee.id);
+        setIsEditMode(true); // Mudar para modo de edição após criar
+        
+        // Salvar dependentes pendentes após criar o funcionário
+        if (pendingDependents.length > 0 && createdEmployee.id) {
+          try {
+            for (const dependentData of pendingDependents) {
+              await dependentService.createDependent({
+                ...dependentData,
+                employeeId: createdEmployee.id
+              });
+            }
+            toast({
+              title: "Sucesso!",
+              description: `Funcionário criado com sucesso. ${pendingDependents.length} dependente(s) adicionado(s).`,
+              variant: "default"
+            });
+            setPendingDependents([]);
+          } catch (err: any) {
+            console.error('Erro ao salvar dependentes:', err);
+            toast({
+              title: "Aviso",
+              description: "Funcionário criado, mas houve erro ao salvar alguns dependentes. Você pode adicioná-los depois.",
+              variant: "default"
+            });
+          }
+        } else {
+          toast({
+            title: "Sucesso!",
+            description: "Funcionário criado com sucesso.",
+            variant: "default"
+          });
+        }
+        
         onCreated();
         
-        // Após salvar o funcionário, abrir modal para criar usuário
-        setCriarUsuarioModalOpen(true);
-        
-        // Não fechar o modal principal ainda, apenas limpar o formulário
-        setForm(initialState);
-        setPhotoPreview(null);
-        setSelectedUser(null);
-        setUserSearchTerm('');
-        setSelectedPosition(null);
-        setPositionSearchTerm('');
-        setDependents([]);
+        // Não limpar o formulário nem fechar o modal após criar
+        // Permitir que o usuário gere as fichas imediatamente
       }
     } catch (err: any) {
       console.error('Erro ao cadastrar funcionário:', err);
@@ -631,6 +778,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   };
 
   const resetForm = () => {
+    setCurrentEmployeeId(null);
+    setIsEditMode(false);
     setForm(initialState);
     setPhotoPreview(null);
     setError(null);
@@ -935,13 +1084,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     );
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-full p-2 sm:p-4 overflow-y-auto max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">
+    <TooltipProvider>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      // Só fechar se o usuário explicitamente fechar (X ou ESC)
+      // Não fechar automaticamente após salvar
+      if (!isOpen) {
+        // Só fechar se não estiver carregando e não houver funcionário salvo recentemente
+        if (!loading) {
+          onClose();
+        }
+      }
+    }}>
+      <DialogContent className="max-w-4xl w-[95vw] sm:w-full p-3 sm:p-4 md:p-6 overflow-y-auto max-h-[90vh] bg-seguranca-graphite border-gray-600">
+        <DialogHeader className="pb-3 sm:pb-4">
+          <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-seguranca-lightgray">
             {isEditMode ? 'Editar Funcionário' : 'Novo Funcionário'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm text-gray-400">
             {isEditMode 
               ? 'Edite os dados do funcionário. Campos marcados com * são obrigatórios.'
               : 'Preencha os dados do funcionário. Campos marcados com * são obrigatórios.'
@@ -1195,28 +1354,28 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           )}
         </DialogHeader>
         
-                 <form onSubmit={handleSubmit} className="space-y-6">
+                 <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
            {/* Seção: Relacionamentos Obrigatórios */}
-           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-             <h3 className="text-lg font-semibold flex items-center text-white">
-               <UserIcon className="mr-2" size={20} />
+           <div className="space-y-3 sm:space-y-4 bg-[#363636] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-600">
+             <h3 className="text-base sm:text-lg md:text-xl font-semibold flex items-center text-white">
+               <UserIcon className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                Relacionamentos Obrigatórios
              </h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                {/* Seleção de Usuário */}
                <div className="space-y-2">
-                 <Label className="text-sm font-medium text-gray-200">
+                 <Label className="text-xs sm:text-sm font-medium text-gray-200">
                    Usuário do Sistema
                  </Label>
                  <div className="relative">
-                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
                    <Input
                      placeholder="Digite nome, email, username ou CPF para buscar usuário..."
                      value={userSearchTerm}
                      onChange={handleUserSearch}
                      onFocus={handleUserInputFocus}
                      onBlur={handleUserInputBlur}
-                     className="pl-10"
+                     className="pl-9 sm:pl-10 text-xs sm:text-sm h-9 sm:h-10"
                    />
                    
                    {/* Dropdown de usuários */}
@@ -1413,12 +1572,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  />
                </div>
                <div>
-                 <Label className="text-sm font-medium text-gray-200">RG *</Label>
+                 <Label className="text-sm font-medium text-gray-200">RG</Label>
                  <Input 
                    name="rg" 
                    value={form.rg} 
                    onChange={handleChange} 
-                   required 
                  />
                </div>
                <div>
@@ -1544,6 +1702,51 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                      placeholder="Ex: SSP, DETRAN"
                    />
                  </div>
+                 
+                 {/* Upload PDF da CTPS Digital */}
+                 <div className="md:col-span-2">
+                   <Label className="text-sm font-medium text-gray-200">Upload do PDF da CTPS Digital</Label>
+                   <Input 
+                     type="file"
+                     accept=".pdf"
+                     onChange={(e) => {
+                       const file = e.target.files?.[0];
+                       if (file) {
+                         setForm(prev => ({ ...prev, ctpsDigitalPdf: file }));
+                       }
+                     }}
+                     className="mt-1"
+                   />
+                 </div>
+                 
+                 {/* CIN - Carteira de Identidade Nacional */}
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Número do CIN</Label>
+                   <Input 
+                     name="cinNumero" 
+                     value={form.cinNumero || ''} 
+                     onChange={handleChange} 
+                     placeholder="Número do CIN"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Órgão Emissor do CIN</Label>
+                   <Input 
+                     name="cinOrgaoEmissor" 
+                     value={form.cinOrgaoEmissor || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: SSP, DETRAN"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Data de Emissão do CIN</Label>
+                   <Input 
+                     name="cinDataEmissao" 
+                     type="date" 
+                     value={form.cinDataEmissao || ''} 
+                     onChange={handleChange} 
+                   />
+                 </div>
                </div>
              </div>
              
@@ -1638,22 +1841,130 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  <Label className="text-sm font-medium text-gray-200">Telefone *</Label>
                  <Input 
                    name="phone" 
-                   value={form.phone} 
-                   onChange={handleChange} 
+                   value={aplicarMascaraTelefone(form.phone || '')} 
+                   onChange={(e) => {
+                     const valor = e.target.value.replace(/\D/g, '');
+                     setForm(prev => ({ ...prev, phone: valor }));
+                   }}
                    required 
                    placeholder="(00) 00000-0000"
+                   maxLength={15}
                  />
                </div>
-               <div className="md:col-span-2">
-                 <Label className="text-sm font-medium text-gray-200">Endereço *</Label>
+               <div>
+                 <Label className="text-sm font-medium text-gray-200">Telefone de Contato</Label>
                  <Input 
-                   name="address" 
-                   value={form.address} 
-                   onChange={handleChange} 
-                   required 
-                   placeholder="Rua, número, bairro, cidade - estado, CEP"
+                   name="telefoneContato" 
+                   value={aplicarMascaraTelefone(form.telefoneContato || '')} 
+                   onChange={(e) => {
+                     const valor = e.target.value.replace(/\D/g, '');
+                     setForm(prev => ({ ...prev, telefoneContato: valor }));
+                   }}
+                   placeholder="(00) 00000-0000"
+                   maxLength={15}
                  />
                </div>
+            </div>
+            
+            {/* Seção: Endereço Separado */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
+              <h4 className="text-md font-semibold text-seguranca-yellow mb-4">Endereço</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      name="enderecoCep" 
+                      value={aplicarMascaraCep(form.enderecoCep || '')} 
+                      onChange={(e) => {
+                        const valor = e.target.value.replace(/\D/g, '');
+                        setForm(prev => ({ ...prev, enderecoCep: valor }));
+                        if (valor.length === 8) {
+                          buscarCep(valor);
+                        }
+                      }}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      required
+                      className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                    {loadingCep && (
+                      <div className="flex items-center px-2 sm:px-3 text-gray-400">
+                        <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
+                  <Input 
+                    name="enderecoRua" 
+                    value={form.enderecoRua || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome da rua, avenida, etc."
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Número *</Label>
+                  <Input 
+                    name="enderecoNumero" 
+                    value={form.enderecoNumero || ''} 
+                    onChange={handleChange} 
+                    placeholder="123"
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Complemento</Label>
+                  <Input 
+                    name="enderecoComplemento" 
+                    value={form.enderecoComplemento || ''} 
+                    onChange={handleChange} 
+                    placeholder="Apto, Bloco, etc."
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Bairro *</Label>
+                  <Input 
+                    name="enderecoBairro" 
+                    value={form.enderecoBairro || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome do bairro"
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Cidade *</Label>
+                  <Input 
+                    name="enderecoCidade" 
+                    value={form.enderecoCidade || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome da cidade"
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Estado (UF) *</Label>
+                  <Input 
+                    name="enderecoEstado" 
+                    value={form.enderecoEstado || ''} 
+                    onChange={(e) => {
+                      const valor = e.target.value.toUpperCase().substring(0, 2);
+                      setForm(prev => ({ ...prev, enderecoEstado: valor }));
+                    }}
+                    placeholder="MG"
+                    maxLength={2}
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1699,12 +2010,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
              </h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div>
-                 <Label className="text-sm font-medium text-gray-200">Número de Registro *</Label>
+                 <Label className="text-sm font-medium text-gray-200">Número de Registro</Label>
                  <Input 
                    name="registrationNumber" 
                    value={form.registrationNumber} 
                    onChange={handleChange} 
-                   required 
                    placeholder="EMP001"
                  />
                </div>
@@ -2027,7 +2337,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                <Button
                  type="button"
                  onClick={handleAddDependent}
-                 disabled={!isEditMode || !employeeToEdit?.id}
+                 disabled={false}
                  className="bg-purple-600 hover:bg-purple-700 text-white"
                  size="sm"
                >
@@ -2036,11 +2346,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                </Button>
              </div>
 
-             {!isEditMode || !employeeToEdit?.id ? (
-               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-                 <p className="text-yellow-300 text-sm flex items-center">
+             {/* Permitir adicionar dependentes mesmo na criação - serão salvos após salvar o funcionário */}
+             {employeeDependents.length === 0 && !isEditMode ? (
+               <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                 <p className="text-blue-300 text-sm flex items-center">
                    <AlertCircle className="mr-2" size={16} />
-                   Para adicionar dependentes, primeiro salve o funcionário e depois edite-o.
+                   Você pode adicionar dependentes após salvar o funcionário. Eles serão salvos automaticamente.
                  </p>
                </div>
              ) : (
@@ -2137,45 +2448,157 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
              </div>
            )}
           
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            {/* Botão de Ficha Contabilidade - apenas em modo de edição */}
-            {isEditMode && employeeToEdit?.id && (
-              <div className="w-full sm:w-auto">
-                <AccountingFormButton
-                  employeeId={employeeToEdit.id}
-                  employeeName={employeeToEdit.name || 'Funcionário'}
-                  variant="outline"
-                  className="border-red-500 text-red-400 hover:bg-red-500/10 w-full sm:w-auto"
-                />
+          <DialogFooter className="flex flex-col gap-2 sm:gap-2 pt-3 sm:pt-4 border-t border-gray-600 overflow-x-hidden">
+            {/* Botões de geração de fichas - sempre visíveis, habilitados após salvar */}
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 order-1">
+              <div className="w-full min-w-0">
+                {(!currentEmployeeId && !employeeToEdit?.id) ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="w-full">
+                        <AccountingFormButton
+                          employeeId={currentEmployeeId || employeeToEdit?.id || ''}
+                          employeeName={form.name || employeeToEdit?.name || 'Funcionário'}
+                          variant="outline"
+                          className="border-red-500 text-red-400 hover:bg-red-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                          disabled={true}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-semibold">Ficha Contabilidade</p>
+                      <p className="text-xs text-gray-400 mt-1">Será habilitado após salvar o registro</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <AccountingFormButton
+                    employeeId={currentEmployeeId || employeeToEdit?.id || ''}
+                    employeeName={form.name || employeeToEdit?.name || 'Funcionário'}
+                    variant="outline"
+                    className="border-red-500 text-red-400 hover:bg-red-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                    disabled={false}
+                  />
+                )}
               </div>
-            )}
+              {(!currentEmployeeId && !employeeToEdit?.id) ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-full">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={true}
+                        className="border-blue-500 text-blue-400 hover:bg-blue-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
+                      >
+                        <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">Gerar Ficha do Funcionário</span>
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-semibold">Gerar Ficha do Funcionário</p>
+                    <p className="text-xs text-gray-400 mt-1">Será habilitado após salvar o registro</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    const employeeId = currentEmployeeId || employeeToEdit?.id;
+                    if (!employeeId) return;
+                    try {
+                      // Redirecionar para a página de geração de ficha do funcionário
+                      window.open(`/rh/gestao-funcionarios?tab=gerar&tipo=registro&employeeId=${employeeId}`, '_blank');
+                    } catch (error) {
+                      toast({
+                        title: "Erro",
+                        description: "Não foi possível abrir a geração de ficha.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  disabled={loading}
+                  className="border-blue-500 text-blue-400 hover:bg-blue-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
+                >
+                  <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Gerar Ficha do Funcionário</span>
+                </Button>
+              )}
+              {(!currentEmployeeId && !employeeToEdit?.id) ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-full">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={true}
+                        className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
+                      >
+                        <Shield className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">Gerar Ficha de Entrega de EPI</span>
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-semibold">Gerar Ficha de Entrega de EPI</p>
+                    <p className="text-xs text-gray-400 mt-1">Será habilitado após salvar o registro</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    const employeeId = currentEmployeeId || employeeToEdit?.id;
+                    if (!employeeId) return;
+                    try {
+                      // Redirecionar para a página de geração de ficha de entrega de EPI
+                      window.open(`/rh/gestao-funcionarios?tab=gerar&tipo=epi&employeeId=${employeeId}`, '_blank');
+                    } catch (error) {
+                      toast({
+                        title: "Erro",
+                        description: "Não foi possível abrir a geração de ficha de entrega de EPI.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  disabled={loading}
+                  className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
+                >
+                  <Shield className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Gerar Ficha de Entrega de EPI</span>
+                </Button>
+              )}
+            </div>
             
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={resetForm}
-              disabled={loading}
-              className="w-full sm:w-auto"
-            >
-              Limpar Formulário
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose} 
-              disabled={loading}
-              className="w-full sm:w-auto"
-            >
-              Cancelar
-            </Button>
-                         <Button 
-               type="submit" 
-               disabled={loading || loadingData || !form.position?.id}
-               className="w-full sm:w-auto"
-             >
-               {loading ? 'Salvando...' : (isEditMode ? 'Atualizar Funcionário' : 'Cadastrar Funcionário')}
-             </Button>
-                     </DialogFooter>
+            {/* Botões de ação */}
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 order-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={loading}
+                className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="w-full h-9 sm:h-10 text-xs sm:text-sm bg-seguranca-red hover:bg-seguranca-red/90 text-white"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2 inline-block"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar'
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
          </form>
        </DialogContent>
        
@@ -2202,17 +2625,34 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
        />
 
        {/* Modal de Dependentes */}
-       {employeeToEdit?.id && (
-         <DependentFormModal
-           isOpen={dependentModalOpen}
-           onClose={() => setDependentModalOpen(false)}
-           employeeId={employeeToEdit.id}
-           employeeName={employeeToEdit.name}
-           dependent={dependentToEdit || undefined}
-           onSuccess={handleDependentSaved}
-         />
-       )}
+       <DependentFormModal
+         isOpen={dependentModalOpen}
+         onClose={() => {
+           setDependentModalOpen(false);
+           setDependentToEdit(null);
+         }}
+         employeeId={employeeToEdit?.id}
+         employeeName={employeeToEdit?.name}
+         dependent={dependentToEdit || undefined}
+         onSuccess={async () => {
+           if (!isEditMode || !employeeToEdit?.id) {
+             // Se ainda não há funcionário criado, armazenar dependente temporariamente
+             // O DependentFormModal retornará os dados do dependente via callback
+             setDependentModalOpen(false);
+             setDependentToEdit(null);
+             toast({
+               title: "Aviso",
+               description: "Dependente será adicionado após salvar o funcionário.",
+               variant: "default"
+             });
+           } else {
+             // Se já há funcionário, usar o callback normal
+             await handleDependentSaved();
+           }
+         }}
+       />
      </Dialog>
+     </TooltipProvider>
    );
  };
 

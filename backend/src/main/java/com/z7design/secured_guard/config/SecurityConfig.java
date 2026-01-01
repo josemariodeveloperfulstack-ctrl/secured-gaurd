@@ -198,7 +198,7 @@ public class SecurityConfig {
                     "GESTOR"
                 )
                 // Endpoints de mensagens - permitir para todos os roles principais, incluindo Departamento Pessoal
-                .requestMatchers("/api/v1/messages/**").hasAnyRole(
+                .requestMatchers("/api/v1/messages/**").hasAnyAuthority(
                     "SUPER_ADMIN",
                     "ADMIN",
                     "SUPERVISOR",
@@ -207,7 +207,16 @@ public class SecurityConfig {
                     "RH",
                     "DEPARTAMENTO_PESSOAL",
                     "FINANCEIRO",
-                    "GESTOR"
+                    "GESTOR",
+                    "ROLE_SUPER_ADMIN",
+                    "ROLE_ADMIN",
+                    "ROLE_SUPERVISOR",
+                    "ROLE_COLABORADOR",
+                    "ROLE_VIGILANTE",
+                    "ROLE_RH",
+                    "ROLE_DEPARTAMENTO_PESSOAL",
+                    "ROLE_FINANCEIRO",
+                    "ROLE_GESTOR"
                 )
                 // Endpoints de suporte e atendimento - requerem permissões específicas
                 .requestMatchers("/api/v1/support/**").hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE", "SUPPORT_DELETE", "SUPPORT_MANAGE", "ATTENDANCE_READ", "ATTENDANCE_WRITE", "ATTENDANCE_MANAGE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_FINANCEIRO", "ROLE_COMERCIAL", "ROLE_SUPERVISOR")

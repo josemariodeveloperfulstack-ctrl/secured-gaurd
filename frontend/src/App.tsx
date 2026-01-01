@@ -57,6 +57,7 @@ const Frota = lazy(() => import('@/pages/Frota'));
 const Documentos = lazy(() => import('@/pages/Documentos'));
 const DocumentosUnificados = lazy(() => import('@/pages/DocumentosUnificados'));
 const EPIs = lazy(() => import('@/pages/EPIs'));
+const FichasEntregaEPI = lazy(() => import('@/pages/FichasEntregaEPI'));
 const Certificacoes = lazy(() => import('@/pages/Certificacoes'));
 const RH = lazy(() => import('@/pages/RH'));
 const Departamentos = lazy(() => import('@/pages/RH/Departamentos'));
@@ -622,6 +623,13 @@ function App() {
                     <Route path="/epis" element={
                       <ProtectedRoute>
                         <EPIs />
+                      </ProtectedRoute>
+                    } />
+                    
+                    {/* Fichas de Entrega de EPI */}
+                    <Route path="/fichas-entrega-epi" element={
+                      <ProtectedRoute>
+                        <FichasEntregaEPI />
                       </ProtectedRoute>
                     } />
                     

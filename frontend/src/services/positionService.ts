@@ -4,6 +4,7 @@ export interface Position {
   id: string;
   name: string;
   description?: string;
+  cbo?: string;
   baseSalary?: number;
   unitId?: string;
   createdAt: string;
@@ -13,6 +14,7 @@ export interface Position {
 export interface PositionDTO {
   name: string;
   description: string;
+  cbo?: string;
   baseSalary: number;
   unitId?: string;
 }

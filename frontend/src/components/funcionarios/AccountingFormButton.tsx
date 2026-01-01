@@ -16,6 +16,7 @@ interface AccountingFormButtonProps {
   variant?: 'default' | 'outline' | 'ghost';
   size?: 'default' | 'sm' | 'lg';
   className?: string;
+  disabled?: boolean;
 }
 
 export const AccountingFormButton: React.FC<AccountingFormButtonProps> = ({
@@ -23,7 +24,8 @@ export const AccountingFormButton: React.FC<AccountingFormButtonProps> = ({
   employeeName,
   variant = 'outline',
   size = 'default',
-  className = ''
+  className = '',
+  disabled = false
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -91,19 +93,18 @@ export const AccountingFormButton: React.FC<AccountingFormButtonProps> = ({
         <Button 
           variant={variant} 
           size={size}
-          className={className}
-          disabled={loading}
+          className={`${className} truncate`}
+          disabled={loading || disabled || !employeeId}
         >
           {loading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Gerando...
+              <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin flex-shrink-0" />
+              <span className="truncate">Gerando...</span>
             </>
           ) : (
             <>
-              <FileText className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Ficha Contabilidade</span>
-              <span className="sm:hidden">Ficha</span>
+              <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Ficha Contabilidade</span>
             </>
           )}
         </Button>

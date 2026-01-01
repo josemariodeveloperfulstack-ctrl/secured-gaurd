@@ -6,3 +6,4 @@ public enum VacationType {
     PECUNIARY_BONUS   // Abono Pecuniário
 }
 
+

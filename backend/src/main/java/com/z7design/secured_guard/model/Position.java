@@ -28,6 +28,9 @@ public class Position {
     @Column(length = 500)
     private String description;
 
+    @Column(name = "cbo", length = 10)
+    private String cbo;
+
     @Column(nullable = false)
     private BigDecimal baseSalary;
 

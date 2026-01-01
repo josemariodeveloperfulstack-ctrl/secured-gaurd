@@ -13,7 +13,11 @@ import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
-const FichaRegistroFuncionarioForm = () => {
+interface FichaRegistroFuncionarioFormProps {
+  employeeId?: string;
+}
+
+const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> = ({ employeeId }) => {
   const { toast } = useToast();
   
   // Função auxiliar para formatar data ISO para BR
@@ -27,13 +31,20 @@ const FichaRegistroFuncionarioForm = () => {
     }
   };
   const [form, setForm] = useState({
-    funcionarioId: '',
+    funcionarioId: employeeId || '',
     empresaId: '',
     dataRegistro: '',
     responsavelRegistroId: '', // ID do funcionário responsável
     observacoes: '',
     documentosEntregues: [] as string[],
   });
+  
+  // Atualizar funcionarioId quando employeeId mudar
+  useEffect(() => {
+    if (employeeId) {
+      setForm(prev => ({ ...prev, funcionarioId: employeeId }));
+    }
+  }, [employeeId]);
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);

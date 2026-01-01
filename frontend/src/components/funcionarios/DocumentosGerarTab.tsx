@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import TermoValeTransporteForm from './TermoValeTransporteForm';
 import FichaEntregaEPIForm from './FichaEntregaEPIForm';
@@ -30,7 +31,17 @@ const tipos = [
 ];
 
 const DocumentosGerarTab = () => {
-  const [tipo, setTipo] = useState('modelos');
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const tipoFromUrl = params.get('tipo');
+  const [tipo, setTipo] = useState(tipoFromUrl || 'modelos');
+  
+  // Atualizar tipo quando mudar na URL
+  useEffect(() => {
+    if (tipoFromUrl) {
+      setTipo(tipoFromUrl);
+    }
+  }, [tipoFromUrl]);
 
   return (
     <div className="space-y-6">
@@ -84,8 +95,8 @@ const DocumentosGerarTab = () => {
       <div>
         {tipo === 'modelos' && <ModelosDocumentosForm />}
         {tipo === 'vt' && <TermoValeTransporteForm />}
-        {tipo === 'epi' && <FichaEntregaEPIForm />}
-        {tipo === 'registro' && <FichaRegistroFuncionarioForm />}
+        {tipo === 'epi' && <FichaEntregaEPIForm employeeId={params.get('employeeId') || undefined} />}
+        {tipo === 'registro' && <FichaRegistroFuncionarioForm employeeId={params.get('employeeId') || undefined} />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm />}
         {tipo === 'lgpd' && <TermoLGPDForm />}
         {tipo === 'contratos' && <ContratosTrabalhoForm />}

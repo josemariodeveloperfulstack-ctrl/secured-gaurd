@@ -109,6 +109,7 @@ public class PositionService {
 
         existingPosition.setName(dto.getName());
         existingPosition.setDescription(dto.getDescription());
+        existingPosition.setCbo(dto.getCbo());
         existingPosition.setBaseSalary(dto.getBaseSalary());
 
         if (dto.getUnitId() != null) {

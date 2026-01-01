@@ -24,6 +24,9 @@ public class PositionCreateDTO {
     @Size(max = 500, message = "Description cannot exceed 500 characters")
     private String description;
     
+    @Size(max = 10, message = "CBO cannot exceed 10 characters")
+    private String cbo;
+    
     @NotNull(message = "Base salary is required")
     @PositiveOrZero(message = "Base salary must be a positive value or zero")
     private Double baseSalary;

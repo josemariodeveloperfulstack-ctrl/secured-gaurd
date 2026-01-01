@@ -4,8 +4,10 @@ import com.z7design.secured_guard.model.ModeloDocumento;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.ModeloDocumentoService;
 import com.z7design.secured_guard.service.AuthenticationService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/modelos-documentos")
 @CrossOrigin(origins = "*")
@@ -121,15 +124,35 @@ public class ModeloDocumentoController {
             @RequestParam(value = "descricao", required = false) String descricao) {
         
         try {
+            log.info("📤 Recebendo upload de modelo de documento: nomeModelo={}, categoria={}, arquivo={}, tamanho={} bytes", 
+                nomeModelo, categoria, arquivo.getOriginalFilename(), arquivo.getSize());
+            
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null) {
+                log.error("❌ Autenticação é null");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
             User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            if (usuarioAtual == null) {
+                log.error("❌ Usuário atual é null");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            log.info("✅ Usuário autenticado: {}", usuarioAtual.getUsername());
+            
             ModeloDocumento modelo = modeloDocumentoService.criarDeArquivo(arquivo, nomeModelo, categoria, descricao, usuarioAtual);
+            log.info("✅ Modelo de documento criado com sucesso: id={}, nome={}", modelo.getId(), modelo.getNomeModelo());
             return ResponseEntity.status(HttpStatus.CREATED).body(modelo);
         } catch (IOException e) {
+            log.error("❌ Erro de IO ao criar modelo de documento: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         } catch (IllegalArgumentException e) {
+            log.error("❌ Argumento inválido ao criar modelo de documento: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
+            log.error("❌ Erro inesperado ao criar modelo de documento: {}", e.getMessage(), e);
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -218,6 +241,37 @@ public class ModeloDocumentoController {
         List<String> placeholders = modelo.getPlaceholdersAsList();
         
         return ResponseEntity.ok(placeholders);
+    }
+    
+    /**
+     * Download do arquivo original do modelo
+     */
+    @GetMapping("/{id}/download")
+    public ResponseEntity<byte[]> downloadArquivo(@PathVariable UUID id) {
+        try {
+            ModeloDocumento modelo = modeloDocumentoService.buscarPorId(id);
+            if (modelo.getArquivoOriginal() == null || modelo.getArquivoOriginal().length == 0) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            String nomeArquivo = modelo.getNomeArquivoOriginal() != null 
+                ? modelo.getNomeArquivoOriginal() 
+                : modelo.getNomeModelo() + "." + modelo.getTipoArquivo().name().toLowerCase();
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", nomeArquivo);
+            headers.setContentLength(modelo.getArquivoOriginal().length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(modelo.getArquivoOriginal());
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Erro ao fazer download do arquivo: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
     
     /**
