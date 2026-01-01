@@ -40,7 +40,7 @@ public class EPIDeliveryFormDTO {
                 .id(form.getId())
                 .employeeId(form.getEmployee().getId())
                 .employeeName(form.getEmployee().getName())
-                .employeeCpf(form.getEmployee().getCpf() != null ? form.getEmployee().getCpf() : form.getEmployee().getDocument())
+                .employeeCpf(form.getEmployee().getDocument() != null ? form.getEmployee().getDocument() : null)
                 .companyId(form.getCompany().getId())
                 .companyName(form.getCompany().getName())
                 .companyCnpj(form.getCompany().getCnpj())
