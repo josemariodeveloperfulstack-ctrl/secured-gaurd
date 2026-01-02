@@ -6,3 +6,4 @@ ADD COLUMN IF NOT EXISTS vacation_type VARCHAR(50) DEFAULT 'NORMAL';
 COMMENT ON COLUMN vacations.vacation_type IS 'Tipo de férias: NORMAL, SOLD, PECUNIARY_BONUS';
 
 
+

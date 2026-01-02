@@ -41,9 +41,30 @@ public class EmployeeDTO {
     // private String currentScale;
     private String email;
     private String phone;
+    private String telefoneContato;
     private String cnhNumber;
     @JsonDeserialize(using = AddressDeserializer.class)
     private AddressDTO address;
+    
+    // Campos de endereço separados
+    private String enderecoRua;
+    private String enderecoNumero;
+    private String enderecoComplemento;
+    private String enderecoBairro;
+    private String enderecoCidade;
+    private String enderecoEstado;
+    private String enderecoCep;
+    
+    // CIN (Carteira de Identidade Nacional)
+    private String cinNumero;
+    private String cinOrgaoEmissor;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate cinDataEmissao;
+    
+    // CTPS Digital PDF
+    private byte[] ctpsDigitalPdf;
+    private String ctpsDigitalPdfNome;
+    private Long ctpsDigitalPdfTamanho;
     private BankInfoDTO bankInfo;
     private JobInfoDTO jobInfo;
     private List<DocumentDTO> documents;

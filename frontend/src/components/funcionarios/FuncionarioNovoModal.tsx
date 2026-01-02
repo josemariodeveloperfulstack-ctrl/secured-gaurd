@@ -181,6 +181,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     if (employeeToEdit && open) {
       console.log('🔍 Carregando dados do funcionário para edição:', employeeToEdit);
       setIsEditMode(true);
+      // Definir currentEmployeeId quando abrir para edição
+      if (employeeToEdit.id) {
+        setCurrentEmployeeId(employeeToEdit.id);
+        console.log('✅ currentEmployeeId definido para edição:', employeeToEdit.id);
+      }
       
       // Preencher o formulário com os dados do funcionário
       setForm({
@@ -711,7 +716,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       if (isEditMode && employeeToEdit?.id) {
         // Modo de edição
         const updatedEmployee = await employeeService.updateEmployee(employeeToEdit.id, employeeData);
-        setCurrentEmployeeId(updatedEmployee.id || employeeToEdit.id);
+        const savedId = updatedEmployee?.id || employeeToEdit.id;
+        console.log('✅ Funcionário atualizado - ID:', savedId);
+        console.log('✅ updatedEmployee:', updatedEmployee);
+        setCurrentEmployeeId(savedId);
         toast({
           title: "Sucesso!",
           description: "Funcionário atualizado com sucesso.",
@@ -722,6 +730,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       } else {
         // Modo de criação
         const createdEmployee = await employeeService.createEmployee(employeeData);
+        console.log('✅ Funcionário criado - ID:', createdEmployee.id);
+        console.log('✅ createdEmployee:', createdEmployee);
         setCurrentEmployeeId(createdEmployee.id);
         setIsEditMode(true); // Mudar para modo de edição após criar
         
@@ -2506,14 +2516,46 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   variant="outline"
                   onClick={async () => {
                     const employeeId = currentEmployeeId || employeeToEdit?.id;
-                    if (!employeeId) return;
+                    console.log('🔍 Gerar Ficha - employeeId:', employeeId);
+                    console.log('🔍 Gerar Ficha - currentEmployeeId:', currentEmployeeId);
+                    console.log('🔍 Gerar Ficha - employeeToEdit?.id:', employeeToEdit?.id);
+                    
+                    if (!employeeId) {
+                      toast({
+                        title: "Atenção",
+                        description: "É necessário salvar o funcionário primeiro para gerar a ficha.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    
                     try {
-                      // Redirecionar para a página de geração de ficha do funcionário
-                      window.open(`/rh/gestao-funcionarios?tab=gerar&tipo=registro&employeeId=${employeeId}`, '_blank');
-                    } catch (error) {
+                      const url = `/funcionarios?tab=gerar&tipo=registro&employeeId=${employeeId}`;
+                      console.log('🔗 Abrindo URL:', url);
+                      
+                      // Tentar abrir em nova aba
+                      const newWindow = window.open(url, '_blank');
+                      
+                      if (!newWindow) {
+                        // Se o popup foi bloqueado, tentar navegar na mesma aba
+                        toast({
+                          title: "Aviso",
+                          description: "Popup bloqueado. Redirecionando na mesma aba...",
+                          variant: "default"
+                        });
+                        window.location.href = url;
+                      } else {
+                        toast({
+                          title: "Sucesso",
+                          description: "Abrindo página de geração de ficha...",
+                          variant: "default"
+                        });
+                      }
+                    } catch (error: any) {
+                      console.error('❌ Erro ao abrir geração de ficha:', error);
                       toast({
                         title: "Erro",
-                        description: "Não foi possível abrir a geração de ficha.",
+                        description: error.message || "Não foi possível abrir a geração de ficha.",
                         variant: "destructive"
                       });
                     }
@@ -2551,14 +2593,46 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   variant="outline"
                   onClick={async () => {
                     const employeeId = currentEmployeeId || employeeToEdit?.id;
-                    if (!employeeId) return;
+                    console.log('🔍 Gerar Ficha EPI - employeeId:', employeeId);
+                    console.log('🔍 Gerar Ficha EPI - currentEmployeeId:', currentEmployeeId);
+                    console.log('🔍 Gerar Ficha EPI - employeeToEdit?.id:', employeeToEdit?.id);
+                    
+                    if (!employeeId) {
+                      toast({
+                        title: "Atenção",
+                        description: "É necessário salvar o funcionário primeiro para gerar a ficha de EPI.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    
                     try {
-                      // Redirecionar para a página de geração de ficha de entrega de EPI
-                      window.open(`/rh/gestao-funcionarios?tab=gerar&tipo=epi&employeeId=${employeeId}`, '_blank');
-                    } catch (error) {
+                      const url = `/funcionarios?tab=gerar&tipo=epi&employeeId=${employeeId}`;
+                      console.log('🔗 Abrindo URL:', url);
+                      
+                      // Tentar abrir em nova aba
+                      const newWindow = window.open(url, '_blank');
+                      
+                      if (!newWindow) {
+                        // Se o popup foi bloqueado, tentar navegar na mesma aba
+                        toast({
+                          title: "Aviso",
+                          description: "Popup bloqueado. Redirecionando na mesma aba...",
+                          variant: "default"
+                        });
+                        window.location.href = url;
+                      } else {
+                        toast({
+                          title: "Sucesso",
+                          description: "Abrindo página de geração de ficha de EPI...",
+                          variant: "default"
+                        });
+                      }
+                    } catch (error: any) {
+                      console.error('❌ Erro ao abrir geração de ficha EPI:', error);
                       toast({
                         title: "Erro",
-                        description: "Não foi possível abrir a geração de ficha de entrega de EPI.",
+                        description: error.message || "Não foi possível abrir a geração de ficha de entrega de EPI.",
                         variant: "destructive"
                       });
                     }

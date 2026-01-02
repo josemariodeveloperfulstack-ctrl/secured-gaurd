@@ -71,12 +71,16 @@ public class EmployeeService {
     @Transactional
     public EmployeeDTO update(UUID id, EmployeeDTO dto) {
         try {
-            System.out.println("[DEBUG] DTO recebido: " + dto);
+            System.out.println("[DEBUG] EmployeeService.update - Iniciando atualização do funcionário ID: " + id);
+            System.out.println("[DEBUG] DTO recebido - Nome: " + dto.getName() + ", Email: " + dto.getEmail());
             
             Employee existingEmployee = findById(id);
             System.out.println("[DEBUG] Funcionário existente encontrado: " + existingEmployee.getName());
+            System.out.println("[DEBUG] Email existente: " + existingEmployee.getEmail());
             
-            if (!existingEmployee.getEmail().equals(dto.getEmail()) && 
+            // Validar email único (exceto para o próprio funcionário)
+            if (dto.getEmail() != null && existingEmployee.getEmail() != null && 
+                !existingEmployee.getEmail().equals(dto.getEmail()) && 
                 employeeRepository.existsByEmail(dto.getEmail())) {
                 throw new RuntimeException("Email já cadastrado");
             }
@@ -123,15 +127,91 @@ public class EmployeeService {
             if (dto.getNotes() != null) {
                 existingEmployee.setNotes(dto.getNotes());
             }
+            // Atualizar campo address (compatibilidade) e campos separados
             if (dto.getAddress() != null && dto.getAddress().getStreet() != null && !dto.getAddress().getStreet().isEmpty()) {
                 existingEmployee.setAddress(dto.getAddress().getStreet());
                 System.out.println("[DEBUG] Address atualizado: " + existingEmployee.getAddress());
+            }
+            
+            // Se os campos separados vierem no objeto address, usar eles também
+            if (dto.getAddress() != null) {
+                if (dto.getAddress().getStreet() != null) {
+                    existingEmployee.setEnderecoRua(dto.getAddress().getStreet());
+                }
+                if (dto.getAddress().getNumber() != null) {
+                    existingEmployee.setEnderecoNumero(dto.getAddress().getNumber());
+                }
+                if (dto.getAddress().getComplement() != null) {
+                    existingEmployee.setEnderecoComplemento(dto.getAddress().getComplement());
+                }
+                if (dto.getAddress().getNeighborhood() != null) {
+                    existingEmployee.setEnderecoBairro(dto.getAddress().getNeighborhood());
+                }
+                if (dto.getAddress().getCity() != null) {
+                    existingEmployee.setEnderecoCidade(dto.getAddress().getCity());
+                }
+                if (dto.getAddress().getState() != null) {
+                    existingEmployee.setEnderecoEstado(dto.getAddress().getState());
+                }
+                if (dto.getAddress().getZipCode() != null) {
+                    existingEmployee.setEnderecoCep(dto.getAddress().getZipCode());
+                }
             }
             if (dto.getPhone() != null) {
                 existingEmployee.setPhone(dto.getPhone());
             }
             if (dto.getEmail() != null) {
                 existingEmployee.setEmail(dto.getEmail());
+            }
+            
+            // Atualizar telefone de contato
+            if (dto.getTelefoneContato() != null) {
+                existingEmployee.setTelefoneContato(dto.getTelefoneContato());
+            }
+            
+            // Atualizar campos de endereço separados
+            if (dto.getEnderecoRua() != null) {
+                existingEmployee.setEnderecoRua(dto.getEnderecoRua());
+            }
+            if (dto.getEnderecoNumero() != null) {
+                existingEmployee.setEnderecoNumero(dto.getEnderecoNumero());
+            }
+            if (dto.getEnderecoComplemento() != null) {
+                existingEmployee.setEnderecoComplemento(dto.getEnderecoComplemento());
+            }
+            if (dto.getEnderecoBairro() != null) {
+                existingEmployee.setEnderecoBairro(dto.getEnderecoBairro());
+            }
+            if (dto.getEnderecoCidade() != null) {
+                existingEmployee.setEnderecoCidade(dto.getEnderecoCidade());
+            }
+            if (dto.getEnderecoEstado() != null) {
+                existingEmployee.setEnderecoEstado(dto.getEnderecoEstado());
+            }
+            if (dto.getEnderecoCep() != null) {
+                existingEmployee.setEnderecoCep(dto.getEnderecoCep());
+            }
+            
+            // Atualizar campos CIN
+            if (dto.getCinNumero() != null) {
+                existingEmployee.setCinNumero(dto.getCinNumero());
+            }
+            if (dto.getCinOrgaoEmissor() != null) {
+                existingEmployee.setCinOrgaoEmissor(dto.getCinOrgaoEmissor());
+            }
+            if (dto.getCinDataEmissao() != null) {
+                existingEmployee.setCinDataEmissao(dto.getCinDataEmissao());
+            }
+            
+            // Atualizar CTPS Digital PDF (apenas se fornecido)
+            if (dto.getCtpsDigitalPdf() != null) {
+                existingEmployee.setCtpsDigitalPdf(dto.getCtpsDigitalPdf());
+            }
+            if (dto.getCtpsDigitalPdfNome() != null) {
+                existingEmployee.setCtpsDigitalPdfNome(dto.getCtpsDigitalPdfNome());
+            }
+            if (dto.getCtpsDigitalPdfTamanho() != null) {
+                existingEmployee.setCtpsDigitalPdfTamanho(dto.getCtpsDigitalPdfTamanho());
             }
             
             // Atualizar dados bancários se fornecidos
@@ -167,16 +247,24 @@ public class EmployeeService {
             existingEmployee.setUpdatedAt(LocalDateTime.now());
             
             System.out.println("[DEBUG] Salvando funcionário atualizado...");
+            System.out.println("[DEBUG] Campos de endereço antes de salvar:");
+            System.out.println("  - enderecoRua: " + existingEmployee.getEnderecoRua());
+            System.out.println("  - enderecoNumero: " + existingEmployee.getEnderecoNumero());
+            System.out.println("  - enderecoCidade: " + existingEmployee.getEnderecoCidade());
+            System.out.println("  - enderecoEstado: " + existingEmployee.getEnderecoEstado());
+            System.out.println("  - enderecoCep: " + existingEmployee.getEnderecoCep());
+            
             Employee saved = employeeRepository.save(existingEmployee);
             System.out.println("[DEBUG] Funcionário salvo com sucesso: " + saved.getName());
             
             System.out.println("[DEBUG] Convertendo entidade para DTO...");
             EmployeeDTO result = toDTO(saved);
-            System.out.println("[DEBUG] DTO retornado: " + result);
+            System.out.println("[DEBUG] DTO retornado - Nome: " + result.getName());
             
             return result;
         } catch (Exception e) {
-            System.err.println("[ERROR] Erro ao atualizar funcionário: " + e.getMessage());
+            System.err.println("[ERROR] Erro ao atualizar funcionário ID " + id + ": " + e.getMessage());
+            System.err.println("[ERROR] Tipo da exceção: " + e.getClass().getName());
             e.printStackTrace();
             throw new RuntimeException("Erro ao atualizar funcionário: " + e.getMessage(), e);
         }
@@ -427,9 +515,33 @@ public class EmployeeService {
             // e.setAnoReferencia(dto.getAnoReferencia());
             e.setNotes(dto.getNotes());
             
-            // Garantir que address nunca seja null
-            if (dto.getAddress() != null && dto.getAddress().getStreet() != null && !dto.getAddress().getStreet().isEmpty()) {
-                e.setAddress(dto.getAddress().getStreet());
+            // Processar endereço - usar campos separados se disponíveis, senão usar campo address antigo
+            if (dto.getAddress() != null) {
+                if (dto.getAddress().getStreet() != null && !dto.getAddress().getStreet().isEmpty()) {
+                    e.setAddress(dto.getAddress().getStreet());
+                    // Também preencher campos separados se vierem no objeto address
+                    if (dto.getEnderecoRua() == null) {
+                        e.setEnderecoRua(dto.getAddress().getStreet());
+                    }
+                }
+                if (dto.getAddress().getNumber() != null && dto.getEnderecoNumero() == null) {
+                    e.setEnderecoNumero(dto.getAddress().getNumber());
+                }
+                if (dto.getAddress().getComplement() != null && dto.getEnderecoComplemento() == null) {
+                    e.setEnderecoComplemento(dto.getAddress().getComplement());
+                }
+                if (dto.getAddress().getNeighborhood() != null && dto.getEnderecoBairro() == null) {
+                    e.setEnderecoBairro(dto.getAddress().getNeighborhood());
+                }
+                if (dto.getAddress().getCity() != null && dto.getEnderecoCidade() == null) {
+                    e.setEnderecoCidade(dto.getAddress().getCity());
+                }
+                if (dto.getAddress().getState() != null && dto.getEnderecoEstado() == null) {
+                    e.setEnderecoEstado(dto.getAddress().getState());
+                }
+                if (dto.getAddress().getZipCode() != null && dto.getEnderecoCep() == null) {
+                    e.setEnderecoCep(dto.getAddress().getZipCode());
+                }
             } else {
                 e.setAddress(""); // Definir como string vazia se não fornecido
             }
@@ -437,6 +549,56 @@ public class EmployeeService {
             
             e.setPhone(dto.getPhone());
             e.setEmail(dto.getEmail());
+            
+            // Mapear telefone de contato
+            if (dto.getTelefoneContato() != null) {
+                e.setTelefoneContato(dto.getTelefoneContato());
+            }
+            
+            // Mapear campos de endereço separados
+            if (dto.getEnderecoRua() != null) {
+                e.setEnderecoRua(dto.getEnderecoRua());
+            }
+            if (dto.getEnderecoNumero() != null) {
+                e.setEnderecoNumero(dto.getEnderecoNumero());
+            }
+            if (dto.getEnderecoComplemento() != null) {
+                e.setEnderecoComplemento(dto.getEnderecoComplemento());
+            }
+            if (dto.getEnderecoBairro() != null) {
+                e.setEnderecoBairro(dto.getEnderecoBairro());
+            }
+            if (dto.getEnderecoCidade() != null) {
+                e.setEnderecoCidade(dto.getEnderecoCidade());
+            }
+            if (dto.getEnderecoEstado() != null) {
+                e.setEnderecoEstado(dto.getEnderecoEstado());
+            }
+            if (dto.getEnderecoCep() != null) {
+                e.setEnderecoCep(dto.getEnderecoCep());
+            }
+            
+            // Mapear campos CIN
+            if (dto.getCinNumero() != null) {
+                e.setCinNumero(dto.getCinNumero());
+            }
+            if (dto.getCinOrgaoEmissor() != null) {
+                e.setCinOrgaoEmissor(dto.getCinOrgaoEmissor());
+            }
+            if (dto.getCinDataEmissao() != null) {
+                e.setCinDataEmissao(dto.getCinDataEmissao());
+            }
+            
+            // Mapear CTPS Digital PDF (apenas se fornecido)
+            if (dto.getCtpsDigitalPdf() != null) {
+                e.setCtpsDigitalPdf(dto.getCtpsDigitalPdf());
+            }
+            if (dto.getCtpsDigitalPdfNome() != null) {
+                e.setCtpsDigitalPdfNome(dto.getCtpsDigitalPdfNome());
+            }
+            if (dto.getCtpsDigitalPdfTamanho() != null) {
+                e.setCtpsDigitalPdfTamanho(dto.getCtpsDigitalPdfTamanho());
+            }
             
             // Mapear dados do cônjuge
             e.setSpouseName(dto.getSpouseName());
@@ -587,12 +749,57 @@ public class EmployeeService {
                 dto.setTerminationDate(e.getTerminationDate());
             }
             
-            // Address simplificado
-            if (e.getAddress() != null && !e.getAddress().trim().isEmpty()) {
-                EmployeeDTO.AddressDTO address = new EmployeeDTO.AddressDTO();
+            // Address - usar campos separados se disponíveis, senão usar campo address antigo
+            EmployeeDTO.AddressDTO address = new EmployeeDTO.AddressDTO();
+            if (e.getEnderecoRua() != null) {
+                address.setStreet(e.getEnderecoRua());
+            } else if (e.getAddress() != null && !e.getAddress().trim().isEmpty()) {
                 address.setStreet(e.getAddress());
+            }
+            if (e.getEnderecoNumero() != null) {
+                address.setNumber(e.getEnderecoNumero());
+            }
+            if (e.getEnderecoComplemento() != null) {
+                address.setComplement(e.getEnderecoComplemento());
+            }
+            if (e.getEnderecoBairro() != null) {
+                address.setNeighborhood(e.getEnderecoBairro());
+            }
+            if (e.getEnderecoCidade() != null) {
+                address.setCity(e.getEnderecoCidade());
+            }
+            if (e.getEnderecoEstado() != null) {
+                address.setState(e.getEnderecoEstado());
+            }
+            if (e.getEnderecoCep() != null) {
+                address.setZipCode(e.getEnderecoCep());
+            }
+            if (address.getStreet() != null || address.getNumber() != null || 
+                address.getNeighborhood() != null || address.getCity() != null) {
                 dto.setAddress(address);
             }
+            
+            // Mapear campos de endereço separados
+            dto.setEnderecoRua(e.getEnderecoRua());
+            dto.setEnderecoNumero(e.getEnderecoNumero());
+            dto.setEnderecoComplemento(e.getEnderecoComplemento());
+            dto.setEnderecoBairro(e.getEnderecoBairro());
+            dto.setEnderecoCidade(e.getEnderecoCidade());
+            dto.setEnderecoEstado(e.getEnderecoEstado());
+            dto.setEnderecoCep(e.getEnderecoCep());
+            
+            // Mapear telefone de contato
+            dto.setTelefoneContato(e.getTelefoneContato());
+            
+            // Mapear campos CIN
+            dto.setCinNumero(e.getCinNumero());
+            dto.setCinOrgaoEmissor(e.getCinOrgaoEmissor());
+            dto.setCinDataEmissao(e.getCinDataEmissao());
+            
+            // Mapear CTPS Digital PDF (não incluir o byte array no DTO por padrão, apenas metadados)
+            // dto.setCtpsDigitalPdf(e.getCtpsDigitalPdf()); // Não incluir byte array no DTO
+            dto.setCtpsDigitalPdfNome(e.getCtpsDigitalPdfNome());
+            dto.setCtpsDigitalPdfTamanho(e.getCtpsDigitalPdfTamanho());
             
             // Mapear dados do cônjuge
             dto.setSpouseName(e.getSpouseName());
