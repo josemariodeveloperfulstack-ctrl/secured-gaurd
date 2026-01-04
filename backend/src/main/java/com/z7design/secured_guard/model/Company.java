@@ -50,6 +50,35 @@ public class Company {
     @Column(length = 255)
     private String address;
     
+    // Campos de endereço separados
+    @Size(max = 255, message = "Street must not exceed 255 characters")
+    @Column(name = "endereco_rua", length = 255)
+    private String enderecoRua;
+    
+    @Size(max = 20, message = "Number must not exceed 20 characters")
+    @Column(name = "endereco_numero", length = 20)
+    private String enderecoNumero;
+    
+    @Size(max = 100, message = "Complement must not exceed 100 characters")
+    @Column(name = "endereco_complemento", length = 100)
+    private String enderecoComplemento;
+    
+    @Size(max = 100, message = "Neighborhood must not exceed 100 characters")
+    @Column(name = "endereco_bairro", length = 100)
+    private String enderecoBairro;
+    
+    @Size(max = 100, message = "City must not exceed 100 characters")
+    @Column(length = 100)
+    private String city;
+    
+    @Size(max = 2, message = "State must not exceed 2 characters")
+    @Column(length = 2)
+    private String state;
+    
+    @Size(max = 10, message = "Zip code must not exceed 10 characters")
+    @Column(name = "zip_code", length = 10)
+    private String zipCode;
+    
     @Size(max = 20, message = "Phone must not exceed 20 characters")
     @Column(length = 20)
     private String phone;
@@ -62,6 +91,10 @@ public class Company {
     @Size(max = 255, message = "Website must not exceed 255 characters")
     @Column(length = 255)
     private String website;
+    
+    @Size(max = 500, message = "Logo URL must not exceed 500 characters")
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
     
     @NotNull(message = "Company status is required")
     @Enumerated(EnumType.STRING)
@@ -80,6 +113,10 @@ public class Company {
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference("company-employees")
     private List<Employee> employees;
+    
+    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonManagedReference("company-default-epis")
+    private List<CompanyDefaultEPI> defaultEpis;
     
     public enum CompanyStatus {
         ACTIVE("Ativo"),

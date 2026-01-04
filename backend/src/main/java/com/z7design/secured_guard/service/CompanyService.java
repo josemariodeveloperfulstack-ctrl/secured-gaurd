@@ -1,11 +1,14 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.CompanyDTO;
+import com.z7design.secured_guard.dto.CompanyDefaultEPIDTO;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
+import com.z7design.secured_guard.model.CompanyDefaultEPI;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.CompanyDefaultEPIRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
 public class CompanyService {
     
     private final CompanyRepository companyRepository;
+    private final CompanyDefaultEPIRepository companyDefaultEPIRepository;
     
     /**
      * Buscar todas as empresas
@@ -30,7 +34,7 @@ public class CompanyService {
     public List<CompanyDTO> getAllCompanies() {
         try {
             log.info("Buscando todas as empresas");
-            List<Company> companies = companyRepository.findAllByOrderByNameAsc();
+            List<Company> companies = companyRepository.findAllWithDefaultEpis();
             log.info("Encontradas {} empresas", companies.size());
             
             if (companies.isEmpty()) {
@@ -79,7 +83,7 @@ public class CompanyService {
      */
     public CompanyDTO getCompanyById(UUID id) {
         log.info("Buscando empresa por ID: {}", id);
-        Company company = companyRepository.findById(id)
+        Company company = companyRepository.findByIdWithDefaultEpis(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + id));
         return CompanyDTO.fromEntity(company);
     }
@@ -116,7 +120,25 @@ public class CompanyService {
         company.setStatus(dto.getStatus() != null ? dto.getStatus() : CompanyStatus.ACTIVE);
         
         company = companyRepository.save(company);
+        
+        // Adicionar EPIs padrão se fornecidos
+        if (dto.getDefaultEpis() != null && !dto.getDefaultEpis().isEmpty()) {
+            for (int i = 0; i < dto.getDefaultEpis().size(); i++) {
+                CompanyDefaultEPIDTO epiDto = dto.getDefaultEpis().get(i);
+                CompanyDefaultEPI epi = epiDto.toEntity();
+                epi.setCompany(company);
+                epi.setOrderIndex(i);
+                companyDefaultEPIRepository.save(epi);
+            }
+            log.info("EPIs padrão adicionados para empresa ID: {}", company.getId());
+        }
+        
         log.info("Empresa criada com sucesso - ID: {}", company.getId());
+        
+        // Recarregar empresa com EPIs
+        company = companyRepository.findById(company.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+        
         return CompanyDTO.fromEntity(company);
     }
     
@@ -149,13 +171,43 @@ public class CompanyService {
         existingCompany.setDescription(dto.getDescription());
         existingCompany.setCnpj(dto.getCnpj());
         existingCompany.setAddress(dto.getAddress());
+        existingCompany.setEnderecoRua(dto.getEnderecoRua());
+        existingCompany.setEnderecoNumero(dto.getEnderecoNumero());
+        existingCompany.setEnderecoComplemento(dto.getEnderecoComplemento());
+        existingCompany.setEnderecoBairro(dto.getEnderecoBairro());
+        existingCompany.setCity(dto.getCity());
+        existingCompany.setState(dto.getState());
+        existingCompany.setZipCode(dto.getZipCode());
         existingCompany.setPhone(dto.getPhone());
         existingCompany.setEmail(dto.getEmail());
         existingCompany.setWebsite(dto.getWebsite());
+        existingCompany.setLogoUrl(dto.getLogoUrl());
         existingCompany.setStatus(dto.getStatus());
         
         existingCompany = companyRepository.save(existingCompany);
+        
+        // Atualizar EPIs padrão
+        if (dto.getDefaultEpis() != null) {
+            // Remover EPIs existentes
+            companyDefaultEPIRepository.deleteByCompanyId(existingCompany.getId());
+            
+            // Adicionar novos EPIs
+            for (int i = 0; i < dto.getDefaultEpis().size(); i++) {
+                CompanyDefaultEPIDTO epiDto = dto.getDefaultEpis().get(i);
+                CompanyDefaultEPI epi = epiDto.toEntity();
+                epi.setCompany(existingCompany);
+                epi.setOrderIndex(i);
+                companyDefaultEPIRepository.save(epi);
+            }
+            log.info("EPIs padrão atualizados para empresa ID: {}", existingCompany.getId());
+        }
+        
         log.info("Empresa atualizada com sucesso - ID: {}", existingCompany.getId());
+        
+        // Recarregar empresa com EPIs
+        existingCompany = companyRepository.findById(existingCompany.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+        
         return CompanyDTO.fromEntity(existingCompany);
     }
     

@@ -49,4 +49,25 @@ public interface UnifiedDocumentRepository extends JpaRepository<UnifiedDocument
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Query(value = "UPDATE unified_documents SET receipt_id = NULL WHERE receipt_id = :receiptId", nativeQuery = true)
     int removeReceiptReference(@Param("receiptId") UUID receiptId);
+    
+    /**
+     * Query otimizada para buscar unified documents com payslips relacionados
+     * Usa paginação para evitar carregar muitos dados de uma vez
+     */
+    @Query("SELECT ud FROM UnifiedDocument ud " +
+           "WHERE ud.employeeName IS NOT NULL AND ud.month IS NOT NULL AND ud.year IS NOT NULL " +
+           "ORDER BY ud.year DESC, ud.month DESC, ud.employeeName ASC")
+    List<UnifiedDocument> findAllWithPayslipOptimized();
+    
+    /**
+     * Busca documentos unificados por nome do arquivo
+     */
+    List<UnifiedDocument> findByFileName(String fileName);
+    
+    /**
+     * Exclui documentos unificados por nome do arquivo
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByFileName(String fileName);
 } 

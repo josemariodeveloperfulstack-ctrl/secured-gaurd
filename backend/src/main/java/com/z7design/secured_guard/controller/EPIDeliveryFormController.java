@@ -3,6 +3,9 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
 import com.z7design.secured_guard.service.EPIDeliveryFormService;
+import com.z7design.secured_guard.service.EPIDeliveryPdfService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +34,7 @@ import java.util.UUID;
 public class EPIDeliveryFormController {
 
     private final EPIDeliveryFormService epiDeliveryFormService;
+    private final EPIDeliveryPdfService epiDeliveryPdfService;
 
     @Operation(summary = "Cria uma nova ficha de entrega de EPI")
     @PostMapping
@@ -110,6 +114,44 @@ public class EPIDeliveryFormController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         epiDeliveryFormService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Gerar PDF da ficha de entrega de EPI e salvar no banco", 
+               description = "Gera o PDF da ficha de entrega de EPI, salva o registro no banco e retorna o PDF")
+    @PostMapping("/generate-pdf")
+    public ResponseEntity<byte[]> generateAndSaveEPIDeliveryPdf(
+            @RequestBody CreateEPIDeliveryFormDTO dto,
+            Authentication authentication) {
+        try {
+            log.info("📄 Gerando PDF de ficha de entrega de EPI para funcionário: {}", dto.getEmployeeId());
+            
+            UUID createdByUserId = null;
+            if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
+                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+                // Buscar UUID do usuário pelo username se necessário
+            }
+            
+            // Primeiro, salvar a ficha no banco
+            EPIDeliveryFormDTO savedForm = epiDeliveryFormService.create(dto, createdByUserId);
+            log.info("✅ Ficha de entrega de EPI salva no banco com ID: {}", savedForm.getId());
+            
+            // Buscar a ficha completa para gerar o PDF
+            com.z7design.secured_guard.model.EPIDeliveryForm form = 
+                epiDeliveryFormService.findByIdEntity(savedForm.getId());
+            
+            // Gerar PDF
+            byte[] pdf = epiDeliveryPdfService.generateEPIDeliveryPdfFromForm(form);
+            
+            String fileName = "ficha-entrega-epi-" + savedForm.getId() + ".pdf";
+            
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                .body(pdf);
+        } catch (Exception e) {
+            log.error("❌ Erro ao gerar PDF de ficha de entrega de EPI: {}", e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }
 

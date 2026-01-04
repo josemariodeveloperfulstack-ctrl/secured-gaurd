@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.dto.SimpleEmployeeDTO;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.service.EmployeeService;
+import com.z7design.secured_guard.service.EmployeeRecordPdfService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 public class EmployeeController {
     
     private final EmployeeService employeeService;
+    private final EmployeeRecordPdfService employeeRecordPdfService;
     
     @GetMapping("/count")
     @Operation(summary = "Contar funcionários", description = "Retorna o número total de funcionários")
@@ -245,18 +247,25 @@ public class EmployeeController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos os funcionários", description = "Retorna uma lista de todos os funcionários")
+    @Operation(summary = "Listar todos os funcionários", description = "Retorna uma lista de todos os funcionários com opção de busca por nome ou CPF")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários retornada com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @Transactional(readOnly = true)
-    public ResponseEntity<Object> getAll() {
+    public ResponseEntity<Object> getAll(@RequestParam(required = false) String searchTerm) {
         try {
             System.out.println("🔍 EmployeeController.getAll - Usando query nativa para evitar problemas de relacionamentos");
+            System.out.println("🔍 EmployeeController.getAll - searchTerm: " + searchTerm);
             
-            // Usar query nativa para buscar dados básicos
-            List<Object[]> data = employeeService.findBasicData();
+            // Se houver searchTerm, usar busca por nome ou documento
+            List<Object[]> data;
+            if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                System.out.println("🔍 EmployeeController.getAll - Buscando por termo: " + searchTerm);
+                data = employeeService.findBasicDataBySearchTerm(searchTerm.trim());
+            } else {
+                data = employeeService.findBasicData();
+            }
             System.out.println("🔍 Encontrados " + data.size() + " funcionários no banco");
             
             if (data.isEmpty()) {
@@ -566,6 +575,33 @@ public class EmployeeController {
             System.err.println("[ERROR] EmployeeController.findByCpfExact - Erro: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Erro ao buscar funcionário por CPF: " + e.getMessage());
+        }
+    }
+    
+    @GetMapping("/{id}/generate-record-pdf")
+    @Operation(summary = "Gerar PDF da ficha de registro do funcionário", description = "Gera e retorna o PDF da ficha de registro do funcionário")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar PDF")
+    })
+    public ResponseEntity<byte[]> generateEmployeeRecordPdf(@PathVariable String id) {
+        try {
+            System.out.println("[DEBUG] EmployeeController.generateEmployeeRecordPdf - ID: " + id);
+            
+            UUID employeeId = UUID.fromString(id);
+            byte[] pdf = employeeRecordPdfService.generateEmployeeRecordPdf(employeeId);
+            
+            String fileName = "ficha-registro-funcionario-" + id + ".pdf";
+            
+            return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
+                .body(pdf);
+        } catch (Exception e) {
+            System.err.println("[ERROR] EmployeeController.generateEmployeeRecordPdf - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 } 

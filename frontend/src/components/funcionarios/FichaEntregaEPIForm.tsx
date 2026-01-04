@@ -91,6 +91,45 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
     loadData();
   }, []);
 
+  // Carregar EPIs padrão quando empresa for selecionada
+  useEffect(() => {
+    if (form.empresaId && companies.length > 0) {
+      const selectedCompany = companies.find(c => c.id === form.empresaId);
+      if (selectedCompany) {
+        const companyDefaultEpis = (selectedCompany as any).defaultEpis;
+        if (companyDefaultEpis && companyDefaultEpis.length > 0) {
+          // Verificar se já não foram carregados (evitar loop)
+          const firstEpiName = epis.length > 0 ? epis[0].nome : '';
+          const shouldLoad = firstEpiName === '' || firstEpiName !== companyDefaultEpis[0]?.epiName;
+          
+          if (shouldLoad) {
+            const loadedEpis = companyDefaultEpis.map((epi: any) => ({
+              nome: epi.epiName || '',
+              quantidade: String(epi.quantity || 1),
+              ca: epi.caNumber || '',
+              validade: epi.validity || '',
+              observacoes: epi.observations || '',
+              uniformeTipo: '',
+              uniformePeca: ''
+            }));
+            setEpis(loadedEpis);
+            toast({
+              title: 'EPIs carregados',
+              description: `${loadedEpis.length} EPI(s) padrão da empresa foram carregados automaticamente.`,
+              variant: 'default'
+            });
+          }
+        } else {
+          // Se a empresa não tem EPIs padrão e não há EPIs preenchidos, manter apenas um campo vazio
+          if (epis.length === 0 || (epis.length === 1 && epis[0].nome === '')) {
+            setEpis([{ nome: '', quantidade: '1', ca: '', validade: '', observacoes: '', uniformeTipo: '', uniformePeca: '' }]);
+          }
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.empresaId]);
+
   const loadData = async () => {
     setLoadingData(true);
     try {

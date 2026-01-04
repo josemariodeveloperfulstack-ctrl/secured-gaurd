@@ -13,7 +13,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -39,6 +41,28 @@ public class CompanyDTO {
     @Size(max = 255, message = "Address must not exceed 255 characters")
     private String address;
     
+    // Campos de endereço separados
+    @Size(max = 255, message = "Street must not exceed 255 characters")
+    private String enderecoRua;
+    
+    @Size(max = 20, message = "Number must not exceed 20 characters")
+    private String enderecoNumero;
+    
+    @Size(max = 100, message = "Complement must not exceed 100 characters")
+    private String enderecoComplemento;
+    
+    @Size(max = 100, message = "Neighborhood must not exceed 100 characters")
+    private String enderecoBairro;
+    
+    @Size(max = 100, message = "City must not exceed 100 characters")
+    private String city;
+    
+    @Size(max = 2, message = "State must not exceed 2 characters")
+    private String state;
+    
+    @Size(max = 10, message = "Zip code must not exceed 10 characters")
+    private String zipCode;
+    
     @Size(max = 20, message = "Phone must not exceed 20 characters")
     private String phone;
     
@@ -49,11 +73,17 @@ public class CompanyDTO {
     @Size(max = 255, message = "Website must not exceed 255 characters")
     private String website;
     
+    @Size(max = 500, message = "Logo URL must not exceed 500 characters")
+    private String logoUrl;
+    
     @NotNull(message = "Company status is required")
     private CompanyStatus status;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    // EPIs padrão da primeira entrega
+    private List<CompanyDefaultEPIDTO> defaultEpis;
     
     // Métodos de conversão
     public static CompanyDTO fromEntity(Company company) {
@@ -68,10 +98,23 @@ public class CompanyDTO {
                 .description(company.getDescription())
                 .cnpj(company.getCnpj())
                 .address(company.getAddress())
+                .enderecoRua(company.getEnderecoRua())
+                .enderecoNumero(company.getEnderecoNumero())
+                .enderecoComplemento(company.getEnderecoComplemento())
+                .enderecoBairro(company.getEnderecoBairro())
+                .city(company.getCity())
+                .state(company.getState())
+                .zipCode(company.getZipCode())
                 .phone(company.getPhone())
                 .email(company.getEmail())
                 .website(company.getWebsite())
+                .logoUrl(company.getLogoUrl())
                 .status(company.getStatus())
+                .defaultEpis(company.getDefaultEpis() != null 
+                    ? company.getDefaultEpis().stream()
+                        .map(CompanyDefaultEPIDTO::fromEntity)
+                        .collect(Collectors.toList())
+                    : null)
                 .createdAt(company.getCreatedAt())
                 .updatedAt(company.getUpdatedAt())
                 .build();
@@ -85,9 +128,17 @@ public class CompanyDTO {
         company.setDescription(this.description);
         company.setCnpj(this.cnpj);
         company.setAddress(this.address);
+        company.setEnderecoRua(this.enderecoRua);
+        company.setEnderecoNumero(this.enderecoNumero);
+        company.setEnderecoComplemento(this.enderecoComplemento);
+        company.setEnderecoBairro(this.enderecoBairro);
+        company.setCity(this.city);
+        company.setState(this.state);
+        company.setZipCode(this.zipCode);
         company.setPhone(this.phone);
         company.setEmail(this.email);
         company.setWebsite(this.website);
+        company.setLogoUrl(this.logoUrl);
         company.setStatus(this.status);
         return company;
     }

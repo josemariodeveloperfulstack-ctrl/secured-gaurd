@@ -40,6 +40,8 @@ public class EmployeeService {
     private UnitRepository unitRepository;
     @Autowired
     private com.z7design.secured_guard.repository.CompanyRepository companyRepository;
+    @Autowired
+    private com.z7design.secured_guard.repository.DoctorRepository doctorRepository;
     
     @Transactional
     public EmployeeDTO create(EmployeeDTO dto) {
@@ -243,6 +245,116 @@ public class EmployeeService {
                 existingEmployee.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
             
+            // Atualizar dados do exame médico (ASO)
+            if (dto.getExameMedicoData() != null) {
+                existingEmployee.setExameMedicoData(dto.getExameMedicoData());
+            }
+            if (dto.getExameMedicoTipo() != null) {
+                existingEmployee.setExameMedicoTipo(dto.getExameMedicoTipo());
+            }
+            if (dto.getExameMedicoDoctor() != null && dto.getExameMedicoDoctor().getId() != null) {
+                existingEmployee.setExameMedicoDoctor(doctorRepository.findById(dto.getExameMedicoDoctor().getId()).orElse(null));
+            } else if (dto.getExameMedicoDoctor() == null) {
+                existingEmployee.setExameMedicoDoctor(null);
+            }
+            if (dto.getExameMedicoHorario() != null) {
+                existingEmployee.setExameMedicoHorario(dto.getExameMedicoHorario());
+            }
+            if (dto.getExameMedicoIntervalosRefeicao() != null) {
+                existingEmployee.setExameMedicoIntervalosRefeicao(dto.getExameMedicoIntervalosRefeicao());
+            }
+            if (dto.getExameMedicoObservacoes() != null) {
+                existingEmployee.setExameMedicoObservacoes(dto.getExameMedicoObservacoes());
+            }
+            if (dto.getExameMedicoPrimeiroEmprego() != null) {
+                existingEmployee.setExameMedicoPrimeiroEmprego(dto.getExameMedicoPrimeiroEmprego());
+            }
+            if (dto.getExameMedicoContribuicaoSindicalPaga() != null) {
+                existingEmployee.setExameMedicoContribuicaoSindicalPaga(dto.getExameMedicoContribuicaoSindicalPaga());
+            }
+            
+            // Atualizar campos para Estrangeiro
+            if (dto.getRneNumero() != null) {
+                existingEmployee.setRneNumero(dto.getRneNumero());
+            }
+            if (dto.getRneValidade() != null) {
+                existingEmployee.setRneValidade(dto.getRneValidade());
+            }
+            if (dto.getRicNumero() != null) {
+                existingEmployee.setRicNumero(dto.getRicNumero());
+            }
+            if (dto.getRicOrgaoEmissor() != null) {
+                existingEmployee.setRicOrgaoEmissor(dto.getRicOrgaoEmissor());
+            }
+            if (dto.getRicDataEmissao() != null) {
+                existingEmployee.setRicDataEmissao(dto.getRicDataEmissao());
+            }
+            if (dto.getTipoVisto() != null) {
+                existingEmployee.setTipoVisto(dto.getTipoVisto());
+            }
+            
+            // Atualizar campos de admissão
+            if (dto.getPis() != null) {
+                existingEmployee.setPis(dto.getPis());
+            }
+            if (dto.getTituloEleitor() != null) {
+                existingEmployee.setTituloEleitor(dto.getTituloEleitor());
+            }
+            if (dto.getTituloEleitorZona() != null) {
+                existingEmployee.setTituloEleitorZona(dto.getTituloEleitorZona());
+            }
+            if (dto.getTituloEleitorSecao() != null) {
+                existingEmployee.setTituloEleitorSecao(dto.getTituloEleitorSecao());
+            }
+            if (dto.getTituloEleitorDataExpedicao() != null) {
+                existingEmployee.setTituloEleitorDataExpedicao(dto.getTituloEleitorDataExpedicao());
+            }
+            if (dto.getTituloEleitorValidade() != null) {
+                existingEmployee.setTituloEleitorValidade(dto.getTituloEleitorValidade());
+            }
+            if (dto.getNomeConselhoRegional() != null) {
+                existingEmployee.setNomeConselhoRegional(dto.getNomeConselhoRegional());
+            }
+            if (dto.getCarteiraIdentidadeOrgaoEmissor() != null) {
+                existingEmployee.setCarteiraIdentidadeOrgaoEmissor(dto.getCarteiraIdentidadeOrgaoEmissor());
+            }
+            if (dto.getCarteiraIdentidadeDataEmissao() != null) {
+                existingEmployee.setCarteiraIdentidadeDataEmissao(dto.getCarteiraIdentidadeDataEmissao());
+            }
+            if (dto.getCertificadoMilitar() != null) {
+                existingEmployee.setCertificadoMilitar(dto.getCertificadoMilitar());
+            }
+            if (dto.getSalario() != null) {
+                existingEmployee.setSalario(dto.getSalario());
+            }
+            if (dto.getSalarioPorExtenso() != null) {
+                existingEmployee.setSalarioPorExtenso(dto.getSalarioPorExtenso());
+            }
+            if (dto.getPeriodoPagamento() != null) {
+                existingEmployee.setPeriodoPagamento(dto.getPeriodoPagamento());
+            }
+            if (dto.getHorarioTrabalho() != null) {
+                existingEmployee.setHorarioTrabalho(dto.getHorarioTrabalho());
+            }
+            if (dto.getHorarioTrabalhoIntervalo() != null) {
+                existingEmployee.setHorarioTrabalhoIntervalo(dto.getHorarioTrabalhoIntervalo());
+            }
+            if (dto.getDiasTrabalho() != null) {
+                existingEmployee.setDiasTrabalho(dto.getDiasTrabalho());
+            }
+            if (dto.getPrazoExperienciaTexto() != null) {
+                existingEmployee.setPrazoExperienciaTexto(dto.getPrazoExperienciaTexto());
+            }
+            if (dto.getProrrogacaoExperiencia() != null) {
+                existingEmployee.setProrrogacaoExperiencia(dto.getProrrogacaoExperiencia());
+            }
+            if (dto.getFolgaSemanal() != null) {
+                existingEmployee.setFolgaSemanal(dto.getFolgaSemanal());
+            }
+            if (dto.getEscalaTrabalho() != null) {
+                existingEmployee.setEscalaTrabalho(dto.getEscalaTrabalho());
+            }
+            
             // Atualizar timestamp
             existingEmployee.setUpdatedAt(LocalDateTime.now());
             
@@ -418,6 +530,19 @@ public class EmployeeService {
             System.err.println("❌ EmployeeService.findBasicData - Erro: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Erro ao buscar dados básicos: " + e.getMessage(), e);
+        }
+    }
+
+    public List<Object[]> findBasicDataBySearchTerm(String searchTerm) {
+        try {
+            System.out.println("🔍 EmployeeService.findBasicDataBySearchTerm - Buscando por termo: " + searchTerm);
+            List<Object[]> data = employeeRepository.findBasicDataBySearchTerm(searchTerm);
+            System.out.println("✅ EmployeeService.findBasicDataBySearchTerm - Encontrados " + data.size() + " registros");
+            return data;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeService.findBasicDataBySearchTerm - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar dados básicos por termo: " + e.getMessage(), e);
         }
     }
     
@@ -615,6 +740,13 @@ public class EmployeeService {
             e.setTituloEleitor(dto.getTituloEleitor());
             e.setTituloEleitorZona(dto.getTituloEleitorZona());
             e.setTituloEleitorSecao(dto.getTituloEleitorSecao());
+            if (dto.getTituloEleitorDataExpedicao() != null) {
+                e.setTituloEleitorDataExpedicao(dto.getTituloEleitorDataExpedicao());
+            }
+            if (dto.getTituloEleitorValidade() != null) {
+                e.setTituloEleitorValidade(dto.getTituloEleitorValidade());
+            }
+            e.setNomeConselhoRegional(dto.getNomeConselhoRegional());
             e.setCarteiraIdentidadeOrgaoEmissor(dto.getCarteiraIdentidadeOrgaoEmissor());
             e.setCarteiraIdentidadeDataEmissao(dto.getCarteiraIdentidadeDataEmissao());
             e.setCertificadoMilitar(dto.getCertificadoMilitar());
@@ -628,7 +760,22 @@ public class EmployeeService {
             e.setSalarioPorExtenso(dto.getSalarioPorExtenso());
             e.setPeriodoPagamento(dto.getPeriodoPagamento());
             e.setHorarioTrabalho(dto.getHorarioTrabalho());
+            if (dto.getHorarioTrabalhoIntervalo() != null) {
+                e.setHorarioTrabalhoIntervalo(dto.getHorarioTrabalhoIntervalo());
+            }
+            if (dto.getDiasTrabalho() != null) {
+                e.setDiasTrabalho(dto.getDiasTrabalho());
+            }
+            if (dto.getPrazoExperienciaTexto() != null) {
+                e.setPrazoExperienciaTexto(dto.getPrazoExperienciaTexto());
+            }
+            if (dto.getProrrogacaoExperiencia() != null) {
+                e.setProrrogacaoExperiencia(dto.getProrrogacaoExperiencia());
+            }
             e.setFolgaSemanal(dto.getFolgaSemanal());
+            if (dto.getEscalaTrabalho() != null) {
+                e.setEscalaTrabalho(dto.getEscalaTrabalho());
+            }
             e.setFgtsOptante(dto.getFgtsOptante());
             e.setFgtsDataOpcao(dto.getFgtsDataOpcao());
             e.setFgtsBancoDepositario(dto.getFgtsBancoDepositario());
@@ -656,6 +803,26 @@ public class EmployeeService {
             e.setNaturalizado(dto.getNaturalizado());
             e.setDecretoNaturalizacao(dto.getDecretoNaturalizacao());
             e.setVistoFiscalizacao(dto.getVistoFiscalizacao());
+            
+            // Campos para Estrangeiro
+            if (dto.getRneNumero() != null) {
+                e.setRneNumero(dto.getRneNumero());
+            }
+            if (dto.getRneValidade() != null) {
+                e.setRneValidade(dto.getRneValidade());
+            }
+            if (dto.getRicNumero() != null) {
+                e.setRicNumero(dto.getRicNumero());
+            }
+            if (dto.getRicOrgaoEmissor() != null) {
+                e.setRicOrgaoEmissor(dto.getRicOrgaoEmissor());
+            }
+            if (dto.getRicDataEmissao() != null) {
+                e.setRicDataEmissao(dto.getRicDataEmissao());
+            }
+            if (dto.getTipoVisto() != null) {
+                e.setTipoVisto(dto.getTipoVisto());
+            }
             e.setAssinaturaFuncionario(dto.getAssinaturaFuncionario());
             e.setDataRescisao(dto.getDataRescisao());
             
@@ -676,6 +843,32 @@ public class EmployeeService {
             
             if (dto.getCompany() != null && dto.getCompany().getId() != null) {
                 e.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
+            }
+            
+            // Mapear dados do exame médico (ASO)
+            if (dto.getExameMedicoData() != null) {
+                e.setExameMedicoData(dto.getExameMedicoData());
+            }
+            if (dto.getExameMedicoTipo() != null) {
+                e.setExameMedicoTipo(dto.getExameMedicoTipo());
+            }
+            if (dto.getExameMedicoDoctor() != null && dto.getExameMedicoDoctor().getId() != null) {
+                e.setExameMedicoDoctor(doctorRepository.findById(dto.getExameMedicoDoctor().getId()).orElse(null));
+            }
+            if (dto.getExameMedicoHorario() != null) {
+                e.setExameMedicoHorario(dto.getExameMedicoHorario());
+            }
+            if (dto.getExameMedicoIntervalosRefeicao() != null) {
+                e.setExameMedicoIntervalosRefeicao(dto.getExameMedicoIntervalosRefeicao());
+            }
+            if (dto.getExameMedicoObservacoes() != null) {
+                e.setExameMedicoObservacoes(dto.getExameMedicoObservacoes());
+            }
+            if (dto.getExameMedicoPrimeiroEmprego() != null) {
+                e.setExameMedicoPrimeiroEmprego(dto.getExameMedicoPrimeiroEmprego());
+            }
+            if (dto.getExameMedicoContribuicaoSindicalPaga() != null) {
+                e.setExameMedicoContribuicaoSindicalPaga(dto.getExameMedicoContribuicaoSindicalPaga());
             }
             
             // Mapear documentos se fornecidos
@@ -816,6 +1009,9 @@ public class EmployeeService {
             dto.setTituloEleitor(e.getTituloEleitor());
             dto.setTituloEleitorZona(e.getTituloEleitorZona());
             dto.setTituloEleitorSecao(e.getTituloEleitorSecao());
+            dto.setTituloEleitorDataExpedicao(e.getTituloEleitorDataExpedicao());
+            dto.setTituloEleitorValidade(e.getTituloEleitorValidade());
+            dto.setNomeConselhoRegional(e.getNomeConselhoRegional());
             dto.setCarteiraIdentidadeOrgaoEmissor(e.getCarteiraIdentidadeOrgaoEmissor());
             dto.setCarteiraIdentidadeDataEmissao(e.getCarteiraIdentidadeDataEmissao());
             dto.setCertificadoMilitar(e.getCertificadoMilitar());
@@ -830,6 +1026,7 @@ public class EmployeeService {
             dto.setPeriodoPagamento(e.getPeriodoPagamento());
             dto.setHorarioTrabalho(e.getHorarioTrabalho());
             dto.setFolgaSemanal(e.getFolgaSemanal());
+            dto.setEscalaTrabalho(e.getEscalaTrabalho());
             dto.setFgtsOptante(e.getFgtsOptante());
             dto.setFgtsDataOpcao(e.getFgtsDataOpcao());
             dto.setFgtsBancoDepositario(e.getFgtsBancoDepositario());

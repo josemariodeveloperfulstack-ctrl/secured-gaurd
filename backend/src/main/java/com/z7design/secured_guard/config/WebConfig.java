@@ -29,6 +29,11 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/holerites/**")
                 .addResourceLocations("file:holerites/")
                 .setCachePeriod(3600);
+                
+        // Servir logos de empresas estaticamente (sem autenticação)
+        registry.addResourceHandler("/api/uploads/companies/logos/**")
+                .addResourceLocations("file:uploads/companies/logos/")
+                .setCachePeriod(3600);
     }
     
     @Override
@@ -38,7 +43,8 @@ public class WebConfig implements WebMvcConfigurer {
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
                 // Adicionar headers CORS para arquivos estáticos
                 if (request.getRequestURI().startsWith("/uploads/") || 
-                    request.getRequestURI().startsWith("/holerites/")) {
+                    request.getRequestURI().startsWith("/holerites/") ||
+                    request.getRequestURI().startsWith("/api/uploads/companies/logos/")) {
                     response.setHeader("Access-Control-Allow-Origin", "*");
                     response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
                     response.setHeader("Access-Control-Allow-Headers", "*");

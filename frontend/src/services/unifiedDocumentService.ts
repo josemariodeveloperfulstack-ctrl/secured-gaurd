@@ -109,10 +109,37 @@ export const unifiedDocumentService = {
   /**
    * Busca organização de documentos unificados por Empresa/Setor/Ano/Mês
    */
-  async getOrganization(): Promise<any> {
+  async getOrganization(forceRefresh: boolean = false): Promise<any> {
     try {
-      const response = await api.get('/api/unified-documents/organization');
-      return response.data;
+      // Criar AbortController para timeout de 30 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
+      
+      try {
+        // Adicionar timestamp para evitar cache quando forçar refresh
+        const params: any = {};
+        if (forceRefresh) {
+          params._t = Date.now(); // Cache-busting
+        }
+        
+        const response = await api.get('/api/unified-documents/organization', {
+          params,
+          signal: controller.signal,
+          timeout: 30000 // 30 segundos
+        });
+        clearTimeout(timeoutId);
+        return response.data;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        
+        // Verificar se foi cancelado por timeout
+        if (error.name === 'AbortError' || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+          console.error('⏱️ Timeout ao buscar organização de documentos unificados (30s)');
+          throw new Error('A requisição demorou muito para responder. Tente novamente ou use filtros para reduzir a quantidade de dados.');
+        }
+        
+        throw error;
+      }
     } catch (error) {
       console.error('Erro ao buscar organização de documentos unificados:', error);
       throw error;

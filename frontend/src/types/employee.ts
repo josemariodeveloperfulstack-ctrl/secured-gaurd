@@ -56,6 +56,9 @@ export interface Employee {
   
   // Campos adicionais do backend
   tituloEleitor?: string;
+  tituloEleitorDataExpedicao?: string;
+  tituloEleitorValidade?: string;
+  nomeConselhoRegional?: string;
   carteiraIdentidade?: string;
   grauInstrucao?: string;
   pai?: string;
@@ -89,8 +92,13 @@ export interface Employee {
   salario?: number; // BigDecimal do backend
   salarioPorExtenso?: string;
   periodoPagamento?: string;
-  horarioTrabalho?: string;
-  folgaSemanal?: string;
+  horarioTrabalho?: string; // Período de Trabalho (ex: "18:00 ÀS 06:00 H")
+  horarioTrabalhoIntervalo?: string; // Intervalo (ex: "23:00 ÀS 00:00 H")
+  diasTrabalho?: string; // Dias de Trabalho (ex: "12X36")
+  prazoExperienciaTexto?: string; // Prazo de Experiência em texto (ex: "45 DIAS")
+  prorrogacaoExperiencia?: string; // Prorrogação do prazo de experiência
+  folgaSemanal?: string; // Dias de Folga (ex: "1ª Escola")
+  escalaTrabalho?: string; // Escala de Trabalho
   
   // FGTS
   fgtsOptante?: boolean;
@@ -120,6 +128,8 @@ export interface Employee {
   // Estrangeiros
   carteiraModelo19?: string;
   registroGeralEstrangeiro?: string;
+  rneNumero?: string; // RNE nº
+  rneValidade?: string; // Validade do RNE
   casadoBrasileiro?: boolean;
   nomeConjugeEstrangeiro?: string;
   temFilhosBrasileiros?: boolean;
@@ -127,6 +137,11 @@ export interface Employee {
   dataChegadaBrasil?: string;
   naturalizado?: boolean;
   decretoNaturalizacao?: string;
+  // RIC - Registro de Identidade Civil (para naturalizados)
+  ricNumero?: string; // Nº RIC
+  ricOrgaoEmissor?: string; // Órgão Emissor do RIC
+  ricDataEmissao?: string; // Data de Emissão do RIC
+  tipoVisto?: string; // Tipo de Visto
   
   // Assinaturas e controle
   assinaturaFuncionario?: string;
@@ -150,6 +165,9 @@ export interface Employee {
   empresaEndereco?: string;
   empresaCnpj?: string;
   tituloEleitor?: string;
+  tituloEleitorDataExpedicao?: string;
+  tituloEleitorValidade?: string;
+  nomeConselhoRegional?: string;
   tituloEleitorZona?: string;
   tituloEleitorSecao?: string;
   carteiraIdentidadeOrgaoEmissor?: string;
@@ -163,8 +181,13 @@ export interface Employee {
   salario?: number;
   salarioPorExtenso?: string;
   periodoPagamento?: string;
-  horarioTrabalho?: string;
-  folgaSemanal?: string;
+  horarioTrabalho?: string; // Período de Trabalho (ex: "18:00 ÀS 06:00 H")
+  horarioTrabalhoIntervalo?: string; // Intervalo (ex: "23:00 ÀS 00:00 H")
+  diasTrabalho?: string; // Dias de Trabalho (ex: "12X36")
+  prazoExperienciaTexto?: string; // Prazo de Experiência em texto (ex: "45 DIAS")
+  prorrogacaoExperiencia?: string; // Prorrogação do prazo de experiência
+  folgaSemanal?: string; // Dias de Folga (ex: "1ª Escola")
+  escalaTrabalho?: string; // Escala de Trabalho
   fgtsOptante?: boolean;
   fgtsDataOpcao?: string;
   fgtsBancoDepositario?: string;
@@ -269,6 +292,9 @@ export interface CreateEmployeeDTO {
   
   // Campos adicionais
   tituloEleitor?: string;
+  tituloEleitorDataExpedicao?: string;
+  tituloEleitorValidade?: string;
+  nomeConselhoRegional?: string;
   carteiraIdentidade?: string;
   grauInstrucao?: string;
   pai?: string;
@@ -302,8 +328,13 @@ export interface CreateEmployeeDTO {
   salario?: number;
   salarioPorExtenso?: string;
   periodoPagamento?: string;
-  horarioTrabalho?: string;
-  folgaSemanal?: string;
+  horarioTrabalho?: string; // Período de Trabalho (ex: "18:00 ÀS 06:00 H")
+  horarioTrabalhoIntervalo?: string; // Intervalo (ex: "23:00 ÀS 00:00 H")
+  diasTrabalho?: string; // Dias de Trabalho (ex: "12X36")
+  prazoExperienciaTexto?: string; // Prazo de Experiência em texto (ex: "45 DIAS")
+  prorrogacaoExperiencia?: string; // Prorrogação do prazo de experiência
+  folgaSemanal?: string; // Dias de Folga (ex: "1ª Escola")
+  escalaTrabalho?: string; // Escala de Trabalho
   
   // FGTS
   fgtsOptante?: boolean;
@@ -333,6 +364,8 @@ export interface CreateEmployeeDTO {
   // Estrangeiros
   carteiraModelo19?: string;
   registroGeralEstrangeiro?: string;
+  rneNumero?: string; // RNE nº
+  rneValidade?: string; // Validade do RNE
   casadoBrasileiro?: boolean;
   nomeConjugeEstrangeiro?: string;
   temFilhosBrasileiros?: boolean;
@@ -340,11 +373,26 @@ export interface CreateEmployeeDTO {
   dataChegadaBrasil?: string;
   naturalizado?: boolean;
   decretoNaturalizacao?: string;
+  // RIC - Registro de Identidade Civil (para naturalizados)
+  ricNumero?: string; // Nº RIC
+  ricOrgaoEmissor?: string; // Órgão Emissor do RIC
+  ricDataEmissao?: string; // Data de Emissão do RIC
+  tipoVisto?: string; // Tipo de Visto
   
   // Assinaturas e controle
   assinaturaFuncionario?: string;
   dataRescisao?: string;
   possuiWhatsapp?: boolean;
+  
+  // Dados do Exame Médico (ASO)
+  exameMedicoData?: string;
+  exameMedicoTipo?: string; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
+  exameMedicoDoctor?: { id: string };
+  exameMedicoHorario?: string; // Ex: "18:00 ÀS 06:00 H"
+  exameMedicoIntervalosRefeicao?: boolean; // true = Sim, false = Não
+  exameMedicoObservacoes?: string;
+  exameMedicoPrimeiroEmprego?: boolean; // true = Sim, false = Não
+  exameMedicoContribuicaoSindicalPaga?: boolean; // true = Sim, false = Não
   
   // Dados do cônjuge
   spouseName?: string;
@@ -360,6 +408,9 @@ export interface CreateEmployeeDTO {
   empresaEndereco?: string;
   empresaCnpj?: string;
   tituloEleitor?: string;
+  tituloEleitorDataExpedicao?: string;
+  tituloEleitorValidade?: string;
+  nomeConselhoRegional?: string;
   tituloEleitorZona?: string;
   tituloEleitorSecao?: string;
   carteiraIdentidadeOrgaoEmissor?: string;
@@ -373,8 +424,13 @@ export interface CreateEmployeeDTO {
   salario?: number;
   salarioPorExtenso?: string;
   periodoPagamento?: string;
-  horarioTrabalho?: string;
-  folgaSemanal?: string;
+  horarioTrabalho?: string; // Período de Trabalho (ex: "18:00 ÀS 06:00 H")
+  horarioTrabalhoIntervalo?: string; // Intervalo (ex: "23:00 ÀS 00:00 H")
+  diasTrabalho?: string; // Dias de Trabalho (ex: "12X36")
+  prazoExperienciaTexto?: string; // Prazo de Experiência em texto (ex: "45 DIAS")
+  prorrogacaoExperiencia?: string; // Prorrogação do prazo de experiência
+  folgaSemanal?: string; // Dias de Folga (ex: "1ª Escola")
+  escalaTrabalho?: string; // Escala de Trabalho
   fgtsOptante?: boolean;
   fgtsDataOpcao?: string;
   fgtsBancoDepositario?: string;

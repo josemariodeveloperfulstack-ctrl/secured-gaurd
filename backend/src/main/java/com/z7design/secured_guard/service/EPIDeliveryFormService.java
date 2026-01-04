@@ -98,6 +98,11 @@ public class EPIDeliveryFormService {
         return EPIDeliveryFormDTO.fromEntity(form);
     }
 
+    public EPIDeliveryForm findByIdEntity(UUID id) {
+        return epiDeliveryFormRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
+    }
+
     public Page<EPIDeliveryFormDTO> findAll(Pageable pageable) {
         return epiDeliveryFormRepository.findAll(pageable)
                 .map(EPIDeliveryFormDTO::fromEntity);

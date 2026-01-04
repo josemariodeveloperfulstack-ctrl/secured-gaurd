@@ -253,6 +253,17 @@ public class Employee {
     @Column(name = "titulo_eleitor_secao", length = 10)
     private String tituloEleitorSecao;
 
+    @Column(name = "titulo_eleitor_data_expedicao")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate tituloEleitorDataExpedicao;
+
+    @Column(name = "titulo_eleitor_validade")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate tituloEleitorValidade;
+
+    @Column(name = "nome_conselho_regional", length = 100)
+    private String nomeConselhoRegional;
+
     @Column(name = "carteira_identidade_orgao_emissor", length = 50)
     private String carteiraIdentidadeOrgaoEmissor;
 
@@ -301,10 +312,25 @@ public class Employee {
     private String periodoPagamento;
 
     @Column(name = "horario_trabalho", columnDefinition = "TEXT")
-    private String horarioTrabalho;
+    private String horarioTrabalho; // Período de Trabalho (ex: "18:00 ÀS 06:00 H")
+
+    @Column(name = "horario_trabalho_intervalo", length = 100)
+    private String horarioTrabalhoIntervalo; // Intervalo (ex: "23:00 ÀS 00:00 H")
+
+    @Column(name = "dias_trabalho", length = 20)
+    private String diasTrabalho; // Dias de Trabalho (ex: "12X36")
+
+    @Column(name = "prazo_experiencia_texto", length = 50)
+    private String prazoExperienciaTexto; // Prazo de Experiência em texto (ex: "45 DIAS")
+
+    @Column(name = "prorrogacao_experiencia", length = 50)
+    private String prorrogacaoExperiencia; // Prorrogação do prazo de experiência
 
     @Column(name = "folga_semanal", length = 50)
-    private String folgaSemanal;
+    private String folgaSemanal; // Dias de Folga (ex: "1ª Escola")
+
+    @Column(name = "escala_trabalho", length = 100)
+    private String escalaTrabalho; // Escala de Trabalho
 
     // FGTS
     @Column(name = "fgts_optante")
@@ -381,11 +407,32 @@ public class Employee {
     @Column(name = "registro_geral_estrangeiro", length = 30)
     private String registroGeralEstrangeiro;
 
+    @Column(name = "rne_numero", length = 30)
+    private String rneNumero; // RNE nº
+
+    @Column(name = "rne_validade")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate rneValidade; // Validade do RNE
+
     @Column(name = "casado_brasileiro")
     private Boolean casadoBrasileiro;
 
     @Column(name = "nome_conjuge_estrangeiro", length = 100)
     private String nomeConjugeEstrangeiro;
+    
+    // RIC - Registro de Identidade Civil (para naturalizados)
+    @Column(name = "ric_numero", length = 30)
+    private String ricNumero; // Nº RIC
+
+    @Column(name = "ric_orgao_emissor", length = 50)
+    private String ricOrgaoEmissor; // Órgão Emissor do RIC
+
+    @Column(name = "ric_data_emissao")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate ricDataEmissao; // Data de Emissão do RIC
+
+    @Column(name = "tipo_visto", length = 50)
+    private String tipoVisto; // Tipo de Visto
 
     // Dados do cônjuge
     @Column(name = "spouse_name", length = 100)
@@ -431,6 +478,35 @@ public class Employee {
     @Column(name = "data_rescisao")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dataRescisao;
+
+    // Dados do Exame Médico (ASO)
+    @Column(name = "exame_medico_data")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate exameMedicoData;
+
+    @Column(name = "exame_medico_tipo", length = 50)
+    private String exameMedicoTipo; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "exame_medico_doctor_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Doctor exameMedicoDoctor;
+
+    @Column(name = "exame_medico_horario", length = 100)
+    private String exameMedicoHorario; // Ex: "18:00 ÀS 06:00 H"
+
+    @Column(name = "exame_medico_intervalos_refeicao")
+    private Boolean exameMedicoIntervalosRefeicao; // true = Sim, false = Não
+
+    @Column(name = "exame_medico_observacoes", columnDefinition = "TEXT")
+    private String exameMedicoObservacoes;
+
+    @Column(name = "exame_medico_primeiro_emprego")
+    private Boolean exameMedicoPrimeiroEmprego; // true = Sim, false = Não
+
+    @Column(name = "exame_medico_contribuicao_sindical_paga")
+    private Boolean exameMedicoContribuicaoSindicalPaga; // true = Sim, false = Não
 
     // Método para obter o nome completo do funcionário
     public String getFullName() {

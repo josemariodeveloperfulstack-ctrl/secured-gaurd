@@ -35,10 +35,18 @@ export const employeeService = {
   /**
    * Buscar todos os funcionários
    */
-  async getAllEmployees(): Promise<Employee[]> {
+  async getAllEmployees(searchTerm?: string): Promise<Employee[]> {
     try {
-      const response = await api.get('/api/employees');
-      return response.data;
+      const params: any = {};
+      if (searchTerm && searchTerm.trim()) {
+        params.searchTerm = searchTerm.trim();
+        console.log('🔍 [EmployeeService] Buscando com searchTerm:', params.searchTerm);
+      } else {
+        console.log('🔍 [EmployeeService] Buscando todos os funcionários (sem searchTerm)');
+      }
+      const response = await api.get('/api/employees', { params });
+      console.log('🔍 [EmployeeService] Resposta recebida:', response.data?.length || 0, 'funcionários');
+      return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
       return [];
@@ -248,6 +256,21 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao atualizar funcionário:', error);
       throw new Error(error.response?.data?.message || 'Erro ao atualizar funcionário');
+    }
+  },
+
+  /**
+   * Gerar PDF da ficha de registro do funcionário
+   */
+  async generateEmployeeRecordPdf(id: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/employees/${id}/generate-record-pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF da ficha de registro:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao gerar PDF da ficha de registro');
     }
   }
 };

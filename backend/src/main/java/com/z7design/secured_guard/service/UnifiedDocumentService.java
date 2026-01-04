@@ -9,6 +9,7 @@ import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UnifiedDocumentRepository;
+import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.Employee;
 import lombok.RequiredArgsConstructor;
@@ -56,9 +57,31 @@ public class UnifiedDocumentService {
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final UnifiedDocumentRepository unifiedDocumentRepository;
+    private final PayslipRepository payslipRepository;
     private final com.z7design.secured_guard.repository.UnificationJobRepository unificationJobRepository;
     private final com.z7design.secured_guard.repository.DeletionJobRepository deletionJobRepository;
     private static final String UNIFIED_DIR = "uploads/unified/";
+
+    /**
+     * Cria documento unificado usando IDs específicos do payslip e receipt
+     * Garante que os documentos corretos sejam usados na unificação individual
+     */
+    public String createUnifiedDocumentByIds(java.util.UUID payslipId, java.util.UUID receiptId) throws IOException {
+        log.info("🎯 Criando documento unificado por IDs: payslipId={}, receiptId={}", payslipId, receiptId);
+        
+        // Buscar payslip e receipt pelos IDs
+        Payslip payslip = payslipRepository.findById(payslipId)
+            .orElseThrow(() -> new IOException("Payslip não encontrado com ID: " + payslipId));
+        
+        PaymentReceipt receipt = receiptRepository.findById(receiptId)
+            .orElseThrow(() -> new IOException("PaymentReceipt não encontrado com ID: " + receiptId));
+        
+        log.info("✅ Payslip encontrado: {} - {}/{}", payslip.getEmployeeName(), payslip.getMonth(), payslip.getYear());
+        log.info("✅ Receipt encontrado: {} - {}/{}", receipt.getEmployeeName(), receipt.getMonth(), receipt.getYear());
+        
+        // Criar documento unificado usando os objetos encontrados
+        return createUnifiedDocument(payslip, receipt);
+    }
 
     /**
      * Cria um documento unificado combinando holerite e recibo
@@ -362,7 +385,7 @@ public class UnifiedDocumentService {
             contentStream.beginText();
             contentStream.setFont(PDType1Font.HELVETICA, 12);
             contentStream.newLineAtOffset(50, 600);
-            contentStream.showText("Nomes Coincidentes: " + (namesMatch ? "✅ Sim" : "❌ Não"));
+            contentStream.showText("Nomes Coincidentes: " + (namesMatch ? "SIM" : "NAO"));
             contentStream.endText();
             
             // Footer
@@ -1948,48 +1971,66 @@ public class UnifiedDocumentService {
     public boolean deleteUnifiedDocument(String fileName) throws IOException {
         log.info("🗑️ Excluindo documento unificado: {}", fileName);
         
+        boolean fileDeleted = false;
+        boolean dbRecordDeleted = false;
+        
         try {
-            // Procurar o arquivo recursivamente na pasta uploads/unified
+            // PASSO 1: Excluir o arquivo físico
             Path basePath = Paths.get("uploads", "unified");
             Path filePath = findFileRecursively(basePath, fileName);
             
-            if (filePath == null) {
-                log.warn("⚠️ Arquivo não encontrado: {}", fileName);
-                return false;
-            }
-            
-            log.info("✅ Arquivo encontrado em: {}", filePath);
-            
-            // Verificar se é um arquivo PDF
-            if (!fileName.toLowerCase().endsWith(".pdf")) {
-                log.warn("⚠️ Tipo de arquivo não permitido: {}", fileName);
-                return false;
-            }
-            
-            // Excluir o arquivo
-            boolean deleted = Files.deleteIfExists(filePath);
-            
-            if (deleted) {
-                log.info("✅ Arquivo excluído com sucesso: {}", fileName);
+            if (filePath != null) {
+                log.info("✅ Arquivo encontrado em: {}", filePath);
                 
-                // Tentar excluir a pasta pai se estiver vazia
-                Path parentDir = filePath.getParent();
-                if (parentDir != null && Files.exists(parentDir)) {
-                    try {
-                        if (Files.list(parentDir).findFirst().isEmpty()) {
-                            Files.deleteIfExists(parentDir);
-                            log.info("✅ Pasta vazia removida: {}", parentDir);
+                // Verificar se é um arquivo PDF
+                if (fileName.toLowerCase().endsWith(".pdf")) {
+                    // Excluir o arquivo
+                    fileDeleted = Files.deleteIfExists(filePath);
+                    
+                    if (fileDeleted) {
+                        log.info("✅ Arquivo físico excluído com sucesso: {}", fileName);
+                        
+                        // Tentar excluir a pasta pai se estiver vazia
+                        Path parentDir = filePath.getParent();
+                        if (parentDir != null && Files.exists(parentDir)) {
+                            try {
+                                if (Files.list(parentDir).findFirst().isEmpty()) {
+                                    Files.deleteIfExists(parentDir);
+                                    log.info("✅ Pasta vazia removida: {}", parentDir);
+                                }
+                            } catch (IOException e) {
+                                log.warn("⚠️ Não foi possível verificar/remover pasta pai: {}", e.getMessage());
+                            }
                         }
-                    } catch (IOException e) {
-                        log.warn("⚠️ Não foi possível verificar/remover pasta pai: {}", e.getMessage());
+                    } else {
+                        log.warn("⚠️ Arquivo físico não pôde ser excluído: {}", fileName);
                     }
+                } else {
+                    log.warn("⚠️ Tipo de arquivo não permitido: {}", fileName);
                 }
-                
-                return true;
             } else {
-                log.warn("⚠️ Arquivo não pôde ser excluído: {}", fileName);
-                return false;
+                log.warn("⚠️ Arquivo físico não encontrado: {}", fileName);
             }
+            
+            // PASSO 2: Excluir o registro do banco de dados
+            try {
+                List<UnifiedDocument> documentsToDelete = unifiedDocumentRepository.findByFileName(fileName);
+                
+                if (!documentsToDelete.isEmpty()) {
+                    unifiedDocumentRepository.deleteAll(documentsToDelete);
+                    dbRecordDeleted = true;
+                    log.info("✅ {} registro(s) excluído(s) do banco de dados para o arquivo: {}", 
+                        documentsToDelete.size(), fileName);
+                } else {
+                    log.warn("⚠️ Nenhum registro encontrado no banco para o arquivo: {}", fileName);
+                }
+            } catch (Exception dbError) {
+                log.error("💥 Erro ao excluir registro do banco de dados: {}", dbError.getMessage(), dbError);
+                // Continuar mesmo se falhar a exclusão do banco
+            }
+            
+            // Retornar true se pelo menos uma operação foi bem-sucedida
+            return fileDeleted || dbRecordDeleted;
             
         } catch (Exception e) {
             log.error("💥 Erro ao excluir documento: {}", e.getMessage(), e);
@@ -3693,19 +3734,22 @@ public class UnifiedDocumentService {
 
     /**
      * Organiza documentos unificados por Empresa/Setor/Ano/Mês
-     * Similar à organização de holerites
+     * VERSÃO OTIMIZADA: Usa queries eficientes e evita carregar dados desnecessários
      */
     public PayslipOrganizationResponse organizeUnifiedDocumentsByCompany() {
+        long startTime = System.currentTimeMillis();
         PayslipOrganizationResponse response = new PayslipOrganizationResponse();
         response.setGeneratedAt(LocalDateTime.now());
+        
+        // Timeout de segurança: máximo 25 segundos
+        long maxExecutionTime = 25000;
 
         try {
-            // Buscar todos os documentos unificados
-            List<Map<String, Object>> unifiedDocs;
-            try {
-                unifiedDocs = listAllUnifiedDocuments();
-            } catch (IOException e) {
-                log.error("❌ Erro ao listar documentos unificados: {}", e.getMessage(), e);
+            log.info("⚡ [OTIMIZADO] Iniciando organização de documentos unificados...");
+            
+            // Verificar timeout periodicamente
+            if (System.currentTimeMillis() - startTime > maxExecutionTime) {
+                log.warn("⏱️ Timeout detectado antes de iniciar processamento");
                 response.setTotalPayslips(0);
                 response.setCompanies(Collections.emptyList());
                 response.setTotalCompanies(0);
@@ -3713,238 +3757,270 @@ public class UnifiedDocumentService {
                 return response;
             }
             
-            if (unifiedDocs.isEmpty()) {
+            // OTIMIZAÇÃO 1: Buscar unified documents do banco (limitado para evitar travamento)
+            List<UnifiedDocument> unifiedDocumentsFromDb;
+            try {
+                unifiedDocumentsFromDb = unifiedDocumentRepository.findAllWithPayslipOptimized();
+                
+                // Limitar a 2000 registros para evitar travamento e respostas muito grandes
+                if (unifiedDocumentsFromDb.size() > 2000) {
+                    log.warn("⚠️ Muitos documentos unificados ({}) encontrados. Limitando a 2000 para performance e evitar travamento do navegador.", unifiedDocumentsFromDb.size());
+                    unifiedDocumentsFromDb = unifiedDocumentsFromDb.subList(0, 2000);
+                }
+                
+                log.info("📋 [OTIMIZADO] Encontrados {} documentos unificados no banco (limitado a 2000)", unifiedDocumentsFromDb.size());
+            } catch (Exception dbError) {
+                log.error("❌ Erro ao buscar documentos unificados: {}", dbError.getMessage(), dbError);
+                // Retornar resposta vazia ao invés de tentar método padrão que pode travar
                 response.setTotalPayslips(0);
                 response.setCompanies(Collections.emptyList());
                 response.setTotalCompanies(0);
                 response.setTotalSectors(0);
                 return response;
+            }
+            
+            if (unifiedDocumentsFromDb.isEmpty()) {
+                log.info("📋 Nenhum documento unificado encontrado no banco, tentando listar arquivos físicos...");
+                // Fallback: tentar listar arquivos físicos
+                try {
+                    List<Map<String, Object>> unifiedDocs = listAllUnifiedDocuments();
+                    if (unifiedDocs.isEmpty()) {
+                        response.setTotalPayslips(0);
+                        response.setCompanies(Collections.emptyList());
+                        response.setTotalCompanies(0);
+                        response.setTotalSectors(0);
+                        return response;
+                    }
+                    // Continuar com processamento de arquivos físicos (código antigo)
+                } catch (IOException e) {
+                    log.error("❌ Erro ao listar documentos unificados: {}", e.getMessage(), e);
+                    response.setTotalPayslips(0);
+                    response.setCompanies(Collections.emptyList());
+                    response.setTotalCompanies(0);
+                    response.setTotalSectors(0);
+                    return response;
+                }
             }
 
-            // Buscar todos os payslips para obter informações de empresa/setor
-            List<Payslip> allPayslips = payslipService.getAllPayslips();
+            // OTIMIZAÇÃO 2: Criar mapa de payslips apenas dos que estão relacionados aos unified documents
+            // Isso evita carregar TODOS os payslips do banco
+            Map<UUID, Payslip> payslipByIdMap = new HashMap<>();
+            Set<String> payslipKeys = new HashSet<>();
             
-            // Criar um mapa de payslips por chave (nome, mês, ano)
-            Map<String, Payslip> payslipMap = new HashMap<>();
-            for (Payslip payslip : allPayslips) {
-                String key = String.format("%s|%d|%d", 
-                    normalizeName(payslip.getEmployeeName()), 
-                    payslip.getMonth(), 
-                    payslip.getYear());
-                payslipMap.put(key, payslip);
-            }
-            
-            // Buscar todos os unified documents do banco para obter relacionamento com payslip
-            List<UnifiedDocument> unifiedDocumentsFromDb = new ArrayList<>();
-            try {
-                unifiedDocumentsFromDb = unifiedDocumentRepository.findAll();
-                log.info("📋 Encontrados {} documentos unificados no banco de dados", unifiedDocumentsFromDb.size());
-            } catch (Exception dbError) {
-                log.warn("⚠️ Erro ao buscar documentos unificados do banco de dados (continuando com arquivos físicos): {}", dbError.getMessage());
-                // Continuar mesmo se houver erro ao buscar do banco
-            }
-            
-            Map<String, Payslip> unifiedDocPayslipMap = new HashMap<>();
             for (UnifiedDocument ud : unifiedDocumentsFromDb) {
-                if (ud.getEmployeeName() != null && ud.getMonth() != null && ud.getYear() != null) {
-                    String key = String.format("%s|%d|%d", 
-                        normalizeName(ud.getEmployeeName()), 
-                        ud.getMonth(), 
-                        ud.getYear());
-                    
-                    // Buscar payslip relacionado
-                    Payslip payslip = null;
-                    
-                    // Tentar obter do relacionamento (pode ser LAZY ou referência órfã)
-                    try {
-                        payslip = ud.getPayslip();
-                        // Verificar se o payslip realmente existe tentando acessar uma propriedade
-                        if (payslip != null) {
-                            try {
-                                payslip.getCompanyName(); // Força o carregamento do proxy
-                            } catch (jakarta.persistence.EntityNotFoundException e) {
-                                log.warn("⚠️ Payslip referenciado não existe mais no banco (ID órfão): {}", e.getMessage());
-                                payslip = null; // Marcar como não encontrado
-                            }
-                        }
-                    } catch (jakarta.persistence.EntityNotFoundException e) {
-                        log.warn("⚠️ Payslip referenciado não existe mais no banco (proxy inválido): {}", e.getMessage());
-                        payslip = null;
-                    } catch (Exception e) {
-                        log.debug("⚠️ Relacionamento LAZY não carregado, buscando explicitamente: {}", e.getMessage());
+                try {
+                    Payslip payslip = ud.getPayslip();
+                    if (payslip != null && payslip.getId() != null) {
+                        payslipByIdMap.put(payslip.getId(), payslip);
+                        String key = String.format("%s|%d|%d", 
+                            normalizeName(payslip.getEmployeeName()), 
+                            payslip.getMonth(), 
+                            payslip.getYear());
+                        payslipKeys.add(key);
                     }
+                } catch (Exception e) {
+                    log.debug("⚠️ Erro ao acessar payslip do unified document: {}", e.getMessage());
+                }
+            }
+            
+            log.info("📊 [OTIMIZADO] Mapeados {} payslips únicos relacionados aos documentos unificados", payslipByIdMap.size());
+
+            // OTIMIZAÇÃO 3: Buscar apenas payslips que não estão no mapa mas podem corresponder aos unified documents
+            // OTIMIZAÇÃO: Agrupar por mês/ano para evitar queries repetidas e limitar processamento
+            List<Payslip> additionalPayslips = new ArrayList<>();
+            Set<String> processedPeriods = new HashSet<>();
+            int maxPeriodsToProcess = 30; // Limitar a 30 períodos diferentes para evitar travamento e respostas grandes
+            int periodsProcessed = 0;
+            
+            for (UnifiedDocument ud : unifiedDocumentsFromDb) {
+                // Verificar timeout
+                if (System.currentTimeMillis() - startTime > maxExecutionTime) {
+                    log.warn("⏱️ Timeout durante busca de payslips adicionais. Processando dados já carregados...");
+                    break;
+                }
+                
+                if (ud.getPayslip() == null && ud.getEmployeeName() != null && ud.getMonth() != null && ud.getYear() != null) {
+                    String periodKey = String.format("%d|%d", ud.getMonth(), ud.getYear());
                     
-                    // Se não encontrou ou é LAZY, buscar explicitamente
-                    if (payslip == null) {
-                        // Buscar pelo ID do payslip se disponível
+                    // Evitar buscar o mesmo período múltiplas vezes e limitar quantidade
+                    if (!processedPeriods.contains(periodKey) && periodsProcessed < maxPeriodsToProcess) {
+                        processedPeriods.add(periodKey);
+                        periodsProcessed++;
                         try {
-                            Payslip referencedPayslip = ud.getPayslip();
-                            if (referencedPayslip != null && referencedPayslip.getId() != null) {
-                                try {
-                                    payslip = allPayslips.stream()
-                                        .filter(p -> p.getId() != null && p.getId().equals(referencedPayslip.getId()))
-                                        .findFirst()
-                                        .orElse(null);
-                                } catch (Exception e) {
-                                    log.warn("⚠️ Erro ao buscar payslip por ID: {}", e.getMessage());
+                            List<Payslip> matchingPayslips = payslipRepository.findByMonthAndYear(ud.getMonth(), ud.getYear());
+                            
+                            // Limitar quantidade de payslips processados por período
+                            if (matchingPayslips.size() > 500) {
+                                log.warn("⚠️ Muitos payslips ({}) para período {}/{}. Limitando processamento a 500 para evitar travamento.", 
+                                    matchingPayslips.size(), ud.getMonth(), ud.getYear());
+                                matchingPayslips = matchingPayslips.subList(0, 500);
+                            }
+                            
+                            // Processar unified documents deste período
+                            for (UnifiedDocument ud2 : unifiedDocumentsFromDb) {
+                                if (ud2.getPayslip() == null && 
+                                    ud2.getMonth() != null && ud2.getMonth().equals(ud.getMonth()) &&
+                                    ud2.getYear() != null && ud2.getYear().equals(ud.getYear()) &&
+                                    ud2.getEmployeeName() != null) {
+                                    
+                                    for (Payslip p : matchingPayslips) {
+                                        if (verifyEmployeeNames(ud2.getEmployeeName(), p.getEmployeeName())) {
+                                            String key = String.format("%s|%d|%d", 
+                                                normalizeName(p.getEmployeeName()), 
+                                                p.getMonth(), 
+                                                p.getYear());
+                                            if (!payslipKeys.contains(key)) {
+                                                payslipByIdMap.put(p.getId(), p);
+                                                payslipKeys.add(key);
+                                                additionalPayslips.add(p);
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                        } catch (jakarta.persistence.EntityNotFoundException e) {
-                            log.debug("⚠️ Payslip referenciado não existe, buscando por nome/mês/ano: {}", e.getMessage());
                         } catch (Exception e) {
-                            log.debug("⚠️ Erro ao acessar relacionamento payslip: {}", e.getMessage());
+                            log.warn("⚠️ Erro ao buscar payslip adicional para período {}/{}: {}", 
+                                ud.getMonth(), ud.getYear(), e.getMessage());
                         }
-                        
-                        // Se ainda não encontrou, buscar por nome/mês/ano usando verificação flexível
-                        if (payslip == null) {
-                            for (Payslip p : allPayslips) {
-                                if (p.getMonth() != null && p.getMonth().equals(ud.getMonth()) &&
-                                    p.getYear() != null && p.getYear().equals(ud.getYear()) &&
-                                    verifyEmployeeNames(ud.getEmployeeName(), p.getEmployeeName())) {
-                                    payslip = p;
-                                    log.debug("✅ Payslip encontrado via verificação flexível para: {} - {}/{}", 
-                                        ud.getEmployeeName(), ud.getMonth(), ud.getYear());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (payslip != null) {
-                        try {
-                            unifiedDocPayslipMap.put(key, payslip);
-                            log.debug("✅ Payslip mapeado para documento unificado: {} - {}/{} (Empresa: {}, Setor: {})", 
-                                ud.getEmployeeName(), ud.getMonth(), ud.getYear(),
-                                payslip.getCompanyName(), payslip.getWorkPostName());
-                        } catch (jakarta.persistence.EntityNotFoundException e) {
-                            log.warn("⚠️ Erro ao acessar propriedades do payslip (entidade não existe): {}", e.getMessage());
-                            // Não adicionar ao mapa se a entidade não existe
-                        }
-                    } else {
-                        log.debug("⚠️ Payslip não encontrado para documento unificado: {} - {}/{}", 
-                            ud.getEmployeeName(), ud.getMonth(), ud.getYear());
                     }
                 }
             }
             
-            log.info("📊 Total de documentos unificados para organizar: {}", unifiedDocs.size());
-            log.info("📊 Total de payslips encontrados: {}", allPayslips.size());
-            log.info("📊 Total de documentos unificados no banco: {}", unifiedDocumentsFromDb.size());
-
-            // Converter documentos unificados em "payslips" para usar a mesma lógica de organização
+            log.info("📊 [OTIMIZADO] Adicionados {} payslips adicionais encontrados", additionalPayslips.size());
+            
+            // OTIMIZAÇÃO 4: Converter unified documents diretamente em payslips usando os dados já carregados
             List<Payslip> payslipsForOrganization = new ArrayList<>();
             int processedCount = 0;
             int skippedCount = 0;
             int foundPayslipCount = 0;
             int tempPayslipCount = 0;
             
-            for (Map<String, Object> doc : unifiedDocs) {
-                String employeeName = (String) doc.get("employeeName");
-                Integer month = (Integer) doc.get("month");
-                Integer year = (Integer) doc.get("year");
-                String filePath = (String) doc.get("filePath");
-                
-                if (employeeName == null || month == null || year == null) {
+            for (UnifiedDocument ud : unifiedDocumentsFromDb) {
+                if (ud.getEmployeeName() == null || ud.getMonth() == null || ud.getYear() == null) {
                     skippedCount++;
-                    log.debug("⏭️ Documento unificado ignorado (dados incompletos): employeeName={}, month={}, year={}", 
-                        employeeName, month, year);
                     continue;
                 }
                 
                 processedCount++;
                 Payslip payslip = null;
                 
-                // Estratégia 1: Buscar payslip correspondente por nome/mês/ano no mapa de payslips (exato)
-                String key = String.format("%s|%d|%d", normalizeName(employeeName), month, year);
-                payslip = payslipMap.get(key);
-                
-                if (payslip != null) {
-                    foundPayslipCount++;
-                    log.debug("✅ Payslip encontrado via mapa (exato) para: {} - {}/{}", employeeName, month, year);
-                }
-                
-                // Estratégia 2: Se não encontrou, buscar pelo unified document do banco
-                if (payslip == null) {
-                    payslip = unifiedDocPayslipMap.get(key);
+                // Estratégia 1: Usar payslip já carregado via JOIN FETCH
+                try {
+                    payslip = ud.getPayslip();
                     if (payslip != null) {
-                        foundPayslipCount++;
-                        log.debug("✅ Payslip encontrado via banco de dados (exato) para: {} - {}/{}", employeeName, month, year);
+                        // Verificar se o payslip realmente existe
+                        try {
+                            payslip.getCompanyName(); // Força o carregamento
+                            foundPayslipCount++;
+                        } catch (jakarta.persistence.EntityNotFoundException e) {
+                            log.debug("⚠️ Payslip referenciado não existe mais: {}", e.getMessage());
+                            payslip = null;
+                        }
                     }
+                } catch (Exception e) {
+                    log.debug("⚠️ Erro ao acessar payslip: {}", e.getMessage());
                 }
                 
-                // Estratégia 2.1: Se ainda não encontrou, buscar usando verificação flexível de nomes
+                // Estratégia 2: Se não encontrou, buscar no mapa de payslips adicionais
                 if (payslip == null) {
-                    for (Payslip p : allPayslips) {
-                        try {
-                            if (p.getMonth() != null && p.getMonth().equals(month) &&
-                                p.getYear() != null && p.getYear().equals(year) &&
-                                verifyEmployeeNames(employeeName, p.getEmployeeName())) {
-                                payslip = p;
-                                foundPayslipCount++;
-                                log.debug("✅ Payslip encontrado via verificação flexível para: {} - {}/{} (Empresa: {}, Setor: {})", 
-                                    employeeName, month, year, p.getCompanyName(), p.getWorkPostName());
-                                break;
-                            }
-                        } catch (jakarta.persistence.EntityNotFoundException e) {
-                            log.warn("⚠️ Payslip no loop não existe mais no banco (pulando): {}", e.getMessage());
-                            continue; // Pular este payslip e continuar com o próximo
+                    String key = String.format("%s|%d|%d", 
+                        normalizeName(ud.getEmployeeName()), 
+                        ud.getMonth(), 
+                        ud.getYear());
+                    
+                    // Buscar nos payslips adicionais encontrados
+                    for (Payslip p : additionalPayslips) {
+                        if (p.getMonth() != null && p.getMonth().equals(ud.getMonth()) &&
+                            p.getYear() != null && p.getYear().equals(ud.getYear()) &&
+                            verifyEmployeeNames(ud.getEmployeeName(), p.getEmployeeName())) {
+                            payslip = p;
+                            foundPayslipCount++;
+                            break;
                         }
                     }
                 }
                 
-                // Estratégia 3: Se ainda não encontrou, tentar extrair do PDF do documento unificado
-                if (payslip == null && filePath != null) {
+                // Estratégia 3: Se ainda não encontrou, criar payslip temporário com dados do unified document
+                if (payslip == null) {
+                    tempPayslipCount++;
+                    // Tentar obter dados do payslip relacionado se existir (mesmo que não carregado)
+                    String cpf = "";
+                    String companyName = "";
+                    String companyCnpj = "";
+                    String companySigla = "";
+                    String workPostName = "";
+                    
                     try {
-                        log.info("🔍 Payslip não encontrado para documento unificado {}. Tentando extrair do PDF...", filePath);
-                        Payslip extractedPayslip = extractPayslipInfoFromUnifiedDocument(filePath, employeeName, month, year, (String) doc.getOrDefault("cpf", ""));
-                        if (extractedPayslip != null) {
-                            payslip = extractedPayslip;
-                            log.info("✅ Informações extraídas do PDF: Empresa={}, CNPJ={}, Setor={}", 
-                                payslip.getCompanyName(), payslip.getCompanyCnpj(), payslip.getWorkPostName());
+                        Payslip relatedPayslip = ud.getPayslip();
+                        if (relatedPayslip != null) {
+                            try {
+                                cpf = relatedPayslip.getCpf() != null ? relatedPayslip.getCpf() : "";
+                                companyName = relatedPayslip.getCompanyName() != null ? relatedPayslip.getCompanyName() : "";
+                                companyCnpj = relatedPayslip.getCompanyCnpj() != null ? relatedPayslip.getCompanyCnpj() : "";
+                                companySigla = relatedPayslip.getCompanySigla() != null ? relatedPayslip.getCompanySigla() : "";
+                                workPostName = relatedPayslip.getWorkPostName() != null ? relatedPayslip.getWorkPostName() : "";
+                            } catch (Exception e) {
+                                log.debug("⚠️ Erro ao acessar dados do payslip relacionado: {}", e.getMessage());
+                            }
                         }
                     } catch (Exception e) {
-                        log.warn("⚠️ Erro ao extrair informações do PDF unificado {}: {}", filePath, e.getMessage());
+                        log.debug("⚠️ Erro ao acessar payslip relacionado: {}", e.getMessage());
+                    }
+                    
+                    payslip = Payslip.builder()
+                        .employeeName(ud.getEmployeeName())
+                        .cpf(cpf)
+                        .month(ud.getMonth())
+                        .year(ud.getYear())
+                        .fileName(ud.getFileName() != null ? ud.getFileName() : "")
+                        .companyName(companyName)
+                        .companyCnpj(companyCnpj)
+                        .companySigla(companySigla)
+                        .workPostName(workPostName)
+                        .build();
+                } else {
+                    // Garantir que o nome do arquivo está definido
+                    if (payslip.getFileName() == null || payslip.getFileName().isEmpty()) {
+                        payslip.setFileName(ud.getFileName() != null ? ud.getFileName() : "");
                     }
                 }
                 
-                if (payslip != null) {
-                    // Garantir que o nome do arquivo está definido
-                    if (payslip.getFileName() == null || payslip.getFileName().isEmpty()) {
-                        payslip.setFileName((String) doc.getOrDefault("fileName", ""));
-                    }
-                    payslipsForOrganization.add(payslip);
-                } else {
-                    // Se não encontrar payslip, criar um temporário com dados do documento
-                    tempPayslipCount++;
-                    log.debug("⚠️ Criando payslip temporário para documento unificado: {} - {}/{}", 
-                        employeeName, month, year);
-                    Payslip tempPayslip = Payslip.builder()
-                        .employeeName(employeeName)
-                        .cpf((String) doc.getOrDefault("cpf", ""))
-                        .month(month)
-                        .year(year)
-                        .fileName((String) doc.getOrDefault("fileName", ""))
-                        .companyName((String) doc.getOrDefault("companyName", ""))
-                        .companyCnpj((String) doc.getOrDefault("companyCnpj", ""))
-                        .companySigla((String) doc.getOrDefault("companySigla", ""))
-                        .workPostName((String) doc.getOrDefault("sector", ""))
-                        .build();
-                    payslipsForOrganization.add(tempPayslip);
-                }
+                payslipsForOrganization.add(payslip);
             }
+            
+            log.info("📊 [OTIMIZADO] Estatísticas: {} processados, {} ignorados, {} com payslip encontrado, {} temporários", 
+                processedCount, skippedCount, foundPayslipCount, tempPayslipCount);
             
             log.info("📊 Estatísticas de processamento: {} processados, {} ignorados, {} com payslip encontrado, {} com payslip temporário", 
                 processedCount, skippedCount, foundPayslipCount, tempPayslipCount);
 
-            log.info("📊 Total de payslips preparados para organização: {}", payslipsForOrganization.size());
+            log.info("📊 [OTIMIZADO] Total de payslips preparados para organização: {}", payslipsForOrganization.size());
+            
+            // Verificar timeout antes de organizar
+            long timeBeforeOrg = System.currentTimeMillis() - startTime;
+            if (timeBeforeOrg > maxExecutionTime) {
+                log.warn("⏱️ Timeout antes de organizar ({}ms). Retornando resposta parcial...", timeBeforeOrg);
+                response.setTotalPayslips(payslipsForOrganization.size());
+                response.setCompanies(Collections.emptyList());
+                response.setTotalCompanies(0);
+                response.setTotalSectors(0);
+                return response;
+            }
             
             // Usar o método de organização de payslips
             PayslipOrganizationResponse organizedResponse = payslipService.organizePayslipsByCompany(payslipsForOrganization);
             
-            log.info("✅ Organização concluída: {} empresas, {} setores, {} documentos", 
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.info("✅ [OTIMIZADO] Organização concluída em {}ms: {} empresas, {} setores, {} documentos", 
+                elapsedTime,
                 organizedResponse.getTotalCompanies(), 
                 organizedResponse.getTotalSectors(),
                 organizedResponse.getTotalPayslips());
+            
+            // Verificar se demorou muito
+            if (elapsedTime > 20000) {
+                log.warn("⚠️ Organização demorou {}ms (mais de 20 segundos). Considere otimizar mais.", elapsedTime);
+            }
             
             return organizedResponse;
             

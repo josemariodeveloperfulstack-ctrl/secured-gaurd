@@ -50,6 +50,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, e.user_id FROM employees e LEFT JOIN positions p ON e.position_id = p.id LEFT JOIN units u ON e.unit_id = u.id", nativeQuery = true)
     List<Object[]> findBasicData();
 
+    // Buscar dados básicos COM relacionamentos de cargo e unidade por termo de busca (nome ou CPF)
+    @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, e.user_id " +
+            "FROM employees e " +
+            "LEFT JOIN positions p ON e.position_id = p.id " +
+            "LEFT JOIN units u ON e.unit_id = u.id " +
+            "WHERE UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+            "OR REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+            "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))", nativeQuery = true)
+    List<Object[]> findBasicDataBySearchTerm(@Param("searchTerm") String searchTerm);
+
     // Buscar apenas o nome por ID para evitar carregar toda a entidade (e colunas inexistentes em alguns ambientes)
     @Query("SELECT e.name FROM Employee e WHERE e.id = :id")
     Optional<String> findNameById(@Param("id") UUID id);

@@ -6,7 +6,7 @@ export const accountingFormService = {
    */
   async generateHtml(employeeId: string): Promise<void> {
     try {
-      const response = await api.get(`/accounting-forms/${employeeId}/html`, {
+      const response = await api.get(`/api/accounting-forms/${employeeId}/html`, {
         responseType: 'blob'
       });
 
@@ -28,7 +28,7 @@ export const accountingFormService = {
    */
   async downloadPdf(employeeId: string, employeeName: string): Promise<void> {
     try {
-      const response = await api.get(`/accounting-forms/${employeeId}/pdf`, {
+      const response = await api.get(`/api/accounting-forms/${employeeId}/pdf`, {
         responseType: 'blob'
       });
 
@@ -55,7 +55,7 @@ export const accountingFormService = {
    */
   async print(employeeId: string): Promise<void> {
     try {
-      const response = await api.get(`/accounting-forms/${employeeId}/html`, {
+      const response = await api.get(`/api/accounting-forms/${employeeId}/html`, {
         responseType: 'blob'
       });
 

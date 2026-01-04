@@ -119,6 +119,11 @@ public class EmployeeDTO {
     private String tituloEleitor;
     private String tituloEleitorZona;
     private String tituloEleitorSecao;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate tituloEleitorDataExpedicao;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate tituloEleitorValidade;
+    private String nomeConselhoRegional;
     private String carteiraIdentidadeOrgaoEmissor;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate carteiraIdentidadeDataEmissao;
@@ -132,8 +137,13 @@ public class EmployeeDTO {
     private BigDecimal salario;
     private String salarioPorExtenso;
     private String periodoPagamento;
-    private String horarioTrabalho;
-    private String folgaSemanal;
+    private String horarioTrabalho; // Período de Trabalho (ex: "18:00 ÀS 06:00 H")
+    private String horarioTrabalhoIntervalo; // Intervalo (ex: "23:00 ÀS 00:00 H")
+    private String diasTrabalho; // Dias de Trabalho (ex: "12X36")
+    private String prazoExperienciaTexto; // Prazo de Experiência em texto (ex: "45 DIAS")
+    private String prorrogacaoExperiencia; // Prorrogação do prazo de experiência
+    private String folgaSemanal; // Dias de Folga (ex: "1ª Escola")
+    private String escalaTrabalho; // Escala de Trabalho
     private Boolean fgtsOptante;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate fgtsDataOpcao;
@@ -172,9 +182,31 @@ public class EmployeeDTO {
     private Boolean naturalizado;
     private String decretoNaturalizacao;
     private String vistoFiscalizacao;
+    
+    // Campos para Estrangeiro
+    private String rneNumero; // RNE nº
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate rneValidade; // Validade do RNE
+    private String ricNumero; // Nº RIC (para naturalizados)
+    private String ricOrgaoEmissor; // Órgão Emissor do RIC
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate ricDataEmissao; // Data de Emissão do RIC
+    private String tipoVisto; // Tipo de Visto
+    
     private String assinaturaFuncionario;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dataRescisao;
+    
+    // Dados do Exame Médico (ASO)
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate exameMedicoData;
+    private String exameMedicoTipo; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
+    private IdOnlyDTO exameMedicoDoctor; // Referência ao médico
+    private String exameMedicoHorario; // Ex: "18:00 ÀS 06:00 H"
+    private Boolean exameMedicoIntervalosRefeicao; // true = Sim, false = Não
+    private String exameMedicoObservacoes;
+    private Boolean exameMedicoPrimeiroEmprego; // true = Sim, false = Não
+    private Boolean exameMedicoContribuicaoSindicalPaga; // true = Sim, false = Não
     
     /**
      * Usuário do sistema vinculado ao funcionário (opcional).

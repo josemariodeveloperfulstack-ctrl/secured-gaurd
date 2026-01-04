@@ -79,4 +79,16 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
      * Busca todas as empresas ordenadas por nome
      */
     List<Company> findAllByOrderByNameAsc();
+    
+    /**
+     * Busca empresa por ID com EPIs padrão carregados
+     */
+    @Query("SELECT DISTINCT c FROM Company c LEFT JOIN FETCH c.defaultEpis WHERE c.id = :id")
+    Optional<Company> findByIdWithDefaultEpis(@Param("id") UUID id);
+    
+    /**
+     * Busca todas as empresas com EPIs padrão carregados
+     */
+    @Query("SELECT DISTINCT c FROM Company c LEFT JOIN FETCH c.defaultEpis ORDER BY c.name ASC")
+    List<Company> findAllWithDefaultEpis();
 }

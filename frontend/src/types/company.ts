@@ -1,17 +1,34 @@
+export interface CompanyDefaultEPI {
+  id?: string;
+  epiName: string;
+  quantity: number;
+  caNumber?: string;
+  validity?: string;
+  observations?: string;
+  orderIndex?: number;
+}
+
 export interface Company {
   id: string;
   name: string;
+  sigla?: string;
   tradeName?: string;
   cnpj?: string;
   inscricaoEstadual?: string;
   inscricaoMunicipal?: string;
   address?: string;
+  enderecoRua?: string;
+  enderecoNumero?: string;
+  enderecoComplemento?: string;
+  enderecoBairro?: string;
   city?: string;
   state?: string;
   zipCode?: string;
   phone?: string;
   email?: string;
   website?: string;
+  logoUrl?: string;
+  defaultEpis?: CompanyDefaultEPI[];
   contactPerson?: string;
   contactPhone?: string;
   contactEmail?: string;

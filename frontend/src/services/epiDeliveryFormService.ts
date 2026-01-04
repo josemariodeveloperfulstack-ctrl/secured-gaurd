@@ -153,6 +153,21 @@ export const epiDeliveryFormService = {
       console.error('Erro ao deletar ficha de entrega de EPI:', error);
       throw error;
     }
+  },
+
+  /**
+   * Gerar PDF da ficha de entrega de EPI e salvar no banco
+   */
+  async generateAndSavePdf(data: CreateEPIDeliveryForm): Promise<Blob> {
+    try {
+      const response = await api.post('/api/epi-delivery-forms/generate-pdf', data, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar PDF da ficha de entrega de EPI:', error);
+      throw error;
+    }
   }
 };
 

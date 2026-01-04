@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.service.AccountingFormService;
+import com.z7design.secured_guard.service.AccountingFormPdfService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class AccountingFormController {
 
     private final AccountingFormService accountingFormService;
+    private final AccountingFormPdfService accountingFormPdfService;
 
     /**
      * Gera ficha de contabilidade em HTML para um funcionário
@@ -45,7 +47,6 @@ public class AccountingFormController {
 
     /**
      * Gera ficha de contabilidade em PDF para um funcionário
-     * TODO: Implementar conversão HTML para PDF
      */
     @GetMapping("/{employeeId}/pdf")
     @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'EMPLOYEES_READ')")
@@ -53,15 +54,14 @@ public class AccountingFormController {
         try {
             log.info("📄 Gerando ficha de contabilidade PDF para funcionário: {}", employeeId);
             
-            String html = accountingFormService.generateAccountingFormHtml(employeeId);
+            byte[] pdf = accountingFormPdfService.generateAccountingFormPdf(employeeId);
             
-            // Por enquanto, retornar HTML como fallback
-            // TODO: Converter HTML para PDF usando biblioteca adequada
+            String fileName = "ficha_contabilidade_" + employeeId + ".pdf";
             
             return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_HTML)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ficha_contabilidade_" + employeeId + ".html")
-                .body(html.getBytes());
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(pdf);
                 
         } catch (Exception e) {
             log.error("❌ Erro ao gerar ficha de contabilidade PDF: {}", e.getMessage(), e);

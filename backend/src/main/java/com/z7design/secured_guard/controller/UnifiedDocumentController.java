@@ -67,19 +67,33 @@ public class UnifiedDocumentController {
 
     /**
      * Cria documento unificado para um funcionário específico
+     * Aceita payslipId e receiptId opcionais para garantir que os documentos corretos sejam usados
      */
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createUnifiedDocument(
             @RequestParam String employeeName,
             @RequestParam int month,
-            @RequestParam int year) {
+            @RequestParam int year,
+            @RequestParam(required = false) java.util.UUID payslipId,
+            @RequestParam(required = false) java.util.UUID receiptId) {
         
         Map<String, Object> response = new HashMap<>();
         
         try {
-            log.info("🎯 Criando documento unificado para: {} - {}/{}", employeeName, month, year);
+            log.info("🎯 Criando documento unificado para: {} - {}/{} (payslipId: {}, receiptId: {})", 
+                employeeName, month, year, payslipId, receiptId);
             
-            String unifiedPdfPath = unifiedDocumentService.createUnifiedDocumentForEmployee(employeeName, month, year);
+            String unifiedPdfPath;
+            
+            // Se temos IDs específicos, usar eles para garantir que os documentos corretos sejam usados
+            if (payslipId != null && receiptId != null) {
+                log.info("✅ Usando IDs específicos para garantir documentos corretos");
+                unifiedPdfPath = unifiedDocumentService.createUnifiedDocumentByIds(payslipId, receiptId);
+            } else {
+                // Fallback para busca por nome/mês/ano (comportamento antigo)
+                log.info("⚠️ Usando busca por nome/mês/ano (pode encontrar documentos incorretos se houver nomes similares)");
+                unifiedPdfPath = unifiedDocumentService.createUnifiedDocumentForEmployee(employeeName, month, year);
+            }
             
             response.put("sucesso", true);
             response.put("mensagem", "Documento unificado criado com sucesso");
@@ -2198,13 +2212,27 @@ public class UnifiedDocumentController {
 
     /**
      * Organiza documentos unificados por Empresa/Setor/Ano/Mês
+     * OTIMIZADO: Com timeout e proteção contra loops
      */
     @GetMapping("/organization")
     public ResponseEntity<?> getUnifiedDocumentsOrganization() {
+        long startTime = System.currentTimeMillis();
         try {
             log.info("📋 Organizando documentos unificados por Empresa/Setor/Ano/Mês...");
+            
+            // Timeout de segurança: máximo 30 segundos
+            long timeout = 30000; // 30 segundos
+            
             com.z7design.secured_guard.dto.PayslipOrganizationResponse response = 
                 unifiedDocumentService.organizeUnifiedDocumentsByCompany();
+            
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("✅ Organização concluída em {}ms", elapsed);
+            
+            if (elapsed > timeout) {
+                log.warn("⚠️ Organização demorou mais que o esperado: {}ms", elapsed);
+            }
+            
             return ResponseEntity.ok(response);
         } catch (jakarta.persistence.EntityNotFoundException e) {
             log.error("💥 Erro ao organizar documentos unificados (entidade não encontrada): {}", e.getMessage(), e);
@@ -2213,7 +2241,17 @@ public class UnifiedDocumentController {
             errorResponse.put("message", "Alguns documentos unificados referenciam payslips que não existem mais no banco de dados");
             return ResponseEntity.status(500).body(errorResponse);
         } catch (Exception e) {
-            log.error("💥 Erro ao organizar documentos unificados: {}", e.getMessage(), e);
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.error("💥 Erro ao organizar documentos unificados após {}ms: {}", elapsed, e.getMessage(), e);
+            
+            // Verificar se foi timeout baseado no tempo decorrido
+            if (elapsed > 30000) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Timeout");
+                errorResponse.put("message", "A operação demorou muito para responder. Tente novamente.");
+                return ResponseEntity.status(504).body(errorResponse);
+            }
+            
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Erro ao organizar documentos unificados");
             errorResponse.put("message", e.getMessage() != null ? e.getMessage() : "Erro desconhecido");

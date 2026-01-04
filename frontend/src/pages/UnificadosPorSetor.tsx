@@ -26,7 +26,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import axios from '@/lib/axios';
+import api from '@/lib/axios';
 import { unifiedDocumentService } from '@/services/unifiedDocumentService';
 import holeriteService, { HoleriteOrganizationResponse, HoleriteCompanyGroup, HoleriteSectorGroup, HoleritePeriodGroup, HoleriteOrganizedEntry } from '@/services/holeriteService';
 
@@ -103,6 +103,11 @@ const UnificadosPorSetorNovo: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<DocumentData | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedUnifiedDocuments, setSelectedUnifiedDocuments] = useState<Set<string>>(new Set());
+  const [deletingDocuments, setDeletingDocuments] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [documentsToDelete, setDocumentsToDelete] = useState<string[]>([]);
+  const [deleteType, setDeleteType] = useState<'individual' | 'batch'>('batch');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<DocumentData | null>(null);
   const [previewContext, setPreviewContext] = useState<{ sector: string; period: string } | null>(null);
@@ -122,13 +127,19 @@ const UnificadosPorSetorNovo: React.FC = () => {
   });
 
   // Carregar organização de documentos unificados por Empresa/Setor/Ano/Mês
-  const loadOrganization = async () => {
+  const loadOrganization = async (forceRefresh: boolean = false) => {
     setLoadingOrganization(true);
     setOrganizationError(null);
     try {
-      const data = await unifiedDocumentService.getOrganization();
+      // Adicionar timestamp para evitar cache
+      const data = await unifiedDocumentService.getOrganization(forceRefresh);
       setOrganizationData(data);
       console.log('✅ Organização de documentos unificados carregada:', data);
+      
+      // Se forçou refresh, limpar seleções também
+      if (forceRefresh) {
+        setSelectedUnifiedDocuments(new Set());
+      }
     } catch (error: any) {
       console.error('❌ Erro ao carregar organização:', error);
       setOrganizationError(error?.response?.data?.message || error?.message || 'Erro ao carregar organização');
@@ -228,6 +239,349 @@ const UnificadosPorSetorNovo: React.FC = () => {
     return `${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}`;
   };
 
+  // Funções auxiliares para coletar fileNames de documentos (usando fileName como identificador único)
+  const collectCompanyDocumentFileNames = (company: HoleriteCompanyGroup): string[] => {
+    const fileNames: string[] = [];
+    company.sectors?.forEach(sector => {
+      sector.periods?.forEach(period => {
+        period.payslips?.forEach(payslip => {
+          if (payslip.fileName) {
+            fileNames.push(payslip.fileName);
+          }
+        });
+      });
+    });
+    return fileNames;
+  };
+
+  const collectSectorDocumentFileNames = (sector: HoleriteSectorGroup): string[] => {
+    const fileNames: string[] = [];
+    sector.periods?.forEach(period => {
+      period.payslips?.forEach(payslip => {
+        if (payslip.fileName) {
+          fileNames.push(payslip.fileName);
+        }
+      });
+    });
+    return fileNames;
+  };
+
+  const collectPeriodDocumentFileNames = (period: HoleritePeriodGroup): string[] => {
+    return period.payslips?.map(p => p.fileName).filter(Boolean) || [];
+  };
+
+  // Função para verificar se todos os documentos estão selecionados
+  const areFileNamesFullySelected = (fileNames: string[]): boolean => {
+    if (fileNames.length === 0) return false;
+    return fileNames.every(fileName => selectedUnifiedDocuments.has(fileName));
+  };
+
+  // Função para obter fileNames selecionados
+  const getSelectedFileNames = (fileNames: string[]): string[] => {
+    return fileNames.filter(fileName => selectedUnifiedDocuments.has(fileName));
+  };
+
+  // Função para lidar com seleção de documentos
+  const handleSelectDocuments = (fileNames: string[], checked: boolean) => {
+    setSelectedUnifiedDocuments(prev => {
+      const newSelected = new Set(prev);
+      if (checked) {
+        fileNames.forEach(fileName => {
+          if (fileName) {
+            newSelected.add(fileName);
+          }
+        });
+      } else {
+        fileNames.forEach(fileName => {
+          newSelected.delete(fileName);
+        });
+      }
+      return newSelected;
+    });
+  };
+
+  // Função para abrir modal de confirmação de exclusão
+  const handleDeleteDocuments = (type: 'individual' | 'batch', fileNames?: string[]) => {
+    if (!fileNames || fileNames.length === 0) {
+      toast({
+        title: '⚠️ Nenhum documento selecionado',
+        description: 'Selecione pelo menos um documento para excluir.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDeleteType(type);
+    setDocumentsToDelete(fileNames);
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Função para executar a exclusão após confirmação
+  const executeDeleteDocuments = async () => {
+    if (documentsToDelete.length === 0) {
+      setShowDeleteConfirmModal(false);
+      return;
+    }
+
+    try {
+      setDeletingDocuments(true);
+      
+      if (deleteType === 'individual' && documentsToDelete.length === 1) {
+        const response = await api.delete(`/api/unified-documents/delete/${encodeURIComponent(documentsToDelete[0])}`);
+        if (response.data.sucesso) {
+          toast({
+            title: '✅ Documento excluído',
+            description: 'Documento excluído com sucesso!',
+          });
+          // Remover da seleção
+          setSelectedUnifiedDocuments(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(documentsToDelete[0]);
+            return newSet;
+          });
+          // Forçar recarga completa após exclusão
+          await loadOrganization(true);
+          
+          // Aguardar um pouco para garantir que o backend processou
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Recarregar novamente para garantir sincronização
+          await loadOrganization(true);
+        } else {
+          throw new Error(response.data.mensagem || 'Erro ao excluir documento');
+        }
+      } else {
+        const response = await api.delete('/api/unified-documents/delete-multiple', {
+          data: documentsToDelete
+        });
+        if (response.data.sucesso) {
+          const deletedCount = response.data.deletedCount || documentsToDelete.length;
+          toast({
+            title: '✅ Exclusão concluída',
+            description: `${deletedCount} documento(s) excluído(s) com sucesso!`,
+          });
+          // Remover da seleção
+          const deletedFiles = response.data.deletedFiles || documentsToDelete;
+          setSelectedUnifiedDocuments(prev => {
+            const newSet = new Set(prev);
+            deletedFiles.forEach((fileName: string) => newSet.delete(fileName));
+            return newSet;
+          });
+          
+          // Forçar recarga completa após exclusão
+          await loadOrganization(true);
+          
+          // Aguardar um pouco para garantir que o backend processou
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Recarregar novamente para garantir sincronização
+          await loadOrganization(true);
+        } else {
+          throw new Error(response.data.mensagem || 'Erro ao excluir documentos');
+        }
+      }
+    } catch (error: any) {
+      console.error('Erro ao excluir documentos:', error);
+      toast({
+        title: '❌ Erro na exclusão',
+        description: error.response?.data?.message || error.message || 'Erro ao excluir documentos',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingDocuments(false);
+      setShowDeleteConfirmModal(false);
+      setDocumentsToDelete([]);
+    }
+  };
+
+  // Função de download por empresa (usando endpoint otimizado do backend)
+  const handleDownloadByCompany = async (companyName: string) => {
+    try {
+      setLoading(true);
+      toast({
+        title: '📦 Preparando download...',
+        description: `Organizando documentos da empresa ${companyName}...`,
+      });
+
+      // Usar o endpoint otimizado do backend que já cria o ZIP organizado
+      const url = `/api/unified-documents/download/company`;
+      const response = await api.get(url, { 
+        params: { name: companyName },
+        responseType: 'blob',
+        timeout: 300000 // 5 minutos para downloads grandes
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_documentos_unificados.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(link.href);
+      
+      toast({ 
+        title: '✅ Download iniciado', 
+        description: `Baixando documentos da empresa ${companyName}. O ZIP está organizado por Empresa/Setor/Período/Funcionário.`,
+        duration: 5000,
+      });
+    } catch (error: any) {
+      console.error('Erro ao baixar documentos da empresa:', error);
+      
+      // Se o endpoint falhar com 404, informar que não há documentos
+      if (error.response?.status === 404) {
+        toast({ 
+          title: '⚠️ Nenhum documento encontrado', 
+          description: `Não foram encontrados documentos unificados para a empresa "${companyName}".`,
+          variant: 'default',
+          duration: 5000,
+        });
+      } else {
+        toast({ 
+          title: '❌ Erro no download', 
+          description: error.response?.data?.message || error.message || 'Erro ao baixar documentos da empresa. Verifique se todos os arquivos existem.',
+          variant: 'destructive',
+          duration: 5000,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função de download por setor
+  const handleDownloadBySector = async (sectorName: string) => {
+    try {
+      setLoading(true);
+      toast({
+        title: '📦 Preparando download...',
+        description: `Organizando documentos do setor ${sectorName}...`,
+      });
+
+      // Tentar usar o endpoint de download por setor do holeriteService
+      try {
+        const blob = await holeriteService.downloadBySector(sectorName);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sectorName.replace(/[^a-zA-Z0-9]/g, '_')}_documentos_unificados.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast({ 
+          title: '✅ Download concluído', 
+          description: `Documentos do setor ${sectorName} baixados com sucesso.` 
+        });
+      } catch (holeriteError) {
+        // Fallback: criar ZIP client-side com os documentos do setor
+        console.log('Endpoint de setor não disponível, criando ZIP client-side...');
+        const sectorFileNames = organizationData?.companies
+          .flatMap(c => c.sectors || [])
+          .find(s => s.sectorName === sectorName)
+          ?.periods?.flatMap(p => p.payslips?.map(ps => ps.fileName).filter(Boolean) || []) || [];
+
+        if (sectorFileNames.length === 0) {
+          throw new Error('Nenhum documento encontrado para este setor');
+        }
+
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+        const BATCH_SIZE = 10; // Downloads simultâneos
+        let successCount = 0;
+        let failCount = 0;
+        const failedFiles: string[] = [];
+        
+        // Download paralelo otimizado
+        for (let i = 0; i < sectorFileNames.length; i += BATCH_SIZE) {
+          const batch = sectorFileNames.slice(i, i + BATCH_SIZE);
+          const batchPromises = batch.map(async (fileName) => {
+            try {
+              const response = await api.get(`/api/unified-documents/download/${encodeURIComponent(fileName)}`, {
+                responseType: 'blob',
+                timeout: 30000
+              });
+              zip.file(fileName, response.data);
+              successCount++;
+            } catch (err: any) {
+              console.warn(`⚠️ Arquivo não encontrado: ${fileName}`, err.response?.status);
+              failCount++;
+              failedFiles.push(fileName);
+            }
+          });
+          await Promise.all(batchPromises);
+          
+          // Atualizar progresso
+          if (i + BATCH_SIZE < sectorFileNames.length) {
+            toast({
+              title: '📦 Download em progresso...',
+              description: `${Math.min(i + BATCH_SIZE, sectorFileNames.length)}/${sectorFileNames.length} arquivo(s) processado(s)...`,
+              duration: 2000,
+            });
+          }
+        }
+        
+        if (successCount === 0) {
+          throw new Error(`Nenhum dos ${sectorFileNames.length} documento(s) foi encontrado no servidor. Os arquivos podem não ter sido gerados ainda ou podem estar em um local diferente.`);
+        }
+        
+        const blob = await zip.generateAsync({ 
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${sectorName.replace(/[^a-zA-Z0-9]/g, '_')}_documentos_unificados.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(link.href);
+        
+        if (failCount > 0) {
+          toast({
+            title: '⚠️ Download parcial',
+            description: `${successCount} documento(s) baixado(s) com sucesso, ${failCount} não foram encontrados no servidor.`,
+            variant: 'default',
+            duration: 5000
+          });
+          console.warn('Arquivos que falharam:', failedFiles.slice(0, 10)); // Log dos primeiros 10
+        } else {
+          toast({
+            title: '✅ Download concluído',
+            description: `ZIP criado com ${successCount} documento(s) do setor ${sectorName}.`,
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Erro ao baixar documentos do setor:', error);
+      toast({ 
+        title: '❌ Erro no download', 
+        description: error.response?.data?.message || error.message || 'Erro ao baixar documentos do setor.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função de envio de documentos
+  const handleSendDocuments = async (type: 'email' | 'whatsapp', fileNames?: string[]) => {
+    if (!fileNames || fileNames.length === 0) {
+      toast({
+        title: '⚠️ Nenhum documento selecionado',
+        description: 'Selecione pelo menos um documento para enviar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: '⏳ Em desenvolvimento',
+      description: `Envio por ${type === 'email' ? 'Email' : 'WhatsApp'} será implementado em breve.`,
+    });
+  };
+
   // Função de renderização de empresas (igual Holerites)
   const renderOrganizationCompanies = () => {
     if (!organizationData?.companies?.length) {
@@ -238,7 +592,23 @@ const UnificadosPorSetorNovo: React.FC = () => {
       );
     }
 
-    return organizationData.companies.map(company => {
+    // Filtrar empresas "OUTROS" que não têm documentos
+    const filteredCompanies = organizationData.companies.filter(company => {
+      // Se a empresa é "OUTROS" e não tem documentos, filtrar
+      const isOutros = (company.companySigla || '').toUpperCase() === 'OUTROS';
+      const hasDocuments = (company.totalPayslips || 0) > 0;
+      return !isOutros || hasDocuments;
+    });
+
+    if (filteredCompanies.length === 0) {
+      return (
+        <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
+          Nenhum documento unificado encontrado. Crie documentos unificados para visualizar a organização.
+        </div>
+      );
+    }
+
+    return filteredCompanies.map(company => {
       const companyKey = getCompanyKey(company);
       const companyExpanded = !!expandedCompanies[companyKey];
 
@@ -263,16 +633,152 @@ const UnificadosPorSetorNovo: React.FC = () => {
                   CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} documento(s) · {company.sectors.length} setor(es)
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleCompanyExpansion(companyKey)}
-                  className="w-full sm:w-auto text-seguranca-lightgray hover:text-white"
-                >
-                  {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                  {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
-                </Button>
+              <div className="flex flex-col gap-3 w-full lg:w-auto">
+                {/* Primeira linha: Checkbox e botão Ver setores */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {(() => {
+                    const companyFileNames = collectCompanyDocumentFileNames(company);
+                    const companySelectedFileNames = getSelectedFileNames(companyFileNames);
+                    const companySelectedCount = companySelectedFileNames.length;
+                    const companyCheckboxState: boolean | 'indeterminate' = companyFileNames.length === 0
+                      ? false
+                      : areFileNamesFullySelected(companyFileNames)
+                        ? true
+                        : companySelectedCount > 0
+                          ? 'indeterminate'
+                          : false;
+                    
+                    return (
+                      <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                        <Checkbox
+                          checked={companyCheckboxState}
+                          onCheckedChange={(checked) => handleSelectDocuments(companyFileNames, checked === true)}
+                          className="border-blue-400"
+                        />
+                        <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
+                      </div>
+                    );
+                  })()}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleCompanyExpansion(companyKey)}
+                    className="text-seguranca-lightgray hover:text-white"
+                  >
+                    {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                    {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
+                  </Button>
+                </div>
+                
+                {/* Segunda linha: Botões de ação sempre visíveis */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {(() => {
+                    const companyFileNames = collectCompanyDocumentFileNames(company);
+                    const companySelectedFileNames = getSelectedFileNames(companyFileNames);
+                    const companySelectedCount = companySelectedFileNames.length;
+                    
+                    return (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadByCompany(company.companyName || company.companyCnpj || '')}
+                          className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                          disabled={loading || loadingOrganization || (company.totalPayslips || 0) === 0}
+                          title={(company.totalPayslips || 0) === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos da empresa organizados por Empresa/Setor/Período/Funcionário'}
+                        >
+                          {loading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              <span className="whitespace-nowrap">Preparando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              <span className="whitespace-nowrap">Download Lote</span>
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const fileNames = companyFileNames.length > 0 ? companyFileNames : collectCompanyDocumentFileNames(company);
+                            if (fileNames.length > 0) {
+                              handleSendDocuments('whatsapp', fileNames);
+                            }
+                          }}
+                          className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                          disabled={(company.totalPayslips || 0) === 0}
+                          title={(company.totalPayslips || 0) === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos por WhatsApp'}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          <span className="whitespace-nowrap">WhatsApp Todos</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const fileNames = collectCompanyDocumentFileNames(company);
+                            console.log('🗑️ Excluir empresa - fileNames coletados:', fileNames.length, fileNames);
+                            if (fileNames.length > 0) {
+                              handleDeleteDocuments('batch', fileNames);
+                            } else {
+                              toast({
+                                title: '⚠️ Nenhum documento encontrado',
+                                description: 'Não há documentos para excluir nesta empresa.',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                          className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                          disabled={deletingDocuments || (company.totalPayslips || 0) === 0}
+                          title={(company.totalPayslips || 0) === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos da empresa'}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          <span className="whitespace-nowrap">Excluir Todos</span>
+                        </Button>
+                        
+                        {/* Botões de ação em massa - aparecem quando há seleção */}
+                        {companySelectedCount > 0 && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="bg-green-600/90 text-white hover:bg-green-600"
+                              onClick={() => {
+                                handleSendDocuments('email', companySelectedFileNames);
+                              }}
+                            >
+                              <Mail className="h-4 w-4 mr-1" />
+                              Email ({companySelectedCount})
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="bg-blue-600/90 text-white hover:bg-blue-600"
+                              onClick={() => {
+                                handleSendDocuments('whatsapp', companySelectedFileNames);
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              WhatsApp ({companySelectedCount})
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                              onClick={() => {
+                                handleDeleteDocuments('batch', companySelectedFileNames);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Excluir ({companySelectedCount})
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
             {companyExpanded && (
@@ -284,22 +790,147 @@ const UnificadosPorSetorNovo: React.FC = () => {
 
                     return (
                       <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
-                          <div>
-                            <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
-                            <p className="text-xs text-gray-400">
-                              {sector.totalPayslips} documento(s) · {sector.periods?.length ?? 0} período(s)
-                            </p>
+                        <div className="flex flex-col gap-3 px-4 py-3">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              {(() => {
+                                const sectorFileNames = collectSectorDocumentFileNames(sector);
+                                const sectorSelectedFileNames = getSelectedFileNames(sectorFileNames);
+                                const sectorSelectedCount = sectorSelectedFileNames.length;
+                                const sectorCheckboxState: boolean | 'indeterminate' = sectorFileNames.length === 0
+                                  ? false
+                                  : areFileNamesFullySelected(sectorFileNames)
+                                    ? true
+                                    : sectorSelectedCount > 0
+                                      ? 'indeterminate'
+                                      : false;
+                                
+                                return (
+                                  <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                                    <Checkbox
+                                      checked={sectorCheckboxState}
+                                      onCheckedChange={(checked) => handleSelectDocuments(sectorFileNames, checked === true)}
+                                      className="border-blue-400"
+                                    />
+                                    <span className="text-xs text-gray-300">Selecionar setor</span>
+                                  </div>
+                                );
+                              })()}
+                              <div>
+                                <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
+                                <p className="text-xs text-gray-400">
+                                  {sector.totalPayslips} documento(s) · {sector.periods?.length ?? 0} período(s)
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleSectorExpansion(sectorKey)}
+                              className="text-seguranca-lightgray hover:text-white"
+                            >
+                              {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                              {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleSectorExpansion(sectorKey)}
-                            className="text-seguranca-lightgray hover:text-white"
-                          >
-                            {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                            {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
-                          </Button>
+                          
+                          {/* Botões de ação do setor */}
+                          <div className="flex flex-wrap gap-2 items-center">
+                            {(() => {
+                              const sectorFileNames = collectSectorDocumentFileNames(sector);
+                              const sectorSelectedFileNames = getSelectedFileNames(sectorFileNames);
+                              const sectorSelectedCount = sectorSelectedFileNames.length;
+                              
+                              return (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadBySector(sector.sectorName || '')}
+                                    className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                    disabled={loading || (sector.totalPayslips || 0) === 0}
+                                    title={(sector.totalPayslips || 0) === 0 ? 'Nenhum documento encontrado' : 'Baixar todos os documentos do setor'}
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">Download Setor</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (sectorFileNames.length > 0) {
+                                        handleSendDocuments('whatsapp', sectorFileNames);
+                                      }
+                                    }}
+                                    className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                    disabled={(sector.totalPayslips || 0) === 0}
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const fileNames = collectSectorDocumentFileNames(sector);
+                                      console.log('🗑️ Excluir setor - fileNames coletados:', fileNames.length, fileNames);
+                                      if (fileNames.length > 0) {
+                                        handleDeleteDocuments('batch', fileNames);
+                                      } else {
+                                        toast({
+                                          title: '⚠️ Nenhum documento encontrado',
+                                          description: 'Não há documentos para excluir neste setor.',
+                                          variant: 'destructive',
+                                        });
+                                      }
+                                    }}
+                                    className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                    disabled={deletingDocuments || (sector.totalPayslips || 0) === 0}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">Excluir Todos</span>
+                                  </Button>
+                                  
+                                  {/* Botões de ação em massa - aparecem quando há seleção */}
+                                  {sectorSelectedCount > 0 && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        className="bg-green-600/90 text-white hover:bg-green-600"
+                                        onClick={() => {
+                                          handleSendDocuments('email', sectorSelectedFileNames);
+                                        }}
+                                      >
+                                        <Mail className="h-4 w-4 mr-1" />
+                                        Email ({sectorSelectedCount})
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                        onClick={() => {
+                                          handleSendDocuments('whatsapp', sectorSelectedFileNames);
+                                        }}
+                                      >
+                                        <MessageSquare className="h-4 w-4 mr-1" />
+                                        WhatsApp ({sectorSelectedCount})
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                        onClick={() => {
+                                          handleDeleteDocuments('batch', sectorSelectedFileNames);
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Excluir ({sectorSelectedCount})
+                                      </Button>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
                         {sectorExpanded && (
                           <div className="space-y-3 px-4 py-4 bg-gray-900/70">
@@ -310,20 +941,249 @@ const UnificadosPorSetorNovo: React.FC = () => {
 
                                 return (
                                   <div key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
-                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
-                                      <div>
-                                        <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
-                                        <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
+                                    <div className="flex flex-col gap-3 px-4 py-3">
+                                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                          {(() => {
+                                            const periodFileNames = collectPeriodDocumentFileNames(period);
+                                            const periodSelectedFileNames = getSelectedFileNames(periodFileNames);
+                                            const periodSelectedCount = periodSelectedFileNames.length;
+                                            const periodCheckboxState: boolean | 'indeterminate' = periodFileNames.length === 0
+                                              ? false
+                                              : areFileNamesFullySelected(periodFileNames)
+                                                ? true
+                                                : periodSelectedCount > 0
+                                                  ? 'indeterminate'
+                                                  : false;
+                                            
+                                            return (
+                                              <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                                                <Checkbox
+                                                  checked={periodCheckboxState}
+                                                  onCheckedChange={(checked) => handleSelectDocuments(periodFileNames, checked === true)}
+                                                  className="border-blue-400"
+                                                />
+                                                <span className="text-xs text-gray-300">Selecionar período</span>
+                                              </div>
+                                            );
+                                          })()}
+                                          <div>
+                                            <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
+                                            <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
+                                          </div>
+                                        </div>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => togglePeriodExpansion(periodKey)}
+                                          className="text-seguranca-lightgray hover:text-white"
+                                        >
+                                          {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                          {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
+                                        </Button>
                                       </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => togglePeriodExpansion(periodKey)}
-                                        className="text-seguranca-lightgray hover:text-white"
-                                      >
-                                        {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                        {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
-                                      </Button>
+                                      
+                                      {/* Botões de ação do período */}
+                                      <div className="flex flex-wrap gap-2 items-center">
+                                        {(() => {
+                                          const periodFileNames = collectPeriodDocumentFileNames(period);
+                                          const periodSelectedFileNames = getSelectedFileNames(periodFileNames);
+                                          const periodSelectedCount = periodSelectedFileNames.length;
+                                          
+                                          return (
+                                            <>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={async () => {
+                                                  if (periodFileNames.length === 0) {
+                                                    toast({
+                                                      title: '⚠️ Nenhum documento',
+                                                      description: 'Não há documentos para baixar neste período.',
+                                                      variant: 'destructive'
+                                                    });
+                                                    return;
+                                                  }
+                                                  
+                                                  try {
+                                                    setLoading(true);
+                                                    toast({
+                                                      title: '📦 Preparando ZIP...',
+                                                      description: `Compactando ${periodFileNames.length} documento(s) do período ${period.formattedPeriod}...`,
+                                                    });
+
+                                                    const JSZip = (await import('jszip')).default;
+                                                    const zip = new JSZip();
+                                                    
+                                                    let successCount = 0;
+                                                    let failCount = 0;
+                                                    const BATCH_SIZE = 10; // Downloads simultâneos
+                                                    const failedFiles: string[] = [];
+                                                    
+                                                    // Download paralelo otimizado
+                                                    for (let i = 0; i < periodFileNames.length; i += BATCH_SIZE) {
+                                                      const batch = periodFileNames.slice(i, i + BATCH_SIZE);
+                                                      const batchPromises = batch.map(async (fileName) => {
+                                                        try {
+                                                          const response = await api.get(`/api/unified-documents/download/${encodeURIComponent(fileName)}`, {
+                                                            responseType: 'blob',
+                                                            timeout: 30000
+                                                          });
+                                                          zip.file(fileName, response.data);
+                                                          successCount++;
+                                                        } catch (err: any) {
+                                                          console.warn(`⚠️ Arquivo não encontrado: ${fileName}`, err.response?.status);
+                                                          failCount++;
+                                                          failedFiles.push(fileName);
+                                                        }
+                                                      });
+                                                      await Promise.all(batchPromises);
+                                                      
+                                                      // Atualizar progresso
+                                                      if (i + BATCH_SIZE < periodFileNames.length) {
+                                                        toast({
+                                                          title: '📦 Download em progresso...',
+                                                          description: `${Math.min(i + BATCH_SIZE, periodFileNames.length)}/${periodFileNames.length} arquivo(s) processado(s)...`,
+                                                          duration: 2000,
+                                                        });
+                                                      }
+                                                    }
+                                                    
+                                                    if (successCount === 0) {
+                                                      throw new Error(`Nenhum dos ${periodFileNames.length} documento(s) foi encontrado no servidor. Os arquivos podem não ter sido gerados ainda ou podem estar em um local diferente.`);
+                                                    }
+                                                    
+                                                    const blob = await zip.generateAsync({ 
+                                                      type: 'blob',
+                                                      compression: 'DEFLATE',
+                                                      compressionOptions: { level: 6 }
+                                                    });
+                                                    const link = document.createElement('a');
+                                                    link.href = URL.createObjectURL(blob);
+                                                    link.download = `${period.formattedPeriod?.replace(/\//g, '_') || 'periodo'}_documentos_unificados.zip`;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                    window.URL.revokeObjectURL(link.href);
+                                                    
+                                                    if (failCount > 0) {
+                                                      toast({
+                                                        title: '⚠️ Download parcial',
+                                                        description: `${successCount} documento(s) baixado(s) com sucesso, ${failCount} não foram encontrados no servidor.`,
+                                                        variant: 'default',
+                                                        duration: 5000
+                                                      });
+                                                      console.warn('Arquivos que falharam:', failedFiles.slice(0, 10)); // Log dos primeiros 10
+                                                    } else {
+                                                      toast({
+                                                        title: '✅ Download concluído',
+                                                        description: `ZIP criado com ${successCount} documento(s) do período ${period.formattedPeriod}.`,
+                                                      });
+                                                    }
+                                                  } catch (err: any) {
+                                                    console.error('Erro ao criar ZIP:', err);
+                                                    toast({
+                                                      title: '❌ Erro no download',
+                                                      description: err.message || 'Erro ao criar arquivo ZIP',
+                                                      variant: 'destructive'
+                                                    });
+                                                  } finally {
+                                                    setLoading(false);
+                                                  }
+                                                }}
+                                                className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                                disabled={loading || (period.totalPayslips || 0) === 0}
+                                                title={(period.totalPayslips || 0) === 0 ? 'Nenhum documento encontrado' : `Baixar todos os documentos do período ${period.formattedPeriod}`}
+                                              >
+                                                {loading ? (
+                                                  <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    <span className="whitespace-nowrap">Preparando...</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    <span className="whitespace-nowrap">Download Período</span>
+                                                  </>
+                                                )}
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  if (periodFileNames.length > 0) {
+                                                    handleSendDocuments('whatsapp', periodFileNames);
+                                                  }
+                                                }}
+                                                className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                                disabled={(period.totalPayslips || 0) === 0}
+                                              >
+                                                <MessageSquare className="h-4 w-4 mr-2" />
+                                                <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  const fileNames = collectPeriodDocumentFileNames(period);
+                                                  console.log('🗑️ Excluir período - fileNames coletados:', fileNames.length, fileNames);
+                                                  if (fileNames.length > 0) {
+                                                    handleDeleteDocuments('batch', fileNames);
+                                                  } else {
+                                                    toast({
+                                                      title: '⚠️ Nenhum documento encontrado',
+                                                      description: 'Não há documentos para excluir neste período.',
+                                                      variant: 'destructive',
+                                                    });
+                                                  }
+                                                }}
+                                                className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                                disabled={deletingDocuments || (period.totalPayslips || 0) === 0}
+                                              >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                <span className="whitespace-nowrap">Excluir Todos</span>
+                                              </Button>
+                                              
+                                              {/* Botões de ação em massa - aparecem quando há seleção */}
+                                              {periodSelectedCount > 0 && (
+                                                <>
+                                                  <Button
+                                                    size="sm"
+                                                    className="bg-green-600/90 text-white hover:bg-green-600"
+                                                    onClick={() => {
+                                                      handleSendDocuments('email', periodSelectedFileNames);
+                                                    }}
+                                                  >
+                                                    <Mail className="h-4 w-4 mr-1" />
+                                                    Email ({periodSelectedCount})
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                                    onClick={() => {
+                                                      handleSendDocuments('whatsapp', periodSelectedFileNames);
+                                                    }}
+                                                  >
+                                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                                    WhatsApp ({periodSelectedCount})
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                    onClick={() => {
+                                                      handleDeleteDocuments('batch', periodSelectedFileNames);
+                                                    }}
+                                                  >
+                                                    <Trash2 className="h-4 w-4 mr-1" />
+                                                    Excluir ({periodSelectedCount})
+                                                  </Button>
+                                                </>
+                                              )}
+                                            </>
+                                          );
+                                        })()}
+                                      </div>
                                     </div>
                                     {periodExpanded && (
                                       <div className="divide-y divide-gray-800 bg-gray-950/60">
@@ -341,41 +1201,86 @@ const UnificadosPorSetorNovo: React.FC = () => {
                                                   </p>
                                                 </div>
                                               </div>
-                                              <div className="flex flex-wrap gap-2">
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                  onClick={() => {
-                                                    unifiedDocumentService.viewUnifiedDocument(entry.fileName).catch(err => {
-                                                      toast({
-                                                        title: 'Erro',
-                                                        description: 'Erro ao visualizar documento',
-                                                        variant: 'destructive'
-                                                      });
-                                                    });
+                                              <div className="flex items-center gap-2">
+                                                {/* Checkbox de seleção individual */}
+                                                <Checkbox
+                                                  checked={selectedUnifiedDocuments.has(entry.fileName)}
+                                                  onCheckedChange={(checked) => {
+                                                    handleSelectDocuments([entry.fileName], checked === true);
                                                   }}
-                                                >
-                                                  <Eye className="h-4 w-4 mr-1" />
-                                                  Visualizar
-                                                </Button>
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                  onClick={() => {
-                                                    unifiedDocumentService.downloadUnifiedDocument(entry.fileName).catch(err => {
-                                                      toast({
-                                                        title: 'Erro',
-                                                        description: 'Erro ao baixar documento',
-                                                        variant: 'destructive'
+                                                  className="border-blue-400"
+                                                />
+                                                
+                                                <div className="flex flex-wrap gap-2">
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                    onClick={() => {
+                                                      unifiedDocumentService.viewUnifiedDocument(entry.fileName).catch(err => {
+                                                        toast({
+                                                          title: 'Erro',
+                                                          description: 'Erro ao visualizar documento',
+                                                          variant: 'destructive'
+                                                        });
                                                       });
-                                                    });
-                                                  }}
-                                                >
-                                                  <Download className="h-4 w-4 mr-1" />
-                                                  Download
-                                                </Button>
+                                                    }}
+                                                  >
+                                                    <Eye className="h-4 w-4 mr-1" />
+                                                    Visualizar
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                    onClick={() => {
+                                                      unifiedDocumentService.downloadUnifiedDocument(entry.fileName).catch(err => {
+                                                        toast({
+                                                          title: 'Erro',
+                                                          description: 'Erro ao baixar documento',
+                                                          variant: 'destructive'
+                                                        });
+                                                      });
+                                                    }}
+                                                  >
+                                                    <Download className="h-4 w-4 mr-1" />
+                                                    Download
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-green-500/50 text-green-300 hover:bg-green-800/50"
+                                                    onClick={() => {
+                                                      handleSendDocuments('email', [entry.fileName]);
+                                                    }}
+                                                  >
+                                                    <Mail className="h-4 w-4 mr-1" />
+                                                    Email
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50"
+                                                    onClick={() => {
+                                                      handleSendDocuments('whatsapp', [entry.fileName]);
+                                                    }}
+                                                  >
+                                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                                    WhatsApp
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-red-500/50 text-red-300 hover:bg-red-800/50"
+                                                    onClick={() => {
+                                                      handleDeleteDocuments('individual', [entry.fileName]);
+                                                    }}
+                                                    disabled={deletingDocuments}
+                                                  >
+                                                    <Trash2 className="h-4 w-4 mr-1" />
+                                                    Excluir
+                                                  </Button>
+                                                </div>
                                               </div>
                                             </div>
                                           );
@@ -918,7 +1823,7 @@ const UnificadosPorSetorNovo: React.FC = () => {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={loadOrganization}
+              onClick={() => loadOrganization(true)}
               disabled={loadingOrganization}
               className="border-gray-600/60 text-seguranca-lightgray hover:bg-seguranca-black"
             >
@@ -998,7 +1903,7 @@ const UnificadosPorSetorNovo: React.FC = () => {
               )}
               <Button
                 variant="outline"
-                onClick={loadOrganization}
+                onClick={() => loadOrganization(true)}
                 disabled={loadingOrganization}
                 className="border-gray-600/60 text-seguranca-lightgray hover:bg-seguranca-black"
               >
@@ -1292,7 +2197,61 @@ const UnificadosPorSetorNovo: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Confirmação de Exclusão */}
+      {/* Modal de Confirmação de Exclusão (Documentos Unificados) */}
+      <Dialog open={showDeleteConfirmModal} onOpenChange={setShowDeleteConfirmModal}>
+        <DialogContent className="bg-seguranca-graphite border-gray-600">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-gray-100">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              Confirmar Exclusão
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              {documentsToDelete.length === 1 ? (
+                <>
+                  Tem certeza que deseja excluir <strong>1 documento unificado</strong>?
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja excluir <strong>{documentsToDelete.length} documento(s) unificado(s)</strong>?
+                </>
+              )}
+              <p className="mt-2 text-red-300">Esta ação não pode ser desfeita!</p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteConfirmModal(false);
+                setDocumentsToDelete([]);
+              }}
+              disabled={deletingDocuments}
+              className="border-gray-700 hover:bg-gray-700"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={executeDeleteDocuments}
+              disabled={deletingDocuments}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deletingDocuments ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Confirmar Exclusão
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Confirmação de Exclusão (Legado) */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
         <DialogContent className="bg-seguranca-graphite border-gray-600">
           <DialogHeader>

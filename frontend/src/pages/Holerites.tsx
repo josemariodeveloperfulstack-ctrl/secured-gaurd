@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1421,12 +1421,17 @@ const Holerites: React.FC = () => {
         if (response.data && (response.data.sucesso || response.data.documents)) {
           documents = response.data.documents || response.data || [];
           if (Array.isArray(documents)) {
+            // Sempre atualizar o estado, mesmo se for array vazio
             setUnifiedDocuments(documents);
             console.log('✅ Documentos unificados carregados:', documents.length);
           } else {
+            // Se não for array, limpar o estado
+            setUnifiedDocuments([]);
             throw new Error('Formato de resposta inválido');
           }
         } else {
+          // Se não há sucesso ou documentos, limpar o estado
+          setUnifiedDocuments([]);
           throw new Error(response.data?.mensagem || 'Resposta inválida do servidor');
         }
       } catch (protectedError: any) {
@@ -1441,12 +1446,17 @@ const Holerites: React.FC = () => {
           if (response.data && (response.data.sucesso || response.data.documents)) {
             documents = response.data.documents || response.data || [];
             if (Array.isArray(documents)) {
+              // Sempre atualizar o estado, mesmo se for array vazio
               setUnifiedDocuments(documents);
               console.log('✅ Documentos unificados carregados (público):', documents.length);
             } else {
+              // Se não for array, limpar o estado
+              setUnifiedDocuments([]);
               throw new Error('Formato de resposta inválido');
             }
           } else {
+            // Se não há sucesso ou documentos, limpar o estado
+            setUnifiedDocuments([]);
             throw new Error(response.data?.mensagem || 'Resposta inválida do servidor');
           }
         } catch (publicError: any) {
@@ -1458,7 +1468,7 @@ const Holerites: React.FC = () => {
       // Limpar seleções se não há documentos ou se a lista mudou significativamente
       if (documents.length === 0) {
         setSelectedUnifiedDocuments(new Set());
-        console.log('🧹 Lista vazia - seleções limpas');
+        console.log('🧹 Lista vazia - seleções limpas e estado atualizado para array vazio');
       } else {
         // Verificar se os índices selecionados ainda são válidos
         const filteredDocs = documents;
@@ -1988,6 +1998,11 @@ const Holerites: React.FC = () => {
       }
       
       // Recarregar a lista de documentos unificados para garantir sincronização
+      // Aguardar um pouco para garantir que o backend processou a exclusão
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await fetchUnifiedDocuments(true);
+      // Aguardar mais um pouco e recarregar novamente para garantir sincronização
+      await new Promise(resolve => setTimeout(resolve, 500));
       await fetchUnifiedDocuments(true);
       await loadUnifiedOrganization();
       
@@ -3022,7 +3037,10 @@ const Holerites: React.FC = () => {
       const month = unification?.holerite?.month || unification?.recibo?.month;
       const year = unification?.holerite?.year || unification?.recibo?.year;
 
-      console.log('📊‹ Dados extraídos:', { employeeName, month, year });
+      const payslipId = unification?.holerite?.id;
+      const receiptId = unification?.recibo?.id;
+
+      console.log('📊 Dados extraídos:', { employeeName, month, year, payslipId, receiptId });
 
       if (!employeeName || !month || !year) {
         throw new Error('Dados insuficientes para unificação (nome/mês/ano)');
@@ -3030,11 +3048,30 @@ const Holerites: React.FC = () => {
 
       console.log('🌐 Enviando requisição para backend...');
       const response = await api.post('/api/unified-documents/create', null, {
-        params: {
-          employeeName,
-          month,
-          year
-        },
+        params: (() => {
+          const params: any = {
+            employeeName,
+            month,
+            year
+          };
+          
+          const payslipId = unification?.holerite?.id;
+          const receiptId = unification?.recibo?.id;
+          
+          if (payslipId && receiptId) {
+            // Remover prefixos "hol-" e "rec-" se existirem
+            const cleanPayslipId = typeof payslipId === 'string' ? payslipId.replace(/^hol-/, '') : payslipId;
+            const cleanReceiptId = typeof receiptId === 'string' ? receiptId.replace(/^rec-/, '') : receiptId;
+            
+            params.payslipId = cleanPayslipId;
+            params.receiptId = cleanReceiptId;
+            console.log('✅ Usando IDs específicos para garantir documentos corretos:', { payslipId: cleanPayslipId, receiptId: cleanReceiptId });
+          } else {
+            console.warn('⚠️ IDs não disponíveis, usando busca por nome/mês/ano (pode encontrar documentos incorretos)');
+          }
+          
+          return params;
+        })(),
         timeout: 60000 // 1 minuto de timeout
       });
 
@@ -3789,21 +3826,276 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     }
   }, [activeTab, user]);
 
+  // Funções auxiliares para chaves de organização
+  const getUnifiedCompanyKey = (company: HoleriteCompanyGroup): string => {
+    return `${company.companyCnpj || company.companyName || ''}`;
+  };
+
+  const getUnifiedSectorKey = (companyKey: string, sector: HoleriteSectorGroup): string => {
+    return `${companyKey}|${sector.sectorName || ''}`;
+  };
+
+  const getUnifiedPeriodKey = (sectorKey: string, period: HoleritePeriodGroup): string => {
+    return `${sectorKey}|${period.year || ''}|${period.month || ''}`;
+  };
+
+  // Função auxiliar para normalizar nomes (remove acentos e espaços extras)
+  const normalizeNameForMatching = useCallback((name: string): string => {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/\s+/g, ' ')
+      .trim();
+  }, []);
+
+  // Função auxiliar para normalizar número (converte string para número se necessário)
+  const normalizeNumber = useCallback((value: any): number | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  }, []);
+
+  // Mapa indexado para busca O(1) de documentos unificados
+  // Criado apenas uma vez quando unifiedDocuments muda
+  const unifiedDocumentsIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    
+    unifiedDocuments.forEach((doc, index) => {
+      if (!doc) return;
+      
+      const docNameNormalized = normalizeNameForMatching(doc.employeeName || '');
+      const docMonth = normalizeNumber(doc.month);
+      const docYear = normalizeNumber(doc.year);
+      
+      // Chave primária: nome normalizado + mês + ano
+      if (docNameNormalized && docMonth !== null && docYear !== null) {
+        const primaryKey = `${docNameNormalized}|${docMonth}|${docYear}`;
+        if (!map.has(primaryKey)) {
+          map.set(primaryKey, index);
+        }
+      }
+      
+      // Chave secundária: fileName (se disponível)
+      if (doc.fileName) {
+        const fileNameKey = doc.fileName.toLowerCase().trim();
+        if (!map.has(fileNameKey)) {
+          map.set(fileNameKey, index);
+        }
+      }
+      
+      // Chave alternativa: nome parcial (primeiro e último nome) + mês + ano
+      if (docNameNormalized && docMonth !== null && docYear !== null) {
+        const nameParts = docNameNormalized.split(/\s+/).filter(p => p.length > 0);
+        if (nameParts.length >= 2) {
+          const firstLastKey = `${nameParts[0]}|${nameParts[nameParts.length - 1]}|${docMonth}|${docYear}`;
+          if (!map.has(firstLastKey)) {
+            map.set(firstLastKey, index);
+          }
+        }
+      }
+    });
+    
+    return map;
+  }, [unifiedDocuments, normalizeNameForMatching, normalizeNumber]);
+
+  // Função auxiliar para encontrar índice de documento unificado (OTIMIZADA com Map O(1))
+  const findUnifiedDocumentIndex = useCallback((entry: HoleriteOrganizedEntry): number => {
+    if (!entry || !entry.employeeName) {
+      return -1;
+    }
+
+    const entryNameNormalized = normalizeNameForMatching(entry.employeeName);
+    const entryMonth = normalizeNumber(entry.month);
+    const entryYear = normalizeNumber(entry.year);
+
+    // Estratégia 1: Busca exata por chave primária (nome + mês + ano) - O(1)
+    if (entryNameNormalized && entryMonth !== null && entryYear !== null) {
+      const primaryKey = `${entryNameNormalized}|${entryMonth}|${entryYear}`;
+      const index = unifiedDocumentsIndexMap.get(primaryKey);
+      if (index !== undefined) {
+        return index;
+      }
+    }
+
+    // Estratégia 2: Busca por fileName - O(1)
+    if (entry.fileName) {
+      const fileNameKey = entry.fileName.toLowerCase().trim();
+      const index = unifiedDocumentsIndexMap.get(fileNameKey);
+      if (index !== undefined) {
+        return index;
+      }
+    }
+
+    // Estratégia 3: Busca por primeiro e último nome + mês + ano - O(1)
+    if (entryNameNormalized && entryMonth !== null && entryYear !== null) {
+      const nameParts = entryNameNormalized.split(/\s+/).filter(p => p.length > 0);
+      if (nameParts.length >= 2) {
+        const firstLastKey = `${nameParts[0]}|${nameParts[nameParts.length - 1]}|${entryMonth}|${entryYear}`;
+        const index = unifiedDocumentsIndexMap.get(firstLastKey);
+        if (index !== undefined) {
+          return index;
+        }
+      }
+    }
+
+    // Fallback: busca linear apenas se necessário (raramente usado)
+    // Isso só acontece se o documento não foi indexado corretamente
+    for (let i = 0; i < unifiedDocuments.length; i++) {
+      const doc = unifiedDocuments[i];
+      if (!doc) continue;
+
+      const docNameNormalized = normalizeNameForMatching(doc.employeeName || '');
+      const docMonth = normalizeNumber(doc.month);
+      const docYear = normalizeNumber(doc.year);
+
+      if (entryNameNormalized && docNameNormalized && 
+          entryMonth !== null && docMonth !== null && entryMonth === docMonth &&
+          entryYear !== null && docYear !== null && entryYear === docYear) {
+        // Verificar correspondência parcial de nome
+        if (docNameNormalized.includes(entryNameNormalized) || 
+            entryNameNormalized.includes(docNameNormalized)) {
+          return i;
+        }
+      }
+    }
+
+    return -1;
+  }, [unifiedDocumentsIndexMap, unifiedDocuments, normalizeNameForMatching, normalizeNumber]);
+
+  // Mapa pré-computado de índices para empresas, setores e períodos
+  // Calculado uma vez quando unifiedOrganizationData ou unifiedDocuments mudam
+  const unifiedIndicesMap = useMemo(() => {
+    const map = {
+      companies: new Map<string, number[]>(),
+      sectors: new Map<string, number[]>(),
+      periods: new Map<string, number[]>(),
+      entries: new Map<string, number>() // Mapa direto de entry para índice
+    };
+
+    if (!unifiedOrganizationData || !unifiedDocuments.length) {
+      return map;
+    }
+
+    // Pré-computar todos os índices uma única vez
+    unifiedOrganizationData.companies.forEach(company => {
+      const companyKey = getUnifiedCompanyKey(company);
+      const companyIndices: number[] = [];
+      const seenCompanyIndices = new Set<number>();
+
+      company.sectors.forEach(sector => {
+        const sectorKey = getUnifiedSectorKey(companyKey, sector);
+        const sectorIndices: number[] = [];
+        const seenSectorIndices = new Set<number>();
+
+        sector.periods?.forEach(period => {
+          const periodKey = getUnifiedPeriodKey(sectorKey, period);
+          const periodIndices: number[] = [];
+          const seenPeriodIndices = new Set<number>();
+
+          period.payslips.forEach(entry => {
+            // Criar chave única para o entry
+            const entryKey = entry.id 
+              ? `entry-${entry.id}` 
+              : `entry-${entry.employeeName}-${entry.month}-${entry.year}`;
+            
+            // Buscar índice apenas uma vez por entry
+            let docIndex = map.entries.get(entryKey);
+            if (docIndex === undefined) {
+              docIndex = findUnifiedDocumentIndex(entry);
+              if (docIndex !== -1) {
+                map.entries.set(entryKey, docIndex);
+              }
+            }
+
+            if (docIndex !== -1) {
+              // Adicionar ao período
+              if (!seenPeriodIndices.has(docIndex)) {
+                periodIndices.push(docIndex);
+                seenPeriodIndices.add(docIndex);
+              }
+
+              // Adicionar ao setor
+              if (!seenSectorIndices.has(docIndex)) {
+                sectorIndices.push(docIndex);
+                seenSectorIndices.add(docIndex);
+              }
+
+              // Adicionar à empresa
+              if (!seenCompanyIndices.has(docIndex)) {
+                companyIndices.push(docIndex);
+                seenCompanyIndices.add(docIndex);
+              }
+            }
+          });
+
+          // Armazenar índices do período
+          if (periodIndices.length > 0) {
+            map.periods.set(periodKey, periodIndices);
+          }
+        });
+
+        // Armazenar índices do setor
+        if (sectorIndices.length > 0) {
+          map.sectors.set(sectorKey, sectorIndices);
+        }
+      });
+
+      // Armazenar índices da empresa
+      if (companyIndices.length > 0) {
+        map.companies.set(companyKey, companyIndices);
+      }
+    });
+
+    return map;
+  }, [unifiedOrganizationData, unifiedDocuments, findUnifiedDocumentIndex]);
+
   // Função para filtrar dados organizados de documentos unificados
   const getFilteredUnifiedOrganizationData = useCallback((): HoleriteOrganizationResponse | null => {
     if (!unifiedOrganizationData) {
       return null;
     }
 
-    // Se não há termo de busca ou é muito curto, retornar dados originais
+    // Se não há documentos unificados, não exibir nenhuma empresa
+    if (!unifiedDocuments || unifiedDocuments.length === 0) {
+      return {
+        ...unifiedOrganizationData,
+        companies: [],
+        totalPayslips: 0
+      };
+    }
+
+    // Filtrar empresas que não têm documentos unificados correspondentes
+    let companiesToFilter = unifiedOrganizationData.companies;
+    
+    // Filtrar empresas sem documentos unificados usando unifiedIndicesMap
+    companiesToFilter = companiesToFilter.filter(company => {
+      const companyKey = getUnifiedCompanyKey(company);
+      const companyIndices = unifiedIndicesMap.companies.get(companyKey);
+      // Só exibir empresas que têm pelo menos um documento unificado correspondente
+      return companyIndices && companyIndices.length > 0;
+    });
+
+    // Se não há termo de busca ou é muito curto, retornar dados filtrados
     if (!unifiedSearchTerm || unifiedSearchTerm.trim().length < 4) {
-      return unifiedOrganizationData;
+      // Recalcular total de payslips
+      const totalPayslips = companiesToFilter.reduce((sum, c) => sum + c.totalPayslips, 0);
+      return {
+        ...unifiedOrganizationData,
+        companies: companiesToFilter,
+        totalPayslips
+      };
     }
 
     const searchLower = unifiedSearchTerm.toLowerCase().trim();
 
     // Filtrar empresas, setores, períodos e documentos baseado no termo de busca
-    const filteredCompanies: HoleriteCompanyGroup[] = unifiedOrganizationData.companies
+    const filteredCompanies: HoleriteCompanyGroup[] = companiesToFilter
       .map(company => {
         // Verificar se a empresa corresponde ao termo de busca
         const companyMatches = 
@@ -3881,7 +4173,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       companies: filteredCompanies,
       totalPayslips
     };
-  }, [unifiedOrganizationData, unifiedSearchTerm]);
+  }, [unifiedOrganizationData, unifiedSearchTerm, unifiedDocuments, unifiedIndicesMap]);
 
   // Função para carregar organização de documentos unificados
   const loadUnifiedOrganization = async () => {
@@ -3905,29 +4197,26 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         response: error.response?.data,
         status: error.response?.status
       });
-      setUnifiedOrganizationError(error.message || 'Erro ao carregar organização');
+      
+      // Mensagem de erro mais específica para timeouts
+      let errorMessage = error.message || 'Erro ao carregar organização';
+      if (error.message?.includes('timeout') || error.message?.includes('demorou muito')) {
+        errorMessage = 'A requisição demorou muito para responder. Tente novamente ou use filtros para reduzir a quantidade de dados.';
+      } else if (error.response?.status === 504) {
+        errorMessage = 'O servidor demorou muito para processar a requisição. Tente novamente mais tarde.';
+      }
+      
+      setUnifiedOrganizationError(errorMessage);
       setUnifiedOrganizationData(null);
       toast({
         title: "Erro ao carregar organização",
-        description: error.response?.data?.message || error.message || 'Erro desconhecido',
-        variant: "destructive"
+        description: error.response?.data?.message || errorMessage,
+        variant: "destructive",
+        duration: 5000
       });
     } finally {
       setLoadingUnifiedOrganization(false);
     }
-  };
-
-  // Funções auxiliares para chaves de organização
-  const getUnifiedCompanyKey = (company: HoleriteCompanyGroup): string => {
-    return `${company.companyCnpj || company.companyName || ''}`;
-  };
-
-  const getUnifiedSectorKey = (companyKey: string, sector: HoleriteSectorGroup): string => {
-    return `${companyKey}|${sector.sectorName || ''}`;
-  };
-
-  const getUnifiedPeriodKey = (sectorKey: string, period: HoleritePeriodGroup): string => {
-    return `${sectorKey}|${period.year || ''}|${period.month || ''}`;
   };
 
   // Funções para expandir/colapsar
@@ -3974,296 +4263,65 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     }));
   };
 
-  // Função auxiliar para normalizar nomes (remove acentos e espaços extras)
-  const normalizeNameForMatching = (name: string): string => {
-    if (!name) return '';
-    return name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
+  // Funções auxiliares para seleção de documentos unificados (OTIMIZADAS - usam mapa pré-computado)
+  const collectUnifiedCompanyDocumentIndices = useCallback((company: HoleriteCompanyGroup): number[] => {
+    const companyKey = getUnifiedCompanyKey(company);
+    return unifiedIndicesMap.companies.get(companyKey) || [];
+  }, [unifiedIndicesMap]);
 
-  // Função auxiliar para normalizar número (converte string para número se necessário)
-  const normalizeNumber = (value: any): number | null => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-      const parsed = parseInt(value, 10);
-      return isNaN(parsed) ? null : parsed;
-    }
-    return null;
-  };
+  const collectUnifiedSectorDocumentIndices = useCallback((sector: HoleriteSectorGroup, companyKey: string): number[] => {
+    const sectorKey = getUnifiedSectorKey(companyKey, sector);
+    return unifiedIndicesMap.sectors.get(sectorKey) || [];
+  }, [unifiedIndicesMap]);
 
-  // Função auxiliar para encontrar índice de documento unificado
-  const findUnifiedDocumentIndex = (entry: HoleriteOrganizedEntry): number => {
-    if (!entry || !entry.employeeName) {
-      console.warn('⚠️ Entry inválido:', entry);
-      return -1;
-    }
+  const collectUnifiedPeriodDocumentIndices = useCallback((period: HoleritePeriodGroup, sectorKey: string): number[] => {
+    const periodKey = getUnifiedPeriodKey(sectorKey, period);
+    return unifiedIndicesMap.periods.get(periodKey) || [];
+  }, [unifiedIndicesMap]);
 
-    const entryNameNormalized = normalizeNameForMatching(entry.employeeName);
-    const entryMonth = normalizeNumber(entry.month);
-    const entryYear = normalizeNumber(entry.year);
-
-    // Log detalhado apenas para o primeiro documento não encontrado
-    let loggedFirstMiss = false;
-
-    const foundIndex = unifiedDocuments.findIndex((d, index) => {
-      if (!d) return false;
-
-      const docNameNormalized = normalizeNameForMatching(d.employeeName || '');
-      const docMonth = normalizeNumber(d.month);
-      const docYear = normalizeNumber(d.year);
-
-      // Estratégia 1: Busca exata por nome normalizado + mês + ano
-      if (entryNameNormalized && docNameNormalized) {
-        const nameExactMatch = entryNameNormalized === docNameNormalized;
-        const monthMatch = entryMonth !== null && docMonth !== null && entryMonth === docMonth;
-        const yearMatch = entryYear !== null && docYear !== null && entryYear === docYear;
-        
-        if (nameExactMatch && monthMatch && yearMatch) {
-          if (!loggedFirstMiss && index === 0) {
-            console.log('✅ Documento encontrado via Estratégia 1 (exata):', {
-              entry: { name: entry.employeeName, month: entryMonth, year: entryYear },
-              doc: { name: d.employeeName, month: docMonth, year: docYear },
-              index
-            });
-          }
-          return true;
-        }
-      }
-
-      // Estratégia 2: Busca por nome contém + mês + ano
-      if (entryNameNormalized && docNameNormalized) {
-        const nameContainsMatch = docNameNormalized.includes(entryNameNormalized) || 
-                                  entryNameNormalized.includes(docNameNormalized);
-        const monthMatch = entryMonth !== null && docMonth !== null && entryMonth === docMonth;
-        const yearMatch = entryYear !== null && docYear !== null && entryYear === docYear;
-        
-        if (nameContainsMatch && monthMatch && yearMatch) {
-          if (!loggedFirstMiss && index === 0) {
-            console.log('✅ Documento encontrado via Estratégia 2 (contém):', {
-              entry: { name: entry.employeeName, month: entryMonth, year: entryYear },
-              doc: { name: d.employeeName, month: docMonth, year: docYear },
-              index
-            });
-          }
-          return true;
-        }
-      }
-
-      // Estratégia 3: Busca por fileName se disponível
-      if (entry.fileName && d.fileName) {
-        const entryFileName = entry.fileName.replace(/^UNIFICADO_/, '').toLowerCase().trim();
-        const docFileName = d.fileName.replace(/^UNIFICADO_/, '').toLowerCase().trim();
-        
-        if (entryFileName === docFileName || 
-            entryFileName.includes(docFileName) || 
-            docFileName.includes(entryFileName)) {
-          // Verificar também mês/ano para confirmar
-          const monthMatch = entryMonth !== null && docMonth !== null && entryMonth === docMonth;
-          const yearMatch = entryYear !== null && docYear !== null && entryYear === docYear;
-          
-          if (monthMatch && yearMatch) {
-            if (!loggedFirstMiss && index === 0) {
-              console.log('✅ Documento encontrado via Estratégia 3 (fileName):', {
-                entry: { fileName: entry.fileName, month: entryMonth, year: entryYear },
-                doc: { fileName: d.fileName, month: docMonth, year: docYear },
-                index
-              });
-            }
-            return true;
-          }
-        }
-      }
-
-      // Estratégia 4: Busca parcial por primeiro e último nome + mês + ano
-      if (entryNameNormalized && docNameNormalized) {
-        const entryNameParts = entryNameNormalized.split(/\s+/).filter(p => p.length > 0);
-        const docNameParts = docNameNormalized.split(/\s+/).filter(p => p.length > 0);
-        
-        if (entryNameParts.length >= 2 && docNameParts.length >= 2) {
-          const entryFirst = entryNameParts[0];
-          const entryLast = entryNameParts[entryNameParts.length - 1];
-          const docFirst = docNameParts[0];
-          const docLast = docNameParts[docNameParts.length - 1];
-          
-          const firstLastMatch = entryFirst === docFirst && entryLast === docLast;
-          const monthMatch = entryMonth !== null && docMonth !== null && entryMonth === docMonth;
-          const yearMatch = entryYear !== null && docYear !== null && entryYear === docYear;
-          
-          if (firstLastMatch && monthMatch && yearMatch) {
-            if (!loggedFirstMiss && index === 0) {
-              console.log('✅ Documento encontrado via Estratégia 4 (primeiro/último):', {
-                entry: { name: entry.employeeName, month: entryMonth, year: entryYear },
-                doc: { name: d.employeeName, month: docMonth, year: docYear },
-                index
-              });
-            }
-            return true;
-          }
-        }
-      }
-
-      // Estratégia 5: Busca flexível - primeiro nome + qualquer parte do nome + mês + ano
-      if (entryNameNormalized && docNameNormalized) {
-        const entryNameParts = entryNameNormalized.split(/\s+/).filter(p => p.length > 0);
-        const docNameParts = docNameNormalized.split(/\s+/).filter(p => p.length > 0);
-        
-        if (entryNameParts.length >= 1 && docNameParts.length >= 1) {
-          const entryFirst = entryNameParts[0];
-          const docFirst = docNameParts[0];
-          
-          // Verificar se o primeiro nome corresponde e se há alguma palavra em comum
-          if (entryFirst === docFirst && entryFirst.length >= 3) {
-            const hasCommonWord = entryNameParts.some(ep => 
-              docNameParts.some(dp => ep === dp && ep.length >= 3)
-            );
-            
-            const monthMatch = entryMonth !== null && docMonth !== null && entryMonth === docMonth;
-            const yearMatch = entryYear !== null && docYear !== null && entryYear === docYear;
-            
-            if (hasCommonWord && monthMatch && yearMatch) {
-              if (!loggedFirstMiss && index === 0) {
-                console.log('✅ Documento encontrado via Estratégia 5 (flexível):', {
-                  entry: { name: entry.employeeName, month: entryMonth, year: entryYear },
-                  doc: { name: d.employeeName, month: docMonth, year: docYear },
-                  index
-                });
-              }
-              return true;
-            }
-          }
-        }
-      }
-
-      return false;
-    });
-
-    if (foundIndex === -1) {
-      // Log detalhado apenas uma vez por entry
-      console.warn('⚠️ Documento não encontrado após todas as estratégias:', {
-        entry: {
-          employeeName: entry.employeeName,
-          employeeNameNormalized: entryNameNormalized,
-          month: entry.month,
-          monthNormalized: entryMonth,
-          year: entry.year,
-          yearNormalized: entryYear,
-          fileName: entry.fileName
-        },
-        totalUnifiedDocuments: unifiedDocuments.length,
-        sampleDocs: unifiedDocuments.slice(0, 5).map(d => ({
-          employeeName: d.employeeName,
-          employeeNameNormalized: normalizeNameForMatching(d.employeeName || ''),
-          month: d.month,
-          monthNormalized: normalizeNumber(d.month),
-          year: d.year,
-          yearNormalized: normalizeNumber(d.year),
-          fileName: d.fileName
-        }))
-      });
-    } else {
-      console.log(`✅ Documento encontrado no índice ${foundIndex}:`, {
-        entry: entry.employeeName,
-        doc: unifiedDocuments[foundIndex]?.employeeName
-      });
-    }
-
-    return foundIndex;
-  };
-
-  // Funções auxiliares para seleção de documentos unificados
-  const collectUnifiedCompanyDocumentIndices = (company: HoleriteCompanyGroup): number[] => {
-    const indices: number[] = [];
-    console.log('🔍 Coletando índices da empresa:', company.companyName, 'Total de documentos unificados:', unifiedDocuments.length);
-    company.sectors.forEach(sector => {
-      sector.periods?.forEach(period => {
-        period.payslips.forEach((entry, entryIdx) => {
-          const docIndex = findUnifiedDocumentIndex(entry);
-          if (docIndex !== -1) {
-            indices.push(docIndex);
-            console.log(`✅ Documento ${entryIdx + 1} encontrado:`, entry.employeeName, `-> índice ${docIndex}`);
-          } else {
-            console.warn(`❌ Documento ${entryIdx + 1} NÃO encontrado:`, entry.employeeName, entry.month, entry.year);
-          }
-        });
-      });
-    });
-    console.log(`📊 Total de índices coletados para empresa ${company.companyName}:`, indices.length);
-    return indices;
-  };
-
-  const collectUnifiedSectorDocumentIndices = (sector: HoleriteSectorGroup): number[] => {
-    const indices: number[] = [];
-    console.log('🔍 Coletando índices do setor:', sector.sectorName);
-    sector.periods?.forEach(period => {
-      period.payslips.forEach((entry, entryIdx) => {
-        const docIndex = findUnifiedDocumentIndex(entry);
-        if (docIndex !== -1) {
-          indices.push(docIndex);
-        } else {
-          console.warn(`❌ Documento ${entryIdx + 1} NÃO encontrado no setor:`, entry.employeeName);
-        }
-      });
-    });
-    console.log(`📊 Total de índices coletados para setor ${sector.sectorName}:`, indices.length);
-    return indices;
-  };
-
-  const collectUnifiedPeriodDocumentIndices = (period: HoleritePeriodGroup): number[] => {
-    const indices: number[] = [];
-    console.log('🔍 Coletando índices do período:', period.month, period.year);
-    period.payslips.forEach((entry, entryIdx) => {
-      const docIndex = findUnifiedDocumentIndex(entry);
-      if (docIndex !== -1) {
-        indices.push(docIndex);
-      } else {
-        console.warn(`❌ Documento ${entryIdx + 1} NÃO encontrado no período:`, entry.employeeName);
-      }
-    });
-    console.log(`📊 Total de índices coletados para período ${period.month}/${period.year}:`, indices.length);
-    return indices;
-  };
-
-  const areUnifiedIndicesFullySelected = (indices: number[]): boolean => {
-    return indices.length > 0 && indices.every(idx => selectedUnifiedDocuments.has(idx));
-  };
-
-  const getSelectedUnifiedIndices = (indices: number[]): number[] => {
-    return indices.filter(idx => selectedUnifiedDocuments.has(idx));
-  };
-
-  const handleSelectUnifiedDocuments = (indices: number[], checked: boolean) => {
-    console.log('🔘 handleSelectUnifiedDocuments chamado:', { 
-      indices, 
-      checked, 
-      currentSelected: Array.from(selectedUnifiedDocuments),
-      unifiedDocumentsCount: unifiedDocuments.length
-    });
+  // Função auxiliar para obter índice de um entry específico (OTIMIZADA)
+  const getUnifiedEntryIndex = useCallback((entry: HoleriteOrganizedEntry): number => {
+    const entryKey = entry.id 
+      ? `entry-${entry.id}` 
+      : `entry-${entry.employeeName}-${entry.month}-${entry.year}`;
     
-    const newSelected = new Set(selectedUnifiedDocuments);
+    const cachedIndex = unifiedIndicesMap.entries.get(entryKey);
+    if (cachedIndex !== undefined) {
+      return cachedIndex;
+    }
+
+    // Fallback: buscar se não estiver no cache
+    return findUnifiedDocumentIndex(entry);
+  }, [unifiedIndicesMap, findUnifiedDocumentIndex]);
+
+  const areUnifiedIndicesFullySelected = useCallback((indices: number[]): boolean => {
+    if (indices.length === 0) return false;
+    return indices.every(idx => selectedUnifiedDocuments.has(idx));
+  }, [selectedUnifiedDocuments]);
+
+  const getSelectedUnifiedIndices = useCallback((indices: number[]): number[] => {
+    return indices.filter(idx => selectedUnifiedDocuments.has(idx));
+  }, [selectedUnifiedDocuments]);
+
+  const handleSelectUnifiedDocuments = useCallback((indices: number[], checked: boolean) => {
+    setSelectedUnifiedDocuments(prev => {
+      const newSelected = new Set(prev);
+      
     if (checked) {
       indices.forEach(idx => {
         if (idx >= 0 && idx < unifiedDocuments.length) {
           newSelected.add(idx);
-          console.log('✅ Adicionando índice:', idx, unifiedDocuments[idx]?.employeeName);
-        } else {
-          console.warn('⚠️ Índice inválido:', idx, 'Total de documentos:', unifiedDocuments.length);
         }
       });
     } else {
       indices.forEach(idx => {
         newSelected.delete(idx);
-        console.log('❌ Removendo índice:', idx);
-      });
-    }
-    
-    console.log('📊 Novo estado de seleção:', Array.from(newSelected));
-    setSelectedUnifiedDocuments(newSelected);
-  };
+        });
+      }
+      
+      return newSelected;
+    });
+  }, [unifiedDocuments.length]);
 
   // Carregar documentos unificados quando a aba de unificação for ativada
   // useEffect removido - não carregar automaticamente quando a aba é ativada
@@ -6842,6 +6900,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                   <p className="text-gray-400 text-sm mt-1">
                                       Documentos organizados por Empresa/Setor/Período
                                   </p>
+                                  <p className="text-yellow-400/70 text-xs mt-1">
+                                      ⚡ Otimizado: máximo de 2000 documentos para melhor performance
+                                  </p>
                               </div>
                           </div>
                           <div className="flex items-center space-x-3">
@@ -6886,7 +6947,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                   )}
                               </Button>
                               <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1">
-                                  {unifiedDocuments.length} documento(s) | {unifiedOrganizationData?.totalPayslips || 0} organizado(s)
+                                  {unifiedDocuments?.length || 0} documento(s) | {unifiedOrganizationData?.totalPayslips || 0} organizado(s)
                               </Badge>
                           </div>
                       </div>
@@ -6955,8 +7016,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                           className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
                                       >
                                           <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 sm:py-6">
-                                              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-                                                  <div className="space-y-2">
+                                              {/* Cabeçalho da empresa */}
+                                              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                                                  <div className="space-y-2 flex-1">
                                                       <div className="flex flex-wrap items-center gap-3">
                                                           <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
                                                               {company.companySigla}
@@ -6970,8 +7032,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                           CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} documento(s) · {company.sectors.length} setor(es)
                                                       </p>
                                                   </div>
-                                                  <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
-                                                      {/* Checkbox "Selecionar empresa" - sempre visível */}
+                                                  
+                                                  {/* Área de ações da empresa - sempre visível */}
+                                                  <div className="flex flex-col gap-3 w-full lg:w-auto">
+                                                      {/* Primeira linha: Checkbox e botão Ver setores */}
+                                                      <div className="flex flex-wrap items-center gap-3">
                                                       <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
                                                           <Checkbox
                                                               checked={companyCheckboxState}
@@ -6980,7 +7045,64 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                           />
                                                           <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
                                                       </div>
-                                                      <div className="flex flex-wrap gap-2 justify-end">
+                                                          <Button
+                                                              variant="ghost"
+                                                              size="sm"
+                                                              onClick={() => toggleUnifiedCompanyExpansion(companyKey)}
+                                                              className="text-seguranca-lightgray hover:text-white"
+                                                          >
+                                                              {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                              {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
+                                                          </Button>
+                                                      </div>
+                                                      
+                                                      {/* Segunda linha: Botões de ação sempre visíveis */}
+                                                      <div className="flex flex-wrap gap-2 items-center">
+                                                          {/* Botões sempre visíveis para empresa */}
+                                                          <Button
+                                                              variant="outline"
+                                                              size="sm"
+                                                              onClick={() => handleDownloadByCompany(company.companyName || company.companyCnpj || '')}
+                                                              className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                                              disabled={loading || companyIndices.length === 0}
+                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos da empresa'}
+                                                          >
+                                                              <Download className="h-4 w-4 mr-2" />
+                                                              <span className="whitespace-nowrap">Download Lote</span>
+                                                          </Button>
+                                                          <Button
+                                                              variant="outline"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                  if (companyIndices.length > 0) {
+                                                                      setSelectedUnifiedDocuments(new Set(companyIndices));
+                                                                      handleSendDocuments('whatsapp');
+                                                                  }
+                                                              }}
+                                                              className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                                              disabled={companyIndices.length === 0}
+                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos por WhatsApp'}
+                                                          >
+                                                              <MessageSquare className="h-4 w-4 mr-2" />
+                                                              <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                                          </Button>
+                                                          <Button
+                                                              variant="outline"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                  if (companyIndices.length > 0) {
+                                                                      setSelectedUnifiedDocuments(new Set(companyIndices));
+                                                                      handleDeleteDocuments('batch');
+                                                                  }
+                                                              }}
+                                                              className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                                              disabled={companyIndices.length === 0}
+                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos da empresa'}
+                                                          >
+                                                              <Trash2 className="h-4 w-4 mr-2" />
+                                                              <span className="whitespace-nowrap">Excluir Todos</span>
+                                                          </Button>
+                                                          
                                                           {/* Botões de ação em massa - aparecem quando "Selecionar empresa" está marcado */}
                                                           {companySelectedCount > 0 && (
                                                               <>
@@ -7022,24 +7144,6 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                   </Button>
                                                               </>
                                                           )}
-                                                          <Button
-                                                              variant="outline"
-                                                              size="sm"
-                                                              onClick={() => downloadByCompany(company.companyName || company.companyCnpj || '')}
-                                                              className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50"
-                                                          >
-                                                              <Download className="h-4 w-4 mr-2" />
-                                                              Download Empresa
-                                                          </Button>
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              onClick={() => toggleUnifiedCompanyExpansion(companyKey)}
-                                                              className="w-full sm:w-auto text-seguranca-lightgray hover:text-white"
-                                                          >
-                                                              {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                              {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
-                                                          </Button>
                                                       </div>
                                                   </div>
                                               </div>
@@ -7049,7 +7153,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                           company.sectors.map(sector => {
                                                               const sectorKey = getUnifiedSectorKey(companyKey, sector);
                                                               const sectorExpanded = !!expandedUnifiedSectors[sectorKey];
-                                                              const sectorIndices = collectUnifiedSectorDocumentIndices(sector);
+                                                              const sectorIndices = collectUnifiedSectorDocumentIndices(sector, companyKey);
                                                               const sectorSelectedIndices = getSelectedUnifiedIndices(sectorIndices);
                                                               const sectorSelectedCount = sectorSelectedIndices.length;
                                                               const sectorCheckboxState: boolean | 'indeterminate' = sectorIndices.length === 0
@@ -7069,8 +7173,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                   {sector.totalPayslips} documento(s) · {sector.periods?.length ?? 0} período(s)
                                                                               </p>
                                                                           </div>
-                                                                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                                                              {/* Checkbox "Selecionar setor" - sempre visível */}
+                                                                          <div className="flex flex-col gap-2">
+                                                                              {/* Primeira linha: Checkbox e botão Ver períodos */}
+                                                                              <div className="flex flex-wrap items-center gap-2">
                                                                               <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
                                                                                   <Checkbox
                                                                                       checked={sectorCheckboxState}
@@ -7079,9 +7184,67 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                   />
                                                                                   <span className="text-xs text-gray-300">Selecionar setor</span>
                                                                               </div>
+                                                                                  <Button
+                                                                                      variant="ghost"
+                                                                                      size="sm"
+                                                                                      onClick={() => toggleUnifiedSectorExpansion(sectorKey)}
+                                                                                      className="text-seguranca-lightgray hover:text-white"
+                                                                                  >
+                                                                                      {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                                                      {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                                                                                  </Button>
+                                                                              </div>
+                                                                              
+                                                                              {/* Segunda linha: Botões de ação sempre visíveis */}
+                                                                              <div className="flex flex-wrap gap-2 items-center">
+                                                                                  {/* Botões sempre visíveis para setor */}
+                                                                                  <Button
+                                                                                      variant="outline"
+                                                                                      size="sm"
+                                                                                      onClick={() => downloadBySector(sector.sectorName || '')}
+                                                                                      className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                                                                      disabled={sectorIndices.length === 0}
+                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos do setor'}
+                                                                                  >
+                                                                                      <Download className="h-4 w-4 mr-2" />
+                                                                                      <span className="whitespace-nowrap">Download Setor</span>
+                                                                                  </Button>
+                                                                                  <Button
+                                                                                      variant="outline"
+                                                                                      size="sm"
+                                                                                      onClick={() => {
+                                                                                          if (sectorIndices.length > 0) {
+                                                                                              setSelectedUnifiedDocuments(new Set(sectorIndices));
+                                                                                              handleSendDocuments('whatsapp');
+                                                                                          }
+                                                                                      }}
+                                                                                      className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                                                                      disabled={sectorIndices.length === 0}
+                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor por WhatsApp'}
+                                                                                  >
+                                                                                      <MessageSquare className="h-4 w-4 mr-2" />
+                                                                                      <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                                                                  </Button>
+                                                                                  <Button
+                                                                                      variant="outline"
+                                                                                      size="sm"
+                                                                                      onClick={() => {
+                                                                                          if (sectorIndices.length > 0) {
+                                                                                              setSelectedUnifiedDocuments(new Set(sectorIndices));
+                                                                                              handleDeleteDocuments('batch');
+                                                                                          }
+                                                                                      }}
+                                                                                      className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                                                                      disabled={sectorIndices.length === 0}
+                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos do setor'}
+                                                                                  >
+                                                                                      <Trash2 className="h-4 w-4 mr-2" />
+                                                                                      <span className="whitespace-nowrap">Excluir Todos</span>
+                                                                                  </Button>
+                                                                                  
                                                                               {/* Botões de ação em massa - aparecem quando "Selecionar setor" está marcado */}
                                                                               {sectorSelectedCount > 0 && (
-                                                                                  <div className="flex flex-wrap gap-2 justify-end">
+                                                                                      <>
                                                                                       <Button
                                                                                           size="sm"
                                                                                           className="bg-green-600/90 text-white hover:bg-green-600"
@@ -7116,26 +7279,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                           <Trash2 className="h-4 w-4 mr-1" />
                                                                                           Excluir ({sectorSelectedCount})
                                                                                       </Button>
-                                                                                  </div>
-                                                                              )}
-                                                                              <Button
-                                                                                  variant="outline"
-                                                                                  size="sm"
-                                                                                  onClick={() => downloadBySector(sector.sectorName || '')}
-                                                                                  className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50"
-                                                                              >
-                                                                                  <Download className="h-4 w-4 mr-2" />
-                                                                                  Download Setor
-                                                                              </Button>
-                                                                              <Button
-                                                                                  variant="ghost"
-                                                                                  size="sm"
-                                                                                  onClick={() => toggleUnifiedSectorExpansion(sectorKey)}
-                                                                                  className="text-seguranca-lightgray hover:text-white"
-                                                                              >
-                                                                                  {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                                                  {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
-                                                                              </Button>
+                                                                                      </>
+                                                                                  )}
+                                                                              </div>
                                                                           </div>
                                                                       </div>
                                                                       {sectorExpanded && (
@@ -7144,7 +7290,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                   sector.periods.map(period => {
                                                                                       const periodKey = getUnifiedPeriodKey(sectorKey, period);
                                                                                       const periodExpanded = !!expandedUnifiedPeriods[periodKey];
-                                                                                      const periodIndices = collectUnifiedPeriodDocumentIndices(period);
+                                                                                      const periodIndices = collectUnifiedPeriodDocumentIndices(period, sectorKey);
                                                                                       const periodSelectedIndices = getSelectedUnifiedIndices(periodIndices);
                                                                                       const periodSelectedCount = periodSelectedIndices.length;
                                                                                       const periodCheckboxState: boolean | 'indeterminate' = periodIndices.length === 0
@@ -7157,13 +7303,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
                                                                                       return (
                                                                                           <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
-                                                                                              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
-                                                                                                  <div>
+                                                                                              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 px-4 py-3">
+                                                                                                  <div className="flex-1">
                                                                                                       <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
                                                                                                       <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
                                                                                                   </div>
-                                                                                                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                                                                                      {/* Checkbox "Selecionar período" - sempre visível */}
+                                                                                                  <div className="flex flex-col gap-2 min-w-0 lg:min-w-[350px]">
+                                                                                                      {/* Primeira linha: Checkbox e botão Ver documentos */}
+                                                                                                      <div className="flex flex-wrap items-center gap-2">
                                                                                                       <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
                                                                                                           <Checkbox
                                                                                                               checked={periodCheckboxState}
@@ -7172,81 +7319,130 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                                           />
                                                                                                           <span className="text-xs text-gray-300">Selecionar período</span>
                                                                                                       </div>
-                                                                                                      {/* Botões de ação em massa - aparecem quando "Selecionar período" está marcado */}
-                                                                                                      {periodSelectedCount > 0 && (
-                                                                                                          <div className="flex flex-wrap gap-2 justify-end">
                                                                                                               <Button
+                                                                                                              variant="ghost"
                                                                                                                   size="sm"
-                                                                                                                  className="bg-green-600/90 text-white hover:bg-green-600"
-                                                                                                                  onClick={() => {
-                                                                                                                      setSelectedUnifiedDocuments(new Set(periodSelectedIndices));
-                                                                                                                      handleSendDocuments('email');
-                                                                                                                  }}
-                                                                                                              >
-                                                                                                                  <Mail className="h-4 w-4 mr-1" />
-                                                                                                                  Email ({periodSelectedCount})
-                                                                                                              </Button>
-                                                                                                              <Button
-                                                                                                                  size="sm"
-                                                                                                                  className="bg-blue-600/90 text-white hover:bg-blue-600"
-                                                                                                                  onClick={() => {
-                                                                                                                      setSelectedUnifiedDocuments(new Set(periodSelectedIndices));
-                                                                                                                      handleSendDocuments('whatsapp');
-                                                                                                                  }}
-                                                                                                              >
-                                                                                                                  <MessageSquare className="h-4 w-4 mr-1" />
-                                                                                                                  WhatsApp ({periodSelectedCount})
-                                                                                                              </Button>
-                                                                                                              <Button
-                                                                                                                  size="sm"
-                                                                                                                  variant="destructive"
-                                                                                                                  className="bg-red-600/90 hover:bg-red-700 border-red-700"
-                                                                                                                  onClick={() => {
-                                                                                                                      setSelectedUnifiedDocuments(new Set(periodSelectedIndices));
-                                                                                                                      handleDeleteDocuments('batch');
-                                                                                                                  }}
-                                                                                                              >
-                                                                                                                  <Trash2 className="h-4 w-4 mr-1" />
-                                                                                                                  Excluir ({periodSelectedCount})
-                                                                                                              </Button>
-                                                                                                          </div>
-                                                                                                      )}
+                                                                                                              onClick={() => toggleUnifiedPeriodExpansion(periodKey)}
+                                                                                                              className="text-seguranca-lightgray hover:text-white"
+                                                                                                          >
+                                                                                                              {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                                                                              {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
+                                                                                                          </Button>
+                                                                                                      </div>
+                                                                                                      
+                                                                                                      {/* Segunda linha: Botões de ação sempre visíveis */}
+                                                                                                      <div className="flex flex-wrap gap-2 items-center">
+                                                                                                          {/* Botões sempre visíveis para período */}
                                                                                                       <Button
-                                                                                                          variant="ghost"
+                                                                                                          variant="outline"
                                                                                                           size="sm"
-                                                                                                          onClick={() => toggleUnifiedPeriodExpansion(periodKey)}
-                                                                                                          className="text-seguranca-lightgray hover:text-white"
+                                                                                                          onClick={async () => {
+                                                                                                              // Download de todos os documentos do período
+                                                                                                              const periodDocs = periodIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
+                                                                                                              if (periodDocs.length === 0) {
+                                                                                                                  toast({
+                                                                                                                      title: 'Nenhum documento',
+                                                                                                                      description: 'Não há documentos para baixar neste período.',
+                                                                                                                      variant: 'destructive'
+                                                                                                                  });
+                                                                                                                  return;
+                                                                                                              }
+                                                                                                              
+                                                                                                              // Criar ZIP com todos os documentos do período
+                                                                                                              try {
+                                                                                                                  setLoading(true);
+                                                                                                                  const JSZip = (await import('jszip')).default;
+                                                                                                                  const zip = new JSZip();
+                                                                                                                  
+                                                                                                                  for (const doc of periodDocs) {
+                                                                                                                      if (doc?.fileName) {
+                                                                                                                          try {
+                                                                                                                              const response = await api.get(`/api/unified-documents/download/${doc.fileName}`, { 
+                                                                                                                                  responseType: 'blob',
+                                                                                                                                  timeout: 30000
+                                                                                                                              });
+                                                                                                                              zip.file(doc.fileName, response.data);
+                                                                                                                          } catch (err) {
+                                                                                                                              console.error(`Erro ao baixar ${doc.fileName}:`, err);
+                                                                                                                          }
+                                                                                                                      }
+                                                                                                                  }
+                                                                                                                  
+                                                                                                                  const blob = await zip.generateAsync({ type: 'blob' });
+                                                                                                                  const url = window.URL.createObjectURL(blob);
+                                                                                                                  const a = document.createElement('a');
+                                                                                                                  a.href = url;
+                                                                                                                  const periodStr = `${String(period.month).padStart(2, '0')}_${period.year}`;
+                                                                                                                  a.download = `Periodo_${periodStr}_documentos_unificados.zip`;
+                                                                                                                  document.body.appendChild(a);
+                                                                                                                  a.click();
+                                                                                                                  document.body.removeChild(a);
+                                                                                                                  window.URL.revokeObjectURL(url);
+                                                                                                                  
+                                                                                                                  toast({
+                                                                                                                      title: '✅ Download iniciado',
+                                                                                                                      description: `Baixando ${periodDocs.length} documento(s) do período ${period.month}/${period.year}...`
+                                                                                                                  });
+                                                                                                              } catch (error: any) {
+                                                                                                                  console.error('Erro ao criar ZIP:', error);
+                                                                                                                  toast({
+                                                                                                                      title: '❌ Erro no download',
+                                                                                                                      description: 'Erro ao criar arquivo ZIP.',
+                                                                                                                      variant: 'destructive'
+                                                                                                                  });
+                                                                                                              } finally {
+                                                                                                                  setLoading(false);
+                                                                                                              }
+                                                                                                          }}
+                                                                                                          className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                                                                                          disabled={loading || periodIndices.length === 0}
+                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos do período'}
                                                                                                       >
-                                                                                                          {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                                                                          {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
+                                                                                                          <Download className="h-4 w-4 mr-2" />
+                                                                                                          <span className="whitespace-nowrap">Download Período</span>
                                                                                                       </Button>
+                                                                                                      <Button
+                                                                                                          variant="outline"
+                                                                                                          size="sm"
+                                                                                                          onClick={() => {
+                                                                                                              if (periodIndices.length > 0) {
+                                                                                                                  setSelectedUnifiedDocuments(new Set(periodIndices));
+                                                                                                                  handleSendDocuments('whatsapp');
+                                                                                                              }
+                                                                                                          }}
+                                                                                                          className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                                                                                          disabled={periodIndices.length === 0}
+                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período por WhatsApp'}
+                                                                                                      >
+                                                                                                          <MessageSquare className="h-4 w-4 mr-2" />
+                                                                                                          <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                                                                                      </Button>
+                                                                                                      <Button
+                                                                                                          variant="outline"
+                                                                                                          size="sm"
+                                                                                                          onClick={() => {
+                                                                                                              if (periodIndices.length > 0) {
+                                                                                                                  setSelectedUnifiedDocuments(new Set(periodIndices));
+                                                                                                                  handleDeleteDocuments('batch');
+                                                                                                              }
+                                                                                                          }}
+                                                                                                          className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                                                                                          disabled={periodIndices.length === 0}
+                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos do período'}
+                                                                                                      >
+                                                                                                          <Trash2 className="h-4 w-4 mr-2" />
+                                                                                                          <span className="whitespace-nowrap">Excluir Todos</span>
+                                                                                                      </Button>
+                                                                                                          </div>
                                                                                                   </div>
                                                                                               </div>
                                                                                               {periodExpanded && (
                                                                                                   <div className="divide-y divide-gray-800 bg-gray-950/60">
                                                                                                       {period.payslips.map((entry, entryIndex) => {
-                                                                                                          // Buscar documento por nome do funcionário + mês/ano (mais confiável que fileName)
-                                                                                                          const docIndex = findUnifiedDocumentIndex(entry);
+                                                                                                          // Buscar índice usando função otimizada (usa cache pré-computado)
+                                                                                                          const docIndex = getUnifiedEntryIndex(entry);
                                                                                                           const isSelected = docIndex !== -1 && selectedUnifiedDocuments.has(docIndex);
                                                                                                           const doc = docIndex !== -1 ? unifiedDocuments[docIndex] : null;
-                                                                                                          
-                                                                                                          // Log para debug quando não encontrar
-                                                                                                          if (docIndex === -1 && entryIndex === 0) {
-                                                                                                            console.log('🔍 Primeiro documento do período não encontrado:', {
-                                                                                                              entry: {
-                                                                                                                employeeName: entry.employeeName,
-                                                                                                                month: entry.month,
-                                                                                                                year: entry.year,
-                                                                                                                fileName: entry.fileName
-                                                                                                              },
-                                                                                                              unifiedDocumentsSample: unifiedDocuments.slice(0, 5).map(d => ({
-                                                                                                                employeeName: d.employeeName,
-                                                                                                                month: d.month,
-                                                                                                                year: d.year,
-                                                                                                                fileName: d.fileName
-                                                                                                              }))
-                                                                                                            });
-                                                                                                          }
 
                                                                                                           // Criar chave única combinando ID do entry com índice para evitar duplicatas
                                                                                                           const uniqueKey = entry.id ? `${entry.id}-${entryIndex}` : `entry-${entryIndex}-${entry.employeeName}-${entry.month}-${entry.year}`;
@@ -7260,68 +7456,15 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                                                       <Checkbox
                                                                                                                           checked={isSelected}
                                                                                                                           onCheckedChange={(checked) => {
-                                                                                                                              // Tentar usar o índice encontrado primeiro
-                                                                                                                              let finalIndex = docIndex;
-                                                                                                                              
-                                                                                                                              // Se não encontrou, tentar buscar novamente (pode ter sido carregado depois)
-                                                                                                                              if (finalIndex === -1) {
-                                                                                                                                finalIndex = findUnifiedDocumentIndex(entry);
-                                                                                                                              }
-                                                                                                                              
-                                                                                                                              // Se ainda não encontrou, tentar busca mais agressiva
-                                                                                                                              if (finalIndex === -1 && unifiedDocuments.length > 0) {
-                                                                                                                                const entryNameNormalized = normalizeNameForMatching(entry.employeeName || '');
-                                                                                                                                const entryMonth = normalizeNumber(entry.month);
-                                                                                                                                const entryYear = normalizeNumber(entry.year);
-                                                                                                                                
-                                                                                                                                finalIndex = unifiedDocuments.findIndex(d => {
-                                                                                                                                    if (!d) return false;
-                                                                                                                                    
-                                                                                                                                    const docNameNormalized = normalizeNameForMatching(d.employeeName || '');
-                                                                                                                                    const docMonth = normalizeNumber(d.month);
-                                                                                                                                    const docYear = normalizeNumber(d.year);
-                                                                                                                                    
-                                                                                                                                    // Busca muito flexível: apenas primeiro nome + mês + ano
-                                                                                                                                    if (entryNameNormalized && docNameNormalized) {
-                                                                                                                                        const entryFirst = entryNameNormalized.split(/\s+/)[0];
-                                                                                                                                        const docFirst = docNameNormalized.split(/\s+/)[0];
-                                                                                                                                        
-                                                                                                                                        if (entryFirst && docFirst && entryFirst === docFirst && entryFirst.length >= 3) {
-                                                                                                                                            const monthMatch = entryMonth !== null && docMonth !== null && entryMonth === docMonth;
-                                                                                                                                            const yearMatch = entryYear !== null && docYear !== null && entryYear === docYear;
-                                                                                                                                            return monthMatch && yearMatch;
-                                                                                                                                        }
-                                                                                                                                    }
-                                                                                                                                    
-                                                                                                                                    return false;
-                                                                                                                                });
-                                                                                                                              }
+                                                                                                                              // Usar índice já calculado ou buscar novamente se necessário
+                                                                                                                              const finalIndex = docIndex !== -1 ? docIndex : getUnifiedEntryIndex(entry);
                                                                                                                               
                                                                                                                               if (finalIndex !== -1) {
-                                                                                                                                console.log(`✅ Documento encontrado para seleção (índice ${finalIndex}):`, {
-                                                                                                                                    entry: entry.employeeName,
-                                                                                                                                    doc: unifiedDocuments[finalIndex]?.employeeName
-                                                                                                                                });
                                                                                                                                 handleSelectUnifiedDocuments([finalIndex], checked === true);
                                                                                                                               } else {
-                                                                                                                                  console.warn('⚠️ Documento não encontrado após todas as tentativas:', {
-                                                                                                                                      entry: {
-                                                                                                                                          employeeName: entry.employeeName,
-                                                                                                                                          month: entry.month,
-                                                                                                                                          year: entry.year,
-                                                                                                                                          fileName: entry.fileName
-                                                                                                                                      },
-                                                                                                                                      unifiedDocumentsCount: unifiedDocuments.length,
-                                                                                                                                      sampleUnifiedDocs: unifiedDocuments.slice(0, 5).map(d => ({
-                                                                                                                                          employeeName: d.employeeName,
-                                                                                                                                          month: d.month,
-                                                                                                                                          year: d.year,
-                                                                                                                                          fileName: d.fileName
-                                                                                                                                      }))
-                                                                                                                                  });
                                                                                                                                   toast({
                                                                                                                                       title: '⚠️ Documento não encontrado',
-                                                                                                                                      description: `Não foi possível encontrar o documento de ${entry.employeeName} (${entry.month}/${entry.year}) na lista de documentos unificados. Verifique se o documento foi unificado corretamente.`,
+                                                                                                                                      description: `Não foi possível encontrar o documento de ${entry.employeeName} (${entry.month}/${entry.year}) na lista de documentos unificados.`,
                                                                                                                                       variant: 'destructive'
                                                                                                                                   });
                                                                                                                               }
@@ -7356,8 +7499,6 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                                                                   <Download className="h-4 w-4 mr-1" />
                                                                                                                                   Download
                                                                                                                               </Button>
-                                                                                                                              {isSelected && (
-                                                                                                                                  <>
                                                                                                                                       <Button
                                                                                                                                           size="sm"
                                                                                                                                           variant="outline"
@@ -7382,8 +7523,6 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                                                                           <MessageSquare className="h-4 w-4 mr-1" />
                                                                                                                                           WhatsApp
                                                                                                                                       </Button>
-                                                                                                                                  </>
-                                                                                                                              )}
                                                                                                                               <Button
                                                                                                                                   size="sm"
                                                                                                                                   variant="outline"

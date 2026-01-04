@@ -1,15 +1,34 @@
 import api from '@/lib/axios';
 
+export interface CompanyDefaultEPI {
+  id?: string;
+  epiName: string;
+  quantity: number;
+  caNumber?: string;
+  validity?: string;
+  observations?: string;
+  orderIndex?: number;
+}
+
 export interface CreateCompanyRequest {
   name: string;
   cnpj: string;
   email?: string;
   phone?: string;
   address?: string;
+  enderecoRua?: string;
+  enderecoNumero?: string;
+  enderecoComplemento?: string;
+  enderecoBairro?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   sigla?: string;
   description?: string;
   website?: string;
   status?: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'SUSPENDED';
+  logoUrl?: string;
+  defaultEpis?: CompanyDefaultEPI[];
 }
 
 export const companyService = {

@@ -16,6 +16,7 @@ import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
 import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
+import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import { EmployeeDataFromPDF } from '@/services/pdfProcessingService';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
@@ -24,6 +25,11 @@ import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
 import { AccountingFormButton } from '@/components/funcionarios/AccountingFormButton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
+import { doctorService } from '@/services/doctorService';
+import { Doctor } from '@/types/doctor';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -50,6 +56,8 @@ const initialState: CreateEmployeeDTO = {
   birthDate: '',
   maritalStatus: 'SINGLE',
   nationality: 'Brasileiro',
+  nomePai: '',
+  nomeMae: '',
   registrationNumber: '',
   hireDate: '',
   status: 'ACTIVE',
@@ -82,6 +90,48 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [error, setError] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
+  
+  // Estados para médicos
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [doctorSearchTerm, setDoctorSearchTerm] = useState('');
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  
+  // Função para carregar médicos
+  const loadDoctors = async () => {
+    try {
+      setLoadingDoctors(true);
+      const doctorsList = await doctorService.getAllActive();
+      setDoctors(doctorsList);
+    } catch (error) {
+      console.error('Erro ao carregar médicos:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de médicos.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  // Função para buscar médicos por nome
+  const handleDoctorSearch = async (searchTerm: string) => {
+    if (searchTerm.length < 2) {
+      loadDoctors();
+      return;
+    }
+    try {
+      setLoadingDoctors(true);
+      const results = await doctorService.searchByName(searchTerm);
+      setDoctors(results);
+    } catch (error) {
+      console.error('Erro ao buscar médicos:', error);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
   
   // Função para buscar CEP via API ViaCEP
   const buscarCep = async (cep: string) => {
@@ -231,6 +281,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         tituloEleitor: employeeToEdit.tituloEleitor || '',
         tituloEleitorZona: employeeToEdit.tituloEleitorZona || '',
         tituloEleitorSecao: employeeToEdit.tituloEleitorSecao || '',
+        tituloEleitorDataExpedicao: employeeToEdit.tituloEleitorDataExpedicao || '',
+        tituloEleitorValidade: employeeToEdit.tituloEleitorValidade || '',
+        nomeConselhoRegional: employeeToEdit.nomeConselhoRegional || '',
         carteiraIdentidadeOrgaoEmissor: employeeToEdit.carteiraIdentidadeOrgaoEmissor || '',
         carteiraIdentidadeDataEmissao: employeeToEdit.carteiraIdentidadeDataEmissao || '',
         certificadoMilitar: employeeToEdit.certificadoMilitar || '',
@@ -243,7 +296,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         salarioPorExtenso: employeeToEdit.salarioPorExtenso || '',
         periodoPagamento: employeeToEdit.periodoPagamento || '',
         horarioTrabalho: employeeToEdit.horarioTrabalho || '',
+        horarioTrabalhoIntervalo: employeeToEdit.horarioTrabalhoIntervalo || '',
+        diasTrabalho: employeeToEdit.diasTrabalho || '',
+        prazoExperienciaTexto: employeeToEdit.prazoExperienciaTexto || '',
+        prorrogacaoExperiencia: employeeToEdit.prorrogacaoExperiencia || '',
         folgaSemanal: employeeToEdit.folgaSemanal || '',
+        escalaTrabalho: employeeToEdit.escalaTrabalho || '',
         fgtsOptante: employeeToEdit.fgtsOptante || false,
         fgtsDataOpcao: employeeToEdit.fgtsDataOpcao || '',
         fgtsBancoDepositario: employeeToEdit.fgtsBancoDepositario || '',
@@ -275,6 +333,24 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         pis: employeeToEdit.pis || '',
         gender: employeeToEdit.gender || '',
         vistoFiscalizacao: employeeToEdit.vistoFiscalizacao || '',
+        
+        // Campos para Estrangeiro
+        rneNumero: employeeToEdit.rneNumero || '',
+        rneValidade: employeeToEdit.rneValidade || '',
+        ricNumero: employeeToEdit.ricNumero || '',
+        ricOrgaoEmissor: employeeToEdit.ricOrgaoEmissor || '',
+        ricDataEmissao: employeeToEdit.ricDataEmissao || '',
+        tipoVisto: employeeToEdit.tipoVisto || '',
+        
+        // Dados do Exame Médico (ASO)
+        exameMedicoData: employeeToEdit.exameMedicoData || '',
+        exameMedicoTipo: employeeToEdit.exameMedicoTipo || '',
+        exameMedicoDoctor: employeeToEdit.exameMedicoDoctor || undefined,
+        exameMedicoHorario: employeeToEdit.exameMedicoHorario || '',
+        exameMedicoIntervalosRefeicao: employeeToEdit.exameMedicoIntervalosRefeicao,
+        exameMedicoObservacoes: employeeToEdit.exameMedicoObservacoes || '',
+        exameMedicoPrimeiroEmprego: employeeToEdit.exameMedicoPrimeiroEmprego,
+        exameMedicoContribuicaoSindicalPaga: employeeToEdit.exameMedicoContribuicaoSindicalPaga,
         
         // Dados bancários - converter de bankInfo (backend) para bankData (frontend)
         bankData: employeeToEdit.bankData ? {
@@ -317,13 +393,30 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setSelectedUser(employeeToEdit.user);
         setUserSearchTerm(employeeToEdit.user.name || employeeToEdit.user.username || '');
       }
-      if (employeeToEdit.company) {
+      if (employeeToEdit.company && employeeToEdit.company.id) {
         console.log('🔍 Carregando empresa:', employeeToEdit.company);
-        setSelectedCompany(employeeToEdit.company);
+        // Buscar empresa completa da lista de empresas
+        const fullCompany = companies.find(c => c.id === employeeToEdit.company?.id);
+        if (fullCompany) {
+          setSelectedCompany(fullCompany);
+        } else {
+          // Se não encontrou, usar os dados disponíveis ou buscar depois
+          setSelectedCompany(employeeToEdit.company as Company);
+        }
       }
 
       // Carregar dependentes do funcionário
       loadEmployeeDependents(employeeToEdit.id);
+      
+      // Carregar médico se houver
+      if (employeeToEdit.exameMedicoDoctor?.id) {
+        doctorService.getById(employeeToEdit.exameMedicoDoctor.id)
+          .then(doctor => {
+            setSelectedDoctor(doctor);
+            setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+          })
+          .catch(err => console.error('Erro ao carregar médico:', err));
+      }
     } else if (!employeeToEdit && open) {
       // Modo de criação - resetar formulário
       setIsEditMode(false);
@@ -336,8 +429,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setEmployeeDependents([]);
       setUserSearchTerm('');
       setPositionSearchTerm('');
+      setSelectedDoctor(null);
+      setDoctorSearchTerm('');
+      setShowDoctorDropdown(false);
     }
   }, [employeeToEdit, open]);
+  
+  // Carregar médicos quando abrir o modal
+  useEffect(() => {
+    if (open) {
+      loadDoctors();
+    }
+  }, [open]);
 
   // Carregar Postos de Trabalho e Departamentos
   useEffect(() => {
@@ -355,6 +458,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     };
     loadWorkPostsAndDepartments();
   }, []);
+
+  // Atualizar selectedCompany quando companies forem carregadas e houver employeeToEdit
+  useEffect(() => {
+    if (employeeToEdit?.company?.id && companies.length > 0) {
+      const fullCompany = companies.find(c => c.id === employeeToEdit.company?.id);
+      if (fullCompany && (!selectedCompany || selectedCompany.id !== fullCompany.id)) {
+        console.log('🔍 Atualizando empresa com dados completos:', fullCompany);
+        setSelectedCompany(fullCompany);
+      }
+    }
+  }, [companies, employeeToEdit?.company?.id]);
 
   // Função para carregar dependentes do funcionário
   const loadEmployeeDependents = async (employeeId: string) => {
@@ -461,6 +575,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
+  
+  // Estados para modal de novo médico
+  const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
   
   // Estados para modal de criar usuário padrão
   const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
@@ -674,9 +791,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validação de formato de email (se preenchido)
+    if (form.email && form.email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        setError('Por favor, insira um email válido.');
+        return;
+      }
+    }
+    
     // Validações básicas
-    if (!form.name || !form.cpf || !form.email || !form.phone) {
-      setError('Campos obrigatórios: Nome, CPF, Email e Telefone.');
+    if (!form.name || !form.cpf || !form.phone) {
+      setError('Campos obrigatórios: Nome, CPF e Telefone.');
       return;
     }
     
@@ -801,6 +927,24 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setPositions(prev => [...prev, cargo]);
     // Selecionar automaticamente o novo cargo
     setForm(prev => ({ ...prev, position: { id: cargo.id } }));
+  };
+
+  const handleMedicoCreated = (medico: Doctor) => {
+    // Adicionar o novo médico à lista
+    setDoctors(prev => [...prev, medico]);
+    // Selecionar automaticamente o novo médico
+    setSelectedDoctor(medico);
+    setDoctorSearchTerm(`${medico.name} - CRM ${medico.crmNumber}/${medico.crmState}`);
+    setForm(prev => ({ 
+      ...prev, 
+      exameMedicoDoctor: { id: medico.id } 
+    }));
+    setShowDoctorDropdown(false);
+    toast({
+      title: "Sucesso!",
+      description: "Médico cadastrado e selecionado com sucesso.",
+      variant: "default"
+    });
   };
 
   const handleUsuarioPadraoCriado = (usuario: User) => {
@@ -961,6 +1105,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       periodoPagamento: combined.periodoPagamento || prev.periodoPagamento,
       horarioTrabalho: combined.horarioTrabalho || prev.horarioTrabalho,
       folgaSemanal: combined.folgaSemanal || prev.folgaSemanal,
+      escalaTrabalho: combined.escalaTrabalho || prev.escalaTrabalho,
       fgtsOptante: combined.fgtsOptante !== undefined ? combined.fgtsOptante : prev.fgtsOptante,
       fgtsDataOpcao: combined.fgtsDataOpcao || prev.fgtsDataOpcao,
       fgtsBancoDepositario: combined.fgtsBancoDepositario || prev.fgtsBancoDepositario,
@@ -1038,7 +1183,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handlePositionSelect = (position: Position) => {
     setSelectedPosition(position);
     setPositionSearchTerm(position.name);
-    setForm(prev => ({ ...prev, position: { id: position.id } }));
+    setForm(prev => ({ 
+      ...prev, 
+      position: { id: position.id },
+      // Preencher CBO automaticamente se o cargo tiver CBO
+      cbo: position.cbo || prev.cbo || ''
+    }));
     setShowPositionDropdown(false);
   };
 
@@ -1622,7 +1772,146 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    name="nationality" 
                    value={form.nationality} 
                    onChange={handleChange} 
+                   className="text-xs sm:text-sm h-9 sm:h-10"
                  />
+               </div>
+             </div>
+             
+             {/* Dados Familiares (Nomes dos pais) */}
+             <div className="mt-4 pt-4 border-t border-gray-600">
+               <h4 className="text-md font-semibold text-white mb-4">Dados Familiares (Nomes dos pais)</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Nome da Mãe</Label>
+                   <Input 
+                     name="nomeMae" 
+                     value={form.nomeMae || ''} 
+                     onChange={handleChange} 
+                     placeholder="Nome completo da mãe"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Nome do Pai</Label>
+                   <Input 
+                     name="nomePai" 
+                     value={form.nomePai || ''} 
+                     onChange={handleChange} 
+                     placeholder="Nome completo do pai"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+               </div>
+             </div>
+             
+             {/* Título de Eleitor */}
+             <div className="mt-4 pt-4 border-t border-gray-600">
+               <h4 className="text-md font-semibold text-white mb-4">Título de Eleitor</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Número</Label>
+                   <Input 
+                     name="tituloEleitor" 
+                     value={form.tituloEleitor || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: 2236.5048.0205"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Zona</Label>
+                   <Input 
+                     name="tituloEleitorZona" 
+                     value={form.tituloEleitorZona || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: 316"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Seção</Label>
+                   <Input 
+                     name="tituloEleitorSecao" 
+                     value={form.tituloEleitorSecao || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: 0585"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Data de Expedição</Label>
+                   <Input 
+                     name="tituloEleitorDataExpedicao" 
+                     type="date" 
+                     value={form.tituloEleitorDataExpedicao || ''} 
+                     onChange={handleChange} 
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Validade</Label>
+                   <Input 
+                     name="tituloEleitorValidade" 
+                     type="date" 
+                     value={form.tituloEleitorValidade || ''} 
+                     onChange={handleChange} 
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+               </div>
+             </div>
+             
+             {/* Registro Geral (RG) */}
+             <div className="mt-4 pt-4 border-t border-gray-600">
+               <h4 className="text-md font-semibold text-white mb-4">Registro Geral (RG)</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Número</Label>
+                   <Input 
+                     name="rg" 
+                     value={form.rg || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: MG-15.934.064"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Órgão Emissor</Label>
+                   <Input 
+                     name="carteiraIdentidadeOrgaoEmissor" 
+                     value={form.carteiraIdentidadeOrgaoEmissor || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: PF"
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Data de Expedição</Label>
+                   <Input 
+                     name="carteiraIdentidadeDataEmissao" 
+                     type="date" 
+                     value={form.carteiraIdentidadeDataEmissao || ''} 
+                     onChange={handleChange} 
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
+               </div>
+             </div>
+             
+             {/* Nome do Conselho Regional */}
+             <div className="mt-4 pt-4 border-t border-gray-600">
+               <h4 className="text-md font-semibold text-white mb-4">Nome do Conselho Regional</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <Label className="text-sm font-medium text-gray-200">Sigla</Label>
+                   <Input 
+                     name="nomeConselhoRegional" 
+                     value={form.nomeConselhoRegional || ''} 
+                     onChange={handleChange} 
+                     placeholder="Ex: CRM, CRO, etc."
+                     className="text-xs sm:text-sm h-9 sm:h-10"
+                   />
+                 </div>
                </div>
              </div>
              
@@ -1837,16 +2126,16 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
            <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
              <h3 className="text-lg font-semibold text-white">Informações de Contato</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Email *</Label>
-                 <Input 
-                   name="email" 
-                   type="email" 
-                   value={form.email} 
-                   onChange={handleChange} 
-                   required 
-                 />
-               </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Email</Label>
+                <Input 
+                  name="email" 
+                  type="email" 
+                  value={form.email} 
+                  onChange={handleChange}
+                  placeholder="exemplo@email.com"
+                />
+              </div>
                <div>
                  <Label className="text-sm font-medium text-gray-200">Telefone *</Label>
                  <Input 
@@ -2012,6 +2301,491 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             </div>
           </div>
 
+          {/* Seção: Dados do Exame Médico (ASO) */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data do Exame Médico (ASO)</Label>
+                <Input 
+                  name="exameMedicoData" 
+                  type="date"
+                  value={form.exameMedicoData || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))} 
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
+                <Select 
+                  value={form.exameMedicoTipo || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoTipo: value }))}
+                >
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="ADMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Admissional</SelectItem>
+                    <SelectItem value="DEMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Demissional</SelectItem>
+                    <SelectItem value="PERIODICO" className="text-seguranca-lightgray hover:bg-gray-700">Periódico</SelectItem>
+                    <SelectItem value="MUDANCA_FUNCAO" className="text-seguranca-lightgray hover:bg-gray-700">Mudança de Função</SelectItem>
+                    <SelectItem value="RETORNO_TRABALHO" className="text-seguranca-lightgray hover:bg-gray-700">Retorno ao Trabalho</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
+                <div className="relative">
+                  <Input 
+                    value={doctorSearchTerm} 
+                    onChange={(e) => {
+                      setDoctorSearchTerm(e.target.value);
+                      setShowDoctorDropdown(true);
+                      if (e.target.value.length > 0) {
+                        handleDoctorSearch(e.target.value);
+                      } else {
+                        loadDoctors();
+                      }
+                    }}
+                    onFocus={() => {
+                      setShowDoctorDropdown(true);
+                      if (doctors.length === 0) {
+                        loadDoctors();
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay para permitir clique no dropdown
+                      setTimeout(() => setShowDoctorDropdown(false), 200);
+                    }}
+                    placeholder="Digite para buscar médico..."
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                  {showDoctorDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {loadingDoctors ? (
+                        <div className="p-2 text-sm text-gray-400">Carregando...</div>
+                      ) : doctors.length > 0 ? (
+                        doctors.map((doctor) => (
+                          <div
+                            key={doctor.id}
+                            className="p-2 hover:bg-gray-700 cursor-pointer text-seguranca-lightgray text-xs sm:text-sm"
+                            onClick={() => {
+                              setSelectedDoctor(doctor);
+                              setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+                              setForm(prev => ({ 
+                                ...prev, 
+                                exameMedicoDoctor: { id: doctor.id } 
+                              }));
+                              setShowDoctorDropdown(false);
+                            }}
+                          >
+                            {doctor.name} - CRM {doctor.crmNumber}/{doctor.crmState}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 space-y-2">
+                          <div className="text-sm text-gray-400 mb-2">Nenhum médico encontrado</div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setNovoMedicoModalOpen(true);
+                              setShowDoctorDropdown(false);
+                            }}
+                            className="w-full text-left p-2 text-sm text-seguranca-yellow hover:bg-gray-700 rounded border border-seguranca-yellow/30 flex items-center gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            <span>Cadastrar novo médico</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Horário</Label>
+                <Input 
+                  name="exameMedicoHorario" 
+                  value={form.exameMedicoHorario || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoHorario: e.target.value }))} 
+                  placeholder="Ex: 18:00 ÀS 06:00 H"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Intervalos Almoço/Janta</Label>
+                <RadioGroup 
+                  value={form.exameMedicoIntervalosRefeicao === true ? 'sim' : form.exameMedicoIntervalosRefeicao === false ? 'nao' : ''}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoIntervalosRefeicao: value === 'sim' }))}
+                  className="flex gap-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="intervalos-sim" className="text-seguranca-lightgray" />
+                    <Label htmlFor="intervalos-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="intervalos-nao" className="text-seguranca-lightgray" />
+                    <Label htmlFor="intervalos-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Observações</Label>
+                <Textarea 
+                  name="exameMedicoObservacoes" 
+                  value={form.exameMedicoObservacoes || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoObservacoes: e.target.value }))} 
+                  placeholder="Observações sobre o exame médico..."
+                  rows={3}
+                  className="text-xs sm:text-sm bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Este é o primeiro registro (1º emprego)?</Label>
+                <RadioGroup 
+                  value={form.exameMedicoPrimeiroEmprego === true ? 'sim' : form.exameMedicoPrimeiroEmprego === false ? 'nao' : ''}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoPrimeiroEmprego: value === 'sim' }))}
+                  className="flex gap-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="primeiro-sim" className="text-seguranca-lightgray" />
+                    <Label htmlFor="primeiro-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="primeiro-nao" className="text-seguranca-lightgray" />
+                    <Label htmlFor="primeiro-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Contribuição Sindical está pago este ano?</Label>
+                <RadioGroup 
+                  value={form.exameMedicoContribuicaoSindicalPaga === true ? 'sim' : form.exameMedicoContribuicaoSindicalPaga === false ? 'nao' : ''}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoContribuicaoSindicalPaga: value === 'sim' }))}
+                  className="flex gap-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="sindical-sim" className="text-seguranca-lightgray" />
+                    <Label htmlFor="sindical-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="sindical-nao" className="text-seguranca-lightgray" />
+                    <Label htmlFor="sindical-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Para Estrangeiro */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white">Para Estrangeiro</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">RNE nº</Label>
+                <Input 
+                  name="rneNumero" 
+                  value={form.rneNumero || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, rneNumero: e.target.value }))} 
+                  placeholder="Número do RNE"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Validade</Label>
+                <Input 
+                  name="rneValidade" 
+                  type="date"
+                  value={form.rneValidade || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))} 
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Possui filhos com brasileiro?</Label>
+                <RadioGroup 
+                  value={form.temFilhosBrasileiros === true ? 'sim' : form.temFilhosBrasileiros === false ? 'nao' : ''}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, temFilhosBrasileiros: value === 'sim' }))}
+                  className="flex gap-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="filhos-brasileiros-sim" className="text-seguranca-lightgray" />
+                    <Label htmlFor="filhos-brasileiros-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="filhos-brasileiros-nao" className="text-seguranca-lightgray" />
+                    <Label htmlFor="filhos-brasileiros-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Quantos?</Label>
+                <Input 
+                  name="quantidadeFilhosBrasileiros" 
+                  type="number"
+                  min="0"
+                  value={form.quantidadeFilhosBrasileiros || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, quantidadeFilhosBrasileiros: e.target.value ? parseInt(e.target.value) : undefined }))} 
+                  placeholder="Quantidade"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                  disabled={form.temFilhosBrasileiros !== true}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200 mb-2 block">
+                  Em caso de estrangeiro naturalizado brasileiro, informar o Nº RIC / Órgão Emissor / Data Emissão:
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-300">Nº RIC</Label>
+                    <Input 
+                      name="ricNumero" 
+                      value={form.ricNumero || ''} 
+                      onChange={(e) => setForm(prev => ({ ...prev, ricNumero: e.target.value }))} 
+                      placeholder="Número do RIC"
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-300">Órgão Emissor</Label>
+                    <Input 
+                      name="ricOrgaoEmissor" 
+                      value={form.ricOrgaoEmissor || ''} 
+                      onChange={(e) => setForm(prev => ({ ...prev, ricOrgaoEmissor: e.target.value }))} 
+                      placeholder="Órgão Emissor"
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
+                    <Input 
+                      name="ricDataEmissao" 
+                      type="date"
+                      value={form.ricDataEmissao || ''} 
+                      onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))} 
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Tipo de Visto</Label>
+                <Input 
+                  name="tipoVisto" 
+                  value={form.tipoVisto || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, tipoVisto: e.target.value }))} 
+                  placeholder="Tipo de visto"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Dados do Cadastro / Admissão */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white">Dados do Cadastro / Admissão</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">PIS</Label>
+                <Input 
+                  name="pis" 
+                  value={form.pis || ''} 
+                  onChange={handleChange} 
+                  placeholder="000.00000.00-0"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Reservista nº</Label>
+                <Input 
+                  name="certificadoMilitar" 
+                  value={form.certificadoMilitar || ''} 
+                  onChange={handleChange} 
+                  placeholder="Número do certificado militar"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data de Admissão *</Label>
+                <Input 
+                  name="hireDate" 
+                  type="date" 
+                  value={form.hireDate} 
+                  onChange={handleChange} 
+                  required 
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Setor/Posto de Trabalho</Label>
+                <Select 
+                  value={(form as any).workPostId || ''}
+                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
+                >
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Selecione um posto" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    {workPosts.map((wp) => (
+                      <SelectItem key={wp.id} value={wp.id} className="text-seguranca-lightgray hover:bg-gray-700">
+                        {wp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Função</Label>
+                <div className="relative">
+                  <Input 
+                    value={positionSearchTerm} 
+                    onChange={(e) => {
+                      setPositionSearchTerm(e.target.value);
+                      setShowPositionDropdown(true);
+                      if (e.target.value.length > 0) {
+                        handlePositionSearch(e.target.value);
+                      } else {
+                        loadPositions();
+                      }
+                    }}
+                    onFocus={() => {
+                      setShowPositionDropdown(true);
+                      if (positions.length === 0) {
+                        loadPositions();
+                      }
+                    }}
+                    placeholder="Digite para buscar cargo..."
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                  {showPositionDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {loadingData ? (
+                        <div className="p-2 text-sm text-gray-400">Carregando...</div>
+                      ) : positions.length > 0 ? (
+                        positions.map((position) => (
+                          <div
+                            key={position.id}
+                            className="p-2 hover:bg-gray-700 cursor-pointer text-seguranca-lightgray text-xs sm:text-sm"
+                            onClick={() => handlePositionSelect(position)}
+                          >
+                            {position.name}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-400">Nenhum cargo encontrado</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Salário (R$)</Label>
+                <Input 
+                  name="salario" 
+                  type="number" 
+                  step="0.01"
+                  value={form.salario as any || ''} 
+                  onChange={handleChange} 
+                  placeholder="0,00"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Forma de Pagamento</Label>
+                <Select 
+                  value={form.periodoPagamento || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, periodoPagamento: value }))}
+                >
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Selecione a forma" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="MENSAL" className="text-seguranca-lightgray hover:bg-gray-700">Mensal</SelectItem>
+                    <SelectItem value="QUINZENAL" className="text-seguranca-lightgray hover:bg-gray-700">Quinzenal</SelectItem>
+                    <SelectItem value="SEMANAL" className="text-seguranca-lightgray hover:bg-gray-700">Semanal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Dias de Trabalho</Label>
+                <Input 
+                  name="diasTrabalho" 
+                  value={form.diasTrabalho || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, diasTrabalho: e.target.value }))} 
+                  placeholder="Ex: 12X36"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200 mb-2 block">Horário de Trabalho</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-300">Intervalo</Label>
+                    <Input 
+                      name="horarioTrabalhoIntervalo" 
+                      value={form.horarioTrabalhoIntervalo || ''} 
+                      onChange={(e) => setForm(prev => ({ ...prev, horarioTrabalhoIntervalo: e.target.value }))} 
+                      placeholder="Ex: 23:00 ÀS 00:00 H"
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-300">Período de Trabalho</Label>
+                    <Input 
+                      name="horarioTrabalho" 
+                      value={form.horarioTrabalho || ''} 
+                      onChange={handleChange} 
+                      placeholder="Ex: 18:00 ÀS 06:00 H"
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Prazo de Experiência</Label>
+                <Input 
+                  name="prazoExperienciaTexto" 
+                  value={form.prazoExperienciaTexto || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, prazoExperienciaTexto: e.target.value }))} 
+                  placeholder="Ex: 45 DIAS"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Prorrogação</Label>
+                <Input 
+                  name="prorrogacaoExperiencia" 
+                  value={form.prorrogacaoExperiencia || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, prorrogacaoExperiencia: e.target.value }))} 
+                  placeholder="Prorrogação do prazo"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Dias de Folga</Label>
+                <Input 
+                  name="folgaSemanal" 
+                  value={form.folgaSemanal || ''} 
+                  onChange={handleChange} 
+                  placeholder="Ex: 1ª Escola"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Escala de Trabalho</Label>
+                <Input 
+                  name="escalaTrabalho" 
+                  value={form.escalaTrabalho || ''} 
+                  onChange={handleChange} 
+                  placeholder="Ex: 12x36, 6x1, etc."
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Seção: Informações Profissionais */}
            <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
              <h3 className="text-lg font-semibold flex items-center text-white">
@@ -2026,16 +2800,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    value={form.registrationNumber} 
                    onChange={handleChange} 
                    placeholder="EMP001"
-                 />
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Data de Admissão *</Label>
-                 <Input 
-                   name="hireDate" 
-                   type="date" 
-                   value={form.hireDate} 
-                   onChange={handleChange} 
-                   required 
+                   className="text-xs sm:text-sm h-9 sm:h-10"
                  />
                </div>
                <div>
@@ -2044,14 +2809,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    value={form.status} 
                    onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
                  >
-                   <SelectTrigger>
+                   <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
                      <SelectValue placeholder="Selecione o status" />
                    </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="ACTIVE">Ativo</SelectItem>
-                     <SelectItem value="INACTIVE">Inativo</SelectItem>
-                     <SelectItem value="VACATION">Férias</SelectItem>
-                     <SelectItem value="TERMINATED">Demitido</SelectItem>
+                   <SelectContent className="bg-seguranca-graphite border-gray-600">
+                     <SelectItem value="ACTIVE" className="text-seguranca-lightgray hover:bg-gray-700">Ativo</SelectItem>
+                     <SelectItem value="INACTIVE" className="text-seguranca-lightgray hover:bg-gray-700">Inativo</SelectItem>
+                     <SelectItem value="VACATION" className="text-seguranca-lightgray hover:bg-gray-700">Férias</SelectItem>
+                     <SelectItem value="TERMINATED" className="text-seguranca-lightgray hover:bg-gray-700">Demitido</SelectItem>
                    </SelectContent>
                  </Select>
                </div>
@@ -2062,52 +2827,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   value={form.cbo || ''} 
                   onChange={handleChange} 
                   placeholder="Ex: 517410"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
                 />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-2 00">Salário (R$)</Label>
-                <Input 
-                  name="salario" 
-                  type="number" 
-                  step="0.01"
-                  value={form.salario as any || ''} 
-                  onChange={handleChange} 
-                  placeholder="0,00"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Período de Pagamento</Label>
-                <Select 
-                  value={form.periodoPagamento || ''} 
-                  onValueChange={(value) => setForm(prev => ({ ...prev, periodoPagamento: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MENSAL">Mensal</SelectItem>
-                    <SelectItem value="QUINZENAL">Quinzenal</SelectItem>
-                    <SelectItem value="SEMANAL">Semanal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Posto de Trabalho</Label>
-                <Select 
-                  value={(form as any).workPostId || ''}
-                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um posto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workPosts.map((wp) => (
-                      <SelectItem key={wp.id} value={wp.id}>
-                        {wp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-200">Departamento</Label>
@@ -2115,35 +2836,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   value={(form as any).departmentId || ''}
                   onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
                     <SelectValue placeholder="Selecione um departamento" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
                     {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
+                      <SelectItem key={d.id} value={d.id} className="text-seguranca-lightgray hover:bg-gray-700">
                         {d.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium text-gray-200">Horário de Trabalho</Label>
-                <Input 
-                  name="horarioTrabalho" 
-                  value={form.horarioTrabalho || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: 07:00-19:00 12x36"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Folga Semanal</Label>
-                <Input 
-                  name="folgaSemanal" 
-                  value={form.folgaSemanal || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: Domingo"
-                />
               </div>
                <div>
                  <Label className="text-sm font-medium text-gray-200">Unidade (Opcional)</Label>
@@ -2173,20 +2876,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    onValueChange={handleCompanySelect}
                  >
                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                     <SelectValue placeholder="Selecione uma empresa">
-                       {selectedCompany ? (
-                         <div className="flex flex-col text-left">
-                           <span className="font-medium">
-                             {selectedCompany.sigla ? selectedCompany.sigla.toUpperCase() : selectedCompany.name}
-                           </span>
-                           {selectedCompany.sigla && selectedCompany.name && (
-                             <span className="text-xs text-gray-400">{selectedCompany.name}</span>
-                           )}
-                         </div>
-                       ) : (
-                         'Selecione uma empresa'
-                       )}
-                     </SelectValue>
+                     <SelectValue placeholder="Selecione uma empresa" />
                    </SelectTrigger>
                    <SelectContent className="bg-seguranca-graphite border-gray-600">
                      <SelectItem value="none" className="text-seguranca-lightgray hover:bg-gray-700">
@@ -2198,19 +2888,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                          value={company.id}
                          className="text-seguranca-lightgray hover:bg-gray-700"
                        >
-                         <div className="flex flex-col">
-                           <span className="font-medium">
-                             {company.sigla ? company.sigla.toUpperCase() : company.name}
-                           </span>
-                           {company.sigla && company.name && (
-                             <span className="text-xs text-gray-400">{company.name}</span>
-                           )}
-                           {company.cnpj && (
-                             <span className="text-xs text-gray-400">
-                               CNPJ: {company.cnpj} • {company.status}
-                             </span>
-                           )}
-                         </div>
+                         {company.sigla ? `${company.sigla.toUpperCase()} - ${company.name}` : company.name}
                        </SelectItem>
                      ))}
                    </SelectContent>
@@ -2517,8 +3195,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   onClick={async () => {
                     const employeeId = currentEmployeeId || employeeToEdit?.id;
                     console.log('🔍 Gerar Ficha - employeeId:', employeeId);
-                    console.log('🔍 Gerar Ficha - currentEmployeeId:', currentEmployeeId);
-                    console.log('🔍 Gerar Ficha - employeeToEdit?.id:', employeeToEdit?.id);
                     
                     if (!employeeId) {
                       toast({
@@ -2529,35 +3205,35 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                       return;
                     }
                     
+                    setLoading(true);
                     try {
-                      const url = `/funcionarios?tab=gerar&tipo=registro&employeeId=${employeeId}`;
-                      console.log('🔗 Abrindo URL:', url);
+                      // Gerar PDF diretamente
+                      const blob = await employeeService.generateEmployeeRecordPdf(employeeId);
                       
-                      // Tentar abrir em nova aba
-                      const newWindow = window.open(url, '_blank');
+                      // Criar URL do blob e fazer download
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `ficha-registro-funcionario-${employeeId}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
                       
-                      if (!newWindow) {
-                        // Se o popup foi bloqueado, tentar navegar na mesma aba
-                        toast({
-                          title: "Aviso",
-                          description: "Popup bloqueado. Redirecionando na mesma aba...",
-                          variant: "default"
-                        });
-                        window.location.href = url;
-                      } else {
-                        toast({
-                          title: "Sucesso",
-                          description: "Abrindo página de geração de ficha...",
-                          variant: "default"
-                        });
-                      }
+                      toast({
+                        title: "Sucesso",
+                        description: "Ficha de registro gerada e baixada com sucesso!",
+                        variant: "default"
+                      });
                     } catch (error: any) {
-                      console.error('❌ Erro ao abrir geração de ficha:', error);
+                      console.error('❌ Erro ao gerar ficha:', error);
                       toast({
                         title: "Erro",
-                        description: error.message || "Não foi possível abrir a geração de ficha.",
+                        description: error.message || "Não foi possível gerar a ficha.",
                         variant: "destructive"
                       });
+                    } finally {
+                      setLoading(false);
                     }
                   }}
                   disabled={loading}
@@ -2594,8 +3270,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   onClick={async () => {
                     const employeeId = currentEmployeeId || employeeToEdit?.id;
                     console.log('🔍 Gerar Ficha EPI - employeeId:', employeeId);
-                    console.log('🔍 Gerar Ficha EPI - currentEmployeeId:', currentEmployeeId);
-                    console.log('🔍 Gerar Ficha EPI - employeeToEdit?.id:', employeeToEdit?.id);
                     
                     if (!employeeId) {
                       toast({
@@ -2606,35 +3280,59 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                       return;
                     }
                     
+                    setLoading(true);
                     try {
-                      const url = `/funcionarios?tab=gerar&tipo=epi&employeeId=${employeeId}`;
-                      console.log('🔗 Abrindo URL:', url);
-                      
-                      // Tentar abrir em nova aba
-                      const newWindow = window.open(url, '_blank');
-                      
-                      if (!newWindow) {
-                        // Se o popup foi bloqueado, tentar navegar na mesma aba
-                        toast({
-                          title: "Aviso",
-                          description: "Popup bloqueado. Redirecionando na mesma aba...",
-                          variant: "default"
-                        });
-                        window.location.href = url;
-                      } else {
-                        toast({
-                          title: "Sucesso",
-                          description: "Abrindo página de geração de ficha de EPI...",
-                          variant: "default"
-                        });
+                      // Buscar dados completos do funcionário
+                      const employee = await employeeService.getEmployeeById(employeeId);
+                      if (!employee) {
+                        throw new Error('Funcionário não encontrado');
                       }
+                      
+                      // Verificar se o funcionário tem empresa
+                      if (!employee.company || !employee.company.id) {
+                        toast({
+                          title: "Atenção",
+                          description: "O funcionário precisa ter uma empresa cadastrada para gerar a ficha de EPI.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      // Criar ficha básica de EPI (primeira entrega)
+                      const epiFormData = {
+                        employeeId: employeeId,
+                        companyId: employee.company.id,
+                        deliveryDate: new Date().toISOString().split('T')[0], // Data atual
+                        items: [] // Lista vazia - pode ser preenchida depois na área de EPI
+                      };
+                      
+                      // Gerar PDF e salvar no banco
+                      const blob = await epiDeliveryFormService.generateAndSavePdf(epiFormData);
+                      
+                      // Criar URL do blob e fazer download
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `ficha-entrega-epi-${employeeId}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                      
+                      toast({
+                        title: "Sucesso",
+                        description: "Ficha de entrega de EPI gerada, salva e baixada com sucesso!",
+                        variant: "default"
+                      });
                     } catch (error: any) {
-                      console.error('❌ Erro ao abrir geração de ficha EPI:', error);
+                      console.error('❌ Erro ao gerar ficha de EPI:', error);
                       toast({
                         title: "Erro",
-                        description: error.message || "Não foi possível abrir a geração de ficha de entrega de EPI.",
+                        description: error.message || "Não foi possível gerar a ficha de EPI.",
                         variant: "destructive"
                       });
+                    } finally {
+                      setLoading(false);
                     }
                   }}
                   disabled={loading}
@@ -2696,6 +3394,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
          employeeName={form.name}
          employeeCpf={form.cpf}
          employeePhone={form.phone}
+       />
+
+       {/* Modal de Novo Médico */}
+       <NovoMedicoModal
+         open={novoMedicoModalOpen}
+         onClose={() => setNovoMedicoModalOpen(false)}
+         onMedicoCreated={handleMedicoCreated}
        />
 
        {/* Modal de Dependentes */}

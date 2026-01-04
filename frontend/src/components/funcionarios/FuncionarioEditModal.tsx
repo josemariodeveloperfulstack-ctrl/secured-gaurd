@@ -543,6 +543,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     
     if (!funcionario) return;
     
+    // Validação de formato de email (se preenchido)
+    if (form.email && form.email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        setError('Por favor, insira um email válido.');
+        return;
+      }
+    }
+    
     // Validações
     if (!form.address) {
       setError('Endereço é obrigatório para editar um funcionário.');
@@ -913,13 +922,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             <h3 className="text-lg font-semibold text-white">Informações de Contato</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm font-medium text-gray-200">Email *</Label>
+                <Label className="text-sm font-medium text-gray-200">Email</Label>
                 <Input 
                   name="email" 
                   type="email" 
                   value={form.email} 
-                  onChange={handleChange} 
-                  required 
+                  onChange={handleChange}
+                  placeholder="exemplo@email.com"
                 />
               </div>
               <div>

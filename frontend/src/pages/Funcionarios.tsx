@@ -76,12 +76,14 @@ const Funcionarios: React.FC = () => {
   }, [location.search]);
 
   // Carregar funcionários
-  const loadEmployees = async (filters: EmployeeFilters = {}) => {
+  const loadEmployees = async (search?: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      const data = await employeeService.getAllEmployees();
+      console.log('🔍 [Funcionarios] Carregando funcionários com searchTerm:', search);
+      const data = await employeeService.getAllEmployees(search);
+      console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length);
       setEmployees(data);
     } catch (err) {
       console.error('Erro ao carregar funcionários:', err);
@@ -98,17 +100,9 @@ const Funcionarios: React.FC = () => {
 
   // Carregar funcionários com filtros
   const loadEmployeesWithFilters = async () => {
-    const filters: EmployeeFilters = {};
-    
-    if (searchTerm) {
-      filters.searchTerm = searchTerm;
-    }
-    
-    if (statusFilter !== 'all') {
-      filters.status = statusFilter;
-    }
-    
-    await loadEmployees(filters);
+    const term = searchTerm?.trim() || undefined;
+    console.log('🔍 [Funcionarios] loadEmployeesWithFilters chamado com searchTerm:', term);
+    await loadEmployees(term);
   };
 
   // Carregar funcionários iniciais
@@ -116,12 +110,27 @@ const Funcionarios: React.FC = () => {
     loadEmployees();
   }, []);
 
-  // Aplicar filtros quando mudarem
+  // Aplicar busca com debounce
   useEffect(() => {
-    if (!loading) {
-      loadEmployeesWithFilters();
+    // Se o searchTerm estiver vazio, recarregar todos os funcionários
+    if (!searchTerm || searchTerm.trim() === '') {
+      const timeoutId = setTimeout(() => {
+        if (!loading) {
+          loadEmployees();
+        }
+      }, 300);
+      return () => clearTimeout(timeoutId);
     }
-  }, [searchTerm, statusFilter]);
+    
+    // Se houver searchTerm, buscar apenas os resultados filtrados
+    const timeoutId = setTimeout(() => {
+      if (!loading) {
+        loadEmployeesWithFilters();
+      }
+    }, 500); // Debounce de 500ms
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (shouldOpenModal) setModalOpen(true);
@@ -176,13 +185,15 @@ const Funcionarios: React.FC = () => {
     handleCloseEditModal();
   };
 
-  // Filtrar funcionários por departamento (filtro local)
+  // Filtrar funcionários por departamento e status (filtro local)
   const filteredEmployees = employees.filter(employee => {
     const matchesDepartment = departmentFilter === 'all' || 
       employee.unit?.id === departmentFilter || 
       employee.position?.id === departmentFilter;
     
-    return matchesDepartment;
+    const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+    
+    return matchesDepartment && matchesStatus;
   });
 
   // Limpar filtros
