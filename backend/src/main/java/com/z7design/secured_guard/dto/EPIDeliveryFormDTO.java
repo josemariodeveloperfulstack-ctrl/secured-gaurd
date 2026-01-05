@@ -59,6 +59,7 @@ public class EPIDeliveryFormDTO {
                                 .epiName(item.getEpiName())
                                 .quantity(item.getQuantity())
                                 .ca(item.getCa())
+                                .caName(item.getCaName())
                                 .validityDate(item.getValidityDate())
                                 .uniformType(item.getUniformType())
                                 .uniformPiece(item.getUniformPiece())

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import EPIControl from './EPIControl';
 import api from '@/lib/axios';
+import { caepiService, CAEPIResponse } from '@/services/caepiService';
+import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
+import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 
 const EPIs: React.FC = () => {
   const { toast } = useToast();
@@ -52,6 +55,15 @@ const EPIs: React.FC = () => {
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [epiDeliveries, setEpiDeliveries] = useState<any[]>([]);
   const [loadingDeliveries, setLoadingDeliveries] = useState(false);
+  
+  // Estados para busca de CA
+  const [caLoading, setCaLoading] = useState(false);
+  const [caSearchTimeout, setCaSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Estados para fornecedores
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   
   // Formulário de criação
   const [epiForm, setEpiForm] = useState<Omit<EPI, 'id' | 'createdAt' | 'updatedAt'>>({
@@ -95,6 +107,117 @@ const EPIs: React.FC = () => {
     queryKey: ['epiStats'],
     queryFn: () => epiService.getEPIStats()
   });
+
+  // Carregar fornecedores quando modal abrir
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      loadSuppliers();
+    }
+  }, [isCreateModalOpen]);
+
+  // Buscar CA automaticamente quando o nome do EPI mudar
+  useEffect(() => {
+    if (!epiForm.name || epiForm.name.trim().length < 3) {
+      return;
+    }
+
+    // Limpar timeout anterior
+    if (caSearchTimeout) {
+      clearTimeout(caSearchTimeout);
+    }
+
+    // Debounce de 800ms
+    const timeout = setTimeout(async () => {
+      try {
+        setCaLoading(true);
+        const resultados = await caepiService.buscarCAs(epiForm.name);
+        
+        if (resultados && resultados.length > 0) {
+          // Pegar o primeiro resultado mais relevante
+          const caEncontrado = resultados[0];
+          setEpiForm(prev => ({
+            ...prev,
+            certification: caEncontrado.numero,
+            // Se não tiver validade preenchida, tentar preencher
+            expiryDate: prev.expiryDate || (caEncontrado.validade ? formatDateForInput(caEncontrado.validade) : undefined)
+          }));
+          
+          toast({
+            title: "CA encontrado",
+            description: `CA ${caEncontrado.numero} - ${caEncontrado.nome}`,
+            variant: "default"
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CA:', error);
+      } finally {
+        setCaLoading(false);
+      }
+    }, 800);
+
+    setCaSearchTimeout(timeout);
+
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [epiForm.name]);
+
+  // Função auxiliar para formatar data para input
+  const formatDateForInput = (dateString: string): string | undefined => {
+    try {
+      // Tentar diferentes formatos de data
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return undefined;
+      }
+      return date.toISOString().split('T')[0];
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Carregar fornecedores
+  const loadSuppliers = async () => {
+    setLoadingSuppliers(true);
+    try {
+      const fornecedores = await contasAPagarService.getFornecedores();
+      setSuppliers(fornecedores);
+    } catch (error) {
+      console.error('Erro ao carregar fornecedores:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de fornecedores",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
+
+  // Salvar novo fornecedor
+  const handleSupplierSave = async (payload: any) => {
+    try {
+      const newSupplier = await contasAPagarService.createFornecedor(payload);
+      toast({
+        title: "Sucesso",
+        description: "Fornecedor criado com sucesso!",
+      });
+      await loadSuppliers();
+      // Selecionar automaticamente o fornecedor recém-criado
+      setEpiForm(prev => ({ ...prev, supplier: newSupplier.name }));
+      setIsSupplierModalOpen(false);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Não foi possível salvar o fornecedor.';
+      toast({
+        title: "Erro",
+        description: msg,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
 
   // Mutation para criar EPI
   const createEPIMutation = useMutation({
@@ -597,13 +720,21 @@ const EPIs: React.FC = () => {
               {/* Nome */}
               <div>
                 <Label htmlFor="name" className="text-seguranca-lightgray">Nome do EPI *</Label>
-                <Input
-                  id="name"
-                  value={epiForm.name}
-                  onChange={(e) => setEpiForm({ ...epiForm, name: e.target.value })}
-                  placeholder="Ex: Capacete de Segurança"
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1"
-                />
+                <div className="relative">
+                  <Input
+                    id="name"
+                    value={epiForm.name}
+                    onChange={(e) => setEpiForm({ ...epiForm, name: e.target.value })}
+                    placeholder="Ex: Capacete de Segurança"
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1 pr-8"
+                  />
+                  {caLoading && (
+                    <Loader2 className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400 mt-1" />
+                  )}
+                </div>
+                {caLoading && (
+                  <p className="text-xs text-gray-400 mt-1">Buscando CA...</p>
+                )}
               </div>
 
               {/* Descrição */}
@@ -691,13 +822,21 @@ const EPIs: React.FC = () => {
                 {/* Certificação (CA) */}
                 <div>
                   <Label htmlFor="certification" className="text-seguranca-lightgray">Número do CA</Label>
-                  <Input
-                    id="certification"
-                    value={epiForm.certification}
-                    onChange={(e) => setEpiForm({ ...epiForm, certification: e.target.value })}
-                    placeholder="Ex: ABNT NBR 8221"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="certification"
+                      value={epiForm.certification}
+                      onChange={(e) => setEpiForm({ ...epiForm, certification: e.target.value })}
+                      placeholder="Ex: ABNT NBR 8221"
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1 pr-8"
+                    />
+                    {caLoading && (
+                      <Loader2 className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {caLoading ? 'Buscando CA...' : 'Preenchido automaticamente ao digitar o nome do EPI'}
+                  </p>
                 </div>
 
                 {/* Quantidade */}
@@ -732,14 +871,56 @@ const EPIs: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Fornecedor */}
                 <div>
-                  <Label htmlFor="supplier" className="text-seguranca-lightgray">Fornecedor</Label>
-                  <Input
-                    id="supplier"
-                    value={epiForm.supplier}
-                    onChange={(e) => setEpiForm({ ...epiForm, supplier: e.target.value })}
-                    placeholder="Nome do fornecedor"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <Label htmlFor="supplier" className="text-seguranca-lightgray">Fornecedor</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsSupplierModalOpen(true)}
+                      className="text-xs h-6 px-2 text-seguranca-yellow hover:text-yellow-400 hover:bg-yellow-500/10"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Novo
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Select
+                      value={epiForm.supplier || undefined}
+                      onValueChange={(value) => {
+                        if (value === '__NEW__') {
+                          setIsSupplierModalOpen(true);
+                        } else {
+                          setEpiForm({ ...epiForm, supplier: value || '' });
+                        }
+                      }}
+                      disabled={loadingSuppliers}
+                    >
+                      <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1 flex-1">
+                        <SelectValue placeholder={loadingSuppliers ? "Carregando..." : "Selecione o fornecedor"} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                        {suppliers.map((supplier) => (
+                          <SelectItem
+                            key={supplier.id}
+                            value={supplier.name}
+                            className="text-seguranca-lightgray hover:bg-seguranca-black"
+                          >
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem
+                          value="__NEW__"
+                          className="text-seguranca-yellow hover:bg-yellow-500/10 border-t border-gray-600 mt-1"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            <span>Novo Fornecedor</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* Validade do CA */}
@@ -975,6 +1156,13 @@ const EPIs: React.FC = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Novo Fornecedor */}
+        <SupplierFormModal
+          isOpen={isSupplierModalOpen}
+          onClose={() => setIsSupplierModalOpen(false)}
+          onSave={handleSupplierSave}
+        />
       </div>
     </StandardLayout>
   );

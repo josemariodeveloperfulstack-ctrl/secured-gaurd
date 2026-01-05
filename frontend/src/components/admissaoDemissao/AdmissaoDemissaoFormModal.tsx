@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2, UserPlus, ExternalLink, Eye, FileText, Send, Mail, Calendar } from 'lucide-react';
+import { X, Save, Loader2, UserPlus, ExternalLink, Eye, FileText, Send, Mail, Calendar, Shield, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +59,9 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     subject: '',
     message: ''
   });
+  const [defaultEpis, setDefaultEpis] = useState<Array<{ epiName: string; quantity: string; caNumber: string; validity: string; observations: string }>>([
+    { epiName: '', quantity: '1', caNumber: '', validity: '', observations: '' }
+  ]);
 
   // Carregar dados quando o modal abrir
   useEffect(() => {
@@ -93,6 +96,26 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
       fillFormFromRequest(request);
     }
   }, [isOpen, request, funcionarios, empresas, unidades]);
+
+  // Carregar EPIs padrão quando empresa for selecionada e for admissão
+  useEffect(() => {
+    if (form.empresa && form.tipo === 'admissao' && empresas.length > 0) {
+      const selectedCompany = empresas.find(c => c.id === form.empresa);
+      if (selectedCompany && selectedCompany.defaultEpis && selectedCompany.defaultEpis.length > 0) {
+        setDefaultEpis(selectedCompany.defaultEpis.map(epi => ({
+          epiName: epi.epiName || '',
+          quantity: String(epi.quantity || 1),
+          caNumber: epi.caNumber || '',
+          validity: epi.validity || '',
+          observations: epi.observations || ''
+        })));
+      } else {
+        setDefaultEpis([{ epiName: '', quantity: '1', caNumber: '', validity: '', observations: '' }]);
+      }
+    } else if (form.tipo !== 'admissao') {
+      setDefaultEpis([{ epiName: '', quantity: '1', caNumber: '', validity: '', observations: '' }]);
+    }
+  }, [form.empresa, form.tipo, empresas]);
   
   // Função para preencher formulário a partir do request
   const fillFormFromRequest = (req: AdmissionRequest) => {
@@ -301,6 +324,24 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     setShowFuncionarioModal(false); // Fecha o modal de funcionário
     // Recarregar a lista de funcionários após criar um novo
     loadFuncionarios();
+  };
+
+  const handleEpiChange = (idx: number, field: string, value: string) => {
+    setDefaultEpis(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return updated;
+    });
+  };
+
+  const addEpi = () => {
+    setDefaultEpis([...defaultEpis, { epiName: '', quantity: '1', caNumber: '', validity: '', observations: '' }]);
+  };
+
+  const removeEpi = (idx: number) => {
+    if (defaultEpis.length > 1) {
+      setDefaultEpis(defaultEpis.filter((_, i) => i !== idx));
+    }
   };
 
   const handlePreview = () => {
@@ -622,6 +663,99 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
                   </div>
                 </div>
               </div>
+              
+              {/* Seção: EPIs da Primeira Entrega (apenas para admissão) */}
+              {form.tipo === 'admissao' && (
+                <div className="bg-gray-800/50 rounded-lg p-4 sm:p-6 border border-gray-600">
+                  <h3 className="text-sm sm:text-base font-semibold text-seguranca-yellow border-b border-gray-600 pb-2 mb-4 flex items-center gap-2">
+                    <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
+                    EPIs da Primeira Entrega
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-400 mb-4">Configure os equipamentos padrão que serão incluídos automaticamente na ficha de entrega de EPI</p>
+                  
+                  {defaultEpis.map((epi, idx) => (
+                    <div key={idx} className="space-y-2 p-3 sm:p-4 bg-gray-700/50 rounded-lg border border-gray-600 mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-xs sm:text-sm font-medium text-gray-200">
+                          EPI {idx + 1}
+                        </Label>
+                        {defaultEpis.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeEpi(idx)}
+                            className="text-red-400 hover:text-red-300 p-1"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label className="text-xs sm:text-sm font-medium text-gray-200">Nome do EPI *</Label>
+                          <Input
+                            value={epi.epiName}
+                            onChange={(e) => handleEpiChange(idx, 'epiName', e.target.value)}
+                            className="h-9 sm:h-10 text-xs sm:text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                            placeholder="Ex: Capacete, Óculos de Proteção, etc."
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label className="text-xs sm:text-sm font-medium text-gray-200">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={epi.quantity}
+                              onChange={(e) => handleEpiChange(idx, 'quantity', e.target.value)}
+                              className="h-9 sm:h-10 text-xs sm:text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                              placeholder="1"
+                            />
+                          </div>
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label className="text-xs sm:text-sm font-medium text-gray-200">CA (Certificado de Aprovação)</Label>
+                            <Input
+                              value={epi.caNumber}
+                              onChange={(e) => handleEpiChange(idx, 'caNumber', e.target.value)}
+                              className="h-9 sm:h-10 text-xs sm:text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                              placeholder="Nº do CA"
+                            />
+                          </div>
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label className="text-xs sm:text-sm font-medium text-gray-200">Validade</Label>
+                            <Input
+                              value={epi.validity}
+                              onChange={(e) => handleEpiChange(idx, 'validity', e.target.value)}
+                              className="h-9 sm:h-10 text-xs sm:text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                              placeholder="Ex: 12 meses"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label className="text-xs sm:text-sm font-medium text-gray-200">Observações</Label>
+                          <Input
+                            value={epi.observations}
+                            onChange={(e) => handleEpiChange(idx, 'observations', e.target.value)}
+                            className="h-9 sm:h-10 text-xs sm:text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                            placeholder="Observações adicionais (opcional)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <button
+                    type="button"
+                    onClick={addEpi}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-xs sm:text-sm transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Adicionar EPI
+                  </button>
+                </div>
+              )}
               
               {/* Motivo da Solicitação */}
               <div className="bg-gray-800/50 rounded-lg p-4 sm:p-6 border border-gray-600">

@@ -4,7 +4,8 @@ export interface EPIDeliveryFormItem {
   id?: string;
   epiName: string;
   quantity: number;
-  ca?: string;
+  ca?: string; // Número do CA
+  caName?: string; // Nome/Descrição do CA
   validityDate?: string;
   uniformType?: string;
   uniformPiece?: string;
@@ -107,12 +108,30 @@ export const epiDeliveryFormService = {
    */
   async search(filters: EPIDeliveryFormFilters): Promise<EPIDeliveryFormPage> {
     try {
+      // Remover filtros vazios ou undefined antes de enviar
+      const cleanFilters: any = {};
+      if (filters.page !== undefined) cleanFilters.page = filters.page;
+      if (filters.size !== undefined) cleanFilters.size = filters.size;
+      if (filters.sortBy) cleanFilters.sortBy = filters.sortBy;
+      if (filters.sortDir) cleanFilters.sortDir = filters.sortDir;
+      if (filters.employeeId) cleanFilters.employeeId = filters.employeeId;
+      if (filters.companyId) cleanFilters.companyId = filters.companyId;
+      if (filters.startDate) cleanFilters.startDate = filters.startDate;
+      if (filters.endDate) cleanFilters.endDate = filters.endDate;
+
+      console.log('📤 Enviando requisição de busca:', cleanFilters);
       const response = await api.get('/api/epi-delivery-forms/search', {
-        params: filters
+        params: cleanFilters
       });
+      console.log('📥 Resposta da busca:', response.data);
       return response.data;
-    } catch (error) {
-      console.error('Erro ao buscar fichas de entrega de EPI:', error);
+    } catch (error: any) {
+      console.error('❌ Erro ao buscar fichas de entrega de EPI:', error);
+      console.error('Detalhes do erro:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
       throw error;
     }
   },

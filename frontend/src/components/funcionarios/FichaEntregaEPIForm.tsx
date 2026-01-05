@@ -13,6 +13,8 @@ import { companyService } from '@/services/companyService';
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { caepiService, CAEPIResponse } from '@/services/caepiService';
+import { caepiService, CAEPIResponse } from '@/services/caepiService';
 
 const epiOptions = [
   'Capacete de Segurança',
@@ -69,13 +71,20 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
     { 
       nome: '', 
       quantidade: '1', 
-      ca: '', // Certificado de Aprovação
+      ca: '', // Número do Certificado de Aprovação
+      caName: '', // Nome/Descrição do CA
       validade: '',
       observacoes: '',
       uniformeTipo: '', // 'COMPLETO' ou 'INDIVIDUAL'
       uniformePeca: '' // Peça específica se for individual
     }
   ]);
+
+  // Estados para autocomplete do CA
+  const [caSuggestions, setCaSuggestions] = useState<{ [key: number]: CAEPIResponse[] }>({});
+  const [caLoading, setCaLoading] = useState<{ [key: number]: boolean }>({});
+  const [caSearchTimeouts, setCaSearchTimeouts] = useState<{ [key: number]: NodeJS.Timeout }>({});
+  const [showCaSuggestions, setShowCaSuggestions] = useState<{ [key: number]: boolean }>({});
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -159,11 +168,78 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
     });
   };
 
+  // Função para buscar CA quando o usuário digita
+  const handleCABlur = async (idx: number, caNumber: string) => {
+    if (!caNumber || caNumber.trim().length < 3) {
+      setShowCaSuggestions(prev => ({ ...prev, [idx]: false }));
+      return;
+    }
+
+    try {
+      setCaLoading(prev => ({ ...prev, [idx]: true }));
+      const caInfo = await caepiService.buscarCA(caNumber);
+      
+      if (caInfo) {
+        handleEpiChange(idx, 'ca', caInfo.numero);
+        handleEpiChange(idx, 'caName', caInfo.nome || caInfo.descricao || '');
+        toast({
+          title: "CA encontrado",
+          description: `CA ${caInfo.numero} - ${caInfo.nome}`,
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CA:', error);
+    } finally {
+      setCaLoading(prev => ({ ...prev, [idx]: false }));
+      setShowCaSuggestions(prev => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  // Função para buscar sugestões de CA enquanto digita
+  const handleCASearch = async (idx: number, searchTerm: string) => {
+    // Limpar timeout anterior
+    if (caSearchTimeouts[idx]) {
+      clearTimeout(caSearchTimeouts[idx]);
+    }
+
+    if (!searchTerm || searchTerm.trim().length < 3) {
+      setCaSuggestions(prev => ({ ...prev, [idx]: [] }));
+      setShowCaSuggestions(prev => ({ ...prev, [idx]: false }));
+      return;
+    }
+
+    // Debounce de 500ms
+    const timeout = setTimeout(async () => {
+      try {
+        setCaLoading(prev => ({ ...prev, [idx]: true }));
+        const resultados = await caepiService.buscarCAs(searchTerm);
+        setCaSuggestions(prev => ({ ...prev, [idx]: resultados }));
+        setShowCaSuggestions(prev => ({ ...prev, [idx]: resultados.length > 0 }));
+      } catch (error) {
+        console.error('Erro ao buscar sugestões de CA:', error);
+      } finally {
+        setCaLoading(prev => ({ ...prev, [idx]: false }));
+      }
+    }, 500);
+
+    setCaSearchTimeouts(prev => ({ ...prev, [idx]: timeout }));
+  };
+
+  // Função para selecionar uma sugestão de CA
+  const handleCASelect = (idx: number, ca: CAEPIResponse) => {
+    handleEpiChange(idx, 'ca', ca.numero);
+    handleEpiChange(idx, 'caName', ca.nome || ca.descricao || '');
+    setShowCaSuggestions(prev => ({ ...prev, [idx]: false }));
+    setCaSuggestions(prev => ({ ...prev, [idx]: [] }));
+  };
+
   const addEpi = () => {
     setEpis([...epis, { 
       nome: '', 
       quantidade: '1', 
       ca: '', 
+      caName: '',
       validade: '', 
       observacoes: '',
       uniformeTipo: '',
@@ -400,6 +476,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
             epiName: epi.nome,
             quantity: parseInt(epi.quantidade) || 1,
             ca: epi.ca || undefined,
+            caName: epi.caName || undefined,
             validityDate: epi.validade || undefined,
             uniformType: epi.uniformeTipo || undefined,
             uniformPiece: epi.uniformePeca || undefined,
@@ -766,14 +843,46 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                               />
                             </div>
                             
-                            <div className="space-y-2">
+                            <div className="space-y-2 relative">
                               <Label>CA</Label>
-                              <Input 
-                                value={epi.ca} 
-                                onChange={(e) => handleEpiChange(idx, 'ca', e.target.value)}
-                                placeholder="Certificado de Aprovação"
-                                className="bg-background"
-                              />
+                              <div className="relative">
+                                <Input 
+                                  value={epi.ca} 
+                                  onChange={(e) => {
+                                    handleEpiChange(idx, 'ca', e.target.value);
+                                    handleCASearch(idx, e.target.value);
+                                  }}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      if (epi.ca) {
+                                        handleCABlur(idx, epi.ca);
+                                      }
+                                    }, 200);
+                                  }}
+                                  placeholder="Digite o número do CA"
+                                  className="bg-background pr-8"
+                                />
+                                {caLoading[idx] && (
+                                  <Loader2 className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                                )}
+                              </div>
+                              {epi.caName && (
+                                <p className="text-xs text-gray-500 mt-1">{epi.caName}</p>
+                              )}
+                              {showCaSuggestions[idx] && caSuggestions[idx] && caSuggestions[idx].length > 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                                  {caSuggestions[idx].map((suggestion, sugIdx) => (
+                                    <div
+                                      key={sugIdx}
+                                      onClick={() => handleCASelect(idx, suggestion)}
+                                      className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                                    >
+                                      <div className="font-medium text-sm">{suggestion.numero}</div>
+                                      <div className="text-xs text-gray-500">{suggestion.nome || suggestion.descricao}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </>
                         )}
@@ -840,14 +949,46 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                                   />
                                 </div>
                                 
-                                <div className="space-y-2">
+                                <div className="space-y-2 relative">
                                   <Label>CA</Label>
-                                  <Input 
-                                    value={epi.ca} 
-                                    onChange={(e) => handleEpiChange(idx, 'ca', e.target.value)}
-                                    placeholder="Certificado de Aprovação"
-                                    className="bg-background"
-                                  />
+                                  <div className="relative">
+                                    <Input 
+                                      value={epi.ca} 
+                                      onChange={(e) => {
+                                        handleEpiChange(idx, 'ca', e.target.value);
+                                        handleCASearch(idx, e.target.value);
+                                      }}
+                                      onBlur={() => {
+                                        setTimeout(() => {
+                                          if (epi.ca) {
+                                            handleCABlur(idx, epi.ca);
+                                          }
+                                        }, 200);
+                                      }}
+                                      placeholder="Digite o número do CA"
+                                      className="bg-background pr-8"
+                                    />
+                                    {caLoading[idx] && (
+                                      <Loader2 className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                                    )}
+                                  </div>
+                                  {epi.caName && (
+                                    <p className="text-xs text-gray-500 mt-1">{epi.caName}</p>
+                                  )}
+                                  {showCaSuggestions[idx] && caSuggestions[idx] && caSuggestions[idx].length > 0 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                                      {caSuggestions[idx].map((suggestion, sugIdx) => (
+                                        <div
+                                          key={sugIdx}
+                                          onClick={() => handleCASelect(idx, suggestion)}
+                                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                                        >
+                                          <div className="font-medium text-sm">{suggestion.numero}</div>
+                                          <div className="text-xs text-gray-500">{suggestion.nome || suggestion.descricao}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </>
                             )}

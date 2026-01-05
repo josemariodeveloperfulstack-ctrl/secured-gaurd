@@ -62,6 +62,27 @@ const FichasEntregaEPI: React.FC = () => {
     loadFichas();
   }, [page, employeeFilter, companyFilter, startDateFilter, endDateFilter]);
 
+  // Recarregar lista quando a página receber foco (útil quando volta de outra página)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadFichas();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadFichas();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [page, employeeFilter, companyFilter, startDateFilter, endDateFilter]);
+
   const loadFichas = async () => {
     try {
       setLoading(true);
@@ -73,22 +94,41 @@ const FichasEntregaEPI: React.FC = () => {
         sortDir: 'DESC'
       };
 
-      if (employeeFilter) filters.employeeId = employeeFilter;
-      if (companyFilter) filters.companyId = companyFilter;
-      if (startDateFilter) filters.startDate = startDateFilter;
-      if (endDateFilter) filters.endDate = endDateFilter;
+      // Apenas adicionar filtros se tiverem valor
+      if (employeeFilter && employeeFilter.trim()) {
+        filters.employeeId = employeeFilter;
+      }
+      if (companyFilter && companyFilter.trim()) {
+        filters.companyId = companyFilter;
+      }
+      if (startDateFilter && startDateFilter.trim()) {
+        filters.startDate = startDateFilter;
+      }
+      if (endDateFilter && endDateFilter.trim()) {
+        filters.endDate = endDateFilter;
+      }
 
+      console.log('🔍 Buscando fichas com filtros:', filters);
       const response = await epiDeliveryFormService.search(filters);
-      setFichas(response.content);
-      setTotalPages(response.totalPages);
-      setTotalElements(response.totalElements);
-    } catch (error) {
+      console.log('✅ Resposta recebida:', { 
+        totalElements: response.totalElements, 
+        contentLength: response.content?.length || 0 
+      });
+      setFichas(response.content || []);
+      setTotalPages(response.totalPages || 0);
+      setTotalElements(response.totalElements || 0);
+    } catch (error: any) {
       console.error('Erro ao carregar fichas:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Não foi possível carregar as fichas de entrega de EPI.';
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar as fichas de entrega de EPI.',
+        description: errorMessage,
         variant: 'destructive'
       });
+      // Em caso de erro, garantir que os estados estejam vazios
+      setFichas([]);
+      setTotalPages(0);
+      setTotalElements(0);
     } finally {
       setLoading(false);
     }
@@ -157,6 +197,16 @@ const FichasEntregaEPI: React.FC = () => {
                 </p>
               </div>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadFichas}
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -429,6 +479,7 @@ const FichasEntregaEPI: React.FC = () => {
 };
 
 export default FichasEntregaEPI;
+
 
 
 

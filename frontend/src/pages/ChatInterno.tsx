@@ -91,6 +91,7 @@ const ChatInterno: React.FC = () => {
   const [favoriteMessages, setFavoriteMessages] = useState<Set<string>>(new Set());
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [sendingMessages, setSendingMessages] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -402,6 +403,25 @@ const ChatInterno: React.FC = () => {
 
     console.log('📤 [CHAT] Enviando mensagem:', newMessage, selectedFile ? 'com arquivo' : '');
 
+    // Criar mensagem temporária para mostrar "enviando..."
+    const tempMessageId = `temp-${Date.now()}`;
+    const tempMessage: ChatMessage = {
+      id: tempMessageId,
+      content: newMessage || (selectedFile ? `Enviando ${selectedFile.name}...` : ''),
+      sender: currentUser || { id: '', name: 'Você', email: '' },
+      type: selectedFile ? (selectedFile.type.startsWith('image/') ? 'IMAGE' : selectedFile.type.startsWith('audio/') ? 'AUDIO' : selectedFile.type.startsWith('video/') ? 'VIDEO' : 'FILE') : 'TEXT',
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      fileUrl: selectedFile ? URL.createObjectURL(selectedFile) : undefined,
+      fileName: selectedFile?.name,
+      fileSize: selectedFile?.size,
+      fileContentType: selectedFile?.type
+    };
+
+    // Adicionar mensagem temporária
+    addChatMessage(tempMessage);
+    setSendingMessages(prev => new Set(prev).add(tempMessageId));
+
     try {
       setLoading(true);
 
@@ -436,7 +456,14 @@ const ChatInterno: React.FC = () => {
         sentMessage = await messageService.sendChatMessage(messageData);
       }
       
-      // Adicionar mensagem localmente (otimistic update)
+      // Remover mensagem temporária e adicionar a mensagem real
+      removeChatMessage(tempMessageId);
+      setSendingMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tempMessageId);
+        return newSet;
+      });
+      
       // Garantir que todas as informações do arquivo estejam presentes
       console.log('📤 [CHAT] Mensagem enviada:', {
         id: sentMessage.id,
@@ -463,6 +490,15 @@ const ChatInterno: React.FC = () => {
 
     } catch (error) {
       console.error('❌ [CHAT] Erro ao enviar mensagem:', error);
+      
+      // Remover mensagem temporária em caso de erro
+      removeChatMessage(tempMessageId);
+      setSendingMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tempMessageId);
+        return newSet;
+      });
+      
       if (error instanceof MessageServiceError) {
         toast({
           title: "Erro",
@@ -1404,6 +1440,9 @@ const ChatInterno: React.FC = () => {
                     ) : (
                       safeChatMessages.map((message) => {
                         const isCurrentUser = message.sender.id === currentUser?.id || message.sender.id === currentUser?.username;
+                        const isSending = sendingMessages.has(message.id);
+                        const isGroupOrDepartment = selectedConversation?.type === 'group' || selectedConversation?.type === 'department';
+                        const shouldShowSender = !isCurrentUser || isGroupOrDepartment;
                         
                         return (
                           <div
@@ -1411,12 +1450,21 @@ const ChatInterno: React.FC = () => {
                             className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                           >
                             <div className={`max-w-[85%] sm:max-w-xs lg:max-w-md ${isCurrentUser ? 'order-2' : 'order-1'}`}>
-                              {!isCurrentUser && (
-                                <div className="flex items-center gap-2 mb-1">
+                              {shouldShowSender && (
+                                <div className={`flex items-center gap-2 mb-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
                                   <Avatar className="w-6 h-6">
                                     <AvatarFallback>{getInitials(message.sender.name)}</AvatarFallback>
                                   </Avatar>
                                   <span className="text-xs font-medium">{message.sender.name}</span>
+                                  {isSending && (
+                                    <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                  )}
+                                </div>
+                              )}
+                              {!shouldShowSender && isSending && (
+                                <div className="flex items-center justify-end gap-2 mb-1">
+                                  <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">Enviando...</span>
                                 </div>
                               )}
                               
@@ -1518,7 +1566,16 @@ const ChatInterno: React.FC = () => {
                                         
                                         <div className="flex items-start justify-between gap-2">
                                           {message.content && (
-                                            <p className="text-sm flex-1">{message.content}</p>
+                                            <p className={`text-sm flex-1 ${isSending ? 'opacity-70 italic' : ''}`}>
+                                              {isSending && message.content.includes('Enviando') ? (
+                                                <span className="flex items-center gap-2">
+                                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                                  {message.content}
+                                                </span>
+                                              ) : (
+                                                message.content
+                                              )}
+                                            </p>
                                           )}
                                           {pinnedMessages.has(message.id) && (
                                             <Pin className="w-3 h-3 opacity-70 flex-shrink-0" />

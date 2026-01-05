@@ -4,13 +4,17 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { CompanyFormModal } from '@/components/comercial/CompanyFormModal';
+import { CompanyViewModal } from '@/components/comercial/CompanyViewModal';
 import { companyService } from '@/services/companyService';
 import { useEffect } from 'react';
+import { Company } from '@/types/company';
 
 const Empresas: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
+  const [viewing, setViewing] = useState<Company | null>(null);
 
   const load = async () => {
     try {
@@ -67,7 +71,7 @@ const Empresas: React.FC = () => {
                       <td className="py-2 pr-4">{(c.sigla || '-').toString().toUpperCase()}</td>
                       <td className="py-2 pr-4">{(c.status || '-').toString().toUpperCase()}</td>
                       <td className="py-2 pr-4 flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => alert(JSON.stringify(c, null, 2))}>
+                        <Button variant="outline" size="sm" onClick={() => { setViewing(c as Company); setViewOpen(true); }}>
                           <Eye className="w-4 h-4" />
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => { setEditing(c); setOpen(true); }}>
@@ -90,6 +94,11 @@ const Empresas: React.FC = () => {
           onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}
           onSuccess={async () => { await load(); }}
           initialData={editing}
+        />
+        <CompanyViewModal
+          open={viewOpen}
+          onOpenChange={(o) => { setViewOpen(o); if (!o) setViewing(null); }}
+          company={viewing}
         />
       </div>
     </StandardLayout>

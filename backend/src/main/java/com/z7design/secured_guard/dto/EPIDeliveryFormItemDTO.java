@@ -16,12 +16,14 @@ public class EPIDeliveryFormItemDTO {
     private UUID id;
     private String epiName;
     private Integer quantity;
-    private String ca;
+    private String ca; // Número do CA
+    private String caName; // Nome/Descrição do CA
     private LocalDate validityDate;
     private String uniformType;
     private String uniformPiece;
     private String observations;
 }
+
 
 
 

@@ -65,6 +65,8 @@ const EPIs: React.FC = () => {
     reason: 'ADMISSAO',
     notes: ''
   });
+  const [uniformType, setUniformType] = useState<'COMPLETO' | 'INDIVIDUAL' | ''>('');
+  const [uniformItems, setUniformItems] = useState<string[]>([]);
 
   // Estado para modal de visualização de EPI
   const [selectedEPI, setSelectedEPI] = useState<PersonalProtectiveEquipment | null>(null);
@@ -212,6 +214,8 @@ const EPIs: React.FC = () => {
       reason: 'ADMISSAO',
       notes: ''
     });
+    setUniformType('');
+    setUniformItems([]);
   };
 
   // Fechar modal e resetar formulário
@@ -219,6 +223,11 @@ const EPIs: React.FC = () => {
     setShowDeliveryModal(false);
     resetDeliveryForm();
   };
+
+  // Verificar se o EPI selecionado é Uniforme de Trabalho
+  const selectedEPIForDelivery = epis.find(epi => epi.id.toString() === deliveryForm.epiId);
+  const isUniformeTrabalho = selectedEPIForDelivery?.name?.toLowerCase().includes('uniforme de trabalho') || 
+                             selectedEPIForDelivery?.name?.toLowerCase().includes('uniforme');
 
   // Criar nova entrega
   const handleCreateDelivery = async () => {
@@ -232,10 +241,53 @@ const EPIs: React.FC = () => {
         return;
       }
 
+      // Validar uniforme se for Uniforme de Trabalho
+      if (isUniformeTrabalho) {
+        if (!uniformType) {
+          toast({
+            title: "Erro",
+            description: "Selecione se é uniforme completo ou individual",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (uniformType === 'INDIVIDUAL' && uniformItems.length === 0) {
+          toast({
+            title: "Erro",
+            description: "Selecione pelo menos um item do uniforme",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Construir notas com informações do uniforme
+      let notes = deliveryForm.notes || '';
+      if (isUniformeTrabalho && uniformType) {
+        const itemLabels: { [key: string]: string } = {
+          'CALCA': 'Calça',
+          'CAMISA': 'Camisa',
+          'CAMISA_SOCIAL': 'Camisa Social',
+          'JAQUETA': 'Jaqueta',
+          'CINTO': 'Cinto',
+          'SAPATO': 'Sapato',
+          'SAPATO_SOCIAL': 'Sapato Social',
+          'BLASER': 'Blaser',
+          'PERNEIRA': 'Perneira'
+        };
+        
+        const uniformInfo = uniformType === 'COMPLETO' 
+          ? 'Primeira entrega com uniforme completo: Calça, Camisa, Camisa Social, Jaqueta, Cinto, Sapato, Sapato Social, Blaser, Perneira'
+          : `Uniforme individual - Itens: ${uniformItems.map(item => itemLabels[item] || item).join(', ')}`;
+        
+        notes = notes ? `${notes}\n\n${uniformInfo}` : uniformInfo;
+      }
+
       // Adicionar o ID do usuário autenticado ao payload
       const deliveryPayload: CreateEPIDeliveryDTO = {
         ...deliveryForm,
-        deliveredByUserId: user?.id || undefined
+        deliveredByUserId: user?.id || undefined,
+        notes: notes
       };
       
       await sstService.createEPIDelivery(deliveryPayload);
@@ -691,7 +743,17 @@ const EPIs: React.FC = () => {
                         <>
                           <Select
                             value={deliveryForm.epiId}
-                            onValueChange={(value) => setDeliveryForm({ ...deliveryForm, epiId: value })}
+                            onValueChange={(value) => {
+                              setDeliveryForm({ ...deliveryForm, epiId: value });
+                              // Resetar campos de uniforme quando mudar o EPI
+                              const selectedEPI = epis.find(epi => epi.id.toString() === value);
+                              const isUniform = selectedEPI?.name?.toLowerCase().includes('uniforme de trabalho') || 
+                                               selectedEPI?.name?.toLowerCase().includes('uniforme');
+                              if (!isUniform) {
+                                setUniformType('');
+                                setUniformItems([]);
+                              }
+                            }}
                             disabled={epis.filter(epi => epi.isActive).length === 0}
                           >
                             <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-red h-11 [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:!text-white [&>span:not([data-placeholder])]:!opacity-100">
@@ -817,6 +879,145 @@ const EPIs: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Campos específicos para Uniforme de Trabalho */}
+                  {isUniformeTrabalho && (
+                    <>
+                      <div className="md:col-span-2">
+                        <Label className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                          <Shield className="w-4 h-4" />
+                          Tipo de Entrega do Uniforme *
+                        </Label>
+                        <div className="mt-2">
+                          <Select
+                            value={uniformType}
+                            onValueChange={(value: 'COMPLETO' | 'INDIVIDUAL') => {
+                              setUniformType(value);
+                              if (value === 'COMPLETO') {
+                                setUniformItems([]);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-red h-11">
+                              <SelectValue placeholder="Selecione o tipo de entrega" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-black border-gray-600">
+                              <SelectItem value="COMPLETO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  Primeira entrega com uniforme completo
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="INDIVIDUAL" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                                <div className="flex items-center gap-2">
+                                  <Package className="w-4 h-4 text-blue-400" />
+                                  Entrega individual de peças
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Descrição do uniforme completo */}
+                      {uniformType === 'COMPLETO' && (
+                        <div className="md:col-span-2">
+                          <div className="p-4 bg-seguranca-black/50 border border-seguranca-yellow/30 rounded-lg">
+                            <p className="text-sm font-medium text-seguranca-yellow mb-2">
+                              Itens incluídos no uniforme completo:
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-gray-300">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Calça
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Camisa
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Camisa Social
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Jaqueta
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Cinto
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Sapato
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Sapato Social
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Blaser
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                Perneira
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Seleção de itens individuais */}
+                      {uniformType === 'INDIVIDUAL' && (
+                        <div className="md:col-span-2">
+                          <Label className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                            <Package className="w-4 h-4" />
+                            Itens do Uniforme *
+                          </Label>
+                          <div className="mt-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-seguranca-black/50 border border-gray-600 rounded-lg">
+                              {[
+                                { value: 'CALCA', label: 'Calça' },
+                                { value: 'CAMISA', label: 'Camisa' },
+                                { value: 'CAMISA_SOCIAL', label: 'Camisa Social' },
+                                { value: 'JAQUETA', label: 'Jaqueta' },
+                                { value: 'CINTO', label: 'Cinto' },
+                                { value: 'SAPATO', label: 'Sapato' },
+                                { value: 'SAPATO_SOCIAL', label: 'Sapato Social' },
+                                { value: 'BLASER', label: 'Blaser' },
+                                { value: 'PERNEIRA', label: 'Perneira' }
+                              ].map((item) => (
+                                <label
+                                  key={item.value}
+                                  className="flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-gray-700 transition-colors"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={uniformItems.includes(item.value)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setUniformItems([...uniformItems, item.value]);
+                                      } else {
+                                        setUniformItems(uniformItems.filter(i => i !== item.value));
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded border-gray-600 bg-seguranca-black text-seguranca-red focus:ring-seguranca-red focus:ring-offset-seguranca-black"
+                                  />
+                                  <span className="text-sm text-seguranca-lightgray">{item.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {uniformItems.length === 0 && (
+                              <p className="text-xs text-yellow-400 mt-2">
+                                Selecione pelo menos um item do uniforme
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {/* Observações */}
                   <div className="md:col-span-2">
                     <Label htmlFor="notes" className="text-seguranca-lightgray font-medium flex items-center gap-2">
@@ -874,7 +1075,12 @@ const EPIs: React.FC = () => {
                   <Button
                     onClick={handleCreateDelivery}
                     className="bg-seguranca-red hover:bg-seguranca-darkred text-white shadow-lg"
-                    disabled={!deliveryForm.employeeId || !deliveryForm.epiId || !deliveryForm.deliveryDate}
+                    disabled={
+                      !deliveryForm.employeeId || 
+                      !deliveryForm.epiId || 
+                      !deliveryForm.deliveryDate ||
+                      (isUniformeTrabalho && (!uniformType || (uniformType === 'INDIVIDUAL' && uniformItems.length === 0)))
+                    }
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Registrar Entrega

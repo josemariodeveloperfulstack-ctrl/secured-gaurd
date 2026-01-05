@@ -43,7 +43,10 @@ public class EPIDeliveryFormItem {
     private Integer quantity = 1;
 
     @Column(name = "ca", length = 100)
-    private String ca; // Certificado de Aprovação
+    private String ca; // Número do Certificado de Aprovação
+
+    @Column(name = "ca_name", length = 255)
+    private String caName; // Nome/Descrição do CA
 
     @Column(name = "validity_date")
     private LocalDate validityDate;
@@ -57,6 +60,7 @@ public class EPIDeliveryFormItem {
     @Column(columnDefinition = "TEXT")
     private String observations;
 }
+
 
 
 

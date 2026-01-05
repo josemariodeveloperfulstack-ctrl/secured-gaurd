@@ -9,9 +9,11 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.EPIDeliveryForm;
 import com.z7design.secured_guard.model.EPIDeliveryFormItem;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
+import com.z7design.secured_guard.repository.PersonalProtectiveEquipmentRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class EPIDeliveryFormService {
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
+    private final PersonalProtectiveEquipmentRepository epiRepository;
 
     @Transactional
     public EPIDeliveryFormDTO create(CreateEPIDeliveryFormDTO dto, UUID createdByUserId) {
@@ -69,14 +72,68 @@ public class EPIDeliveryFormService {
                 .createdBy(createdBy)
                 .build();
 
-        // Adicionar itens
+        // Adicionar itens e dar baixa no estoque
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
+                String epiName = itemDto.getEpiName();
+                Integer quantity = itemDto.getQuantity() != null ? itemDto.getQuantity() : 1;
+                
+                // Buscar EPI pelo nome no estoque
+                List<PersonalProtectiveEquipment> epis = epiRepository.findByNameContainingIgnoreCase(epiName);
+                PersonalProtectiveEquipment epi = null;
+                
+                // Tentar encontrar EPI exato primeiro
+                for (PersonalProtectiveEquipment e : epis) {
+                    if (e.getName().equalsIgnoreCase(epiName) && e.getIsActive()) {
+                        epi = e;
+                        break;
+                    }
+                }
+                
+                // Se não encontrou exato, pegar o primeiro ativo
+                if (epi == null && !epis.isEmpty()) {
+                    epi = epis.stream()
+                            .filter(e -> e.getIsActive())
+                            .findFirst()
+                            .orElse(null);
+                }
+                
+                // Se encontrou o EPI no estoque, verificar e dar baixa
+                if (epi != null) {
+                    // Verificar estoque disponível
+                    Integer availableStock = epi.getCurrentStock();
+                    
+                    if (availableStock < quantity) {
+                        throw new IllegalArgumentException(
+                            String.format("Estoque insuficiente para o EPI '%s'. Disponível: %d, Solicitado: %d", 
+                                epiName, availableStock, quantity)
+                        );
+                    }
+                    
+                    // Dar baixa no estoque
+                    Integer newStock = availableStock - quantity;
+                    epi.setCurrentStock(newStock);
+                    epiRepository.save(epi);
+                    
+                    log.info("📦 Baixa no estoque: EPI '{}' - Quantidade: {} - Estoque anterior: {} - Estoque atual: {}", 
+                        epiName, quantity, availableStock, newStock);
+                    
+                    // Verificar se o estoque está baixo e criar alerta se necessário
+                    if (newStock <= epi.getMinimumStock()) {
+                        log.warn("⚠️ Estoque baixo para o EPI '{}': {} unidades (mínimo: {})", 
+                            epiName, newStock, epi.getMinimumStock());
+                    }
+                } else {
+                    log.warn("⚠️ EPI '{}' não encontrado no estoque. Entrega registrada sem baixa no estoque.", epiName);
+                }
+                
+                // Criar item da ficha
                 EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
                         .deliveryForm(form)
-                        .epiName(itemDto.getEpiName())
-                        .quantity(itemDto.getQuantity() != null ? itemDto.getQuantity() : 1)
+                        .epiName(epiName)
+                        .quantity(quantity)
                         .ca(itemDto.getCa())
+                        .caName(itemDto.getCaName())
                         .validityDate(itemDto.getValidityDate())
                         .uniformType(itemDto.getUniformType())
                         .uniformPiece(itemDto.getUniformPiece())
@@ -127,9 +184,50 @@ public class EPIDeliveryFormService {
 
     @Transactional
     public void delete(UUID id) {
-        if (!epiDeliveryFormRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id);
+        EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
+        
+        // Devolver itens ao estoque antes de deletar
+        if (form.getItems() != null && !form.getItems().isEmpty()) {
+            for (EPIDeliveryFormItem item : form.getItems()) {
+                String epiName = item.getEpiName();
+                Integer quantity = item.getQuantity() != null ? item.getQuantity() : 1;
+                
+                // Buscar EPI pelo nome no estoque
+                List<PersonalProtectiveEquipment> epis = epiRepository.findByNameContainingIgnoreCase(epiName);
+                PersonalProtectiveEquipment epi = null;
+                
+                // Tentar encontrar EPI exato primeiro
+                for (PersonalProtectiveEquipment e : epis) {
+                    if (e.getName().equalsIgnoreCase(epiName) && e.getIsActive()) {
+                        epi = e;
+                        break;
+                    }
+                }
+                
+                // Se não encontrou exato, pegar o primeiro ativo
+                if (epi == null && !epis.isEmpty()) {
+                    epi = epis.stream()
+                            .filter(e -> e.getIsActive())
+                            .findFirst()
+                            .orElse(null);
+                }
+                
+                // Se encontrou o EPI, devolver ao estoque
+                if (epi != null) {
+                    Integer currentStock = epi.getCurrentStock();
+                    Integer newStock = currentStock + quantity;
+                    epi.setCurrentStock(newStock);
+                    epiRepository.save(epi);
+                    
+                    log.info("📦 Devolução ao estoque: EPI '{}' - Quantidade: {} - Estoque anterior: {} - Estoque atual: {}", 
+                        epiName, quantity, currentStock, newStock);
+                } else {
+                    log.warn("⚠️ EPI '{}' não encontrado no estoque. Não foi possível devolver ao estoque.", epiName);
+                }
+            }
         }
+        
         epiDeliveryFormRepository.deleteById(id);
         log.info("🗑️ Ficha de entrega de EPI deletada: {}", id);
     }

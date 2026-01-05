@@ -124,43 +124,44 @@ public class EPIDeliveryPdfService {
         Company company = form.getCompany();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document document = new Document(PageSize.A4, 25, 25, 25, 25); // Margens mínimas: esquerda, direita, topo, baixo
+        // Margens reduzidas: esquerda, direita, topo, baixo
+        Document document = new Document(PageSize.A4, 20, 20, 15, 15);
         PdfWriter.getInstance(document, baos);
         
         document.open();
 
-        // Configurar fontes (tamanhos reduzidos para caber em uma página)
-        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.WHITE);
-        Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
-        Font smallFont = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
-        Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.BLACK);
+        // Configurar fontes (tamanhos ainda mais reduzidos para caber em uma página)
+        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.WHITE);
+        Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
+        Font smallFont = FontFactory.getFont(FontFactory.HELVETICA, 6, Color.BLACK);
+        Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.BLACK);
 
-        // Título principal em caixa preta
+        // Título principal em caixa preta (mais compacto)
         PdfPTable titleTable = new PdfPTable(1);
         titleTable.setWidthPercentage(100);
         PdfPCell titleCell = new PdfPCell(new Phrase("CONTROLE DE EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)", titleFont));
         titleCell.setBackgroundColor(Color.BLACK);
-        titleCell.setPadding(6);
+        titleCell.setPadding(4);
         titleCell.setBorder(Rectangle.NO_BORDER);
         titleCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         titleTable.addCell(titleCell);
-        titleTable.setSpacingAfter(8);
+        titleTable.setSpacingAfter(4);
         document.add(titleTable);
 
-        // Dados da Empresa
+        // Dados da Empresa (mais compacto)
         Paragraph companyName = new Paragraph(company.getName() != null ? company.getName().toUpperCase() : "", boldFont);
-        companyName.setSpacingAfter(2);
+        companyName.setSpacingAfter(1);
         document.add(companyName);
         
         Paragraph companyCnpj = new Paragraph("CNPJ: " + (company.getCnpj() != null ? company.getCnpj() : ""), normalFont);
-        companyCnpj.setSpacingAfter(6);
+        companyCnpj.setSpacingAfter(3);
         document.add(companyCnpj);
 
-        // Dados do Funcionário (em tabela compacta)
+        // Dados do Funcionário (em tabela mais compacta)
         PdfPTable employeeInfoTable = new PdfPTable(2);
         employeeInfoTable.setWidthPercentage(100);
         employeeInfoTable.setWidths(new float[]{50f, 50f});
-        employeeInfoTable.setSpacingAfter(6);
+        employeeInfoTable.setSpacingAfter(3);
         
         String funcao = employee.getPosition() != null ? employee.getPosition().getName() : "";
         String cpf = employee.getDocument() != null ? employee.getDocument() : "";
@@ -177,43 +178,43 @@ public class EPIDeliveryPdfService {
         
         PdfPCell cell1 = new PdfPCell(new Phrase("NOME: " + (employee.getName() != null ? employee.getName().toUpperCase() : ""), normalFont));
         cell1.setBorder(Rectangle.NO_BORDER);
-        cell1.setPadding(2);
+        cell1.setPadding(1);
         employeeInfoTable.addCell(cell1);
         
         PdfPCell cell2 = new PdfPCell(new Phrase("FUNÇÃO: " + funcao.toUpperCase(), normalFont));
         cell2.setBorder(Rectangle.NO_BORDER);
-        cell2.setPadding(2);
+        cell2.setPadding(1);
         employeeInfoTable.addCell(cell2);
         
         PdfPCell cell3 = new PdfPCell(new Phrase("CPF: " + cpf, normalFont));
         cell3.setBorder(Rectangle.NO_BORDER);
-        cell3.setPadding(2);
+        cell3.setPadding(1);
         employeeInfoTable.addCell(cell3);
         
         PdfPCell cell4 = new PdfPCell(new Phrase("RG: " + rg, normalFont));
         cell4.setBorder(Rectangle.NO_BORDER);
-        cell4.setPadding(2);
+        cell4.setPadding(1);
         employeeInfoTable.addCell(cell4);
         
         PdfPCell cell5 = new PdfPCell(new Phrase("ADMISSÃO: " + formatDate(employee.getHireDate()), normalFont));
         cell5.setBorder(Rectangle.NO_BORDER);
-        cell5.setPadding(2);
+        cell5.setPadding(1);
         employeeInfoTable.addCell(cell5);
         
         PdfPCell cell6 = new PdfPCell(new Phrase("DEMISSÃO: " + (terminationDateStr.isEmpty() ? "" : terminationDateStr), normalFont));
         cell6.setBorder(Rectangle.NO_BORDER);
-        cell6.setPadding(2);
+        cell6.setPadding(1);
         employeeInfoTable.addCell(cell6);
         
         document.add(employeeInfoTable);
 
-        // Título do Recibo
+        // Título do Recibo (mais compacto)
         Paragraph receiptTitle = new Paragraph("RECIBO DE EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL (EPI)", boldFont);
         receiptTitle.setAlignment(Element.ALIGN_CENTER);
-        receiptTitle.setSpacingAfter(5);
+        receiptTitle.setSpacingAfter(3);
         document.add(receiptTitle);
 
-        // Texto de declaração (compacto)
+        // Texto de declaração (mais compacto)
         String companyNameForText = company.getName() != null ? company.getName() : "a Empresa";
         String declarationText = "Recebi da " + companyNameForText + ", Os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. " +
                 "Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. " +
@@ -221,70 +222,70 @@ public class EPIDeliveryPdfService {
         
         Paragraph declaration = new Paragraph(declarationText, smallFont);
         declaration.setAlignment(Element.ALIGN_JUSTIFIED);
-        declaration.setSpacingAfter(6);
+        declaration.setSpacingAfter(3);
         document.add(declaration);
 
-        // Campos de data e assinatura (compacto)
+        // Campos de data e assinatura (mais compacto)
         PdfPTable signatureTable = new PdfPTable(2);
         signatureTable.setWidthPercentage(100);
         signatureTable.setWidths(new float[]{50f, 50f});
         
         PdfPCell dateCell = new PdfPCell(new Phrase("Contagem: ____/____/____", smallFont));
         dateCell.setBorder(Rectangle.NO_BORDER);
-        dateCell.setPadding(3);
+        dateCell.setPadding(2);
         signatureTable.addCell(dateCell);
         
         PdfPCell signatureCell = new PdfPCell(new Phrase("Assinatura: ________________________", smallFont));
         signatureCell.setBorder(Rectangle.NO_BORDER);
-        signatureCell.setPadding(3);
+        signatureCell.setPadding(2);
         signatureTable.addCell(signatureCell);
-        signatureTable.setSpacingAfter(5);
+        signatureTable.setSpacingAfter(3);
         document.add(signatureTable);
 
-        // Tabela de EPIs
-        PdfPTable epiTable = new PdfPTable(8);
+        // Tabela de EPIs (ajustada para caber em uma página)
+        PdfPTable epiTable = new PdfPTable(7);
         epiTable.setWidthPercentage(100);
-        epiTable.setWidths(new float[]{25f, 8f, 12f, 10f, 12f, 12f, 10f, 11f});
+        // Colunas: ITEM, DESCRIÇÃO DO EPI, CA, QUANTIDADE, DATA DE ENTREGA, DATA DE DEVOLUÇÃO, AS
+        epiTable.setWidths(new float[]{6f, 35f, 15f, 10f, 12f, 12f, 10f});
         // Não permitir quebra de página na tabela - tudo deve caber em uma página
         epiTable.setSplitLate(false);
         epiTable.setSplitRows(false);
+        epiTable.setSpacingBefore(2);
         
-        // Cabeçalho da tabela
-        addTableHeader(epiTable, "EQUIPAMENTO", smallFont);
-        addTableHeader(epiTable, "Nº", smallFont);
+        // Cabeçalho da tabela (ajustado para 7 colunas conforme imagem)
+        addTableHeader(epiTable, "ITEM", smallFont);
+        addTableHeader(epiTable, "DESCRIÇÃO DO EPI", smallFont);
         addTableHeader(epiTable, "CA", smallFont);
         addTableHeader(epiTable, "QUANTIDADE", smallFont);
-        addTableHeader(epiTable, "ENTREGA", smallFont);
-        addTableHeader(epiTable, "SUBSTITUIDO", smallFont);
-        addTableHeader(epiTable, "MOTIVO DA SUBST.", smallFont);
-        addTableHeader(epiTable, "ASSINATURA", smallFont);
+        addTableHeader(epiTable, "DATA DE ENTREGA", smallFont);
+        addTableHeader(epiTable, "DATA DE DEVOLUÇÃO", smallFont);
+        addTableHeader(epiTable, "AS", smallFont);
 
         // Adicionar itens de EPI
         if (form.getItems() != null && !form.getItems().isEmpty()) {
             int itemNumber = 1;
             for (EPIDeliveryFormItem item : form.getItems()) {
-                epiTable.addCell(createEquipmentCell(item.getEpiName() != null ? item.getEpiName() : "", smallFont));
-                epiTable.addCell(createTableCell(String.valueOf(itemNumber++), smallFont));
-                epiTable.addCell(createTableCell(item.getCa() != null ? item.getCa() : "", smallFont));
-                epiTable.addCell(createTableCell(item.getQuantity() != null ? item.getQuantity().toString() : "1", smallFont));
-                epiTable.addCell(createTableCell(formatDate(form.getDeliveryDate()), smallFont));
-                epiTable.addCell(createTableCell("", smallFont)); // SUBSTITUIDO
-                epiTable.addCell(createTableCell("", smallFont)); // MOTIVO DA SUBST.
-                epiTable.addCell(createTableCell("", smallFont)); // ASSINATURA
+                epiTable.addCell(createTableCell(String.valueOf(itemNumber++), smallFont)); // ITEM
+                epiTable.addCell(createEquipmentCell(item.getEpiName() != null ? item.getEpiName() : "", smallFont)); // DESCRIÇÃO DO EPI
+                epiTable.addCell(createTableCell(item.getCa() != null ? item.getCa() : "", smallFont)); // CA
+                epiTable.addCell(createTableCell(item.getQuantity() != null ? item.getQuantity().toString() : "1", smallFont)); // QUANTIDADE
+                epiTable.addCell(createTableCell(formatDate(form.getDeliveryDate()), smallFont)); // DATA DE ENTREGA
+                epiTable.addCell(createTableCell("", smallFont)); // DATA DE DEVOLUÇÃO
+                epiTable.addCell(createTableCell("", smallFont)); // AS (Assinatura)
             }
         }
         
-        // Adicionar linhas vazias para preenchimento manual (reduzido para caber em uma página)
-        int emptyRows = 20 - (form.getItems() != null ? form.getItems().size() : 0);
-        for (int i = 0; i < emptyRows && i < 20; i++) {
-            epiTable.addCell(createEquipmentCell("", smallFont)); // Coluna EQUIPAMENTO com altura maior
-            epiTable.addCell(createTableCell("", smallFont));
-            epiTable.addCell(createTableCell("", smallFont));
-            epiTable.addCell(createTableCell("", smallFont));
-            epiTable.addCell(createTableCell("", smallFont));
-            epiTable.addCell(createTableCell("", smallFont));
-            epiTable.addCell(createTableCell("", smallFont));
-            epiTable.addCell(createTableCell("", smallFont));
+        // Adicionar linhas vazias para preenchimento manual (reduzido para caber em uma página - máximo 10 linhas)
+        int itemsCount = form.getItems() != null ? form.getItems().size() : 0;
+        int emptyRows = Math.max(0, Math.min(10 - itemsCount, 10)); // Máximo 10 linhas totais
+        for (int i = 0; i < emptyRows; i++) {
+            epiTable.addCell(createTableCell("", smallFont)); // ITEM
+            epiTable.addCell(createEquipmentCell("", smallFont)); // DESCRIÇÃO DO EPI
+            epiTable.addCell(createTableCell("", smallFont)); // CA
+            epiTable.addCell(createTableCell("", smallFont)); // QUANTIDADE
+            epiTable.addCell(createTableCell("", smallFont)); // DATA DE ENTREGA
+            epiTable.addCell(createTableCell("", smallFont)); // DATA DE DEVOLUÇÃO
+            epiTable.addCell(createTableCell("", smallFont)); // AS
         }
 
         document.add(epiTable);
@@ -297,21 +298,23 @@ public class EPIDeliveryPdfService {
     
     private PdfPCell createTableCell(String text, Font font) {
         PdfPCell cell = new PdfPCell(new Phrase(text != null ? text : "", font));
-        cell.setPadding(3);
+        cell.setPadding(2);
         cell.setBorder(Rectangle.BOX);
-        cell.setVerticalAlignment(Element.ALIGN_TOP);
-        // Altura mínima reduzida mas suficiente para escrita manual
-        cell.setMinimumHeight(18f);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        // Altura mínima reduzida para caber em uma página
+        cell.setMinimumHeight(12f);
         return cell;
     }
     
     private PdfPCell createEquipmentCell(String text, Font font) {
         PdfPCell cell = new PdfPCell(new Phrase(text != null ? text : "", font));
-        cell.setPadding(3);
+        cell.setPadding(2);
         cell.setBorder(Rectangle.BOX);
-        cell.setVerticalAlignment(Element.ALIGN_TOP);
-        // Altura maior para a coluna de equipamento mas ainda compacta
-        cell.setMinimumHeight(20f);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setHorizontalAlignment(Element.ALIGN_LEFT);
+        // Altura reduzida mas ainda suficiente
+        cell.setMinimumHeight(12f);
         return cell;
     }
 
@@ -331,12 +334,12 @@ public class EPIDeliveryPdfService {
     private void addTableHeader(PdfPTable table, String text, Font font) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setBackgroundColor(new Color(200, 200, 200));
-        cell.setPadding(4);
+        cell.setPadding(3);
         cell.setBorder(Rectangle.BOX);
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        // Altura mínima reduzida para cabeçalho
-        cell.setMinimumHeight(15f);
+        // Altura mínima ainda mais reduzida para cabeçalho
+        cell.setMinimumHeight(12f);
         table.addCell(cell);
     }
 
