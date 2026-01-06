@@ -31,6 +31,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { sstService, SSTDashboardSummary, SSTAlert } from '@/services/sstService';
 import { useToast } from '@/hooks/use-toast';
+import RiskMatrixByPosition from '@/components/sst/RiskMatrixByPosition';
+import CorrectiveActions from '@/components/sst/CorrectiveActions';
 
 const SST: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -603,26 +605,12 @@ const SST: React.FC = () => {
 
           {/* Riscos */}
           <TabsContent value="risks" className="space-y-6">
-            <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
-                <CardTitle className="text-seguranca-lightgray">Matriz de Riscos por Cargo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400">Em desenvolvimento - Matriz de riscos ocupacionais por cargo e setor</p>
-              </CardContent>
-            </Card>
+            <RiskMatrixByPosition />
           </TabsContent>
 
           {/* Ações */}
           <TabsContent value="actions" className="space-y-6">
-            <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
-                <CardTitle className="text-seguranca-lightgray">Ações Corretivas Pendentes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400">Em desenvolvimento - Ações corretivas e planos de ação</p>
-              </CardContent>
-            </Card>
+            <CorrectiveActions />
           </TabsContent>
         </Tabs>
       </div>

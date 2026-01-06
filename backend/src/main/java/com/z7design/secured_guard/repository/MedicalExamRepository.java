@@ -89,4 +89,10 @@ public interface MedicalExamRepository extends JpaRepository<MedicalExam, UUID> 
      */
     // @Query("SELECT COUNT(me) FROM MedicalExam me WHERE me.employee.id = :employeeId AND me.status = :status")
     // Long countByEmployeeAndStatus(@Param("employeeId") UUID employeeId, @Param("status") MedicalExamStatus status);
+
+    /**
+     * Busca nomes únicos de clínicas
+     */
+    @Query("SELECT DISTINCT me.clinicName FROM MedicalExam me WHERE me.clinicName IS NOT NULL AND me.clinicName != '' ORDER BY me.clinicName")
+    List<String> findDistinctClinicNames();
 }

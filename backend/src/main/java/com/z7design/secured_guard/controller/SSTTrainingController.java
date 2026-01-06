@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.SSTTrainingDTO;
+import com.z7design.secured_guard.dto.CreateSSTTrainingDTO;
 import com.z7design.secured_guard.model.SSTTraining;
 import com.z7design.secured_guard.model.TrainingParticipation;
 import com.z7design.secured_guard.service.SSTTrainingService;
@@ -35,11 +37,30 @@ public class SSTTrainingController {
         return ResponseEntity.ok(trainings);
     }
 
+    @GetMapping("/with-stats")
+    @Operation(summary = "Listar treinamentos com estatísticas", description = "Retorna todos os treinamentos com informações agregadas (participantes, certificados vencendo, etc.)")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<SSTTrainingDTO>> getAllTrainingsWithStats() {
+        List<SSTTrainingDTO> trainings = trainingService.getAllTrainingsWithStats();
+        return ResponseEntity.ok(trainings);
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Buscar treinamento por ID", description = "Retorna um treinamento específico")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<SSTTraining> getTrainingById(@PathVariable UUID id) {
         SSTTraining training = trainingService.getTrainingById(id);
+        if (training == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(training);
+    }
+
+    @GetMapping("/{id}/with-stats")
+    @Operation(summary = "Buscar treinamento por ID com estatísticas", description = "Retorna um treinamento específico com informações agregadas")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<SSTTrainingDTO> getTrainingWithStatsById(@PathVariable UUID id) {
+        SSTTrainingDTO training = trainingService.getTrainingWithStatsById(id);
         if (training == null) {
             return ResponseEntity.notFound().build();
         }
@@ -62,6 +83,14 @@ public class SSTTrainingController {
         return ResponseEntity.ok(created);
     }
 
+    @PostMapping("/create")
+    @Operation(summary = "Criar treinamento a partir de DTO", description = "Cria um novo treinamento a partir de DTO")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<SSTTraining> createTrainingFromDTO(@RequestBody CreateSSTTrainingDTO dto) {
+        SSTTraining created = trainingService.createTrainingFromDTO(dto);
+        return ResponseEntity.ok(created);
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar treinamento", description = "Atualiza um treinamento existente")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
@@ -70,6 +99,29 @@ public class SSTTrainingController {
         if (updated == null) {
             return ResponseEntity.notFound().build();
         }
+        return ResponseEntity.ok(updated);
+    }
+
+    @PutMapping("/{id}/update")
+    @Operation(summary = "Atualizar treinamento a partir de DTO", description = "Atualiza um treinamento existente a partir de DTO")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<SSTTraining> updateTrainingFromDTO(@PathVariable UUID id, @RequestBody CreateSSTTrainingDTO dto) {
+        SSTTraining existing = trainingService.getTrainingById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        existing.setName(dto.getName());
+        existing.setDescription(dto.getDescription());
+        existing.setTrainingType(dto.getTrainingType());
+        existing.setDurationHours(dto.getDurationHours());
+        existing.setValidityMonths(dto.getValidityMonths());
+        existing.setIsMandatory(dto.getIsMandatory() != null ? dto.getIsMandatory() : true);
+        existing.setProvider(dto.getProvider());
+        existing.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);
+        existing.setRequiredForRisks(dto.getRequiredForRisks());
+        
+        SSTTraining updated = trainingService.updateTraining(id, existing);
         return ResponseEntity.ok(updated);
     }
 

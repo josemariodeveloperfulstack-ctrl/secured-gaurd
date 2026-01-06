@@ -265,4 +265,88 @@ public class ReportController {
             return ResponseEntity.notFound().build();
         }
     }
+    
+    @GetMapping("/companies/pdf")
+    @Operation(summary = "Relatório de Empresas em PDF", 
+               description = "Gera relatório PDF com todas as empresas cadastradas")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<byte[]> generateCompaniesReportPdf() {
+        try {
+            log.info("Gerando relatório de empresas em PDF");
+            byte[] pdf = reportService.generateCompanyReportPdf(Map.of());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-empresas.pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de empresas em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    @GetMapping("/products/pdf")
+    @Operation(summary = "Relatório de Produtos em PDF", 
+               description = "Gera relatório PDF com todos os produtos cadastrados")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<byte[]> generateProductsReportPdf() {
+        try {
+            log.info("Gerando relatório de produtos em PDF");
+            byte[] pdf = reportService.generateProductReportPdf(Map.of());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-produtos.pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de produtos em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    @GetMapping("/inventory/pdf")
+    @Operation(summary = "Relatório de Estoque em PDF", 
+               description = "Gera relatório PDF com a situação atual do estoque")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<byte[]> generateInventoryReportPdf() {
+        try {
+            log.info("Gerando relatório de estoque em PDF");
+            byte[] pdf = reportService.generateInventoryReportPdf(Map.of());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-estoque.pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de estoque em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    @GetMapping("/consolidated/pdf")
+    @Operation(summary = "Relatório Consolidado em PDF", 
+               description = "Gera relatório PDF consolidado com dados de funcionários, empresas, produtos, estoque e transações financeiras")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<byte[]> generateConsolidatedReportPdf() {
+        try {
+            log.info("Gerando relatório consolidado em PDF");
+            byte[] pdf = reportService.generateConsolidatedReportPdf(Map.of());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-consolidado.pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório consolidado em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

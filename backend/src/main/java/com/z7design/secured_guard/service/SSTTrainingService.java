@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.SSTTrainingDTO;
+import com.z7design.secured_guard.dto.CreateSSTTrainingDTO;
 import com.z7design.secured_guard.model.SSTTraining;
 import com.z7design.secured_guard.model.TrainingParticipation;
 import com.z7design.secured_guard.model.enums.TrainingStatus;
@@ -12,8 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Serviço para gerenciamento de treinamentos SST
@@ -35,6 +39,25 @@ public class SSTTrainingService {
      */
     public SSTTraining createTraining(SSTTraining training) {
         log.info("Criando treinamento: {}", training.getName());
+        return trainingRepository.save(training);
+    }
+
+    /**
+     * Cria um novo treinamento a partir de DTO
+     */
+    public SSTTraining createTrainingFromDTO(CreateSSTTrainingDTO dto) {
+        log.info("Criando treinamento a partir de DTO: {}", dto.getName());
+        SSTTraining training = SSTTraining.builder()
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .trainingType(dto.getTrainingType())
+                .durationHours(dto.getDurationHours())
+                .validityMonths(dto.getValidityMonths())
+                .isMandatory(dto.getIsMandatory() != null ? dto.getIsMandatory() : true)
+                .provider(dto.getProvider())
+                .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
+                .requiredForRisks(dto.getRequiredForRisks())
+                .build();
         return trainingRepository.save(training);
     }
 
@@ -250,5 +273,83 @@ public class SSTTrainingService {
                     return saved;
                 })
                 .orElse(null);
+    }
+
+    // ========== DTOs AGREGADOS ==========
+
+    /**
+     * Busca todos os treinamentos com informações agregadas
+     */
+    @Transactional(readOnly = true)
+    public List<SSTTrainingDTO> getAllTrainingsWithStats() {
+        List<SSTTraining> trainings = trainingRepository.findAll();
+        return trainings.stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Busca treinamento por ID com informações agregadas
+     */
+    @Transactional(readOnly = true)
+    public SSTTrainingDTO getTrainingWithStatsById(UUID id) {
+        SSTTraining training = trainingRepository.findById(id).orElse(null);
+        if (training == null) {
+            return null;
+        }
+        return toDTO(training);
+    }
+
+    /**
+     * Converte entidade para DTO com estatísticas agregadas
+     */
+    private SSTTrainingDTO toDTO(SSTTraining training) {
+        List<TrainingParticipation> participations = participationRepository.findByTraining(training);
+        
+        long totalParticipants = participations.size();
+        long scheduledParticipants = participations.stream()
+                .filter(p -> p.getStatus() == TrainingStatus.AGENDADO || p.getStatus() == TrainingStatus.EM_ANDAMENTO)
+                .count();
+        long completedParticipants = participations.stream()
+                .filter(p -> p.getStatus() == TrainingStatus.CONCLUIDO)
+                .count();
+        
+        // Contar certificados próximos do vencimento (30 dias)
+        LocalDate checkDate = LocalDate.now().plusDays(30);
+        long certificatesExpiring = participations.stream()
+                .filter(p -> {
+                    if (p.getCompletionDate() == null || training.getValidityMonths() == null) {
+                        return false;
+                    }
+                    LocalDate expirationDate = p.getCompletionDate().plusMonths(training.getValidityMonths());
+                    return !expirationDate.isBefore(LocalDate.now()) && !expirationDate.isAfter(checkDate);
+                })
+                .count();
+        
+        // Próxima data agendada
+        LocalDateTime nextScheduledDate = participations.stream()
+                .filter(p -> p.getStatus() == TrainingStatus.AGENDADO && p.getParticipationDate() != null)
+                .map(p -> p.getParticipationDate().atStartOfDay())
+                .min(LocalDateTime::compareTo)
+                .orElse(null);
+        
+        return SSTTrainingDTO.builder()
+                .id(training.getId())
+                .name(training.getName())
+                .description(training.getDescription())
+                .trainingType(training.getTrainingType())
+                .durationHours(training.getDurationHours())
+                .validityMonths(training.getValidityMonths())
+                .isMandatory(training.getIsMandatory())
+                .provider(training.getProvider())
+                .isActive(training.getIsActive())
+                .createdAt(training.getCreatedAt())
+                .updatedAt(training.getUpdatedAt())
+                .totalParticipants(totalParticipants)
+                .scheduledParticipants(scheduledParticipants)
+                .completedParticipants(completedParticipants)
+                .certificatesExpiring(certificatesExpiring)
+                .nextScheduledDate(nextScheduledDate)
+                .build();
     }
 }

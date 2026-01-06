@@ -3,11 +3,13 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.model.SSTAlert;
 import com.z7design.secured_guard.model.enums.SSTAlertType;
 import com.z7design.secured_guard.service.SSTAlertService;
+import com.z7design.secured_guard.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class SSTController {
 
     private final SSTAlertService alertService;
+    private final AuthenticationService authenticationService;
 
     // ========== ALERTAS SST ==========
 
@@ -78,7 +81,9 @@ public class SSTController {
     @PostMapping("/alerts/{alertId}/resolve")
     @Operation(summary = "Marcar alerta como resolvido", description = "Marca um alerta como resolvido")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<Void> markAlertAsResolved(@PathVariable UUID alertId, @RequestParam UUID resolvedByUserId) {
+    public ResponseEntity<Void> markAlertAsResolved(@PathVariable UUID alertId, Authentication authentication) {
+        // Obter o usuário atual do contexto de autenticação
+        UUID resolvedByUserId = authenticationService.getCurrentUser(authentication).getId();
         alertService.markAsResolved(alertId, resolvedByUserId);
         return ResponseEntity.ok().build();
     }

@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -181,5 +180,13 @@ public class SSTMedicalExamController {
     public ResponseEntity<MedicalExam> scheduleDismissalExam(@PathVariable UUID employeeId) {
         MedicalExam exam = medicalExamService.scheduleDismissalExam(employeeId);
         return ResponseEntity.ok(exam);
+    }
+
+    @GetMapping("/clinics")
+    @Operation(summary = "Listar clínicas únicas", description = "Retorna lista de nomes únicos de clínicas dos exames médicos")
+    @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<String>> getDistinctClinicNames() {
+        List<String> clinics = medicalExamService.getDistinctClinicNames();
+        return ResponseEntity.ok(clinics);
     }
 }
