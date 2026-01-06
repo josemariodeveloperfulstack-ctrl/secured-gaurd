@@ -29,6 +29,49 @@ import Contato from '@/pages/Contato';
 import CookieConsent from '@/components/CookieConsent';
 import UnificadosPorSetor from '@/pages/UnificadosPorSetor';
 
+// Helper function para lazy loading com retry
+const lazyWithRetry = (componentImport: () => Promise<any>, componentName: string) => {
+  return lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error(`Erro ao carregar ${componentName}:`, error);
+      // Tenta recarregar a página após 2 segundos se for erro 404
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.warn(`Tentando recarregar página para ${componentName}...`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+        return {
+          default: () => (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <p className="text-lg mb-2">Erro ao carregar {componentName}</p>
+                <p className="text-sm text-gray-500">Recarregando a página...</p>
+              </div>
+            </div>
+          )
+        };
+      }
+      return {
+        default: () => (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <p className="text-lg mb-2">Erro ao carregar {componentName}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Recarregar Página
+              </button>
+            </div>
+          </div>
+        )
+      };
+    }
+  });
+};
+
 // Sistema Administrativo - Lazy loading para páginas administrativas
 const Login = lazy(() => import('@/pages/Login').catch(() => ({ default: () => <div>Erro ao carregar Login</div> })));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword').catch(() => ({ default: () => <div>Erro ao carregar Recuperação de Senha</div> })));
@@ -40,7 +83,7 @@ const DashboardVigilante = lazy(() => import('@/pages/DashboardVigilante'));
 const Funcionarios = lazy(() => import('@/pages/Funcionarios'));
 const Usuarios = lazy(() => import('@/pages/Usuarios'));
 const Roles = lazy(() => import('@/pages/Roles'));
-const Clientes = lazy(() => import('@/pages/Clientes'));
+const Clientes = lazyWithRetry(() => import('@/pages/Clientes'), 'Clientes');
 const Fornecedores = lazy(() => import('@/pages/Fornecedores'));
 const Contratos = lazy(() => import('@/pages/Contratos'));
 const Financeiro = lazy(() => import('@/pages/Financeiro').catch(() => ({ default: () => <div>Erro ao carregar Financeiro</div> })));

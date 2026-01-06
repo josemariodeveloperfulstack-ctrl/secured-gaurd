@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogPortal, DialogOverlay } from '@/components/ui/dialog';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
@@ -280,7 +281,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                   <Label className="text-gray-300 text-sm sm:text-base">Estado</Label>
                   <Input 
                     value={form.state || ''} 
-                    onChange={e => update('state', e.target.value)} 
+                    onChange={e => update('state', e.target.value.toUpperCase())} 
                     className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
                     placeholder="SP"
                     maxLength={2}
@@ -305,7 +306,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
               <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red flex-shrink-0" />
               <span className="truncate">Informações Adicionais</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-3 sm:space-y-4">
               <div className="space-y-2">
                 <Label className="text-gray-300 text-sm sm:text-base">Categoria</Label>
                 <Input 
@@ -320,10 +321,10 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                   <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
                   Observações
                 </Label>
-                <Input 
+                <Textarea 
                   value={form.notes || ''} 
                   onChange={e => update('notes', e.target.value)} 
-                  className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                  className="min-h-[80px] bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 resize-y text-sm sm:text-base"
                   placeholder="Observações adicionais"
                 />
               </div>

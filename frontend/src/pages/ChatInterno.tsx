@@ -326,14 +326,44 @@ const ChatInterno: React.FC = () => {
         };
       }) : [];
 
-      setConversations(Array.isArray(conversationsData) ? conversationsData : []);
+      // Normalizar conversas: garantir que tenham nome e estrutura correta
+      const normalizedConversations = Array.isArray(conversationsData) ? conversationsData.map((conv: any) => {
+        // Garantir que a conversa tenha um nome adequado
+        let conversationName = conv.name || 'Conversa sem nome';
+        
+        // Se for conversa individual e não tiver nome, tentar pegar do recipient ou sender
+        if (conversationName === 'Conversa sem nome' && conv.type === 'individual') {
+          if (conv.recipient?.name) {
+            conversationName = conv.recipient.name;
+          } else if (conv.sender?.name) {
+            conversationName = conv.sender.name;
+          } else if (conv.participants && conv.participants.length > 0) {
+            const otherParticipant = conv.participants.find((p: any) => p.id !== currentUser?.id);
+            if (otherParticipant?.name) {
+              conversationName = otherParticipant.name;
+            }
+          }
+        }
+        
+        return {
+          ...conv,
+          name: conversationName,
+          // Garantir que campos obrigatórios existam
+          id: conv.id || conv.conversationId,
+          type: conv.type || 'individual',
+          unreadCount: conv.unreadCount || 0,
+          isOnline: conv.isOnline || false
+        };
+      }).filter((conv: any) => conv && conv.id) : [];
+
+      // Usar setConversations que já faz deduplicação
+      setConversations(normalizedConversations);
       setAvailableUsers(usersWithOnlineStatus);
       
       console.log('✅ [CHAT] Dados iniciais carregados:', {
-        conversations: Array.isArray(conversationsData) ? conversationsData.length : 0,
+        conversations: normalizedConversations.length,
         users: usersWithOnlineStatus.length,
-        conversationsData: conversationsData,
-        usersData: usersWithOnlineStatus
+        normalizedConversations: normalizedConversations
       });
     } catch (error) {
       console.error('❌ [CHAT] Erro ao carregar dados iniciais:', error);

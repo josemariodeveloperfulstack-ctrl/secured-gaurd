@@ -35,25 +35,42 @@ api.interceptors.request.use(
     // Tentar múltiplas chaves possíveis para o token
     const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
     let token = localStorage.getItem(tokenKey);
+    let tokenSource = tokenKey;
     
-    // Se não encontrou, tentar outras chaves comuns
-    if (!token) {
+    // Se não encontrou ou está vazio, tentar outras chaves comuns
+    if (!token || token.trim() === '') {
       token = localStorage.getItem('token');
+      if (token && token.trim() !== '') {
+        tokenSource = 'token';
+      }
     }
-    if (!token) {
+    if (!token || token.trim() === '') {
       token = localStorage.getItem('authToken');
+      if (token && token.trim() !== '') {
+        tokenSource = 'authToken';
+      }
     }
     
-    if (token) {
+    // Verificar se o token não é 'fake-token' ou inválido
+    if (token && token.trim() !== '' && token !== 'fake-token') {
       config.headers.Authorization = `Bearer ${token}`;
       if (isDebugMode()) {
         console.log('🔗 Token adicionado ao header:', token.substring(0, 50) + '...');
+        console.log('🔗 Token encontrado em:', tokenSource);
       }
     } else {
       if (isDebugMode()) {
-        console.log('🔗 Nenhum token encontrado no localStorage');
+        console.log('🔗 Nenhum token válido encontrado no localStorage');
         console.log('🔗 Chaves disponíveis:', Object.keys(localStorage));
         console.log('🔗 Tentando buscar token em:', tokenKey);
+        // Debug: mostrar valores de todas as chaves possíveis
+        const allKeys = ['token', 'authToken', tokenKey];
+        allKeys.forEach(key => {
+          const value = localStorage.getItem(key);
+          if (value) {
+            console.log(`🔍 Chave "${key}":`, value.substring(0, 30) + '...', '(válido:', value !== 'fake-token' && value.trim() !== '', ')');
+          }
+        });
       }
     }
     
@@ -90,8 +107,21 @@ api.interceptors.response.use(
     }
     const originalRequest = error.config;
 
-    // Se o erro for 401 (não autorizado - token inválido/expirado)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Se o erro for 401 ou 403 (não autorizado - token inválido/expirado ou sem permissão)
+    // 403 também pode indicar token inválido em alguns casos
+    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+      // Verificar se o problema é falta de token
+      const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
+      const token = localStorage.getItem(tokenKey) || localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      if (!token || token.trim() === '' || token === 'fake-token') {
+        console.error('❌ Token inválido ou não encontrado. Redirecionando para login...');
+        localStorage.removeItem(import.meta.env.VITE_TOKEN_KEY || 'token');
+        localStorage.removeItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
+        localStorage.removeItem(import.meta.env.VITE_USER_KEY || 'user');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
       originalRequest._retry = true;
 
       try {

@@ -146,9 +146,37 @@ export const useMessageStore = create<MessageState>()(
             isConnected: false,
 
             // Actions
-            setConversations: (conversations) => set({ 
-                conversations: Array.isArray(conversations) ? conversations : [] 
-            }),
+            setConversations: (conversations) => {
+                const validConversations = Array.isArray(conversations) ? conversations : [];
+                // Deduplicar conversas por ID e tipo
+                const uniqueConversations = validConversations.reduce((acc, conv) => {
+                    if (!conv || !conv.id) return acc;
+                    const key = `${conv.type}-${conv.id}`;
+                    const existing = acc.find(c => `${c.type}-${c.id}` === key);
+                    if (!existing) {
+                        acc.push(conv);
+                    } else {
+                        // Manter a conversa com mais informações (nome, última mensagem, etc)
+                        const betterConv = conv.name && conv.name !== 'Conversa sem nome' 
+                            ? conv 
+                            : existing.name && existing.name !== 'Conversa sem nome'
+                                ? existing
+                                : conv.lastMessage?.createdAt && existing.lastMessage?.createdAt
+                                    ? (new Date(conv.lastMessage.createdAt) > new Date(existing.lastMessage.createdAt) ? conv : existing)
+                                    : conv;
+                        const index = acc.indexOf(existing);
+                        acc[index] = betterConv;
+                    }
+                    return acc;
+                }, [] as Conversation[]);
+                // Ordenar por última mensagem (mais recente primeiro)
+                uniqueConversations.sort((a, b) => {
+                    const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+                    const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+                    return bTime - aTime;
+                });
+                set({ conversations: uniqueConversations });
+            },
 
             setSelectedConversation: (conversation) => {
                 set({ selectedConversation: conversation });
@@ -196,20 +224,14 @@ export const useMessageStore = create<MessageState>()(
                     ? [...state.chatMessages, message]
                     : [message];
                 
-                // Verificar se a conversa já existe
+                // Verificar se a conversa já existe (usando chave única: type-id)
                 const currentConversationId = state.selectedConversation?.id;
                 const conversations = Array.isArray(state.conversations) ? state.conversations : [];
-                const existingConversationIndex = conversations.findIndex(conv => {
-                    if (conversationType === 'individual') {
-                        return conv.type === 'individual' && 
-                               (conv.id === message.recipient?.id || conv.id === message.sender?.id);
-                    } else if (conversationType === 'group') {
-                        return conv.type === 'group' && conv.id === message.group?.id;
-                    } else if (conversationType === 'department') {
-                        return conv.type === 'department' && conv.id === message.department?.id;
-                    }
-                    return false;
-                });
+                const conversationKey = conversationId ? `${conversationType}-${conversationId}` : null;
+                const existingConversationIndex = conversationKey ? conversations.findIndex(conv => {
+                    const convKey = `${conv.type}-${conv.id}`;
+                    return convKey === conversationKey;
+                }) : -1;
                 
                 let updatedConversations: Conversation[];
                 
@@ -233,18 +255,26 @@ export const useMessageStore = create<MessageState>()(
                     updatedConversations.splice(existingConversationIndex, 1);
                     updatedConversations.unshift(updatedConv);
                 } else if (conversationId) {
-                    // Conversa não existe, criar nova
-                    const newConversation: Conversation = {
-                        id: conversationId,
-                        name: conversationName,
-                        type: conversationType,
-                        lastMessage: message,
-                        unreadCount: conversationId !== currentConversationId ? 1 : 0,
-                        isOnline: conversationType === 'individual' && message.sender?.isOnline ? true : false
-                    };
-                    // Adicionar no início da lista
-                    updatedConversations = [newConversation, ...conversations];
-                    console.log('[Store] Nova conversa criada:', newConversation);
+                    // Conversa não existe, criar nova apenas se tiver informações suficientes
+                    // Não criar conversas vazias ou sem nome adequado
+                    if (conversationName && conversationName !== 'Conversa sem nome') {
+                        const newConversation: Conversation = {
+                            id: conversationId,
+                            name: conversationName,
+                            type: conversationType,
+                            lastMessage: message,
+                            unreadCount: conversationId !== currentConversationId ? 1 : 0,
+                            isOnline: conversationType === 'individual' && message.sender?.isOnline ? true : false
+                        };
+                        // Adicionar no início da lista
+                        updatedConversations = [newConversation, ...conversations];
+                        console.log('[Store] Nova conversa criada:', newConversation);
+                    } else {
+                        // Se não tem nome adequado, não criar a conversa ainda
+                        // Ela será criada quando o backend retornar ou quando tiver mais informações
+                        updatedConversations = conversations;
+                        console.log('[Store] Conversa sem nome adequado, ignorando criação automática');
+                    }
                 } else {
                     updatedConversations = conversations;
                 }
