@@ -10,15 +10,70 @@ FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /build
 
+# Configurar Maven para usar retry e repositórios alternativos
+RUN mkdir -p /root/.m2 && \
+    cat > /root/.m2/settings.xml << 'EOF'
+<settings>
+  <profiles>
+    <profile>
+      <id>retry</id>
+      <properties>
+        <maven.wagon.http.retryHandler.count>5</maven.wagon.http.retryHandler.count>
+        <maven.wagon.httpconnectionManager.ttlSeconds>120</maven.wagon.httpconnectionManager.ttlSeconds>
+        <maven.wagon.http.readTimeout>60000</maven.wagon.http.readTimeout>
+      </properties>
+      <repositories>
+        <repository>
+          <id>central</id>
+          <name>Maven Central</name>
+          <url>https://repo1.maven.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <repository>
+          <id>central-alt</id>
+          <name>Maven Central Alternative</name>
+          <url>https://repo.maven.apache.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>central</id>
+          <name>Maven Central</name>
+          <url>https://repo1.maven.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>retry</activeProfile>
+  </activeProfiles>
+</settings>
+EOF
+
 # Copiar pom.xml primeiro (para cache de dependências)
 COPY pom.xml .
-RUN mvn dependency:go-offline -B || true
+
+# Tentar baixar dependências com retry
+RUN for i in 1 2 3; do \
+      echo "🔄 Tentativa $i de baixar dependências..." && \
+      mvn dependency:go-offline -B && break || \
+      (echo "⚠️ Tentativa $i falhou, aguardando 5 segundos..." && sleep 5); \
+    done || echo "⚠️ Aviso: Algumas dependências podem não ter sido baixadas"
 
 # Copiar código fonte
 COPY src ./src
 
-# Build do projeto (skip tests em produção)
-RUN mvn clean package -DskipTests -B -Dmaven.test.skip=true && \
+# Build do projeto com retry (skip tests em produção)
+RUN for i in 1 2 3; do \
+      echo "🔨 Tentativa $i de build..." && \
+      mvn clean package -DskipTests -B -Dmaven.test.skip=true && break || \
+      (echo "⚠️ Tentativa $i falhou, aguardando 10 segundos..." && sleep 10); \
+    done && \
     find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" -not -name "*-original.jar" | head -1 | xargs -I {} sh -c 'mv "{}" app.jar' || \
     (echo "❌ Erro: Nenhum JAR encontrado após build" && ls -la target/ && exit 1)
 
