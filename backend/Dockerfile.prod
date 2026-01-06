@@ -10,16 +10,17 @@ FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /build
 
-# Copiar pom.xml e baixar dependências (cache layer)
+# Copiar pom.xml primeiro (para cache de dependências)
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:go-offline -B || true
 
 # Copiar código fonte
 COPY src ./src
 
 # Build do projeto (skip tests em produção)
-RUN mvn clean package -DskipTests -B && \
-    mv target/*.jar app.jar
+RUN mvn clean package -DskipTests -B -Dmaven.test.skip=true && \
+    find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" | head -1 | xargs -I {} mv {} app.jar || \
+    (ls -la target/ && exit 1)
 
 # ============================================
 # STAGE 2: Runtime
