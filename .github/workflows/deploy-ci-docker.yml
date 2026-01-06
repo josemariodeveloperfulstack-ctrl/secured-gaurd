@@ -85,17 +85,55 @@ jobs:
       # ============================================
       - name: 🐳 Build Docker images
         run: |
-          docker build --no-cache -t z7design/secured-guard-backend:ci \
-            -f backend/Dockerfile.prod ./backend
+          echo "🐳 Iniciando build das imagens Docker..."
           
+          # Verificar se os Dockerfiles existem
+          echo "📋 Verificando Dockerfiles..."
+          ls -la backend/Dockerfile.prod || echo "❌ backend/Dockerfile.prod não encontrado"
+          ls -la frontend/Dockerfile.prod || echo "❌ frontend/Dockerfile.prod não encontrado"
+          ls -la whatsapp-service/Dockerfile || echo "❌ whatsapp-service/Dockerfile não encontrado"
+          
+          # Verificar se o JAR foi gerado
+          echo "📋 Verificando JAR do backend..."
+          ls -lh backend/target/*.jar || echo "⚠️ Nenhum JAR encontrado em backend/target/"
+          
+          # Verificar se o dist do frontend foi gerado
+          echo "📋 Verificando build do frontend..."
+          ls -lh frontend/dist/ || echo "⚠️ Diretório frontend/dist/ não encontrado"
+          
+          # Build Backend
+          echo "🔨 Construindo imagem do backend..."
+          docker build --no-cache -t z7design/secured-guard-backend:ci \
+            -f backend/Dockerfile.prod ./backend || {
+            echo "❌ Build do backend Docker falhou!"
+            exit 1
+          }
+          echo "✅ Imagem do backend construída com sucesso!"
+          
+          # Build Frontend
+          echo "🎨 Construindo imagem do frontend..."
           docker build --no-cache -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
-            -f frontend/Dockerfile.prod ./frontend
+            -f frontend/Dockerfile.prod ./frontend || {
+            echo "❌ Build do frontend Docker falhou!"
+            exit 1
+          }
+          echo "✅ Imagem do frontend construída com sucesso!"
           
+          # Build WhatsApp Service
+          echo "📱 Construindo imagem do WhatsApp service..."
           docker build --no-cache -t z7design/secured-guard-whatsapp:ci \
-            -f whatsapp-service/Dockerfile ./whatsapp-service
+            -f whatsapp-service/Dockerfile ./whatsapp-service || {
+            echo "❌ Build do WhatsApp service Docker falhou!"
+            exit 1
+          }
+          echo "✅ Imagem do WhatsApp service construída com sucesso!"
+          
+          # Verificar imagens construídas
+          echo "📋 Verificando imagens construídas..."
+          docker images | grep z7design/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
 
       # ============================================
       # 5️⃣ LOGIN TO DOCKER HUB
