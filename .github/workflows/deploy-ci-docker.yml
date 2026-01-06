@@ -48,8 +48,25 @@ jobs:
       - name: 🔨 Build Backend (Maven)
         working-directory: ./backend
         run: |
+          echo "🔨 Iniciando build do backend..."
           chmod +x mvnw || true
-          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci
+          echo "📋 Verificando Maven Wrapper..."
+          ls -la mvnw || echo "⚠️ mvnw não encontrado"
+          echo "📋 Verificando pom.xml..."
+          ls -la pom.xml || echo "❌ pom.xml não encontrado"
+          echo "📋 Verificando estrutura do projeto..."
+          ls -la src/main/java/com/z7design/secured_guard/ || echo "⚠️ Diretório src não encontrado"
+          echo "🔨 Executando Maven clean package..."
+          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci -X || {
+            echo "❌ Build falhou! Verificando logs..."
+            echo "📋 Listando arquivos em target/..."
+            ls -la target/ || echo "⚠️ Diretório target não existe"
+            echo "📋 Verificando última parte do log..."
+            tail -100 ~/.m2/repository/.cache/error.log 2>/dev/null || echo "⚠️ Log de erro não encontrado"
+            exit 1
+          }
+          echo "✅ Build concluído! Verificando JAR gerado..."
+          ls -lh target/*.jar || echo "⚠️ Nenhum JAR encontrado em target/"
 
       # ============================================
       # 3️⃣ BUILD FRONTEND (Vite)
