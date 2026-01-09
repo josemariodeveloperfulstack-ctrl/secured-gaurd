@@ -86,7 +86,7 @@ jobs:
           
           echo "🔨 Executando Maven clean package..."
           echo "📋 Configurando variáveis de ambiente do Maven..."
-          export MAVEN_OPTS="-Xmx2048m -XX:MaxPermSize=512m"
+          export MAVEN_OPTS="-Xmx2048m"
           
           # Tentar usar Maven Wrapper com retry, ou usar Maven do sistema
           MAVEN_CMD="./mvnw"
