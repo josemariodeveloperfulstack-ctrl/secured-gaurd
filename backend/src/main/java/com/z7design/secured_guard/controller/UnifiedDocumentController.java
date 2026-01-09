@@ -41,6 +41,7 @@ import java.io.BufferedOutputStream;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import java.io.FileInputStream;
 import java.io.BufferedInputStream;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/unified-documents")
@@ -654,8 +655,8 @@ public class UnifiedDocumentController {
             
             // Criar mapa para organizar arquivos por estrutura: Empresa/Setor/Período/Funcionário
             // Usar UUID do Payslip como chave para evitar LazyInitializationException
-            Map<UUID, Path> payslipToFileMap = new java.util.HashMap<>();
-            Map<UUID, Payslip> payslipMap = new java.util.HashMap<>();
+            Map<UUID, Path> payslipToFileMap = new HashMap<>();
+            Map<UUID, Payslip> payslipMap = new HashMap<>();
             
             // Inicializar relações lazy antes de usar
             for (Payslip payslip : companyPayslips) {
@@ -888,8 +889,8 @@ public class UnifiedDocumentController {
             
             // Criar mapa para organizar arquivos por estrutura: Empresa/Setor/Período/Funcionário
             // Usar UUID do Payslip como chave para evitar LazyInitializationException
-            Map<UUID, Path> payslipToFileMap = new java.util.HashMap<>();
-            Map<UUID, Payslip> payslipMap = new java.util.HashMap<>();
+            Map<UUID, Path> payslipToFileMap = new HashMap<>();
+            Map<UUID, Payslip> payslipMap = new HashMap<>();
             
             // Inicializar relações lazy antes de usar
             for (Payslip payslip : sectorPayslips) {

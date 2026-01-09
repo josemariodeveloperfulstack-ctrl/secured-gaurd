@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MainLayout } from '@/components/MainLayout';
+import MessageGroupsManagement from '@/components/mensagens/MessageGroupsManagement';
 
 import { UUID } from '@/types/employee';
 
@@ -388,20 +389,7 @@ const GestaoMensagens: React.FC = () => {
 
         {/* Página de Grupos */}
         {currentPage === 'grupos' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Grupos de Mensagens</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <UsersIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p>Funcionalidade em desenvolvimento</p>
-                  <p className="text-sm">Em breve você poderá gerenciar grupos de mensagens</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <MessageGroupsManagement />
         )}
 
         {/* Página de Notificações */}
