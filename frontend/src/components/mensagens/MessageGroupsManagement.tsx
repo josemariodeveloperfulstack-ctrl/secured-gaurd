@@ -135,11 +135,19 @@ const MessageGroupsManagement: React.FC = () => {
       return;
     }
 
+    if (!formData.groupName.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome técnico do grupo é obrigatório (ex: GRUPO_VENDAS)",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Criar um nome único baseado no displayName
-      const groupName = formData.groupName || 
-        formData.displayName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+      // Validar que o groupName é um valor válido do enum
+      const groupName = formData.groupName.toUpperCase().trim();
       
       await groupService.createGroup({
         displayName: formData.displayName,
@@ -159,7 +167,7 @@ const MessageGroupsManagement: React.FC = () => {
       console.error('Erro ao criar grupo:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao criar grupo",
+        description: error.message || "Erro ao criar grupo. Verifique se o nome técnico é válido (ex: GRUPO_VENDAS)",
         variant: "destructive"
       });
     } finally {
@@ -392,7 +400,7 @@ const MessageGroupsManagement: React.FC = () => {
                         <TableCell>
                           <Badge variant="secondary">
                             <Users className="w-3 h-3 mr-1" />
-                            {group.userCount || 0}
+                            {group.userCount || group.users?.length || 0}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -479,7 +487,7 @@ const MessageGroupsManagement: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <Badge variant="secondary">
                           <Users className="w-3 h-3 mr-1" />
-                          {group.userCount || 0} membros
+                          {group.userCount || group.users?.length || 0} membros
                         </Badge>
                       </div>
                     </CardContent>
@@ -509,6 +517,19 @@ const MessageGroupsManagement: React.FC = () => {
                 onChange={(e) => setFormData({...formData, displayName: e.target.value})}
                 placeholder="Ex: Equipe de Vendas"
               />
+            </div>
+            <div>
+              <Label htmlFor="groupName">Nome Técnico *</Label>
+              <Input
+                id="groupName"
+                value={formData.groupName}
+                onChange={(e) => setFormData({...formData, groupName: e.target.value.toUpperCase()})}
+                placeholder="Ex: GRUPO_VENDAS (apenas letras, números e _)"
+                pattern="[A-Z0-9_]+"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Nome técnico único usado internamente (ex: GRUPO_VENDAS, GRUPO_RH)
+              </p>
             </div>
             <div>
               <Label htmlFor="description">Descrição</Label>
@@ -563,6 +584,9 @@ const MessageGroupsManagement: React.FC = () => {
                 placeholder="Descrição do grupo..."
                 rows={3}
               />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              <p>Nota: O nome técnico do grupo não pode ser alterado após a criação.</p>
             </div>
           </div>
           <DialogFooter>
