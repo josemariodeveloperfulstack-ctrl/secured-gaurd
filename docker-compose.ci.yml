@@ -245,6 +245,5 @@ networks:
     driver: bridge
     name: secured-guard-ci
   z7network:
-    external: false
-    driver: bridge
+    external: true
     name: z7network
