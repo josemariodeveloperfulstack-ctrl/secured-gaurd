@@ -3646,7 +3646,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       // Tentar abrir automaticamente o modal correto baseado na mensagem do backend
       try {
         // Reutiliza cpf/funcionarioId calculados acima
-        let employeeIdToValidate = funcionarioId;
+        let employeeIdToValidate = funcionarioId || undefined;
         if (!employeeIdToValidate && cpf) {
           try {
             const matches = await employeeService.searchEmployees(cpf);
