@@ -436,22 +436,25 @@ public class BaileysRestService {
         }
         
         try {
-            // Verificar se arquivo existe
+            // Verificar se arquivo existe no caminho original
             File file = new File(filePath);
             if (!file.exists()) {
-                lastErrorMessage = "Arquivo não encontrado: " + filePath;
-                logger.error("❌ Arquivo não existe: {}", filePath);
+                lastErrorMessage = "Arquivo não encontrado no backend: " + filePath;
+                logger.error("❌ Arquivo não existe no backend: {}", filePath);
+                logger.info("💡 O arquivo precisa existir no backend antes de ser enviado ao WhatsApp");
                 return false;
             }
             
             logger.info("📤 Preparando envio do arquivo: {}", file.getName());
             logger.info("📊 Tamanho: {} bytes", file.length());
+            logger.info("📂 Caminho original (backend): {}", filePath);
             
             // CORREÇÃO: Normalizar número com DDI 55
             String normalizedNumber = normalizePhoneNumber(phoneNumber);
             
-            // Converter caminho local para caminho Docker
+            // Converter caminho local para caminho Docker (que o serviço WhatsApp pode acessar)
             String dockerFilePath = convertToDockerPath(filePath);
+            logger.info("📂 Caminho Docker (WhatsApp): {}", dockerFilePath);
             
             String url = baileysRestUrl + "/message/document?key=" + instanceKey;
             
