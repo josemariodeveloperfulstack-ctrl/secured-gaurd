@@ -3521,16 +3521,18 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
   // Envio individual via WhatsApp
   const handleSendWhatsAppIndividual = async (payslip: Holerite) => {
+    // Declarar variáveis no escopo da função para serem acessíveis no catch
+    let funcionarioId: string | undefined;
+    let cpf: string = '';
+    
     try {
       console.log('🚀 Iniciando envio WhatsApp individual para:', payslip);
       
       // Normaliza CPF e tenta resolver employeeId antes de enviar
       const rawCpf = (payslip.cpf || '').toString();
-      const cpf = rawCpf.replace(/\D/g, '');
+      cpf = rawCpf.replace(/\D/g, '');
       
       console.log('📋 CPF normalizado:', cpf);
-
-      let funcionarioId: string | undefined;
       try {
         const matches = await employeeService.searchEmployees(cpf);
         console.log('🔍 Busca por CPF retornou:', matches);
@@ -3646,7 +3648,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       // Tentar abrir automaticamente o modal correto baseado na mensagem do backend
       try {
         // Reutiliza cpf/funcionarioId calculados acima
-        let employeeIdToValidate = funcionarioId || undefined;
+        let employeeIdToValidate = funcionarioId;
         if (!employeeIdToValidate && cpf) {
           try {
             const matches = await employeeService.searchEmployees(cpf);
