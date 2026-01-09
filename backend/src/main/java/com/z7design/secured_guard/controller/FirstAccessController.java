@@ -113,19 +113,10 @@ public class FirstAccessController {
                     .success(true)
                     .build());
 
-        } catch (jakarta.validation.ConstraintViolationException e) {
-            log.error("💥 Erro de validação ao alterar senha: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(SimpleResponseDTO.builder()
-                    .message("Dados inválidos: " + e.getMessage())
-                    .success(false)
-                    .build());
-        } catch (org.springframework.web.bind.MethodArgumentNotValidException e) {
-            log.error("💥 Erro de validação de argumentos: {}", e.getMessage(), e);
-            String errorMessage = e.getBindingResult().getFieldErrors().stream()
-                    .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                    .collect(java.util.stream.Collectors.joining(", "));
-            return ResponseEntity.badRequest().body(SimpleResponseDTO.builder()
-                    .message("Dados inválidos: " + errorMessage)
+        } catch (NullPointerException e) {
+            log.error("💥 Erro: usuário não autenticado ou dados nulos: {}", e.getMessage(), e);
+            return ResponseEntity.status(401).body(SimpleResponseDTO.builder()
+                    .message("Usuário não autenticado. Faça login novamente.")
                     .success(false)
                     .build());
         } catch (Exception e) {
