@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   MoreHorizontal, Edit, Trash2, Eye, User, Mail, Phone, MapPin, 
-  Calendar, Building, FileText, UserPlus, AlertCircle, UserMinus 
+  Calendar, Building, FileText, UserPlus, AlertCircle, UserMinus, Briefcase
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 
@@ -107,8 +107,9 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
           <TableHeader>
             <TableRow className="bg-seguranca-black/50 hover:bg-seguranca-black/70 border-gray-600/30">
               <TableHead className="text-seguranca-yellow font-semibold">Funcionário</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Cargo/Unidade</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Contato</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">Cargo/Função</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">Empresa</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">Posto de Trabalho</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Admissão</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Status</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold w-[70px]">Ações</TableHead>
@@ -151,34 +152,45 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                         {employee.position.name}
                       </div>
                     )}
-                    {employee.unit?.name && (
+                    {employee.position?.description && (
                       <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <MapPin className="h-4 w-4" />
-                        {employee.unit.name}
+                        <Briefcase className="h-4 w-4" />
+                        {employee.position.description}
                       </div>
                     )}
-                    {!employee.position?.name && !employee.unit?.name && (
+                    {!employee.position?.name && !employee.position?.description && (
                       <span className="text-gray-500 italic text-sm">Não definido</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="space-y-1">
-                    {employee.email && (
-                      <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
-                        <Mail className="h-3 w-3 text-gray-400" />
-                        <span className="truncate max-w-[200px]">{employee.email}</span>
-                      </div>
+                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
+                    {employee.company?.sigla ? (
+                      <>
+                        <Building className="h-4 w-4 text-gray-400" />
+                        <span className="truncate max-w-[200px] font-semibold">{employee.company.sigla}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500 italic text-sm">Não definido</span>
                     )}
-                    {employee.phone && (
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Phone className="h-3 w-3" />
-                        {employee.phone}
-                      </div>
-                    )}
-                    {!employee.email && !employee.phone && (
-                      <span className="text-gray-500 italic text-sm">Sem contato</span>
-                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
+                    {(() => {
+                      // Priorizar workPost, depois department (NÃO exibir unit)
+                      const workPostName = employee.workPost?.name;
+                      const departmentName = (employee as any).department?.name;
+                      const displayName = workPostName || departmentName;
+                      return displayName ? (
+                        <>
+                          <MapPin className="h-4 w-4 text-gray-400" />
+                          <span className="truncate max-w-[200px]">{displayName}</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-500 italic text-sm">Não definido</span>
+                      );
+                    })()}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -290,24 +302,30 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                     <span className="truncate">{employee.position.name}</span>
                   </div>
                 )}
-                {employee.unit?.name && (
+                {employee.position?.description && (
                   <div className="flex items-center gap-2 text-gray-400">
-                    <MapPin className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{employee.unit.name}</span>
+                    <Briefcase className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{employee.position.description}</span>
                   </div>
                 )}
-                {employee.email && (
+                {employee.company?.sigla && (
                   <div className="flex items-center gap-2 text-gray-400">
-                    <Mail className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{employee.email}</span>
+                    <Building className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate font-semibold">Empresa: {employee.company.sigla}</span>
                   </div>
                 )}
-                {employee.phone && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Phone className="h-4 w-4 flex-shrink-0" />
-                    <span>{employee.phone}</span>
-                  </div>
-                )}
+                {(() => {
+                  // Priorizar workPost, depois department (NÃO exibir unit)
+                  const workPostName = employee.workPost?.name;
+                  const departmentName = (employee as any).department?.name;
+                  const displayName = workPostName || departmentName;
+                  return displayName ? (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <MapPin className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">Setor/Posto: {displayName}</span>
+                    </div>
+                  ) : null;
+                })()}
                 {employee.hireDate && (
                   <div className="flex items-center gap-2 text-gray-400">
                     <Calendar className="h-4 w-4 flex-shrink-0" />

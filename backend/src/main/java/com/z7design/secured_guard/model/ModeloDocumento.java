@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,6 +25,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Entity
 @Table(name = "modelos_documentos")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ModeloDocumento {
     
     @Id
@@ -75,6 +77,7 @@ public class ModeloDocumento {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "criado_por")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User criadoPor;
     
     @Column(name = "ativo")

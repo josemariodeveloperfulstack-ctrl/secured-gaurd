@@ -233,7 +233,19 @@ export interface Employee {
   company?: { 
     id: UUID;
     name?: string;
+    sigla?: string;
     cnpj?: string;
+  };
+  workPost?: {
+    id: UUID;
+    name?: string;
+    postCode?: string;
+    description?: string;
+  };
+  department?: {
+    id: UUID;
+    name?: string;
+    description?: string;
   };
   
   // Dados aninhados (opcionais)
@@ -476,6 +488,7 @@ export interface CreateEmployeeDTO {
   company?: { 
     id: string;
     name?: string;
+    sigla?: string;
     cnpj?: string;
   };
   

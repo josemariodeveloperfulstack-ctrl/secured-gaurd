@@ -78,17 +78,31 @@ public class EmailTestController {
             Throwable cause = e.getCause();
             String errorMessage = e.getMessage();
             String errorType = "MAIL_EXCEPTION";
+            String suggestion = "";
             
             if (cause != null) {
                 if (cause instanceof jakarta.mail.AuthenticationFailedException) {
                     errorType = "AUTHENTICATION_FAILED";
                     errorMessage = "Falha na autenticação SMTP. Verifique usuário e senha.";
+                    suggestion = "Verifique se as credenciais SMTP estão corretas nas variáveis de ambiente MAIL_USERNAME e MAIL_PASSWORD.";
                 } else if (cause instanceof jakarta.mail.MessagingException) {
                     errorType = "MESSAGING_EXCEPTION";
-                    if (cause.getMessage() != null && cause.getMessage().contains("Could not connect")) {
-                        errorMessage = "Não foi possível conectar ao servidor SMTP. Verifique host, porta e firewall.";
-                    } else if (cause.getMessage() != null && cause.getMessage().contains("timeout")) {
-                        errorMessage = "Timeout ao conectar ao servidor SMTP. Tente usar porta 587 com STARTTLS.";
+                    String causeMessage = cause.getMessage() != null ? cause.getMessage() : "";
+                    if (causeMessage.contains("Could not connect") || causeMessage.contains("Couldn't connect")) {
+                        errorMessage = "Não foi possível conectar ao servidor SMTP " + mailHost + ":" + mailPort;
+                        suggestion = "O servidor SMTP não está acessível. Verifique:\n" +
+                                    "1. Firewall/antivírus não está bloqueando a porta " + mailPort + "\n" +
+                                    "2. Servidor SMTP está online e acessível\n" +
+                                    "3. Para desenvolvimento local, considere usar Gmail SMTP (smtp.gmail.com:587) ou Mailtrap (smtp.mailtrap.io:2525)";
+                    } else if (causeMessage.contains("timeout") || causeMessage.contains("Connection timed out")) {
+                        errorMessage = "Timeout ao conectar ao servidor SMTP " + mailHost + ":" + mailPort;
+                        suggestion = "A conexão com o servidor SMTP expirou após 60 segundos. Possíveis causas:\n" +
+                                    "1. Servidor SMTP não está acessível da sua rede\n" +
+                                    "2. Firewall bloqueando a porta " + mailPort + "\n" +
+                                    "3. Para desenvolvimento local, use um servidor SMTP alternativo (Gmail ou Mailtrap)";
+                    } else {
+                        errorMessage = "Erro ao enviar email: " + causeMessage;
+                        suggestion = "Verifique a configuração SMTP e os logs do backend para mais detalhes.";
                     }
                 }
             }
@@ -98,7 +112,10 @@ public class EmailTestController {
                 "message", errorMessage,
                 "to", toEmail != null ? toEmail : "N/A",
                 "error", errorType,
-                "details", cause != null ? cause.getMessage() : e.getMessage()
+                "details", cause != null ? cause.getMessage() : e.getMessage(),
+                "suggestion", suggestion,
+                "smtp_host", mailHost,
+                "smtp_port", mailPort
             ));
         } catch (Exception e) {
             log.error("💥 Erro inesperado ao testar envio de email: {}", e.getMessage(), e);

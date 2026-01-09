@@ -30,6 +30,10 @@ import com.z7design.secured_guard.repository.UserGroupRepository;
 import com.z7design.secured_guard.repository.MessageDeletionLogRepository;
 
 import lombok.extern.slf4j.Slf4j;
+import lombok.Data;
+import lombok.Builder;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import com.z7design.secured_guard.dto.UserResponseDTO;
 import com.z7design.secured_guard.dto.DepartmentDTO;
 
@@ -155,23 +159,55 @@ public class MessageService {
     }
     
     /**
-     * Busca mensagens recebidas por um usuário
+     * Busca mensagens recebidas por um usuário (excluindo arquivadas)
      */
     public Page<MessageResponseDTO> getReceivedMessages(UUID userId, Pageable pageable) {
-        log.info("Buscando mensagens recebidas para usuário: {}", userId);
+        log.info("Buscando mensagens recebidas para usuário: {} (excluindo arquivadas)", userId);
         
-        Page<Message> messages = messageRepository.findByRecipientId(userId, pageable);
-        return messages.map(this::convertToDTO);
+        // Buscar apenas mensagens não arquivadas onde o usuário é destinatário
+        Page<Message> messages = messageRepository.findNonArchivedByUserId(userId, pageable);
+        // Filtrar apenas mensagens onde o usuário é destinatário (não remetente)
+        List<Message> receivedMessages = messages.getContent().stream()
+                .filter(m -> {
+                    boolean isRecipient = m.getRecipients() != null && 
+                                       m.getRecipients().stream()
+                                          .anyMatch(user -> user.getId().equals(userId));
+                    boolean isNotSender = !m.getSender().getId().equals(userId);
+                    return isRecipient && isNotSender;
+                })
+                .collect(java.util.stream.Collectors.toList());
+        
+        Page<Message> filteredPage = new org.springframework.data.domain.PageImpl<>(
+                receivedMessages, 
+                pageable, 
+                receivedMessages.size()
+        );
+        
+        log.info("Encontradas {} mensagens recebidas não arquivadas para usuário {}", filteredPage.getTotalElements(), userId);
+        return filteredPage.map(this::convertToDTO);
     }
     
     /**
-     * Busca mensagens enviadas por um usuário
+     * Busca mensagens enviadas por um usuário (excluindo arquivadas)
      */
     public Page<MessageResponseDTO> getSentMessages(UUID userId, Pageable pageable) {
-        log.info("Buscando mensagens enviadas por usuário: {}", userId);
+        log.info("Buscando mensagens enviadas por usuário: {} (excluindo arquivadas)", userId);
         
-        Page<Message> messages = messageRepository.findBySenderIdOrderByCreatedAtDesc(userId, pageable);
-        return messages.map(this::convertToDTO);
+        // Buscar apenas mensagens não arquivadas enviadas pelo usuário
+        Page<Message> messages = messageRepository.findNonArchivedByUserId(userId, pageable);
+        // Filtrar apenas as mensagens onde o usuário é remetente
+        List<Message> sentMessages = messages.getContent().stream()
+                .filter(m -> m.getSender().getId().equals(userId))
+                .collect(java.util.stream.Collectors.toList());
+        
+        Page<Message> filteredPage = new org.springframework.data.domain.PageImpl<>(
+                sentMessages, 
+                pageable, 
+                sentMessages.size()
+        );
+        
+        log.info("Encontradas {} mensagens enviadas não arquivadas para usuário {}", filteredPage.getTotalElements(), userId);
+        return filteredPage.map(this::convertToDTO);
     }
     
     /**
@@ -222,10 +258,41 @@ public class MessageService {
     }
     
     /**
-     * Conta mensagens não lidas
+     * Conta mensagens não lidas (considerando remetente ou destinatário)
      */
     public Long countUnreadMessages(UUID userId) {
-        return messageRepository.countUnreadByUserId(userId);
+        return messageRepository.countUnreadByUserIdIncludingSender(userId);
+    }
+    
+    /**
+     * Obtém estatísticas de mensagens para o usuário
+     */
+    public MessageStatistics getMessageStatistics(UUID userId) {
+        Long total = messageRepository.countTotalByUserId(userId);
+        Long unread = messageRepository.countUnreadByUserIdIncludingSender(userId);
+        Long read = messageRepository.countByUserIdAndStatus(userId, MessageStatus.READ);
+        Long archived = messageRepository.countByUserIdAndStatus(userId, MessageStatus.ARCHIVED);
+        
+        return MessageStatistics.builder()
+                .total(total != null ? total : 0L)
+                .unread(unread != null ? unread : 0L)
+                .read(read != null ? read : 0L)
+                .archived(archived != null ? archived : 0L)
+                .build();
+    }
+    
+    /**
+     * Classe interna para estatísticas de mensagens
+     */
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class MessageStatistics {
+        private Long total;
+        private Long unread;
+        private Long read;
+        private Long archived;
     }
     
     /**
@@ -344,12 +411,14 @@ public class MessageService {
     }
     
     /**
-     * Busca mensagens por status
+     * Busca mensagens por status (considerando remetente ou destinatário)
      */
     public Page<MessageResponseDTO> getMessagesByStatus(UUID userId, MessageStatus status, Pageable pageable) {
-        log.info("Buscando mensagens com status {} para usuário: {}", status, userId);
+        log.info("Buscando mensagens com status {} para usuário: {} (remetente ou destinatário)", status, userId);
         
-        Page<Message> messages = messageRepository.findByRecipientIdAndStatus(userId, status, pageable);
+        // Buscar mensagens onde o usuário é remetente ou destinatário
+        Page<Message> messages = messageRepository.findByUserIdAndStatus(userId, status, pageable);
+        log.info("Encontradas {} mensagens com status {} para usuário {}", messages.getTotalElements(), status, userId);
         return messages.map(this::convertToDTO);
     }
     
@@ -389,16 +458,19 @@ public class MessageService {
         Message message = messageRepository.findById(messageId)
             .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
         
-        // Verificar se o usuário é destinatário
-        boolean isRecipient = message.getRecipients().stream()
-            .anyMatch(user -> user.getId().equals(userId));
+        // Verificar se o usuário é remetente ou destinatário
+        boolean isSender = message.getSender().getId().equals(userId);
+        boolean isRecipient = message.getRecipients() != null && 
+                             message.getRecipients().stream()
+                                    .anyMatch(user -> user.getId().equals(userId));
         
-        if (!isRecipient) {
-            throw new BusinessException("Usuário não é destinatário desta mensagem");
+        if (!isSender && !isRecipient) {
+            throw new BusinessException("Usuário não tem permissão para arquivar esta mensagem. Apenas remetente ou destinatários podem arquivar.");
         }
         
         message.setStatus(MessageStatus.ARCHIVED);
         messageRepository.save(message);
+        log.info("Mensagem {} arquivada com sucesso pelo usuário {}", messageId, userId);
     }
     
     /**
@@ -410,16 +482,26 @@ public class MessageService {
         Message message = messageRepository.findById(messageId)
             .orElseThrow(() -> new BusinessException("Mensagem não encontrada"));
         
-        // Verificar se o usuário é destinatário
-        boolean isRecipient = message.getRecipients().stream()
-            .anyMatch(user -> user.getId().equals(userId));
-        
-        if (!isRecipient) {
-            throw new BusinessException("Usuário não é destinatário desta mensagem");
+        // Verificar se a mensagem está arquivada
+        if (message.getStatus() != MessageStatus.ARCHIVED) {
+            throw new BusinessException("A mensagem não está arquivada. Apenas mensagens arquivadas podem ser restauradas.");
         }
         
-        message.setStatus(MessageStatus.READ);
+        // Verificar se o usuário é remetente ou destinatário
+        boolean isSender = message.getSender().getId().equals(userId);
+        boolean isRecipient = message.getRecipients() != null && 
+                             message.getRecipients().stream()
+                                    .anyMatch(user -> user.getId().equals(userId));
+        
+        if (!isSender && !isRecipient) {
+            throw new BusinessException("Usuário não tem permissão para restaurar esta mensagem. Apenas remetente ou destinatários podem restaurar.");
+        }
+        
+        // Restaurar para status lido (se foi lida antes) ou não lida (se nunca foi lida)
+        MessageStatus restoredStatus = message.getReadAt() != null ? MessageStatus.READ : MessageStatus.UNREAD;
+        message.setStatus(restoredStatus);
         messageRepository.save(message);
+        log.info("Mensagem {} restaurada com sucesso pelo usuário {} com status {}", messageId, userId, restoredStatus);
     }
     
     /**

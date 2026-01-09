@@ -2136,20 +2136,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   placeholder="exemplo@email.com"
                 />
               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Telefone *</Label>
-                 <Input 
-                   name="phone" 
-                   value={aplicarMascaraTelefone(form.phone || '')} 
-                   onChange={(e) => {
-                     const valor = e.target.value.replace(/\D/g, '');
-                     setForm(prev => ({ ...prev, phone: valor }));
-                   }}
-                   required 
-                   placeholder="(00) 00000-0000"
-                   maxLength={15}
-                 />
-               </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">WhatsApp *</Label>
+                <Input 
+                  name="phone" 
+                  value={aplicarMascaraTelefone(form.phone || '')} 
+                  onChange={(e) => {
+                    const valor = e.target.value.replace(/\D/g, '');
+                    setForm(prev => ({ ...prev, phone: valor }));
+                  }}
+                  required 
+                  placeholder="(00) 00000-0000"
+                  maxLength={15}
+                />
+              </div>
                <div>
                  <Label className="text-sm font-medium text-gray-200">Telefone de Contato</Label>
                  <Input 

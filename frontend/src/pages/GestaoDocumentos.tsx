@@ -414,6 +414,104 @@ const GestaoDocumentos: React.FC = () => {
     }
   };
 
+  // Handlers para documentos gerados
+  const handleViewDocumento = async (documento: DocumentoGerado) => {
+    try {
+      const response = await fetch(`/api/documentos-gerados/${documento.id}/view`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Limpar a URL após um tempo para liberar memória
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        throw new Error('Erro ao visualizar documento');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao visualizar documento',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDownloadDocumento = async (documento: DocumentoGerado) => {
+    try {
+      const response = await fetch(`/api/documentos-gerados/${documento.id}/download`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = documento.modelo.nomeModelo + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        throw new Error('Erro ao baixar documento');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao baixar documento',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleAssinarDocumento = async (documento: DocumentoGerado) => {
+    try {
+      setLoading(true);
+      // O IP será obtido pelo backend através do request
+      const response = await fetch(`/api/documentos-gerados/${documento.id}/assinar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Sucesso',
+          description: 'Documento assinado com sucesso'
+        });
+        carregarDocumentosGerados();
+      } else {
+        const errorText = await response.text();
+        let errorMessage = 'Erro ao assinar documento';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Se não for JSON, usar o texto da resposta
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao assinar documento',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       PENDENTE: { variant: 'secondary' as const, icon: Clock, text: 'Pendente' },
@@ -939,16 +1037,33 @@ const GestaoDocumentos: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Button size="sm" variant="outline" className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+                        onClick={() => handleViewDocumento(documento)}
+                        disabled={loading}
+                      >
                         <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                         Visualizar
                       </Button>
-                      <Button size="sm" variant="outline" className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+                        onClick={() => handleDownloadDocumento(documento)}
+                        disabled={loading}
+                      >
                         <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                         Download
                       </Button>
                       {documento.status === 'PENDENTE' && (
-                        <Button size="sm" className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm">
+                        <Button 
+                          size="sm" 
+                          className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+                          onClick={() => handleAssinarDocumento(documento)}
+                          disabled={loading}
+                        >
                           <FileSignature className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                           Assinar
                         </Button>

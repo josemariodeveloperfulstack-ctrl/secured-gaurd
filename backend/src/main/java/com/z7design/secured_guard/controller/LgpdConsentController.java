@@ -2,7 +2,9 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.UserConsent;
 import com.z7design.secured_guard.model.UserConsent.ConsentType;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.LgpdConsentService;
+import com.z7design.secured_guard.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class LgpdConsentController {
 
     private final LgpdConsentService consentService;
+    private final AuthenticationService authenticationService;
 
     @PostMapping("/consent")
     @Operation(summary = "Registrar consentimento LGPD", description = "Registra aceite dos termos LGPD")
@@ -34,7 +37,13 @@ public class LgpdConsentController {
             HttpServletRequest httpRequest
     ) {
         try {
-            UUID userId = request.getUserId();
+            // Obter usuário autenticado do contexto de segurança
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            User currentUser = authenticationService.getCurrentUser(authentication);
+            UUID userId = currentUser.getId();
+            
+            log.info("📝 Registrando consentimento {} para usuário autenticado: {} (ID: {})", 
+                    request.getConsentType(), currentUser.getUsername(), userId);
 
             String ipAddress = getClientIP(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
@@ -82,14 +91,30 @@ public class LgpdConsentController {
         return ResponseEntity.ok(consents);
     }
 
-    @PostMapping("/complete-first-access/{userId}")
+    @PostMapping("/complete-first-access")
     @Operation(summary = "Completar primeiro acesso", description = "Marca primeiro acesso como completo")
-    public ResponseEntity<?> completeFirstAccess(@PathVariable UUID userId) {
-        consentService.markFirstAccessCompleted(userId);
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Primeiro acesso completado"
-        ));
+    public ResponseEntity<?> completeFirstAccess() {
+        try {
+            // Obter usuário autenticado do contexto de segurança
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            User currentUser = authenticationService.getCurrentUser(authentication);
+            UUID userId = currentUser.getId();
+            
+            log.info("✅ Completando primeiro acesso para usuário: {} (ID: {})", 
+                    currentUser.getUsername(), userId);
+            
+            consentService.markFirstAccessCompleted(userId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Primeiro acesso completado"
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao completar primeiro acesso: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
     }
 
     @PostMapping("/revoke/{consentId}")
@@ -115,13 +140,10 @@ public class LgpdConsentController {
 
     // DTO
     public static class ConsentRequest {
-        private UUID userId;
         private ConsentType consentType;
         private BigDecimal latitude;
         private BigDecimal longitude;
 
-        public UUID getUserId() { return userId; }
-        public void setUserId(UUID userId) { this.userId = userId; }
         public ConsentType getConsentType() { return consentType; }
         public void setConsentType(ConsentType consentType) { this.consentType = consentType; }
         public BigDecimal getLatitude() { return latitude; }

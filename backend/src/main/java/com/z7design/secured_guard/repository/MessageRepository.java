@@ -104,4 +104,40 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
      */
     @Query("SELECT m FROM Message m JOIN m.recipients r WHERE r.id = :userId AND m.status = :status AND m.type = :type ORDER BY m.createdAt DESC")
     List<Message> findByRecipientIdAndStatusAndType(@Param("userId") UUID userId, @Param("status") MessageStatus status, @Param("type") MessageType type);
+    
+    /**
+     * Busca mensagens por status considerando remetente ou destinatário
+     */
+    @Query("SELECT DISTINCT m FROM Message m LEFT JOIN m.recipients r WHERE (m.sender.id = :userId OR r.id = :userId) AND m.status = :status ORDER BY m.createdAt DESC")
+    Page<Message> findByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") MessageStatus status, Pageable pageable);
+    
+    /**
+     * Busca mensagens por status considerando remetente ou destinatário (sem paginação)
+     */
+    @Query("SELECT DISTINCT m FROM Message m LEFT JOIN m.recipients r WHERE (m.sender.id = :userId OR r.id = :userId) AND m.status = :status ORDER BY m.createdAt DESC")
+    List<Message> findByUserIdAndStatusList(@Param("userId") UUID userId, @Param("status") MessageStatus status);
+    
+    /**
+     * Conta mensagens não lidas considerando remetente ou destinatário
+     */
+    @Query("SELECT COUNT(DISTINCT m) FROM Message m LEFT JOIN m.recipients r WHERE (m.sender.id = :userId OR r.id = :userId) AND m.status = 'UNREAD'")
+    Long countUnreadByUserIdIncludingSender(@Param("userId") UUID userId);
+    
+    /**
+     * Conta mensagens por status considerando remetente ou destinatário
+     */
+    @Query("SELECT COUNT(DISTINCT m) FROM Message m LEFT JOIN m.recipients r WHERE (m.sender.id = :userId OR r.id = :userId) AND m.status = :status")
+    Long countByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") MessageStatus status);
+    
+    /**
+     * Conta total de mensagens considerando remetente ou destinatário
+     */
+    @Query("SELECT COUNT(DISTINCT m) FROM Message m LEFT JOIN m.recipients r WHERE (m.sender.id = :userId OR r.id = :userId)")
+    Long countTotalByUserId(@Param("userId") UUID userId);
+    
+    /**
+     * Busca mensagens recebidas (não arquivadas) considerando remetente ou destinatário
+     */
+    @Query("SELECT DISTINCT m FROM Message m LEFT JOIN m.recipients r WHERE (m.sender.id = :userId OR r.id = :userId) AND m.status != 'ARCHIVED' ORDER BY m.createdAt DESC")
+    Page<Message> findNonArchivedByUserId(@Param("userId") UUID userId, Pageable pageable);
 }

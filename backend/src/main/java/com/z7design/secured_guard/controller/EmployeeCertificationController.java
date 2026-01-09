@@ -64,8 +64,18 @@ public class EmployeeCertificationController {
 
         System.out.println("📋 EmployeeCertificationController.find - Total de certificações encontradas: " + results.size());
         results.forEach(cert -> {
+            String employeeName = cert.getEmployee() != null ? cert.getEmployee().getName() : "null";
+            String positionName = null;
+            if (cert.getEmployee() != null && cert.getEmployee().getPosition() != null) {
+                try {
+                    positionName = cert.getEmployee().getPosition().getName();
+                } catch (Exception e) {
+                    System.err.println("⚠️ Erro ao acessar position.getName() para employee: " + employeeName);
+                }
+            }
             System.out.println("  - ID: " + cert.getId() + 
-                ", Employee: " + (cert.getEmployee() != null ? cert.getEmployee().getName() : "null") +
+                ", Employee: " + employeeName +
+                ", Position: " + (positionName != null ? positionName : "null") +
                 ", Training: " + (cert.getTraining() != null ? cert.getTraining().getName() : "null"));
         });
 

@@ -163,8 +163,27 @@ public class EmployeeCertificationService {
     
     @Transactional(readOnly = true)
     public List<EmployeeCertification> findAll() {
-        // O findAll() já usa @EntityGraph para carregar relacionamentos
-        return certificationRepository.findAll();
+        // Usar método com FETCH JOIN para garantir que todos os relacionamentos sejam carregados
+        List<EmployeeCertification> certifications = certificationRepository.findAllWithDetails();
+        System.out.println("📋 EmployeeCertificationService.findAll - Total de certificações carregadas: " + certifications.size());
+        
+        // Verificar se o position está sendo carregado
+        certifications.forEach(cert -> {
+            if (cert.getEmployee() != null) {
+                try {
+                    if (cert.getEmployee().getPosition() != null) {
+                        String positionName = cert.getEmployee().getPosition().getName();
+                        System.out.println("  ✅ Position carregado: " + positionName + " para employee: " + cert.getEmployee().getName());
+                    } else {
+                        System.out.println("  ⚠️ Position é null para employee: " + cert.getEmployee().getName() + " (ID: " + cert.getEmployee().getId() + ")");
+                    }
+                } catch (Exception e) {
+                    System.err.println("  ❌ Erro ao acessar position para employee: " + cert.getEmployee().getName() + " - " + e.getMessage());
+                }
+            }
+        });
+        
+        return certifications;
     }
     
     private void validateCertification(EmployeeCertification certification) {

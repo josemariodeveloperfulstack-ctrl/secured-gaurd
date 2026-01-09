@@ -49,6 +49,14 @@ const MessageDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reply'>('create');
+  
+  // Estatísticas de mensagens do backend
+  const [messageStats, setMessageStats] = useState({
+    total: 0,
+    unread: 0,
+    read: 0,
+    archived: 0
+  });
 
   const { toast } = useToast();
 
@@ -69,16 +77,16 @@ const MessageDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const [messagesData, count] = await Promise.all([
-        messageService.getSystemMessages(0, 20),
-        messageService.getUnreadSystemCount()
-      ]);
+      // Carregar estatísticas do backend
+      const stats = await messageService.getMessageStatistics();
+      setMessageStats(stats);
       
-      setSystemMessages(messagesData.messages);
+      // Carregar mensagens baseado na aba ativa (excluindo arquivadas)
+      await loadMessages(activeTab, 0);
       
-      console.log('✅ [MessageDashboard] Dados carregados:', {
-        messages: messagesData.messages.length,
-        unreadCount: count
+      console.log('✅ [MessageDashboard] Dashboard carregado:', {
+        stats,
+        activeTab
       });
     } catch (error) {
       console.error('❌ [MessageDashboard] Erro ao carregar dashboard:', error);
@@ -109,10 +117,20 @@ const MessageDashboard: React.FC = () => {
       
       let messagesData;
       
-      // Buscar mensagens enviadas ou recebidas baseado na aba
+      // Buscar mensagens baseado na aba selecionada
       if (tab === 'sent') {
         messagesData = await messageService.getSentMessages(page, 10);
+      } else if (tab === 'archived') {
+        // Buscar mensagens arquivadas do backend
+        messagesData = await messageService.getMessagesByStatus('ARCHIVED', page, 10);
+      } else if (tab === 'unread') {
+        // Buscar mensagens não lidas do backend
+        messagesData = await messageService.getMessagesByStatus('UNREAD', page, 10);
+      } else if (tab === 'read') {
+        // Buscar mensagens lidas do backend
+        messagesData = await messageService.getMessagesByStatus('READ', page, 10);
       } else {
+        // 'received' - todas as mensagens recebidas
         messagesData = await messageService.getSystemMessages(page, 10);
       }
       
@@ -135,10 +153,19 @@ const MessageDashboard: React.FC = () => {
     }
   };
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = async (tab: string) => {
     setActiveTab(tab);
     setCurrentPage(0);
     setHasMore(true);
+    
+    // Recarregar estatísticas ao mudar de aba
+    try {
+      const stats = await messageService.getMessageStatistics();
+      setMessageStats(stats);
+    } catch (error) {
+      console.error('❌ [MessageDashboard] Erro ao carregar estatísticas:', error);
+    }
+    
     loadMessages(tab, 0);
   };
 
@@ -170,6 +197,10 @@ const MessageDashboard: React.FC = () => {
     try {
       await messageService.markSystemMessageAsRead(messageId);
       updateSystemMessage(messageId, { status: 'READ', readAt: new Date().toISOString() });
+      
+      // Atualizar estatísticas após marcar como lida
+      const stats = await messageService.getMessageStatistics();
+      setMessageStats(stats);
       
       toast({
         title: "Sucesso",
@@ -213,6 +244,60 @@ const MessageDashboard: React.FC = () => {
     }
   };
 
+  const handleArchive = async (messageId: string) => {
+    try {
+      await messageService.archiveSystemMessage(messageId);
+      updateSystemMessage(messageId, { status: 'ARCHIVED' });
+      
+      toast({
+        title: "Sucesso",
+        description: "Mensagem arquivada com sucesso"
+      });
+
+      // Recarregar estatísticas e mensagens para atualizar a lista
+      const stats = await messageService.getMessageStatistics();
+      setMessageStats(stats);
+      loadMessages(activeTab, 0);
+    } catch (error: any) {
+      console.error('❌ [MessageDashboard] Erro ao arquivar:', error);
+      
+      if (error instanceof MessageServiceError) {
+        toast({
+          title: "Erro",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleRestore = async (messageId: string) => {
+    try {
+      await messageService.restoreSystemMessage(messageId);
+      updateSystemMessage(messageId, { status: 'READ' });
+      
+      toast({
+        title: "Sucesso",
+        description: "Mensagem restaurada com sucesso"
+      });
+
+      // Recarregar estatísticas e mensagens para atualizar a lista
+      const stats = await messageService.getMessageStatistics();
+      setMessageStats(stats);
+      loadMessages(activeTab, 0);
+    } catch (error: any) {
+      console.error('❌ [MessageDashboard] Erro ao restaurar:', error);
+      
+      if (error instanceof MessageServiceError) {
+        toast({
+          title: "Erro",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   const handleView = (message: SystemMessage) => {
     setSelectedMessage(message);
     setShowViewModal(true);
@@ -243,29 +328,20 @@ const MessageDashboard: React.FC = () => {
     setShowMessageForm(true);
   };
 
-  const handleFormSuccess = () => {
+  const handleFormSuccess = async () => {
+    // Recarregar estatísticas e mensagens após criar/editar mensagem
+    try {
+      const stats = await messageService.getMessageStatistics();
+      setMessageStats(stats);
+    } catch (error) {
+      console.error('❌ [MessageDashboard] Erro ao carregar estatísticas:', error);
+    }
     loadDashboard();
   };
 
-  // Filtrar mensagens baseado na aba ativa
-  const getFilteredMessages = () => {
-    switch (activeTab) {
-      case 'sent':
-        // Mensagens enviadas já vêm filtradas do backend
-        return systemMessages;
-      case 'unread':
-        return systemMessages.filter(msg => msg.status === 'UNREAD');
-      case 'read':
-        return systemMessages.filter(msg => msg.status === 'READ');
-      case 'archived':
-        return systemMessages.filter(msg => msg.status === 'ARCHIVED');
-      default:
-        // 'received' - todas as mensagens recebidas
-        return systemMessages;
-    }
-  };
-
-  const filteredMessages = getFilteredMessages();
+  // As mensagens já vêm filtradas do backend baseado na aba ativa
+  // Não precisamos filtrar localmente, apenas usar systemMessages diretamente
+  const filteredMessages = systemMessages;
 
   return (
     <div className="space-y-6">
@@ -321,7 +397,7 @@ const MessageDashboard: React.FC = () => {
         </Alert>
       )}
 
-      {/* Stats Cards Responsivos */}
+      {/* Stats Cards Responsivos - Integrados com Backend */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/30 hover:shadow-xl transition-all duration-200 hover:scale-105">
           <CardHeader className="pb-2">
@@ -331,7 +407,7 @@ const MessageDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-500">{systemMessages.length}</div>
+            <div className="text-3xl font-bold text-blue-500">{messageStats.total}</div>
             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
               <TrendingUp className="w-3 h-3" />
               Todas as mensagens
@@ -347,7 +423,7 @@ const MessageDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-500">{unreadSystemCount}</div>
+            <div className="text-3xl font-bold text-red-500">{messageStats.unread}</div>
             <p className="text-xs text-gray-500 mt-1">Pendentes de leitura</p>
           </CardContent>
         </Card>
@@ -360,9 +436,7 @@ const MessageDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-500">
-              {systemMessages.filter(m => m.status === 'READ').length}
-            </div>
+            <div className="text-3xl font-bold text-green-500">{messageStats.read}</div>
             <p className="text-xs text-gray-500 mt-1">Já visualizadas</p>
           </CardContent>
         </Card>
@@ -375,9 +449,7 @@ const MessageDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-500">
-              {systemMessages.filter(m => m.status === 'ARCHIVED').length}
-            </div>
+            <div className="text-3xl font-bold text-purple-500">{messageStats.archived}</div>
             <p className="text-xs text-gray-500 mt-1">Guardadas</p>
           </CardContent>
         </Card>
@@ -476,6 +548,8 @@ const MessageDashboard: React.FC = () => {
                 onEdit={handleEditClick}
                 onView={handleView}
                 onReply={handleReplyClick}
+                onArchive={handleArchive}
+                onRestore={handleRestore}
                 loading={loading}
                 activeTab={activeTab}
               />
@@ -525,6 +599,8 @@ const MessageDashboard: React.FC = () => {
         onDelete={() => selectedMessage && handleDeleteClick(selectedMessage)}
         onMarkAsRead={() => selectedMessage && handleMarkAsRead(selectedMessage.id)}
         onReply={() => selectedMessage && handleReplyClick(selectedMessage)}
+        onArchive={() => selectedMessage && handleArchive(selectedMessage.id)}
+        onRestore={() => selectedMessage && handleRestore(selectedMessage.id)}
       />
 
       <DeleteMessageModal
@@ -545,6 +621,8 @@ interface MessageListProps {
   onEdit: (message: SystemMessage) => void;
   onView: (message: SystemMessage) => void;
   onReply: (message: SystemMessage) => void;
+  onArchive: (id: string) => void;
+  onRestore: (id: string) => void;
   loading: boolean;
   activeTab: string;
 }
@@ -556,6 +634,8 @@ const MessageList: React.FC<MessageListProps> = ({
   onEdit,
   onView,
   onReply,
+  onArchive,
+  onRestore,
   loading,
   activeTab
 }) => {
@@ -595,6 +675,21 @@ const MessageList: React.FC<MessageListProps> = ({
     }
   };
 
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'URGENT':
+        return 'Urgente';
+      case 'HIGH':
+        return 'Alta';
+      case 'NORMAL':
+        return 'Normal';
+      case 'LOW':
+        return 'Baixa';
+      default:
+        return priority;
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'UNREAD':
@@ -605,6 +700,34 @@ const MessageList: React.FC<MessageListProps> = ({
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
       default:
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'UNREAD':
+        return 'Nova';
+      case 'READ':
+        return 'Lida';
+      case 'ARCHIVED':
+        return 'Arquivada';
+      default:
+        return status;
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'INDIVIDUAL':
+        return 'Individual';
+      case 'GROUP':
+        return 'Grupo';
+      case 'DEPARTMENT':
+        return 'Departamento';
+      case 'GLOBAL':
+        return 'Global';
+      default:
+        return type;
     }
   };
 
@@ -625,12 +748,16 @@ const MessageList: React.FC<MessageListProps> = ({
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <h3 className="font-semibold text-white text-lg">{message.title}</h3>
                 <Badge className={getPriorityColor(message.priority)}>
-                  {message.priority}
+                  {getPriorityLabel(message.priority)}
                 </Badge>
                 <Badge className={getStatusColor(message.status)}>
-                  {message.status === 'UNREAD' ? 'Nova' : 
-                   message.status === 'READ' ? 'Lida' : 'Arquivada'}
+                  {getStatusLabel(message.status)}
                 </Badge>
+                {message.type && (
+                  <Badge variant="outline" className="border-gray-500 text-gray-300">
+                    {getTypeLabel(message.type)}
+                  </Badge>
+                )}
               </div>
               
               <p className="text-gray-400 text-sm md:text-base mb-3 line-clamp-2">
@@ -644,7 +771,7 @@ const MessageList: React.FC<MessageListProps> = ({
                       <Users className="w-3 h-3" />
                       <span>Para: {message.recipients && message.recipients.length > 0 
                         ? `${message.recipients.length} ${message.recipients.length === 1 ? 'destinatário' : 'destinatários'}`
-                        : message.type === 'GLOBAL' ? 'Todos' : 'N/A'}</span>
+                        : message.type === 'GLOBAL' ? 'Todos' : 'Nenhum'}</span>
                     </div>
                     {message.recipients && message.recipients.length > 0 && message.recipients.length <= 3 && (
                       <div className="flex items-center gap-1">
@@ -652,7 +779,7 @@ const MessageList: React.FC<MessageListProps> = ({
                         <span>{message.recipients.map((r: any) => r.name || r.email).join(', ')}</span>
                       </div>
                     )}
-                  </>
+                  </> 
                 ) : (
                   <>
                     <div className="flex items-center gap-1">
@@ -662,7 +789,7 @@ const MessageList: React.FC<MessageListProps> = ({
                     {message.recipients && message.recipients.length > 0 && (
                       <div className="flex items-center gap-1">
                         <Mail className="w-3 h-3" />
-                        <span>{message.recipients.length} dest.</span>
+                        <span>{message.recipients.length} {message.recipients.length === 1 ? 'destinatário' : 'destinatários'}</span>
                       </div>
                     )}
                   </>
@@ -686,7 +813,35 @@ const MessageList: React.FC<MessageListProps> = ({
                   className="border-green-500/30 text-green-400 hover:bg-green-500/10"
                 >
                   <CheckCircle className="w-4 h-4 md:mr-2" />
-                  <span className="hidden md:inline">Marcar</span>
+                  <span className="hidden md:inline">Marcar como Lida</span>
+                </Button>
+              )}
+              {message.status !== 'ARCHIVED' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchive(message.id);
+                  }}
+                  className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                >
+                  <Archive className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">Arquivar</span>
+                </Button>
+              )}
+              {message.status === 'ARCHIVED' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRestore(message.id);
+                  }}
+                  className="border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                >
+                  <RefreshCw className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">Restaurar</span>
                 </Button>
               )}
               <Button

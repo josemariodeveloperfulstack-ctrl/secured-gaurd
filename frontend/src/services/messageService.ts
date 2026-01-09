@@ -208,6 +208,58 @@ export const messageService = {
     }
   },
 
+  async getMessagesByStatus(status: 'UNREAD' | 'READ' | 'ARCHIVED', page = 0, size = 10): Promise<{ messages: SystemMessage[]; totalPages: number; hasNext: boolean }> {
+    try {
+      const response = await api.get(`/api/v1/messages/status/${status}`, {
+        headers: getAuthHeaders(),
+        params: { page, size, sort: 'createdAt,desc' }
+      });
+
+      // Usar o adaptador para converter a resposta do backend
+      return adaptPaginatedResponse(response.data);
+    } catch (error: any) {
+      console.error('[MessageService] Erro ao buscar mensagens por status:', error);
+      
+      // Se for erro de conexão ou 500, retornar estrutura vazia
+      if (!error?.response || error?.response?.status >= 500) {
+        console.warn('[MessageService] Backend indisponível ou erro interno, retornando lista vazia');
+        return {
+          messages: [],
+          totalPages: 0,
+          hasNext: false
+        };
+      }
+      
+      // Para outros erros, lançar exceção para ser tratada pelo chamador
+      handleApiError(error, 'getMessagesByStatus');
+      // Nunca será alcançado, mas necessário para TypeScript
+      return {
+        messages: [],
+        totalPages: 0,
+        hasNext: false
+      };
+    }
+  },
+
+  async getMessageStatistics(): Promise<{ total: number; unread: number; read: number; archived: number }> {
+    try {
+      const response = await api.get('/api/v1/messages/stats', {
+        headers: getAuthHeaders()
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('[MessageService] Erro ao buscar estatísticas de mensagens:', error);
+      
+      // Retornar valores zero em caso de erro
+      return {
+        total: 0,
+        unread: 0,
+        read: 0,
+        archived: 0
+      };
+    }
+  },
+
   // ===== CHAT INTERNO =====
 
   async getAvailableUsers(): Promise<User[]> {
@@ -462,6 +514,26 @@ export const messageService = {
       });
     } catch (error) {
       handleApiError(error, 'deleteSystemMessage');
+    }
+  },
+
+  async archiveSystemMessage(messageId: string): Promise<void> {
+    try {
+      await api.put(`/api/v1/messages/${messageId}/archive`, {}, {
+        headers: getAuthHeaders()
+      });
+    } catch (error) {
+      handleApiError(error, 'archiveSystemMessage');
+    }
+  },
+
+  async restoreSystemMessage(messageId: string): Promise<void> {
+    try {
+      await api.put(`/api/v1/messages/${messageId}/restore`, {}, {
+        headers: getAuthHeaders()
+      });
+    } catch (error) {
+      handleApiError(error, 'restoreSystemMessage');
     }
   },
 

@@ -146,34 +146,43 @@ const EmployeeTrainingTab = () => {
         // Buscar certificações de funcionários (histórico de treinamentos concluídos)
         const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
         
-        // Buscar dados completos dos funcionários para obter position e sector
-        const { employeeService } = await import('@/services/employeeService');
-        const employees = await employeeService.getAllEmployees();
-        const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
-        
         const rows: TrainingRow[] = certs.map(c => {
           const validUntil = c.expirationDate || '';
           const status = getTrainingStatus(validUntil);
-          const employee = employeeMap.get(c.employeeId) as any;
           
-          // Priorizar workPostName da certificação, senão pegar unit do employee
+          // Priorizar workPostName da certificação, senão usar employeeDepartment
           let sectorName = '';
           if (c.workPostName) {
             sectorName = c.workPostName;
-          } else if (employee?.unit) {
-            if (typeof employee.unit === 'string') {
-              sectorName = employee.unit;
-            } else if (employee.unit.name) {
-              sectorName = employee.unit.name;
-            }
+          } else if (c.employeeDepartment) {
+            sectorName = c.employeeDepartment;
+          }
+          
+          // Debug: verificar se os dados estão chegando
+          console.log('📋 Certificação:', {
+            id: c.id,
+            employeeName: c.employeeName,
+            employeePosition: c.employeePosition,
+            employeeDepartment: c.employeeDepartment,
+            workPostName: c.workPostName,
+            employeeId: c.employeeId
+          });
+          
+          // Verificar se employeePosition está vazio/null
+          if (!c.employeePosition && c.employeeName) {
+            console.warn('⚠️ Certificação sem cargo (position):', {
+              certificationId: c.id,
+              employeeName: c.employeeName,
+              employeeId: c.employeeId
+            });
           }
           
           return {
             id: c.id,
             employeeId: c.employeeId, // ID do funcionário para edição
-            employee: c.employeeName || employee?.name || 'Funcionário',
-            cpf: c.employeeDocument || employee?.document || employee?.cpf,
-            position: employee?.position?.name || '',
+            employee: c.employeeName || 'Funcionário',
+            cpf: c.employeeDocument || '',
+            position: c.employeePosition || '',
             sector: sectorName,
             validUntil,
             status,
@@ -276,34 +285,24 @@ const EmployeeTrainingTab = () => {
       // Buscar certificações de funcionários (histórico de treinamentos concluídos)
       const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
       
-      // Buscar dados completos dos funcionários para obter position e sector
-      const { employeeService } = await import('@/services/employeeService');
-      const employees = await employeeService.getAllEmployees();
-      const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
-      
       const rows: TrainingRow[] = certs.map(c => {
         const validUntil = c.expirationDate || '';
         const status = getTrainingStatus(validUntil);
-        const employee = employeeMap.get(c.employeeId) as any;
         
-        // Priorizar workPostName da certificação, senão pegar unit do employee
+        // Priorizar workPostName da certificação, senão usar employeeDepartment
         let sectorName = '';
         if (c.workPostName) {
           sectorName = c.workPostName;
-        } else if (employee?.unit) {
-          if (typeof employee.unit === 'string') {
-            sectorName = employee.unit;
-          } else if (employee.unit.name) {
-            sectorName = employee.unit.name;
-          }
+        } else if (c.employeeDepartment) {
+          sectorName = c.employeeDepartment;
         }
         
         return {
           id: c.id,
           employeeId: c.employeeId, // ID do funcionário para edição
-          employee: c.employeeName || employee?.name || 'Funcionário',
-          cpf: c.employeeDocument || employee?.document || employee?.cpf,
-          position: employee?.position?.name || '',
+          employee: c.employeeName || 'Funcionário',
+          cpf: c.employeeDocument || '',
+          position: c.employeePosition || '',
           sector: sectorName,
           validUntil,
           status,
@@ -528,7 +527,9 @@ const EmployeeTrainingTab = () => {
                           <div className="text-xs text-seguranca-lightgray/70">{t.cpf}</div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 border">{t.position}</td>
+                      <td className="px-3 py-3 border">
+                        {t.position || <span className="text-gray-500 italic">Não informado</span>}
+                      </td>
                       <td className="px-3 py-3 border">{t.sector}</td>
                       <td className="px-3 py-3 border">
                         <div>

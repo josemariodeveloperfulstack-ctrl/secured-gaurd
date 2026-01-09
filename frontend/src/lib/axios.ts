@@ -107,9 +107,10 @@ api.interceptors.response.use(
     }
     const originalRequest = error.config;
 
-    // Se o erro for 401 ou 403 (não autorizado - token inválido/expirado ou sem permissão)
-    // 403 também pode indicar token inválido em alguns casos
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+    // Se o erro for 401 (não autorizado - token inválido/expirado)
+    // 403 (Forbidden) é diferente - significa que o usuário está autenticado mas não tem permissão
+    // Não devemos redirecionar para login em caso de 403, apenas em 401
+    if (error.response?.status === 401 && !originalRequest._retry) {
       // Verificar se o problema é falta de token
       const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
       const token = localStorage.getItem(tokenKey) || localStorage.getItem('token') || localStorage.getItem('authToken');

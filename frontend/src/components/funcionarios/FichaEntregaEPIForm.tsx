@@ -14,7 +14,6 @@ import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { caepiService, CAEPIResponse } from '@/services/caepiService';
-import { caepiService, CAEPIResponse } from '@/services/caepiService';
 
 const epiOptions = [
   'Capacete de Segurança',

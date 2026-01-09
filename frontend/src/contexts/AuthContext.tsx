@@ -175,7 +175,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         hasToken: !!response.data?.token,
         hasUser: !!response.data?.user,
         userRole: response.data?.user?.role,
-        userRoles: response.data?.user?.roles
+        userRoles: response.data?.user?.roles,
+        requiresPasswordChange: response.data?.requiresPasswordChange,
+        firstAccessCompleted: response.data?.firstAccessCompleted,
+        requires2FA: response.data?.requires2FA,
+        requiresLgpdConsent: response.data?.requiresLgpdConsent
       });
       
       // Obter os roles do backend (array ou string)
@@ -228,7 +232,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const userData: User = {
-        id: response.data.user?.id || 'fe812a92-90ee-4a2a-b846-4476a35ea9b9',
+        id: response.data.user?.id || '',
         name: response.data.user?.fullName || response.data.user?.name || 'Usuário Teste',
         email: response.data.user?.email || email,
         username: response.data.user?.username || email, // CPF usado no login
@@ -241,6 +245,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         position: response.data.user?.position,
         employeeCode: response.data.user?.employeeCode,
       };
+
+      // Validar que o ID foi fornecido
+      if (!userData.id || userData.id.trim() === '') {
+        console.error('❌ ID do usuário não encontrado na resposta do login!');
+        throw new Error('ID do usuário não encontrado na resposta do login');
+      }
+      
+      console.log('✅ ID do usuário obtido:', userData.id);
 
       // Salvar token e dados do usuário
       if (response.data.token) {
@@ -268,13 +280,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
       }
 
+      // Verificar se precisa de mudança de senha ou primeiro acesso
+      const requiresPasswordChange = response.data?.requiresPasswordChange === true;
+      const firstAccessCompleted = response.data?.firstAccessCompleted === true;
+      const requires2FA = response.data?.requires2FA === true;
+      const requiresLgpdConsent = response.data?.requiresLgpdConsent === true;
+
+      console.log('🔍 Verificando requisitos de acesso:', {
+        requiresPasswordChange,
+        firstAccessCompleted,
+        requires2FA,
+        requiresLgpdConsent
+      });
+
+      // IMPORTANTE: Setar isLoading como false ANTES de navegar
+      // para evitar que ProtectedRoute redirecione para login
+      setIsLoading(false);
+
       // Aguardar um tick do React para garantir que o estado foi atualizado
       // antes de navegar
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Navegar apenas após login bem-sucedido e estado atualizado
-      console.log('🚀 Navegando para /dashboard');
-      navigate('/dashboard');
+      // Redirecionar baseado nos requisitos
+      if (requiresPasswordChange || !firstAccessCompleted) {
+        console.log('🚀 Redirecionando para primeiro acesso (mudança de senha)');
+        navigate('/first-access/change-password');
+      } else if (requires2FA) {
+        console.log('🚀 Redirecionando para ativação de 2FA');
+        navigate('/first-access/activate-2fa');
+      } else if (requiresLgpdConsent) {
+        console.log('🚀 Redirecionando para consentimento LGPD');
+        navigate('/lgpd-consent');
+      } else {
+        // Navegar apenas após login bem-sucedido e estado atualizado
+        console.log('🚀 Navegando para /dashboard');
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       console.error('❌ Erro no login:', error);
       console.error('📋 Detalhes do erro:', {

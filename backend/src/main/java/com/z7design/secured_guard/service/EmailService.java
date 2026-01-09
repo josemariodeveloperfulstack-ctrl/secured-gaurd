@@ -119,11 +119,18 @@ public class EmailService {
             } else if (cause instanceof jakarta.mail.MessagingException) {
                 log.error("❌ Erro de mensagem ao enviar email com anexo para {}: {}", toEmail, cause.getMessage());
                 log.error("Causa: {}", cause.getCause() != null ? cause.getCause().getMessage() : "Desconhecida");
-                if (cause.getMessage() != null && cause.getMessage().contains("Could not connect to SMTP host")) {
+                String causeMessage = cause.getMessage() != null ? cause.getMessage() : "";
+                if (causeMessage.contains("Could not connect") || causeMessage.contains("Couldn't connect")) {
                     log.error("⚠️ Não foi possível conectar ao servidor SMTP. Verifique:");
                     log.error("   - Host e porta estão corretos?");
                     log.error("   - Firewall/antivírus está bloqueando?");
                     log.error("   - Servidor SMTP está acessível?");
+                } else if (causeMessage.contains("timeout") || causeMessage.contains("Connection timed out")) {
+                    log.error("⚠️ Timeout ao conectar ao servidor SMTP:");
+                    log.error("   - A conexão expirou após 60 segundos");
+                    log.error("   - Servidor pode estar inacessível da sua rede");
+                    log.error("   - Verifique firewall e conectividade de rede");
+                    log.error("   - Para desenvolvimento local, considere usar Gmail SMTP ou Mailtrap");
                 }
             } else {
                 log.error("💥 Erro ao enviar email com anexo para {}: {}", toEmail, e.getMessage(), e);
@@ -223,11 +230,18 @@ public class EmailService {
             } else if (cause instanceof jakarta.mail.MessagingException) {
                 log.error("❌ Erro de mensagem na configuração de email: {}", cause.getMessage());
                 log.error("Causa: {}", cause.getCause() != null ? cause.getCause().getMessage() : "Desconhecida");
-                if (cause.getMessage() != null && cause.getMessage().contains("Could not connect to SMTP host")) {
+                String causeMessage = cause.getMessage() != null ? cause.getMessage() : "";
+                if (causeMessage.contains("Could not connect") || causeMessage.contains("Couldn't connect")) {
                     log.error("⚠️ Não foi possível conectar ao servidor SMTP. Verifique:");
                     log.error("   - Host e porta estão corretos?");
                     log.error("   - Firewall/antivírus está bloqueando?");
                     log.error("   - Servidor SMTP está acessível?");
+                } else if (causeMessage.contains("timeout") || causeMessage.contains("Connection timed out")) {
+                    log.error("⚠️ Timeout ao conectar ao servidor SMTP:");
+                    log.error("   - A conexão expirou após 60 segundos");
+                    log.error("   - Servidor pode estar inacessível da sua rede");
+                    log.error("   - Verifique firewall e conectividade de rede");
+                    log.error("   - Para desenvolvimento local, considere usar Gmail SMTP ou Mailtrap");
                 }
             } else {
                 log.error("❌ Erro na configuração de email: {}", e.getMessage(), e);

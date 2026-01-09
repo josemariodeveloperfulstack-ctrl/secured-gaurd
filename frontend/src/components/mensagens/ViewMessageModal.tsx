@@ -24,7 +24,9 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
-  Reply
+  Reply,
+  Archive,
+  RefreshCw
 } from 'lucide-react';
 import { SystemMessage } from '@/stores/messageStore';
 
@@ -36,6 +38,8 @@ interface ViewMessageModalProps {
   onDelete?: () => void;
   onMarkAsRead?: () => void;
   onReply?: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
 }
 
 export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
@@ -45,7 +49,9 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
   onEdit,
   onDelete,
   onMarkAsRead,
-  onReply
+  onReply,
+  onArchive,
+  onRestore
 }) => {
   if (!message) return null;
 
@@ -79,6 +85,21 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
     }
   };
 
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'URGENT':
+        return 'Urgente';
+      case 'HIGH':
+        return 'Alta';
+      case 'NORMAL':
+        return 'Normal';
+      case 'LOW':
+        return 'Baixa';
+      default:
+        return priority;
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'UNREAD':
@@ -92,6 +113,19 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'UNREAD':
+        return 'Nova';
+      case 'READ':
+        return 'Lida';
+      case 'ARCHIVED':
+        return 'Arquivada';
+      default:
+        return status;
+    }
+  };
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'GLOBAL':
@@ -102,6 +136,21 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
         return <User className="h-4 w-4" />;
       default:
         return <User className="h-4 w-4" />;
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'GLOBAL':
+        return 'Global';
+      case 'GROUP':
+        return 'Grupo';
+      case 'DEPARTMENT':
+        return 'Departamento';
+      case 'INDIVIDUAL':
+        return 'Individual';
+      default:
+        return type;
     }
   };
 
@@ -129,7 +178,7 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
               <div className="flex flex-wrap gap-2">
                 <Badge className={`${getPriorityColor(message.priority)} flex items-center gap-1`}>
                   {getPriorityIcon(message.priority)}
-                  Prioridade: {message.priority}
+                  Prioridade: {getPriorityLabel(message.priority)}
                 </Badge>
                 
                 <Badge className={`${getStatusColor(message.status)} flex items-center gap-1`}>
@@ -153,8 +202,7 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
 
                 <Badge variant="outline" className="border-gray-500 text-gray-300 flex items-center gap-1">
                   {getTypeIcon(message.type)}
-                  {message.type === 'GLOBAL' ? 'Global' :
-                   message.type === 'GROUP' ? 'Grupo' : 'Individual'}
+                  {getTypeLabel(message.type)}
                 </Badge>
               </div>
             </div>
@@ -253,6 +301,32 @@ export const ViewMessageModal: React.FC<ViewMessageModalProps> = ({
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Marcar como Lida
+            </Button>
+          )}
+          
+          {message.status !== 'ARCHIVED' && onArchive && (
+            <Button
+              onClick={() => {
+                onArchive();
+                onClose();
+              }}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              Arquivar
+            </Button>
+          )}
+          
+          {message.status === 'ARCHIVED' && onRestore && (
+            <Button
+              onClick={() => {
+                onRestore();
+                onClose();
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Restaurar
             </Button>
           )}
           

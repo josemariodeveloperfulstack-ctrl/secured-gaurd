@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import jakarta.validation.Valid;
 import java.util.Collections;
@@ -145,12 +146,64 @@ public class PaymentReceiptController {
         }
     }
     
-    // Download de comprovante
+    // Download de comprovante individual
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> downloadReceipt(@PathVariable String id) {
         try {
+            log.info("📥 Download individual de comprovante: {}", id);
             return paymentReceiptService.downloadReceiptFile(id);
         } catch (Exception e) {
+            log.error("❌ Erro ao fazer download individual: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    // Download em lote de comprovantes (ZIP) - ALTA PERFORMANCE
+    @PostMapping("/download-batch")
+    public ResponseEntity<StreamingResponseBody> downloadBatch(@RequestBody(required = false) Map<String, Object> body) {
+        try {
+            log.info("📦 Recebida requisição para download em lote");
+            
+            if (body == null) {
+                log.warn("⚠️ Request body é nulo");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            Object idsObj = body.get("ids");
+            if (idsObj == null) {
+                log.warn("⚠️ Campo 'ids' não encontrado no body");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Converter para List<String>
+            List<String> idStrings;
+            try {
+                if (idsObj instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> idsList = (List<Object>) idsObj;
+                    idStrings = idsList.stream()
+                        .map(id -> id != null ? id.toString() : null)
+                        .filter(id -> id != null && !id.trim().isEmpty())
+                        .collect(java.util.stream.Collectors.toList());
+                } else {
+                    log.warn("⚠️ Campo 'ids' não é uma lista: {}", idsObj.getClass().getSimpleName());
+                    return ResponseEntity.badRequest().build();
+                }
+            } catch (Exception e) {
+                log.error("❌ Erro ao converter lista de IDs: {}", e.getMessage(), e);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (idStrings.isEmpty()) {
+                log.info("📋 Lista de IDs vazia");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            log.info("📦 Iniciando download em lote de {} comprovante(s)", idStrings.size());
+            return paymentReceiptService.downloadBatch(idStrings);
+            
+        } catch (Exception e) {
+            log.error("❌ Erro ao processar download em lote: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

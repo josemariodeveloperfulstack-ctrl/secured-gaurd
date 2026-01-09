@@ -244,6 +244,28 @@ public class MessageController {
     }
     
     /**
+     * Obtém estatísticas de mensagens
+     */
+    @GetMapping("/stats")
+    public ResponseEntity<MessageService.MessageStatistics> getMessageStatistics(Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            UUID userId = getUserIdFromUsername(username);
+            
+            if (userId == null) {
+                log.error("Usuário não encontrado para username: {}", username);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            MessageService.MessageStatistics stats = messageService.getMessageStatistics(userId);
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erro ao buscar estatísticas de mensagens: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
      * Busca mensagens não lidas
      */
     @GetMapping("/unread")

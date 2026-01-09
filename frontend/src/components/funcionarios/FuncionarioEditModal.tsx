@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,9 +13,15 @@ import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
 import { User } from '@/types/user';
 import { Employee } from '@/types/employee';
-import { Search, User as UserIcon, Building, Briefcase, Plus } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, FileText } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import { useToast } from '@/hooks/use-toast';
+import workPostService, { WorkPost } from '@/services/workPostService';
+import departmentService, { Department } from '@/services/departmentService';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { doctorService } from '@/services/doctorService';
+import { Doctor } from '@/types/doctor';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -116,6 +122,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingCep, setLoadingCep] = useState(false);
   
   // Estados para os dados dos selects
   const [positions, setPositions] = useState<Position[]>([]);
@@ -124,12 +131,21 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+  
+  // Estados para médicos
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [doctorSearchTerm, setDoctorSearchTerm] = useState('');
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
   
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
@@ -279,7 +295,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         rg: funcionario.rg || '',
         email: funcionario.email || '',
         phone: funcionario.phone || '',
+        telefoneContato: (funcionario as any).telefoneContato || '',
         address: addressValue,
+        enderecoRua: (funcionario as any).enderecoRua || '',
+        enderecoNumero: (funcionario as any).enderecoNumero || '',
+        enderecoComplemento: (funcionario as any).enderecoComplemento || '',
+        enderecoBairro: (funcionario as any).enderecoBairro || '',
+        enderecoCidade: (funcionario as any).enderecoCidade || '',
+        enderecoEstado: (funcionario as any).enderecoEstado || '',
+        enderecoCep: (funcionario as any).enderecoCep || '',
         birthDate: funcionario.birthDate || '',
         maritalStatus: funcionario.maritalStatus || 'SINGLE',
         nationality: funcionario.nationality || 'Brasileiro',
@@ -291,6 +315,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         unit: { id: funcionario.unit?.id ? String(funcionario.unit.id) : '' },
         user: { id: funcionario.user?.id ? String(funcionario.user.id) : '' },
         company: { id: funcionario.company?.id ? String(funcionario.company.id) : '' },
+        workPostId: (funcionario as any).workPost?.id || (funcionario as any).workPostId || '',
+        departmentId: (funcionario as any).department?.id || (funcionario as any).departmentId || '',
         bankData: bankData,
         // Campos do cônjuge
         spouseName: funcionario.spouseName || '',
@@ -375,15 +401,110 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     }
   }, [funcionario, open]);
 
+  // Função para buscar CEP
+  const buscarCep = async (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+    
+    setLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        setForm(prev => ({
+          ...prev,
+          enderecoRua: data.logradouro || '',
+          enderecoBairro: data.bairro || '',
+          enderecoCidade: data.localidade || '',
+          enderecoEstado: data.uf || '',
+          enderecoCep: cepLimpo,
+          address: `${data.logradouro || ''}, ${data.bairro || ''}, ${data.localidade || ''} - ${data.uf || ''}, ${cepLimpo}`
+        }));
+        toast({
+          title: "CEP encontrado",
+          description: "Endereço preenchido automaticamente.",
+        });
+      } else {
+        toast({
+          title: "CEP não encontrado",
+          description: "Verifique o CEP informado.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível buscar o CEP.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingCep(false);
+    }
+  };
+
+  // Função para aplicar máscara de telefone
+  const aplicarMascaraTelefone = (valor: string) => {
+    const numeros = valor.replace(/\D/g, '');
+    if (numeros.length <= 10) {
+      return numeros.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    } else {
+      return numeros.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    }
+  };
+  
+  // Função para aplicar máscara de CEP
+  const aplicarMascaraCep = (valor: string) => {
+    const numeros = valor.replace(/\D/g, '');
+    return numeros.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+  };
+
+  // Função para carregar médicos
+  const loadDoctors = async () => {
+    try {
+      setLoadingDoctors(true);
+      const doctorsList = await doctorService.getAllActive();
+      setDoctors(doctorsList);
+    } catch (error) {
+      console.error('Erro ao carregar médicos:', error);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  // Função para buscar médicos por nome
+  const handleDoctorSearch = async (searchTerm: string) => {
+    if (searchTerm.length < 2) {
+      loadDoctors();
+      return;
+    }
+    try {
+      setLoadingDoctors(true);
+      const doctorsList = await doctorService.getAllActive();
+      const filtered = doctorsList.filter(doctor =>
+        doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doctor.crmNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setDoctors(filtered);
+    } catch (error) {
+      console.error('Erro ao buscar médicos:', error);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
   const loadSelectData = async () => {
     setLoadingData(true);
     try {
       console.log('📥 Carregando dados dos selects...');
-      const [positionsData, unitsData, usersData, companiesData] = await Promise.all([
+      const [positionsData, unitsData, usersData, companiesData, workPostsData, departmentsData] = await Promise.all([
         positionService.getPositions(),
         unitService.getAllUnits(),
         userService.getAllUsers(),
-        companyService.getAllCompanies()
+        companyService.getAllCompanies(),
+        workPostService.getAllWorkPosts(),
+        departmentService.listActive()
       ]);
       
       console.log('✅ Dados carregados:', {
@@ -398,6 +519,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setUsers(usersData);
       setFilteredUsers(usersData);
       setCompanies(companiesData);
+      setWorkPosts(workPostsData);
+      setDepartments(departmentsData);
+      
+      // Carregar médicos
+      await loadDoctors();
       
       // Após carregar os dados, preencher os selects se houver funcionário
       if (funcionario) {
@@ -630,16 +756,23 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setForm(prev => ({ ...prev, position: { id: cargo.id } }));
   };
 
-  if (!funcionario) return null;
+  // Não renderizar se não houver funcionário e a modal estiver fechada
+  if (!open) return null;
+  if (!funcionario && open) {
+    // Se a modal está aberta mas não há funcionário, mostrar mensagem ou fechar
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full p-2 sm:p-4 overflow-y-auto max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Editar Funcionário</DialogTitle>
-          <p className="text-sm text-gray-400">
+      <DialogContent className="max-w-4xl w-[95vw] sm:w-full p-3 sm:p-4 md:p-6 overflow-y-auto max-h-[90vh] bg-seguranca-graphite border-gray-600">
+        <DialogHeader className="pb-3 sm:pb-4">
+          <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-seguranca-lightgray">
+            Editar Funcionário
+          </DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm text-gray-400">
             Edite os dados do funcionário. Campos marcados com * são obrigatórios.
-          </p>
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -846,6 +979,107 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
             </div>
+            
+            {/* Dados Familiares (Nomes dos pais) */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
+              <h4 className="text-md font-semibold text-white mb-4">Dados Familiares (Nomes dos pais)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Nome da Mãe</Label>
+                  <Input 
+                    name="nomeMae" 
+                    value={form.nomeMae || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome completo da mãe"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Nome do Pai</Label>
+                  <Input 
+                    name="nomePai" 
+                    value={form.nomePai || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome completo do pai"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Título de Eleitor */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
+              <h4 className="text-md font-semibold text-white mb-4">Título de Eleitor</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Número</Label>
+                  <Input 
+                    name="tituloEleitor" 
+                    value={form.tituloEleitor || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 2236.5048.0205"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Zona</Label>
+                  <Input 
+                    name="tituloEleitorZona" 
+                    value={form.tituloEleitorZona || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 316"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Seção</Label>
+                  <Input 
+                    name="tituloEleitorSecao" 
+                    value={form.tituloEleitorSecao || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 0585"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Registro Geral (RG) */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
+              <h4 className="text-md font-semibold text-white mb-4">Registro Geral (RG)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Número</Label>
+                  <Input 
+                    name="rg" 
+                    value={form.rg || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: MG-15.934.064"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Órgão Emissor</Label>
+                  <Input 
+                    name="carteiraIdentidadeOrgaoEmissor" 
+                    value={form.carteiraIdentidadeOrgaoEmissor || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: PF"
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Data de Expedição</Label>
+                  <Input 
+                    name="carteiraIdentidadeDataEmissao" 
+                    type="date" 
+                    value={form.carteiraIdentidadeDataEmissao || ''} 
+                    onChange={handleChange} 
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Seção: Informações do Cônjuge - Exibida apenas quando estado civil for "Casado" */}
@@ -932,7 +1166,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-200">Telefone *</Label>
+                <Label className="text-sm font-medium text-gray-200">WhatsApp *</Label>
                 <Input 
                   name="phone" 
                   value={form.phone} 
@@ -941,15 +1175,119 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   placeholder="(00) 00000-0000"
                 />
               </div>
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium text-gray-200">Endereço *</Label>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Telefone de Contato</Label>
                 <Input 
-                  name="address" 
-                  value={form.address} 
-                  onChange={handleChange} 
-                  required 
-                  placeholder="Rua, número, bairro, cidade - estado, CEP"
+                  name="telefoneContato" 
+                  value={aplicarMascaraTelefone((form as any).telefoneContato || '')} 
+                  onChange={(e) => {
+                    const valor = e.target.value.replace(/\D/g, '');
+                    setForm(prev => ({ ...prev, telefoneContato: valor } as any));
+                  }}
+                  placeholder="(00) 00000-0000"
+                  maxLength={15}
                 />
+              </div>
+            </div>
+            
+            {/* Seção: Endereço Separado */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
+              <h4 className="text-md font-semibold text-seguranca-yellow mb-4">Endereço</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      name="enderecoCep" 
+                      value={aplicarMascaraCep((form as any).enderecoCep || '')} 
+                      onChange={(e) => {
+                        const valor = e.target.value.replace(/\D/g, '');
+                        setForm(prev => ({ ...prev, enderecoCep: valor } as any));
+                        if (valor.length === 8) {
+                          buscarCep(valor);
+                        }
+                      }}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      required
+                      className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+                    />
+                    {loadingCep && (
+                      <div className="flex items-center px-2 sm:px-3 text-gray-400">
+                        <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
+                  <Input 
+                    name="enderecoRua" 
+                    value={(form as any).enderecoRua || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome da rua, avenida, etc."
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Número *</Label>
+                  <Input 
+                    name="enderecoNumero" 
+                    value={(form as any).enderecoNumero || ''} 
+                    onChange={handleChange} 
+                    placeholder="123"
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Complemento</Label>
+                  <Input 
+                    name="enderecoComplemento" 
+                    value={(form as any).enderecoComplemento || ''} 
+                    onChange={handleChange} 
+                    placeholder="Apto, Bloco, etc."
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Bairro *</Label>
+                  <Input 
+                    name="enderecoBairro" 
+                    value={(form as any).enderecoBairro || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome do bairro"
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Cidade *</Label>
+                  <Input 
+                    name="enderecoCidade" 
+                    value={(form as any).enderecoCidade || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome da cidade"
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Estado (UF) *</Label>
+                  <Input 
+                    name="enderecoEstado" 
+                    value={(form as any).enderecoEstado || ''} 
+                    onChange={(e) => {
+                      const valor = e.target.value.toUpperCase().substring(0, 2);
+                      setForm(prev => ({ ...prev, enderecoEstado: valor } as any));
+                    }}
+                    placeholder="MG"
+                    maxLength={2}
+                    required
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1062,12 +1400,110 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-200">CNH</Label>
+                <Label className="text-sm font-medium text-gray-200">Número da CNH</Label>
                 <Input 
                   name="cnhNumber" 
-                  value={form.cnhNumber} 
+                  value={form.cnhNumber || ''} 
                   onChange={handleChange} 
-                  placeholder="Número da CNH"
+                  placeholder="00000000000"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Categoria da CNH</Label>
+                <Select 
+                  value={form.cnhCategory || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, cnhCategory: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">A - Motocicleta</SelectItem>
+                    <SelectItem value="B">B - Carro</SelectItem>
+                    <SelectItem value="C">C - Caminhão</SelectItem>
+                    <SelectItem value="D">D - Ônibus</SelectItem>
+                    <SelectItem value="E">E - Carreta</SelectItem>
+                    <SelectItem value="AB">AB - Moto e Carro</SelectItem>
+                    <SelectItem value="AC">AC - Moto e Caminhão</SelectItem>
+                    <SelectItem value="AD">AD - Moto e Ônibus</SelectItem>
+                    <SelectItem value="AE">AE - Moto e Carreta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Validade da CNH</Label>
+                <Input 
+                  name="cnhExpirationDate" 
+                  type="date" 
+                  value={form.cnhExpirationDate || ''} 
+                  onChange={handleChange} 
+                />
+              </div>
+              
+              {/* CTPS */}
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Número da CTPS</Label>
+                <Input 
+                  name="ctps" 
+                  value={form.ctps || ''} 
+                  onChange={handleChange} 
+                  placeholder="0000000"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Série da CTPS</Label>
+                <Input 
+                  name="ctpsSeries" 
+                  value={form.ctpsSeries || ''} 
+                  onChange={handleChange} 
+                  placeholder="0000"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data de Emissão da CTPS</Label>
+                <Input 
+                  name="ctpsIssueDate" 
+                  type="date" 
+                  value={form.ctpsIssueDate || ''} 
+                  onChange={handleChange} 
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Órgão Emissor da CTPS</Label>
+                <Input 
+                  name="ctpsIssuingAgency" 
+                  value={form.ctpsIssuingAgency || ''} 
+                  onChange={handleChange} 
+                  placeholder="Ex: SSP, DETRAN"
+                />
+              </div>
+              
+              {/* CIN - Carteira de Identidade Nacional */}
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Número do CIN</Label>
+                <Input 
+                  name="cinNumero" 
+                  value={(form as any).cinNumero || ''} 
+                  onChange={handleChange} 
+                  placeholder="Número do CIN"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Órgão Emissor do CIN</Label>
+                <Input 
+                  name="cinOrgaoEmissor" 
+                  value={(form as any).cinOrgaoEmissor || ''} 
+                  onChange={handleChange} 
+                  placeholder="Ex: SSP, DETRAN"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data de Emissão do CIN</Label>
+                <Input 
+                  name="cinDataEmissao" 
+                  type="date" 
+                  value={(form as any).cinDataEmissao || ''} 
+                  onChange={handleChange} 
                 />
               </div>
             </div>
@@ -1209,6 +1645,42 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   onChange={handleChange} 
                   placeholder="Ex: Domingo"
                 />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Departamento</Label>
+                <Select 
+                  value={(form as any).departmentId || ''}
+                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
+                >
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Selecione um departamento" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id} className="text-seguranca-lightgray hover:bg-gray-700">
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Setor/Posto de Trabalho</Label>
+                <Select 
+                  value={(form as any).workPostId || ''}
+                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
+                >
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Selecione um posto" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    {workPosts.map((wp) => (
+                      <SelectItem key={wp.id} value={wp.id} className="text-seguranca-lightgray hover:bg-gray-700">
+                        {wp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-200">Unidade (Opcional)</Label>
@@ -1383,6 +1855,174 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   value={form.pis} 
                   onChange={handleChange} 
                   placeholder="Número do PIS"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Dados do Exame Médico (ASO) */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data do Exame Médico (ASO)</Label>
+                <Input 
+                  name="exameMedicoData" 
+                  type="date"
+                  value={(form as any).exameMedicoData || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value } as any))} 
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
+                <Select 
+                  value={(form as any).exameMedicoTipo || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoTipo: value } as any))}
+                >
+                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="ADMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Admissional</SelectItem>
+                    <SelectItem value="DEMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Demissional</SelectItem>
+                    <SelectItem value="PERIODICO" className="text-seguranca-lightgray hover:bg-gray-700">Periódico</SelectItem>
+                    <SelectItem value="MUDANCA_FUNCAO" className="text-seguranca-lightgray hover:bg-gray-700">Mudança de Função</SelectItem>
+                    <SelectItem value="RETORNO_TRABALHO" className="text-seguranca-lightgray hover:bg-gray-700">Retorno ao Trabalho</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
+                <div className="relative">
+                  <Input 
+                    value={doctorSearchTerm} 
+                    onChange={(e) => {
+                      setDoctorSearchTerm(e.target.value);
+                      setShowDoctorDropdown(true);
+                      if (e.target.value.length > 0) {
+                        handleDoctorSearch(e.target.value);
+                      } else {
+                        loadDoctors();
+                      }
+                    }}
+                    onFocus={() => {
+                      setShowDoctorDropdown(true);
+                      if (doctors.length === 0) {
+                        loadDoctors();
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setShowDoctorDropdown(false), 200);
+                    }}
+                    placeholder="Digite para buscar médico..."
+                    className="text-xs sm:text-sm h-9 sm:h-10"
+                  />
+                  {showDoctorDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {loadingDoctors ? (
+                        <div className="p-2 text-sm text-gray-400">Carregando...</div>
+                      ) : doctors.length > 0 ? (
+                        doctors.map((doctor) => (
+                          <div
+                            key={doctor.id}
+                            className="p-2 hover:bg-gray-700 cursor-pointer text-seguranca-lightgray text-xs sm:text-sm"
+                            onClick={() => {
+                              setSelectedDoctor(doctor);
+                              setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+                              setForm(prev => ({ 
+                                ...prev, 
+                                exameMedicoDoctor: { id: doctor.id } 
+                              } as any));
+                              setShowDoctorDropdown(false);
+                            }}
+                          >
+                            {doctor.name} - CRM {doctor.crmNumber}/{doctor.crmState}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-400">Nenhum médico encontrado</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Horário</Label>
+                <Input 
+                  name="exameMedicoHorario" 
+                  value={(form as any).exameMedicoHorario || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoHorario: e.target.value } as any))} 
+                  placeholder="Ex: 18:00 ÀS 06:00 H"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Observações</Label>
+                <Textarea 
+                  name="exameMedicoObservacoes" 
+                  value={(form as any).exameMedicoObservacoes || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoObservacoes: e.target.value } as any))} 
+                  placeholder="Observações sobre o exame médico..."
+                  rows={3}
+                  className="text-xs sm:text-sm bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Para Estrangeiro */}
+          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white">Para Estrangeiro</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200">RNE nº</Label>
+                <Input 
+                  name="rneNumero" 
+                  value={(form as any).rneNumero || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, rneNumero: e.target.value } as any))} 
+                  placeholder="Número do RNE"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Validade</Label>
+                <Input 
+                  name="rneValidade" 
+                  type="date"
+                  value={(form as any).rneValidade || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value } as any))} 
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Possui filhos com brasileiro?</Label>
+                <RadioGroup 
+                  value={form.temFilhosBrasileiros === true ? 'sim' : form.temFilhosBrasileiros === false ? 'nao' : ''}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, temFilhosBrasileiros: value === 'sim' }))}
+                  className="flex gap-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="filhos-brasileiros-sim" className="text-seguranca-lightgray" />
+                    <Label htmlFor="filhos-brasileiros-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="filhos-brasileiros-nao" className="text-seguranca-lightgray" />
+                    <Label htmlFor="filhos-brasileiros-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Quantos?</Label>
+                <Input 
+                  name="quantidadeFilhosBrasileiros" 
+                  type="number"
+                  min="0"
+                  value={form.quantidadeFilhosBrasileiros || ''} 
+                  onChange={(e) => setForm(prev => ({ ...prev, quantidadeFilhosBrasileiros: e.target.value ? parseInt(e.target.value) : undefined }))} 
+                  placeholder="Quantidade"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                  disabled={form.temFilhosBrasileiros !== true}
                 />
               </div>
             </div>

@@ -38,3 +38,6 @@ CREATE OR REPLACE TRIGGER update_corrective_actions_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+
+
+

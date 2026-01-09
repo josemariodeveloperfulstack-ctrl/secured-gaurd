@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,8 +10,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +23,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Entity
 @Table(name = "documentos_gerados")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class DocumentoGerado {
     
     @Id
@@ -30,22 +33,24 @@ public class DocumentoGerado {
     @NotNull(message = "Modelo é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "modelo_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ModeloDocumento modelo;
     
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "funcionario_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Employee funcionario;
     
     @Column(name = "conteudo_final", columnDefinition = "TEXT")
     private String conteudoFinal;
     
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "dados_preenchidos", columnDefinition = "JSON")
     private String dadosPreenchidos; // JSON com os dados utilizados
     
     @JsonIgnore
-    @Lob
-    @Column(name = "arquivo_gerado", nullable = false)
+    @Column(name = "arquivo_gerado", nullable = false, columnDefinition = "BYTEA")
     private byte[] arquivoGerado; // Sempre PDF
     
     @NotBlank(message = "Nome do arquivo gerado é obrigatório")
@@ -70,6 +75,7 @@ public class DocumentoGerado {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assinado_por")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User assinadoPor;
     
     @Column(name = "ip_assinatura")
@@ -83,6 +89,7 @@ public class DocumentoGerado {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "criado_por")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User criadoPor;
     
     // Relacionamento com assinaturas

@@ -94,21 +94,36 @@ public class ReceiptProcessingService {
             log.info("📄 Arquivo contém {} página(s) - Cada página contém 1 comprovante", pageCount);
             log.info("📋 Expectativa: {} comprovante(s) processado(s) (1 comprovante por página)", pageCount);
 
-            PDFTextStripper stripper = new PDFTextStripper();
-            
+            // IMPORTANTE: Criar uma nova instância do stripper para cada página
+            // para garantir que não há estado compartilhado entre páginas
             for (int pageNum = 0; pageNum < pageCount; pageNum++) {
+                log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 log.info("=== PROCESSANDO PÁGINA {}/{} ===", pageNum + 1, pageCount);
+                log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 
+                // CRIAR NOVA INSTÂNCIA PARA CADA PÁGINA (crítico para evitar estado compartilhado)
+                PDFTextStripper stripper = new PDFTextStripper();
                 stripper.setStartPage(pageNum + 1);
                 stripper.setEndPage(pageNum + 1);
                 
                 String pageText = stripper.getText(document);
                 log.info("📝 Texto extraído da página {}: {} caracteres", pageNum + 1, pageText.length());
                 
-                // Log do texto extraído para debug (primeiros 200 caracteres)
+                // Log do texto extraído para debug (mostrar parte relevante da seção creditada)
                 if (pageText.length() > 0) {
-                    String preview = pageText.substring(0, Math.min(200, pageText.length()));
-                    log.debug("🔍 Preview da página {}: {}", pageNum + 1, preview);
+                    // Buscar seção creditada no texto para confirmar que é da página correta
+                    Pattern creditadaPreviewPattern = Pattern.compile("Dados da conta (?:a ser )?creditada([\\s\\S]{0,300}?)(?=Dados|Valor|Informações|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                    Matcher creditadaPreviewMatcher = creditadaPreviewPattern.matcher(pageText);
+                    if (creditadaPreviewMatcher.find()) {
+                        String creditadaSection = creditadaPreviewMatcher.group(1);
+                        log.info("🔍 Seção creditada encontrada na página {}: {}", pageNum + 1, creditadaSection.substring(0, Math.min(200, creditadaSection.length())));
+                    } else {
+                        log.warn("⚠️ Seção creditada NÃO encontrada na página {}!", pageNum + 1);
+                    }
+                    
+                    // Preview geral da página
+                    String preview = pageText.substring(0, Math.min(300, pageText.length()));
+                    log.info("🔍 Preview da página {} (primeiros 300 chars): {}", pageNum + 1, preview);
                 } else {
                     log.warn("⚠️ Página {} está vazia!", pageNum + 1);
                 }
@@ -119,9 +134,10 @@ public class ReceiptProcessingService {
                     PaymentReceipt receipt = extractReceiptInfo(pageText, pageNum + 1, new java.io.ByteArrayInputStream(fileBytes));
                     
                     if (receipt != null && receipt.getEmployeeName() != null && !receipt.getEmployeeName().trim().isEmpty()) {
-                        log.info("✅ Comprovante extraído da página {}/{}: {} (CPF/Período: {}/{})", 
+                        log.info("✅ Comprovante extraído da página {}/{}: {} (Período: {}/{}, Conta: {})", 
                             pageNum + 1, pageCount, receipt.getEmployeeName(), 
-                            receipt.getMonth(), receipt.getYear());
+                            receipt.getMonth(), receipt.getYear(),
+                            receipt.getCreditedAccount() != null ? receipt.getCreditedAccount() : "NÃO EXTRAÍDA");
                         
                         extractedReceipts.add(receipt);
                         paginasProcessadas++;
@@ -598,10 +614,17 @@ public class ReceiptProcessingService {
             log.info("Nome do arquivo gerado: {}", fileName);
 
             // Criar objeto PaymentReceipt com validação e todos os dados bancários
-            // Normalizar data da transferência: preferir formato DD/MM/AAAA;
-            // se não extraída do PDF, usar a data derivada da pasta (01/MM/AAAA)
-            // Definir a data do comprovante como MM/AAAA (mês/ano)
-            String normalizedTransferDate = String.format("%02d/%04d", receiptData.month, receiptData.year);
+            // Usar a data de transferência extraída do PDF, ou se não houver, usar o período (MM/AAAA)
+            String normalizedTransferDate;
+            if (receiptData.transferDate != null && !receiptData.transferDate.trim().isEmpty()) {
+                // Usar a data extraída do PDF (formato DD/MM/AAAA)
+                normalizedTransferDate = receiptData.transferDate.trim();
+                log.info("✅ Usando data de transferência extraída do PDF: {}", normalizedTransferDate);
+            } else {
+                // Fallback: usar período como data (MM/AAAA)
+                normalizedTransferDate = String.format("%02d/%04d", receiptData.month, receiptData.year);
+                log.warn("⚠️ Data de transferência não encontrada no PDF, usando período: {}", normalizedTransferDate);
+            }
 
             PaymentReceipt receipt = PaymentReceipt.builder()
                     .employeeId(employeeId) // Associar ao funcionário encontrado
@@ -620,13 +643,14 @@ public class ReceiptProcessingService {
                     .debitedAgency(receiptData.agency != null ? receiptData.agency : "0925")
                     .debitedAccount(receiptData.account != null ? receiptData.account : "98240 - 7")
                     .debitedName(receiptData.companyName != null ? receiptData.companyName : "PROMOVER VIGILANCIA PATRIMONIA")
-                    .creditedAgency(receiptData.creditedAgency != null ? receiptData.creditedAgency : "3804")
-                    .creditedAccount(receiptData.creditedAccount != null ? receiptData.creditedAccount : "68007 - 6")
-                    .creditedName(receiptData.employeeName != null ? receiptData.employeeName.trim().toUpperCase() : "FUNCIONARIO")
+                    .creditedAgency(receiptData.creditedAgency != null ? receiptData.creditedAgency : null)
+                    .creditedAccount(receiptData.creditedAccount != null ? receiptData.creditedAccount : null)
+                    .creditedName(receiptData.creditedName != null ? receiptData.creditedName : 
+                                (receiptData.employeeName != null ? receiptData.employeeName.trim().toUpperCase() : "FUNCIONARIO"))
                     .controlNumber(receiptData.controlNumber != null ? receiptData.controlNumber : String.valueOf(System.currentTimeMillis()).substring(0, 15))
                     .authenticationCode(receiptData.authentication != null ? receiptData.authentication : java.util.UUID.randomUUID().toString().replace("-", "").toUpperCase())
                     .transferDate(normalizedTransferDate)
-                    .transferTime(null)
+                    .transferTime(receiptData.transferTime != null ? receiptData.transferTime : null)
                     .bankName(receiptData.bankName != null ? receiptData.bankName : "Itaú")
                     .transactionType("Transferência de Conta Corrente para Conta Corrente")
                     .statementIdentification("SISPAG SALARIOS")
@@ -634,8 +658,24 @@ public class ReceiptProcessingService {
 
             paymentReceiptService.applyCompanyHierarchy(receipt);
 
-            log.info("Recibo criado com sucesso para: {} (Mês: {}, Ano: {}, Valor: {})", 
-                    receipt.getEmployeeName(), receipt.getMonth(), receipt.getYear(), receipt.getGrossSalary());
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("✅ RECIBO CRIADO COM SUCESSO PARA A PÁGINA {}", pageNumber);
+            log.info("👤 Nome: {}", receipt.getEmployeeName());
+            log.info("📅 Período: {}/{}", receipt.getMonth(), receipt.getYear());
+            log.info("💰 Valor: R$ {}", receipt.getGrossSalary());
+            log.info("🏦 Agência Creditada: {}", receipt.getCreditedAgency() != null ? receipt.getCreditedAgency() : "NÃO EXTRAÍDA");
+            log.info("💳 Conta Creditada: {}", receipt.getCreditedAccount() != null ? receipt.getCreditedAccount() : "NÃO EXTRAÍDA");
+            log.info("👤 Nome Creditado: {}", receipt.getCreditedName() != null ? receipt.getCreditedName() : "NÃO EXTRAÍDO");
+            log.info("📅 Data Transferência: {}", receipt.getTransferDate() != null ? receipt.getTransferDate() : "NÃO EXTRAÍDA");
+            log.info("🕐 Horário Transferência: {}", receipt.getTransferTime() != null ? receipt.getTransferTime() : "NÃO EXTRAÍDO");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            
+            // Validação: alertar se conta não foi extraída
+            if (receipt.getCreditedAccount() == null || receipt.getCreditedAccount().trim().isEmpty()) {
+                log.error("⚠️⚠️⚠️ ATENÇÃO: Conta creditada NÃO foi extraída para o comprovante de {} na página {}", 
+                    receipt.getEmployeeName(), pageNumber);
+            }
+            
             return receipt;
 
         } catch (Exception e) {
@@ -653,8 +693,10 @@ public class ReceiptProcessingService {
         String companyCnpj;
         String creditedAgency;
         String creditedAccount;
+        String creditedName; // Nome da conta creditada (funcionário)
         Double amount;
         String transferDate;
+        String transferTime; // Horário da transferência (HH:MM:SS ou HH:MM)
         String controlNumber;
         String authentication;
         int month;
@@ -866,25 +908,163 @@ public class ReceiptProcessingService {
             String creditedAgency = null;
             String creditedAccount = null;
             
-            // Padrão para agência creditada
-            Pattern creditedAgencyPattern = Pattern.compile("Dados da conta a ser creditada[\\s\\S]*?Agência\\s*:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
-            Matcher creditedAgencyMatcher = creditedAgencyPattern.matcher(text);
-            if (creditedAgencyMatcher.find()) {
-                creditedAgency = creditedAgencyMatcher.group(1);
-                log.info("Agência creditada extraída: {}", creditedAgency);
+            log.info("🔍 Iniciando extração de dados da conta creditada...");
+            
+            // Padrão 1: "Dados da conta a ser creditada" seguido de "Agência:" e "Conta corrente:"
+            Pattern creditedAgencyPattern1 = Pattern.compile("Dados da conta a ser creditada[\\s\\S]*?Agência\\s*:\\s*(\\d+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            Matcher creditedAgencyMatcher1 = creditedAgencyPattern1.matcher(text);
+            if (creditedAgencyMatcher1.find()) {
+                creditedAgency = creditedAgencyMatcher1.group(1);
+                log.info("✅ Agência creditada extraída (padrão 1): {}", creditedAgency);
             }
             
-            // Padrão para conta creditada
-            Pattern creditedAccountPattern = Pattern.compile("Dados da conta a ser creditada[\\s\\S]*?Conta\\s*:\\s*([\\d\\s-]+)", Pattern.CASE_INSENSITIVE);
-            Matcher creditedAccountMatcher = creditedAccountPattern.matcher(text);
-            if (creditedAccountMatcher.find()) {
-                creditedAccount = creditedAccountMatcher.group(1).trim();
-                log.info("Conta creditada extraída: {}", creditedAccount);
+            // Padrão 1 para conta creditada: "Conta corrente: [NÚMERO]" na seção creditada (formato "Dados da conta creditada:" - SEM "a ser")
+            // Priorizar formato sem "a ser" que é o mais comum no PDF do Itaú
+            Pattern creditedAccountPattern1 = Pattern.compile("Dados da conta creditada[\\s\\S]*?Conta\\s*corrente\\s*:\\s*([\\d\\s\\-]+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            Matcher creditedAccountMatcher1 = creditedAccountPattern1.matcher(text);
+            if (creditedAccountMatcher1.find()) {
+                creditedAccount = creditedAccountMatcher1.group(1).trim();
+                // Validar que tem pelo menos 4 dígitos
+                if (creditedAccount.replaceAll("[^0-9]", "").length() >= 4) {
+                    log.info("✅ Conta creditada extraída (padrão 1 - sem 'a ser'): {}", creditedAccount);
+                } else {
+                    creditedAccount = null; // Resetar se não é válida
+                    log.warn("⚠️ Conta extraída inválida (menos de 4 dígitos): {}", creditedAccountMatcher1.group(1));
+                }
+            }
+            
+            // Padrão 2: Buscar "Conta corrente:" depois de "Dados da conta a ser creditada" (com "a ser")
+            if (creditedAccount == null || creditedAccount.isEmpty()) {
+                Pattern creditedAccountPattern2 = Pattern.compile("Dados da conta a ser creditada[\\s\\S]*?Conta\\s*corrente\\s*:\\s*([\\d\\s\\-]+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                Matcher creditedAccountMatcher2 = creditedAccountPattern2.matcher(text);
+                if (creditedAccountMatcher2.find()) {
+                    String extractedAccount = creditedAccountMatcher2.group(1).trim();
+                    // Validar que tem pelo menos 4 dígitos
+                    if (extractedAccount.replaceAll("[^0-9]", "").length() >= 4) {
+                        creditedAccount = extractedAccount;
+                        log.info("✅ Conta creditada extraída (padrão 2 - com 'a ser'): {}", creditedAccount);
+                    } else {
+                        log.warn("⚠️ Conta extraída inválida (menos de 4 dígitos): {}", extractedAccount);
+                    }
+                }
+            }
+            
+            // Padrão 2b: Buscar apenas "Conta:" (sem "corrente") na seção creditada
+            if (creditedAccount == null || creditedAccount.isEmpty()) {
+                Pattern creditedAccountPattern2b = Pattern.compile("Dados da conta (?:a ser )?creditada[\\s\\S]*?Conta\\s*:\\s*([\\d\\s\\-]+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                Matcher creditedAccountMatcher2b = creditedAccountPattern2b.matcher(text);
+                if (creditedAccountMatcher2b.find()) {
+                    String extractedAccount = creditedAccountMatcher2b.group(1).trim();
+                    // Validar que tem pelo menos 4 dígitos
+                    if (extractedAccount.replaceAll("[^0-9]", "").length() >= 4) {
+                        creditedAccount = extractedAccount;
+                        log.info("✅ Conta creditada extraída (padrão 2b - apenas 'Conta:'): {}", creditedAccount);
+                    } else {
+                        log.warn("⚠️ Conta extraída inválida (menos de 4 dígitos): {}", extractedAccount);
+                    }
+                }
+            }
+            
+            // Padrão 3: Buscar "Conta corrente:" dentro da seção creditada isolada (MELHORADO)
+            if (creditedAccount == null || creditedAccount.isEmpty()) {
+                // Primeiro encontrar a seção "Dados da conta creditada" ou "Dados da conta a ser creditada"
+                // Usar lookahead negativo para não capturar além da seção
+                Pattern creditadaSectionPattern = Pattern.compile("Dados da conta (?:a ser )?creditada\\s*:?\\s*([\\s\\S]*?)(?=Dados da conta (?:a ser )?debitada|Valor\\s*:|Informações|\\n\\n|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                Matcher creditadaSectionMatcher = creditadaSectionPattern.matcher(text);
+                if (creditadaSectionMatcher.find()) {
+                    String creditadaSection = creditadaSectionMatcher.group(1);
+                    log.info("📋 Seção creditada encontrada ({} caracteres)", creditadaSection.length());
+                    log.info("📋 Conteúdo da seção: {}", creditadaSection.substring(0, Math.min(300, creditadaSection.length())));
+                    
+                    // Procurar "Conta corrente:" primeiro (formato mais comum)
+                    Pattern contaInSectionPattern1 = Pattern.compile("Conta\\s*corrente\\s*:\\s*([\\d\\s\\-]+)", Pattern.CASE_INSENSITIVE);
+                    Matcher contaInSectionMatcher1 = contaInSectionPattern1.matcher(creditadaSection);
+                    if (contaInSectionMatcher1.find()) {
+                        String extractedAccount = contaInSectionMatcher1.group(1).trim();
+                        // Validar que é realmente uma conta (tem pelo menos 4 dígitos)
+                        if (extractedAccount.replaceAll("[^0-9]", "").length() >= 4) {
+                            creditedAccount = extractedAccount;
+                            log.info("✅ Conta creditada extraída (padrão 3a - conta corrente na seção): {}", creditedAccount);
+                        } else {
+                            log.warn("⚠️ Conta extraída parece inválida (menos de 4 dígitos): {}", extractedAccount);
+                        }
+                    } else {
+                        // Se não encontrou "Conta corrente:", tentar apenas "Conta:" seguida de números
+                        Pattern contaInSectionPattern2 = Pattern.compile("Conta\\s*:\\s*([\\d\\s\\-]+)", Pattern.CASE_INSENSITIVE);
+                        Matcher contaInSectionMatcher2 = contaInSectionPattern2.matcher(creditadaSection);
+                        if (contaInSectionMatcher2.find()) {
+                            String extractedAccount = contaInSectionMatcher2.group(1).trim();
+                            // Validar que é realmente uma conta (tem pelo menos 4 dígitos)
+                            if (extractedAccount.replaceAll("[^0-9]", "").length() >= 4) {
+                                creditedAccount = extractedAccount;
+                                log.info("✅ Conta creditada extraída (padrão 3b - conta na seção): {}", creditedAccount);
+                            } else {
+                                log.warn("⚠️ Conta extraída parece inválida (menos de 4 dígitos): {}", extractedAccount);
+                            }
+                        }
+                    }
+                } else {
+                    log.warn("⚠️ Seção 'Dados da conta creditada' não encontrada no texto");
+                }
+            }
+            
+            // Padrão 4: Buscar agência depois do nome se ainda não encontrou
+            if (creditedAgency == null || creditedAgency.isEmpty()) {
+                Pattern creditedAgencyPattern2 = Pattern.compile("Dados da conta creditada[\\s\\S]*?Agência\\s*:\\s*(\\d+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                Matcher creditedAgencyMatcher2 = creditedAgencyPattern2.matcher(text);
+                if (creditedAgencyMatcher2.find()) {
+                    creditedAgency = creditedAgencyMatcher2.group(1);
+                    log.info("✅ Agência creditada extraída (padrão 2): {}", creditedAgency);
+                }
+            }
+            
+            // Validação: se não encontrou conta, tentar buscar próximo ao nome do funcionário
+            if (creditedAccount == null || creditedAccount.isEmpty()) {
+                log.warn("⚠️ Conta creditada não encontrada pelos padrões anteriores. Tentando busca alternativa...");
+                
+                // Buscar próximo ao nome do funcionário
+                if (employeeName != null && !employeeName.trim().isEmpty()) {
+                    String normalizedEmployeeName = employeeName.trim().toUpperCase().replaceAll("\\s+", "\\s+");
+                    Pattern contaNextToNamePattern = Pattern.compile(normalizedEmployeeName + "[\\s\\S]{0,200}?Conta\\s*(?:corrente)?\\s*:\\s*([\\d\\s-]+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                    Matcher contaNextToNameMatcher = contaNextToNamePattern.matcher(text);
+                    if (contaNextToNameMatcher.find()) {
+                        creditedAccount = contaNextToNameMatcher.group(1).trim();
+                        log.info("✅ Conta creditada extraída (padrão 4 - próximo ao nome): {}", creditedAccount);
+                    }
+                }
             }
             
             // Armazenar dados da conta creditada
             data.creditedAgency = creditedAgency;
             data.creditedAccount = creditedAccount;
+            
+            // Log final para debug - IMPORTANTE para rastrear extração
+            if (creditedAccount != null && !creditedAccount.isEmpty()) {
+                log.info("✅✅✅ CONTA CREDITADA FINAL EXTRAÍDA: '{}'", creditedAccount);
+                log.info("📋 Validação: {} dígitos encontrados", creditedAccount.replaceAll("[^0-9]", "").length());
+            } else {
+                log.error("❌❌❌ FALHA CRÍTICA: Conta creditada NÃO FOI EXTRAÍDA do texto da página.");
+                log.error("📋 Primeiros 1500 caracteres do texto completo para debug:");
+                log.error("{}", text.substring(0, Math.min(1500, text.length())));
+                log.error("📋 Tentando encontrar seção creditada para debug:");
+                Pattern debugSectionPattern = Pattern.compile("Dados da conta (?:a ser )?creditada([\\s\\S]{0,500}?)(?=Dados|Valor|Informações|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                Matcher debugSectionMatcher = debugSectionPattern.matcher(text);
+                if (debugSectionMatcher.find()) {
+                    log.error("📋 Seção creditada encontrada:\n{}", debugSectionMatcher.group(1));
+                } else {
+                    log.error("❌ Seção 'Dados da conta creditada' NÃO encontrada no texto!");
+                }
+            }
+            
+            // Extrair nome da conta creditada explicitamente
+            // O employeeName já foi extraído da seção "Dados da conta a ser creditada", então usamos ele
+            data.creditedName = employeeName != null ? employeeName.trim().toUpperCase() : null;
+            
+            if (data.creditedName != null) {
+                log.info("✅ Nome da conta creditada extraído: '{}'", data.creditedName);
+            } else {
+                log.warn("⚠️ Nome da conta creditada não foi extraído");
+            }
 
             // Extrair valor - padrão específico do Itaú "Valor: R$ X.XXX,XX"
             Double amount = null;
@@ -970,24 +1150,51 @@ public class ReceiptProcessingService {
             }
 
             // Extrair data da transferência - padrão específico do Itaú
-            Pattern datePattern1 = Pattern.compile("Transferência realizada em\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})\\s*às\\s*(\\d{2}:\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
+            String transferTime = null;
+            
+            // Padrão 1: "Transferência realizada em DD.MM.AAAA às HH:MM:SS"
+            Pattern datePattern1 = Pattern.compile("Transferência\\s+(?:realizada|efetuada)\\s+em\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})\\s*às\\s*(\\d{2}:\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
             Matcher dateMatcher1 = datePattern1.matcher(text);
             if (dateMatcher1.find()) {
                 String day = dateMatcher1.group(1);
                 String month = dateMatcher1.group(2);
                 String year = dateMatcher1.group(3);
-                String time = dateMatcher1.group(4);
-                data.transferDate = day + "." + month + "." + year;
-                log.info("✅ Data de transferência extraída: {} às {}", data.transferDate, time);
+                transferTime = dateMatcher1.group(4);
+                // Formato: DD/MM/AAAA
+                data.transferDate = day + "/" + month + "/" + year;
+                log.info("✅ Data de transferência extraída (padrão 1): {} às {}", data.transferDate, transferTime);
             } else {
-                // Padrão alternativo: "Data: DD/MM/YYYY"
-                Pattern datePattern2 = Pattern.compile("Data\\s*:\\s*(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                // Padrão 2: "Transferência realizada em DD.MM.AAAA" (sem horário)
+                Pattern datePattern2 = Pattern.compile("Transferência\\s+(?:realizada|efetuada)\\s+em\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})", Pattern.CASE_INSENSITIVE);
                 Matcher dateMatcher2 = datePattern2.matcher(text);
                 if (dateMatcher2.find()) {
-                    data.transferDate = dateMatcher2.group(1) + "/" + dateMatcher2.group(2) + "/" + dateMatcher2.group(3);
-                    log.info("Data de transferência extraída (padrão alternativo): {}", data.transferDate);
+                    String day = dateMatcher2.group(1);
+                    String month = dateMatcher2.group(2);
+                    String year = dateMatcher2.group(3);
+                    data.transferDate = day + "/" + month + "/" + year;
+                    log.info("✅ Data de transferência extraída (padrão 2 - sem horário): {}", data.transferDate);
+                } else {
+                    // Padrão 3: "Data: DD/MM/YYYY"
+                    Pattern datePattern3 = Pattern.compile("Data\\s*:\\s*(\\d{2})/(\\d{2})/(\\d{4})", Pattern.CASE_INSENSITIVE);
+                    Matcher dateMatcher3 = datePattern3.matcher(text);
+                    if (dateMatcher3.find()) {
+                        data.transferDate = dateMatcher3.group(1) + "/" + dateMatcher3.group(2) + "/" + dateMatcher3.group(3);
+                        log.info("✅ Data de transferência extraída (padrão 3): {}", data.transferDate);
+                    } else {
+                        // Padrão 4: Buscar data/hora no formato "DD/MM/AAAA, HH:MM"
+                        Pattern datePattern4 = Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4}),\\s*(\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
+                        Matcher dateMatcher4 = datePattern4.matcher(text);
+                        if (dateMatcher4.find()) {
+                            data.transferDate = dateMatcher4.group(1) + "/" + dateMatcher4.group(2) + "/" + dateMatcher4.group(3);
+                            transferTime = dateMatcher4.group(4);
+                            log.info("✅ Data de transferência extraída (padrão 4): {} às {}", data.transferDate, transferTime);
+                        }
+                    }
                 }
             }
+            
+            // Armazenar horário da transferência
+            data.transferTime = transferTime;
 
             // EXTRAIR PERÍODO DE REFERÊNCIA DO SALÁRIO
             log.info("🔍 Procurando período de referência do salário no comprovante...");

@@ -20,7 +20,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SSTTraining, CreateSSTTrainingDTO } from '@/services/sstService';
-import { Loader2, GraduationCap, Clock, FileText, Building2, Shield } from 'lucide-react';
+import { Loader2, GraduationCap, Clock, FileText, Building2, Shield, Plus, ExternalLink } from 'lucide-react';
+import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
+import { useToast } from '@/hooks/use-toast';
+import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 
 interface TrainingFormModalProps {
   open: boolean;
@@ -36,6 +39,7 @@ export default function TrainingFormModal({
   onSubmit,
 }: TrainingFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
   
   // Estados do formulário
   const [name, setName] = useState('');
@@ -45,7 +49,37 @@ export default function TrainingFormModal({
   const [validityMonths, setValidityMonths] = useState<number | undefined>(12);
   const [isMandatory, setIsMandatory] = useState(true);
   const [provider, setProvider] = useState('');
+  const [providerId, setProviderId] = useState<string>('');
   const [isActive, setIsActive] = useState(true);
+  
+  // Estados para fornecedores
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+
+  // Carregar fornecedores do banco de dados
+  useEffect(() => {
+    if (open) {
+      loadSuppliers();
+    }
+  }, [open]);
+
+  const loadSuppliers = async () => {
+    setLoadingSuppliers(true);
+    try {
+      const fornecedores = await contasAPagarService.getFornecedores();
+      setSuppliers(fornecedores.filter(s => s.isActive !== false));
+    } catch (error) {
+      console.error('Erro ao carregar fornecedores:', error);
+      toast({
+        title: "Aviso",
+        description: "Não foi possível carregar a lista de fornecedores",
+        variant: "default",
+      });
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
 
   // Carregar dados do treinamento quando for edição
   useEffect(() => {
@@ -57,6 +91,13 @@ export default function TrainingFormModal({
       setValidityMonths(training.validityMonths);
       setIsMandatory(training.isMandatory);
       setProvider(training.provider || '');
+      // Se o provider for um nome, tentar encontrar o ID correspondente
+      if (training.provider) {
+        const foundSupplier = suppliers.find(s => s.name === training.provider);
+        if (foundSupplier) {
+          setProviderId(foundSupplier.id);
+        }
+      }
       setIsActive(training.isActive);
     } else {
       // Reset form
@@ -67,9 +108,10 @@ export default function TrainingFormModal({
       setValidityMonths(12);
       setIsMandatory(true);
       setProvider('');
+      setProviderId('');
       setIsActive(true);
     }
-  }, [training, open]);
+  }, [training, open, suppliers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +122,15 @@ export default function TrainingFormModal({
 
     setIsSubmitting(true);
     try {
+      // Se providerId estiver selecionado, usar o nome do fornecedor correspondente
+      let providerName = provider;
+      if (providerId && !provider) {
+        const selectedSupplier = suppliers.find(s => s.id === providerId);
+        if (selectedSupplier) {
+          providerName = selectedSupplier.name;
+        }
+      }
+      
       await onSubmit({
         name,
         description: description || undefined,
@@ -87,7 +138,7 @@ export default function TrainingFormModal({
         durationHours,
         validityMonths: validityMonths || undefined,
         isMandatory,
-        provider: provider || undefined,
+        provider: providerName || undefined,
         isActive,
       });
       onOpenChange(false);
@@ -95,6 +146,29 @@ export default function TrainingFormModal({
       console.error('Erro ao salvar treinamento:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSupplierSave = async (supplierData: any) => {
+    try {
+      const newSupplier = await contasAPagarService.createFornecedor(supplierData);
+      toast({
+        title: "Sucesso",
+        description: "Fornecedor criado com sucesso!",
+      });
+      await loadSuppliers();
+      // Selecionar automaticamente o fornecedor recém-criado
+      setProviderId(newSupplier.id);
+      setProvider(newSupplier.name);
+      setShowSupplierModal(false);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Não foi possível salvar o fornecedor.';
+      toast({
+        title: "Erro",
+        description: msg,
+        variant: "destructive",
+      });
+      throw error;
     }
   };
 
@@ -106,6 +180,7 @@ export default function TrainingFormModal({
     { value: 'NR_33', label: 'NR-33 - Espaços Confinados' },
     { value: 'NR_12', label: 'NR-12 - Segurança no Trabalho em Máquinas e Equipamentos' },
     { value: 'PRIMEIROS_SOCORROS', label: 'Primeiros Socorros' },
+    { value: 'RECICLAGEM_VIGILANTE', label: 'Reciclagem de Vigilante' },
     { value: 'OUTROS', label: 'Outros' },
   ];
 
@@ -189,13 +264,59 @@ export default function TrainingFormModal({
                     <Building2 className="h-4 w-4" />
                     Fornecedor
                   </Label>
-                  <Input
-                    id="provider"
-                    placeholder="Nome do fornecedor/instrutor"
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-10 sm:h-11 text-sm sm:text-base"
-                  />
+                  <div className="flex gap-2">
+                    <Select 
+                      value={providerId || provider} 
+                      onValueChange={(value) => {
+                        const selectedSupplier = suppliers.find(s => s.id === value);
+                        if (selectedSupplier) {
+                          setProviderId(selectedSupplier.id);
+                          setProvider(selectedSupplier.name);
+                        } else {
+                          setProviderId(value);
+                          setProvider(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-10 sm:h-11 text-sm sm:text-base flex-1">
+                        <SelectValue placeholder={loadingSuppliers ? "Carregando..." : suppliers.length === 0 ? "Nenhum fornecedor cadastrado" : "Selecione um fornecedor"} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                        {suppliers.length === 0 && !loadingSuppliers ? (
+                          <SelectItem value="" disabled className="text-gray-500">
+                            Nenhum fornecedor cadastrado
+                          </SelectItem>
+                        ) : (
+                          suppliers.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                              {supplier.name}
+                            </SelectItem>
+                          ))
+                        )}
+                        {!providerId && provider && (
+                          <SelectItem value={provider} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                            {provider}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowSupplierModal(true)}
+                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-red/20 flex items-center gap-2 px-3 sm:px-4"
+                      title="Cadastrar novo fornecedor"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Novo</span>
+                    </Button>
+                  </div>
+                  {suppliers.length === 0 && !loadingSuppliers && (
+                    <p className="text-xs text-gray-400 flex items-center gap-1">
+                      <ExternalLink className="h-3 w-3" />
+                      Nenhum fornecedor encontrado. Clique em "Novo" para cadastrar.
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -314,8 +435,21 @@ export default function TrainingFormModal({
             </Button>
           </DialogFooter>
         </form>
+        
+        {/* Modal de Cadastro de Fornecedor */}
+        {showSupplierModal && (
+          <SupplierFormModal
+            isOpen={showSupplierModal}
+            onClose={() => setShowSupplierModal(false)}
+            supplier={null}
+            onSave={handleSupplierSave}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
 }
+
+
+
 

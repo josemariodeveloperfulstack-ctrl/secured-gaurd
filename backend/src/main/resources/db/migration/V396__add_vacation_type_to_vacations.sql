@@ -10,3 +10,7 @@ COMMENT ON COLUMN vacations.vacation_type IS 'Tipo de férias: NORMAL, SOLD, PEC
 
 
 
+
+
+
+

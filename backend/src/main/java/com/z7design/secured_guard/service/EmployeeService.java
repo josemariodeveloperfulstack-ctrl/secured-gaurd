@@ -42,6 +42,10 @@ public class EmployeeService {
     private com.z7design.secured_guard.repository.CompanyRepository companyRepository;
     @Autowired
     private com.z7design.secured_guard.repository.DoctorRepository doctorRepository;
+    @Autowired
+    private com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
+    @Autowired
+    private com.z7design.secured_guard.repository.DepartmentRepository departmentRepository;
     
     @Transactional
     public EmployeeDTO create(EmployeeDTO dto) {
@@ -243,6 +247,30 @@ public class EmployeeService {
             }
             if (dto.getCompany() != null && dto.getCompany().getId() != null) {
                 existingEmployee.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
+            }
+            
+            // Atualizar WorkPost se fornecido
+            if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty()) {
+                try {
+                    UUID workPostId = UUID.fromString(dto.getWorkPostId());
+                    existingEmployee.setWorkPost(workPostRepository.findById(workPostId).orElse(null));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[WARNING] WorkPostId inválido: " + dto.getWorkPostId());
+                }
+            } else {
+                existingEmployee.setWorkPost(null);
+            }
+            
+            // Atualizar Department se fornecido
+            if (dto.getDepartmentId() != null && !dto.getDepartmentId().trim().isEmpty()) {
+                try {
+                    UUID departmentId = UUID.fromString(dto.getDepartmentId());
+                    existingEmployee.setDepartment(departmentRepository.findById(departmentId).orElse(null));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[WARNING] DepartmentId inválido: " + dto.getDepartmentId());
+                }
+            } else {
+                existingEmployee.setDepartment(null);
             }
             
             // Atualizar dados do exame médico (ASO)
@@ -845,6 +873,26 @@ public class EmployeeService {
                 e.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
             
+            // Mapear WorkPost se fornecido
+            if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty()) {
+                try {
+                    UUID workPostId = UUID.fromString(dto.getWorkPostId());
+                    e.setWorkPost(workPostRepository.findById(workPostId).orElse(null));
+                } catch (IllegalArgumentException ex) {
+                    System.err.println("[WARNING] WorkPostId inválido: " + dto.getWorkPostId());
+                }
+            }
+            
+            // Mapear Department se fornecido
+            if (dto.getDepartmentId() != null && !dto.getDepartmentId().trim().isEmpty()) {
+                try {
+                    UUID departmentId = UUID.fromString(dto.getDepartmentId());
+                    e.setDepartment(departmentRepository.findById(departmentId).orElse(null));
+                } catch (IllegalArgumentException ex) {
+                    System.err.println("[WARNING] DepartmentId inválido: " + dto.getDepartmentId());
+                }
+            }
+            
             // Mapear dados do exame médico (ASO)
             if (dto.getExameMedicoData() != null) {
                 e.setExameMedicoData(dto.getExameMedicoData());
@@ -1067,9 +1115,13 @@ public class EmployeeService {
                 dto.setBankInfo(bankInfo);
             }
             
-            // Campos adicionais - comentados pois não existem na entidade
-            // dto.setWorkPostId(e.getWorkPostId()); // Campo workPostId não existe na entidade
-            // dto.setDepartmentId(e.getDepartmentId()); // Campo departmentId não existe na entidade
+            // Mapear WorkPost e Department
+            if (e.getWorkPost() != null) {
+                dto.setWorkPostId(e.getWorkPost().getId().toString());
+            }
+            if (e.getDepartment() != null) {
+                dto.setDepartmentId(e.getDepartment().getId().toString());
+            }
             
             // Mapear entidades relacionais com verificação de null
             if (e.getUser() != null) {

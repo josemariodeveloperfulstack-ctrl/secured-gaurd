@@ -36,3 +36,6 @@ public class SSTTrainingDTO {
     private LocalDateTime nextScheduledDate; // Próxima data agendada
 }
 
+
+
+

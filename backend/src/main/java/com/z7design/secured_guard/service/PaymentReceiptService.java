@@ -39,6 +39,14 @@ import com.z7design.secured_guard.model.Employee;
 
 import java.util.Set;
 import java.util.HashSet;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 @Transactional
@@ -718,6 +726,150 @@ public class PaymentReceiptService {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+    
+    /**
+     * Download em lote de comprovantes (ZIP) - VERSÃO DE ALTA PERFORMANCE
+     * Processamento assíncrono com StreamingResponseBody para não bloquear o servidor
+     */
+    public ResponseEntity<StreamingResponseBody> downloadBatch(List<String> ids) {
+        try {
+            log.info("📦 Iniciando download em lote de {} comprovante(s)", ids.size());
+            
+            // Converter strings para UUIDs
+            List<UUID> uuids = ids.stream()
+                .map(id -> {
+                    try {
+                        return UUID.fromString(id);
+                    } catch (IllegalArgumentException e) {
+                        log.warn("⚠️ ID inválido ignorado: {}", id);
+                        return null;
+                    }
+                })
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+            
+            if (uuids.isEmpty()) {
+                log.warn("⚠️ Nenhum UUID válido fornecido");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Buscar comprovantes do banco em uma única query (otimização)
+            List<PaymentReceipt> receipts = paymentReceiptRepository.findByIdIn(uuids);
+            
+            if (receipts.isEmpty()) {
+                log.warn("⚠️ Nenhum comprovante encontrado");
+                return ResponseEntity.notFound().build();
+            }
+            
+            log.info("✅ {} comprovante(s) encontrado(s) para download", receipts.size());
+            
+            // Criar StreamingResponseBody para processamento assíncrono
+            StreamingResponseBody responseBody = outputStream -> {
+                try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
+                    AtomicInteger filesAdded = new AtomicInteger(0);
+                    AtomicInteger filesSkipped = new AtomicInteger(0);
+                    
+                    // Processar em lotes para melhor performance (evitar sobrecarga de memória)
+                    int batchSize = 50; // Processar 50 arquivos por vez
+                    ForkJoinPool customThreadPool = new ForkJoinPool(Math.min(4, Runtime.getRuntime().availableProcessors()));
+                    
+                    for (int i = 0; i < receipts.size(); i += batchSize) {
+                        int endIndex = Math.min(i + batchSize, receipts.size());
+                        List<PaymentReceipt> batch = receipts.subList(i, endIndex);
+                        
+                        // Processar batch em paralelo
+                        List<CompletableFuture<Void>> futures = batch.stream()
+                            .map(receipt -> CompletableFuture.runAsync(() -> {
+                                try {
+                                    Path filePath = Paths.get(receipt.getFilePath());
+                                    
+                                    if (!Files.exists(filePath)) {
+                                        log.warn("⚠️ Arquivo não encontrado: {}", receipt.getFilePath());
+                                        filesSkipped.incrementAndGet();
+                                        return;
+                                    }
+                                    
+                                    // Criar nome do arquivo no ZIP (evitar duplicatas)
+                                    String zipEntryName = sanitizeFileName(
+                                        receipt.getEmployeeName() != null ? receipt.getEmployeeName() : "Sem_Nome",
+                                        receipt.getMonth(),
+                                        receipt.getYear(),
+                                        receipt.getId()
+                                    ) + ".pdf";
+                                    
+                                    synchronized (zos) {
+                                        ZipEntry zipEntry = new ZipEntry(zipEntryName);
+                                        zipEntry.setTime(System.currentTimeMillis());
+                                        zos.putNextEntry(zipEntry);
+                                        
+                                        // Ler e escrever arquivo com buffer otimizado
+                                        try (BufferedInputStream bis = new BufferedInputStream(
+                                                new FileInputStream(filePath.toFile()), 65536)) {
+                                            byte[] buffer = new byte[65536]; // 64KB buffer
+                                            int bytesRead;
+                                            while ((bytesRead = bis.read(buffer)) != -1) {
+                                                zos.write(buffer, 0, bytesRead);
+                                            }
+                                        }
+                                        
+                                        zos.closeEntry();
+                                        int added = filesAdded.incrementAndGet();
+                                        
+                                        if (added % 10 == 0) {
+                                            log.debug("📦 Progresso: {} arquivo(s) adicionado(s)...", added);
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    log.error("❌ Erro ao adicionar arquivo {} ao ZIP: {}", 
+                                        receipt.getFileName(), e.getMessage());
+                                    filesSkipped.incrementAndGet();
+                                }
+                            }, customThreadPool))
+                            .collect(Collectors.toList());
+                        
+                        // Aguardar conclusão do batch
+                        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                    }
+                    
+                    customThreadPool.shutdown();
+                    
+                    log.info("✅ ZIP criado com sucesso: {} arquivo(s) adicionado(s), {} pulado(s)", 
+                        filesAdded.get(), filesSkipped.get());
+                } catch (Exception e) {
+                    log.error("💥 Erro ao criar ZIP: {}", e.getMessage(), e);
+                    throw new RuntimeException("Erro ao criar ZIP", e);
+                }
+            };
+            
+            String zipFileName = "comprovantes_" + System.currentTimeMillis() + ".zip";
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", zipFileName);
+            
+            log.info("⚡ Download em lote preparado: {} comprovante(s)", receipts.size());
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(responseBody);
+                
+        } catch (Exception e) {
+            log.error("💥 Erro ao preparar download em lote: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
+     * Sanitiza nome do arquivo para evitar problemas no ZIP
+     */
+    private String sanitizeFileName(String employeeName, Integer month, Integer year, UUID id) {
+        String sanitized = employeeName
+            .replaceAll("[^a-zA-Z0-9\\s]", "_")
+            .replaceAll("\\s+", "_")
+            .substring(0, Math.min(50, employeeName.length()));
+        return String.format("%s_%02d_%d_%s", sanitized, month != null ? month : 0, 
+            year != null ? year : 0, id.toString().substring(0, 8));
     }
     
     public ResponseEntity<byte[]> viewReceiptFile(String id) {

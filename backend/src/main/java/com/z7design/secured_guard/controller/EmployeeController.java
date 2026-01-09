@@ -226,9 +226,16 @@ public class EmployeeController {
                     employee.put("unit", unit);
                 }
                 
-                // Adicionar userId se existir (index 21)
+                // Adicionar company (sigla) se existir (index 21)
                 if (row.length > 21 && row[21] != null) {
-                    employee.put("userId", row[21]);
+                    java.util.Map<String, Object> company = new java.util.HashMap<>();
+                    company.put("sigla", row[21]); // company_sigla
+                    employee.put("company", company);
+                }
+                
+                // Adicionar userId se existir (index 22)
+                if (row.length > 22 && row[22] != null) {
+                    employee.put("userId", row[22]);
                 }
                 
                 employees.add(employee);
@@ -310,10 +317,31 @@ public class EmployeeController {
                         unit.put("name", row[20]); // unit_name
                         employee.put("unit", unit);
                     }
-
-                    // Adicionar userId se existir (index 21)
+                    
+                    // Adicionar company (sigla) se existir (index 21)
                     if (row.length > 21 && row[21] != null) {
-                        employee.put("userId", row[21]);
+                        java.util.Map<String, Object> company = new java.util.HashMap<>();
+                        company.put("sigla", row[21]); // company_sigla
+                        employee.put("company", company);
+                    }
+                    
+                    // Adicionar userId se existir (index 22)
+                    if (row.length > 22 && row[22] != null) {
+                        employee.put("userId", row[22]);
+                    }
+                    
+                    // Adicionar workPost se existir (index 23)
+                    if (row.length > 23 && row[23] != null) {
+                        java.util.Map<String, Object> workPost = new java.util.HashMap<>();
+                        workPost.put("name", row[23]); // work_post_name
+                        employee.put("workPost", workPost);
+                    }
+                    
+                    // Adicionar department se existir (index 24)
+                    if (row.length > 24 && row[24] != null) {
+                        java.util.Map<String, Object> department = new java.util.HashMap<>();
+                        department.put("name", row[24]); // department_name
+                        employee.put("department", department);
                     }
                     
                     employees.add(employee);

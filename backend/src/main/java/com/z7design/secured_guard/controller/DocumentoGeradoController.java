@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -151,15 +152,36 @@ public class DocumentoGeradoController {
      */
     @PostMapping("/{id}/assinar")
     public ResponseEntity<DocumentoGerado> assinarDocumento(@PathVariable UUID id, 
-                                                           @RequestParam(value = "ipAddress", required = false) String ipAddress) {
+                                                           HttpServletRequest request) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            String ipAddress = getClientIpAddress(request);
             DocumentoGerado documento = documentoGeradoService.assinarDocumento(id, usuarioAtual, ipAddress);
             return ResponseEntity.ok(documento);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+    
+    /**
+     * Obtém o IP do cliente considerando proxies e load balancers
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
+            // X-Forwarded-For pode conter múltiplos IPs separados por vírgula
+            // O primeiro IP é geralmente o IP original do cliente
+            String[] ips = xForwardedFor.split(",");
+            return ips[0].trim();
+        }
+        
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty() && !"unknown".equalsIgnoreCase(xRealIp)) {
+            return xRealIp;
+        }
+        
+        return request.getRemoteAddr();
     }
     
     /**

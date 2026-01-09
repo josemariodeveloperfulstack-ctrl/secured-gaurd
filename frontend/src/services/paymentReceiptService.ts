@@ -293,6 +293,47 @@ class PaymentReceiptService {
       throw error;
     }
   }
+
+  // Download em lote de comprovantes (ZIP) - ALTA PERFORMANCE
+  async downloadBatch(receiptIds: string[]): Promise<void> {
+    try {
+      console.log('📦 Baixando comprovantes em lote:', receiptIds.length);
+      
+      if (!receiptIds || receiptIds.length === 0) {
+        throw new Error('Nenhum comprovante selecionado para download');
+      }
+
+      const response = await api.post('/receipts/download-batch', 
+        { ids: receiptIds },
+        {
+          responseType: 'blob',
+          timeout: 300000, // 5 minutos de timeout para downloads grandes
+          onDownloadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              console.log(`📥 Progresso do download: ${percentCompleted}%`);
+            }
+          }
+        }
+      );
+
+      // Criar blob e fazer download
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/zip' }));
+      const link = document.createElement('a');
+      link.href = url;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      link.setAttribute('download', `comprovantes_${timestamp}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      console.log('✅ Download em lote concluído com sucesso');
+    } catch (error: any) {
+      console.error('❌ Erro ao fazer download em lote:', error);
+      throw error;
+    }
+  }
 }
 
 export default new PaymentReceiptService();

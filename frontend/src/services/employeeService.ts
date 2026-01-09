@@ -260,6 +260,21 @@ export const employeeService = {
   },
 
   /**
+   * Atualizar status do funcionário
+   */
+  async updateEmployeeStatus(id: string, status: string): Promise<Employee> {
+    try {
+      const response = await api.put(`/api/employees/${id}/status`, null, {
+        params: { status }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao atualizar status do funcionário:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao atualizar status do funcionário');
+    }
+  },
+
+  /**
    * Gerar PDF da ficha de registro do funcionário
    */
   async generateEmployeeRecordPdf(id: string): Promise<Blob> {

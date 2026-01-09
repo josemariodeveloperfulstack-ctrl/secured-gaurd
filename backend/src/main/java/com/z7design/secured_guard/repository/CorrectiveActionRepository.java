@@ -56,3 +56,6 @@ public interface CorrectiveActionRepository extends JpaRepository<CorrectiveActi
     List<CorrectiveAction> findPendingActions();
 }
 
+
+
+

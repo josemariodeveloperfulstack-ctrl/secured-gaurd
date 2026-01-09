@@ -238,6 +238,38 @@ export function PaymentReceiptViewModal({
                 </div>
               </div>
 
+              {/* Nome da Conta Creditada */}
+              {receipt.creditedName && (
+                <div className="bg-gradient-to-r from-indigo-500/10 to-blue-500/10 border border-indigo-500/20 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <User size={16} className="sm:hidden text-white" />
+                      <User size={18} className="hidden sm:block text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-indigo-300/80 text-xs sm:text-sm font-medium">Nome da Conta Creditada</p>
+                      <p className="text-white font-semibold text-sm sm:text-base truncate">{receipt.creditedName}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Conta Corrente Creditada */}
+              {receipt.creditedAccount && (
+                <div className="bg-gradient-to-r from-cyan-500/10 to-teal-500/10 border border-cyan-500/20 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <FileText size={16} className="sm:hidden text-white" />
+                      <FileText size={18} className="hidden sm:block text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-cyan-300/80 text-xs sm:text-sm font-medium">Conta Corrente Creditada</p>
+                      <p className="text-white font-semibold text-sm sm:text-base truncate">{receipt.creditedAccount}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Botões de Ação */}
               <div className="space-y-2 sm:space-y-3 pt-2 sm:pt-4">
                 <Button

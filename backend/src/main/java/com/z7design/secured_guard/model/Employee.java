@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.ArrayList;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -22,6 +21,8 @@ import lombok.NoArgsConstructor;
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.z7design.secured_guard.model.WorkPost;
+import com.z7design.secured_guard.model.Department;
 
 @Data
 @Entity
@@ -44,7 +45,7 @@ public class Employee {
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "position_id")
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Position position;
     
     @Column
@@ -152,6 +153,18 @@ public class Employee {
     @JoinColumn(name = "company_id")
     @JsonBackReference("company-employees")
     private Company company;
+    
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "work_post_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private WorkPost workPost;
+    
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "department_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Department department;
     
     // Dados Pessoais
     @Column(name = "marital_status")

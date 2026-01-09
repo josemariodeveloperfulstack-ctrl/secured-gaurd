@@ -60,12 +60,12 @@ const Login = () => {
   // Usar um pequeno delay para evitar conflito com o login em andamento
   useEffect(() => {
     const timer = setTimeout(() => {
-      console.log('🔍 Login useEffect - user check:', user);
+      console.log('🔍 Login useEffect - user check:', { user: !!user, loading, userRole: user?.role });
       if (user && !loading) {
         console.log('🔍 User already logged in, redirecting to dashboard');
         navigate('/dashboard');
       }
-    }, 100);
+    }, 200);
     
     return () => clearTimeout(timer);
   }, [user, navigate, loading]);

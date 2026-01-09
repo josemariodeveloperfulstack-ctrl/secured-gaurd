@@ -2326,7 +2326,7 @@ const Holerites: React.FC = () => {
     setShowPaymentReceiptViewModal(true);
   };
 
-  // Baixar comprovante
+  // Baixar comprovante individual
   const handleDownloadPaymentReceipt = async (receiptId: string, fileName: string) => {
     try {
       await paymentReceiptService.downloadPaymentReceipt(receiptId, fileName);
@@ -2339,6 +2339,40 @@ const Holerites: React.FC = () => {
       toast({
         title: "Erro",
         description: "Erro ao baixar comprovante. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Baixar múltiplos comprovantes em lote (ZIP)
+  const handleDownloadBatchPaymentReceipts = async () => {
+    if (selectedPaymentReceipts.length === 0) {
+      toast({
+        title: "Nenhum comprovante selecionado",
+        description: "Selecione pelo menos um comprovante para download.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      toast({
+        title: "Download em lote iniciado",
+        description: `Processando ${selectedPaymentReceipts.length} comprovante(s)...`,
+      });
+
+      await paymentReceiptService.downloadBatch(selectedPaymentReceipts);
+      
+      toast({
+        title: "Download concluído",
+        description: `${selectedPaymentReceipts.length} comprovante(s) baixado(s) com sucesso.`,
+      });
+    } catch (error: any) {
+      console.error('Erro ao fazer download em lote:', error);
+      const errorMessage = error.response?.data?.error || error.message || "Erro ao fazer download em lote. Tente novamente.";
+      toast({
+        title: "Erro",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -6191,6 +6225,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                         <FileText className="h-4 w-4 mr-1" />
                                         Visualizar
                                       </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleDownloadPaymentReceipt(String(receipt.id), receipt.fileName)}
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                      >
+                                        <Download className="h-4 w-4 mr-1" />
+                                        Download
+                                      </Button>
                                     </div>
                                   </div>
                                 </div>
@@ -6333,6 +6375,13 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                 <Trash2 size={16} className="mr-2" />
                                 Excluir ({selectedPaymentReceipts.length})
                               </Button>
+                              <Button
+                                onClick={handleDownloadBatchPaymentReceipts}
+                                className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                <Download size={16} className="mr-2" />
+                                Download ({selectedPaymentReceipts.length})
+                              </Button>
                             </div>
                             )}
                           </div>
@@ -6385,6 +6434,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                               <div className="flex-1">
                                 <p className="text-white font-medium">{receipt.employeeName}</p>
                                 <p className="text-gray-400 text-sm">CPF: {(receipt as any).cpf || 'Não informado'}</p>
+                                {receipt.creditedAccount && (
+                                  <p className="text-gray-300 text-sm">
+                                    Conta creditada: <span className="font-semibold">{receipt.creditedAccount}</span>
+                                  </p>
+                                )}
                                 <p className="text-gray-400 text-sm">Período: {receipt.month}/{receipt.year}</p>
                                 <p className="text-green-400 text-sm">Transferência: {formatDate(receipt.processedAt || receipt.updatedAt)}</p>
                               </div>
@@ -6400,6 +6454,16 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                               >
                                 <Eye size={14} className="mr-1" />
                                 Ver
+                              </Button>
+                              
+                              {/* Botão Download Individual */}
+                              <Button
+                                size="sm"
+                                onClick={() => handleDownloadPaymentReceipt(String(receipt.id), receipt.fileName)}
+                                className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
+                              >
+                                <Download size={14} className="mr-1" />
+                                Download
                               </Button>
                               
                               {/* Botão Excluir */}

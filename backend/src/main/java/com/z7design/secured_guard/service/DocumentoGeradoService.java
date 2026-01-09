@@ -6,6 +6,7 @@ import com.z7design.secured_guard.model.*;
 import com.z7design.secured_guard.repository.DocumentoGeradoRepository;
 import com.z7design.secured_guard.repository.ModeloDocumentoRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.regex.Pattern;
 
 @Service
 @Transactional
+@Slf4j
 public class DocumentoGeradoService {
     
     private final DocumentoGeradoRepository documentoGeradoRepository;
@@ -63,28 +65,49 @@ public class DocumentoGeradoService {
         Map<String, Object> dadosCompletos = preencherDadosAutomaticos(funcionario, dadosPreenchidos);
         
         // Gerar conteúdo final
-        String conteudoFinal = substituirPlaceholders(modelo.getConteudoTemplate(), dadosCompletos);
+        String conteudoTemplate = modelo.getConteudoTemplate();
+        log.info("📝 Template do modelo: {} (tamanho: {} chars)", 
+            modelo.getNomeModelo(), 
+            conteudoTemplate != null ? conteudoTemplate.length() : 0);
         
-        // Gerar PDF
-        byte[] arquivoPdf = gerarPdf(modelo, dadosCompletos);
+        String conteudoFinal = substituirPlaceholders(conteudoTemplate, dadosCompletos);
+        
+        // Se não houver conteúdo template, criar um conteúdo básico com os dados do funcionário
+        if (conteudoFinal == null || conteudoFinal.trim().isEmpty()) {
+            log.warn("⚠️ Template vazio ou nulo para modelo {}. Gerando conteúdo básico.", modelo.getNomeModelo());
+            conteudoFinal = gerarConteudoBasico(funcionario, dadosCompletos);
+        }
+        
+        log.info("📄 Conteúdo final gerado: {} caracteres", conteudoFinal.length());
+        
+        // Gerar PDF usando o conteúdo final
+        byte[] arquivoPdf = gerarPdf(modelo, dadosCompletos, conteudoFinal);
+        
+        // Validar que o PDF foi gerado corretamente
+        if (arquivoPdf == null || arquivoPdf.length == 0) {
+            log.error("❌ Erro ao gerar PDF: arquivo vazio ou nulo para modelo {} e funcionário {}", modeloId, funcionarioId);
+            throw new RuntimeException("Erro ao gerar PDF: arquivo vazio ou nulo");
+        }
+        
+        log.info("✅ PDF gerado com sucesso: {} bytes para modelo {} e funcionário {}", arquivoPdf.length, modeloId, funcionarioId);
+        
         String nomeArquivoPdf = pdfGenerationService.gerarNomeArquivo(modelo, funcionario.getName());
         
         // Converter dados para JSON
         String dadosJson = converterParaJson(dadosCompletos);
         
-        // Criar documento gerado
-        DocumentoGerado documento = DocumentoGerado.builder()
-                .modelo(modelo)
-                .funcionario(funcionario)
-                .conteudoFinal(conteudoFinal)
-                .dadosPreenchidos(dadosJson)
-                .arquivoGerado(arquivoPdf)
-                .nomeArquivoGerado(nomeArquivoPdf)
-                .tamanhoArquivoGerado((long) arquivoPdf.length)
-                .status(DocumentoGerado.StatusDocumento.PENDENTE)
-                .criadoPor(criadoPor)
-                .dataCriacao(LocalDateTime.now())
-                .build();
+        // Criar documento gerado usando new em vez de builder para evitar problemas de ordem
+        DocumentoGerado documento = new DocumentoGerado();
+        documento.setModelo(modelo);
+        documento.setFuncionario(funcionario);
+        documento.setConteudoFinal(conteudoFinal);
+        documento.setDadosPreenchidos(dadosJson);
+        documento.setArquivoGerado(arquivoPdf); // byte[] - deve ser BYTEA
+        documento.setNomeArquivoGerado(nomeArquivoPdf);
+        documento.setTamanhoArquivoGerado((long) arquivoPdf.length); // Long - deve ser BIGINT
+        documento.setStatus(DocumentoGerado.StatusDocumento.PENDENTE);
+        documento.setCriadoPor(criadoPor);
+        documento.setDataCriacao(LocalDateTime.now());
         
         return documentoGeradoRepository.save(documento);
     }
@@ -336,18 +359,61 @@ public class DocumentoGeradoService {
     /**
      * Gera PDF a partir de um modelo
      */
-    private byte[] gerarPdf(ModeloDocumento modelo, Map<String, Object> dadosPreenchidos) {
+    private byte[] gerarPdf(ModeloDocumento modelo, Map<String, Object> dadosPreenchidos, String conteudoFinal) {
         try {
-            switch (modelo.getTipoArquivo()) {
-                case DOCX:
-                    return pdfGenerationService.gerarPdfDeDocx(modelo, dadosPreenchidos);
-                case PDF:
-                    return pdfGenerationService.gerarPdfDePdf(modelo, dadosPreenchidos);
-                default:
-                    throw new IllegalArgumentException("Tipo de arquivo não suportado: " + modelo.getTipoArquivo());
-            }
+            // Usar o conteúdo final diretamente para gerar o PDF
+            return pdfGenerationService.gerarPdf(conteudoFinal, modelo.getNomeModelo());
         } catch (IOException e) {
             throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
         }
+    }
+    
+    /**
+     * Gera conteúdo básico quando não há template
+     */
+    private String gerarConteudoBasico(Employee funcionario, Map<String, Object> dadosCompletos) {
+        StringBuilder conteudo = new StringBuilder();
+        
+        String nomeModelo = funcionario.getName() != null ? funcionario.getName() : "Funcionário";
+        conteudo.append("DECLARAÇÃO\n\n");
+        conteudo.append("Declaro para os devidos fins que:\n\n");
+        
+        // Informações do funcionário
+        if (dadosCompletos.get("nome") != null) {
+            conteudo.append("Nome: ").append(dadosCompletos.get("nome")).append("\n");
+        }
+        if (dadosCompletos.get("cpf") != null && !dadosCompletos.get("cpf").toString().isEmpty()) {
+            conteudo.append("CPF: ").append(dadosCompletos.get("cpf")).append("\n");
+        }
+        if (dadosCompletos.get("rg") != null && !dadosCompletos.get("rg").toString().isEmpty()) {
+            conteudo.append("RG: ").append(dadosCompletos.get("rg")).append("\n");
+        }
+        if (dadosCompletos.get("cargo") != null && !dadosCompletos.get("cargo").toString().isEmpty()) {
+            conteudo.append("Cargo: ").append(dadosCompletos.get("cargo")).append("\n");
+        }
+        if (dadosCompletos.get("departamento") != null && !dadosCompletos.get("departamento").toString().isEmpty()) {
+            conteudo.append("Departamento: ").append(dadosCompletos.get("departamento")).append("\n");
+        }
+        if (dadosCompletos.get("data_admissao") != null) {
+            conteudo.append("Data de Admissão: ").append(dadosCompletos.get("data_admissao")).append("\n");
+        }
+        if (dadosCompletos.get("endereco") != null && !dadosCompletos.get("endereco").toString().isEmpty()) {
+            conteudo.append("Endereço: ").append(dadosCompletos.get("endereco")).append("\n");
+        }
+        if (dadosCompletos.get("telefone") != null && !dadosCompletos.get("telefone").toString().isEmpty()) {
+            conteudo.append("Telefone: ").append(dadosCompletos.get("telefone")).append("\n");
+        }
+        if (dadosCompletos.get("email") != null && !dadosCompletos.get("email").toString().isEmpty()) {
+            conteudo.append("E-mail: ").append(dadosCompletos.get("email")).append("\n");
+        }
+        
+        conteudo.append("\n");
+        conteudo.append("Data: ").append(LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))).append("\n");
+        conteudo.append("\n");
+        conteudo.append("_________________________________________\n");
+        conteudo.append(nomeModelo).append("\n");
+        conteudo.append("CPF: ").append(dadosCompletos.get("cpf") != null ? dadosCompletos.get("cpf") : "").append("\n");
+        
+        return conteudo.toString();
     }
 }
