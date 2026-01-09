@@ -101,19 +101,35 @@ api.interceptors.response.use(
       return Promise.reject(createConnectionError(apiUrl));
     }
     
-    // Tratamento específico para erro 522 (Cloudflare timeout)
+    // Tratamento específico para erro 522 (Cloudflare timeout) com retry automático
     if (error.response?.status === 522) {
-      const apiUrl = error.config?.baseURL || getApiUrl();
-      console.error('❌ Erro 522: Timeout do servidor (Cloudflare)');
-      console.error('❌ O servidor de origem não está respondendo:', apiUrl);
-      console.error('❌ Isso geralmente indica que o servidor está sobrecarregado ou inacessível');
+      const originalRequest = error.config;
+      const retryCount = (originalRequest as any).__retryCount || 0;
+      const maxRetries = 3;
       
-      // Criar erro customizado para erro 522
-      const error522 = new Error('O servidor está temporariamente indisponível. Por favor, tente novamente em alguns instantes.');
-      (error522 as any).is522Error = true;
-      (error522 as any).isConnectionError = true;
-      (error522 as any).status = 522;
-      return Promise.reject(error522);
+      if (retryCount < maxRetries) {
+        (originalRequest as any).__retryCount = retryCount + 1;
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Backoff exponencial: 1s, 2s, 4s
+        
+        console.warn(`⚠️ Erro 522 (tentativa ${retryCount + 1}/${maxRetries}). Aguardando ${delay}ms antes de tentar novamente...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Tentar novamente a requisição
+        return api(originalRequest);
+      } else {
+        const apiUrl = error.config?.baseURL || getApiUrl();
+        console.error('❌ Erro 522: Timeout do servidor (Cloudflare) após', maxRetries, 'tentativas');
+        console.error('❌ O servidor de origem não está respondendo:', apiUrl);
+        console.error('❌ Isso geralmente indica que o servidor está sobrecarregado ou inacessível');
+        
+        // Criar erro customizado para erro 522
+        const error522 = new Error('O servidor está temporariamente indisponível. Por favor, tente novamente em alguns instantes.');
+        (error522 as any).is522Error = true;
+        (error522 as any).isConnectionError = true;
+        (error522 as any).status = 522;
+        return Promise.reject(error522);
+      }
     }
     
     if (isDebugMode()) {

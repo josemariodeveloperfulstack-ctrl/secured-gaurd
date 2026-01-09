@@ -169,7 +169,7 @@ const AvaliacaoDesempenho = lazy(() => import('@/pages/RH/AvaliacaoDesempenho'))
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
-const Grupos = lazy(() => import('@/pages/Grupos'));
+const Grupos = lazyWithRetry(() => import('@/pages/Grupos'), 'Grupos');
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Holerites = lazy(() => import('@/pages/Holerites'));

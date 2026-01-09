@@ -141,6 +141,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error: any) {
       const status = error?.response?.status;
       
+      // Tratamento específico para erro 522 (servidor indisponível)
+      if (status === 522 || (error as any)?.is522Error) {
+        console.warn('⚠️ [AuthContext] Erro 522 ao carregar grupos - servidor temporariamente indisponível. Continuando sem grupos.');
+        console.warn('⚠️ [AuthContext] O retry automático do axios já foi tentado. Continuando sem grupos para não bloquear o login.');
+        return;
+      }
+      
       if (error?.isConnectionError) {
         console.warn('⚠️ [AuthContext] Backend não está disponível. Continuando sem grupos.');
         return;
