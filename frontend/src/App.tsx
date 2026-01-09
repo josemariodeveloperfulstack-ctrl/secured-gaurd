@@ -30,45 +30,89 @@ import CookieConsent from '@/components/CookieConsent';
 import UnificadosPorSetor from '@/pages/UnificadosPorSetor';
 
 // Helper function para lazy loading com retry
-const lazyWithRetry = (componentImport: () => Promise<any>, componentName: string) => {
+const lazyWithRetry = (componentImport: () => Promise<any>, componentName: string, maxRetries = 3) => {
   return lazy(async () => {
-    try {
-      return await componentImport();
-    } catch (error) {
-      console.error(`Erro ao carregar ${componentName}:`, error);
-      // Tenta recarregar a página após 2 segundos se for erro 404
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        console.warn(`Tentando recarregar página para ${componentName}...`);
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-        return {
-          default: () => (
-            <div className="flex items-center justify-center min-h-screen">
-              <div className="text-center">
-                <p className="text-lg mb-2">Erro ao carregar {componentName}</p>
-                <p className="text-sm text-gray-500">Recarregando a página...</p>
-              </div>
-            </div>
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Tentativa ${attempt}/${maxRetries} de carregar ${componentName}...`);
+        const module = await Promise.race([
+          componentImport(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout após 30 segundos')), 30000)
           )
-        };
+        ]);
+        console.log(`✅ ${componentName} carregado com sucesso na tentativa ${attempt}`);
+        return module;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Erro na tentativa ${attempt}/${maxRetries} ao carregar ${componentName}:`, error);
+        
+        // Se for erro de rede/timeout, aguarda antes de tentar novamente
+        if (
+          (error instanceof TypeError && error.message.includes('Failed to fetch')) ||
+          error.message.includes('Timeout') ||
+          error.message.includes('522') ||
+          error.message.includes('NetworkError')
+        ) {
+          if (attempt < maxRetries) {
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Backoff exponencial, max 5s
+            console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        } else {
+          // Para outros erros, não tenta novamente
+          break;
+        }
       }
-      return {
-        default: () => (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <p className="text-lg mb-2">Erro ao carregar {componentName}</p>
+    }
+    
+    // Se todas as tentativas falharam
+    console.error(`❌ Falha ao carregar ${componentName} após ${maxRetries} tentativas`);
+    
+    return {
+      default: () => (
+        <div className="flex items-center justify-center min-h-screen bg-seguranca-black">
+          <div className="text-center p-8 bg-seguranca-graphite rounded-lg border border-red-500 max-w-md">
+            <h2 className="text-xl font-bold text-red-500 mb-4">Erro ao carregar {componentName}</h2>
+            <p className="text-seguranca-lightgray mb-4">
+              Não foi possível carregar o módulo após {maxRetries} tentativas.
+            </p>
+            {lastError && (
+              <p className="text-sm text-gray-400 mb-4">
+                {lastError.message || 'Erro desconhecido'}
+              </p>
+            )}
+            <div className="flex gap-4 justify-center">
               <button
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
               >
                 Recarregar Página
               </button>
+              <button
+                onClick={() => {
+                  // Limpa cache e recarrega
+                  if ('caches' in window) {
+                    caches.keys().then(names => {
+                      names.forEach(name => caches.delete(name));
+                      window.location.reload();
+                    });
+                  } else {
+                    window.location.reload();
+                  }
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+              >
+                Limpar Cache e Recarregar
+              </button>
             </div>
           </div>
-        )
-      };
-    }
+        </div>
+      )
+    };
   });
 };
 
@@ -83,7 +127,7 @@ const Index = lazy(() => import('@/pages/Index').catch(() => ({ default: () => <
 const Dashboard = lazy(() => import('@/pages/Dashboard').catch(() => ({ default: () => <div>Erro ao carregar Dashboard</div> })));
 const DashboardColaborador = lazy(() => import('@/pages/DashboardColaborador'));
 const DashboardVigilante = lazy(() => import('@/pages/DashboardVigilante'));
-const Funcionarios = lazy(() => import('@/pages/Funcionarios'));
+const Funcionarios = lazyWithRetry(() => import('@/pages/Funcionarios'), 'Funcionarios');
 const Usuarios = lazy(() => import('@/pages/Usuarios'));
 const Roles = lazy(() => import('@/pages/Roles'));
 const Clientes = lazyWithRetry(() => import('@/pages/Clientes'), 'Clientes');

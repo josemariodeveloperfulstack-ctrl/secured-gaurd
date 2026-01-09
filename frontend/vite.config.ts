@@ -102,9 +102,21 @@ export default defineConfig(({ mode }) => {
     },
     plugins,
     build: {
-      chunkSizeWarningLimit: 1000, // 1MB - mais restritivo
+      // Melhorar geração de chunks para evitar problemas de carregamento
+      sourcemap: false, // Desabilitar sourcemaps em produção para reduzir tamanho
+      minify: 'terser', // Usar terser para melhor minificação
+      terserOptions: {
+        compress: {
+          drop_console: false, // Manter console.logs para debug
+        },
+      },
       rollupOptions: {
         output: {
+          // Garantir nomes de arquivos consistentes
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+          // Melhorar code splitting
           manualChunks: {
             // Core React
             'react-vendor': ['react', 'react-dom'],
@@ -176,8 +188,12 @@ export default defineConfig(({ mode }) => {
               'embla-carousel-react'
             ]
           },
+          // Melhorar tratamento de chunks dinâmicos
+          experimentalMinChunkSize: 20000, // 20KB mínimo por chunk
         },
       },
+      // Aumentar timeout para builds grandes
+      chunkSizeWarningLimit: 2000,
     },
     resolve: {
       alias: {
