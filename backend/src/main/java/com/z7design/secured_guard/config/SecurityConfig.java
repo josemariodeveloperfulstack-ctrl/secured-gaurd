@@ -149,6 +149,7 @@ public class SecurityConfig {
                 // Endpoints de supervisores - requerem permissões administrativas
                 .requestMatchers("/api/supervisors/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                 // Endpoints de consentimento LGPD - públicos para verificação e aceitação
+                .requestMatchers("/api/first-access/**").authenticated()
                 .requestMatchers("/api/user-terms-consent/check/**").permitAll()
                 .requestMatchers("/api/user-terms-consent/accept").permitAll()
                 .requestMatchers("/api/user-terms-consent/versions").permitAll()
