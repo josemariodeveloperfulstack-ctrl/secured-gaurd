@@ -336,7 +336,20 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣7️⃣ START NEW CONTAINERS
+      # 1️⃣7️⃣ CLEAN NETWORKS BEFORE STARTING
+      # ============================================
+      - name: 🧹 Clean networks before starting
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            cd /var/www/secured_guard/ci
+            # Remover rede secured-guard-ci se existir (será recriada pelo docker-compose)
+            docker network rm secured-guard-ci 2>/dev/null || true
+            # Aguardar um pouco para garantir que a rede foi removida
+            sleep 2
+          EOF
+
+      # ============================================
+      # 1️⃣8️⃣ START NEW CONTAINERS
       # ============================================
       - name: 🚀 Start new containers
         run: |
@@ -346,7 +359,7 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣8️⃣ FIX CONTAINERS THAT ARE NOT RUNNING
+      # 1️⃣9️⃣ FIX CONTAINERS THAT ARE NOT RUNNING
       # ============================================
       - name: 🔧 Fix containers that are not running
         run: |
@@ -372,7 +385,7 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣0️⃣ ENSURE USER ROLES AND PERMISSIONS
+      # 2️⃣1️⃣ ENSURE USER ROLES AND PERMISSIONS
       # ============================================
       - name: 👥 Ensure user roles and permissions
         run: |
@@ -381,7 +394,7 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣1️⃣ DIAGNOSTIC - CONTAINER STATUS
+      # 2️⃣2️⃣ DIAGNOSTIC - CONTAINER STATUS
       # ============================================
       - name: 🔍 Diagnostic - Container Status
         run: |
@@ -392,7 +405,7 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣2️⃣ DIAGNOSTIC - NETWORK CONNECTIVITY
+      # 2️⃣3️⃣ DIAGNOSTIC - NETWORK CONNECTIVITY
       # ============================================
       - name: 🌐 Diagnostic - Network Connectivity
         run: |
@@ -401,7 +414,7 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣3️⃣ VERIFY CONTAINERS ARE RUNNING
+      # 2️⃣4️⃣ VERIFY CONTAINERS ARE RUNNING
       # ============================================
       - name: 🔍 Verify containers are running
         run: |
@@ -410,7 +423,7 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣4️⃣ ENSURE TRAEFIK IS RUNNING
+      # 2️⃣5️⃣ ENSURE TRAEFIK IS RUNNING
       # ============================================
       - name: 🔄 Ensure traefik is running
         run: |
@@ -422,7 +435,7 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣5️⃣ HEALTH CHECK
+      # 2️⃣6️⃣ HEALTH CHECK
       # ============================================
       - name: 🏥 Health check
         env:
@@ -434,7 +447,7 @@ jobs:
           ./scripts/health-check-ci.sh
 
       # ============================================
-      # 2️⃣6️⃣ RUN LOGIN AFTER DEPLOY
+      # 2️⃣7️⃣ RUN LOGIN AFTER DEPLOY
       # ============================================
       - name: 🔐 Run login after deploy
         run: |
