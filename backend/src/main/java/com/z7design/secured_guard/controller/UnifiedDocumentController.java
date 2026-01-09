@@ -653,8 +653,23 @@ public class UnifiedDocumentController {
             }
             
             // Criar mapa para organizar arquivos por estrutura: Empresa/Setor/Período/Funcionário
-            // Usar Payslip como chave para manter a relação arquivo -> payslip
-            Map<Payslip, Path> payslipToFileMap = new java.util.HashMap<>();
+            // Usar UUID do Payslip como chave para evitar LazyInitializationException
+            Map<UUID, Path> payslipToFileMap = new java.util.HashMap<>();
+            Map<UUID, Payslip> payslipMap = new java.util.HashMap<>();
+            
+            // Inicializar relações lazy antes de usar
+            for (Payslip payslip : companyPayslips) {
+                // Inicializar company se necessário (para evitar LazyInitializationException)
+                if (payslip.getCompany() != null) {
+                    try {
+                        // Forçar inicialização da relação lazy
+                        org.hibernate.Hibernate.initialize(payslip.getCompany());
+                    } catch (Exception e) {
+                        log.warn("⚠️ Não foi possível inicializar company para payslip {}: {}", payslip.getId(), e.getMessage());
+                    }
+                }
+                payslipMap.put(payslip.getId(), payslip);
+            }
             
             // Mapear cada payslip para seu arquivo encontrado
             for (Payslip payslip : companyPayslips) {
@@ -754,7 +769,7 @@ public class UnifiedDocumentController {
                 }
                 
                 if (foundFile != null) {
-                    payslipToFileMap.put(payslip, foundFile);
+                    payslipToFileMap.put(payslip.getId(), foundFile);
                 } else {
                     log.warn("⚠️ Arquivo não encontrado para payslip {}: {}", payslip.getId(), fileName);
                 }
@@ -777,9 +792,15 @@ public class UnifiedDocumentController {
                 try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outputStream, 65536))) {
                     int filesAdded = 0;
                     
-                    for (Map.Entry<Payslip, Path> entry : payslipToFileMap.entrySet()) {
-                        Payslip payslip = entry.getKey();
+                    for (Map.Entry<UUID, Path> entry : payslipToFileMap.entrySet()) {
+                        UUID payslipId = entry.getKey();
+                        Payslip payslip = payslipMap.get(payslipId);
                         Path filePath = entry.getValue();
+                        
+                        if (payslip == null) {
+                            log.warn("⚠️ Payslip não encontrado para ID: {}", payslipId);
+                            continue;
+                        }
                         
                         // Construir caminho no ZIP: Empresa/Setor/Período/Funcionário/arquivo.pdf
                         String setorNome = payslip.getWorkPostName() != null 
@@ -866,7 +887,23 @@ public class UnifiedDocumentController {
             }
             
             // Criar mapa para organizar arquivos por estrutura: Empresa/Setor/Período/Funcionário
-            Map<Payslip, Path> payslipToFileMap = new java.util.HashMap<>();
+            // Usar UUID do Payslip como chave para evitar LazyInitializationException
+            Map<UUID, Path> payslipToFileMap = new java.util.HashMap<>();
+            Map<UUID, Payslip> payslipMap = new java.util.HashMap<>();
+            
+            // Inicializar relações lazy antes de usar
+            for (Payslip payslip : sectorPayslips) {
+                // Inicializar company se necessário (para evitar LazyInitializationException)
+                if (payslip.getCompany() != null) {
+                    try {
+                        // Forçar inicialização da relação lazy
+                        org.hibernate.Hibernate.initialize(payslip.getCompany());
+                    } catch (Exception e) {
+                        log.warn("⚠️ Não foi possível inicializar company para payslip {}: {}", payslip.getId(), e.getMessage());
+                    }
+                }
+                payslipMap.put(payslip.getId(), payslip);
+            }
             
             log.info("🔍 Buscando arquivos físicos para {} payslip(s)...", sectorPayslips.size());
             
@@ -880,7 +917,7 @@ public class UnifiedDocumentController {
                 
                 Path foundFile = findPayslipFile(payslip, fileName);
                 if (foundFile != null) {
-                    payslipToFileMap.put(payslip, foundFile);
+                    payslipToFileMap.put(payslip.getId(), foundFile);
                 } else {
                     log.warn("⚠️ Arquivo não encontrado para payslip {}: {}", payslip.getId(), fileName);
                 }
@@ -903,9 +940,15 @@ public class UnifiedDocumentController {
                 try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outputStream, 65536))) {
                     int filesAdded = 0;
                     
-                    for (Map.Entry<Payslip, Path> entry : payslipToFileMap.entrySet()) {
-                        Payslip payslip = entry.getKey();
+                    for (Map.Entry<UUID, Path> entry : payslipToFileMap.entrySet()) {
+                        UUID payslipId = entry.getKey();
+                        Payslip payslip = payslipMap.get(payslipId);
                         Path filePath = entry.getValue();
+                        
+                        if (payslip == null) {
+                            log.warn("⚠️ Payslip não encontrado para ID: {}", payslipId);
+                            continue;
+                        }
                         
                         // Construir caminho no ZIP: Empresa/Setor/Período/Funcionário/arquivo.pdf
                         String empresaNome = payslip.getCompanyName() != null 
