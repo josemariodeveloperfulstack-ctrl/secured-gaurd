@@ -117,6 +117,8 @@ const Login = () => {
         errorMessage = 'Acesso negado. Verifique suas permissões.';
       } else if (error?.response?.status === 500) {
         errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (error?.response?.status === 522 || (error as any)?.is522Error) {
+        errorMessage = 'O servidor está temporariamente indisponível. O servidor de origem não está respondendo. Por favor, tente novamente em alguns instantes. Se o problema persistir, entre em contato com o suporte técnico.';
       } else if (error?.message) {
         errorMessage = error.message;
       }

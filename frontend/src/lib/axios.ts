@@ -101,6 +101,21 @@ api.interceptors.response.use(
       return Promise.reject(createConnectionError(apiUrl));
     }
     
+    // Tratamento específico para erro 522 (Cloudflare timeout)
+    if (error.response?.status === 522) {
+      const apiUrl = error.config?.baseURL || getApiUrl();
+      console.error('❌ Erro 522: Timeout do servidor (Cloudflare)');
+      console.error('❌ O servidor de origem não está respondendo:', apiUrl);
+      console.error('❌ Isso geralmente indica que o servidor está sobrecarregado ou inacessível');
+      
+      // Criar erro customizado para erro 522
+      const error522 = new Error('O servidor está temporariamente indisponível. Por favor, tente novamente em alguns instantes.');
+      (error522 as any).is522Error = true;
+      (error522 as any).isConnectionError = true;
+      (error522 as any).status = 522;
+      return Promise.reject(error522);
+    }
+    
     if (isDebugMode()) {
       console.error('❌ Axios Response Error:', error.response?.status, error.config?.url);
       console.error('❌ Error details:', error.response?.data);
