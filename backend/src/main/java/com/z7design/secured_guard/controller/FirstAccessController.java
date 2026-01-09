@@ -66,6 +66,14 @@ public class FirstAccessController {
             @AuthenticationPrincipal UserDetails userDetails) {
         
         try {
+            if (userDetails == null) {
+                log.warn("❌ Usuário não autenticado");
+                return ResponseEntity.status(401).body(SimpleResponseDTO.builder()
+                        .message("Usuário não autenticado")
+                        .success(false)
+                        .build());
+            }
+            
             log.info("🔐 Iniciando mudança de senha no primeiro acesso para: {}", userDetails.getUsername());
 
             User user = userRepository.findByUsername(userDetails.getUsername())
@@ -105,6 +113,21 @@ public class FirstAccessController {
                     .success(true)
                     .build());
 
+        } catch (jakarta.validation.ConstraintViolationException e) {
+            log.error("💥 Erro de validação ao alterar senha: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(SimpleResponseDTO.builder()
+                    .message("Dados inválidos: " + e.getMessage())
+                    .success(false)
+                    .build());
+        } catch (org.springframework.web.bind.MethodArgumentNotValidException e) {
+            log.error("💥 Erro de validação de argumentos: {}", e.getMessage(), e);
+            String errorMessage = e.getBindingResult().getFieldErrors().stream()
+                    .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                    .collect(java.util.stream.Collectors.joining(", "));
+            return ResponseEntity.badRequest().body(SimpleResponseDTO.builder()
+                    .message("Dados inválidos: " + errorMessage)
+                    .success(false)
+                    .build());
         } catch (Exception e) {
             log.error("💥 Erro ao alterar senha: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(SimpleResponseDTO.builder()
@@ -118,6 +141,14 @@ public class FirstAccessController {
     @PostMapping("/request-2fa-code")
     public ResponseEntity<SimpleResponseDTO> requestTwoFactorCode(@AuthenticationPrincipal UserDetails userDetails) {
         try {
+            if (userDetails == null) {
+                log.warn("❌ Usuário não autenticado");
+                return ResponseEntity.status(401).body(SimpleResponseDTO.builder()
+                        .message("Usuário não autenticado")
+                        .success(false)
+                        .build());
+            }
+            
             log.info("📱 Solicitando código 2FA para: {}", userDetails.getUsername());
 
             User user = userRepository.findByUsername(userDetails.getUsername())
