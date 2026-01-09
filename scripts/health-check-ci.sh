@@ -51,6 +51,30 @@ check_traefik() {
     fi
 }
 
+# Função para verificar se backend está pronto
+check_backend_ready() {
+    log "🔍 Verificando se backend está pronto..."
+    local backend_status=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
+        "docker inspect secured-guard-backend-ci --format '{{.State.Health.Status}}' 2>/dev/null || echo 'unknown'" 2>/dev/null || echo "unknown")
+    
+    if [ "$backend_status" = "healthy" ]; then
+        log "✅ Backend está healthy"
+        return 0
+    elif [ "$backend_status" = "starting" ]; then
+        log "⏳ Backend ainda está iniciando..."
+        return 1
+    else
+        log "⚠️ Status do backend: $backend_status"
+        # Verificar logs para ver se há erros
+        local last_log=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
+            "docker logs --tail 5 secured-guard-backend-ci 2>&1 | tail -1" 2>/dev/null || echo "")
+        if [ -n "$last_log" ]; then
+            log "📋 Última linha do log: $last_log"
+        fi
+        return 1
+    fi
+}
+
 # Função para verificar health check interno (via SSH)
 check_internal_health() {
     log "🔍 Verificando health check interno no servidor..."
@@ -206,8 +230,12 @@ DIAG_EOF
 }
 
 # Aguardar inicialização
-log "⏳ Aguardando 60 segundos para aplicação inicializar completamente..."
-sleep 60
+log "⏳ Aguardando 120 segundos para aplicação inicializar completamente..."
+log "💡 Backend precisa de tempo para:"
+log "   - Conectar ao banco de dados"
+log "   - Executar migrations do Flyway"
+log "   - Inicializar Spring Boot completamente"
+sleep 120
 
 # Loop principal de tentativas
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -225,8 +253,10 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
         fi
     fi
     
-    # Primeiro, verificar health check interno
-    if check_internal_health; then
+    # Primeiro, verificar se backend está pronto
+    if check_backend_ready; then
+        # Se backend está pronto, verificar health check interno
+        if check_internal_health; then
         log "✅ Aplicação está funcionando internamente!"
         
         # Se interno funciona, tentar externo
