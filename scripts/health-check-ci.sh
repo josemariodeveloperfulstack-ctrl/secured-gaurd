@@ -257,27 +257,30 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     if check_backend_ready; then
         # Se backend está pronto, verificar health check interno
         if check_internal_health; then
-        log "✅ Aplicação está funcionando internamente!"
-        
-        # Se interno funciona, tentar externo
-        if check_external_health; then
-            log "✅ Health check externo também passou!"
-            log "✅ Aplicação CI está totalmente operacional!"
-            exit 0
-        else
-            log "⚠️ Aplicação funciona internamente mas não externamente"
-            log "💡 Pode ser problema de Cloudflare ou Traefik"
-            # Se o interno está funcionando e já tentamos várias vezes,
-            # considerar como sucesso parcial (aplicação está funcionando)
-            if [ $ATTEMPT -ge 10 ]; then
-                log "✅ Aplicação está funcionando internamente após $ATTEMPT tentativas"
-                log "⚠️ Problema externo pode ser temporário (Cloudflare/Traefik)"
-                log "✅ Considerando como sucesso parcial - aplicação está operacional"
+            log "✅ Aplicação está funcionando internamente!"
+            
+            # Se interno funciona, tentar externo
+            if check_external_health; then
+                log "✅ Health check externo também passou!"
+                log "✅ Aplicação CI está totalmente operacional!"
                 exit 0
+            else
+                log "⚠️ Aplicação funciona internamente mas não externamente"
+                log "💡 Pode ser problema de Cloudflare ou Traefik"
+                # Se o interno está funcionando e já tentamos várias vezes,
+                # considerar como sucesso parcial (aplicação está funcionando)
+                if [ $ATTEMPT -ge 10 ]; then
+                    log "✅ Aplicação está funcionando internamente após $ATTEMPT tentativas"
+                    log "⚠️ Problema externo pode ser temporário (Cloudflare/Traefik)"
+                    log "✅ Considerando como sucesso parcial - aplicação está operacional"
+                    exit 0
+                fi
             fi
+        else
+            log "⚠️ Health check interno falhou"
         fi
     else
-        log "⚠️ Health check interno falhou"
+        log "⚠️ Backend ainda não está pronto"
     fi
     
     # Se não passou, aguardar antes da próxima tentativa

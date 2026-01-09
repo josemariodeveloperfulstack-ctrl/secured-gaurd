@@ -14,15 +14,25 @@ BEGIN
         ALTER TABLE employees 
         ADD COLUMN work_post_id UUID;
         
-        -- Adicionar foreign key para work_posts se a tabela existir
+        -- Adicionar foreign key para work_posts se a tabela existir e tiver PRIMARY KEY
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'work_posts') THEN
-            ALTER TABLE employees
-            ADD CONSTRAINT fk_employees_work_post
-            FOREIGN KEY (work_post_id) 
-            REFERENCES work_posts(id) 
-            ON DELETE SET NULL;
-            
-            CREATE INDEX IF NOT EXISTS idx_employees_work_post_id ON employees(work_post_id);
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint 
+                WHERE conrelid = 'work_posts'::regclass 
+                AND contype = 'p'
+            ) THEN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_employees_work_post'
+                ) THEN
+                    ALTER TABLE employees
+                    ADD CONSTRAINT fk_employees_work_post
+                    FOREIGN KEY (work_post_id) 
+                    REFERENCES work_posts(id) 
+                    ON DELETE SET NULL;
+                END IF;
+                
+                CREATE INDEX IF NOT EXISTS idx_employees_work_post_id ON employees(work_post_id);
+            END IF;
         END IF;
         
         RAISE NOTICE 'Coluna work_post_id adicionada à tabela employees';
@@ -40,15 +50,25 @@ BEGIN
         ALTER TABLE employees 
         ADD COLUMN department_id UUID;
         
-        -- Adicionar foreign key para departments se a tabela existir
+        -- Adicionar foreign key para departments se a tabela existir e tiver PRIMARY KEY
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'departments') THEN
-            ALTER TABLE employees
-            ADD CONSTRAINT fk_employees_department
-            FOREIGN KEY (department_id) 
-            REFERENCES departments(id) 
-            ON DELETE SET NULL;
-            
-            CREATE INDEX IF NOT EXISTS idx_employees_department_id ON employees(department_id);
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint 
+                WHERE conrelid = 'departments'::regclass 
+                AND contype = 'p'
+            ) THEN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_employees_department'
+                ) THEN
+                    ALTER TABLE employees
+                    ADD CONSTRAINT fk_employees_department
+                    FOREIGN KEY (department_id) 
+                    REFERENCES departments(id) 
+                    ON DELETE SET NULL;
+                END IF;
+                
+                CREATE INDEX IF NOT EXISTS idx_employees_department_id ON employees(department_id);
+            END IF;
         END IF;
         
         RAISE NOTICE 'Coluna department_id adicionada à tabela employees';
