@@ -2034,6 +2034,8 @@ const Holerites: React.FC = () => {
     try {
       setProcessingPaymentReceipts(true);
       console.log('📊¤ Iniciando processamento automático do comprovante:', file.name);
+      console.log('📊 Token no localStorage:', localStorage.getItem('token') ? 'Token encontrado' : 'Token não encontrado');
+      console.log('📊 Usuário atual:', user);
       
       // Usar o novo endpoint de processamento automático
       try {

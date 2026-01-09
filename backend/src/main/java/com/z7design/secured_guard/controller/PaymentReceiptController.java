@@ -19,9 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
@@ -52,6 +52,7 @@ public class PaymentReceiptController {
     
     // Buscar todos os comprovantes
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_COLABORADOR')")
     public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts(
             @RequestParam(required = false) String search) {
         try {
@@ -246,6 +247,7 @@ public class PaymentReceiptController {
     
     // Processamento automático de comprovantes (NOVO ENDPOINT)
     @PostMapping("/process-automatic")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO')")
     public ResponseEntity<ReceiptProcessingResponse> processReceiptsAutomatic(@RequestParam("file") MultipartFile file) {
         try {
             // Validar arquivo
