@@ -384,10 +384,18 @@ public class BaileysRestService {
     /**
      * Converte caminho do sistema de arquivos local para caminho do Docker
      * Exemplo: C:\dev\secured-guard\backend\holerites\9-2025\arquivo.pdf -> /app/holerites/9-2025/arquivo.pdf
+     * Exemplo: /app/backend/holerites/... -> /app/holerites/...
      */
     private String convertToDockerPath(String localPath) {
         // Substituir backslashes por forward slashes
         String normalizedPath = localPath.replace("\\", "/");
+        
+        // Se já estiver no formato Docker com /app/backend/holerites, remover /backend
+        if (normalizedPath.startsWith("/app/backend/holerites")) {
+            String dockerPath = normalizedPath.replace("/app/backend/holerites", "/app/holerites");
+            logger.info("🔄 Convertendo caminho Docker: {} -> {}", localPath, dockerPath);
+            return dockerPath;
+        }
         
         // Encontrar "backend/holerites" e substituir pelo caminho do Docker
         int index = normalizedPath.indexOf("backend/holerites");
@@ -397,6 +405,12 @@ public class BaileysRestService {
             String dockerPath = "/app/" + relativePath;
             logger.info("🔄 Convertendo caminho: {} -> {}", localPath, dockerPath);
             return dockerPath;
+        }
+        
+        // Se já começar com /app/holerites, retornar como está
+        if (normalizedPath.startsWith("/app/holerites")) {
+            logger.info("✅ Caminho já está no formato Docker: {}", normalizedPath);
+            return normalizedPath;
         }
         
         // Se não encontrar, retornar o caminho original

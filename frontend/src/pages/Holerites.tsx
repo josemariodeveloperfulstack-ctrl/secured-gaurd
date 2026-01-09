@@ -3604,7 +3604,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       }
 
       // Sem ID resolvido ou sem detail: tentar por CPF mesmo (backend validará novamente)
-      const consentOpenedByCpf = await tryOpenConsentModalFromCpf(cpf, payslip, funcionarioId);
+      const consentOpenedByCpf = await tryOpenConsentModalFromCpf(cpf, payslip, funcionarioId || undefined);
       if (consentOpenedByCpf) {
         return;
       }
