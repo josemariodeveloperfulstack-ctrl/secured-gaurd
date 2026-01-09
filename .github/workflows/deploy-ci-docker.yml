@@ -342,10 +342,14 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             cd /var/www/secured_guard/ci
+            # Parar containers que podem estar usando a rede
+            docker-compose -f docker-compose.ci.yml down 2>/dev/null || true
             # Remover rede secured-guard-ci se existir (será recriada pelo docker-compose)
             docker network rm secured-guard-ci 2>/dev/null || true
             # Aguardar um pouco para garantir que a rede foi removida
             sleep 2
+            # Verificar se a rede foi removida
+            docker network ls | grep secured-guard-ci || echo "✅ Rede secured-guard-ci removida ou não existe"
           EOF
 
       # ============================================
