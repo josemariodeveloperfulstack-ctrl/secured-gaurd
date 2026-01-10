@@ -13,6 +13,7 @@ import org.springframework.web.context.request.WebRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.apache.catalina.connector.ClientAbortException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -153,8 +154,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<Void> handleClientAbortException(ClientAbortException ex, WebRequest request) {
+        // ClientAbortException é uma exceção normal quando o cliente cancela a conexão
+        // Não é um erro real do servidor, então apenas logamos em debug
+        String path = request.getDescription(false);
+        log.debug("Cliente cancelou a conexão para: {} - {}", path, ex.getMessage());
+        
+        // Retornar null para não enviar resposta (a conexão já foi fechada)
+        return null;
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
+        // Ignorar ClientAbortException no handler genérico (já tratado acima)
+        if (ex instanceof ClientAbortException || 
+            (ex.getCause() != null && ex.getCause() instanceof ClientAbortException)) {
+            return null;
+        }
+        
         log.error("Erro interno do servidor: {}", ex.getMessage(), ex);
         
         // Log específico para debugging

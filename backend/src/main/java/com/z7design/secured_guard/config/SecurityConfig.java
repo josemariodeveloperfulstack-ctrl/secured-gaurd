@@ -104,7 +104,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/document-processing/**").authenticated()
                 // Arquivos públicos (imagens e uploads)
                 .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/api/uploads/**").authenticated() // Arquivos do chat requerem autenticação
+                // Logos de empresas - permitir acesso público (para exibição em relatórios)
+                .requestMatchers("/api/uploads/companies/logos/**").permitAll()
+                .requestMatchers("/api/uploads/**").authenticated() // Outros arquivos do chat requerem autenticação
                 .requestMatchers("/files/**").permitAll()
                 // Endpoints HR - requerem permissões específicas
                 .requestMatchers("/api/hr/**").hasAnyAuthority("EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEES_CREATE", "EMPLOYEES_DELETE", "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_HR", "ROLE_RH")

@@ -210,8 +210,10 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
         }
       });
 
-      const logoUrl = response.data.url; // Backend retorna: /api/uploads/companies/logos/{filename}
-      // Construir URL completa se necessário
+      // Backend retorna: /api/uploads/companies/logos/{filename}
+      const logoUrl = response.data.url;
+      
+      // Construir URL completa apenas para preview
       const baseUrl = getApiUrl().replace('/api', '');
       let fullLogoUrl = logoUrl;
       
@@ -232,7 +234,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
         fullLogoUrl = `${baseUrl}/api/uploads/companies/logos/${logoUrl}`;
       }
       
-      setForm(prev => ({ ...prev, logoUrl: fullLogoUrl }));
+      // IMPORTANTE: Salvar apenas o caminho relativo no banco (/api/uploads/companies/logos/{filename})
+      // A URL completa será construída quando necessário (exibição)
+      setForm(prev => ({ ...prev, logoUrl: logoUrl }));
       setLogoPreview(fullLogoUrl);
       toast({
         title: 'Logo enviado',

@@ -1,6 +1,5 @@
 package com.z7design.secured_guard.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Cell;
@@ -9,9 +8,16 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.VehicleReportDTO;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Vehicle;
 import com.z7design.secured_guard.model.Vehicle.VehicleStatus;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.VehicleRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.service.StandardReportLayoutService;
+import com.z7design.secured_guard.service.JasperReportService;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +37,8 @@ public class VehicleReportService {
     
     private final VehicleRepository vehicleRepository;
     private final JasperReportService jasperReportService;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     
     @Transactional(readOnly = true)
     public byte[] generateVehicleReportPDF(String statusFilter) throws IOException {
@@ -72,39 +80,60 @@ public class VehicleReportService {
     private byte[] generateVehicleReportPDFWithIText(List<Vehicle> vehicles, String statusFilter) throws IOException {
         log.info("Gerando relatório PDF de veículos com iText - {} veículos", vehicles.size());
         
+        // Determinar companyId - tentar obter dos veículos primeiro
+        java.util.UUID companyId = null;
+        if (!vehicles.isEmpty()) {
+            // Tentar encontrar um veículo com companyId não nulo
+            for (Vehicle vehicle : vehicles) {
+                if (vehicle.getCompanyId() != null) {
+                    companyId = vehicle.getCompanyId();
+                    log.info("Usando empresa do veículo {}: {}", vehicle.getPlate(), companyId);
+                    break;
+                }
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa se nenhum veículo tiver companyId
+        if (companyId == null) {
+            log.warn("Nenhum veículo possui empresa associada. Buscando primeira empresa ativa como fallback...");
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})", 
+                        activeCompanies.get(0).getName(), companyId);
+            } else {
+                // Último recurso: usar qualquer empresa
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                            allCompanies.get(0).getName(), companyId);
+                } else {
+                    throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
+            }
+        }
+        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
         
         try {
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
-            document.setMargins(50, 50, 50, 50);
+            PdfWriter writer = new PdfWriter(baos);
             
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE VEÍCULOS")
+                .withWatermark(false) // Relatórios gerais não têm marca d'água
+                .topMargin(120f)  // Espaço para cabeçalho
+                .bottomMargin(80f) // Espaço para rodapé
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
             
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-            
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE VEÍCULOS")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
             
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -176,30 +205,20 @@ public class VehicleReportService {
                 document.add(table);
             }
             
-            // Rodapé
-            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8)
-                    .setMarginTop(30);
-            document.add(footer);
+            // Finalizar layout (adicionar header/footer em todas as páginas)
+            // IMPORTANTE: Deve ser chamado ANTES de fechar o documento
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            
+            // Fechar documento (fecha automaticamente o PdfDocument e PdfWriter)
+            document.close();
             
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de veículos com iText: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        } finally {
-            if (document != null) {
-                document.close();
-            }
-            if (pdfDoc != null) {
-                pdfDoc.close();
-            }
-            if (writer != null) {
-                writer.close();
-            }
         }
         
         byte[] result = baos.toByteArray();
-        log.info("PDF de veículos gerado com sucesso usando iText, tamanho: {} bytes", result.length);
+        log.info("PDF de veículos gerado com sucesso usando layout padrão, tamanho: {} bytes", result.length);
         return result;
     }
     

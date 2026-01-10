@@ -32,6 +32,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtConfig jwtConfig;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        
+        // Pular filtro para recursos estáticos públicos (logos, uploads, etc)
+        if (path.startsWith("/api/uploads/companies/logos/") ||
+            path.startsWith("/uploads/") ||
+            path.startsWith("/holerites/") ||
+            path.startsWith("/api/auth/") ||
+            path.startsWith("/swagger-ui") ||
+            path.startsWith("/v3/api-docs") ||
+            path.startsWith("/api/public/") ||
+            path.startsWith("/api/health") ||
+            path.startsWith("/error")) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,

@@ -1,6 +1,5 @@
 package com.z7design.secured_guard.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
@@ -8,17 +7,23 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.model.FuelRecord;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.FuelRecordRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.dto.FuelRecordReportDTO;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.repository.CostCenterRepository;
 import com.z7design.secured_guard.model.CostCenter;
+import com.z7design.secured_guard.service.StandardReportLayoutService;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import com.z7design.secured_guard.service.JasperReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.z7design.secured_guard.service.JasperReportService;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,6 +43,8 @@ public class FuelRecordReportService {
     private final FuelRecordRepository fuelRecordRepository;
     private final CostCenterRepository costCenterRepository;
     private final JasperReportService jasperReportService;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     
     public byte[] generateExcelReport(LocalDate startDate, LocalDate endDate, UUID vehicleId, String posto, UUID driverId, String fuelType) throws IOException {
         log.info("Gerando relatório Excel de abastecimentos - Período: {} a {}, Veículo: {}, Posto: {}, Motorista: {}, Combustível: {}", 
@@ -142,39 +149,60 @@ public class FuelRecordReportService {
                                              UUID vehicleId, String posto, UUID driverId, String fuelType) throws IOException {
         log.info("Gerando relatório PDF de abastecimentos com iText - {} registros", fuelRecords.size());
         
+        // Determinar companyId - tentar obter dos veículos primeiro
+        UUID companyId = null;
+        if (!fuelRecords.isEmpty()) {
+            // Tentar encontrar um registro com veículo que tenha companyId não nulo
+            for (FuelRecord record : fuelRecords) {
+                if (record.getVehicle() != null && record.getVehicle().getCompanyId() != null) {
+                    companyId = record.getVehicle().getCompanyId();
+                    log.info("Usando empresa do veículo {}: {}", record.getVehicle().getPlate(), companyId);
+                    break;
+                }
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa se nenhum veículo tiver companyId
+        if (companyId == null) {
+            log.warn("Nenhum veículo possui empresa associada. Buscando primeira empresa ativa como fallback...");
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})", 
+                        activeCompanies.get(0).getName(), companyId);
+            } else {
+                // Último recurso: usar qualquer empresa
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                            allCompanies.get(0).getName(), companyId);
+                } else {
+                    throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
+            }
+        }
+        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
         
         try {
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
-            document.setMargins(50, 50, 50, 50);
+            PdfWriter writer = new PdfWriter(baos);
             
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE ABASTECIMENTOS")
+                .withWatermark(false) // Relatórios gerais não têm marca d'água
+                .topMargin(120f)  // Espaço para cabeçalho
+                .bottomMargin(80f) // Espaço para rodapé
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
             
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-            
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE ABASTECIMENTOS")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
             
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -284,30 +312,20 @@ public class FuelRecordReportService {
                 document.add(table);
             }
             
-            // Rodapé
-            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8)
-                    .setMarginTop(30);
-            document.add(footer);
+            // Finalizar layout (adicionar header/footer em todas as páginas)
+            // IMPORTANTE: Deve ser chamado ANTES de fechar o documento
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            
+            // Fechar documento (fecha automaticamente o PdfDocument e PdfWriter)
+            document.close();
             
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de abastecimentos com iText: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        } finally {
-            if (document != null) {
-                document.close();
-            }
-            if (pdfDoc != null) {
-                pdfDoc.close();
-            }
-            if (writer != null) {
-                writer.close();
-            }
         }
         
         byte[] result = baos.toByteArray();
-        log.info("PDF de abastecimentos gerado com sucesso usando iText, tamanho: {} bytes", result.length);
+        log.info("PDF de abastecimentos gerado com sucesso usando layout padrão, tamanho: {} bytes", result.length);
         return result;
     }
     
