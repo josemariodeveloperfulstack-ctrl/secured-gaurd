@@ -130,6 +130,7 @@ export const messageService = {
     type: 'INDIVIDUAL' | 'GROUP' | 'DEPARTMENT' | 'GLOBAL';
     priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
     recipientIds?: string[];
+    groupIds?: string[];
     departmentIds?: string[];
     sendEmail?: boolean;
     sendNotification?: boolean;
@@ -145,6 +146,9 @@ export const messageService = {
         priority: messageData.priority || 'NORMAL',
         recipientIds: messageData.recipientIds && messageData.recipientIds.length > 0
           ? messageData.recipientIds.filter(id => id && id.trim())
+          : undefined,
+        groupIds: messageData.groupIds && messageData.groupIds.length > 0
+          ? messageData.groupIds.filter(id => id && id.trim())
           : undefined,
         departmentIds: messageData.departmentIds && messageData.departmentIds.length > 0
           ? messageData.departmentIds.filter(id => id && id.trim())
