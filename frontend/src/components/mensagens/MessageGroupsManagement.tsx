@@ -38,6 +38,13 @@ import {
   Search,
   X
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { groupService } from '@/services/groupService';
 import { userService } from '@/services/userService';
 import { useToast } from '@/hooks/use-toast';
@@ -521,26 +528,28 @@ const MessageGroupsManagement: React.FC = () => {
             </div>
             <div>
               <Label htmlFor="groupName">Nome Técnico *</Label>
-              <select
-                id="groupName"
+              <Select
                 value={formData.groupName}
-                onChange={(e) => setFormData({...formData, groupName: e.target.value})}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onValueChange={(value) => setFormData({...formData, groupName: value})}
               >
-                <option value="">Selecione um nome técnico...</option>
-                <option value="GRUPO_SUPER_ADMIN">GRUPO_SUPER_ADMIN</option>
-                <option value="GRUPO_ADMIN">GRUPO_ADMIN</option>
-                <option value="GRUPO_GESTOR">GRUPO_GESTOR</option>
-                <option value="GRUPO_RH">GRUPO_RH</option>
-                <option value="GRUPO_DPE">GRUPO_DPE</option>
-                <option value="GRUPO_SUPERVISOR">GRUPO_SUPERVISOR</option>
-                <option value="GRUPO_COLABORADORES">GRUPO_COLABORADORES</option>
-                <option value="GRUPO_VIGILANTES">GRUPO_VIGILANTES</option>
-                <option value="GRUPO_FINANCEIRO">GRUPO_FINANCEIRO</option>
-                <option value="GRUPO_TI_SUPORTE">GRUPO_TI_SUPORTE</option>
-                <option value="GRUPO_AUDITOR">GRUPO_AUDITOR</option>
-                <option value="GRUPO_AUXILIARES">GRUPO_AUXILIARES</option>
-              </select>
+                <SelectTrigger id="groupName">
+                  <SelectValue placeholder="Selecione um nome técnico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GRUPO_SUPER_ADMIN">GRUPO_SUPER_ADMIN</SelectItem>
+                  <SelectItem value="GRUPO_ADMIN">GRUPO_ADMIN</SelectItem>
+                  <SelectItem value="GRUPO_GESTOR">GRUPO_GESTOR</SelectItem>
+                  <SelectItem value="GRUPO_RH">GRUPO_RH</SelectItem>
+                  <SelectItem value="GRUPO_DPE">GRUPO_DPE</SelectItem>
+                  <SelectItem value="GRUPO_SUPERVISOR">GRUPO_SUPERVISOR</SelectItem>
+                  <SelectItem value="GRUPO_COLABORADORES">GRUPO_COLABORADORES</SelectItem>
+                  <SelectItem value="GRUPO_VIGILANTES">GRUPO_VIGILANTES</SelectItem>
+                  <SelectItem value="GRUPO_FINANCEIRO">GRUPO_FINANCEIRO</SelectItem>
+                  <SelectItem value="GRUPO_TI_SUPORTE">GRUPO_TI_SUPORTE</SelectItem>
+                  <SelectItem value="GRUPO_AUDITOR">GRUPO_AUDITOR</SelectItem>
+                  <SelectItem value="GRUPO_AUXILIARES">GRUPO_AUXILIARES</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground mt-1">
                 Selecione um nome técnico válido do sistema
               </p>
