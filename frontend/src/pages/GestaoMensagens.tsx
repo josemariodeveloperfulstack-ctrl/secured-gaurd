@@ -19,11 +19,16 @@ import {
   Eye
 } from 'lucide-react';
 import { messageService } from '@/services/messageService';
+import { userService } from '@/services/userService';
+import { groupService } from '@/services/groupService';
+import { departmentService } from '@/services/departmentService';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MainLayout } from '@/components/MainLayout';
 import MessageGroupsManagement from '@/components/mensagens/MessageGroupsManagement';
+import { UserGroupData } from '@/types/user';
+import { Search, X } from 'lucide-react';
 
 import { UUID } from '@/types/employee';
 
@@ -35,9 +40,9 @@ interface User {
 }
 
 interface Department {
-  id: UUID;
+  id: string;
   name: string;
-  description: string;
+  description?: string;
 }
 
 interface Message {
@@ -67,11 +72,20 @@ const GestaoMensagens: React.FC = () => {
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<UserGroupData[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Estados para busca e seleção
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
   
   const { toast } = useToast();
 
@@ -82,6 +96,7 @@ const GestaoMensagens: React.FC = () => {
     type: 'GLOBAL' as 'INDIVIDUAL' | 'GROUP' | 'DEPARTMENT' | 'GLOBAL',
     priority: 'NORMAL' as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT',
     recipientIds: [] as string[],
+    groupIds: [] as string[],
     departmentIds: [] as string[],
     sendEmail: false,
     sendNotification: true,
@@ -110,16 +125,16 @@ const GestaoMensagens: React.FC = () => {
       const count = await messageService.getUnreadSystemCount();
       setUnreadCount(count);
 
-      // Carregar usuários e departamentos (simulado por enquanto)
-      setUsers([
-        { id: '1', name: 'João Silva', email: 'joao@empresa.com', department: 'TI' },
-        { id: '2', name: 'Maria Santos', email: 'maria@empresa.com', department: 'RH' }
+      // Carregar usuários, grupos e departamentos
+      const [usersData, groupsData, departmentsData] = await Promise.all([
+        userService.getAllUsers().catch(() => []),
+        groupService.getGroups().catch(() => []),
+        departmentService.listActive().catch(() => [])
       ]);
       
-      setDepartments([
-        { id: '1', name: 'TI', description: 'Tecnologia da Informação' },
-        { id: '2', name: 'RH', description: 'Recursos Humanos' }
-      ]);
+      setUsers(usersData);
+      setGroups(groupsData);
+      setDepartments(departmentsData);
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -148,7 +163,16 @@ const GestaoMensagens: React.FC = () => {
     if (formData.type === 'INDIVIDUAL' && (!formData.recipientIds || formData.recipientIds.length === 0)) {
       toast({
         title: "Erro",
-        description: "Selecione pelo menos um destinatário para mensagens individuais",
+        description: "Selecione pelo menos um usuário para mensagens individuais",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.type === 'GROUP' && (!formData.groupIds || formData.groupIds.length === 0)) {
+      toast({
+        title: "Erro",
+        description: "Selecione pelo menos um grupo para mensagens de grupo",
         variant: "destructive"
       });
       return;
@@ -171,6 +195,7 @@ const GestaoMensagens: React.FC = () => {
         type: formData.type,
         priority: formData.priority,
         recipientIds: formData.recipientIds,
+        groupIds: formData.groupIds,
         departmentIds: formData.departmentIds,
         sendEmail: formData.sendEmail,
         sendNotification: formData.sendNotification,
@@ -216,11 +241,62 @@ const GestaoMensagens: React.FC = () => {
       type: 'GLOBAL',
       priority: 'NORMAL',
       recipientIds: [],
+      groupIds: [],
       departmentIds: [],
       sendEmail: false,
       sendNotification: true,
       scheduledAt: ''
     });
+    setSelectedUserIds([]);
+    setSelectedGroupIds([]);
+    setSelectedDepartmentIds([]);
+    setUserSearchTerm('');
+    setGroupSearchTerm('');
+    setDepartmentSearchTerm('');
+  };
+
+  // Funções auxiliares para filtragem
+  const filteredUsers = users.filter(user => {
+    if (!userSearchTerm.trim()) return true;
+    const search = userSearchTerm.toLowerCase();
+    return user.name?.toLowerCase().includes(search) || 
+           user.email?.toLowerCase().includes(search);
+  });
+
+  const filteredGroups = groups.filter(group => {
+    if (!groupSearchTerm.trim()) return true;
+    const search = groupSearchTerm.toLowerCase();
+    return group.displayName?.toLowerCase().includes(search) || 
+           group.groupName?.toLowerCase().includes(search);
+  });
+
+  const filteredDepartments = departments.filter(dept => {
+    if (!departmentSearchTerm.trim()) return true;
+    const search = departmentSearchTerm.toLowerCase();
+    return dept.name?.toLowerCase().includes(search) || 
+           dept.description?.toLowerCase().includes(search);
+  });
+
+  // Funções para adicionar/remover seleções
+  const toggleUserSelection = (userId: string) => {
+    const newSelection = formData.recipientIds.includes(userId)
+      ? formData.recipientIds.filter(id => id !== userId)
+      : [...formData.recipientIds, userId];
+    setFormData({ ...formData, recipientIds: newSelection });
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    const newSelection = formData.groupIds.includes(groupId)
+      ? formData.groupIds.filter(id => id !== groupId)
+      : [...formData.groupIds, groupId];
+    setFormData({ ...formData, groupIds: newSelection });
+  };
+
+  const toggleDepartmentSelection = (departmentId: string) => {
+    const newSelection = formData.departmentIds.includes(departmentId)
+      ? formData.departmentIds.filter(id => id !== departmentId)
+      : [...formData.departmentIds, departmentId];
+    setFormData({ ...formData, departmentIds: newSelection });
   };
 
   const getPriorityColor = (priority: string) => {
@@ -325,7 +401,12 @@ const GestaoMensagens: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="type">Tipo</Label>
-                      <Select value={formData.type} onValueChange={(value: 'INDIVIDUAL' | 'GROUP' | 'DEPARTMENT' | 'GLOBAL') => setFormData({...formData, type: value})}>
+                      <Select value={formData.type} onValueChange={(value: 'INDIVIDUAL' | 'GROUP' | 'DEPARTMENT' | 'GLOBAL') => {
+                        setFormData({...formData, type: value, recipientIds: [], groupIds: [], departmentIds: []});
+                        setSelectedUserIds([]);
+                        setSelectedGroupIds([]);
+                        setSelectedDepartmentIds([]);
+                      }}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -353,6 +434,184 @@ const GestaoMensagens: React.FC = () => {
                       </Select>
                     </div>
                   </div>
+
+                  {/* Seleção de destinatários baseado no tipo */}
+                  {formData.type === 'INDIVIDUAL' && (
+                    <div>
+                      <Label>Selecionar Usuários *</Label>
+                      <div className="relative mt-2">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          placeholder="Buscar usuários..."
+                          value={userSearchTerm}
+                          onChange={(e) => setUserSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                        {filteredUsers.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">Nenhum usuário encontrado</p>
+                        ) : (
+                          filteredUsers.map((user) => (
+                            <div
+                              key={user.id}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-accent ${
+                                formData.recipientIds.includes(user.id) ? 'bg-accent' : ''
+                              }`}
+                              onClick={() => toggleUserSelection(user.id)}
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{user.name}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                              </div>
+                              <Checkbox
+                                checked={formData.recipientIds.includes(user.id)}
+                                onCheckedChange={() => toggleUserSelection(user.id)}
+                              />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {formData.recipientIds.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {formData.recipientIds.map((userId) => {
+                            const user = users.find(u => u.id === userId);
+                            return user ? (
+                              <Badge key={userId} variant="secondary" className="flex items-center gap-1">
+                                {user.name}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => toggleUserSelection(userId)}
+                                />
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {formData.type === 'GROUP' && (
+                    <div>
+                      <Label>Selecionar Grupos *</Label>
+                      <div className="relative mt-2">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          placeholder="Buscar grupos..."
+                          value={groupSearchTerm}
+                          onChange={(e) => setGroupSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                        {filteredGroups.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">Nenhum grupo encontrado</p>
+                        ) : (
+                          filteredGroups.map((group) => (
+                            <div
+                              key={group.id}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-accent ${
+                                formData.groupIds.includes(group.id) ? 'bg-accent' : ''
+                              }`}
+                              onClick={() => toggleGroupSelection(group.id)}
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{group.displayName}</p>
+                                {group.description && (
+                                  <p className="text-xs text-muted-foreground">{group.description}</p>
+                                )}
+                              </div>
+                              <Checkbox
+                                checked={formData.groupIds.includes(group.id)}
+                                onCheckedChange={() => toggleGroupSelection(group.id)}
+                              />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {formData.groupIds.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {formData.groupIds.map((groupId) => {
+                            const group = groups.find(g => g.id === groupId);
+                            return group ? (
+                              <Badge key={groupId} variant="secondary" className="flex items-center gap-1">
+                                {group.displayName}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => toggleGroupSelection(groupId)}
+                                />
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {formData.type === 'DEPARTMENT' && (
+                    <div>
+                      <Label>Selecionar Departamentos *</Label>
+                      <div className="relative mt-2">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          placeholder="Buscar departamentos..."
+                          value={departmentSearchTerm}
+                          onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                        {filteredDepartments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">Nenhum departamento encontrado</p>
+                        ) : (
+                          filteredDepartments.map((dept) => (
+                            <div
+                              key={dept.id}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-accent ${
+                                formData.departmentIds.includes(dept.id) ? 'bg-accent' : ''
+                              }`}
+                              onClick={() => toggleDepartmentSelection(dept.id)}
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{dept.name}</p>
+                                {dept.description && (
+                                  <p className="text-xs text-muted-foreground">{dept.description}</p>
+                                )}
+                              </div>
+                              <Checkbox
+                                checked={formData.departmentIds.includes(dept.id)}
+                                onCheckedChange={() => toggleDepartmentSelection(dept.id)}
+                              />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {formData.departmentIds.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {formData.departmentIds.map((deptId) => {
+                            const dept = departments.find(d => d.id === deptId);
+                            return dept ? (
+                              <Badge key={deptId} variant="secondary" className="flex items-center gap-1">
+                                {dept.name}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => toggleDepartmentSelection(deptId)}
+                                />
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {formData.type === 'GLOBAL' && (
+                    <div className="p-4 bg-muted rounded-md">
+                      <p className="text-sm text-muted-foreground">
+                        Mensagem global será enviada para todos os usuários do sistema.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
