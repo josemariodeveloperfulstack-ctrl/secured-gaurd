@@ -165,9 +165,10 @@ const MessageGroupsManagement: React.FC = () => {
       loadGroups();
     } catch (error: any) {
       console.error('Erro ao criar grupo:', error);
+      const errorMessage = error.response?.data?.message || error.message || "Erro ao criar grupo. Verifique se o nome técnico é válido.";
       toast({
         title: "Erro",
-        description: error.message || "Erro ao criar grupo. Verifique se o nome técnico é válido (ex: GRUPO_VENDAS)",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -520,15 +521,28 @@ const MessageGroupsManagement: React.FC = () => {
             </div>
             <div>
               <Label htmlFor="groupName">Nome Técnico *</Label>
-              <Input
+              <select
                 id="groupName"
                 value={formData.groupName}
-                onChange={(e) => setFormData({...formData, groupName: e.target.value.toUpperCase()})}
-                placeholder="Ex: GRUPO_VENDAS (apenas letras, números e _)"
-                pattern="[A-Z0-9_]+"
-              />
+                onChange={(e) => setFormData({...formData, groupName: e.target.value})}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Selecione um nome técnico...</option>
+                <option value="GRUPO_SUPER_ADMIN">GRUPO_SUPER_ADMIN</option>
+                <option value="GRUPO_ADMIN">GRUPO_ADMIN</option>
+                <option value="GRUPO_GESTOR">GRUPO_GESTOR</option>
+                <option value="GRUPO_RH">GRUPO_RH</option>
+                <option value="GRUPO_DPE">GRUPO_DPE</option>
+                <option value="GRUPO_SUPERVISOR">GRUPO_SUPERVISOR</option>
+                <option value="GRUPO_COLABORADORES">GRUPO_COLABORADORES</option>
+                <option value="GRUPO_VIGILANTES">GRUPO_VIGILANTES</option>
+                <option value="GRUPO_FINANCEIRO">GRUPO_FINANCEIRO</option>
+                <option value="GRUPO_TI_SUPORTE">GRUPO_TI_SUPORTE</option>
+                <option value="GRUPO_AUDITOR">GRUPO_AUDITOR</option>
+                <option value="GRUPO_AUXILIARES">GRUPO_AUXILIARES</option>
+              </select>
               <p className="text-xs text-muted-foreground mt-1">
-                Nome técnico único usado internamente (ex: GRUPO_VENDAS, GRUPO_RH)
+                Selecione um nome técnico válido do sistema
               </p>
             </div>
             <div>

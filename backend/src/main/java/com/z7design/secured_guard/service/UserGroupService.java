@@ -116,16 +116,44 @@ public class UserGroupService {
     }
     
     public UserGroupDTO createGroup(UserGroupDTO groupDTO) {
-        if (groupDTO.getGroupName() != null && userGroupRepository.existsByGroupName(UserGroup.valueOf(groupDTO.getGroupName()))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Já existe um grupo com esse nome. Escolha outro nome.");
+        // Validar que groupName é obrigatório
+        if (groupDTO.getGroupName() == null || groupDTO.getGroupName().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome técnico do grupo é obrigatório (ex: GRUPO_VENDAS, GRUPO_RH)");
+        }
+        
+        // Validar que o groupName é um valor válido do enum
+        UserGroup groupNameEnum;
+        try {
+            groupNameEnum = UserGroup.valueOf(groupDTO.getGroupName().toUpperCase().trim());
+        } catch (IllegalArgumentException e) {
+            // Listar valores válidos para ajudar o usuário
+            StringBuilder validValues = new StringBuilder();
+            for (UserGroup validGroup : UserGroup.values()) {
+                if (validValues.length() > 0) {
+                    validValues.append(", ");
+                }
+                validValues.append(validGroup.name());
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
+                String.format("Nome técnico inválido: '%s'. Valores válidos: %s", 
+                    groupDTO.getGroupName(), validValues.toString()));
+        }
+        
+        // Verificar se já existe um grupo com esse nome
+        if (userGroupRepository.existsByGroupName(groupNameEnum)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
+                String.format("Já existe um grupo com o nome técnico '%s'. Escolha outro nome.", groupDTO.getGroupName()));
+        }
+        
+        // Validar displayName
+        if (groupDTO.getDisplayName() == null || groupDTO.getDisplayName().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome de exibição do grupo é obrigatório");
         }
         
         UserGroupEntity group = new UserGroupEntity();
-        if (groupDTO.getGroupName() != null) {
-            group.setGroupName(UserGroup.valueOf(groupDTO.getGroupName()));
-        }
-        group.setDisplayName(groupDTO.getDisplayName());
-        group.setDescription(groupDTO.getDescription());
+        group.setGroupName(groupNameEnum);
+        group.setDisplayName(groupDTO.getDisplayName().trim());
+        group.setDescription(groupDTO.getDescription() != null ? groupDTO.getDescription().trim() : null);
         group.setPermissions(groupDTO.getPermissions() != null ? groupDTO.getPermissions() : new HashSet<>());
         
         UserGroupEntity savedGroup = userGroupRepository.save(group);
