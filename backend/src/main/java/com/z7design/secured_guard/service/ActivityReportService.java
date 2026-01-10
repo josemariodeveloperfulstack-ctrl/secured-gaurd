@@ -25,7 +25,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -372,20 +371,27 @@ public class ActivityReportService {
         log.info("Gerando relatório PDF de atividades - EmployeeId: {}, ClientId: {}, StartDate: {}, EndDate: {}",
                 employeeId, clientId, startDate, endDate);
 
-        // Buscar relatórios com os filtros
-        ActivityReportStatus status = null; // Buscar todos os status
-        UUID workPostId = null;
-        UUID supervisorId = null;
-        
-        List<ActivityReportDTO> reports = getActivityReports(employeeId, clientId, workPostId, startDate, endDate, status, supervisorId);
-        log.info("Total de relatórios encontrados para o PDF: {}", reports.size());
-
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = null;
         PdfDocument pdfDoc = null;
         Document document = null;
+        boolean resourcesClosed = false;
 
         try {
+            // Buscar relatórios com os filtros
+            ActivityReportStatus status = null; // Buscar todos os status
+            UUID workPostId = null;
+            UUID supervisorId = null;
+            
+            List<ActivityReportDTO> reports;
+            try {
+                reports = getActivityReports(employeeId, clientId, workPostId, startDate, endDate, status, supervisorId);
+                log.info("Total de relatórios encontrados para o PDF: {}", reports.size());
+            } catch (Exception e) {
+                log.error("Erro ao buscar relatórios para PDF: {}", e.getMessage(), e);
+                throw new RuntimeException("Erro ao buscar relatórios: " + e.getMessage(), e);
+            }
+            
             writer = new PdfWriter(baos);
             pdfDoc = new PdfDocument(writer);
             document = new Document(pdfDoc);
@@ -487,9 +493,14 @@ public class ActivityReportService {
                     
                     String timeRange = "";
                     if (report.getStartTime() != null && report.getEndTime() != null) {
-                        timeRange = report.getStartTime().toString() + " - " + report.getEndTime().toString();
+                        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                        timeRange = report.getStartTime().format(timeFormatter) + " - " + report.getEndTime().format(timeFormatter);
                     } else if (report.getStartTime() != null) {
-                        timeRange = report.getStartTime().toString();
+                        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                        timeRange = report.getStartTime().format(timeFormatter);
+                    } else if (report.getEndTime() != null) {
+                        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                        timeRange = " - " + report.getEndTime().format(timeFormatter);
                     }
                     table.addCell(createCell(timeRange));
                     
@@ -505,9 +516,11 @@ public class ActivityReportService {
                 document.add(table);
             }
 
+            // Fechar documento para finalizar o PDF
             document.close();
-            pdfDoc.close();
-            writer.close();
+            resourcesClosed = true;
+            
+            // PdfDoc e writer são fechados automaticamente quando document é fechado
 
             byte[] pdfBytes = baos.toByteArray();
             log.info("PDF gerado com sucesso. Tamanho: {} bytes", pdfBytes.length);
@@ -515,21 +528,38 @@ public class ActivityReportService {
 
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de relatórios de atividade: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
-        } finally {
-            try {
-                if (document != null) {
-                    document.close();
+            e.printStackTrace();
+            
+            // Fechar recursos apenas se ainda não foram fechados
+            if (!resourcesClosed) {
+                try {
+                    if (document != null) {
+                        try {
+                            document.close();
+                        } catch (Exception ignored) {
+                            // Já fechado ou erro ao fechar, ignorar
+                        }
+                    }
+                    if (pdfDoc != null) {
+                        try {
+                            pdfDoc.close();
+                        } catch (Exception ignored) {
+                            // Já fechado ou erro ao fechar, ignorar
+                        }
+                    }
+                    if (writer != null) {
+                        try {
+                            writer.close();
+                        } catch (Exception ignored) {
+                            // Já fechado ou erro ao fechar, ignorar
+                        }
+                    }
+                } catch (Exception closeException) {
+                    log.error("Erro ao fechar recursos do PDF após exceção: {}", closeException.getMessage());
                 }
-                if (pdfDoc != null) {
-                    pdfDoc.close();
-                }
-                if (writer != null) {
-                    writer.close();
-                }
-            } catch (Exception e) {
-                log.error("Erro ao fechar recursos do PDF: {}", e.getMessage());
             }
+            
+            throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
         }
     }
 

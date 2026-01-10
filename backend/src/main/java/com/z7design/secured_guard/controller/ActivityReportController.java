@@ -266,20 +266,40 @@ public class ActivityReportController {
 
     @GetMapping("/pdf")
     @Operation(summary = "Gerar relatório de atividade em PDF", description = "Gera um relatório de atividade em formato PDF com base em filtros.")
-    public ResponseEntity<byte[]> generatePDFReport(
+    public ResponseEntity<?> generatePDFReport(
             @Parameter(description = "ID do funcionário") @RequestParam(required = false) UUID employeeId,
             @Parameter(description = "ID do cliente") @RequestParam(required = false) UUID clientId,
             @Parameter(description = "Data de início do período (ISO: YYYY-MM-DD)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Data de fim do período (ISO: YYYY-MM-DD)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         
-        log.info("GET /api/activity-reports/pdf - Gerando relatório PDF");
-        byte[] pdfBytes = activityReportService.generatePDFReport(employeeId, clientId, startDate, endDate);
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("attachment", "activity_report.pdf");
-        headers.setContentLength(pdfBytes.length);
-        
-        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+        try {
+            log.info("GET /api/activity-reports/pdf - Gerando relatório PDF - EmployeeId: {}, ClientId: {}, StartDate: {}, EndDate: {}", 
+                    employeeId, clientId, startDate, endDate);
+            
+            byte[] pdfBytes = activityReportService.generatePDFReport(employeeId, clientId, startDate, endDate);
+            
+            if (pdfBytes == null || pdfBytes.length == 0) {
+                log.warn("PDF gerado está vazio");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(java.util.Map.of("error", "Erro ao gerar PDF", "message", "PDF gerado está vazio"));
+            }
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "activity_report.pdf");
+            headers.setContentLength(pdfBytes.length);
+            
+            log.info("PDF gerado com sucesso. Tamanho: {} bytes", pdfBytes.length);
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de relatórios de atividade no controller: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(java.util.Map.of(
+                            "error", "Erro ao gerar PDF",
+                            "message", e.getMessage() != null ? e.getMessage() : "Erro desconhecido ao gerar PDF"
+                    ));
+        }
     }
 }
