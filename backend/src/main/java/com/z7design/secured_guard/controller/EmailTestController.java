@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class EmailTestController {
 
     private final EmailService emailService;
+    private final Environment environment;
     
     @Value("${spring.mail.host:mail.z7design.com.br}")
     private String mailHost;
@@ -132,18 +134,53 @@ public class EmailTestController {
     @GetMapping("/config")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Ver configuração de email", description = "Retorna configuração atual de email (sem senha)")
-    public ResponseEntity<?> getEmailConfig(
-        @org.springframework.beans.factory.annotation.Value("${spring.mail.host}") String host,
-        @org.springframework.beans.factory.annotation.Value("${spring.mail.port}") String port,
-        @org.springframework.beans.factory.annotation.Value("${spring.mail.username}") String username,
-        @org.springframework.beans.factory.annotation.Value("${spring.mail.properties.mail.smtp.ssl.enable}") String sslEnabled
-    ) {
+    public ResponseEntity<?> getEmailConfig() {
+        // Obter valores diretamente do Environment para garantir que está usando o perfil correto
+        String host = environment.getProperty("spring.mail.host", "não configurado");
+        String port = environment.getProperty("spring.mail.port", "não configurado");
+        String username = environment.getProperty("spring.mail.username", "não configurado");
+        String sslEnabled = environment.getProperty("spring.mail.properties.mail.smtp.ssl.enable", "false");
+        String starttlsEnabled = environment.getProperty("spring.mail.properties.mail.smtp.starttls.enable", "false");
+        
+        // Verificar variáveis de ambiente também
+        String mailHostEnv = System.getenv("MAIL_HOST");
+        String mailPortEnv = System.getenv("MAIL_PORT");
+        String mailUsernameEnv = System.getenv("MAIL_USERNAME");
+        
+        // Obter perfil ativo
+        String[] activeProfiles = environment.getActiveProfiles();
+        String activeProfile = activeProfiles.length > 0 ? activeProfiles[0] : "default";
+        
+        // Usar variáveis de ambiente se disponíveis (têm prioridade)
+        if (mailHostEnv != null && !mailHostEnv.isEmpty()) {
+            host = mailHostEnv;
+        }
+        if (mailPortEnv != null && !mailPortEnv.isEmpty()) {
+            port = mailPortEnv;
+        }
+        if (mailUsernameEnv != null && !mailUsernameEnv.isEmpty()) {
+            username = mailUsernameEnv;
+        }
+        
+        log.info("📧 Configuração de email solicitada - Perfil ativo: {}", activeProfile);
+        log.info("📧 Host: {} (env: {}), Port: {} (env: {}), Username: {} (env: {}), SSL: {}, STARTTLS: {}", 
+                host, mailHostEnv, port, mailPortEnv, username, mailUsernameEnv, sslEnabled, starttlsEnabled);
+        
+        // Determinar se SSL ou STARTTLS está habilitado
+        boolean ssl = "true".equalsIgnoreCase(sslEnabled);
+        boolean starttls = "true".equalsIgnoreCase(starttlsEnabled);
+        String sslTlsStatus = ssl ? "Habilitado (SSL)" : (starttls ? "Habilitado (STARTTLS)" : "Desabilitado");
+        
         return ResponseEntity.ok(Map.of(
             "host", host,
             "port", port,
             "username", username,
             "ssl", sslEnabled,
-            "configured", true
+            "starttls", starttlsEnabled,
+            "sslTlsStatus", sslTlsStatus,
+            "activeProfile", activeProfile,
+            "configured", true,
+            "source", mailHostEnv != null ? "environment" : "properties"
         ));
     }
 
