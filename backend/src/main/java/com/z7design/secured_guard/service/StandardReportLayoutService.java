@@ -24,6 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import org.springframework.core.io.ClassPathResource;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
@@ -55,6 +57,9 @@ public class StandardReportLayoutService {
     private static final DeviceRgb WATERMARK_YELLOW = new DeviceRgb(255, 240, 200); // Amarelo pêssego claro
     private static final DeviceRgb WATERMARK_PINK = new DeviceRgb(255, 200, 180);   // Rosa pêssego claro
     private static final DeviceRgb DARK_CURVE = new DeviceRgb(30, 30, 30);          // Forma curva escura
+    
+    // Caminho do template de fundo do relatório
+    private static final String REPORT_BACKGROUND_TEMPLATE = "templates/reports/report-background-template.png";
     
     // Dimensões do logo em pixels (297x217px)
     // Conversão para pontos: 1pt = 1/72 inch
@@ -142,27 +147,36 @@ public class StandardReportLayoutService {
             Rectangle pageSize = page.getPageSize();
             
             try {
-                // Desenhar fundos primeiro (gradiente e forma curva) - camada de fundo
+                // Carregar e aplicar template de fundo (imagem com gradiente, forma curva, marca d'água)
                 PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
                 
                 float pageWidth = pageSize.getWidth();
                 float pageHeight = pageSize.getHeight();
-                float headerHeight = 110f;
-                float footerHeight = 3f; // Linha fina na parte inferior conforme modelo
                 
-                // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
-                float gradientBarHeight = headerHeight * 0.25f; // ~25% da altura do cabeçalho
-                addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight));
-                
-                // Forma curva escura no canto superior esquerdo
-                addDarkCurveShape(backgroundCanvas, pageWidth, pageHeight);
-                
-                // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
-                addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerHeight));
+                // Carregar imagem de template de fundo
+                Image backgroundImage = loadReportBackgroundTemplate();
+                if (backgroundImage != null) {
+                    // Aplicar imagem de fundo cobrindo toda a página
+                    backgroundImage.setFixedPosition(0, 0);
+                    backgroundImage.setWidth(pageWidth);
+                    backgroundImage.setHeight(pageHeight);
+                    
+                    Canvas backgroundCanvasLayout = new Canvas(backgroundCanvas, pageSize);
+                    backgroundCanvasLayout.add(backgroundImage);
+                    backgroundCanvasLayout.close();
+                    
+                    log.debug("Template de fundo aplicado na página {}/{}", i, totalPages);
+                } else {
+                    log.warn("Template de fundo não encontrado. Usando fallback programático.");
+                    // Fallback: desenhar elementos programaticamente se template não estiver disponível
+                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - 27.5f, pageWidth, 27.5f));
+                    addDarkCurveShape(backgroundCanvas, pageWidth, pageHeight);
+                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, 3f));
+                }
                 
                 backgroundCanvas.release();
                 
-                // Desenhar cabeçalho e rodapé (texto e logo) - camada sobre o fundo
+                // Desenhar elementos dinâmicos (logo, texto) - camada sobre o fundo
                 // Usar newContentStreamAfter() para garantir que apareça sobre o conteúdo do relatório
                 PdfCanvas headerFooterCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
                 Canvas canvasLayout = new Canvas(headerFooterCanvas, pageSize);
@@ -178,17 +192,15 @@ public class StandardReportLayoutService {
                     headerFooterCanvas.release();
                 }
                 
-                log.debug("Cabeçalho e rodapé adicionados na página {}/{}", i, totalPages);
+                log.debug("Elementos dinâmicos adicionados na página {}/{}", i, totalPages);
                 
             } catch (Exception e) {
                 log.error("Erro ao adicionar cabeçalho/rodapé na página {}: {}", i, e.getMessage(), e);
             }
         }
         
-        // Adicionar marca d'água em uma camada separada (se necessário)
-        if (config.isWithWatermark()) {
-            addWatermarkToAllPages(pdfDoc);
-        }
+        // Marca d'água já está incluída no template de fundo, não precisa adicionar programaticamente
+        log.info("Layout padrão aplicado em {} página(s) usando template de fundo", totalPages);
     }
     
     /**
@@ -371,6 +383,29 @@ public class StandardReportLayoutService {
         pdfCanvas.fill();
         
         pdfCanvas.restoreState();
+    }
+    
+    /**
+     * Carrega a imagem de template de fundo do relatório
+     * Esta imagem contém: gradiente, forma curva escura, marca d'água e linha do rodapé
+     */
+    private Image loadReportBackgroundTemplate() {
+        try {
+            ClassPathResource resource = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE);
+            if (!resource.exists()) {
+                log.warn("Template de fundo não encontrado em: {}", REPORT_BACKGROUND_TEMPLATE);
+                return null;
+            }
+            
+            ImageData imageData = ImageDataFactory.create(resource.getInputStream().readAllBytes());
+            Image image = new Image(imageData);
+            
+            log.debug("Template de fundo carregado com sucesso: {}", REPORT_BACKGROUND_TEMPLATE);
+            return image;
+        } catch (Exception e) {
+            log.error("Erro ao carregar template de fundo de {}: {}", REPORT_BACKGROUND_TEMPLATE, e.getMessage(), e);
+            return null;
+        }
     }
     
     /**
