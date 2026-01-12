@@ -46,7 +46,22 @@ public class EmailTestController {
             
             String email = toEmail.trim();
             log.info("📧 Testando envio de email para: {}", email);
-            log.info("📧 Configuração SMTP - Host: {}, Port: {}", mailHost, mailPort);
+            
+            // Log detalhado da configuração
+            String mailHostEnv = System.getenv("MAIL_HOST");
+            String mailPortEnv = System.getenv("MAIL_PORT");
+            String mailUsernameEnv = System.getenv("MAIL_USERNAME");
+            String mailPasswordEnv = System.getenv("MAIL_PASSWORD");
+            boolean hasPassword = mailPasswordEnv != null && !mailPasswordEnv.isEmpty();
+            
+            log.info("📧 Configuração SMTP - Host: {} (env: {}), Port: {} (env: {})", 
+                    mailHost, mailHostEnv, mailPort, mailPortEnv);
+            log.info("📧 Username: {} (env: {}), Password configurado: {}", 
+                    environment.getProperty("spring.mail.username"), mailUsernameEnv, hasPassword);
+            log.info("📧 SSL: {}, STARTTLS: {}", 
+                    environment.getProperty("spring.mail.properties.mail.smtp.ssl.enable", "false"),
+                    environment.getProperty("spring.mail.properties.mail.smtp.starttls.enable", "false"));
+            log.info("📧 Perfil ativo: {}", String.join(",", environment.getActiveProfiles()));
             
             boolean success = emailService.sendEmailWithAttachment(
                 email,
