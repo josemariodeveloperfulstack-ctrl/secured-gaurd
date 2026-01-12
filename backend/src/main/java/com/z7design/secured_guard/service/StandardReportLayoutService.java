@@ -104,8 +104,13 @@ public class StandardReportLayoutService {
         Company company = docWithPdf.getCompany();
         ReportLayoutConfig config = docWithPdf.getConfig();
         
+        log.info("🎨 Iniciando finalização do layout padrão - Empresa: {}, Título: {}, Páginas: {}", 
+                company.getName(), config.getReportTitle(), pdfDoc.getNumberOfPages());
+        
         // Adicionar cabeçalho e rodapé em todas as páginas (marca d'água é adicionada dentro deste método se necessário)
         addHeaderFooterToAllPages(pdfDoc, company, config);
+        
+        log.info("✅ Layout padrão finalizado com sucesso");
     }
     
     /**
@@ -147,9 +152,6 @@ public class StandardReportLayoutService {
             Rectangle pageSize = page.getPageSize();
             
             try {
-                // Carregar e aplicar template de fundo (imagem com gradiente, forma curva, marca d'água)
-                PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
-                
                 float pageWidth = pageSize.getWidth();
                 float pageHeight = pageSize.getHeight();
                 
@@ -157,6 +159,7 @@ public class StandardReportLayoutService {
                 Image backgroundImage = loadReportBackgroundTemplate();
                 if (backgroundImage != null) {
                     // Aplicar imagem de fundo cobrindo toda a página
+                    PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
                     backgroundImage.setFixedPosition(0, 0);
                     backgroundImage.setWidth(pageWidth);
                     backgroundImage.setHeight(pageHeight);
@@ -164,17 +167,31 @@ public class StandardReportLayoutService {
                     Canvas backgroundCanvasLayout = new Canvas(backgroundCanvas, pageSize);
                     backgroundCanvasLayout.add(backgroundImage);
                     backgroundCanvasLayout.close();
+                    backgroundCanvas.release();
                     
-                    log.debug("Template de fundo aplicado na página {}/{}", i, totalPages);
+                    log.info("✅ Template de fundo aplicado na página {}/{}", i, totalPages);
                 } else {
-                    log.warn("Template de fundo não encontrado. Usando fallback programático.");
+                    log.warn("⚠️ Template de fundo não encontrado. Usando fallback programático para página {}/{}", i, totalPages);
                     // Fallback: desenhar elementos programaticamente se template não estiver disponível
-                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - 27.5f, pageWidth, 27.5f));
+                    PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
+                    
+                    // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
+                    float gradientBarHeight = 27.5f; // Altura da barra gradiente no topo
+                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight));
+                    log.debug("Gradiente superior desenhado na página {}", i);
+                    
+                    // Forma curva escura no canto superior esquerdo
                     addDarkCurveShape(backgroundCanvas, pageWidth, pageHeight);
-                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, 3f));
+                    log.debug("Forma curva escura desenhada na página {}", i);
+                    
+                    // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
+                    float footerLineHeight = 3f;
+                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight));
+                    log.debug("Gradiente inferior desenhado na página {}", i);
+                    
+                    backgroundCanvas.release();
+                    log.info("✅ Fallback programático aplicado na página {}/{}", i, totalPages);
                 }
-                
-                backgroundCanvas.release();
                 
                 // Desenhar elementos dinâmicos (logo, texto) - camada sobre o fundo
                 // Usar newContentStreamAfter() para garantir que apareça sobre o conteúdo do relatório
