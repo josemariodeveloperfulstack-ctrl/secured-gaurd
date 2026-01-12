@@ -76,10 +76,12 @@ services:
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
       # Email Configuration
-      MAIL_HOST: ${MAIL_HOST:-mail.z7design.com.br}
-      MAIL_PORT: ${MAIL_PORT:-465}
-      MAIL_USERNAME: ${MAIL_USERNAME:-securedguard@z7design.com.br}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-D8rKeqSFZfaS$(y7}
+      # As variáveis de email vêm do arquivo .env criado pelo workflow
+      # Se não estiverem no .env, o Spring Boot usará application-ci.properties
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_STARTTLS_ENABLE: ${MAIL_STARTTLS_ENABLE:-false}
       MAIL_SSL_ENABLE: ${MAIL_SSL_ENABLE:-true}
       # WhatsApp Configuration
