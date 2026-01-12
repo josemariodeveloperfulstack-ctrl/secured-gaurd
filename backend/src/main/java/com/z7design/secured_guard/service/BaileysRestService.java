@@ -50,6 +50,20 @@ public class BaileysRestService {
     }
     
     /**
+     * Retorna a URL configurada do serviço Baileys REST
+     */
+    public String getServiceUrl() {
+        return baileysRestUrl;
+    }
+    
+    /**
+     * Retorna se o Baileys está habilitado
+     */
+    public boolean isEnabled() {
+        return baileysEnabled;
+    }
+    
+    /**
      * Faz logout e limpa a sessão do Baileys REST API
      * Isso força uma nova conexão que gerará um novo QR Code
      */

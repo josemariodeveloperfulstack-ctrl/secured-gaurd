@@ -93,13 +93,26 @@ public class WhatsAppController {
             }
             
             if (!serviceAvailable) {
-                log.error("❌ Baileys REST não disponível - serviço não está rodando");
+                String errorMessage = baileysRestService.getLastErrorMessage();
+                String serviceUrl = baileysRestService.getServiceUrl();
+                boolean isEnabled = baileysRestService.isEnabled();
+                
+                log.error("❌ Serviço WhatsApp não disponível");
+                log.error("   URL configurada: {}", serviceUrl);
+                log.error("   Habilitado: {}", isEnabled);
+                log.error("   Erro: {}", errorMessage);
+                
                 // Retornar 200 OK com erro na resposta para não quebrar o frontend
                 return ResponseEntity.ok(Map.of(
                     "success", false,
-                    "error", "Serviço WhatsApp não disponível. Verifique se o container Docker do Baileys REST está rodando.",
+                    "error", "Serviço WhatsApp não disponível. " + 
+                             (errorMessage != null ? errorMessage : "Verifique se o container Docker está rodando."),
                     "instance", instanceName != null ? instanceName : "unknown",
-                    "serviceAvailable", false
+                    "serviceAvailable", false,
+                    "serviceUrl", serviceUrl != null ? serviceUrl : "não configurado",
+                    "enabled", isEnabled,
+                    "hint", "No ambiente CI, verifique se o serviço Evolution API (http://evolution-api-ci:8080) ou Baileys REST está acessível. " +
+                            "Verifique também se o serviço está rodando e acessível na rede Docker."
                 ));
             }
             
