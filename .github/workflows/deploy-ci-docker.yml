@@ -252,9 +252,11 @@ jobs:
       # 🔟 CREATE .ENV FILE ON VPS
       # ============================================
       - name: ⚙️ Create .env file on VPS
+        env:
+          MAIL_PASSWORD_SECRET: ${{ secrets.MAIL_PASSWORD }}
         run: |
           # Criar arquivo .env localmente primeiro para evitar problemas com caracteres especiais
-          # Usar printf para cada linha para evitar problemas de parsing
+          # Usar printf para cada linha, exceto MAIL_PASSWORD que usa variável de ambiente
           {
             printf 'POSTGRES_PASSWORD_CI=%s\n' "${{ secrets.POSTGRES_PASSWORD_CI || '4KaCiJc6an@7sgbdcid2025' }}"
             printf 'REDIS_PASSWORD_CI=%s\n' "${{ secrets.REDIS_PASSWORD_CI || 'redis_ci_2025' }}"
@@ -263,10 +265,13 @@ jobs:
             printf 'MAIL_HOST=%s\n' "${{ secrets.MAIL_HOST || 'mail.z7design.com.br' }}"
             printf 'MAIL_PORT=%s\n' "${{ secrets.MAIL_PORT || '465' }}"
             printf 'MAIL_USERNAME=%s\n' "${{ secrets.MAIL_USERNAME || 'securedguard@z7design.com.br' }}"
-            # Para MAIL_PASSWORD, usar secret se disponível, senão usar valor do application-ci.properties
-            # (que já está no código e será usado como fallback pelo Spring Boot)
-            if [ -n "${{ secrets.MAIL_PASSWORD }}" ]; then
-              printf 'MAIL_PASSWORD=%s\n' "${{ secrets.MAIL_PASSWORD }}"
+            # Para MAIL_PASSWORD, usar variável de ambiente (já definida no env do step)
+            # Isso evita problemas com caracteres especiais como $( na senha
+            if [ -n "${MAIL_PASSWORD_SECRET}" ]; then
+              # Usar printf com %s para evitar interpretação de caracteres especiais
+              printf 'MAIL_PASSWORD='
+              printf '%s' "${MAIL_PASSWORD_SECRET}"
+              printf '\n'
             else
               # Se não houver secret, deixar vazio - o Spring Boot usará o valor do application-ci.properties
               printf 'MAIL_PASSWORD=\n'
