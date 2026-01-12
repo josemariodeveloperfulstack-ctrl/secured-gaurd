@@ -274,12 +274,4 @@ public class MedicalExamService {
         
         return saved;
     }
-
-    /**
-     * Busca nomes únicos de clínicas
-     */
-    @Transactional(readOnly = true)
-    public List<String> getDistinctClinicNames() {
-        return examRepository.findDistinctClinicNames();
-    }
 }

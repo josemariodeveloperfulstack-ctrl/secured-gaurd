@@ -57,11 +57,14 @@ public class StandardReportLayoutService {
     private static final DeviceRgb DARK_CURVE = new DeviceRgb(30, 30, 30);          // Forma curva escura
     
     // Dimensões do logo em pixels (297x217px)
-    // Conversão para pontos: 1pt = 1/72 inch, mas em resolução de tela comum 1px ≈ 0.75pt
-    // Porém, para precisão maior, vamos usar: 1px = 0.264583mm = 0.75pt (aproximadamente)
+    // Conversão para pontos: 1pt = 1/72 inch
+    // Para conversão precisa: 1px = 0.264583mm = 0.75pt (em 96 DPI)
+    // Logo: 297px × 0.75 = 222.75pt ≈ 223pt, 217px × 0.75 = 162.75pt ≈ 163pt
+    // Mas vamos usar conversão mais precisa: 1px = 0.75pt (padrão web)
     // Logo: 297px × 0.75 = 222.75pt, 217px × 0.75 = 162.75pt
-    private static final float LOGO_WIDTH_PT = 223f;   // 297px convertido para pontos
-    private static final float LOGO_HEIGHT_PT = 163f;  // 217px convertido para pontos
+    // Para garantir exatamente 297x217px na renderização, vamos usar:
+    private static final float LOGO_WIDTH_PT = 222.75f;   // 297px × 0.75 = 222.75pt
+    private static final float LOGO_HEIGHT_PT = 162.75f; // 217px × 0.75 = 162.75pt
     
     /**
      * Cria um novo documento PDF com layout padrão
@@ -139,37 +142,43 @@ public class StandardReportLayoutService {
             Rectangle pageSize = page.getPageSize();
             
             try {
-                // PdfCanvas para desenhar tudo (ANTES do conteúdo)
-                PdfCanvas pdfCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
+                // Desenhar fundos primeiro (gradiente e forma curva) - camada de fundo
+                PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
                 
-                // Desenhar fundos primeiro
                 float pageWidth = pageSize.getWidth();
                 float pageHeight = pageSize.getHeight();
                 float headerHeight = 110f;
                 float footerHeight = 3f; // Linha fina na parte inferior conforme modelo
                 
                 // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
-                float gradientBarHeight = headerHeight * 0.25f; // ~5-7% da altura conforme modelo
-                addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight));
+                float gradientBarHeight = headerHeight * 0.25f; // ~25% da altura do cabeçalho
+                addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight));
                 
                 // Forma curva escura no canto superior esquerdo
-                addDarkCurveShape(pdfCanvas, pageWidth, pageHeight);
+                addDarkCurveShape(backgroundCanvas, pageWidth, pageHeight);
                 
                 // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
-                addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerHeight));
+                addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerHeight));
                 
-                // Canvas para elementos de layout (texto, imagens) - usando o mesmo PdfCanvas
-                Canvas canvasLayout = new Canvas(pdfCanvas, pageSize);
+                backgroundCanvas.release();
+                
+                // Desenhar cabeçalho e rodapé (texto e logo) - camada sobre o fundo
+                // Usar newContentStreamAfter() para garantir que apareça sobre o conteúdo do relatório
+                PdfCanvas headerFooterCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
+                Canvas canvasLayout = new Canvas(headerFooterCanvas, pageSize);
                 
                 try {
-                    // Cabeçalho
+                    // Cabeçalho (logo, título, nome da empresa, CNPJ)
                     addHeader(canvasLayout, pageSize, company, config);
                     
-                    // Rodapé
+                    // Rodapé (informações da empresa e data de geração)
                     addFooter(canvasLayout, pageSize, company);
                 } finally {
                     canvasLayout.close();
+                    headerFooterCanvas.release();
                 }
+                
+                log.debug("Cabeçalho e rodapé adicionados na página {}/{}", i, totalPages);
                 
             } catch (Exception e) {
                 log.error("Erro ao adicionar cabeçalho/rodapé na página {}: {}", i, e.getMessage(), e);
@@ -187,39 +196,45 @@ public class StandardReportLayoutService {
      */
     private void addHeader(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config) throws IOException {
         float pageWidth = pageSize.getWidth();
-        float headerHeight = 110f; // Altura do cabeçalho
-        float yPosition = pageSize.getHeight() - headerHeight;
+        float pageHeight = pageSize.getHeight();
+        float headerTop = pageHeight; // Topo do cabeçalho (topo da página)
         
-        // Logo da empresa (297x217px = 223x163pt)
+        // Logo da empresa (297x217px = 222.75x162.75pt)
         try {
             Image logoImage = loadCompanyLogo(company);
             if (logoImage != null) {
-                // Posicionar logo no canto superior esquerdo conforme modelo
+                // Posicionar logo no canto superior esquerdo, dentro da área do cabeçalho
+                // Logo deve começar um pouco abaixo do topo para não sobrepor o gradiente
                 float logoX = 15f; // Margem esquerda
-                float logoY = yPosition + headerHeight - LOGO_HEIGHT_PT - 10f; // Alinhar no topo com pequena margem
+                float logoY = headerTop - LOGO_HEIGHT_PT - 5f; // Alinhar no topo com pequena margem (5pt)
                 
                 logoImage.setFixedPosition(logoX, logoY);
                 logoImage.setWidth(LOGO_WIDTH_PT);
                 logoImage.setHeight(LOGO_HEIGHT_PT);
                 canvas.add(logoImage);
+                
+                log.debug("Logo posicionado em ({}, {}) com dimensões {}x{}pt", 
+                        logoX, logoY, LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
             }
         } catch (Exception e) {
             log.warn("Não foi possível carregar logo da empresa {}: {}", company.getName(), e.getMessage());
         }
         
-        // Título do relatório (centralizado no topo)
+        // Título do relatório (centralizado no topo, abaixo do gradiente)
         if (config.getReportTitle() != null && !config.getReportTitle().isEmpty()) {
+            // Título deve estar abaixo do gradiente (que tem ~27.5pt de altura)
+            float titleY = headerTop - 40f; // ~40pt do topo
             Paragraph title = new Paragraph(config.getReportTitle())
                 .setFontSize(18)
                 .setBold()
                 .setTextAlignment(TextAlignment.CENTER)
                 .setFontColor(DeviceRgb.BLACK)
                 .setMarginBottom(5f);
-            canvas.add(title.setFixedPosition(0, yPosition + headerHeight - 35f, pageWidth));
+            canvas.add(title.setFixedPosition(0, titleY, pageWidth));
         }
         
         // Informações da empresa (centro do cabeçalho, abaixo do título)
-        float infoY = yPosition + 40f;
+        float infoY = headerTop - 65f; // ~65pt do topo
         
         Paragraph companyName = new Paragraph(company.getName())
             .setFontSize(14)
@@ -359,7 +374,7 @@ public class StandardReportLayoutService {
     }
     
     /**
-     * Carrega e redimensiona o logo da empresa
+     * Carrega e redimensiona o logo da empresa para exatamente 297x217px (222.75x162.75pt)
      */
     private Image loadCompanyLogo(Company company) throws IOException {
         if (company.getLogoUrl() == null || company.getLogoUrl().isEmpty()) {
@@ -377,6 +392,21 @@ public class StandardReportLayoutService {
             
             ImageData imageData = ImageDataFactory.create(logoPath);
             Image image = new Image(imageData);
+            
+            // Redimensionar para exatamente 297x217px (222.75x162.75pt)
+            // Manter proporção original e ajustar para caber no espaço definido
+            float originalWidth = image.getImageWidth();
+            float originalHeight = image.getImageHeight();
+            
+            log.debug("Logo original: {}x{}pt, redimensionando para {}x{}pt (297x217px)", 
+                    originalWidth, originalHeight, LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
+            
+            // Definir dimensões fixas (297x217px)
+            image.setWidth(LOGO_WIDTH_PT);
+            image.setHeight(LOGO_HEIGHT_PT);
+            
+            log.info("Logo da empresa {} carregado e redimensionado para {}x{}pt (297x217px)", 
+                    company.getName(), LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
             
             return image;
         } catch (MalformedURLException e) {

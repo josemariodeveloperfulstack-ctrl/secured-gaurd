@@ -7,7 +7,6 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
-import com.z7design.secured_guard.dto.VehicleReportDTO;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Vehicle;
 import com.z7design.secured_guard.model.Vehicle.VehicleStatus;
@@ -16,7 +15,6 @@ import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.VehicleRepository;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService;
-import com.z7design.secured_guard.service.JasperReportService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +26,6 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,39 +33,21 @@ import java.util.stream.Collectors;
 public class VehicleReportService {
     
     private final VehicleRepository vehicleRepository;
-    private final JasperReportService jasperReportService;
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
     
     @Transactional(readOnly = true)
     public byte[] generateVehicleReportPDF(String statusFilter) throws IOException {
-        log.info("Gerando relatório PDF de veículos - Filtro: {}", statusFilter);
+        log.info("Gerando relatório PDF de veículos com layout padrão - Filtro: {}", statusFilter);
         
         try {
             // Buscar veículos com filtro de status
             List<Vehicle> vehicles = getVehiclesFiltered(statusFilter);
             log.info("Dados obtidos: {} veículos", vehicles.size());
             
-            // Tentar usar JasperReports primeiro, se falhar usar iText como fallback
-            try {
-                // Converter para DTOs
-                List<VehicleReportDTO> reportDTOs = vehicles.stream()
-                        .map(VehicleReportDTO::fromEntity)
-                        .collect(Collectors.toList());
-                
-                log.info("DTOs convertidos: {} veículos", reportDTOs.size());
-                
-                // Gerar PDF usando JasperReports
-                byte[] result = jasperReportService.generateVehicleReportPDF(reportDTOs, statusFilter);
-                
-                log.info("Relatório PDF de veículos gerado com sucesso usando JasperReports. {} veículos processados, {} bytes gerados", 
-                        vehicles.size(), result.length);
-                return result;
-            } catch (Exception jasperException) {
-                log.warn("Erro ao gerar PDF com JasperReports, usando iText como fallback: {}", jasperException.getMessage());
-                // Fallback para iText
-                return generateVehicleReportPDFWithIText(vehicles, statusFilter);
-            }
+            // Usar diretamente iText com layout padrão (não usar JasperReports)
+            // O layout padrão inclui: gradiente, logo da empresa, cabeçalho, rodapé e marca d'água
+            return generateVehicleReportPDFWithIText(vehicles, statusFilter);
             
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de veículos", e);
