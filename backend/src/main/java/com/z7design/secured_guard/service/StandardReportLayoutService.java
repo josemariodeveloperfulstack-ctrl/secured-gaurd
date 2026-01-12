@@ -242,11 +242,16 @@ public class StandardReportLayoutService {
                 logoImage.setHeight(LOGO_HEIGHT_PT);
                 canvas.add(logoImage);
                 
-                log.debug("Logo posicionado em ({}, {}) com dimensões {}x{}pt", 
-                        logoX, logoY, LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
+                log.info("✅ Logo da empresa {} carregado e posicionado em ({}, {}) com dimensões {}x{}pt", 
+                        company.getName(), logoX, logoY, LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
+            } else {
+                log.warn("⚠️ Logo da empresa {} não disponível (logoUrl: {})", 
+                        company.getName(), company.getLogoUrl());
             }
         } catch (Exception e) {
-            log.warn("Não foi possível carregar logo da empresa {}: {}", company.getName(), e.getMessage());
+            log.error("❌ Erro ao carregar logo da empresa {} (logoUrl: {}): {}", 
+                    company.getName(), company.getLogoUrl(), e.getMessage());
+            // Continuar mesmo sem logo - não bloquear renderização do resto do cabeçalho
         }
         
         // Título do relatório (centralizado no topo, abaixo do gradiente)
@@ -435,14 +440,25 @@ public class StandardReportLayoutService {
         }
         
         try {
-            String logoPath = resolveLogoPath(company.getLogoUrl());
+            String logoUrl = company.getLogoUrl();
+            ImageData imageData;
             
-            if (!Files.exists(Paths.get(logoPath))) {
-                log.warn("Logo não encontrado no caminho: {}", logoPath);
-                return null;
+            // Se for uma URL HTTP/HTTPS, usar diretamente
+            if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+                log.debug("Carregando logo de URL: {}", logoUrl);
+                imageData = ImageDataFactory.create(logoUrl);
+            } else {
+                // Se for caminho relativo, resolver para caminho absoluto
+                String logoPath = resolveLogoPath(logoUrl);
+                
+                if (!Files.exists(Paths.get(logoPath))) {
+                    log.warn("Logo não encontrado no caminho: {}", logoPath);
+                    return null;
+                }
+                
+                imageData = ImageDataFactory.create(logoPath);
             }
             
-            ImageData imageData = ImageDataFactory.create(logoPath);
             Image image = new Image(imageData);
             
             // Redimensionar para exatamente 297x217px (222.75x162.75pt)

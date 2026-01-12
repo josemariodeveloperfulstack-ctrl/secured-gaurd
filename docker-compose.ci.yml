@@ -85,7 +85,8 @@ services:
       MAIL_STARTTLS_ENABLE: ${MAIL_STARTTLS_ENABLE:-false}
       MAIL_SSL_ENABLE: ${MAIL_SSL_ENABLE:-true}
       # WhatsApp Configuration
-      BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://evolution-api-ci:8080}
+      # Usar o serviço whatsapp-service-ci que está na mesma rede Docker
+      BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://whatsapp-service-ci:3333}
       BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
       BAILEYS_INSTANCE_KEY: ${BAILEYS_INSTANCE_KEY:-securedguard_ci}
     ports:

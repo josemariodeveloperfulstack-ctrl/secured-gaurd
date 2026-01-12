@@ -205,21 +205,24 @@ public class BaileysRestService {
             }
             
             logger.info("🔍 Verificando disponibilidade do Baileys REST em: {}", baileysRestUrl);
+            logger.info("🔍 Configuração: enabled={}, instanceKey={}", baileysEnabled, instanceKey);
             
             // Tentar primeiro o endpoint /health
             try {
                 String healthUrl = baileysRestUrl + "/health";
-                logger.debug("🔍 Tentando health check em: {}", healthUrl);
+                logger.info("🔍 Tentando health check em: {}", healthUrl);
                 ResponseEntity<String> healthResponse = restTemplate.getForEntity(healthUrl, String.class);
                 if (healthResponse.getStatusCode() == HttpStatus.OK) {
-                    logger.info("✅ Serviço Baileys REST está disponível (health check OK)");
+                    logger.info("✅ Serviço Baileys REST está disponível (health check OK) - URL: {}", baileysRestUrl);
                     lastErrorMessage = null;
                     return true;
                 }
             } catch (org.springframework.web.client.ResourceAccessException e) {
-                logger.warn("⚠️ Endpoint /health não acessível (serviço pode não estar rodando): {}", e.getMessage());
+                logger.error("❌ Endpoint /health não acessível - Erro de conexão: {}", e.getMessage());
+                logger.error("   Verifique se o container 'whatsapp-service-ci' está rodando e acessível em: {}", baileysRestUrl);
+                logger.error("   No ambiente CI, o serviço deve estar na rede Docker 'secured-guard-ci-network' ou 'z7network'");
             } catch (Exception e) {
-                logger.debug("⚠️ Endpoint /health não disponível, tentando endpoint alternativo: {}", e.getMessage());
+                logger.warn("⚠️ Endpoint /health não disponível, tentando endpoint alternativo: {}", e.getMessage());
             }
             
             // Se /health falhar, tentar um endpoint básico que sempre existe
