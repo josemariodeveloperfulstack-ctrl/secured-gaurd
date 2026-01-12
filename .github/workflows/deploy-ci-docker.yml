@@ -253,25 +253,35 @@ jobs:
       # ============================================
       - name: ⚙️ Create .env file on VPS
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
-            cd /var/www/secured_guard/ci
-            cat > .env << 'ENV_EOF'
-          POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI || '4KaCiJc6an@7sgbdcid2025' }}
-          REDIS_PASSWORD_CI=${{ secrets.REDIS_PASSWORD_CI || 'redis_ci_2025' }}
-          JWT_SECRET_CI=${{ secrets.JWT_SECRET_CI || 'jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key' }}
-          # Email Configuration
-          MAIL_HOST=${{ secrets.MAIL_HOST || 'mail.z7design.com.br' }}
-          MAIL_PORT=${{ secrets.MAIL_PORT || '465' }}
-          MAIL_USERNAME=${{ secrets.MAIL_USERNAME || 'securedguard@z7design.com.br' }}
-          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD || 'D8rKeqSFZfaS$(y7' }}
-          MAIL_STARTTLS_ENABLE=${{ secrets.MAIL_STARTTLS_ENABLE || 'false' }}
-          MAIL_SSL_ENABLE=${{ secrets.MAIL_SSL_ENABLE || 'true' }}
-          # WhatsApp Configuration
-          BAILEYS_REST_URL=${{ secrets.BAILEYS_REST_URL || 'http://evolution-api-ci:8080' }}
-          BAILEYS_ENABLED=${{ secrets.BAILEYS_ENABLED || 'true' }}
-          BAILEYS_INSTANCE_KEY=${{ secrets.BAILEYS_INSTANCE_KEY || 'securedguard_ci' }}
-          ENV_EOF
-          EOF
+          # Criar arquivo .env localmente primeiro para evitar problemas com caracteres especiais
+          # Usar printf para cada linha para evitar problemas de parsing
+          {
+            printf 'POSTGRES_PASSWORD_CI=%s\n' "${{ secrets.POSTGRES_PASSWORD_CI || '4KaCiJc6an@7sgbdcid2025' }}"
+            printf 'REDIS_PASSWORD_CI=%s\n' "${{ secrets.REDIS_PASSWORD_CI || 'redis_ci_2025' }}"
+            printf 'JWT_SECRET_CI=%s\n' "${{ secrets.JWT_SECRET_CI || 'jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key' }}"
+            printf '# Email Configuration\n'
+            printf 'MAIL_HOST=%s\n' "${{ secrets.MAIL_HOST || 'mail.z7design.com.br' }}"
+            printf 'MAIL_PORT=%s\n' "${{ secrets.MAIL_PORT || '465' }}"
+            printf 'MAIL_USERNAME=%s\n' "${{ secrets.MAIL_USERNAME || 'securedguard@z7design.com.br' }}"
+            # Para MAIL_PASSWORD, usar secret se disponível, senão usar valor do application-ci.properties
+            # (que já está no código e será usado como fallback pelo Spring Boot)
+            if [ -n "${{ secrets.MAIL_PASSWORD }}" ]; then
+              printf 'MAIL_PASSWORD=%s\n' "${{ secrets.MAIL_PASSWORD }}"
+            else
+              # Se não houver secret, deixar vazio - o Spring Boot usará o valor do application-ci.properties
+              printf 'MAIL_PASSWORD=\n'
+            fi
+            printf 'MAIL_STARTTLS_ENABLE=%s\n' "${{ secrets.MAIL_STARTTLS_ENABLE || 'false' }}"
+            printf 'MAIL_SSL_ENABLE=%s\n' "${{ secrets.MAIL_SSL_ENABLE || 'true' }}"
+            printf '# WhatsApp Configuration\n'
+            printf 'BAILEYS_REST_URL=%s\n' "${{ secrets.BAILEYS_REST_URL || 'http://evolution-api-ci:8080' }}"
+            printf 'BAILEYS_ENABLED=%s\n' "${{ secrets.BAILEYS_ENABLED || 'true' }}"
+            printf 'BAILEYS_INSTANCE_KEY=%s\n' "${{ secrets.BAILEYS_INSTANCE_KEY || 'securedguard_ci' }}"
+          } > /tmp/ci.env
+          # Enviar arquivo para VPS
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp /tmp/ci.env ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/.env
+          # Limpar arquivo temporário
+          rm -f /tmp/ci.env
 
       # ============================================
       # 1️⃣1️⃣ ENSURE JWT_SECRET IS CORRECT ON HOST AND .ENV
