@@ -466,7 +466,22 @@ jobs:
           EOF
 
       # ============================================
-      # 2️⃣6️⃣ HEALTH CHECK
+      # 2️⃣6️⃣ CLEAR SERVICE WORKER CACHE
+      # ============================================
+      - name: 🧹 Clear Service Worker Cache
+        run: |
+          # Enviar script de limpeza para VPS
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp scripts/clear-service-worker-cache.sh \
+            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/tmp/clear-service-worker-cache.sh
+          
+          # Executar script na VPS
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            chmod +x /tmp/clear-service-worker-cache.sh
+            /tmp/clear-service-worker-cache.sh
+          EOF
+
+      # ============================================
+      # 2️⃣7️⃣ HEALTH CHECK
       # ============================================
       - name: 🏥 Health check
         env:

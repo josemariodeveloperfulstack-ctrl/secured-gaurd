@@ -24,6 +24,8 @@ import com.z7design.secured_guard.dto.SimpleEmployeeDTO;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +50,7 @@ public class EmployeeService {
     private com.z7design.secured_guard.repository.DepartmentRepository departmentRepository;
     
     @Transactional
+    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
     public EmployeeDTO create(EmployeeDTO dto) {
         try {
             System.out.println("[DEBUG] EmployeeService.create - Iniciando criação de funcionário");
@@ -75,6 +78,7 @@ public class EmployeeService {
     }
     
     @Transactional
+    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
     public EmployeeDTO update(UUID id, EmployeeDTO dto) {
         try {
             System.out.println("[DEBUG] EmployeeService.update - Iniciando atualização do funcionário ID: " + id);
@@ -411,6 +415,7 @@ public class EmployeeService {
     }
     
     @Transactional
+    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
     public void delete(UUID id) {
         Employee employee = findById(id);
         if (employee.getStatus() != EmploymentStatus.TERMINATED) {
@@ -419,6 +424,7 @@ public class EmployeeService {
         employeeRepository.delete(employee);
     }
     
+    @Cacheable(value = "employees", key = "#id")
     public Employee findById(UUID id) {
         return employeeRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
@@ -603,6 +609,7 @@ public class EmployeeService {
     }
 
     @Transactional
+    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
     public void deleteById(UUID id) {
         employeeRepository.deleteById(id);
     }

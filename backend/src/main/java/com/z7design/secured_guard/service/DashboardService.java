@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.DashboardSummaryDTO;
 import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,8 +32,9 @@ public class DashboardService {
     private final UserActivityLogRepository userActivityLogRepository;
     private final NotificationRepository notificationRepository;
 
+    @Cacheable(value = "dashboard-summary", key = "'summary'")
     public DashboardSummaryDTO getDashboardSummary() {
-        log.info("Gerando resumo do dashboard");
+        log.info("Gerando resumo do dashboard (não encontrado no cache)");
         
         DashboardSummaryDTO summary = new DashboardSummaryDTO();
         
@@ -109,8 +111,10 @@ public class DashboardService {
         return summary;
     }
 
+    @Cacheable(value = "statistics", key = "'equipment-stats'")
     private Map<String, Object> getEquipmentStatistics() {
         try {
+            log.debug("Buscando estatísticas de equipamentos (não encontrado no cache)");
             // Buscar estatísticas de equipamentos
             long total = equipmentRepository.count();
             long inUse = 0L; // Implementar quando tiver o enum correto
@@ -141,8 +145,10 @@ public class DashboardService {
         return stats;
     }
 
+    @Cacheable(value = "statistics", key = "'revenue-stats'")
     private Map<String, BigDecimal> getRevenueStatistics() {
         try {
+            log.debug("Buscando estatísticas de receita (não encontrado no cache)");
             // Por enquanto retornar valores zerados até implementar os métodos corretos
             Map<String, BigDecimal> revenue = new HashMap<>();
             revenue.put("monthly", BigDecimal.ZERO);
