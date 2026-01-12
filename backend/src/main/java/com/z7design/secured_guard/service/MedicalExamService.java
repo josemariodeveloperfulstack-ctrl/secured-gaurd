@@ -274,4 +274,15 @@ public class MedicalExamService {
         
         return saved;
     }
+
+    // ========== CONSULTAS ==========
+
+    /**
+     * Busca nomes únicos de clínicas dos exames médicos
+     */
+    @Transactional(readOnly = true)
+    public List<String> getDistinctClinicNames() {
+        log.debug("Buscando nomes únicos de clínicas");
+        return examRepository.findDistinctClinicNames();
+    }
 }
