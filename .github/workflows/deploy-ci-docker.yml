@@ -259,6 +259,17 @@ jobs:
           POSTGRES_PASSWORD_CI=${{ secrets.POSTGRES_PASSWORD_CI || '4KaCiJc6an@7sgbdcid2025' }}
           REDIS_PASSWORD_CI=${{ secrets.REDIS_PASSWORD_CI || 'redis_ci_2025' }}
           JWT_SECRET_CI=${{ secrets.JWT_SECRET_CI || 'jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key' }}
+          # Email Configuration
+          MAIL_HOST=${{ secrets.MAIL_HOST || 'mail.z7design.com.br' }}
+          MAIL_PORT=${{ secrets.MAIL_PORT || '465' }}
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME || 'securedguard@z7design.com.br' }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD || 'D8rKeqSFZfaS$(y7' }}
+          MAIL_STARTTLS_ENABLE=${{ secrets.MAIL_STARTTLS_ENABLE || 'false' }}
+          MAIL_SSL_ENABLE=${{ secrets.MAIL_SSL_ENABLE || 'true' }}
+          # WhatsApp Configuration
+          BAILEYS_REST_URL=${{ secrets.BAILEYS_REST_URL || 'http://evolution-api-ci:8080' }}
+          BAILEYS_ENABLED=${{ secrets.BAILEYS_ENABLED || 'true' }}
+          BAILEYS_INSTANCE_KEY=${{ secrets.BAILEYS_INSTANCE_KEY || 'securedguard_ci' }}
           ENV_EOF
           EOF
 

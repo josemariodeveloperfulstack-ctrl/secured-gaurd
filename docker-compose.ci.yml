@@ -75,8 +75,17 @@ services:
       JWT_REFRESH_EXPIRATION: 2592000000
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
-      BAILEYS_REST_URL: http://whatsapp-service-ci:3333
+      # Email Configuration
+      MAIL_HOST: ${MAIL_HOST:-mail.z7design.com.br}
+      MAIL_PORT: ${MAIL_PORT:-465}
+      MAIL_USERNAME: ${MAIL_USERNAME:-securedguard@z7design.com.br}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-D8rKeqSFZfaS$(y7}
+      MAIL_STARTTLS_ENABLE: ${MAIL_STARTTLS_ENABLE:-false}
+      MAIL_SSL_ENABLE: ${MAIL_SSL_ENABLE:-true}
+      # WhatsApp Configuration
+      BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://evolution-api-ci:8080}
       BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
+      BAILEYS_INSTANCE_KEY: ${BAILEYS_INSTANCE_KEY:-securedguard_ci}
     ports:
       - "8081:8080"
     volumes:
