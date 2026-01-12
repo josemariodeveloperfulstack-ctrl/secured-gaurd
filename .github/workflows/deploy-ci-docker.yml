@@ -279,7 +279,8 @@ jobs:
             printf 'MAIL_STARTTLS_ENABLE=%s\n' "${{ secrets.MAIL_STARTTLS_ENABLE || 'false' }}"
             printf 'MAIL_SSL_ENABLE=%s\n' "${{ secrets.MAIL_SSL_ENABLE || 'true' }}"
             printf '# WhatsApp Configuration\n'
-            printf 'BAILEYS_REST_URL=%s\n' "${{ secrets.BAILEYS_REST_URL || 'http://evolution-api-ci:8080' }}"
+            # Usar whatsapp-service-ci:3333 que está definido no docker-compose.ci.yml
+            printf 'BAILEYS_REST_URL=%s\n' "${{ secrets.BAILEYS_REST_URL || 'http://whatsapp-service-ci:3333' }}"
             printf 'BAILEYS_ENABLED=%s\n' "${{ secrets.BAILEYS_ENABLED || 'true' }}"
             printf 'BAILEYS_INSTANCE_KEY=%s\n' "${{ secrets.BAILEYS_INSTANCE_KEY || 'securedguard_ci' }}"
           } > /tmp/ci.env
