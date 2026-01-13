@@ -9,7 +9,6 @@ import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfPage;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
-import com.itextpdf.kernel.pdf.extgstate.PdfExtGState;
 import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Image;
@@ -19,6 +18,7 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,10 +33,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
  * Serviço para criar layout padrão de relatórios com cabeçalho e rodapé dinâmicos
  * baseados na empresa selecionada.
+ * 
+ * Inclui cache de templates e logos para melhor performance.
  */
 @Service
 @RequiredArgsConstructor
@@ -48,18 +52,35 @@ public class StandardReportLayoutService {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
     
-    // Cores do gradiente (amarelo → laranja → vermelho) conforme modelo
-    private static final DeviceRgb COLOR_YELLOW = new DeviceRgb(255, 204, 0);      // #FFCC00 - Amarelo brilhante
-    private static final DeviceRgb COLOR_ORANGE = new DeviceRgb(255, 153, 0);      // #FF9900 - Laranja
-    private static final DeviceRgb COLOR_RED = new DeviceRgb(255, 51, 51);         // #FF3333 - Vermelho vibrante
+    // Cores padrão do gradiente (amarelo → laranja → vermelho) conforme modelo
+    private static final DeviceRgb COLOR_YELLOW_DEFAULT = new DeviceRgb(255, 204, 0);      // #FFCC00 - Amarelo brilhante
+    private static final DeviceRgb COLOR_ORANGE_DEFAULT = new DeviceRgb(255, 153, 0);      // #FF9900 - Laranja
+    private static final DeviceRgb COLOR_RED_DEFAULT = new DeviceRgb(255, 51, 51);         // #FF3333 - Vermelho vibrante
     
-    // Cores para marca d'água (formas abstratas)
-    private static final DeviceRgb WATERMARK_YELLOW = new DeviceRgb(255, 240, 200); // Amarelo pêssego claro
-    private static final DeviceRgb WATERMARK_PINK = new DeviceRgb(255, 200, 180);   // Rosa pêssego claro
+    /**
+     * Obtém cores do gradiente para uma empresa (suporta personalização futura)
+     */
+    private DeviceRgb[] getGradientColors(Company company) {
+        // Por enquanto, sempre usa cores padrão
+        // Futuro: buscar cores personalizadas da empresa se disponíveis
+        return new DeviceRgb[]{
+            COLOR_YELLOW_DEFAULT,
+            COLOR_ORANGE_DEFAULT,
+            COLOR_RED_DEFAULT
+        };
+    }
+    
     private static final DeviceRgb DARK_CURVE = new DeviceRgb(30, 30, 30);          // Forma curva escura
     
     // Caminho do template de fundo do relatório
     private static final String REPORT_BACKGROUND_TEMPLATE = "templates/reports/report-background-template.png";
+    
+    // Cache de templates e logos para melhor performance
+    private static final Map<String, Image> templateCache = new ConcurrentHashMap<>();
+    private static final Map<String, Image> logoCache = new ConcurrentHashMap<>();
+    
+    // Configuração de cache (pode ser externalizada para properties)
+    private static final long CACHE_MAX_SIZE = 50; // Máximo de itens em cache
     
     // Dimensões do logo em pixels (297x217px)
     // Conversão para pontos: 1pt = 1/72 inch
@@ -177,7 +198,7 @@ public class StandardReportLayoutService {
                     
                     // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
                     float gradientBarHeight = 27.5f; // Altura da barra gradiente no topo
-                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight));
+                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight), company);
                     log.debug("Gradiente superior desenhado na página {}", i);
                     
                     // Forma curva escura no canto superior esquerdo
@@ -186,7 +207,7 @@ public class StandardReportLayoutService {
                     
                     // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
                     float footerLineHeight = 3f;
-                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight));
+                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight), company);
                     log.debug("Gradiente inferior desenhado na página {}", i);
                     
                     backgroundCanvas.release();
@@ -216,7 +237,6 @@ public class StandardReportLayoutService {
             }
         }
         
-        // Marca d'água já está incluída no template de fundo, não precisa adicionar programaticamente
         log.info("Layout padrão aplicado em {} página(s) usando template de fundo", totalPages);
     }
     
@@ -278,8 +298,9 @@ public class StandardReportLayoutService {
             .setMarginBottom(3f);
         canvas.add(companyName.setFixedPosition(0, infoY, pageWidth));
         
-        if (company.getCnpj() != null && !company.getCnpj().isEmpty()) {
-            Paragraph cnpj = new Paragraph("CNPJ: " + formatCnpj(company.getCnpj()))
+        String cnpjText = CompanyDataFormatter.formatCnpjForHeader(company);
+        if (!cnpjText.isEmpty()) {
+            Paragraph cnpj = new Paragraph(cnpjText)
                 .setFontSize(9)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setFontColor(new DeviceRgb(80, 80, 80))
@@ -296,20 +317,8 @@ public class StandardReportLayoutService {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
         
-        // Informações da empresa no rodapé
-        String footerText = company.getName();
-        if (company.getAddress() != null && !company.getAddress().isEmpty()) {
-            footerText += " | " + company.getAddress();
-        }
-        if (company.getCity() != null && !company.getCity().isEmpty()) {
-            footerText += " - " + company.getCity();
-            if (company.getState() != null && !company.getState().isEmpty()) {
-                footerText += "/" + company.getState();
-            }
-        }
-        if (company.getPhone() != null && !company.getPhone().isEmpty()) {
-            footerText += " | Tel: " + company.getPhone();
-        }
+        // Informações da empresa no rodapé usando formatação padronizada
+        String footerText = CompanyDataFormatter.formatCompanyFooter(company, true);
         
         Paragraph footer = new Paragraph(footerText)
             .setFontSize(8)
@@ -330,8 +339,9 @@ public class StandardReportLayoutService {
     /**
      * Adiciona gradiente horizontal (amarelo → laranja → vermelho) conforme modelo
      * Implementa gradiente linear horizontal usando simulação com múltiplos retângulos
+     * Suporta cores personalizadas por empresa
      */
-    private void addHorizontalGradient(PdfCanvas pdfCanvas, PdfDocument pdfDoc, Rectangle rect) {
+    private void addHorizontalGradient(PdfCanvas pdfCanvas, PdfDocument pdfDoc, Rectangle rect, Company company) {
         pdfCanvas.saveState();
         
         float x = rect.getX();
@@ -343,13 +353,16 @@ public class StandardReportLayoutService {
         int segments = 200;
         float segmentWidth = width / segments;
         
+        // Obter cores do gradiente (personalizadas ou padrão)
+        DeviceRgb[] colors = getGradientColors(company);
+        
         // Criar gradiente simulando com múltiplos retângulos
         for (int i = 0; i < segments; i++) {
             float segmentX = x + (i * segmentWidth);
             float progress = (float) i / (segments - 1); // 0.0 a 1.0
             
             // Interpolar cor baseada no progresso
-            DeviceRgb color = interpolateColor(COLOR_YELLOW, COLOR_ORANGE, COLOR_RED, progress);
+            DeviceRgb color = interpolateColor(colors[0], colors[1], colors[2], progress);
             
             pdfCanvas.setFillColor(color);
             pdfCanvas.rectangle(segmentX, y, segmentWidth + 1, height); // +1 para evitar gaps
@@ -408,10 +421,17 @@ public class StandardReportLayoutService {
     }
     
     /**
-     * Carrega a imagem de template de fundo do relatório
-     * Esta imagem contém: gradiente, forma curva escura, marca d'água e linha do rodapé
+     * Carrega a imagem de template de fundo do relatório com cache
+     * Esta imagem contém: gradiente, forma curva escura e linha do rodapé
      */
     private Image loadReportBackgroundTemplate() {
+        // Verificar cache primeiro
+        String cacheKey = REPORT_BACKGROUND_TEMPLATE;
+        if (templateCache.containsKey(cacheKey)) {
+            log.debug("Template de fundo carregado do cache: {}", cacheKey);
+            return templateCache.get(cacheKey);
+        }
+        
         try {
             ClassPathResource resource = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE);
             if (!resource.exists()) {
@@ -421,6 +441,12 @@ public class StandardReportLayoutService {
             
             ImageData imageData = ImageDataFactory.create(resource.getInputStream().readAllBytes());
             Image image = new Image(imageData);
+            
+            // Adicionar ao cache (com limite de tamanho)
+            if (templateCache.size() < CACHE_MAX_SIZE) {
+                templateCache.put(cacheKey, image);
+                log.debug("Template de fundo adicionado ao cache: {}", cacheKey);
+            }
             
             log.debug("Template de fundo carregado com sucesso: {}", REPORT_BACKGROUND_TEMPLATE);
             return image;
@@ -432,11 +458,19 @@ public class StandardReportLayoutService {
     
     /**
      * Carrega e redimensiona o logo da empresa para exatamente 297x217px (222.75x162.75pt)
+     * Com cache para melhor performance
      */
     private Image loadCompanyLogo(Company company) throws IOException {
         if (company.getLogoUrl() == null || company.getLogoUrl().isEmpty()) {
             log.debug("Empresa {} não possui logo cadastrado", company.getName());
             return null;
+        }
+        
+        // Verificar cache primeiro
+        String cacheKey = company.getLogoUrl() + "_" + company.getId();
+        if (logoCache.containsKey(cacheKey)) {
+            log.debug("Logo da empresa {} carregado do cache", company.getName());
+            return logoCache.get(cacheKey);
         }
         
         try {
@@ -462,7 +496,6 @@ public class StandardReportLayoutService {
             Image image = new Image(imageData);
             
             // Redimensionar para exatamente 297x217px (222.75x162.75pt)
-            // Manter proporção original e ajustar para caber no espaço definido
             float originalWidth = image.getImageWidth();
             float originalHeight = image.getImageHeight();
             
@@ -472,6 +505,12 @@ public class StandardReportLayoutService {
             // Definir dimensões fixas (297x217px)
             image.setWidth(LOGO_WIDTH_PT);
             image.setHeight(LOGO_HEIGHT_PT);
+            
+            // Adicionar ao cache (com limite de tamanho)
+            if (logoCache.size() < CACHE_MAX_SIZE) {
+                logoCache.put(cacheKey, image);
+                log.debug("Logo da empresa {} adicionado ao cache", company.getName());
+            }
             
             log.info("Logo da empresa {} carregado e redimensionado para {}x{}pt (297x217px)", 
                     company.getName(), LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
@@ -484,6 +523,16 @@ public class StandardReportLayoutService {
             log.error("Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage(), e);
             return null;
         }
+    }
+    
+    /**
+     * Limpa o cache de templates e logos
+     * Útil para forçar recarregamento após atualizações
+     */
+    public void clearCache() {
+        templateCache.clear();
+        logoCache.clear();
+        log.info("Cache de templates e logos limpo");
     }
     
     /**
@@ -517,165 +566,4 @@ public class StandardReportLayoutService {
         return logoPath.toAbsolutePath().toString();
     }
     
-    /**
-     * Formata CNPJ com máscara
-     */
-    private String formatCnpj(String cnpj) {
-        if (cnpj == null || cnpj.isEmpty()) {
-            return "";
-        }
-        
-        // Remover caracteres não numéricos
-        String digits = cnpj.replaceAll("[^0-9]", "");
-        
-        // Formatar: XX.XXX.XXX/XXXX-XX
-        if (digits.length() == 14) {
-            return String.format("%s.%s.%s/%s-%s",
-                digits.substring(0, 2),
-                digits.substring(2, 5),
-                digits.substring(5, 8),
-                digits.substring(8, 12),
-                digits.substring(12, 14));
-        }
-        
-        return cnpj; // Retornar original se não tiver 14 dígitos
-    }
-    
-    /**
-     * Adiciona marca d'água em todas as páginas (formas abstratas tipo "p" ou crescentes)
-     * Conforme modelo: duas formas abstratas - uma amarelo/pêssego (esquerda) e outra rosa/pêssego (direita)
-     */
-    private void addWatermarkToAllPages(PdfDocument pdfDoc) {
-        int totalPages = pdfDoc.getNumberOfPages();
-        
-        for (int i = 1; i <= totalPages; i++) {
-            PdfPage page = pdfDoc.getPage(i);
-            Rectangle pageSize = page.getPageSize();
-            
-            try {
-                // Canvas para marca d'água (em camada separada, atrás do conteúdo)
-                PdfCanvas pdfCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
-                
-                float pageWidth = pageSize.getWidth();
-                float pageHeight = pageSize.getHeight();
-                float centerX = pageWidth / 2;
-                float centerY = pageHeight / 2;
-                
-                // Forma abstrata tipo "p" amarelo/pêssego (esquerda)
-                // Forma vertical com "bowl" (curva) virado para direita e "stem" (haste) para baixo
-                drawAbstractPShape(pdfCanvas, centerX - 150f, centerY, 120f, WATERMARK_YELLOW, false);
-                
-                // Forma abstrata tipo "p" rosa/pêssego (direita)
-                // Forma vertical com "bowl" (curva) virado para esquerda e "stem" (haste) para cima
-                drawAbstractPShape(pdfCanvas, centerX + 50f, centerY, 120f, WATERMARK_PINK, true);
-                
-            } catch (Exception e) {
-                log.error("Erro ao adicionar marca d'água na página {}: {}", i, e.getMessage(), e);
-            }
-        }
-        
-        log.info("Marca d'água adicionada em {} página(s) do documento", totalPages);
-    }
-    
-    /**
-     * Desenha forma abstrata tipo "p" (crescente) para marca d'água
-     * Conforme modelo: formas tipo crescente com cores suaves
-     * @param pdfCanvas Canvas para desenhar
-     * @param x Posição X central da forma
-     * @param y Posição Y central da forma
-     * @param size Tamanho da forma
-     * @param color Cor da forma
-     * @param mirrored Se true, espelha a forma (inverte orientação)
-     */
-    private void drawAbstractPShape(PdfCanvas pdfCanvas, float x, float y, float size, DeviceRgb color, boolean mirrored) {
-        pdfCanvas.saveState();
-        
-        // Criar estado gráfico com transparência para marca d'água
-        PdfExtGState gs = new PdfExtGState();
-        gs.setFillOpacity(0.15f); // Transparência suave para marca d'água (15% opacidade)
-        pdfCanvas.setExtGState(gs);
-        
-        pdfCanvas.setFillColor(color);
-        pdfCanvas.setStrokeColor(color);
-        pdfCanvas.setLineWidth(0.5f);
-        
-        // Criar forma crescente abstrata usando paths
-        // Baseado no modelo: formas tipo "p" com parte curva (crescente) e haste
-        float width = size * 0.8f;
-        float height = size * 0.7f;
-        float stemWidth = size * 0.15f;
-        float stemLength = size * 0.4f;
-        
-        if (!mirrored) {
-            // Forma normal: crescente à direita, haste para baixo
-            // Desenhar crescente usando path com curvas
-            float centerX = x;
-            float centerY = y;
-            
-            // Criar path para forma crescente (parte curva externa)
-            pdfCanvas.moveTo(centerX + width * 0.1f, centerY - height * 0.4f);
-            
-            // Arco superior da crescente
-            pdfCanvas.curveTo(centerX + width * 0.3f, centerY - height * 0.5f,
-                            centerX + width * 0.6f, centerY - height * 0.3f,
-                            centerX + width * 0.7f, centerY);
-            
-            // Arco inferior da crescente
-            pdfCanvas.curveTo(centerX + width * 0.6f, centerY + height * 0.3f,
-                            centerX + width * 0.3f, centerY + height * 0.5f,
-                            centerX + width * 0.1f, centerY + height * 0.4f);
-            
-            // Parte interna da crescente (fechar o path)
-            pdfCanvas.curveTo(centerX - width * 0.1f, centerY + height * 0.2f,
-                            centerX - width * 0.15f, centerY,
-                            centerX - width * 0.1f, centerY - height * 0.2f);
-            pdfCanvas.curveTo(centerX, centerY - height * 0.3f,
-                            centerX + width * 0.05f, centerY - height * 0.35f,
-                            centerX + width * 0.1f, centerY - height * 0.4f);
-            
-            pdfCanvas.fill();
-            
-            // Desenhar haste (stem) - retângulo arredondado vertical
-            float stemX = centerX - stemWidth / 2;
-            float stemY = centerY - stemLength;
-            pdfCanvas.roundRectangle(stemX, stemY, stemWidth, stemLength, 3f);
-            pdfCanvas.fill();
-            
-        } else {
-            // Forma espelhada: crescente à esquerda, haste para cima
-            float centerX = x;
-            float centerY = y;
-            
-            // Criar path para forma crescente invertida
-            pdfCanvas.moveTo(centerX - width * 0.1f, centerY + height * 0.4f);
-            
-            // Arco inferior da crescente (invertido)
-            pdfCanvas.curveTo(centerX - width * 0.3f, centerY + height * 0.5f,
-                            centerX - width * 0.6f, centerY + height * 0.3f,
-                            centerX - width * 0.7f, centerY);
-            
-            // Arco superior da crescente (invertido)
-            pdfCanvas.curveTo(centerX - width * 0.6f, centerY - height * 0.3f,
-                            centerX - width * 0.3f, centerY - height * 0.5f,
-                            centerX - width * 0.1f, centerY - height * 0.4f);
-            
-            // Parte interna da crescente (fechar o path)
-            pdfCanvas.curveTo(centerX + width * 0.1f, centerY - height * 0.2f,
-                            centerX + width * 0.15f, centerY,
-                            centerX + width * 0.1f, centerY + height * 0.2f);
-            pdfCanvas.curveTo(centerX, centerY + height * 0.3f,
-                            centerX - width * 0.05f, centerY + height * 0.35f,
-                            centerX - width * 0.1f, centerY + height * 0.4f);
-            
-            pdfCanvas.fill();
-            
-            // Desenhar haste (stem) para cima
-            float stemX = centerX - stemWidth / 2;
-            float stemY = centerY;
-            pdfCanvas.roundRectangle(stemX, stemY, stemWidth, stemLength, 3f);
-            pdfCanvas.fill();
-        }
-        
-        pdfCanvas.restoreState();
-    }
 }

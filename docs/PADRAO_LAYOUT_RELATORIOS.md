@@ -1,391 +1,338 @@
-# 📄 Padrão de Layout para Relatórios - Secured Guard
+# 📄 Padrão de Layout para Relatórios PDF e Excel
 
-## 📋 Índice
-1. [Visão Geral](#visão-geral)
-2. [Especificações Técnicas](#especificações-técnicas)
-3. [Estrutura do Layout](#estrutura-do-layout)
-4. [Cabeçalho](#cabeçalho)
-5. [Rodapé](#rodapé)
-6. [Marca d'Água](#marca-dágua)
-7. [Área de Conteúdo](#área-de-conteúdo)
-8. [Cores e Tipografia](#cores-e-tipografia)
-9. [Padrões de Uso](#padrões-de-uso)
-10. [Exemplos de Implementação](#exemplos-de-implementação)
+## 📋 Visão Geral
 
----
+Este documento define o padrão visual e técnico para todos os relatórios do sistema SecuredGuard, garantindo consistência visual e profissionalismo em todos os documentos gerados.
 
-## 🎯 Visão Geral
+## 🎨 Especificações Visuais
 
-Este documento define o padrão visual unificado para todos os relatórios gerados no sistema Secured Guard, garantindo consistência visual e profissionalismo em todos os módulos.
+### 1. Cabeçalho (Header)
 
-### Objetivos
-- ✅ Padronizar visualmente todos os relatórios (PDF e Excel)
-- ✅ Permitir personalização por empresa (cabeçalho e rodapé dinâmicos)
-- ✅ Oferecer dois padrões: com e sem marca d'água
-- ✅ Garantir legibilidade e profissionalismo
-
----
-
-## 📐 Especificações Técnicas
-
-### Dimensões do Documento
-- **Formato padrão**: A4 (210mm x 297mm / 8.27" x 11.69")
-- **Orientação**: Retrato (Portrait)
-- **Resolução**: 300 DPI para imagens
-
-### Margens
-- **Superior**: 80mm (reservado para cabeçalho)
-- **Inferior**: 50mm (reservado para rodapé)
-- **Esquerda**: 20mm
-- **Direita**: 20mm
-- **Área útil de conteúdo**: 170mm x 167mm
-
-### Logo da Empresa
-- **Dimensões**: 297px (largura) x 217px (altura)
-- **Proporção**: ~1.37:1 (aproximadamente 4:3)
-- **Formato suportado**: PNG, JPG, SVG (convertido para PNG)
-- **Resolução mínima**: 300 DPI
-- **Posicionamento**: Canto superior esquerdo do cabeçalho
-- **Espaçamento**: 10mm da borda esquerda e superior
-
----
-
-## 🏗️ Estrutura do Layout
-
-```
-┌─────────────────────────────────────────────────┐
-│  CABEÇALHO (80mm altura)                        │
-│  ┌──────────┐  [Gradiente]                      │
-│  │   LOGO   │  [Informações da Empresa]         │
-│  │ 297x217  │  [Título do Relatório]            │
-│  └──────────┘                                    │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ÁREA DE CONTEÚDO (167mm altura)                │
-│  [Conteúdo específico do relatório]             │
-│  [Tabelas, gráficos, dados]                     │
-│                                                 │
-│  [Marca d'água - apenas em documentos          │
-│   importantes/contratos]                        │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  RODAPÉ (50mm altura)                           │
-│  [Informações da empresa]                       │
-│  [CNPJ, endereço, contato]                      │
-│  [Gradiente inferior]                           │
-│  [Número da página]                             │
-└─────────────────────────────────────────────────┘
-```
-
----
-
-## 📊 Cabeçalho
-
-### Dimensões e Posicionamento
-- **Altura total**: 80mm
-- **Largura**: 100% da página (170mm útil)
-
-### Estrutura do Cabeçalho
-
-#### 1. Logo da Empresa
+#### 1.1 Logo da Empresa
 - **Posição**: Canto superior esquerdo
-- **Coordenadas**: X: 10mm, Y: 10mm (a partir do topo)
-- **Tamanho**: 297px x 217px (convertido para mm: ~78mm x 57mm)
-- **Alinhamento**: Esquerda
-- **Espaçamento direito**: 15mm
+- **Dimensões**: 297px × 217px (222.75pt × 162.75pt)
+- **Margem esquerda**: 15pt
+- **Margem superior**: 5pt abaixo do gradiente
+- **Formato suportado**: PNG, JPG, SVG (convertido para raster)
+- **Comportamento**: 
+  - Se logo não disponível, espaço é reservado mas não exibe nada
+  - Logo é redimensionado mantendo proporção (fit dentro de 297×217px)
+  - Suporta URLs HTTP/HTTPS ou caminhos locais
 
-#### 2. Banda de Gradiente Superior
-- **Posição**: Topo da página
-- **Altura**: 5-7mm
+#### 1.2 Barra Gradiente Superior
+- **Posição**: Topo da página (0pt do topo)
+- **Altura**: 27.5pt (~37px)
+- **Largura**: 100% da página
 - **Cores**: Gradiente horizontal
-  - **Início (esquerda)**: Amarelo (#FFD700 / RGB: 255, 215, 0)
-  - **Meio**: Laranja (#FF8C00 / RGB: 255, 140, 0)
-  - **Fim (direita)**: Vermelho (#FF4500 / RGB: 255, 69, 0)
-- **Transparência**: 100% opaco
+  - Início (esquerda): Amarelo `#FFCC00` (RGB: 255, 204, 0)
+  - Meio: Laranja `#FF9900` (RGB: 255, 153, 0)
+  - Fim (direita): Vermelho `#FF3333` (RGB: 255, 51, 51)
+- **Transição**: Suave, 200 segmentos para gradiente fluido
 
-#### 3. Forma Escura (Topo Esquerdo)
-- **Posição**: Sobrepondo parcialmente o gradiente superior esquerdo
-- **Cor**: Preto (#000000) ou Cinza Escuro (#1a1a1a)
-- **Forma**: Curva orgânica côncava
-- **Propósito**: Elemento de design para separação visual
-- **Transparência**: 100% opaco
+#### 1.3 Forma Curva Escura
+- **Posição**: Canto superior esquerdo, sobrepondo parcialmente o gradiente
+- **Cor**: Cinza escuro `#1E1E1E` (RGB: 30, 30, 30)
+- **Forma**: Curva orgânica usando curvas de Bézier
+- **Dimensões**: ~15% da largura da página, ~60pt de altura
 
-#### 4. Informações da Empresa
-- **Posição**: À direita do logo
-- **Alinhamento**: Esquerda
+#### 1.4 Título do Relatório
+- **Posição**: Centralizado horizontalmente, abaixo do gradiente
+- **Coordenada Y**: 40pt do topo
 - **Fonte**: 
-  - **Nome**: 16pt, Negrito, Cor: #333333
-  - **CNPJ/Info**: 10pt, Regular, Cor: #666666
-- **Espaçamento**: 15mm da logo
+  - Tamanho: 18pt
+  - Peso: Negrito (Bold)
+  - Cor: Preto `#000000`
+  - Alinhamento: Centralizado
+- **Margem inferior**: 5pt
 
-**Exemplo de Layout:**
-```
-[LOGO]  NOME DA EMPRESA LTDA
-        CNPJ: 00.000.000/0001-00
-        Endereço: Rua Exemplo, 123
-        Telefone: (11) 99999-9999
-```
+#### 1.5 Informações da Empresa (Cabeçalho)
+- **Posição**: Centralizado, abaixo do título
+- **Coordenada Y**: 65pt do topo
+- **Nome da Empresa**:
+  - Fonte: 14pt, Negrito, Preto
+  - Alinhamento: Centralizado
+- **CNPJ** (se disponível):
+  - Fonte: 9pt, Regular, Cinza `#505050` (RGB: 80, 80, 80)
+  - Alinhamento: Centralizado
+  - Formato: `CNPJ: XX.XXX.XXX/XXXX-XX`
+  - Posição: 18pt abaixo do nome
 
-#### 5. Título do Relatório
-- **Posição**: Centralizado abaixo das informações da empresa
-- **Fonte**: 18pt, Negrito, Cor: #333333
-- **Espaçamento superior**: 10mm
-- **Espaçamento inferior**: 5mm
+### 2. Área de Conteúdo
 
----
+#### 2.1 Margens
+- **Superior**: 120pt (acomodar cabeçalho)
+- **Inferior**: 80pt (acomodar rodapé)
+- **Esquerda**: 50pt
+- **Direita**: 50pt
 
-## 📌 Rodapé
+#### 2.2 Área Utilizável
+- **Largura**: Largura da página (595pt A4) - 100pt (margens)
+- **Altura**: Altura da página (842pt A4) - 200pt (margens + cabeçalho + rodapé)
+- **Cor de fundo**: Branco `#FFFFFF`
 
-### Dimensões e Posicionamento
-- **Altura total**: 50mm
-- **Largura**: 100% da página (170mm útil)
-- **Posição**: Fixo na parte inferior
+### 3. Rodapé (Footer)
 
-### Estrutura do Rodapé
+#### 3.1 Linha Gradiente Inferior
+- **Posição**: Parte inferior da página (0pt da base)
+- **Altura**: 3pt (~4px)
+- **Largura**: 100% da página
+- **Cores**: Mesmo gradiente do cabeçalho (amarelo → laranja → vermelho)
 
-#### 1. Banda de Gradiente Inferior
-- **Posição**: Base da página
-- **Altura**: 1-2mm (linha fina)
-- **Cores**: Gradiente horizontal (mesmo do cabeçalho)
-  - **Início (esquerda)**: Amarelo (#FFD700)
-  - **Meio**: Laranja (#FF8C00)
-  - **Fim (direita)**: Vermelho (#FF4500)
-
-#### 2. Informações da Empresa
-- **Posição**: Acima do gradiente
+#### 3.2 Informações da Empresa (Rodapé)
+- **Posição**: Acima da linha gradiente
+- **Coordenada Y**: 20pt da base
+- **Fonte**: 8pt, Regular, Preto
 - **Alinhamento**: Centralizado
-- **Fonte**: 8pt, Regular, Cor: #666666
-- **Conteúdo**:
+- **Conteúdo**: 
   - Nome da empresa
-  - CNPJ
-  - Endereço completo
-  - Telefone e Email
-  - Website (se disponível)
+  - Endereço completo (se disponível): `Rua, Número - Bairro - Cidade/Estado`
+  - Telefone (se disponível): `Tel: (XX) XXXX-XXXX`
+  - Email (se disponível): `Email: email@empresa.com.br`
+  - Separador: ` | ` entre informações
 
-#### 3. Número da Página
-- **Posição**: Canto inferior direito
-- **Formato**: "Página X de Y"
-- **Fonte**: 8pt, Regular, Cor: #999999
-- **Espaçamento**: 5mm da borda direita e inferior
+#### 3.3 Data de Geração
+- **Posição**: Acima das informações da empresa
+- **Coordenada Y**: 5pt da base
+- **Fonte**: 7pt, Regular, Cinza `#646464` (RGB: 100, 100, 100)
+- **Alinhamento**: Centralizado
+- **Formato**: `Gerado em: DD/MM/AAAA HH:mm`
 
-**Exemplo de Layout:**
-```
-─────────────────────────────────────────────
-  Nome da Empresa LTDA | CNPJ: 00.000.000/0001-00
-  Rua Exemplo, 123 - Centro - São Paulo/SP - CEP: 01234-567
-  Tel: (11) 99999-9999 | Email: contato@empresa.com.br
-  www.empresa.com.br                    Página 1 de 3
-═════════════════════════════════════════════
-```
+### 4. Cache de Performance
 
----
+#### 4.1 Cache de Templates
+- Templates de fundo são cacheados em memória
+- Limite: 50 templates (configurável)
+- Benefício: Reduz tempo de carregamento em relatórios subsequentes
 
-## 💧 Marca d'Água
+#### 4.2 Cache de Logos
+- Logos redimensionados são cacheados por empresa
+- Limite: 50 logos (configurável)
+- Chave de cache: `logoUrl_companyId`
+- Benefício: Evita recarregar e redimensionar logos repetidamente
 
-### Quando Usar
-- ✅ **COM marca d'água**: Contratos, documentos legais, ordens de serviço, documentos oficiais
-- ❌ **SEM marca d'água**: Relatórios operacionais (estoque, vendas, financeiro, atividades)
+#### 4.3 Limpeza de Cache
+- Endpoint: `POST /api/reports/layout/cache/clear`
+- Método: `StandardReportLayoutService.clearCache()`
+- Uso: Após atualizar logos ou templates
 
-### Especificações da Marca d'Água
+## 📊 Especificações Técnicas
 
-#### Padrão Visual
-- **Formas abstratas**: Duas formas grandes e suaves
-  - **Forma 1 (Amarelo Pálido)**: 
-    - Cor: #FFF9C4 (amarelo muito claro)
-    - Posição: Lado esquerdo do centro
-    - Forma: Estilizada (similar a "p" ou "r")
-    - Transparência: 15-20%
-  
-  - **Forma 2 (Rosa Pálido)**:
-    - Cor: #F8BBD0 (rosa muito claro)
-    - Posição: Lado direito do centro, ligeiramente acima
-    - Forma: Crescente ou "bowl" de "p"
-    - Transparência: 15-20%
+### 5. PDF (iText 7)
 
-#### Posicionamento
-- **Centralizado**: Vertical e horizontalmente na área de conteúdo
-- **Tamanho**: Ocupa aproximadamente 60-70% da área de conteúdo
-- **Rotação**: Opcional, leve rotação (-5° a +5°) para evitar sobreposição com texto
+#### 5.1 Tamanho de Página
+- **Formato**: A4 (595pt × 842pt)
+- **Orientação**: Retrato (Portrait)
 
-#### Implementação Técnica
-- **Camada**: Background (atrás do conteúdo)
-- **Z-index**: Mais baixo que o conteúdo
-- **Interação**: Não deve interferir na legibilidade
+#### 5.2 Conversão de Unidades
+- **1 pixel (px) = 0.75 pontos (pt)** (padrão web 96 DPI)
+- **Logo**: 297px × 217px = 222.75pt × 162.75pt
 
----
+#### 5.3 Camadas (Layers)
+1. **Background Layer** (newContentStreamBefore):
+   - Template de fundo (gradiente, forma curva, marca d'água)
+2. **Content Layer** (conteúdo do relatório):
+   - Tabelas, textos, gráficos
+3. **Header/Footer Layer** (newContentStreamAfter):
+   - Logo, título, informações da empresa, rodapé
 
-## 📝 Área de Conteúdo
+### 6. Excel (Apache POI)
 
-### Dimensões
-- **Largura útil**: 170mm (após margens laterais)
-- **Altura útil**: 167mm (após cabeçalho e rodapé)
-- **Margem interna**: 5mm de todos os lados
+#### 6.1 Estrutura da Planilha
 
-### Regras de Conteúdo
-1. **Tabelas**:
-   - Largura máxima: 100% da área útil
-   - Cabeçalhos: Fundo cinza claro (#F5F5F5), texto negrito
-   - Bordas: 0.5pt, cor #CCCCCC
-   - Espaçamento entre células: 2mm
+##### 6.1.1 Cabeçalho (Linhas 1-6)
+- **Linha 1**: Logo da empresa (mesclado, altura 120px)
+  - Coluna A: Logo (297px × 217px redimensionado proporcionalmente)
+  - Colunas B-F: Vazias (para centralizar logo)
+- **Linha 2**: Barra gradiente (altura 20px)
+  - Células mescladas A-F com gradiente amarelo → laranja → vermelho
+- **Linha 3**: Título do relatório (altura 30px)
+  - Células mescladas A-F
+  - Fonte: 18pt, Negrito, Centralizado
+- **Linha 4**: Nome da empresa (altura 20px)
+  - Células mescladas A-F
+  - Fonte: 14pt, Negrito, Centralizado
+- **Linha 5**: CNPJ (se disponível) (altura 15px)
+  - Células mescladas A-F
+  - Fonte: 9pt, Regular, Cinza, Centralizado
+- **Linha 6**: Linha em branco (altura 10px)
 
-2. **Títulos de Seção**:
-   - Fonte: 14pt, Negrito, Cor: #333333
-   - Espaçamento superior: 10mm
-   - Espaçamento inferior: 5mm
+##### 6.1.2 Conteúdo (Linhas 7+)
+- **Linha 7**: Cabeçalhos da tabela
+  - Fonte: 11pt, Negrito
+  - Fundo: Cinza claro `#E0E0E0`
+  - Borda: Fina, preta
+- **Linhas 8+**: Dados do relatório
+  - Fonte: 10pt, Regular
+  - Bordas: Finas, cinza claro
 
-3. **Texto Corpo**:
-   - Fonte: 10pt, Regular, Cor: #333333
-   - Espaçamento entre linhas: 1.2
+##### 6.1.3 Rodapé (Últimas 3 linhas)
+- **Antepenúltima linha**: Linha em branco (altura 10px)
+- **Penúltima linha**: Informações da empresa (altura 20px)
+  - Células mescladas A-F
+  - Fonte: 8pt, Regular, Centralizado
+  - Conteúdo: Nome | Endereço | Tel: XXX | Email: XXX
+- **Última linha**: Data de geração + linha gradiente (altura 20px)
+  - Células mescladas A-F
+  - Fonte: 7pt, Regular, Cinza, Centralizado
+  - Fundo: Gradiente amarelo → laranja → vermelho (altura 3px na parte inferior)
 
-4. **Gráficos**:
-   - Largura máxima: 100% da área útil
-   - Altura: Proporcional, máximo 80mm
-   - Resolução: 300 DPI
+#### 6.2 Estilos Excel
+- **Cores do gradiente**: 
+  - Amarelo: `#FFCC00`
+  - Laranja: `#FF9900`
+  - Vermelho: `#FF3333`
+- **Bordas**: Fina, cor `#CCCCCC`
+- **Alinhamento**: 
+  - Cabeçalho: Centralizado
+  - Dados numéricos: Direita
+  - Dados texto: Esquerda
+  - Datas: Centralizado
 
----
+## 🔧 Configuração por Empresa
 
-## 🎨 Cores e Tipografia
+### 7. Campos da Entidade Company
 
-### Paleta de Cores
-
-#### Cores Principais
-- **Amarelo**: #FFD700 (RGB: 255, 215, 0)
-- **Laranja**: #FF8C00 (RGB: 255, 140, 0)
-- **Vermelho**: #FF4500 (RGB: 255, 69, 0)
-
-#### Cores de Texto
-- **Título Principal**: #333333 (Cinza Escuro)
-- **Texto Corpo**: #333333 (Cinza Escuro)
-- **Texto Secundário**: #666666 (Cinza Médio)
-- **Texto Terciário**: #999999 (Cinza Claro)
-
-#### Cores de Fundo
-- **Fundo Principal**: #FFFFFF (Branco)
-- **Cabeçalho de Tabela**: #F5F5F5 (Cinza Muito Claro)
-- **Linhas/Bordas**: #CCCCCC (Cinza Claro)
-
-### Tipografia
-
-#### Fontes Recomendadas
-- **Primária**: Helvetica / Arial (sans-serif)
-- **Secundária**: Times New Roman (serif) - apenas para documentos formais
-- **Monospace**: Courier New - apenas para códigos
-
-#### Tamanhos de Fonte
-- **Título Principal**: 18pt
-- **Título de Seção**: 14pt
-- **Subtítulo**: 12pt
-- **Texto Corpo**: 10pt
-- **Texto Pequeno**: 8pt
-- **Rodapé**: 8pt
-
-#### Pesos de Fonte
-- **Negrito**: Títulos, cabeçalhos de tabela, destaques
-- **Regular**: Texto corpo, dados
-- **Itálico**: Citações, notas
-
----
-
-## 📋 Padrões de Uso
-
-### Padrão 1: COM Marca d'Água
-**Uso**: Documentos importantes, contratos, ordens de serviço
-
-**Características**:
-- ✅ Logo da empresa no cabeçalho
-- ✅ Gradiente superior e inferior
-- ✅ Marca d'água centralizada
-- ✅ Informações completas no rodapé
-- ✅ Numeração de páginas
-
-**Módulos que usam**:
-- Comercial (contratos)
-- Ordens de Serviço
-- Documentos Legais
-- Certificados
-
-### Padrão 2: SEM Marca d'Água
-**Uso**: Relatórios operacionais, análises, dados
-
-**Características**:
-- ✅ Logo da empresa no cabeçalho
-- ✅ Gradiente superior e inferior
-- ❌ Sem marca d'água
-- ✅ Informações completas no rodapé
-- ✅ Numeração de páginas
-
-**Módulos que usam**:
-- Financeiro (relatórios)
-- Estoque
-- Vendas
-- Atividades
-- Operacional (relatórios)
-
----
-
-## 🔧 Exemplos de Implementação
-
-### Estrutura de Dados Necessária
+Todos os campos necessários já estão disponíveis na entidade `Company`:
 
 ```java
-public class ReportLayoutConfig {
-    private Company company;              // Empresa selecionada
-    private String reportTitle;            // Título do relatório
-    private boolean withWatermark;         // Com ou sem marca d'água
-    private ReportType reportType;         // Tipo de relatório
-    private Map<String, Object> metadata;  // Metadados adicionais
-}
+- name: String                    // Nome da empresa
+- logoUrl: String                 // URL/caminho do logo
+- cnpj: String                    // CNPJ (formatado)
+- address: String                 // Endereço completo (legado)
+- enderecoRua: String            // Rua
+- enderecoNumero: String         // Número
+- enderecoComplemento: String    // Complemento
+- enderecoBairro: String         // Bairro
+- city: String                   // Cidade
+- state: String                  // Estado (UF)
+- zipCode: String                // CEP
+- phone: String                  // Telefone
+- email: String                  // Email
 ```
 
-### Informações da Empresa (do Banco de Dados)
+### 8. Formatação de Dados
 
-```java
-public class Company {
-    private String name;           // Nome da empresa
-    private String cnpj;           // CNPJ
-    private String logoUrl;        // URL/caminho da logo
-    private String address;        // Endereço completo
-    private String phone;          // Telefone
-    private String email;          // Email
-    private String website;        // Website
-    // ... outros campos
-}
+#### 8.1 CNPJ
+- **Formato**: `XX.XXX.XXX/XXXX-XX`
+- **Exemplo**: `43.576.260/0001-12`
+
+#### 8.2 Telefone
+- **Formato**: `(XX) XXXX-XXXX` ou `(XX) XXXXX-XXXX`
+- **Exemplo**: `(31) 2559-1245`
+
+#### 8.3 Endereço Completo
+- **Formato**: `Rua, Número - Complemento - Bairro - Cidade/Estado - CEP`
+- **Exemplo**: `Rua Coronel João Camargos, nº 267 - Centro - Contagem/MG - 32000-000`
+
+#### 8.4 Data/Hora
+- **Formato**: `DD/MM/AAAA HH:mm`
+- **Exemplo**: `12/01/2026 10:05`
+
+## 📐 Dimensões e Espaçamentos
+
+### 9. Tabela de Referência
+
+| Elemento | PDF (pt) | PDF (px) | Excel (px) | Excel (linhas) |
+|----------|----------|----------|------------|----------------|
+| Logo largura | 222.75 | 297 | 297 | - |
+| Logo altura | 162.75 | 217 | 217 | 120px |
+| Gradiente topo altura | 27.5 | 37 | 20 | 1 |
+| Gradiente rodapé altura | 3 | 4 | 3 | - |
+| Margem superior | 120 | 160 | - | - |
+| Margem inferior | 80 | 107 | - | - |
+| Margem esquerda | 50 | 67 | - | - |
+| Margem direita | 50 | 67 | - | - |
+| Título fonte | 18 | 24 | 18 | - |
+| Nome empresa fonte | 14 | 19 | 14 | - |
+| CNPJ fonte | 9 | 12 | 9 | - |
+| Rodapé fonte | 8 | 11 | 8 | - |
+| Data fonte | 7 | 9 | 7 | - |
+
+## 🎯 Personalização de Cores
+
+### 10. Cores Padrão do Gradiente
+
+**Cores padrão** (usadas quando não há personalização):
+- Amarelo: `#FFCC00` (RGB: 255, 204, 0)
+- Laranja: `#FF9900` (RGB: 255, 153, 0)
+- Vermelho: `#FF3333` (RGB: 255, 51, 51)
+
+### 11. Personalização por Empresa (Futuro)
+
+**Estrutura preparada** para permitir que cada empresa tenha suas próprias cores:
+- Campo `gradientColors` em `ReportLayoutConfig`
+- Método `getGradientColors(Company company)` em `StandardReportLayoutService`
+- Endpoint de preview retorna cores configuradas
+
+**Implementação futura**:
+- Adicionar campos na entidade `Company` para armazenar cores personalizadas
+- Interface administrativa para configurar cores por empresa
+- Validação de cores (formato hex válido)
+
+## 🔄 Fluxo de Geração
+
+### 12. PDF
+
+```
+1. Criar Document com ReportLayoutConfig
+2. Adicionar conteúdo (tabelas, textos, etc.)
+3. Finalizar layout (adicionar header/footer em todas as páginas)
+4. Fechar documento
 ```
 
----
+### 13. Excel
 
-## 📊 Checklist de Implementação
+```
+1. Criar Workbook (XSSFWorkbook)
+2. Criar Sheet
+3. Adicionar cabeçalho (logo, gradiente, título, empresa)
+4. Adicionar conteúdo (tabela de dados)
+5. Adicionar rodapé (informações empresa, data, gradiente)
+6. Aplicar estilos e formatação
+7. Auto-ajustar colunas
+8. Converter para bytes
+```
 
-### Para cada relatório, verificar:
-- [ ] Logo da empresa carregada corretamente (297x217px)
-- [ ] Cabeçalho com gradiente superior
-- [ ] Informações da empresa no cabeçalho
-- [ ] Título do relatório centralizado
-- [ ] Área de conteúdo respeitando margens
-- [ ] Marca d'água (se aplicável)
-- [ ] Rodapé com informações da empresa
-- [ ] Gradiente inferior
-- [ ] Numeração de páginas
-- [ ] Cores e fontes conforme padrão
+## 🔍 Preview de Layout
 
----
+### 12. Endpoint de Preview
 
-## 🔄 Versionamento
+**Endpoint**: `GET /api/reports/layout/preview/{companyId}`
 
-- **Versão**: 1.0
-- **Data**: 2026-01-09
-- **Autor**: Equipe Secured Guard
-- **Status**: Proposta para Aprovação
+**Resposta**: `ReportLayoutPreviewDTO` contendo:
+- Informações da empresa formatadas
+- Logo URL
+- CNPJ formatado
+- Endereço completo formatado
+- Telefone formatado
+- Email
+- Texto completo do rodapé
+- Cores do gradiente (padrão ou personalizadas)
 
----
+**Uso**: 
+- Validar layout antes de gerar relatório
+- Exibir preview no frontend
+- Testar formatação de dados
 
-## 📝 Notas Finais
+## ✅ Checklist de Implementação
 
-Este padrão deve ser aplicado a **TODOS** os relatórios do sistema, garantindo:
-- Consistência visual
-- Profissionalismo
-- Identidade da empresa
-- Legibilidade
-- Facilidade de manutenção
+- [x] Criar template de fundo
+- [x] Implementar serviço de layout Excel (ExcelReportLayoutService)
+- [x] Atualizar StandardReportLayoutService com cache
+- [x] Criar CompanyDataFormatter para formatação
+- [x] Criar endpoint de preview
+- [x] Adicionar estrutura para personalização de cores
+- [ ] Atualizar todos os serviços de relatório para usar novo padrão
+- [ ] Testar geração de PDF com diferentes empresas
+- [ ] Testar geração de Excel com diferentes empresas
+- [ ] Validar formatação de dados (CNPJ, telefone, endereço)
+- [ ] Documentar uso para desenvolvedores
+- [ ] Criar exemplos de uso
 
-Qualquer alteração neste padrão deve ser documentada e aprovada pela equipe.
+## 📝 Notas de Implementação
+
+1. **Logo**: O sistema já suporta logo via URL HTTP/HTTPS ou caminho local
+2. **Templates**: Os templates de fundo devem ser colocados em `backend/src/main/resources/templates/reports/`
+3. **Marca d'água**: Pode ser incluída no template PNG ou desenhada programaticamente
+4. **Excel**: Apache POI não suporta gradientes nativos, usar preenchimento sólido ou simulação
+5. **Performance**: Cache de logos e templates para melhor performance

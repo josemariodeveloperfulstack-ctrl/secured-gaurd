@@ -27,10 +27,23 @@ public class ReportLayoutConfig {
     private String reportTitle;
     
     /**
-     * Se deve incluir marca d'água (usado em contratos e documentos importantes)
+     * Cores personalizadas do gradiente (opcional, usa padrão se null)
+     * Estrutura preparada para futura personalização por empresa
      */
-    @Builder.Default
-    private boolean withWatermark = false;
+    private GradientColors gradientColors;
+    
+    /**
+     * Cores do gradiente
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GradientColors {
+        private String yellow; // Padrão: #FFCC00
+        private String orange; // Padrão: #FF9900
+        private String red;    // Padrão: #FF3333
+    }
     
     /**
      * Margem superior do conteúdo (para acomodar o cabeçalho)
