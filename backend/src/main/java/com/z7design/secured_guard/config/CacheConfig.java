@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -9,8 +10,17 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Configuração de Cache usando Caffeine (cache em memória)
+ * 
+ * Esta configuração só é ativada quando não existe outro CacheManager já definido
+ * (como RedisCacheConfig, que tem prioridade quando spring.cache.type=redis).
+ * 
+ * Quando Redis está configurado, usa-se RedisCacheConfig.
+ */
 @Configuration
 @EnableCaching
+@ConditionalOnMissingBean(CacheManager.class)
 public class CacheConfig {
 
     @Bean
