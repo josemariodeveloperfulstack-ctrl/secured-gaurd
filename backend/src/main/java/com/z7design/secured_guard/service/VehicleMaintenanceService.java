@@ -1,17 +1,22 @@
 package com.z7design.secured_guard.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.dto.VehicleMaintenanceDTO;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.Vehicle;
 import com.z7design.secured_guard.model.VehicleMaintenance;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.VehicleMaintenanceRepository;
 import com.z7design.secured_guard.repository.VehicleRepository;
+import com.z7design.secured_guard.service.StandardReportLayoutService;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +42,8 @@ public class VehicleMaintenanceService {
     private final VehicleMaintenanceRepository maintenanceRepository;
     private final VehicleRepository vehicleRepository;
     private final FileStorageService fileStorageService;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
 
     // Buscar todas as manutenções
     public List<VehicleMaintenanceDTO> getAllMaintenances() {
@@ -587,39 +593,57 @@ public class VehicleMaintenanceService {
         List<VehicleMaintenance> maintenances = getMaintenancesFiltered(startDate, endDate, vehicleId, status, maintenanceType, description);
         log.info("Total de manutenções encontradas para o relatório: {}", maintenances.size());
 
+        // Determinar companyId - tentar obter das manutenções primeiro
+        java.util.UUID companyId = null;
+        if (!maintenances.isEmpty()) {
+            for (VehicleMaintenance maintenance : maintenances) {
+                if (maintenance.getVehicle() != null && maintenance.getVehicle().getCompanyId() != null) {
+                    companyId = maintenance.getVehicle().getCompanyId();
+                    log.info("Usando empresa do veículo {}: {}", maintenance.getVehicle().getPlate(), companyId);
+                    break;
+                }
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa se nenhuma manutenção tiver companyId
+        if (companyId == null) {
+            log.warn("Nenhuma manutenção possui empresa associada. Buscando primeira empresa ativa como fallback...");
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})", 
+                        activeCompanies.get(0).getName(), companyId);
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                            allCompanies.get(0).getName(), companyId);
+                } else {
+                    throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
+            }
+        }
+        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
-
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
+        
         try {
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
-            document.setMargins(50, 50, 50, 50);
-
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
-
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE MANUTENÇÕES")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+            PdfWriter writer = new PdfWriter(baos);
+            
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE MANUTENÇÕES")
+                .topMargin(120f)  // Espaço para cabeçalho
+                .bottomMargin(80f) // Espaço para rodapé
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
+            
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
 
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -720,26 +744,14 @@ public class VehicleMaintenanceService {
                 document.add(table);
             }
 
-            // Rodapé
-            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8)
-                    .setMarginTop(30);
-            document.add(footer);
+            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            
+            document.close();
 
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de manutenções: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        } finally {
-            if (document != null) {
-                document.close();
-            }
-            if (pdfDoc != null) {
-                pdfDoc.close();
-            }
-            if (writer != null) {
-                writer.close();
-            }
         }
 
         byte[] result = baos.toByteArray();

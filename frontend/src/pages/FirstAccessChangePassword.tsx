@@ -73,12 +73,27 @@ const FirstAccessChangePassword = () => {
       if (response.data.success) {
         toast({
           title: "Senha alterada!",
-          description: response.data.message,
+          description: response.data.message || "Senha alterada com sucesso. Redirecionando para o dashboard...",
           variant: "default",
         });
 
-        // Redirecionar para ativação 2FA
-        navigate('/first-access/activate-2fa');
+        // Atualizar dados do usuário no localStorage
+        try {
+          const savedUser = localStorage.getItem('user');
+          if (savedUser) {
+            const userData = JSON.parse(savedUser);
+            userData.firstAccessCompleted = true;
+            localStorage.setItem('user', JSON.stringify(userData));
+          }
+        } catch (e) {
+          console.warn('Não foi possível atualizar dados do usuário:', e);
+        }
+
+        // Aguardar um pouco para o usuário ver a mensagem de sucesso
+        setTimeout(() => {
+          // Redirecionar para o dashboard após atualizar senha
+          navigate('/dashboard', { replace: true });
+        }, 1000);
       } else {
         setError(response.data.message || 'Erro ao alterar senha.');
       }

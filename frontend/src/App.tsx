@@ -345,14 +345,16 @@ function App() {
                       </Suspense>
                     } />
                     <Route path="/first-access/change-password" element={
-                      <Suspense fallback={
-                        <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4">
-                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-seguranca-yellow"></div>
-                          <p className="mt-4 text-seguranca-lightgray">Carregando primeiro acesso...</p>
-                        </div>
-                      }>
-                        <FirstAccessChangePassword />
-                      </Suspense>
+                      <ProtectedRoute allowWithoutFirstAccess={true}>
+                        <Suspense fallback={
+                          <div className="min-h-screen w-full bg-seguranca-black flex flex-col items-center justify-center p-4">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-seguranca-yellow"></div>
+                            <p className="mt-4 text-seguranca-lightgray">Carregando primeiro acesso...</p>
+                          </div>
+                        }>
+                          <FirstAccessChangePassword />
+                        </Suspense>
+                      </ProtectedRoute>
                     } />
                     <Route path="/first-access/activate-2fa" element={
                       <Suspense fallback={

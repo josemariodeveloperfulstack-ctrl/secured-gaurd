@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types/user';
 
@@ -7,14 +7,17 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredPermissions?: (keyof UserPermissions)[];
   requireAllPermissions?: boolean;
+  allowWithoutFirstAccess?: boolean; // Permite acesso mesmo sem completar primeiro acesso (para a própria página de primeiro acesso)
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredPermissions,
   requireAllPermissions = true,
+  allowWithoutFirstAccess = false,
 }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -31,6 +34,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
   
   console.log('🔒 ProtectedRoute: Usuário autenticado:', user.name, 'Role:', user.role);
+
+  // Verificar se o usuário precisa completar o primeiro acesso
+  // Exceto se estiver na própria página de primeiro acesso ou se allowWithoutFirstAccess for true
+  if (!allowWithoutFirstAccess && !user.firstAccessCompleted) {
+    // Permitir acesso apenas às páginas de primeiro acesso
+    const firstAccessPaths = ['/first-access/change-password', '/first-access/activate-2fa'];
+    if (!firstAccessPaths.includes(location.pathname)) {
+      console.log('🔒 ProtectedRoute: Usuário precisa completar primeiro acesso, redirecionando...');
+      return <Navigate to="/first-access/change-password" replace />;
+    }
+  }
 
   if (requiredPermissions && requiredPermissions.length > 0) {
     const userPermissions = user.permissions;

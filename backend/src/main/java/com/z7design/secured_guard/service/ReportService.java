@@ -21,6 +21,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import com.z7design.secured_guard.model.KmControl;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.service.StandardReportLayoutService;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import java.io.ByteArrayOutputStream;
 // import com.z7design.secured_guard.repository.KmControlRepository; // Importar KmControlRepository
 
 @Service
@@ -37,6 +49,8 @@ public class ReportService {
     // private final KmControlRepository kmControlRepository; // Injetar KmControlRepository (usado em relatórios de KM)
     private final com.z7design.secured_guard.repository.PayrollRepository payrollRepository;
     private final com.z7design.secured_guard.service.PayrollService payrollService;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
 
     /**
      * Gera relatório de funcionários em PDF
@@ -134,19 +148,136 @@ public class ReportService {
     }
 
     /**
-     * Gera relatório financeiro em PDF
+     * Gera relatório financeiro em PDF com layout padrão
      */
     public byte[] generateFinancialReportPdf(Map<String, Object> filters) {
         try {
-            List<FinancialTransaction> transactions = financialTransactionService.findAll();
-            Map<String, Object> parameters = createFinancialReportParameters(filters);
+            log.info("Gerando relatório financeiro em PDF com layout padrão");
             
-            return jasperReportsConfig.generatePdfReport(
-                "reports/financial_report.jrxml", 
-                transactions, 
-                parameters
-            );
-        } catch (JRException | IOException e) {
+            List<FinancialTransaction> transactions = financialTransactionService.findAll();
+            
+            // Determinar companyId - usar primeira empresa ativa
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+                log.info("Usando primeira empresa ativa: {} (ID: {})", 
+                        activeCompanies.get(0).getName(), companyId);
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                            allCompanies.get(0).getName(), companyId);
+                } else {
+                    throw new ReportGenerationException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
+            }
+            
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
+            
+            try {
+                PdfWriter writer = new PdfWriter(baos);
+                
+                // Criar documento com layout padrão
+                ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO FINANCEIRO")
+                    .topMargin(120f)  // Espaço para cabeçalho
+                    .bottomMargin(80f) // Espaço para rodapé
+                    .leftMargin(50f)
+                    .rightMargin(50f)
+                    .build();
+                
+                docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+                Document document = docWithPdf.getDocument();
+                
+                // Informações do relatório
+                Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                        .setTextAlignment(TextAlignment.RIGHT)
+                        .setFontSize(10)
+                        .setMarginBottom(10);
+                document.add(reportInfo);
+                
+                // Estatísticas
+                double totalIncome = transactions.stream()
+                        .filter(t -> t.getType() != null && "INCOME".equalsIgnoreCase(t.getType()))
+                        .mapToDouble(t -> t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
+                        .sum();
+                double totalExpense = transactions.stream()
+                        .filter(t -> t.getType() != null && "EXPENSE".equalsIgnoreCase(t.getType()))
+                        .mapToDouble(t -> t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
+                        .sum();
+                double balance = totalIncome - totalExpense;
+                
+                Paragraph stats = new Paragraph(String.format(
+                        "Total de transações: %d | Receitas: R$ %,.2f | Despesas: R$ %,.2f | Saldo: R$ %,.2f",
+                        transactions.size(), totalIncome, totalExpense, balance))
+                        .setFontSize(12)
+                        .setBold()
+                        .setMarginBottom(15);
+                document.add(stats);
+                
+                // Tabela de transações
+                if (transactions.isEmpty()) {
+                    Paragraph noData = new Paragraph("Nenhuma transação financeira encontrada.")
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setFontSize(12)
+                            .setMarginTop(20);
+                    document.add(noData);
+                } else {
+                    Table table = new Table(6).setWidth(UnitValue.createPercentValue(100));
+                    
+                    // Cabeçalhos
+                    table.addHeaderCell(createHeaderCell("Data"));
+                    table.addHeaderCell(createHeaderCell("Tipo"));
+                    table.addHeaderCell(createHeaderCell("Descrição"));
+                    table.addHeaderCell(createHeaderCell("Valor"));
+                    table.addHeaderCell(createHeaderCell("Status"));
+                    table.addHeaderCell(createHeaderCell("Categoria"));
+                    
+                    // Dados
+                    DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+                    for (FinancialTransaction transaction : transactions) {
+                        table.addCell(createCell(transaction.getDate() != null ? 
+                                transaction.getDate().format(dateFormatter) : ""));
+                        table.addCell(createCell(transaction.getType() != null ? transaction.getType() : ""));
+                        
+                        // Descrição (truncar se muito longa)
+                        String desc = transaction.getDescription() != null ? transaction.getDescription() : "";
+                        if (desc.length() > 40) {
+                            desc = desc.substring(0, 37) + "...";
+                        }
+                        table.addCell(createCell(desc));
+                        
+                        table.addCell(createCell(transaction.getAmount() != null ? 
+                                String.format("R$ %,.2f", transaction.getAmount()).replace(",", "X").replace(".", ",").replace("X", ".") : ""));
+                        table.addCell(createCell(transaction.getStatus() != null ? transaction.getStatus() : ""));
+                        table.addCell(createCell(transaction.getCategory() != null ? transaction.getCategory() : ""));
+                    }
+                    
+                    document.add(table);
+                }
+                
+                // Finalizar layout padrão (adiciona header/footer em todas as páginas)
+                standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+                
+                document.close();
+                
+            } catch (Exception e) {
+                log.error("Erro ao gerar PDF financeiro: {}", e.getMessage(), e);
+                throw new ReportGenerationException("Erro ao gerar relatório financeiro: " + e.getMessage(), e);
+            }
+            
+            byte[] result = baos.toByteArray();
+            log.info("PDF financeiro gerado com sucesso, tamanho: {} bytes", result.length);
+            return result;
+            
+        } catch (ReportGenerationException e) {
+            throw e;
+        } catch (Exception e) {
             log.error("Erro ao gerar relatório financeiro em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório financeiro", e);
         }
@@ -221,15 +352,177 @@ public class ReportService {
      * Gera relatório de Controle de Quilometragem em PDF ou Excel
      */
     public byte[] generateKmControlReport(List<KmControl> kmControls, Map<String, Object> filters, String format) throws JRException, IOException {
-        Map<String, Object> parameters = createKmControlReportParameters(filters);
-        
         if ("pdf".equalsIgnoreCase(format)) {
-            return jasperReportsConfig.generatePdfReport("reports/km_control_report.jrxml", kmControls, parameters);
+            // Usar layout padrão para PDF
+            return generateKmControlReportPDFWithIText(kmControls, filters);
         } else if ("xlsx".equalsIgnoreCase(format)) {
+            // Excel ainda usa JasperReports
+            Map<String, Object> parameters = createKmControlReportParameters(filters);
             return jasperReportsConfig.generateExcelReport("reports/km_control_report.jrxml", kmControls, parameters);
         } else {
             throw new IllegalArgumentException("Formato de relatório inválido: " + format);
         }
+    }
+    
+    /**
+     * Gera relatório PDF de Controle de KM usando iText com layout padrão
+     */
+    private byte[] generateKmControlReportPDFWithIText(List<KmControl> kmControls, Map<String, Object> filters) throws IOException {
+        log.info("Gerando relatório PDF de Controle de KM com layout padrão - {} registros", kmControls.size());
+        
+        // Determinar companyId
+        java.util.UUID companyId = null;
+        if (!kmControls.isEmpty()) {
+            for (KmControl kmControl : kmControls) {
+                if (kmControl.getVehicle() != null && kmControl.getVehicle().getCompanyId() != null) {
+                    companyId = kmControl.getVehicle().getCompanyId();
+                    log.info("Usando empresa do veículo {}: {}", kmControl.getVehiclePlate(), companyId);
+                    break;
+                }
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa
+        if (companyId == null) {
+            log.warn("Nenhum registro possui empresa associada. Buscando primeira empresa ativa como fallback...");
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})", 
+                        activeCompanies.get(0).getName(), companyId);
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                            allCompanies.get(0).getName(), companyId);
+                } else {
+                    throw new ReportGenerationException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
+            }
+        }
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
+        
+        try {
+            PdfWriter writer = new PdfWriter(baos);
+            
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE CONTROLE DE QUILOMETRAGEM")
+                .topMargin(120f)  // Espaço para cabeçalho
+                .bottomMargin(80f) // Espaço para rodapé
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
+            
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
+            
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10)
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+            
+            // Filtros aplicados
+            if (filters != null && !filters.isEmpty()) {
+                if (filters.containsKey("startDate") || filters.containsKey("endDate")) {
+                    String period = "";
+                    if (filters.containsKey("startDate")) {
+                        period = filters.get("startDate").toString();
+                    }
+                    if (filters.containsKey("endDate")) {
+                        if (!period.isEmpty()) period += " a ";
+                        period += filters.get("endDate").toString();
+                    }
+                    document.add(new Paragraph("Período: " + period).setFontSize(10).setMarginBottom(2));
+                }
+                if (filters.containsKey("supervisor")) {
+                    document.add(new Paragraph("Supervisor: " + filters.get("supervisor")).setFontSize(10).setMarginBottom(2));
+                }
+                if (filters.containsKey("vehiclePlate")) {
+                    document.add(new Paragraph("Placa: " + filters.get("vehiclePlate")).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+            
+            // Estatísticas
+            Paragraph stats = new Paragraph(String.format("Total de registros: %d", kmControls.size()))
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginBottom(15);
+            document.add(stats);
+            
+            // Tabela de registros
+            if (kmControls.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhum registro encontrado com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Supervisor"));
+                table.addHeaderCell(createHeaderCell("Placa"));
+                table.addHeaderCell(createHeaderCell("KM Inicial"));
+                table.addHeaderCell(createHeaderCell("KM Final"));
+                table.addHeaderCell(createHeaderCell("Total KM"));
+                table.addHeaderCell(createHeaderCell("Valor"));
+                
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (KmControl kmControl : kmControls) {
+                    table.addCell(createCell(kmControl.getDate() != null ? 
+                            kmControl.getDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(kmControl.getSupervisor() != null ? kmControl.getSupervisor() : ""));
+                    table.addCell(createCell(kmControl.getVehiclePlate() != null ? kmControl.getVehiclePlate() : ""));
+                    table.addCell(createCell(kmControl.getInitialKm() != null ? 
+                            String.valueOf(kmControl.getInitialKm()) : ""));
+                    table.addCell(createCell(kmControl.getFinalKm() != null ? 
+                            String.valueOf(kmControl.getFinalKm()) : ""));
+                    table.addCell(createCell(kmControl.getTotalKm() != null ? 
+                            String.valueOf(kmControl.getTotalKm()) : ""));
+                    table.addCell(createCell(kmControl.getValue() != null ? 
+                            "R$ " + kmControl.getValue().setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",") : ""));
+                }
+                
+                document.add(table);
+            }
+            
+            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            
+            document.close();
+            
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de Controle de KM: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        }
+        
+        byte[] result = baos.toByteArray();
+        log.info("PDF de Controle de KM gerado com sucesso, tamanho: {} bytes", result.length);
+        return result;
+    }
+    
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+    
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setTextAlignment(TextAlignment.LEFT);
     }
 
     // Métodos auxiliares para criar parâmetros dos relatórios

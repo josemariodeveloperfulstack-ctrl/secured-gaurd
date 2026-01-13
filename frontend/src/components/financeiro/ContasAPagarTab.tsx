@@ -34,6 +34,7 @@ import { format, addDays, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import api from '@/lib/axios';
 
 const ContasAPagarTab: React.FC = () => {
   const { toast } = useToast();
@@ -600,117 +601,177 @@ const ContasAPagarTab: React.FC = () => {
     }
 
     try {
-      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape para mais espaço
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      let yPos = margin;
-
-      // Cabeçalho
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text(reportData.title || 'Relatório de Contas a Pagar', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text(reportData.subtitle || 'Detalhamento de contas a pagar', margin, yPos);
-      yPos += 8;
-
-      doc.setFontSize(10);
-      doc.text(`Período: ${reportData.period || 'Não informado'}`, margin, yPos);
-      yPos += 6;
+      setReportLoading(true);
       
-      if (empresaFilterRelatorio !== 'TODAS') {
-        doc.text(`Filtrado por: Empresa ${empresaFilterRelatorio}`, margin, yPos);
-        yPos += 6;
-      }
+      // Determinar qual endpoint usar baseado no tipo de relatório
+      let url = '';
+      const params = new URLSearchParams();
+      
+      // Formatar datas para o backend
+      const startDate = format(reportFilters.startDate, 'yyyy-MM-dd');
+      const endDate = format(reportFilters.endDate, 'yyyy-MM-dd');
+      
+      if (reportData.type === 'resumo') {
+        // Relatório resumido - usar endpoint do backend com layout padrão
+        url = `/api/reports/contas-a-pagar/resumo?format=pdf`;
+      } else if (reportData.type === 'empresa' && empresaFilterRelatorio !== 'TODAS') {
+        // Relatório por empresa - usar endpoint do backend com layout padrão
+        url = `/api/reports/contas-a-pagar/empresa/${empresaFilterRelatorio}?format=pdf`;
+        if (startDate && endDate) {
+          params.append('startDate', startDate);
+          params.append('endDate', endDate);
+        }
+        if (params.toString()) {
+          url += `&${params.toString()}`;
+        }
+      } else if (reportData.type === 'periodo') {
+        // Relatório por período - usar endpoint do backend com layout padrão
+        url = `/api/reports/contas-a-pagar?startDate=${startDate}&endDate=${endDate}&format=pdf`;
+      } else {
+        // Para outros tipos, usar geração local (fallback)
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 15;
+        let yPos = margin;
 
-      doc.text(`Data de geração: ${new Date().toLocaleString('pt-BR')}`, margin, yPos);
-      yPos += 6;
-      doc.text(`Total de registros: ${filteredReportDisplayData.length}`, margin, yPos);
-      yPos += 10;
-
-      // Resumo (se disponível)
-      if (displaySummary && Object.keys(displaySummary).length > 0) {
-        doc.setFontSize(12);
+        doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
-        doc.text('Resumo', margin, yPos);
-        yPos += 8;
-        
-        doc.setFontSize(10);
+        doc.text(reportData.title || 'Relatório de Contas a Pagar', margin, yPos);
+        yPos += 10;
+
+        doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Total de Contas: ${displaySummary.totalContas || 0}`, margin, yPos);
-        yPos += 6;
-        doc.text(`Valor Total: ${formatCurrency(displaySummary.valorTotal || 0)}`, margin, yPos);
+        doc.text(reportData.subtitle || 'Detalhamento de contas a pagar', margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(10);
+        doc.text(`Período: ${reportData.period || 'Não informado'}`, margin, yPos);
         yPos += 6;
         
-        if (displaySummary.contasPagas !== undefined) {
-          doc.text(`Contas Pagas: ${displaySummary.contasPagas}`, margin, yPos);
+        if (empresaFilterRelatorio !== 'TODAS') {
+          doc.text(`Filtrado por: Empresa ${empresaFilterRelatorio}`, margin, yPos);
           yPos += 6;
         }
-        if (displaySummary.contasAbertas !== undefined) {
-          doc.text(`Contas Abertas: ${displaySummary.contasAbertas}`, margin, yPos);
+
+        doc.text(`Data de geração: ${new Date().toLocaleString('pt-BR')}`, margin, yPos);
+        yPos += 6;
+        doc.text(`Total de registros: ${filteredReportDisplayData.length}`, margin, yPos);
+        yPos += 10;
+
+        if (displaySummary && Object.keys(displaySummary).length > 0) {
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Resumo', margin, yPos);
+          yPos += 8;
+          
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`Total de Contas: ${displaySummary.totalContas || 0}`, margin, yPos);
           yPos += 6;
-        }
-        if (displaySummary.contasVencidas !== undefined) {
-          doc.text(`Contas Vencidas: ${displaySummary.contasVencidas}`, margin, yPos);
+          doc.text(`Valor Total: ${formatCurrency(displaySummary.valorTotal || 0)}`, margin, yPos);
           yPos += 6;
+          
+          if (displaySummary.contasPagas !== undefined) {
+            doc.text(`Contas Pagas: ${displaySummary.contasPagas}`, margin, yPos);
+            yPos += 6;
+          }
+          if (displaySummary.contasAbertas !== undefined) {
+            doc.text(`Contas Abertas: ${displaySummary.contasAbertas}`, margin, yPos);
+            yPos += 6;
+          }
+          if (displaySummary.contasVencidas !== undefined) {
+            doc.text(`Contas Vencidas: ${displaySummary.contasVencidas}`, margin, yPos);
+            yPos += 6;
+          }
+          yPos += 5;
         }
-        yPos += 5;
+
+        const headers = [['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa']];
+        const rows = filteredReportDisplayData.map((conta: ContaAPagar) => [
+          conta.descricao || '',
+          conta.fornecedor || 'Não informado',
+          formatCurrency(conta.valor),
+          format(conta.vencimento, 'dd/MM/yyyy'),
+          getStatusDisplayName(conta.status),
+          conta.tipo || '',
+          conta.empresa || conta.companySigla || 'Não informado'
+        ]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: headers,
+          body: rows,
+          theme: 'striped',
+          headStyles: {
+            fillColor: [41, 128, 185],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 10
+          },
+          bodyStyles: {
+            fontSize: 9,
+            textColor: [50, 50, 50]
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245]
+          },
+          margin: { left: margin, right: margin },
+          styles: {
+            cellPadding: 3,
+            overflow: 'linebreak',
+            halign: 'left'
+          },
+          columnStyles: {
+            2: { halign: 'right' },
+            3: { halign: 'center' }
+          }
+        });
+
+        const filename = `relatorio_contas_pagar_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(filename);
+        
+        toast({
+          title: "Sucesso",
+          description: `Relatório PDF gerado com sucesso! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
+        });
+        setReportLoading(false);
+        return;
       }
-
-      // Preparar dados da tabela
-      const headers = [['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa']];
-      const rows = filteredReportDisplayData.map((conta: ContaAPagar) => [
-        conta.descricao || '',
-        conta.fornecedor || 'Não informado',
-        formatCurrency(conta.valor),
-        format(conta.vencimento, 'dd/MM/yyyy'),
-        getStatusDisplayName(conta.status),
-        conta.tipo || '',
-        conta.empresa || conta.companySigla || 'Não informado'
-      ]);
-
-      // Adicionar tabela
-      autoTable(doc, {
-        startY: yPos,
-        head: headers,
-        body: rows,
-        theme: 'striped',
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 10
-        },
-        bodyStyles: {
-          fontSize: 9,
-          textColor: [50, 50, 50]
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245]
-        },
-        margin: { left: margin, right: margin },
-        styles: {
-          cellPadding: 3,
-          overflow: 'linebreak',
-          halign: 'left'
-        },
-        columnStyles: {
-          2: { halign: 'right' }, // Valor
-          3: { halign: 'center' } // Vencimento
+      
+      // Chamar endpoint do backend para gerar PDF com layout padrão
+      const response = await api.get(url, {
+        responseType: 'blob',
+        headers: {
+          'Accept': 'application/pdf'
         }
       });
-
-      // Gerar nome do arquivo
-      const filename = `relatorio_contas_pagar_${new Date().toISOString().split('T')[0]}.pdf`;
       
-      // Salvar PDF
-      doc.save(filename);
+      // Criar blob e fazer download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Nome do arquivo baseado no tipo de relatório
+      let filename = 'relatorio-contas-a-pagar';
+      if (reportData.type === 'resumo') {
+        filename = 'relatorio-resumo-contas-a-pagar';
+      } else if (reportData.type === 'empresa' && empresaFilterRelatorio !== 'TODAS') {
+        filename = `relatorio-contas-a-pagar-empresa-${empresaFilterRelatorio}`;
+      } else if (reportData.type === 'periodo') {
+        filename = `relatorio-contas-a-pagar-${startDate}-${endDate}`;
+      }
+      filename += `.pdf`;
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
       
       toast({
         title: "Sucesso",
-        description: `Relatório PDF gerado com sucesso! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
+        description: `Relatório PDF gerado com layout padrão! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
       });
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
@@ -719,6 +780,8 @@ const ContasAPagarTab: React.FC = () => {
         description: "Erro ao exportar arquivo PDF. Tente novamente.",
         variant: "destructive"
       });
+    } finally {
+      setReportLoading(false);
     }
   };
 

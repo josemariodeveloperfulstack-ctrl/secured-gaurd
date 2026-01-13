@@ -100,6 +100,21 @@ public class FirstAccessController {
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
             user.setFirstAccessCompleted(true);
             user.setLastPasswordChange(LocalDateTime.now());
+            
+            // Normalizar campo whatsapp para evitar erro de validação
+            // Se whatsapp estiver vazio ou inválido, definir como null
+            if (user.getWhatsapp() != null) {
+                String cleanWhatsapp = user.getWhatsapp().trim();
+                // Remover caracteres não numéricos
+                cleanWhatsapp = cleanWhatsapp.replaceAll("[^0-9]", "");
+                // Se estiver vazio ou não atender ao padrão (9-20 dígitos), definir como null
+                if (cleanWhatsapp.isEmpty() || cleanWhatsapp.length() < 9 || cleanWhatsapp.length() > 20) {
+                    user.setWhatsapp(null);
+                } else {
+                    user.setWhatsapp(cleanWhatsapp);
+                }
+            }
+            
             userRepository.save(user);
 
             log.info("✅ Senha alterada com sucesso para: {}", user.getUsername());

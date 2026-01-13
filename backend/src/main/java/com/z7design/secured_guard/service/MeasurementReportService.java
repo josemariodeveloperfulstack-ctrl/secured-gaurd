@@ -1,7 +1,13 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.MeasurementBulletin;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.MeasurementBulletinRepository;
+import com.z7design.secured_guard.service.StandardReportLayoutService;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
@@ -31,6 +37,8 @@ import java.util.UUID;
 public class MeasurementReportService {
     
     private final MeasurementBulletinRepository bulletinRepository;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     
     /**
      * Gera PDF de teste simples usando iText
@@ -105,30 +113,43 @@ public class MeasurementReportService {
             bulletin.getItems().size(); // Força inicialização da coleção lazy
         }
         
+        // Determinar companyId - usar primeira empresa ativa
+        java.util.UUID companyId = null;
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            companyId = activeCompanies.get(0).getId();
+            log.info("Usando primeira empresa ativa: {} (ID: {})", 
+                    activeCompanies.get(0).getName(), companyId);
+        } else {
+            List<Company> allCompanies = companyRepository.findAll();
+            if (allCompanies != null && !allCompanies.isEmpty()) {
+                companyId = allCompanies.get(0).getId();
+                log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                        allCompanies.get(0).getName(), companyId);
+            } else {
+                throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                        "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+            }
+        }
+        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
         
         try {
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
+            PdfWriter writer = new PdfWriter(baos);
             
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("Promover Vigilância & Serviços")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold();
-            document.add(companyHeader);
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("BOLETIM DE MEDIÇÃO")
+                .topMargin(120f)  // Espaço para cabeçalho
+                .bottomMargin(80f) // Espaço para rodapé
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
             
-            // Título
-            Paragraph title = new Paragraph("BOLETIM DE MEDIÇÃO")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(20);
-            document.add(title);
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
             
             // Informações do contrato
             Paragraph contractInfo = new Paragraph("Nº Contrato: " + (bulletin.getContractNumber() != null ? bulletin.getContractNumber() : "N/A"))
@@ -219,27 +240,14 @@ public class MeasurementReportService {
                     .setMarginTop(10);
             document.add(signature2Value);
             
-            // Data de geração
-            Paragraph generatedDate = new Paragraph("Gerado em: " + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginTop(40);
-            document.add(generatedDate);
+            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            
+            document.close();
             
         } catch (Exception e) {
             log.error("Erro ao gerar PDF para boletim {}: {}", bulletinId, e.getMessage(), e);
             throw new IOException("Erro ao gerar PDF: " + e.getMessage(), e);
-        } finally {
-            // Fechar recursos na ordem correta
-            if (document != null) {
-                document.close();
-            }
-            if (pdfDoc != null) {
-                pdfDoc.close();
-            }
-            if (writer != null) {
-                writer.close();
-            }
         }
         
         byte[] result = baos.toByteArray();

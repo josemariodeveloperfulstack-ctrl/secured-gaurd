@@ -186,6 +186,7 @@ export interface User {
   username?: string;
   status?: string;
   active?: boolean;
+  firstAccessCompleted?: boolean; // Indica se o usuário completou o primeiro acesso (mudança de senha)
   createdAt?: string;
   updatedAt?: string;
 }

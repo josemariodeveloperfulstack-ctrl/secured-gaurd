@@ -42,6 +42,11 @@ export const companyService = {
     return response.data as Array<any>;
   },
 
+  async getCompanyById(id: string) {
+    const response = await api.get(`/api/companies/${id}`);
+    return response.data;
+  },
+
   async updateCompany(id: string, data: Partial<CreateCompanyRequest>) {
     const response = await api.put(`/api/companies/${id}`, data);
     return response.data;

@@ -150,41 +150,62 @@ public class EmailTestController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Ver configuração de email", description = "Retorna configuração atual de email (sem senha)")
     public ResponseEntity<?> getEmailConfig() {
-        // Obter valores diretamente do Environment para garantir que está usando o perfil correto
+        // PRIORIDADE 1: Variáveis de ambiente (têm precedência absoluta)
+        String mailHostEnv = System.getenv("MAIL_HOST");
+        String mailPortEnv = System.getenv("MAIL_PORT");
+        String mailUsernameEnv = System.getenv("MAIL_USERNAME");
+        String mailSslEnableEnv = System.getenv("MAIL_SSL_ENABLE");
+        String mailStarttlsEnableEnv = System.getenv("MAIL_STARTTLS_ENABLE");
+        
+        // PRIORIDADE 2: Propriedades do Spring Environment (do perfil ativo)
         String host = environment.getProperty("spring.mail.host", "não configurado");
         String port = environment.getProperty("spring.mail.port", "não configurado");
         String username = environment.getProperty("spring.mail.username", "não configurado");
         String sslEnabled = environment.getProperty("spring.mail.properties.mail.smtp.ssl.enable", "false");
         String starttlsEnabled = environment.getProperty("spring.mail.properties.mail.smtp.starttls.enable", "false");
         
-        // Verificar variáveis de ambiente também
-        String mailHostEnv = System.getenv("MAIL_HOST");
-        String mailPortEnv = System.getenv("MAIL_PORT");
-        String mailUsernameEnv = System.getenv("MAIL_USERNAME");
-        
         // Obter perfil ativo
         String[] activeProfiles = environment.getActiveProfiles();
         String activeProfile = activeProfiles.length > 0 ? activeProfiles[0] : "default";
         
-        // Usar variáveis de ambiente se disponíveis (têm prioridade)
-        if (mailHostEnv != null && !mailHostEnv.isEmpty()) {
-            host = mailHostEnv;
+        // Usar variáveis de ambiente se disponíveis (têm prioridade absoluta)
+        if (mailHostEnv != null && !mailHostEnv.trim().isEmpty()) {
+            host = mailHostEnv.trim();
+            log.info("📧 Usando MAIL_HOST da variável de ambiente: {}", host);
         }
-        if (mailPortEnv != null && !mailPortEnv.isEmpty()) {
-            port = mailPortEnv;
+        if (mailPortEnv != null && !mailPortEnv.trim().isEmpty()) {
+            port = mailPortEnv.trim();
+            log.info("📧 Usando MAIL_PORT da variável de ambiente: {}", port);
         }
-        if (mailUsernameEnv != null && !mailUsernameEnv.isEmpty()) {
-            username = mailUsernameEnv;
+        if (mailUsernameEnv != null && !mailUsernameEnv.trim().isEmpty()) {
+            username = mailUsernameEnv.trim();
+            log.info("📧 Usando MAIL_USERNAME da variável de ambiente: {}", username);
+        }
+        if (mailSslEnableEnv != null && !mailSslEnableEnv.trim().isEmpty()) {
+            sslEnabled = mailSslEnableEnv.trim();
+            log.info("📧 Usando MAIL_SSL_ENABLE da variável de ambiente: {}", sslEnabled);
+        }
+        if (mailStarttlsEnableEnv != null && !mailStarttlsEnableEnv.trim().isEmpty()) {
+            starttlsEnabled = mailStarttlsEnableEnv.trim();
+            log.info("📧 Usando MAIL_STARTTLS_ENABLE da variável de ambiente: {}", starttlsEnabled);
         }
         
         log.info("📧 Configuração de email solicitada - Perfil ativo: {}", activeProfile);
-        log.info("📧 Host: {} (env: {}), Port: {} (env: {}), Username: {} (env: {}), SSL: {}, STARTTLS: {}", 
-                host, mailHostEnv, port, mailPortEnv, username, mailUsernameEnv, sslEnabled, starttlsEnabled);
+        log.info("📧 Host: {} (env: {}), Port: {} (env: {}), Username: {} (env: {})", 
+                host, mailHostEnv, port, mailPortEnv, username, mailUsernameEnv);
+        log.info("📧 SSL: {} (env: {}), STARTTLS: {} (env: {})", 
+                sslEnabled, mailSslEnableEnv, starttlsEnabled, mailStarttlsEnableEnv);
         
         // Determinar se SSL ou STARTTLS está habilitado
         boolean ssl = "true".equalsIgnoreCase(sslEnabled);
         boolean starttls = "true".equalsIgnoreCase(starttlsEnabled);
         String sslTlsStatus = ssl ? "Habilitado (SSL)" : (starttls ? "Habilitado (STARTTLS)" : "Desabilitado");
+        
+        // Determinar fonte da configuração
+        String source = "properties";
+        if (mailHostEnv != null && !mailHostEnv.trim().isEmpty()) {
+            source = "environment";
+        }
         
         return ResponseEntity.ok(Map.of(
             "host", host,
@@ -195,7 +216,7 @@ public class EmailTestController {
             "sslTlsStatus", sslTlsStatus,
             "activeProfile", activeProfile,
             "configured", true,
-            "source", mailHostEnv != null ? "environment" : "properties"
+            "source", source
         ));
     }
 

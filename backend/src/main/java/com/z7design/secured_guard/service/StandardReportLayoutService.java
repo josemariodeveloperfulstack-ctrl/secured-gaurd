@@ -24,17 +24,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import org.springframework.core.io.ClassPathResource;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
+import org.springframework.core.io.ClassPathResource;
 
 /**
  * Serviço para criar layout padrão de relatórios com cabeçalho e rodapé dinâmicos
@@ -75,22 +73,21 @@ public class StandardReportLayoutService {
     // Caminho do template de fundo do relatório
     private static final String REPORT_BACKGROUND_TEMPLATE = "templates/reports/report-background-template.png";
     
-    // Cache de templates e logos para melhor performance
-    private static final Map<String, Image> templateCache = new ConcurrentHashMap<>();
-    private static final Map<String, Image> logoCache = new ConcurrentHashMap<>();
+    // Cache de ImageData (não Image) para evitar problemas de reutilização entre documentos PDF
+    // Cada documento precisa de suas próprias instâncias de Image
+    private static final Map<String, ImageData> templateDataCache = new ConcurrentHashMap<>();
+    private static final Map<String, ImageData> logoDataCache = new ConcurrentHashMap<>();
     
     // Configuração de cache (pode ser externalizada para properties)
     private static final long CACHE_MAX_SIZE = 50; // Máximo de itens em cache
     
-    // Dimensões do logo em pixels (297x217px)
+    // Dimensões do logo em pixels (297x217px) - reduzido para caber dentro da forma escura
     // Conversão para pontos: 1pt = 1/72 inch
     // Para conversão precisa: 1px = 0.264583mm = 0.75pt (em 96 DPI)
-    // Logo: 297px × 0.75 = 222.75pt ≈ 223pt, 217px × 0.75 = 162.75pt ≈ 163pt
-    // Mas vamos usar conversão mais precisa: 1px = 0.75pt (padrão web)
-    // Logo: 297px × 0.75 = 222.75pt, 217px × 0.75 = 162.75pt
-    // Para garantir exatamente 297x217px na renderização, vamos usar:
-    private static final float LOGO_WIDTH_PT = 222.75f;   // 297px × 0.75 = 222.75pt
-    private static final float LOGO_HEIGHT_PT = 162.75f; // 217px × 0.75 = 162.75pt
+    // Logo original: 297px × 0.75 = 222.75pt, 217px × 0.75 = 162.75pt
+    // Reduzindo para ~35% do tamanho original para caber dentro da forma escura
+    private static final float LOGO_WIDTH_PT = 78f;   // ~104px (35% de 297px) = 78pt
+    private static final float LOGO_HEIGHT_PT = 57f;  // ~76px (35% de 217px) = 57pt
     
     /**
      * Cria um novo documento PDF com layout padrão
@@ -176,43 +173,36 @@ public class StandardReportLayoutService {
                 float pageWidth = pageSize.getWidth();
                 float pageHeight = pageSize.getHeight();
                 
-                // Carregar imagem de template de fundo
-                Image backgroundImage = loadReportBackgroundTemplate();
-                if (backgroundImage != null) {
-                    // Aplicar imagem de fundo cobrindo toda a página
-                    PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
-                    backgroundImage.setFixedPosition(0, 0);
-                    backgroundImage.setWidth(pageWidth);
-                    backgroundImage.setHeight(pageHeight);
-                    
-                    Canvas backgroundCanvasLayout = new Canvas(backgroundCanvas, pageSize);
-                    backgroundCanvasLayout.add(backgroundImage);
-                    backgroundCanvasLayout.close();
-                    backgroundCanvas.release();
-                    
-                    log.info("✅ Template de fundo aplicado na página {}/{}", i, totalPages);
+                // Tentar carregar template de fundo (se existir)
+                ImageData backgroundTemplateData = loadReportBackgroundTemplateData();
+                
+                PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
+                
+                if (backgroundTemplateData != null) {
+                    // Usar template de fundo (imagem)
+                    try {
+                        Image backgroundImage = new Image(backgroundTemplateData);
+                        backgroundImage.setFixedPosition(0, 0);
+                        backgroundImage.setWidth(pageWidth);
+                        backgroundImage.setHeight(pageHeight);
+                        
+                        Canvas backgroundCanvasLayout = new Canvas(backgroundCanvas, pageSize);
+                        backgroundCanvasLayout.add(backgroundImage);
+                        backgroundCanvasLayout.close();
+                        
+                        log.debug("✅ Template de fundo aplicado na página {}/{}", i, totalPages);
+                    } catch (Exception e) {
+                        log.warn("Erro ao aplicar template de fundo, usando fallback: {}", e.getMessage());
+                        // Fallback para desenho programático
+                        drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
+                    }
                 } else {
-                    log.warn("⚠️ Template de fundo não encontrado. Usando fallback programático para página {}/{}", i, totalPages);
-                    // Fallback: desenhar elementos programaticamente se template não estiver disponível
-                    PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
-                    
-                    // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
-                    float gradientBarHeight = 27.5f; // Altura da barra gradiente no topo
-                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight), company);
-                    log.debug("Gradiente superior desenhado na página {}", i);
-                    
-                    // Forma curva escura no canto superior esquerdo
-                    addDarkCurveShape(backgroundCanvas, pageWidth, pageHeight);
-                    log.debug("Forma curva escura desenhada na página {}", i);
-                    
-                    // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
-                    float footerLineHeight = 3f;
-                    addHorizontalGradient(backgroundCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight), company);
-                    log.debug("Gradiente inferior desenhado na página {}", i);
-                    
-                    backgroundCanvas.release();
-                    log.info("✅ Fallback programático aplicado na página {}/{}", i, totalPages);
+                    // Fallback: desenhar elementos programaticamente
+                    log.debug("Template de fundo não encontrado, usando fallback programático para página {}/{}", i, totalPages);
+                    drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
                 }
+                
+                backgroundCanvas.release();
                 
                 // Desenhar elementos dinâmicos (logo, texto) - camada sobre o fundo
                 // Usar newContentStreamAfter() para garantir que apareça sobre o conteúdo do relatório
@@ -221,7 +211,7 @@ public class StandardReportLayoutService {
                 
                 try {
                     // Cabeçalho (logo, título, nome da empresa, CNPJ)
-                    addHeader(canvasLayout, pageSize, company, config);
+                    addHeader(canvasLayout, pageSize, company, config, pdfDoc);
                     
                     // Rodapé (informações da empresa e data de geração)
                     addFooter(canvasLayout, pageSize, company);
@@ -243,69 +233,52 @@ public class StandardReportLayoutService {
     /**
      * Adiciona cabeçalho ao documento
      */
-    private void addHeader(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config) throws IOException {
+    private void addHeader(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config, PdfDocument pdfDoc) throws IOException {
         float pageWidth = pageSize.getWidth();
         float pageHeight = pageSize.getHeight();
         float headerTop = pageHeight; // Topo do cabeçalho (topo da página)
         
-        // Logo da empresa (297x217px = 222.75x162.75pt)
+        // Logo da empresa - centralizado dentro da forma escura no canto superior esquerdo
+        // O logo deve ficar centralizado dentro da forma curva escura, mais próximo do topo
+        // Com padding bottom de 20pt (espaço abaixo do logo)
         try {
-            Image logoImage = loadCompanyLogo(company);
+            Image logoImage = loadCompanyLogo(company, pdfDoc);
             if (logoImage != null) {
-                // Posicionar logo no canto superior esquerdo, dentro da área do cabeçalho
-                // Logo deve começar um pouco abaixo do topo para não sobrepor o gradiente
-                float logoX = 15f; // Margem esquerda
-                float logoY = headerTop - LOGO_HEIGHT_PT - 5f; // Alinhar no topo com pequena margem (5pt)
+                // A forma escura está no canto superior esquerdo
+                // Centralizar o logo horizontalmente dentro da forma escura, mas mais próximo do topo
+                float formAreaWidth = 120f;  // Largura estimada da forma escura
+                float logoX = (formAreaWidth - LOGO_WIDTH_PT) / 2f; // Centralizar horizontalmente
+                // Subir o logo mais: posicionar bem próximo do topo da forma escura
+                // Com padding bottom de 20pt (espaço abaixo do logo)
+                float logoY = headerTop - 10f - LOGO_HEIGHT_PT; // Mais próximo do topo (10pt do topo)
                 
                 logoImage.setFixedPosition(logoX, logoY);
                 logoImage.setWidth(LOGO_WIDTH_PT);
                 logoImage.setHeight(LOGO_HEIGHT_PT);
                 canvas.add(logoImage);
                 
-                log.info("✅ Logo da empresa {} carregado e posicionado em ({}, {}) com dimensões {}x{}pt", 
-                        company.getName(), logoX, logoY, LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
+                log.debug("✅ Logo da empresa {} centralizado dentro da forma escura em ({}, {}) com padding bottom de 20pt", company.getName(), logoX, logoY);
             } else {
-                log.warn("⚠️ Logo da empresa {} não disponível (logoUrl: {})", 
-                        company.getName(), company.getLogoUrl());
+                log.debug("⚠️ Logo da empresa {} não disponível", company.getName());
             }
         } catch (Exception e) {
-            log.error("❌ Erro ao carregar logo da empresa {} (logoUrl: {}): {}", 
-                    company.getName(), company.getLogoUrl(), e.getMessage());
-            // Continuar mesmo sem logo - não bloquear renderização do resto do cabeçalho
+            log.error("❌ Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage());
         }
         
-        // Título do relatório (centralizado no topo, abaixo do gradiente)
+        // Título do relatório (centralizado, FORA da barra gradiente)
+        // O título deve ficar abaixo da barra gradiente com margin top de 55pt e margin bottom de 45pt
         if (config.getReportTitle() != null && !config.getReportTitle().isEmpty()) {
-            // Título deve estar abaixo do gradiente (que tem ~27.5pt de altura)
-            float titleY = headerTop - 40f; // ~40pt do topo
+            // Barra gradiente tem ~30pt de altura
+            // Título fica FORA da barra, abaixo dela, com margin top de 55pt
+            float titleY = headerTop - 30f - 55f; // Fora da barra gradiente, 55pt abaixo da base
             Paragraph title = new Paragraph(config.getReportTitle())
-                .setFontSize(18)
+                .setFontSize(14) // Fonte reduzida
                 .setBold()
                 .setTextAlignment(TextAlignment.CENTER)
-                .setFontColor(DeviceRgb.BLACK)
-                .setMarginBottom(5f);
+                .setFontColor(new DeviceRgb(0, 0, 0)) // Texto preto (fora da barra gradiente)
+                .setMarginTop(55f) // Margin top de 55pt
+                .setMarginBottom(45f); // Margin bottom de 45pt
             canvas.add(title.setFixedPosition(0, titleY, pageWidth));
-        }
-        
-        // Informações da empresa (centro do cabeçalho, abaixo do título)
-        float infoY = headerTop - 65f; // ~65pt do topo
-        
-        Paragraph companyName = new Paragraph(company.getName())
-            .setFontSize(14)
-            .setBold()
-            .setTextAlignment(TextAlignment.CENTER)
-            .setFontColor(DeviceRgb.BLACK)
-            .setMarginBottom(3f);
-        canvas.add(companyName.setFixedPosition(0, infoY, pageWidth));
-        
-        String cnpjText = CompanyDataFormatter.formatCnpjForHeader(company);
-        if (!cnpjText.isEmpty()) {
-            Paragraph cnpj = new Paragraph(cnpjText)
-                .setFontSize(9)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setFontColor(new DeviceRgb(80, 80, 80))
-                .setMarginBottom(2f);
-            canvas.add(cnpj.setFixedPosition(0, infoY - 18f, pageWidth));
         }
     }
     
@@ -317,23 +290,41 @@ public class StandardReportLayoutService {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
         
-        // Informações da empresa no rodapé usando formatação padronizada
-        String footerText = CompanyDataFormatter.formatCompanyFooter(company, true);
+        // Informações da empresa no rodapé (acima da linha gradiente)
+        // O rodapé deve ficar acima da linha gradiente (4pt de altura)
         
-        Paragraph footer = new Paragraph(footerText)
-            .setFontSize(8)
-            .setTextAlignment(TextAlignment.CENTER)
-            .setFontColor(DeviceRgb.BLACK)
-            .setMarginTop(10f);
-        canvas.add(footer.setFixedPosition(0, yPosition + 20f, pageWidth));
+        // Primeira linha: Nome da empresa (centralizado)
+        if (company.getName() != null && !company.getName().isEmpty()) {
+            Paragraph companyNameFooter = new Paragraph(company.getName())
+                .setFontSize(9)
+                .setBold()
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(DeviceRgb.BLACK)
+                .setMarginBottom(0f);
+            canvas.add(companyNameFooter.setFixedPosition(0, yPosition + 30f, pageWidth));
+        }
         
-        // Data de geração
-        String generatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-        Paragraph dateFooter = new Paragraph("Gerado em: " + generatedAt)
-            .setFontSize(7)
-            .setTextAlignment(TextAlignment.CENTER)
-            .setFontColor(new DeviceRgb(100, 100, 100));
-        canvas.add(dateFooter.setFixedPosition(0, yPosition + 5f, pageWidth));
+        // Segunda linha: Endereço completo
+        String address = CompanyDataFormatter.formatFullAddress(company);
+        if (!address.isEmpty()) {
+            Paragraph addressFooter = new Paragraph(address)
+                .setFontSize(8)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(DeviceRgb.BLACK)
+                .setMarginBottom(0f);
+            canvas.add(addressFooter.setFixedPosition(0, yPosition + 20f, pageWidth));
+        }
+        
+        // Terceira linha: CNPJ
+        String cnpjText = CompanyDataFormatter.formatCnpjForHeader(company);
+        if (!cnpjText.isEmpty()) {
+            Paragraph cnpjFooter = new Paragraph(cnpjText)
+                .setFontSize(8)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(DeviceRgb.BLACK)
+                .setMarginBottom(0f);
+            canvas.add(cnpjFooter.setFixedPosition(0, yPosition + 10f, pageWidth));
+        }
     }
     
     /**
@@ -394,6 +385,56 @@ public class StandardReportLayoutService {
     }
     
     /**
+     * Desenha elementos de fundo programaticamente (fallback quando template não está disponível)
+     */
+    private void drawBackgroundElements(PdfCanvas pdfCanvas, PdfDocument pdfDoc, float pageWidth, float pageHeight, Company company) {
+        // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
+        float gradientBarHeight = 30f; // Altura da barra gradiente no topo
+        addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, pageHeight - gradientBarHeight, pageWidth, gradientBarHeight), company);
+        
+        // Forma curva escura no canto superior esquerdo
+        addDarkCurveShape(pdfCanvas, pageWidth, pageHeight);
+        
+        // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
+        float footerLineHeight = 4f;
+        addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight), company);
+    }
+    
+    /**
+     * Carrega ImageData do template de fundo (com cache)
+     * Retorna null se o template não existir
+     */
+    private ImageData loadReportBackgroundTemplateData() {
+        // Verificar cache primeiro
+        String cacheKey = REPORT_BACKGROUND_TEMPLATE;
+        if (templateDataCache.containsKey(cacheKey)) {
+            log.debug("Template de fundo carregado do cache (ImageData): {}", cacheKey);
+            return templateDataCache.get(cacheKey);
+        }
+        
+        try {
+            ClassPathResource resource = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE);
+            if (!resource.exists()) {
+                log.debug("Template de fundo não encontrado em: {}", REPORT_BACKGROUND_TEMPLATE);
+                return null;
+            }
+            
+            ImageData imageData = ImageDataFactory.create(resource.getInputStream().readAllBytes());
+            
+            // Adicionar ImageData ao cache (com limite de tamanho)
+            if (templateDataCache.size() < CACHE_MAX_SIZE) {
+                templateDataCache.put(cacheKey, imageData);
+                log.info("✅ Template de fundo carregado e adicionado ao cache: {}", REPORT_BACKGROUND_TEMPLATE);
+            }
+            
+            return imageData;
+        } catch (Exception e) {
+            log.warn("Erro ao carregar template de fundo de {}: {}", REPORT_BACKGROUND_TEMPLATE, e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
      * Adiciona forma curva escura no canto superior esquerdo conforme modelo
      */
     private void addDarkCurveShape(PdfCanvas pdfCanvas, float pageWidth, float pageHeight) {
@@ -404,12 +445,12 @@ public class StandardReportLayoutService {
         // Usando Bézier curves para criar a forma curva conforme modelo
         float startX = 0;
         float startY = pageHeight;
-        float curveX1 = pageWidth * 0.15f; // ~15% da largura
+        float curveX1 = pageWidth * 0.25f; // ~25% da largura para curva mais suave
         float curveY1 = pageHeight;
-        float curveX2 = pageWidth * 0.10f;
-        float curveY2 = pageHeight - 40f; // Curvar para baixo
+        float curveX2 = pageWidth * 0.18f;
+        float curveY2 = pageHeight - 80f; // Curvar mais para baixo
         float endX = 0;
-        float endY = pageHeight - 60f;
+        float endY = pageHeight - 120f; // Estender mais para baixo
         
         // Usar path para desenhar a forma curva (curva de Bézier cúbica)
         pdfCanvas.moveTo(startX, startY);
@@ -420,99 +461,58 @@ public class StandardReportLayoutService {
         pdfCanvas.restoreState();
     }
     
-    /**
-     * Carrega a imagem de template de fundo do relatório com cache
-     * Esta imagem contém: gradiente, forma curva escura e linha do rodapé
-     */
-    private Image loadReportBackgroundTemplate() {
-        // Verificar cache primeiro
-        String cacheKey = REPORT_BACKGROUND_TEMPLATE;
-        if (templateCache.containsKey(cacheKey)) {
-            log.debug("Template de fundo carregado do cache: {}", cacheKey);
-            return templateCache.get(cacheKey);
-        }
-        
-        try {
-            ClassPathResource resource = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE);
-            if (!resource.exists()) {
-                log.warn("Template de fundo não encontrado em: {}", REPORT_BACKGROUND_TEMPLATE);
-                return null;
-            }
-            
-            ImageData imageData = ImageDataFactory.create(resource.getInputStream().readAllBytes());
-            Image image = new Image(imageData);
-            
-            // Adicionar ao cache (com limite de tamanho)
-            if (templateCache.size() < CACHE_MAX_SIZE) {
-                templateCache.put(cacheKey, image);
-                log.debug("Template de fundo adicionado ao cache: {}", cacheKey);
-            }
-            
-            log.debug("Template de fundo carregado com sucesso: {}", REPORT_BACKGROUND_TEMPLATE);
-            return image;
-        } catch (Exception e) {
-            log.error("Erro ao carregar template de fundo de {}: {}", REPORT_BACKGROUND_TEMPLATE, e.getMessage(), e);
-            return null;
-        }
-    }
     
     /**
      * Carrega e redimensiona o logo da empresa para exatamente 297x217px (222.75x162.75pt)
-     * Com cache para melhor performance
+     * Cria uma nova instância de Image para cada documento PDF (evita erro de reutilização)
      */
-    private Image loadCompanyLogo(Company company) throws IOException {
+    private Image loadCompanyLogo(Company company, PdfDocument pdfDoc) throws IOException {
         if (company.getLogoUrl() == null || company.getLogoUrl().isEmpty()) {
             log.debug("Empresa {} não possui logo cadastrado", company.getName());
             return null;
-        }
-        
-        // Verificar cache primeiro
-        String cacheKey = company.getLogoUrl() + "_" + company.getId();
-        if (logoCache.containsKey(cacheKey)) {
-            log.debug("Logo da empresa {} carregado do cache", company.getName());
-            return logoCache.get(cacheKey);
         }
         
         try {
             String logoUrl = company.getLogoUrl();
             ImageData imageData;
             
-            // Se for uma URL HTTP/HTTPS, usar diretamente
-            if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
-                log.debug("Carregando logo de URL: {}", logoUrl);
-                imageData = ImageDataFactory.create(logoUrl);
+            // Verificar cache de ImageData primeiro (não Image)
+            String cacheKey = company.getLogoUrl() + "_" + company.getId();
+            if (logoDataCache.containsKey(cacheKey)) {
+                log.debug("Logo da empresa {} carregado do cache (ImageData)", company.getName());
+                imageData = logoDataCache.get(cacheKey);
             } else {
-                // Se for caminho relativo, resolver para caminho absoluto
-                String logoPath = resolveLogoPath(logoUrl);
-                
-                if (!Files.exists(Paths.get(logoPath))) {
-                    log.warn("Logo não encontrado no caminho: {}", logoPath);
-                    return null;
+                // Se for uma URL HTTP/HTTPS, usar diretamente
+                if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+                    log.debug("Carregando logo de URL: {}", logoUrl);
+                    imageData = ImageDataFactory.create(logoUrl);
+                } else {
+                    // Se for caminho relativo, resolver para caminho absoluto
+                    String logoPath = resolveLogoPath(logoUrl);
+                    
+                    if (!Files.exists(Paths.get(logoPath))) {
+                        log.warn("Logo não encontrado no caminho: {}", logoPath);
+                        return null;
+                    }
+                    
+                    imageData = ImageDataFactory.create(logoPath);
                 }
                 
-                imageData = ImageDataFactory.create(logoPath);
+                // Adicionar ImageData ao cache (com limite de tamanho)
+                if (logoDataCache.size() < CACHE_MAX_SIZE) {
+                    logoDataCache.put(cacheKey, imageData);
+                    log.debug("Logo da empresa {} adicionado ao cache (ImageData)", company.getName());
+                }
             }
             
+            // Criar NOVA instância de Image para este documento PDF específico
             Image image = new Image(imageData);
             
-            // Redimensionar para exatamente 297x217px (222.75x162.75pt)
-            float originalWidth = image.getImageWidth();
-            float originalHeight = image.getImageHeight();
-            
-            log.debug("Logo original: {}x{}pt, redimensionando para {}x{}pt (297x217px)", 
-                    originalWidth, originalHeight, LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
-            
-            // Definir dimensões fixas (297x217px)
+            // Redimensionar para caber dentro da forma escura (reduzido para ~80% do tamanho original)
             image.setWidth(LOGO_WIDTH_PT);
             image.setHeight(LOGO_HEIGHT_PT);
             
-            // Adicionar ao cache (com limite de tamanho)
-            if (logoCache.size() < CACHE_MAX_SIZE) {
-                logoCache.put(cacheKey, image);
-                log.debug("Logo da empresa {} adicionado ao cache", company.getName());
-            }
-            
-            log.info("Logo da empresa {} carregado e redimensionado para {}x{}pt (297x217px)", 
+            log.debug("Logo da empresa {} criado para documento PDF ({}x{}pt) - tamanho reduzido para caber na forma escura", 
                     company.getName(), LOGO_WIDTH_PT, LOGO_HEIGHT_PT);
             
             return image;
@@ -530,8 +530,8 @@ public class StandardReportLayoutService {
      * Útil para forçar recarregamento após atualizações
      */
     public void clearCache() {
-        templateCache.clear();
-        logoCache.clear();
+        templateDataCache.clear();
+        logoDataCache.clear();
         log.info("Cache de templates e logos limpo");
     }
     

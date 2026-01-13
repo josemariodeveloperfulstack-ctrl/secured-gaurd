@@ -87,7 +87,6 @@ const mainMenuItems = [
   { icon: FileSpreadsheet, text: 'Holerites', to: '/holerites', id: 'holerites' },
   { icon: Truck, text: 'Frota', to: '/frota', id: 'frota' },
   { icon: Building2, text: 'Filiais', to: '/filiais', id: 'filiais' },
-  { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
 ];
 
   // Módulo Operacional - Correspondente às abas da página

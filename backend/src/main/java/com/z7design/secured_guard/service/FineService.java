@@ -1,12 +1,16 @@
 package com.z7design.secured_guard.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.service.StandardReportLayoutService;
 import com.z7design.secured_guard.dto.FineDTO;
 import com.z7design.secured_guard.dto.FineReportDTO;
 import com.z7design.secured_guard.model.Fine;
@@ -41,6 +45,8 @@ public class FineService {
     private final VehicleRepository vehicleRepository;
     private final DriverRepository driverRepository;
     private final JasperReportService jasperReportService;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     
     public List<FineDTO> getAllFines() {
         log.info("Buscando todas as multas");
@@ -378,39 +384,57 @@ public class FineService {
                 dueDateStart, dueDateEnd, minValue, maxValue, status);
         log.info("Total de multas encontradas para o relatório: {}", fines.size());
 
+        // Determinar companyId - tentar obter das multas primeiro
+        java.util.UUID companyId = null;
+        if (!fines.isEmpty()) {
+            for (Fine fine : fines) {
+                if (fine.getVehicle() != null && fine.getVehicle().getCompanyId() != null) {
+                    companyId = fine.getVehicle().getCompanyId();
+                    log.info("Usando empresa do veículo {}: {}", fine.getVehicle().getPlate(), companyId);
+                    break;
+                }
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa se nenhuma multa tiver companyId
+        if (companyId == null) {
+            log.warn("Nenhuma multa possui empresa associada. Buscando primeira empresa ativa como fallback...");
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})", 
+                        activeCompanies.get(0).getName(), companyId);
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                            allCompanies.get(0).getName(), companyId);
+                } else {
+                    throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
+            }
+        }
+        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
-
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
+        
         try {
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
-            document.setMargins(50, 50, 50, 50);
-
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
-
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE MULTAS")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+            PdfWriter writer = new PdfWriter(baos);
+            
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE MULTAS")
+                .topMargin(120f)  // Espaço para cabeçalho
+                .bottomMargin(80f) // Espaço para rodapé
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
+            
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
 
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -531,26 +555,14 @@ public class FineService {
                 document.add(table);
             }
 
-            // Rodapé
-            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8)
-                    .setMarginTop(30);
-            document.add(footer);
+            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            
+            document.close();
 
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de multas: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        } finally {
-            if (document != null) {
-                document.close();
-            }
-            if (pdfDoc != null) {
-                pdfDoc.close();
-            }
-            if (writer != null) {
-                writer.close();
-            }
         }
 
         byte[] result = baos.toByteArray();

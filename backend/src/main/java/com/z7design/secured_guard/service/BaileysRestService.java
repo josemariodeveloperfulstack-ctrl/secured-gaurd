@@ -580,9 +580,35 @@ public class BaileysRestService {
             
             return null;
             
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            // QR Code ainda não está disponível - isso é esperado após inicialização
+            // Não logar como ERROR, apenas como DEBUG/WARNING
+            String errorBody = e.getResponseBodyAsString();
+            if (errorBody != null && errorBody.contains("QR not available")) {
+                logger.debug("⏳ QR Code ainda não disponível (esperado após inicialização) - URL: {}", baileysRestUrl);
+            } else {
+                logger.warn("⚠️ QR Code não encontrado: {} - URL: {}", e.getMessage(), baileysRestUrl);
+            }
+            // Re-lançar a exceção para que o controller possa tratar adequadamente
+            throw e;
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            // Outros erros HTTP 4xx
+            String errorBody = e.getResponseBodyAsString();
+            if (errorBody != null && errorBody.contains("QR not available")) {
+                logger.debug("⏳ QR Code ainda não disponível (esperado após inicialização) - URL: {}", baileysRestUrl);
+            } else {
+                logger.warn("⚠️ Erro HTTP ao obter QR Code: {} - URL: {}", e.getMessage(), baileysRestUrl);
+            }
+            throw e;
         } catch (Exception e) {
-            logger.error("❌ Erro ao obter QR Code de {}", baileysRestUrl, e);
-            logger.error("💥 Detalhes do erro: {}", e.getMessage());
+            // Apenas logar como ERROR se não for um erro esperado de QR não disponível
+            String errorMessage = e.getMessage();
+            if (errorMessage != null && errorMessage.contains("QR not available")) {
+                logger.debug("⏳ QR Code ainda não disponível (esperado após inicialização) - URL: {}", baileysRestUrl);
+            } else {
+                logger.error("❌ Erro ao obter QR Code de {}", baileysRestUrl, e);
+                logger.error("💥 Detalhes do erro: {}", e.getMessage());
+            }
             return null;
         }
     }

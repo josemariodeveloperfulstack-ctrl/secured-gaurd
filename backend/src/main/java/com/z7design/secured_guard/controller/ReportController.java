@@ -44,7 +44,7 @@ public class ReportController {
             @ApiResponse(responseCode = "400", description = "Parâmetros inválidos"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<String> generateContasAPagarReport(
+    public ResponseEntity<?> generateContasAPagarReport(
             @Parameter(description = "Data de início do período") 
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Data de fim do período") 
@@ -53,27 +53,38 @@ public class ReportController {
             @RequestParam(defaultValue = "html") String format) {
         
         try {
-            log.info("Gerando relatório de contas a pagar para período: {} a {}", startDate, endDate);
-            
-            String report = contasAPagarReportService.generateContasAPagarReport(startDate, endDate);
+            log.info("Gerando relatório de contas a pagar para período: {} a {}, formato: {}", startDate, endDate, format);
             
             HttpHeaders headers = new HttpHeaders();
-            if ("html".equals(format)) {
-                headers.setContentType(MediaType.TEXT_HTML);
-            } else if ("pdf".equals(format)) {
+            
+            if ("pdf".equalsIgnoreCase(format)) {
+                // Usar novo método PDF com layout padrão
+                byte[] pdfBytes = contasAPagarReportService.generateContasAPagarReportPDF(startDate, endDate, null, null);
                 headers.setContentType(MediaType.APPLICATION_PDF);
                 headers.setContentDispositionFormData("attachment", 
                     "relatorio-contas-a-pagar-" + startDate + "-" + endDate + ".pdf");
+                headers.setContentLength(pdfBytes.length);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(pdfBytes);
+            } else {
+                // Formato HTML (padrão)
+                String report = contasAPagarReportService.generateContasAPagarReport(startDate, endDate);
+                headers.setContentType(MediaType.TEXT_HTML);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(report);
             }
-            
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(report);
                     
         } catch (Exception e) {
             log.error("Erro ao gerar relatório de contas a pagar: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao gerar relatório: " + e.getMessage());
+            if ("pdf".equalsIgnoreCase(format)) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(("Erro ao gerar relatório: " + e.getMessage()).getBytes());
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Erro ao gerar relatório: " + e.getMessage());
+            }
         }
     }
 
@@ -122,34 +133,45 @@ public class ReportController {
             @ApiResponse(responseCode = "400", description = "Status inválido"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<String> generateContasAPagarReportByStatus(
+    public ResponseEntity<?> generateContasAPagarReportByStatus(
             @Parameter(description = "Status das contas") 
             @PathVariable ExpenseStatus status,
             @Parameter(description = "Formato de resposta: html ou pdf") 
             @RequestParam(defaultValue = "html") String format) {
         
         try {
-            log.info("Gerando relatório de contas a pagar por status: {}", status);
-            
-            String report = contasAPagarReportService.generateContasAPagarReportByStatus(status);
+            log.info("Gerando relatório de contas a pagar por status: {}, formato: {}", status, format);
             
             HttpHeaders headers = new HttpHeaders();
-            if ("html".equals(format)) {
-                headers.setContentType(MediaType.TEXT_HTML);
-            } else if ("pdf".equals(format)) {
+            
+            if ("pdf".equalsIgnoreCase(format)) {
+                // Usar novo método PDF com layout padrão
+                byte[] pdfBytes = contasAPagarReportService.generateContasAPagarReportPDFByStatus(status);
                 headers.setContentType(MediaType.APPLICATION_PDF);
                 headers.setContentDispositionFormData("attachment", 
                     "relatorio-contas-" + status.name().toLowerCase() + ".pdf");
+                headers.setContentLength(pdfBytes.length);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(pdfBytes);
+            } else {
+                // Formato HTML (padrão)
+                String report = contasAPagarReportService.generateContasAPagarReportByStatus(status);
+                headers.setContentType(MediaType.TEXT_HTML);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(report);
             }
-            
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(report);
                     
         } catch (Exception e) {
             log.error("Erro ao gerar relatório por status: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao gerar relatório: " + e.getMessage());
+            if ("pdf".equalsIgnoreCase(format)) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(("Erro ao gerar relatório: " + e.getMessage()).getBytes());
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Erro ao gerar relatório: " + e.getMessage());
+            }
         }
     }
     
@@ -161,34 +183,45 @@ public class ReportController {
             @ApiResponse(responseCode = "400", description = "Tipo inválido"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<String> generateContasAPagarReportByType(
+    public ResponseEntity<?> generateContasAPagarReportByType(
             @Parameter(description = "Tipo das contas") 
             @PathVariable ExpenseType type,
             @Parameter(description = "Formato de resposta: html ou pdf") 
             @RequestParam(defaultValue = "html") String format) {
         
         try {
-            log.info("Gerando relatório de contas a pagar por tipo: {}", type);
-            
-            String report = contasAPagarReportService.generateContasAPagarReportByType(type);
+            log.info("Gerando relatório de contas a pagar por tipo: {}, formato: {}", type, format);
             
             HttpHeaders headers = new HttpHeaders();
-            if ("html".equals(format)) {
-                headers.setContentType(MediaType.TEXT_HTML);
-            } else if ("pdf".equals(format)) {
+            
+            if ("pdf".equalsIgnoreCase(format)) {
+                // Usar novo método PDF com layout padrão
+                byte[] pdfBytes = contasAPagarReportService.generateContasAPagarReportPDFByType(type);
                 headers.setContentType(MediaType.APPLICATION_PDF);
                 headers.setContentDispositionFormData("attachment", 
                     "relatorio-contas-" + type.name().toLowerCase() + ".pdf");
+                headers.setContentLength(pdfBytes.length);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(pdfBytes);
+            } else {
+                // Formato HTML (padrão)
+                String report = contasAPagarReportService.generateContasAPagarReportByType(type);
+                headers.setContentType(MediaType.TEXT_HTML);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(report);
             }
-            
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(report);
                     
         } catch (Exception e) {
             log.error("Erro ao gerar relatório por tipo: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao gerar relatório: " + e.getMessage());
+            if ("pdf".equalsIgnoreCase(format)) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(("Erro ao gerar relatório: " + e.getMessage()).getBytes());
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Erro ao gerar relatório: " + e.getMessage());
+            }
         }
     }
     
@@ -199,32 +232,100 @@ public class ReportController {
             @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<String> generateContasAPagarSummaryReport(
+    public ResponseEntity<?> generateContasAPagarSummaryReport(
             @Parameter(description = "Formato de resposta: html ou pdf") 
             @RequestParam(defaultValue = "html") String format) {
         
         try {
-            log.info("Gerando relatório resumido de contas a pagar");
-            
-            String report = contasAPagarReportService.generateContasAPagarSummaryReport();
+            log.info("Gerando relatório resumido de contas a pagar, formato: {}", format);
             
             HttpHeaders headers = new HttpHeaders();
-            if ("html".equals(format)) {
-                headers.setContentType(MediaType.TEXT_HTML);
-            } else if ("pdf".equals(format)) {
+            
+            if ("pdf".equalsIgnoreCase(format)) {
+                // Usar novo método PDF com layout padrão
+                byte[] pdfBytes = contasAPagarReportService.generateContasAPagarSummaryReportPDF();
                 headers.setContentType(MediaType.APPLICATION_PDF);
                 headers.setContentDispositionFormData("attachment", 
                     "relatorio-resumo-contas-a-pagar.pdf");
+                headers.setContentLength(pdfBytes.length);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(pdfBytes);
+            } else {
+                // Formato HTML (padrão)
+                String report = contasAPagarReportService.generateContasAPagarSummaryReport();
+                headers.setContentType(MediaType.TEXT_HTML);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(report);
             }
-            
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(report);
                     
         } catch (Exception e) {
             log.error("Erro ao gerar relatório resumido: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao gerar relatório: " + e.getMessage());
+            if ("pdf".equalsIgnoreCase(format)) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(("Erro ao gerar relatório: " + e.getMessage()).getBytes());
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Erro ao gerar relatório: " + e.getMessage());
+            }
+        }
+    }
+    
+    @GetMapping("/contas-a-pagar/empresa/{companySigla}")
+    @Operation(summary = "Relatório de Contas a Pagar por Empresa", 
+               description = "Gera relatório de contas a pagar filtrado por empresa (sigla)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Parâmetros inválidos"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<?> generateContasAPagarReportByCompany(
+            @Parameter(description = "Sigla da empresa") 
+            @PathVariable String companySigla,
+            @Parameter(description = "Data de início do período") 
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "Data de fim do período") 
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Formato de resposta: html ou pdf") 
+            @RequestParam(defaultValue = "pdf") String format) {
+        
+        try {
+            log.info("Gerando relatório de contas a pagar por empresa: {}, formato: {}", companySigla, format);
+            
+            HttpHeaders headers = new HttpHeaders();
+            
+            if ("pdf".equalsIgnoreCase(format)) {
+                // Usar método PDF com layout padrão
+                byte[] pdfBytes = contasAPagarReportService.generateContasAPagarReportPDFByCompany(
+                        companySigla, startDate, endDate);
+                headers.setContentType(MediaType.APPLICATION_PDF);
+                headers.setContentDispositionFormData("attachment", 
+                    "relatorio-contas-a-pagar-empresa-" + companySigla + ".pdf");
+                headers.setContentLength(pdfBytes.length);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(pdfBytes);
+            } else {
+                // Formato HTML (fallback - usar método existente)
+                String report = contasAPagarReportService.generateContasAPagarReport(
+                        startDate != null ? startDate : LocalDate.now().minusMonths(1),
+                        endDate != null ? endDate : LocalDate.now());
+                headers.setContentType(MediaType.TEXT_HTML);
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(report);
+            }
+                    
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório por empresa: {}", e.getMessage(), e);
+            if ("pdf".equalsIgnoreCase(format)) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(("Erro ao gerar relatório: " + e.getMessage()).getBytes());
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Erro ao gerar relatório: " + e.getMessage());
+            }
         }
     }
     

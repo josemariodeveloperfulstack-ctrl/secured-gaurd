@@ -84,12 +84,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Gerar permissões a partir do role principal
           const rolePermissions = generatePermissions(userData.role);
-          const userWithPermissions = { ...userData, permissions: rolePermissions };
+          const userWithPermissions = { 
+            ...userData, 
+            permissions: rolePermissions,
+            firstAccessCompleted: userData.firstAccessCompleted ?? false
+          };
           
           console.log('🔍 AuthContext - Usuário carregado:', {
             name: userData.name,
             role: userData.role,
             permissions: rolePermissions,
+            firstAccessCompleted: userWithPermissions.firstAccessCompleted,
             isSuperAdmin: userData.role === 'SUPER_ADMIN',
             allPermissions: rolePermissions.ALL_PERMISSIONS
           });
@@ -103,6 +108,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const roleKey = (userWithPermissions.role ?? '').toUpperCase();
           if (!['COLABORADOR', 'ROLE_COLABORADOR'].includes(roleKey) && userWithPermissions.id) {
             void loadUserGroups(userWithPermissions.id);
+          }
+
+          // Verificar se precisa redirecionar para primeiro acesso
+          if (!userWithPermissions.firstAccessCompleted) {
+            const currentPath = window.location.pathname;
+            const firstAccessPaths = ['/first-access/change-password', '/first-access/activate-2fa'];
+            if (!firstAccessPaths.includes(currentPath)) {
+              console.log('🔒 Usuário precisa completar primeiro acesso, redirecionando...');
+              setTimeout(() => {
+                navigate('/first-access/change-password', { replace: true });
+              }, 100);
+            }
           }
         } else {
           console.log('🔍 Nenhum token ou usuário encontrado');
@@ -251,6 +268,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         department: response.data.user?.department,
         position: response.data.user?.position,
         employeeCode: response.data.user?.employeeCode,
+        firstAccessCompleted: response.data.user?.firstAccessCompleted ?? response.data.firstAccessCompleted ?? false,
       };
 
       // Validar que o ID foi fornecido

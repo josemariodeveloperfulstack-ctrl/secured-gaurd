@@ -104,7 +104,6 @@ public class VehicleReportService {
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                 .companyId(companyId)
                 .reportTitle("RELATÓRIO DE VEÍCULOS")
-                .withWatermark(false) // Relatórios gerais não têm marca d'água
                 .topMargin(120f)  // Espaço para cabeçalho
                 .bottomMargin(80f) // Espaço para rodapé
                 .leftMargin(50f)

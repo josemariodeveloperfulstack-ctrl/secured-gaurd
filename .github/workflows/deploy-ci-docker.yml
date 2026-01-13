@@ -278,6 +278,12 @@ jobs:
             fi
             printf 'MAIL_STARTTLS_ENABLE=%s\n' "${{ secrets.MAIL_STARTTLS_ENABLE || 'false' }}"
             printf 'MAIL_SSL_ENABLE=%s\n' "${{ secrets.MAIL_SSL_ENABLE || 'true' }}"
+            printf 'MAIL_SOCKET_FACTORY=%s\n' "${{ secrets.MAIL_SOCKET_FACTORY || 'javax.net.ssl.SSLSocketFactory' }}"
+            printf 'MAIL_SOCKET_FACTORY_PORT=%s\n' "${{ secrets.MAIL_SOCKET_FACTORY_PORT || '465' }}"
+            printf 'MAIL_CONNECTION_TIMEOUT=%s\n' "${{ secrets.MAIL_CONNECTION_TIMEOUT || '10000' }}"
+            printf 'MAIL_TIMEOUT=%s\n' "${{ secrets.MAIL_TIMEOUT || '10000' }}"
+            printf 'MAIL_WRITE_TIMEOUT=%s\n' "${{ secrets.MAIL_WRITE_TIMEOUT || '10000' }}"
+            printf 'MAIL_DEBUG=%s\n' "${{ secrets.MAIL_DEBUG || 'false' }}"
             printf '# WhatsApp Configuration\n'
             # Usar whatsapp-service-ci:3333 que está definido no docker-compose.ci.yml
             printf 'BAILEYS_REST_URL=%s\n' "${{ secrets.BAILEYS_REST_URL || 'http://whatsapp-service-ci:3333' }}"

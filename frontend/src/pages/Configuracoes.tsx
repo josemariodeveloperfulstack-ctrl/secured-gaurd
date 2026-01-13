@@ -16,6 +16,13 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -77,6 +84,8 @@ const Configuracoes = () => {
   const [emailConfig, setEmailConfig] = useState<any>(null);
   const [loadingEmailConfig, setLoadingEmailConfig] = useState(false);
 
+  const [empresas, setEmpresas] = useState<any[]>([]);
+  const [selectedEmpresaId, setSelectedEmpresaId] = useState<string>('');
   const [empresaForm, setEmpresaForm] = useState({
     id: '',
     name: '',
@@ -90,6 +99,7 @@ const Configuracoes = () => {
     website: '',
     sigla: '',
     description: '',
+    logoUrl: '',
     status: 'ACTIVE'
   });
 
@@ -101,46 +111,55 @@ const Configuracoes = () => {
     loadNotificationSettings();
   }, []);
 
-  const loadCompanyData = async () => {
+  const loadCompaniesList = async () => {
+    try {
+      const companies = await companyService.getAllCompanies();
+      setEmpresas(companies || []);
+      
+      // Se houver empresas e nenhuma selecionada, selecionar a primeira
+      if (companies && companies.length > 0 && !selectedEmpresaId) {
+        setSelectedEmpresaId(companies[0].id);
+        await loadCompanyById(companies[0].id);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar lista de empresas:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de empresas.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadCompanyById = async (companyId: string) => {
     try {
       setLoadingCompany(true);
-      console.log('🔍 DEBUG: Carregando dados da empresa...');
+      console.log('🔍 DEBUG: Carregando dados da empresa ID:', companyId);
       
-      const companies = await companyService.getAllCompanies();
-      console.log('🔍 DEBUG: Empresas recebidas:', companies);
+      const company = await companyService.getCompanyById(companyId);
+      console.log('🔍 DEBUG: Empresa carregada:', company);
       
-      if (companies && companies.length > 0) {
-        // Pegar a primeira empresa (ou implementar lógica para escolher a empresa principal)
-        const company = companies[0];
-        console.log('🔍 DEBUG: Empresa selecionada:', company);
-        
-        setEmpresaForm({
-          id: company.id || '',
-          name: company.name || '',
-          cnpj: company.cnpj || '',
-          email: company.email || '',
-          phone: company.phone || '',
-          address: company.address || '',
-          city: company.city || '',
-          state: company.state || '',
-          zipCode: company.zipCode || '',
-          website: company.website || '',
-          sigla: company.sigla || '',
-          description: company.description || '',
-          status: company.status || 'ACTIVE'
-        });
-        
-        toast({
-          title: "Dados carregados",
-          description: "Informações da empresa carregadas com sucesso.",
-        });
-      } else {
-        toast({
-          title: "Aviso",
-          description: "Nenhuma empresa encontrada no sistema.",
-          variant: "destructive"
-        });
-      }
+      setEmpresaForm({
+        id: company.id || '',
+        name: company.name || '',
+        cnpj: company.cnpj || '',
+        email: company.email || '',
+        phone: company.phone || '',
+        address: company.address || '',
+        city: company.city || '',
+        state: company.state || '',
+        zipCode: company.zipCode || '',
+        website: company.website || '',
+        sigla: company.sigla || '',
+        description: company.description || '',
+        logoUrl: company.logoUrl || '',
+        status: company.status || 'ACTIVE'
+      });
+      
+      toast({
+        title: "Dados carregados",
+        description: `Informações de ${company.name} carregadas com sucesso.`,
+      });
     } catch (error) {
       console.error('❌ Erro ao carregar dados da empresa:', error);
       toast({
@@ -151,6 +170,15 @@ const Configuracoes = () => {
     } finally {
       setLoadingCompany(false);
     }
+  };
+
+  const handleEmpresaSelect = async (companyId: string) => {
+    setSelectedEmpresaId(companyId);
+    await loadCompanyById(companyId);
+  };
+
+  const loadCompanyData = async () => {
+    await loadCompaniesList();
   };
 
   const handleEmpresaChange = (field: string, value: string) => {
@@ -184,6 +212,7 @@ const Configuracoes = () => {
           website: empresaForm.website,
           sigla: empresaForm.sigla,
           description: empresaForm.description,
+          logoUrl: empresaForm.logoUrl,
           status: empresaForm.status as any
         });
         
@@ -453,22 +482,15 @@ const Configuracoes = () => {
       setLoadingEmailConfig(true);
       const response = await api.get('/api/email/config');
       setEmailConfig(response.data);
-      toast({
-        title: "Configuração carregada",
-        description: "Configuração de email carregada com sucesso.",
-      });
+      // Não mostrar toast ao carregar automaticamente
     } catch (error: any) {
       console.error('❌ Erro ao carregar configuração de email:', error);
-      toast({
-        title: "Erro",
-        description: error.response?.data?.message || "Não foi possível carregar a configuração de email.",
-        variant: "destructive"
-      });
       setEmailConfig(null);
     } finally {
       setLoadingEmailConfig(false);
     }
   };
+
 
   const handleTestEmail = async () => {
     if (!testEmailAddress || !testEmailAddress.includes('@')) {
@@ -647,7 +669,11 @@ const Configuracoes = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="empresa" className="w-full">
+        <Tabs defaultValue="empresa" className="w-full" onValueChange={(value) => {
+          if (value === 'testes' && !emailConfig && !loadingEmailConfig) {
+            loadEmailConfig();
+          }
+        }}>
           <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 w-full bg-seguranca-graphite border-gray-600 p-1 rounded-lg">
             <TabsTrigger value="empresa" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Empresa</TabsTrigger>
             <TabsTrigger value="usuarios" className="text-sm sm:text-base rounded-md data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">Usuários</TabsTrigger>
@@ -671,6 +697,69 @@ const Configuracoes = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Seletor de Empresas */}
+                <div className="space-y-2">
+                  <Label htmlFor="empresa-select" className="text-seguranca-lightgray flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Selecionar Empresa
+                  </Label>
+                  <Select
+                    value={selectedEmpresaId}
+                    onValueChange={handleEmpresaSelect}
+                    disabled={loadingCompany || empresas.length === 0}
+                  >
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder={empresas.length === 0 ? "Nenhuma empresa encontrada" : "Selecione uma empresa"} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      {empresas.map((empresa) => (
+                        <SelectItem 
+                          key={empresa.id} 
+                          value={empresa.id}
+                          className="text-seguranca-lightgray focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                        >
+                          {empresa.sigla ? `${empresa.sigla} - ${empresa.name}` : empresa.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {empresas.length === 0 && (
+                    <p className="text-xs text-gray-400">Nenhuma empresa cadastrada no sistema.</p>
+                  )}
+                </div>
+
+                {/* Logo da Empresa */}
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Logo da Empresa</Label>
+                  {empresaForm.logoUrl ? (
+                    <div className="flex items-start gap-4 p-4 bg-seguranca-black/50 rounded-lg border border-gray-700">
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={empresaForm.logoUrl} 
+                          alt={`Logo ${empresaForm.name || 'Empresa'}`}
+                          className="max-h-32 max-w-32 object-contain rounded border border-gray-600"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const errorMsg = target.nextElementSibling as HTMLElement;
+                            if (errorMsg) errorMsg.style.display = 'block';
+                          }}
+                        />
+                        <p className="text-xs text-red-400 mt-2 hidden">Erro ao carregar imagem</p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-400 mb-1">Preview da Logo:</p>
+                        <p className="text-xs text-seguranca-lightgray font-mono break-all">{empresaForm.logoUrl}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-seguranca-black/30 rounded-lg border border-dashed border-gray-600 text-center">
+                      <p className="text-sm text-gray-400">Nenhuma logo cadastrada</p>
+                      <p className="text-xs text-gray-500 mt-1">Adicione uma URL de imagem no campo abaixo</p>
+                    </div>
+                  )}
+                </div>
+
                 {loadingCompany ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow mr-2" />
@@ -809,6 +898,18 @@ const Configuracoes = () => {
                         className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
                         placeholder="Breve descrição da empresa"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="logoUrl" className="text-seguranca-lightgray">URL da Logo</Label>
+                      <Input 
+                        id="logoUrl" 
+                        value={empresaForm.logoUrl} 
+                        onChange={(e) => handleEmpresaChange('logoUrl', e.target.value)}
+                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                        placeholder="https://exemplo.com/logo.png ou data:image/png;base64,..."
+                      />
+                      <p className="text-xs text-gray-400">URL da imagem ou base64 da logo da empresa</p>
                     </div>
 
                     <div className="flex justify-end pt-4">
@@ -1471,53 +1572,67 @@ const Configuracoes = () => {
                 <CardContent className="space-y-6">
                   {/* Configuração Atual */}
                   <div className="bg-seguranca-black/50 p-4 rounded-lg border border-gray-700">
-                    <h3 className="text-sm font-semibold text-seguranca-lightgray mb-3">Configuração Atual</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-seguranca-lightgray">Configuração Atual</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={loadEmailConfig}
+                        disabled={loadingEmailConfig}
+                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                      >
+                        {loadingEmailConfig ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Carregando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Atualizar
+                          </>
+                        )}
+                      </Button>
+                    </div>
                     {loadingEmailConfig ? (
-                      <div className="flex items-center gap-2 text-gray-400">
+                      <div className="flex items-center gap-2 text-gray-400 py-4">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span>Carregando configuração...</span>
                       </div>
                     ) : emailConfig ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-gray-400">Servidor SMTP:</span>
+                        <div className="flex items-center">
+                          <span className="text-gray-400 min-w-[100px]">Servidor SMTP:</span>
                           <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.host}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-400">Porta:</span>
+                        <div className="flex items-center">
+                          <span className="text-gray-400 min-w-[100px]">Porta:</span>
                           <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.port}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-400">Usuário:</span>
-                          <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.username}</span>
+                        <div className="flex items-center">
+                          <span className="text-gray-400 min-w-[100px]">Usuário:</span>
+                          <span className="ml-2 text-seguranca-lightgray font-mono break-all">{emailConfig.username}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-400">SSL/TLS:</span>
-                          <span className="ml-2 text-seguranca-lightgray">{emailConfig.ssl === 'true' ? 'Habilitado' : 'Desabilitado'}</span>
+                        <div className="flex items-center">
+                          <span className="text-gray-400 min-w-[100px]">SSL/TLS:</span>
+                          <span className={`ml-2 font-semibold ${emailConfig.ssl === 'true' || emailConfig.starttls === 'true' ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {emailConfig.sslTlsStatus || (emailConfig.ssl === 'true' ? 'Habilitado (SSL)' : emailConfig.starttls === 'true' ? 'Habilitado (STARTTLS)' : 'Desabilitado')}
+                          </span>
                         </div>
+                        {emailConfig.activeProfile && (
+                          <div className="flex items-center md:col-span-2">
+                            <span className="text-gray-400 min-w-[100px]">Perfil Ativo:</span>
+                            <span className="ml-2 text-seguranca-lightgray font-mono">{emailConfig.activeProfile}</span>
+                            <span className="ml-2 text-xs text-gray-500">({emailConfig.source || 'properties'})</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <p className="text-gray-400 text-sm">Clique em "Carregar Configuração" para ver os detalhes</p>
+                      <div className="py-4">
+                        <p className="text-gray-400 text-sm mb-2">Nenhuma configuração carregada.</p>
+                        <p className="text-xs text-gray-500">Clique em "Atualizar" para carregar a configuração atual do servidor.</p>
+                      </div>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={loadEmailConfig}
-                      disabled={loadingEmailConfig}
-                      className="mt-3 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                    >
-                      {loadingEmailConfig ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Carregando...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Carregar Configuração
-                        </>
-                      )}
-                    </Button>
                   </div>
 
                   {/* Formulário de Teste */}

@@ -335,7 +335,6 @@ export function AppSidebar() {
       { icon: FileText, text: 'Documentos Unificados', to: '/documentos-unificados', id: 'documentos-unificados' },
       { icon: Truck, text: 'Frota', to: '/frota', id: 'frota' },
       { icon: FileText, text: 'Relatórios', to: '/relatorios', id: 'relatorios' },
-      { icon: Settings, text: 'Configurações', to: '/configuracoes', id: 'configuracoes' },
     ];
 
     // Adicionar Roles apenas para SUPER_ADMIN
