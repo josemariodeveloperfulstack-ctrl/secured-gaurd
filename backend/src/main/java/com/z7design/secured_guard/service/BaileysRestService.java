@@ -77,14 +77,27 @@ public class BaileysRestService {
             HttpEntity<String> request = new HttpEntity<>(headers);
             
             logger.info("🔄 Fazendo logout e resetando instância Baileys REST: {}", instanceKey);
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            restTemplate.postForEntity(url, request, String.class);
             
             // Aguardar um pouco para garantir que a sessão foi limpa
-            Thread.sleep(1000);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             
             logger.info("✅ Instância Baileys REST resetada com sucesso");
             return true;
             
+        } catch (org.springframework.web.client.HttpServerErrorException e) {
+            // Se a conexão já está fechada, isso é esperado e não é um erro
+            if (e.getStatusCode().value() == 500 && e.getResponseBodyAsString() != null 
+                && e.getResponseBodyAsString().contains("Connection Closed")) {
+                logger.info("ℹ️ Conexão já estava fechada, continuando com reset");
+                return true;
+            }
+            logger.warn("⚠️ Erro ao resetar instância: {}", e.getMessage());
+            return true; // Continuar mesmo com erro, pois a instância pode não existir
         } catch (Exception e) {
             logger.warn("⚠️ Erro ao resetar instância (pode não existir): {}", e.getMessage());
             // Não retornar false, pois a instância pode não existir
@@ -590,6 +603,15 @@ public class BaileysRestService {
             
             return response.getStatusCode() == HttpStatus.OK;
             
+        } catch (org.springframework.web.client.HttpServerErrorException e) {
+            // Se a conexão já está fechada, isso é esperado e não é um erro
+            if (e.getStatusCode().value() == 500 && e.getResponseBodyAsString() != null 
+                && e.getResponseBodyAsString().contains("Connection Closed")) {
+                logger.info("ℹ️ Conexão já estava fechada, logout concluído");
+                return true;
+            }
+            logger.error("Erro ao desconectar instância", e);
+            return false;
         } catch (Exception e) {
             logger.error("Erro ao desconectar instância", e);
             return false;

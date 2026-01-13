@@ -139,16 +139,17 @@ public class WhatsAppController {
             }
             
             if (qrcode) {
-                // Aguardar um pouco para o QR Code ser gerado após inicialização
+                // Aguardar mais tempo para o QR Code ser gerado após inicialização
+                // O Baileys REST pode precisar de mais tempo para processar a inicialização
                 try {
-                    Thread.sleep(2000); // 2 segundos
+                    Thread.sleep(3000); // 3 segundos
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
                 
-                // Tentar obter QR Code até 5 vezes com intervalo de 1 segundo
+                // Tentar obter QR Code até 10 vezes com intervalo crescente
                 String qrCodeData = null;
-                int maxAttempts = 5;
+                int maxAttempts = 10;
                 for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                     try {
                         qrCodeData = baileysRestService.getQRCode();
@@ -156,16 +157,23 @@ public class WhatsAppController {
                             log.info("✅ QR Code obtido na tentativa {}/{}", attempt, maxAttempts);
                             break;
                         }
+                    } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+                        // QR Code ainda não está disponível, continuar tentando
+                        log.debug("⏳ QR Code ainda não disponível na tentativa {}/{}", attempt, maxAttempts);
                     } catch (Exception e) {
                         log.warn("⚠️ Erro ao obter QR Code na tentativa {}: {}", attempt, e.getMessage());
                     }
-                    log.info("⏳ Aguardando QR Code... Tentativa {}/{}", attempt, maxAttempts);
-                    if (attempt < maxAttempts) {
-                        try {
-                            Thread.sleep(1000); // 1 segundo entre tentativas
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
+                    
+                    if (qrCodeData == null || qrCodeData.isEmpty()) {
+                        log.info("⏳ Aguardando QR Code... Tentativa {}/{}", attempt, maxAttempts);
+                        if (attempt < maxAttempts) {
+                            try {
+                                // Intervalo crescente: 1s, 2s, 3s, etc.
+                                Thread.sleep(attempt * 1000);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
                         }
                     }
                 }
