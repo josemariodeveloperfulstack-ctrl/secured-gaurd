@@ -181,10 +181,25 @@ public class WhatsAppController {
                 
                 if (qrCodeData == null || qrCodeData.isEmpty()) {
                     log.error("❌ QR Code não foi gerado pelo Baileys REST após {} tentativas", maxAttempts);
+                    
+                    // Verificar estado da conexão para dar mensagem mais específica
+                    String connectionState = baileysRestService.getConnectionState();
+                    String errorMessage = "Não foi possível gerar o QR Code.";
+                    
+                    if (connectionState == null) {
+                        errorMessage += " O serviço Baileys REST não está acessível. Verifique se o container está rodando.";
+                    } else if ("close".equals(connectionState) || "closed".equals(connectionState)) {
+                        errorMessage += " A conexão com o WhatsApp está fechada. Isso pode indicar um problema de autenticação (erro 401) ou mudança no protocolo do WhatsApp. Verifique os logs do container whatsapp-service-ci.";
+                    } else if ("connecting".equals(connectionState)) {
+                        errorMessage += " A conexão está em andamento. Aguarde alguns segundos e tente novamente.";
+                    }
+                    
                     return ResponseEntity.ok(Map.of(
                         "success", false,
-                        "error", "Não foi possível gerar o QR Code. Aguarde alguns segundos e tente novamente. Se o problema persistir, verifique se o serviço Baileys REST está rodando corretamente.",
-                        "instance", instanceName != null ? instanceName : "unknown"
+                        "error", errorMessage,
+                        "instance", instanceName != null ? instanceName : "unknown",
+                        "connectionState", connectionState != null ? connectionState : "unknown",
+                        "hint", "Se o problema persistir, verifique os logs do container whatsapp-service-ci para mais detalhes sobre o erro de conexão com o WhatsApp."
                     ));
                 }
                 
