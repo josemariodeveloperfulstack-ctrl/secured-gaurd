@@ -274,14 +274,15 @@ public class BaileysRestService {
     }
     
     /**
-     * Verifica se a instância está conectada
+     * Verifica o estado da conexão e retorna o estado como string
+     * Retorna: "open", "close", "connecting", "closed", ou null se não disponível
      */
-    public boolean checkConnection() {
+    public String getConnectionState() {
         try {
-            // Se Baileys não estiver habilitado, retornar false sem tentar conectar
+            // Se Baileys não estiver habilitado, retornar "closed"
             if (!baileysEnabled) {
-                logger.debug("Baileys não está habilitado. Retornando false.");
-                return false;
+                logger.debug("Baileys não está habilitado. Retornando closed.");
+                return "closed";
             }
             
             String url = baileysRestUrl + "/instance/connectionState?key=" + instanceKey;
@@ -291,28 +292,50 @@ public class BaileysRestService {
             
             HttpEntity<String> request = new HttpEntity<>(headers);
             
-            // Timeout curto para não travar a aplicação
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
-                // Verificar se está conectado
                 String responseBody = response.getBody();
-                return responseBody != null && responseBody.contains("open");
+                if (responseBody != null) {
+                    // Extrair o estado da conexão do JSON
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+                        JsonNode jsonNode = mapper.readTree(responseBody);
+                        String state = jsonNode.get("state").asText();
+                        logger.debug("📱 Estado da conexão WhatsApp: {}", state);
+                        return state;
+                    } catch (Exception e) {
+                        // Se não conseguir fazer parse, verificar se contém "open"
+                        if (responseBody.contains("\"open\"") || responseBody.contains("open")) {
+                            return "open";
+                        } else if (responseBody.contains("\"close\"") || responseBody.contains("close")) {
+                            return "close";
+                        } else if (responseBody.contains("\"connecting\"") || responseBody.contains("connecting")) {
+                            return "connecting";
+                        }
+                    }
+                }
             }
             
-            return false;
+            return "closed";
             
         } catch (org.springframework.web.client.ResourceAccessException e) {
-            // Serviço não disponível - não é um erro crítico
             logger.debug("Serviço Baileys REST não disponível: {}", e.getMessage());
             lastErrorMessage = "Serviço WhatsApp não disponível: " + e.getMessage();
-            return false;
+            return null;
         } catch (Exception e) {
-            // Outros erros - logar mas não crashar
             logger.warn("⚠️ Erro ao verificar conexão Baileys REST: {}", e.getMessage());
             lastErrorMessage = "Erro ao verificar conexão: " + e.getMessage();
-            return false;
+            return null;
         }
+    }
+    
+    /**
+     * Verifica se a instância está conectada (método legado para compatibilidade)
+     */
+    public boolean checkConnection() {
+        String state = getConnectionState();
+        return "open".equals(state);
     }
     
     /**
