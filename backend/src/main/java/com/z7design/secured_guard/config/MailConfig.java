@@ -65,8 +65,15 @@ public class MailConfig {
 
     @Bean
     public JavaMailSender javaMailSender() {
+        // Verificar se MAIL_HOST está definido na variável de ambiente (tem prioridade absoluta)
+        String mailHostEnv = System.getenv("MAIL_HOST");
+        if (mailHostEnv != null && !mailHostEnv.trim().isEmpty()) {
+            host = mailHostEnv.trim();
+            log.info("📧 Usando MAIL_HOST da variável de ambiente: {}", host);
+        }
+        
         log.info("📧 Configurando JavaMailSender...");
-        log.info("📧 Host: {}, Port: {}, Username: {}", host, port, username);
+        log.info("📧 Host: {} (env: {}), Port: {}, Username: {}", host, mailHostEnv, port, username);
         log.info("📧 Password configurado: {}", password != null && !password.isEmpty() ? "SIM" : "NÃO");
         log.info("📧 SSL: {}, STARTTLS: {}", sslEnable, starttlsEnable);
         
