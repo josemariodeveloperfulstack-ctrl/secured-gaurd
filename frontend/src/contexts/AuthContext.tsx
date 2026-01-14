@@ -420,6 +420,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const setFirstAccessCompleted = (completed: boolean) => {
+    if (!user) return;
+    const updatedUser = { ...user, firstAccessCompleted: completed };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   const value: AuthContextType = {
     user,
     profile,
@@ -447,6 +454,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     },
     refreshUser,
+    setFirstAccessCompleted,
   };
 
   return (

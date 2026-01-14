@@ -201,6 +201,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   refreshAuthToken: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  setFirstAccessCompleted: (completed: boolean) => void;
 }
 
 // Configurações de menu por role

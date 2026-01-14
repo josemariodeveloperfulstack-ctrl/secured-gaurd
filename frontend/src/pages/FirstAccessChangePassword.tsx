@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { useAuth } from '@/contexts/AuthContext';
 
 const FirstAccessChangePassword = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { setFirstAccessCompleted } = useAuth();
   
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -77,17 +79,8 @@ const FirstAccessChangePassword = () => {
           variant: "default",
         });
 
-        // Atualizar dados do usuário no localStorage
-        try {
-          const savedUser = localStorage.getItem('user');
-          if (savedUser) {
-            const userData = JSON.parse(savedUser);
-            userData.firstAccessCompleted = true;
-            localStorage.setItem('user', JSON.stringify(userData));
-          }
-        } catch (e) {
-          console.warn('Não foi possível atualizar dados do usuário:', e);
-        }
+        // Atualizar estado de autenticação para liberar o acesso ao dashboard
+        setFirstAccessCompleted(true);
 
         // Aguardar um pouco para o usuário ver a mensagem de sucesso
         setTimeout(() => {
