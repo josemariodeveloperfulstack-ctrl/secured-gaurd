@@ -1004,6 +1004,7 @@ export const getGroupDisplayName = (groupName: string): string => {
     'GRUPO_DPE': 'Departamento Pessoal',
     'GRUPO_SUPERVISOR': 'Supervisor',
     'GRUPO_COLABORADORES': 'Colaboradores',
+    'GRUPO_OPERACIONAL': 'Operacional',
     'GRUPO_VIGILANTES': 'Vigilantes',
   };
   return groupNames[groupName] || groupName;
@@ -1019,6 +1020,7 @@ export const getGroupColor = (groupName: string): string => {
     'GRUPO_DPE': 'bg-teal-100 text-teal-800',
     'GRUPO_SUPERVISOR': 'bg-green-100 text-green-800',
     'GRUPO_COLABORADORES': 'bg-blue-100 text-blue-800',
+    'GRUPO_OPERACIONAL': 'bg-cyan-100 text-cyan-800',
     'GRUPO_VIGILANTES': 'bg-gray-100 text-gray-800',
   };
   return groupColors[groupName] || 'bg-gray-100 text-gray-800';

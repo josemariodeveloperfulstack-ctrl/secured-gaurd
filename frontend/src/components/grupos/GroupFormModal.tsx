@@ -28,6 +28,7 @@ const GROUP_OPTIONS: { value: UserGroup; label: string }[] = [
   { value: 'GRUPO_DPE', label: 'Departamento Pessoal' },
   { value: 'GRUPO_SUPERVISOR', label: 'Supervisor' },
   { value: 'GRUPO_COLABORADORES', label: 'Colaboradores' },
+  { value: 'GRUPO_OPERACIONAL', label: 'Operacional' },
   { value: 'GRUPO_FINANCEIRO', label: 'Financeiro' },
   { value: 'GRUPO_TI_SUPORTE', label: 'TI / Suporte' },
   { value: 'GRUPO_AUDITOR', label: 'Auditor' },

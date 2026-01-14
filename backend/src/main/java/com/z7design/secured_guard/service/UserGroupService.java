@@ -290,6 +290,7 @@ public class UserGroupService {
             "RH", UserGroup.GRUPO_RH,
             "SUPERVISOR", UserGroup.GRUPO_SUPERVISOR,
             "COLABORADOR", UserGroup.GRUPO_COLABORADORES,
+            "OPERACIONAL", UserGroup.GRUPO_OPERACIONAL,
             "FINANCEIRO", UserGroup.GRUPO_FINANCEIRO,
             "TI_SUPORTE", UserGroup.GRUPO_TI_SUPORTE,
             "AUDITOR", UserGroup.GRUPO_AUDITOR
@@ -371,6 +372,7 @@ public class UserGroupService {
             case GRUPO_DPE: return "Departamento Pessoal";
             case GRUPO_SUPERVISOR: return "Supervisor";
             case GRUPO_COLABORADORES: return "Colaboradores";
+            case GRUPO_OPERACIONAL: return "Operacional";
             case GRUPO_VIGILANTES: return "Vigilantes";
             default: return group.name();
         }
@@ -385,6 +387,7 @@ public class UserGroupService {
             case GRUPO_DPE: return "Departamento pessoal";
             case GRUPO_SUPERVISOR: return "Supervisão de equipes";
             case GRUPO_COLABORADORES: return "Colaboradores da empresa";
+            case GRUPO_OPERACIONAL: return "Equipe operacional";
             case GRUPO_VIGILANTES: return "Vigilantes de segurança";
             default: return "";
         }
@@ -441,6 +444,12 @@ public class UserGroupService {
         // GRUPO_COLABORADORES - Colaboradores
         permissions.put(UserGroup.GRUPO_COLABORADORES, new HashSet<>(Arrays.asList(
             "VIEW_PAYSLIP", "DOWNLOAD_PAYSLIP", "EDIT_PROFILE"
+        )));
+
+        // GRUPO_OPERACIONAL - Operacional
+        permissions.put(UserGroup.GRUPO_OPERACIONAL, new HashSet<>(Arrays.asList(
+            "VIEW_PAYSLIP", "DOWNLOAD_PAYSLIP", "EDIT_PROFILE",
+            "VIEW_EMPLOYEES", "VIEW_CONTRACTS", "VIEW_REPORTS", "VIEW_FLEET"
         )));
         
         // GRUPO_VIGILANTES - Vigilantes

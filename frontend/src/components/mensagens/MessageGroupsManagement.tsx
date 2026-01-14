@@ -543,6 +543,7 @@ const MessageGroupsManagement: React.FC = () => {
                   <SelectItem value="GRUPO_DPE">GRUPO_DPE</SelectItem>
                   <SelectItem value="GRUPO_SUPERVISOR">GRUPO_SUPERVISOR</SelectItem>
                   <SelectItem value="GRUPO_COLABORADORES">GRUPO_COLABORADORES</SelectItem>
+                  <SelectItem value="GRUPO_OPERACIONAL">GRUPO_OPERACIONAL</SelectItem>
                   <SelectItem value="GRUPO_VIGILANTES">GRUPO_VIGILANTES</SelectItem>
                   <SelectItem value="GRUPO_FINANCEIRO">GRUPO_FINANCEIRO</SelectItem>
                   <SelectItem value="GRUPO_TI_SUPORTE">GRUPO_TI_SUPORTE</SelectItem>
