@@ -76,10 +76,11 @@ services:
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
       # Email Configuration
-      # As variáveis de email vêm do arquivo .env criado pelo workflow
+      # IMPORTANTE: Se houver arquivo .env, ele pode sobrescrever essas variáveis
       # Usando IP direto (186.209.113.105) ao invés de domínio para evitar problemas de IPv6/DNS
       # O domínio mail.z7design.com.br resolve para IPv6 e dá timeout, mas o IP funciona
-      MAIL_HOST: ${MAIL_HOST:-186.209.113.105}
+      # Forçar uso do IP mesmo se .env tiver o domínio
+      MAIL_HOST: 186.209.113.105
       MAIL_PORT: ${MAIL_PORT:-465}
       MAIL_USERNAME: ${MAIL_USERNAME:-securedguard@z7design.com.br}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-D8rKeqSFZfaS$(y7}
