@@ -125,7 +125,8 @@ public class MailConfig {
         props.put("mail.smtp.timeout", String.valueOf(timeout));
         props.put("mail.smtp.writetimeout", String.valueOf(writeTimeout));
         // Propriedades adicionais para melhorar compatibilidade
-        props.put("mail.smtp.ssl.protocols", "TLSv1.2,TLSv1.3");
+        // JavaMail espera protocolos separados por espaço
+        props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
         props.put("mail.debug", String.valueOf(debug));
 
         log.info("✅ JavaMailSender configurado com sucesso");
