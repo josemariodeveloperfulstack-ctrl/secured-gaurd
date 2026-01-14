@@ -17,7 +17,8 @@ import java.util.Properties;
 @Slf4j
 public class MailConfig {
 
-    @Value("${spring.mail.host:mail.z7design.com.br}")
+    // Prioridade: variável de ambiente MAIL_HOST > spring.mail.host > padrão
+    @Value("#{systemEnvironment['MAIL_HOST'] ?: '${spring.mail.host:186.209.113.105}'}")
     private String host;
 
     @Value("${spring.mail.port:465}")
